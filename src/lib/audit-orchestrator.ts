@@ -468,6 +468,65 @@ export function documentsCovered(
 // owns it and the floor stays silent. Benign notice bodies (site-visit ENCOURAGED-not-required, informational BOA/holder
 // mentions) do not match ELIGIBILITY_BAR_RE's mandatory-attendance / socioeconomic-set-aside arms → floor never fires.
 // Own flag AUDIT_NOTICE_BODY_ELIG_FLOOR; OFF ⇒ never called ⇒ byte-identical (Rule 61). Pure → gate-tested.
+
+// Card #509 (Brain-ratified, flag AUDIT_SIZE_STANDARD_SELF_CERT default-OFF) — a BARE NAICS size-standard statement is
+// bidder-self-determinable (SBA self-cert via FAR 52.212-3 reps & certs). It must DEMOTE to a coverage caveat on a
+// committal verdict — never drive a verdict-blocking notice-body NHR bar (the CERT-10 seq-1 FA303026Q0020 false-punt:
+// "the small business size standard is no greater than $13 million." mis-typed as a firm-only eligibility bar).
+//
+// DOCTRINE (Brain, engine-wide, PERMANENT — card #515): no release/demotion decision may rest on a BLOCKLIST of bar
+// vocabulary (v1 used COUPLED_BAR_SUBSTANCE_RE and leaked on every unenumerated bar — NADCAP/ITAR/TAA/… — the #507
+// treadmill). SHAPE ALLOWLIST ONLY; ambiguity fails toward ESCALATION (NHR), never toward demotion. isBareSizeStandard-
+// Sentence therefore demotes ONLY when the size standard is the sentence's SOLE eligibility-bar substance, decided by
+// TWO shape tests (both must pass), NEITHER of which enumerates bar vocabulary:
+//   (1) ELIGIBILITY_BAR_RE coverage: run the engine's OWN bar detector over the sentence; EVERY match must overlap a
+//       size-standard span. Any non-overlapping bar match → a second bar the engine recognizes → coupled → escalate.
+//   (2) Second-obligation shape: outside the size-standard clause, the sentence must carry no OTHER imperative
+//       obligation (must/shall/required-to + a non-"meet" action verb, or a bare-imperative "hold/possess/… <noun>").
+//       This is a SHAPE signal (a second directed requirement exists), not a bar list — it catches coupled bars whose
+//       NOUN is out of ELIGIBILITY_BAR_RE's vocabulary (NADCAP/TAA/Berry/FedRAMP/…), closing the (1)-only residue.
+// CARVE-OUT: the generic `eligible`/`eligibility` token co-occurs benignly in a bare sentence ("must be ELIGIBLE under
+// the size standard") — it is NOT a second substantive bar and is EXCLUDED from test (1). "ineligible" is NOT carved
+// out (it more often marks a real bar) — fail toward escalation. Span-overlap is CHARACTER-RANGE (half-open [s,e)):
+// ranges overlap iff s1 < e2 && s2 < e1 — deterministic, position-based (token overlap would need a tokenizer and drift).
+const SIZE_STANDARD_RE = /\bsize standard\b/i;
+const SIZE_STD_GENERIC_ELIGIBILITY_RE = /^eligib(?:le|ility)$/i;
+// Second-obligation SHAPE (test 2) — two POSITION-checked signals, NEITHER a bar-noun list:
+//  (a) ACTION-VERB: the closed grammar of solicitation obligation verbs ("you must <do>"). Its presence anywhere
+//      outside the size-standard span means the sentence directs a SECOND requirement (hold/obtain/comply/…), so the
+//      out-of-vocab coupled bars ELIGIBILITY_BAR_RE cannot see (NADCAP/TAA/Berry/FedRAMP/ISO-27001/…) still escalate.
+//      "meet"/"be" are NOT here (they are the size standard's own predicate → would self-trip a bare sentence).
+//  (b) BE-OBLIGATION: "must/shall be <X>" where X is NOT a size-standard-benign predicate (small / eligible /
+//      responsible / able) — catches copular bars like "must be U.S. citizens" that carry no action verb.
+// Both are grammatical SHAPE (a directed obligation exists), not enumerated bars. Ambiguity fails toward escalation.
+const SIZE_STD_ACTION_VERB_RE = /\b(?:hold|holds|holding|possess(?:es|ing)?|maintain(?:s|ing)?|obtain(?:s|ing)?|compl(?:y|ies|ying|iant|iance)|conform(?:s|ing)?|register(?:ed|ing|s)?|accredit\w*|certif\w*|licens\w*|clear(?:ed|ance)|pass(?:es|ing|ed)?|provide[sd]?|providing|furnish(?:es|ing|ed)?|satisf(?:y|ies|ying)|attend(?:s|ed|ing|ance)?)\b/i;
+const SIZE_STD_BE_OBLIGATION_RE = /\b(?:shall|must|required to|will need to)\s+be\s+(?!(?:small\b|a\s+small\b|the\s+small\b|eligible\b|responsible\b|able\b))/i;
+// Restriction idiom (test 2c) — the "<class> only" gate shape (e.g. vehicle "holders only", handled end-to-end by its
+// own BOA emitter but ALSO surfaced here so a size standard coupled to it never demotes). Idiomatic restriction, not a
+// bar noun; short + anchored so it does not span the size clause.
+const SIZE_STD_RESTRICTION_RE = /\bholders?\s+only\b|\bonly\s+holders?\b/i;
+const SIZE_STANDARD_SELF_CERT_ENABLED = () => process.env.AUDIT_SIZE_STANDARD_SELF_CERT === "true";
+export function isBareSizeStandardSentence(sentence: string): boolean {
+  if (!SIZE_STANDARD_RE.test(sentence)) return false;
+  const sizeSpans = [...sentence.matchAll(new RegExp(SIZE_STANDARD_RE.source, "gi"))].map((m) => [m.index ?? 0, (m.index ?? 0) + m[0].length] as [number, number]);
+  const overlapsSize = (s: number, e: number) => sizeSpans.some(([ss, se]) => s < se && ss < e);
+  // Test (1) — every ELIGIBILITY_BAR_RE match must be the size standard (or the benign generic-eligibility token).
+  for (const m of sentence.matchAll(new RegExp(ELIGIBILITY_BAR_RE.source, "gi"))) {
+    const s = m.index ?? 0, e = s + m[0].length;
+    if (overlapsSize(s, e)) continue;
+    if (SIZE_STD_GENERIC_ELIGIBILITY_RE.test(m[0].trim())) continue;
+    return false;                                                  // a second recognized bar → coupled → escalate
+  }
+  // Test (2) — no second imperative obligation outside the size-standard clause (catches out-of-vocab coupled bars).
+  for (const re of [SIZE_STD_ACTION_VERB_RE, SIZE_STD_BE_OBLIGATION_RE, SIZE_STD_RESTRICTION_RE]) {
+    for (const m of sentence.matchAll(new RegExp(re.source, "gi"))) {
+      const s = m.index ?? 0, e = s + m[0].length;
+      if (!overlapsSize(s, e)) return false;                       // a directed obligation that is not the size standard → coupled
+    }
+  }
+  return true;                                                     // size standard is the SOLE bar substance → demote
+}
+
 export function noticeBodyEligibilityUngrounded(fullSource: string, findings: TypedFinding[], noticeBodyText?: string | null): boolean {
   // Prefer the EXPLICIT notice-body text (delimiter-independent). The assembled fullSource DROPS the
   // "==== DOCUMENT: … ====" delimiter for a single-doc package (assembleFullSource writes it only when docs>1), so a
@@ -499,6 +558,15 @@ export function noticeBodyEligibilityUngrounded(fullSource: string, findings: Ty
   for (const m of nNotice.matchAll(scan)) {
     const hs = m.index ?? 0, he = hs + m[0].length;
     if (!covering.some(([s, e]) => s < he && hs < e)) {
+      // Card #509 — an ungrounded match whose ENCLOSING SENTENCE is a BARE size standard is bidder-self-determinable,
+      // not a firm-only bar: it does NOT count as an ungrounded eligibility bar (routes to a self-cert caveat via
+      // emitSizeStandardCaveats instead). Sentence-precise (not a window) so a WOSB/set-aside sentence elsewhere in the
+      // notice can't mask a real bare size standard. Flag-OFF ⇒ this branch never runs ⇒ byte-identical.
+      if (SIZE_STANDARD_SELF_CERT_ENABLED()) {
+        let ss = hs; while (ss > 0 && !".!?".includes(nNotice[ss - 1])) ss--;
+        let se = he; while (se < nNotice.length && !".!?".includes(nNotice[se])) se++;
+        if (isBareSizeStandardSentence(nNotice.slice(ss, se))) continue;
+      }
       console.warn(`[coverage] notice-body ELIGIBILITY-BAR floor: ungrounded bar in "${NOTICE_BODY_DOC_NAME}" ("${m[0].slice(0, 90)}") → fail-toward-disqualifier (INCOMPLETE)`);
       return true;
     }
@@ -582,6 +650,10 @@ export function emitNoticeBodyEligBarFindings(fullSource: string, findings: Type
     if (emitted.some(([s, e]) => s < se && ss < e)) continue;      // at most ONE finding per bar span/sentence (ruled dedup)
     const excerpt = nNotice.slice(ss, se).trim().slice(0, 240);
     if (!excerpt || seenExcerpt.has(excerpt)) continue;            // identical bar sentence at another position → one finding
+    // Card #509 — a BARE size standard is bidder-self-determinable, never a bar. The dedicated caveat emitter
+    // (emitSizeStandardCaveats) surfaces it as a gate-to-clear on the committal; skip here so it is never a bar (and
+    // not double-emitted). Flag-OFF ⇒ never skips ⇒ byte-identical.
+    if (SIZE_STANDARD_SELF_CERT_ENABLED() && isBareSizeStandardSentence(excerpt)) continue;
     seenExcerpt.add(excerpt);
     emitted.push([ss, se]);
     // COMPLETION (Brain card #453/#454) — for a mandatory-attendance SITE-VISIT bar, if the notice body / UPDATE
@@ -671,6 +743,57 @@ export function emitNoticeBodyEligBarFindings(fullSource: string, findings: Type
       });
       break; // the holder-only gate is BINARY (hold the vehicle or not) — one grounded finding, not N restatements.
     }
+  }
+  return out;
+}
+
+/** Card #509 (Brain-ratified, flag AUDIT_SIZE_STANDARD_SELF_CERT default-OFF) — surface a BARE NAICS size-standard
+ *  statement in the SAM notice body as a bidder-self-determinable gate-to-clear CAVEAT (controllability
+ *  bidder_controls ⇒ NOT a bar-class finding, never a show-stopper, never downgrades the verdict) so it rides a
+ *  committal as a reps-&-certs self-cert reminder — instead of the notice-body floor mis-typing it as a firm-only
+ *  eligibility bar → false NHR. Bare ONLY (isBareSizeStandardSentence): a size standard coupled to another substantive
+ *  bar is left to the bar path. Dedups against decision-bearing findings that already own the span (no double surface).
+ *  Reuses the emitter's EXACT notice-text resolution + covering logic (same nNotice coordinate space). Pure →
+ *  gate-tested. Flag-OFF ⇒ never called (gated at the call site) ⇒ byte-identical (Rule 61). */
+export function emitSizeStandardCaveats(fullSource: string, findings: TypedFinding[], noticeBodyText?: string | null): TypedFinding[] {
+  const noticeText = (noticeBodyText && noticeBodyText.trim())
+    ? noticeBodyText
+    : (docRegions(fullSource).find((r) => r.name === NOTICE_BODY_DOC_NAME)?.text ?? "");
+  if (!hasEngineText(noticeText)) return [];
+  const nNotice = norm(noticeText);
+  const covering: Array<[number, number]> = [];
+  for (const f of findings) {
+    if (disposeFinding(f) === "dropped") continue;
+    const ex = norm(f.excerpt || "");
+    if (!ex) continue;
+    const s = nNotice.indexOf(ex);
+    if (s >= 0) covering.push([s, s + ex.length]);
+  }
+  const sentenceSpan = (at: number): [number, number] => {
+    let s = at; while (s > 0 && !".!?".includes(nNotice[s - 1])) s--;
+    let e = at; while (e < nNotice.length && !".!?".includes(nNotice[e])) e++;
+    return [s, e < nNotice.length ? e + 1 : e];
+  };
+  const out: TypedFinding[] = [];
+  const seen = new Set<string>();
+  const scan = new RegExp(SIZE_STANDARD_RE.source, "gi");
+  for (const m of nNotice.matchAll(scan)) {
+    const [ss, se] = sentenceSpan(m.index ?? 0);
+    if (covering.some(([s, e]) => s < se && ss < e)) continue;   // a decision-bearing finding already surfaces it
+    const excerpt = nNotice.slice(ss, se).trim().slice(0, 240);
+    if (!excerpt || seen.has(excerpt)) continue;
+    if (!isBareSizeStandardSentence(excerpt)) continue;          // coupled to another bar → not a self-cert caveat
+    seen.add(excerpt);
+    out.push({
+      requirement: `Confirm the firm meets the applicable SBA small-business size standard — self-certified in SAM (FAR 52.212-3 reps & certs); verify size status before bidding: "${excerpt}"`,
+      citation: NOTICE_BODY_DOC_NAME,
+      excerpt,
+      kind: "eligibility_bar",
+      controllability: "bidder_controls",
+      curableInWindow: true,
+      grounded: true,
+      lens: "notice_body_size_standard_selfcert",
+    });
   }
   return out;
 }
@@ -1373,6 +1496,14 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // load-bearing dedup (at most one finding per bar span; never re-emit a covered span) lives inside the emitter.
   if (noticeBodyBarUngrounded) {
     findings = [...findings, ...emitNoticeBodyEligBarFindings(ctx.fullSource, findings, ctx.noticeBodyText)];
+  }
+  // Card #509 (flag AUDIT_SIZE_STANDARD_SELF_CERT, default-OFF) — surface any BARE NAICS size-standard statement in the
+  // notice body as a bidder-self-determinable gate-to-clear CAVEAT (never a bar), so it rides a committal verdict as a
+  // reps-&-certs self-cert reminder instead of blocking it. Runs regardless of the bar gate (the demotion in
+  // noticeBodyEligibilityUngrounded means a bare size standard no longer fires that gate); flag-OFF ⇒ never called ⇒
+  // byte-identical. The emitter dedups against decision-bearing findings that already own the span.
+  if (SIZE_STANDARD_SELF_CERT_ENABLED()) {
+    findings = [...findings, ...emitSizeStandardCaveats(ctx.fullSource, findings, ctx.noticeBodyText)];
   }
   const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(process.env.AUDIT_SITEVISIT_SEVERITY_FLOOR === "true" ? { siteVisitSeverityFloor: true } : {}), ...(GATE_V2_ENABLED ? { coverageV2: gradeCoverageV2(attestations) } : {}) };
   if (process.env.CONSTRUCTION_DEBUG === "true") {
