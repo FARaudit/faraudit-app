@@ -431,6 +431,27 @@ assert(cls("Demonstrate past performance with property management systems that m
 assert(cls(CHAPEL, "Section M, Technical Requirements, Item I") === "demote", "round-7 keep: chapel specimen still demotes");
 assert(cls("Demonstrate experience; staff met all customer requirements for accounting system support.", "Section M") === "demote", "k3-4 keep: 'met customer requirements … support' narrative → demote (met-stem noun-anchor discipline)");
 
+// ── P8j — ROUND-8 BATTERY (parts A+B, ceo/redteam-545-r10-round8-{A,B}.md — passive voice, exclusionary
+// distance, morphology closes banked) ──
+console.log("\n── P8j round-8 closes (must escalate) + guards ──");
+// part-A d2: passive-voice qualification-completion (the false-green class):
+assert(cls("Demonstrate capability; item qualification must be completed prior to award.", "Section M") === "escalate", "d2: passive 'qualification must be completed prior to award' → escalate");
+assert(cls("Demonstrate experience; product qualification must be finished before contract award.", "Section M") === "escalate", "d2b: passive variant → escalate");
+// part-B C-class (DRY-blocking): exclusionary-distance subject forms:
+assert(cls("Demonstrate capability; offerors located more than 50 miles from the installation will not be considered for award.", "Section M") === "escalate", "C1: 'located MORE THAN 50 miles FROM' exclusionary → escalate");
+assert(cls("Demonstrate experience; contractors situated beyond the local commuting area will not be considered.", "Section M") === "escalate", "C2: 'situated BEYOND the commuting area' → escalate");
+assert(cls("Demonstrate past performance; firms based outside the State of Alaska will not be considered for award.", "Section M") === "escalate", "C3: 'based OUTSIDE the State' → escalate");
+// part-B A2/E-class morphology:
+assert(cls("Demonstrate capability; the accounting system must have met the requirements of DFARS 252.242-7006.", "Section M") === "escalate", "A2: past-participle 'system must have MET' → escalate");
+assert(cls("Demonstrate experience; quotations will be accepted only from qualified sources.", "Section M") === "escalate", "E1: 'only from QUALIFIED sources' → escalate");
+assert(cls("Demonstrate capability; offerors must be prequalified by the Government prior to award.", "Section M") === "escalate", "E2: 'PREqualified by' glued morphology → escalate");
+assert(cls("Demonstrate past performance; items shall be furnished only from sources previously approved by the Engineering Support Activity.", "Section M") === "escalate", "E3: adverb-split 'sources PREVIOUSLY approved by' → escalate");
+// guards (part-B Cg + part-A released class + k3-4 direction discipline):
+assert(cls("Offeror shall demonstrate relevant experience delivering similar services for more than five years; submissions will be rated favorably.", "Section M, Evaluation Criteria") === "demote", "Cg GUARD: 'more than five years' ratable experience → demote (C-close did not eat it)");
+assert(cls("Demonstrate capability; personnel shall meet the qualification requirements of the labor category.", "Section M") === "demote", "part-A c1: personnel-quals stays released → demote");
+assert(cls("Demonstrate experience; staff met all customer requirements for accounting system support.", "Section M") === "demote", "k3-4 keep re-verify: stem-first 'met' narrative → demote (met is noun-first-only)");
+assert(cls(CHAPEL, "Section M, Technical Requirements, Item I") === "demote", "round-8 keep: chapel specimen still demotes");
+
 // ── P9 — POST-R10 COVERAGE STATEMENT (card #545 item 2): who protects the customer on each channel ──
 // (a) FINDINGS channel: an R10-escalated shape keeps its eligibility-bar typing → NHR pole (not BID_WITH_CAUTION),
 //     eligible=null under the tristate — protection restored WITHOUT the manifest backstop.
