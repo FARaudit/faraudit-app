@@ -58,6 +58,35 @@ const HELD_CREDENTIAL_SHAPE: RegExp[] = [
   /\b(?:must|shall)\s+be\s+(?:eligible\s+for|granted|cleared|adjudicated|read\s+into)\b/i,
 ];
 
+// R10 THIRD-PARTY-STATUS SHAPE (card #545 ruling — the six red-team round-2/3 leak shapes). Each is a STATUS or
+// POSSESSION conferred by a third party (an agency audit, a labor agreement, a physical footprint, a credentialing
+// office, a source-approval authority) — never something the offeror AUTHORS INTO THE QUOTE. "Demonstrate your
+// DCAA-approved accounting system" carries evidence-language AND conferred-status substance; the status vetoes the
+// demote. SHAPE-allowlisted (structural form, position-checked second token — per the no-blocklist doctrine and
+// the round-2 comma lesson); over-catch errs toward ESCALATION, the safe pole. Any hit ⇒ escalate.
+const R10_THIRD_PARTY_STATUS: RegExp[] = [
+  // (i) AGENCY-APPROVED BUSINESS SYSTEM — DCAA/DCMA/government/cognizant-auditor approval of an accounting /
+  //     purchasing / estimating / property / EVMS system. The approval is granted by audit, not narrated.
+  /\b(?:DCAA|DCMA|government|cognizant\s+(?:federal\s+)?(?:agency|auditor|ACO))[- ]?(?:approved|validated|accepted|audited|determined[- ]adequate)\b[^.\n]{0,45}\bsystem\b/i,
+  /\b(?:accounting|purchasing|estimating|property|earned[- ]value(?:\s+management)?|EVMS?)\s+system\b[^.\n]{0,50}\b(?:approved|validated|accepted|deemed\s+adequate|determined\s+adequate|audited)\b/i,
+  /\b(?:approved|adequate)\s+(?:accounting|purchasing|estimating|property|earned[- ]value|EVMS?)\s+system\b/i,
+  // (ii) CBA-SIGNATORY STATUS — signatory to a collective bargaining / union / labor agreement is a held
+  //      labor-relations status, not quote-authored evidence.
+  /\bsignator(?:y|ies)\b[^.\n]{0,50}\b(?:collective\s+bargaining|CBA|union|labor\s+agreement)\b|\b(?:collective\s+bargaining|CBA|union|labor)\s+(?:agreement\s+)?signator(?:y|ies)\b/i,
+  // (iii) FACILITY-GEOGRAPHY — a physical facility/office/presence required AT or WITHIN a stated location or
+  //       radius (the 50-mile class). Requires the facility noun AND a bounded-location form (position-checked) —
+  //       "demonstrate experience within the past 5 years" has neither and stays demote-eligible.
+  /\b(?:facility|facilities|office|warehouse|yard|shop|plant|place\s+of\s+business|physical\s+(?:presence|location))\b[^.\n]{0,45}\b(?:within|no\s+(?:more|further)\s+than|located\s+(?:in|at|within)|in\s+the\s+vicinity\s+of|radius\s+of)\b[^.\n]{0,35}\b(?:miles?|kilometers?|km|minutes?|county|counties|state|city|town|installation|base|site)\b/i,
+  /\b(?:maintain|establish|have|possess|operate)\b[^.\n]{0,25}\b(?:a\s+)?(?:local\s+|permanent\s+)?(?:facility|office|physical\s+presence|place\s+of\s+business)\b[^.\n]{0,40}\bwithin\b/i,
+  // (iv) BASE-ACCESS CREDENTIALING — a named installation-access credential (DBIDS/RAPIDGate/CAC) or the
+  //      base-access + credential/vetting pair. Conferred by the installation's credentialing office.
+  /\b(?:DBIDS|RAPIDGate|common\s+access\s+card)\b|\bCAC\s+(?:card|credential|eligib\w+|required)\b/i,
+  /\b(?:base|installation|post|site|garrison)\s+access\b[^.\n]{0,40}\b(?:credential\w*|badge|pass(?:es)?\b|clearance|vetting|background|registration)\b/i,
+  // (v) APPROVED-SOURCE / QPL-ADJACENT — source/supplier approval conferred by the buying activity or OEM
+  //     (the QPL/QML forms are already vetoed upstream; this closes the adjacent "approved source" family).
+  /\bapproved\s+(?:source|supplier|vendor)s?\b|\bsource\s+approval\b|\bqualified\s+suppliers?\s+list\b|\bQSL\b/i,
+];
+
 // WHO-MAY-BID RESTRICTION SHAPE (Gauntlet round-4 BREAK) — an ACTOR-AGNOSTIC definitive eligibility restriction on
 // who may be awarded/compete ("only <any actor> are eligible/considered/awarded", "award limited/restricted to",
 // "OEM-authorized distributor"). classifyGateShape's who-may-bid arm only enumerated firms/offerors/contractors, so
@@ -181,6 +210,7 @@ export function classifyMmEvidenceFactor(
   const vetoed = (s: string): boolean => { const g = classifyGateShape(s); return g === "profile_bar" || g === "set_aside_caution"; };
   if (vetoed(requirement) || (excerpt && vetoed(excerpt))) return "escalate";
   if (anyHit(HELD_CREDENTIAL_SHAPE, text)) return "escalate";
+  if (anyHit(R10_THIRD_PARTY_STATUS, text)) return "escalate";  // conferred third-party status (card #545 R10 — the six leak shapes)
   if (anyHit(WHO_MAY_BID_RESTRICTION, text)) return "escalate"; // actor-agnostic who-may-bid restriction (round-4/5/6)
   if (BOA_IDIQ_HOLDER_BAR_RE.test(text)) return "escalate";      // contract-vehicle holder-only gate (round-7, ratified regex)
   // R1 — positive evidenced-in-quote substance is REQUIRED (the core discriminator). Corroboration then required:

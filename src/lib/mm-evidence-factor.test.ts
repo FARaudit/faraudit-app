@@ -207,5 +207,46 @@ assert(cls(CHAPEL, "per statute §M(3)") === "not_applicable", "R-T round-2: UPP
 assert(cls(CHAPEL, "See §M.") === "demote", "R-T round-2 keep: 'See §M.' still corroborates");
 assert(cls(CHAPEL, "– §M") === "demote", "R-T round-2 keep: en-dash-preceded bare '§M' still corroborates");
 
+// ── P8 — R10 THIRD-PARTY-STATUS VETOES (card #545 ruling — the six red-team leak shapes must ESCALATE) ──
+// Round-2/3 red-team proved these six classify demote and, with the tristate co-armed, read eligible=true where a
+// KO sees a genuine gate. Each is a CONFERRED status (agency audit / labor agreement / physical footprint /
+// credentialing office / source-approval authority) — never quote-authored evidence.
+console.log("\n── P8 R10 vetoes — conferred third-party status escalates (all six leak shapes) ──");
+assert(cls("Offeror shall demonstrate an accounting system approved by DCAA.", "Section M, Evaluation Criteria") === "escalate", "R10-1: DCAA-approved accounting system → escalate");
+assert(cls("Demonstrate a DCMA-approved purchasing system in the capability statement.", "Section M") === "escalate", "R10-2: DCMA-approved purchasing system → escalate");
+assert(cls("Offeror shall demonstrate that it is a signatory to the applicable collective bargaining agreement.", "Section M, Evaluation Criteria") === "escalate", "R10-3: CBA-signatory status → escalate");
+assert(cls("Demonstrate capability; the offeror must maintain a facility within 50 miles of the installation.", "Section M") === "escalate", "R10-4: 50-mile facility geography → escalate");
+assert(cls("Demonstrate experience; personnel must possess current DBIDS credentials for base access.", "Section M") === "escalate", "R10-5: DBIDS base-access credential → escalate");
+assert(cls("Demonstrate past performance as an approved source for this item.", "Section M, Evaluation Criteria") === "escalate", "R10-6: approved-source restriction → escalate");
+// coupled form — evidence-language wrapping a conferred status still escalates:
+assert(cls("Provide a capability statement demonstrating your government-approved estimating system.", "Section M") === "escalate", "R10 coupled: capability-statement phrasing around an approved system → escalate");
+assert(cls("Submit past performance showing your office located within the county and staff badging.", "Section M") === "escalate", "R10 coupled: geography inside past-performance phrasing → escalate");
+// keep-set — genuine quote-evidenced factors are NOT swallowed by the new vetoes:
+assert(cls(CHAPEL, "Section M, Technical Requirements, Item I") === "demote", "R10 keep: chapel specimen still demotes");
+assert(cls("Offeror shall demonstrate past performance managing multiple facilities for government clients.", "Section M, Evaluation Criteria") === "demote", "R10 keep: 'managing facilities' (no bounded-location form) still demotes");
+assert(cls("Demonstrate relevant experience within the past five years delivering these services.", "Section M") === "demote", "R10 keep: 'within the past five years' (no facility noun + place token) still demotes");
+assert(cls("Provide a capability statement describing your quality system and technical approach.", "Section M") === "demote", "R10 keep: bare 'quality system' (no third-party approval structure) still demotes");
+
+// ── P9 — POST-R10 COVERAGE STATEMENT (card #545 item 2): who protects the customer on each channel ──
+// (a) FINDINGS channel: an R10-escalated shape keeps its eligibility-bar typing → NHR pole (not BID_WITH_CAUTION),
+//     eligible=null under the tristate — protection restored WITHOUT the manifest backstop.
+// (b) MANIFEST backstop (audit-orchestrator.ts:1788-1790): keys SET-ASIDE manifest elements ONLY (+ null profile,
+//     under AUDIT_SETASIDE_ELIG_CLAMP) — code-read, unchanged by this pass.
+// (c) RESIDUAL (stated for Brain, carried on card #545): a proposer that emits NO typed finding for a
+//     non-set-aside gate (DCAA-class) is covered by NEITHER channel — same omission risk that predates #538.
+console.log("\n── P9 post-R10 coverage — findings channel restores the NHR pole on the leak shapes ──");
+const dcaaFinding: TypedFinding = {
+  id: "panel:dcaa", requirement: "Offeror shall demonstrate an accounting system approved by DCAA.",
+  citation: "Section M, Evaluation Criteria", excerpt: "accounting system approved by DCAA",
+  kind: "eligibility_bar", controllability: "bidder_cannot_move", curableInWindow: false,
+  requiredAttribute: "dcaa_approved_accounting_system", grounded: true, lens: "pricing",
+};
+const dcaaBoth = runBoth(true, true, base([dcaaFinding]));
+assert(dcaaBoth.verdict === "NEEDS_HUMAN_REVIEW", `P9: DCAA gate → NHR pole retained under both flags [got ${dcaaBoth.verdict}]`);
+assert(dcaaBoth.eligible === null, `P9: DCAA gate → eligible=null (never a false green) [got ${dcaaBoth.eligible}]`);
+const geoFinding: TypedFinding = { ...dcaaFinding, id: "panel:geo", requirement: "Demonstrate capability; the offeror must maintain a facility within 50 miles of the installation.", excerpt: "maintain a facility within 50 miles", requiredAttribute: "facility_within_50_miles" };
+const geoBoth = runBoth(true, true, base([geoFinding]));
+assert(geoBoth.verdict === "NEEDS_HUMAN_REVIEW" && geoBoth.eligible === null, `P9: geography gate → NHR + eligible=null [got ${geoBoth.verdict}/${geoBoth.eligible}]`);
+
 console.log(`\n${failures === 0 ? "✅ ALL GREEN" : `❌ ${failures} FAILURE(S)`}`);
 process.exit(failures === 0 ? 0 : 1);
