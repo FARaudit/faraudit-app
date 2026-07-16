@@ -15,6 +15,7 @@ import { createHash } from "node:crypto"; // Fork-5 (card 240): deterministic sh
 import type { VerdictInputs, TypedFinding, BidderProfile, Controllability, RequirementKind } from "./audit-findings";
 import { GATE_V2_ENABLED, gateV2Outcome } from "./audit-gate-v2";
 import { SITE_VISIT_RE, SITE_VISIT_CONCLUDED_RE, BOA_IDIQ_HOLDER_BAR_RE } from "./audit-site-visit-patterns";
+import { demoteMmEvidenceFactor, hasGroundedLeadTimeBasis } from "./mm-evidence-factor"; // card #538 (flag AUDIT_MM_EVIDENCE_FACTOR_DEMOTION)
 
 export type Verdict = "BID" | "BID_WITH_CAUTION" | "NO_BID" | "INELIGIBLE" | "NEEDS_HUMAN_REVIEW" | "INCOMPLETE";
 export type Disposition = "met" | "gate_to_clear" | "disqualifying" | "dropped";
@@ -1915,7 +1916,16 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //     enabled by AUDIT_ELIGIBLE_TRISTATE) so the re-typed finding propagates to BOTH the persisted/rendered
   //     findings grid AND this decision — never a grid-vs-verdict divergence (code-review #1). So by here a
   //     null-profile already_satisfied set-aside is ALREADY a bidder_controls verify-caution.
-  const dispositions: DecidedFinding[] = inp.findings.map((f) => ({ ...f, disposition: disposeFinding(f) }));
+  // §M EVIDENCE-FACTOR DEMOTION (Brain card #538 · AUDIT_MM_EVIDENCE_FACTOR_DEMOTION, default-OFF, Rule 61). A §M
+  // evaluation/technical criterion whose substance is EVIDENCED INSIDE the submitted quote (capability statement /
+  // past-performance / prior-experience narrative) is re-typed from a would-be non-curable bar to a curable
+  // competitive caution BEFORE disposition, so it routes to the BID_WITH_CAUTION floor (branch 5c) — never the
+  // non-curable / show-stopper poles. R2 vetoes (coupled true bar / possession-at-offer / who-may-bid ambiguity)
+  // escalate; R3 source-contradiction ("preferred/not required") demotes. Flag OFF ⇒ inp.findings passes through
+  // untouched ⇒ every branch below is byte-identical.
+  const mmDemote = process.env.AUDIT_MM_EVIDENCE_FACTOR_DEMOTION === "true";
+  const decidedFindings = mmDemote ? inp.findings.map((f) => demoteMmEvidenceFactor(f, inp.source)) : inp.findings;
+  const dispositions: DecidedFinding[] = decidedFindings.map((f) => ({ ...f, disposition: disposeFinding(f) }));
   // (b/c) UNVERIFIED ELIGIBILITY GATES — a PROFILE-DEPENDENT eligibility gate (kind eligibility_bar carrying a
   //     specific requiredAttribute credential to check) the profile does not PROVE the firm satisfies. On a
   //     committal verdict these force eligible=null ("not determined", never a false green) + a mandatory
@@ -2143,9 +2153,18 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //     FORK-7 (card 242): an NMR bar is NOT a lead-time structural bar — exclude it here; it gets its own
   //     curability-carrying NHR branch below. A GENUINE structural non-curable bar (clearance/QPL/TDP) still leads.
   const nonCurable = unknownBars.filter((f) => f.curableInWindow === false && f.nmrGuard !== true);
-  if (nonCurable.length)
-    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(),
-      `Non-curable bar(s) — lead time exceeds the response window. CONDITIONAL NO-BID: if your firm does not ALREADY hold the following and cannot obtain it before the deadline, this is a NO-BID — it cannot be cured in the window: ${names(nonCurable)}`, dispositions, nonCurable);
+  if (nonCurable.length) {
+    // R4 FABRICATED-MECHANIC GUARD (Brain card #538 · AUDIT_MM_EVIDENCE_FACTOR_DEMOTION) — the "lead time exceeds the
+    // response window" mechanic may be asserted ONLY when a non-curable finding carries a GROUNDED long-lead /
+    // possession-at-award basis (clearance/QPL/CMMC/lead-time/hold-at-offer). Ungrounded (the FA303026Q0020 specimen)
+    // → state the hold-it-or-walk conditional WITHOUT the fabricated lead-time claim. Flag OFF ⇒ leadTimeGrounded is
+    // forced true ⇒ the original prose emits unchanged (byte-identical).
+    const leadTimeGrounded = !mmDemote || hasGroundedLeadTimeBasis(nonCurable);
+    const barLine = leadTimeGrounded
+      ? `Non-curable bar(s) — lead time exceeds the response window. CONDITIONAL NO-BID: if your firm does not ALREADY hold the following and cannot obtain it before the deadline, this is a NO-BID — it cannot be cured in the window: ${names(nonCurable)}`
+      : `Structural bar(s) the firm may be unable to satisfy within the response window. CONDITIONAL NO-BID: if your firm does not ALREADY hold the following and cannot obtain it before the deadline, this is a NO-BID: ${names(nonCurable)}`;
+    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), barLine, dispositions, nonCurable);
+  }
 
   // 5b-NMR. FORK-7 (Brain card 242 item 4) — NMR unknown/unrecognized status. NOT a lead-time bar: a nonmanufacturer
   //     typically CURES by supplying a small U.S. manufacturer's product. Route to NHR carrying that curability path
