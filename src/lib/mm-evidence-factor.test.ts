@@ -363,6 +363,29 @@ assert(cls("Demonstrate experience conducting site surveys at customer facilitie
 assert(cls(CHAPEL, "Section M, Technical Requirements, Item I") === "demote", "round-4 keep: chapel specimen still demotes");
 assert(cls("Demonstrate experience; offices situated near transit hubs are preferred.", "Section M") === "demote", "round-4 keep: 'situated near transit' (no place token) still demotes");
 
+// ── P8g — ROUND-5 BATTERY (ceo/redteam-545-r10-round5.md — regulation-verbatim H1 sentences banked) ──
+console.log("\n── P8g round-5 regulation-verbatim breaks (must escalate) + morphology twins ──");
+// EVMS — the sixth covered system, its own provision + clause text (DFARS 252.234-7001/-7002):
+assert(cls("The offeror shall provide documentation that the Cognizant Federal Agency has determined that the proposed Earned Value Management System complies with the EVMS guidelines in ANSI/EIA-748.", "Section L/M") === "escalate", "i-r11: 252.234-7001 provision VERBATIM → escalate");
+assert(cls("Demonstrate capability; a Contractor's EVMS that has been formally reviewed and determined by the CFA to be in compliance with the EVMS guidelines is required.", "Section M") === "escalate", "i-r12: 252.234-7002(b) verbatim (bare EVMS + 'in compliance') → escalate");
+assert(cls("Demonstrate past performance; the offeror's EVMS must have been accepted by DCMA prior to award.", "Section M") === "escalate", "i-r13: bare-EVMS acronym + DCMA → escalate (acronym flip closed)");
+assert(cls("Demonstrate experience; the offeror shall use an EVMS that has been determined to be acceptable by the Cognizant Federal Agency.", "Section M") === "escalate", "i-r10x: 252.234-7002 no-dollar variant → escalate (no longer an accidental dollar-arm rescue)");
+assert(cls("Demonstrate capability; EVMS surveillance reviews will be conducted by DCMA.", "Section M") === "escalate", "h2-4: EVMS surveillance vocabulary → escalate");
+assert(cls("Demonstrate experience; the offeror shall have an EVMS accepted in accordance with DFARS 252.234-7002.", "Section M") === "escalate", "h2-5: by-clause-number EVMS citation → escalate");
+// comply/complies — the regulations' own operative VERB (morphology twins of compliant/compliance):
+assert(cls("Demonstrate capability with an earned value management system that complies with ANSI/EIA-748.", "Section M") === "escalate", "i-r14: 'system that COMPLIES' verb form → escalate");
+assert(cls("Demonstrate past performance; offeror shall maintain business systems that comply with the applicable business system clauses.", "Section M") === "escalate", "i-r15: 252.242-7005 definition vocabulary → escalate");
+assert(cls("Demonstrate experience; cost accounting practices must comply with Cost Accounting Standards.", "Section M") === "escalate", "h2-3: CAS comply-verb → escalate");
+// FAR 52.209-1's OWN grammar (enumerated from the provision, not the probe):
+assert(cls("Demonstrate capability; the product, manufacturer, or source must have demonstrated that it meets the standards prescribed for qualification before award of this contract.", "Section M") === "escalate", "v-r1: 52.209-1(b) VERBATIM → escalate");
+assert(cls("Demonstrate experience; the offeror meets the standards established for qualification before the date specified for award.", "Section M") === "escalate", "v-r3: FAR 9.202(c) shape → escalate");
+assert(cls("Demonstrate past performance; a qualification requirement means a Government requirement for testing or other quality assurance demonstration that must be completed before award.", "Section M") === "escalate", "v-r4: 52.209-1(a) definition shape → escalate");
+// round-5 over-catch guard — bare-EVMS narrative joins the ledger (accepted safe-pole cost of the token):
+assert(cls("Demonstrate experience implementing EVMS solutions for commercial clients.", "Section M") === "escalate", "accepted over-catch h3-1: EVMS consultancy narrative escalates (bare-token cost, documented)");
+// keeps after the round-5 widening:
+assert(cls(CHAPEL, "Section M, Technical Requirements, Item I") === "demote", "round-5 keep: chapel specimen still demotes");
+assert(cls("Demonstrate experience; describe how your quality processes comply with industry best practices.", "Section M") === "demote", "round-5 keep: generic 'comply with best practices' (no system/CAS noun) still demotes");
+
 // ── P9 — POST-R10 COVERAGE STATEMENT (card #545 item 2): who protects the customer on each channel ──
 // (a) FINDINGS channel: an R10-escalated shape keeps its eligibility-bar typing → NHR pole (not BID_WITH_CAUTION),
 //     eligible=null under the tristate — protection restored WITHOUT the manifest backstop.
