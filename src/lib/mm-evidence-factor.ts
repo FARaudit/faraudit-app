@@ -113,7 +113,17 @@ const MM_EVAL_FRAMING: RegExp[] = [
   /\blowest[- ]price(?:d)?\s+technically\s+acceptable\b|\bLPTA\b/i,
 ];
 // §M POSITION — the citation/section anchor names §M / evaluation. A strong corroborator (not sufficient alone).
-const MM_POSITION = /\bsection\s+m\b|\b§\s?m\b|\bevaluation\s+(?:criteria|factors?)\b|\btechnical\s+requirements?\b/i;
+const MM_POSITION = /\bsection\s+m\b|\bevaluation\s+(?:criteria|factors?)\b|\btechnical\s+requirements?\b/i;
+// The §M arm is SPLIT OUT and CASE-SENSITIVE (ultra #240 Finding C + red-team rounds 1-2): the old `\b§` never
+// matched (§ is non-word — \b§ needs a word char GLUED before it, so bare "§M" fell through to escalation). The
+// naive `(?:^|\W)§\s?m\b` /i replacement OVER-matched — corroboration widens DEMOTION, so over-match errs against
+// the fail-toward-escalation doctrine. Shape (round-2 re-shape — POSITIVE bridge, not a separator blocklist, which
+// round 2 punctured with a single comma per the #507 treadmill): uppercase M only (kills "§m(3)" / "§ m"), no
+// trailing word/hyphen/paren (kills "§Mod", "§ M-DOT", statute "§M(3)"), and a digit-ANY-bridge lookbehind — a
+// digit within 3 chars of the § means a FOREIGN document designator ("AFI 36-2618, § M" / "(§ M)" / "— § M")
+// whatever the separator; a genuine cite lost to it ("Item 1 – §M") fails toward escalation, the safe pole.
+const MM_POSITION_UCF_ARM = /(?:^|\W)(?<!\d[^§\n]{0,3})§\s?M(?![\w(-])/;
+const mmPositionHit = (s: string): boolean => MM_POSITION.test(s) || MM_POSITION_UCF_ARM.test(s);
 
 // ── R3 SOURCE CONTRADICTION — the document itself calls the substance optional/not-required. ────────────
 const OPTIONAL_DISCLAIMER: RegExp[] = [
@@ -179,7 +189,7 @@ export function classifyMmEvidenceFactor(
   //   no contradiction) is NOT enough — it fails toward escalation (a bare "experience" mention is left alone).
   const hasSubstance = anyHit(EVIDENCED_IN_QUOTE, text);
   if (!hasSubstance) return "not_applicable";
-  const mmCorroborated = anyHit(MM_EVAL_FRAMING, text) || MM_POSITION.test(citation) || MM_POSITION.test(text);
+  const mmCorroborated = anyHit(MM_EVAL_FRAMING, text) || mmPositionHit(citation) || mmPositionHit(text);
   const r3 = sourceContradictsBar(requirement, source);
   if (mmCorroborated || r3) return "demote";
   return "not_applicable";
@@ -200,7 +210,10 @@ export function demoteMmEvidenceFactor<T extends TypedFinding>(f: T, source?: st
     controllability: "bidder_controls",
     curableInWindow: true,
     cautionFloor: true,
-    mmEvidenceFactor: true, // marker only (audit/telemetry); deriveVerdict reads controllability/cautionFloor
+    // LOAD-BEARING (ultra #240 Finding B): kind/requiredAttribute survive the demote, so the tristate
+    // unverifiedGates filter in audit-decide.ts excludes on THIS marker — without it a demoted factor still
+    // clamps eligible=null and names the ML-authored attribute in the customer-facing caution.
+    mmEvidenceFactor: true,
   };
 }
 

@@ -132,8 +132,10 @@ export interface TypedFinding {
   // §M evaluation/technical criterion whose substance is EVIDENCED INSIDE THE SUBMITTED QUOTE (capability statement /
   // past-performance / prior-experience narrative) was re-typed from a would-be non-curable bar to a curable
   // competitive caution (bidder_controls + curableInWindow + cautionFloor). NEVER fires on a coupled true bar
-  // (clearance/QPL/ITAR/holder-only), possession-at-offer, or who-may-bid ambiguity (those escalate). Marker only;
-  // deriveVerdict reads controllability/cautionFloor/curableInWindow, not this field.
+  // (clearance/QPL/ITAR/holder-only), possession-at-offer, or who-may-bid ambiguity (those escalate).
+  // LOAD-BEARING on ONE filter (ultra #240 Finding B): the tristate unverifiedGates filter in audit-decide.ts
+  // excludes demoted findings on this marker (their kind/requiredAttribute survive the demote, so without it a
+  // demoted factor still clamps eligible=null). Verdict routing still reads controllability/cautionFloor/curableInWindow.
   mmEvidenceFactor?: boolean;
   // TEMPORAL SHARED-ARO / SEQUENTIAL-GATE NARROWING (Brain card 140, Step 7) — set on the FAT precondition
   // finding when the Step-2 universal-impossibility (no_one_can_move → NO_BID) was DECLINED under the Option-B
