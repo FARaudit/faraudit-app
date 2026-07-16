@@ -296,6 +296,38 @@ assert(cls("Demonstrate past performance managing an office at each customer sit
 assert(cls("Demonstrate experience supporting DCAA audits and resolving findings for the client's accounting system.", "Section M") === "escalate", "accepted over-catch o11: DCAA-audit advisory narrative escalates");
 assert(cls("Demonstrate past performance supporting CPSR preparation for client firms.", "Section M") === "escalate", "accepted over-catch o12: CPSR consultancy narrative escalates (bare-literal arm)");
 
+// ── P8e — ROUND-3 BATTERY (ceo/redteam-545-r10-round3.md, grade D — class-level closes banked) ──
+console.log("\n── P8e round-3 leaks (must escalate) + F3 consistency matrix + adjudicated keeps ──");
+// family (i) — negation prefixes (DFARS 252.215-7002 'disapprove' verbatim), SF 140x range, CAS grammar:
+assert(cls("Demonstrate capability; offerors with a disapproved purchasing system will not be considered for award.", "Section M") === "escalate", "f1f: 'DISapproved purchasing system' → escalate (negation prefix closed)");
+assert(cls("Demonstrate experience; an offeror whose accounting system has been determined inadequate will not be considered.", "Section M") === "escalate", "f1g: 'determined INadequate' → escalate");
+assert(cls("Demonstrate past performance; award is contingent upon a favorable pre-award survey of the offeror (SF 1403).", "Section M") === "escalate", "f1d: SF 1403 (the RANGE, not the specimen) → escalate");
+assert(cls("Demonstrate capability; a favorable pre-award survey of production capacity (SF 1405) is required.", "Section M") === "escalate", "SF 1405 sibling → escalate");
+assert(cls("Demonstrate experience; offeror must have an approved billing system.", "Section M") === "escalate", "f1a: 'approved billing system' → escalate");
+assert(cls("Demonstrate capability and maintain adequate cost accounting practices.", "Section M") === "escalate", "f1b: 'adequate cost accounting practices' (no 'system' token) → escalate");
+assert(cls("Demonstrate experience; an adequate CAS Disclosure Statement determined by the cognizant federal agency official is required.", "Section M") === "escalate", "f1e: CAS Disclosure Statement → escalate");
+assert(cls("Demonstrate past performance; provisional billing rates approved by DCAA are required.", "Section M") === "escalate", "f1h: 'billing rates approved by DCAA' → escalate");
+// family (iii) — number tolerance BY CONSTRUCTION + on-post + open-class nouns from round 3:
+assert(cls("Demonstrate capability; offeror must maintain offices in all 50 states.", "Section M") === "escalate", "n1: 'offices in all 50 states' → escalate (place-slot number closed)");
+assert(cls("Demonstrate experience; a facility near the cities served is required.", "Section M") === "escalate", "n2: 'facility near the cities served' → escalate");
+assert(cls("Demonstrate capability; the offeror shall maintain a shop located on-post.", "Section M") === "escalate", "f3a: 'shop located on-post' → escalate (family-iv noun imported)");
+assert(cls("Demonstrate experience; operate an authorized service center within 100 miles of the installation.", "Section M") === "escalate", "f3e: 'service center within 100 miles' → escalate");
+assert(cls("Demonstrate capability; maintain a parts depot within 30 minutes of the base.", "Section M") === "escalate", "f3f: 'parts depot within 30 minutes' → escalate");
+assert(cls("Demonstrate experience; maintain an on-site presence at the installation.", "Section M") === "escalate", "f3g: 'on-site presence at the installation' → escalate");
+// family (v) — QPD (DLA's current name), AML, qualifying activity:
+assert(cls("Demonstrate past performance; items not appearing in the Qualified Products Database (QPD) will not be considered for award.", "Section M") === "escalate", "f5a: QPD → escalate");
+assert(cls("Demonstrate capability; the item must appear on the approved manufacturers list (AML).", "Section M") === "escalate", "f5d: AML / manufacturers list → escalate");
+assert(cls("Demonstrate experience; items shall be furnished by manufacturers approved by the qualifying activity.", "Section M") === "escalate", "f5e: 'manufacturers approved by the qualifying activity' → escalate");
+// adjudicated keeps (round-3): PLA party-to binds the AWARDEE post-selection (FAR 22.5) — curable, correct demote:
+assert(cls("Demonstrate experience; the successful offeror shall become a party to the PLA prior to performance.", "Section M") === "demote", "f2b keep: PLA successorship (awardee-binding, curable) → demote");
+// round-3 over-catch ledger (o1/o4/o6/o9 accepted safe-pole + the two anchor-discipline keeps):
+assert(cls("Demonstrate experience conducting customer satisfaction surveys for accounting system users.", "Section M") === "escalate", "accepted over-catch o1: survey+system narrative escalates (surve stem cost)");
+assert(cls("Demonstrate machining of source-controlled parts to spec.", "Section M") === "escalate", "accepted over-catch o4: source-controlled narrative escalates (bare-literal class)");
+assert(cls("Demonstrate experience; we audit purchasing system data for commercial clients.", "Section M") === "escalate", "accepted over-catch o6: bare-audit+system narrative escalates");
+assert(cls("Demonstrate experience supporting the Defense Contract Audit Agency in system modernization efforts.", "Section M") === "escalate", "accepted over-catch o9: spelled-agency+system narrative escalates");
+assert(cls("Demonstrate past performance providing services on installations nationwide.", "Section M") === "demote", "anchor keep o3: 'services on installations' (no facility noun) → demote");
+assert(cls("Demonstrate experience operating warehouse facilities in three states.", "Section M") === "escalate", "number-closed: 'warehouse facilities in three states' now escalates (was an accidental demote — place-slot number tolerance)");
+
 // ── P9 — POST-R10 COVERAGE STATEMENT (card #545 item 2): who protects the customer on each channel ──
 // (a) FINDINGS channel: an R10-escalated shape keeps its eligibility-bar typing → NHR pole (not BID_WITH_CAUTION),
 //     eligible=null under the tristate — protection restored WITHOUT the manifest backstop.
