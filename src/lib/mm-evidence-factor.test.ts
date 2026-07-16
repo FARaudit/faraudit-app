@@ -403,6 +403,34 @@ assert(cls(CHAPEL, "Section M, Technical Requirements, Item I") === "demote", "r
 assert(cls("Demonstrate past performance; describe how your services met customer expectations.", "Section M") === "demote", "round-6 keep: 'met customer expectations' (no system/qualification noun) → demote");
 assert(cls("Demonstrate experience; personnel qualifications shall be described in the technical volume.", "Section M") === "demote", "round-6 keep: bare 'personnel qualifications' (no compound/verb shape) → demote");
 
+// ── P8i — ROUND-7 BATTERY (ceo/redteam-545-r10-round7.md — CAS-arm unification, offeror-subject geography,
+// bare-bigram prescription compliance restored) ──
+console.log("\n── P8i round-7 closes (must escalate) + restored guard rows (must demote) ──");
+// (A) CAS-arm stem-subset asymmetry — 4 faces incl. the FAR 30.202-7(a) verbatim:
+assert(cls("Demonstrate capability; the CFAO will conduct a review of the Disclosure Statement to ascertain whether it is current, accurate, and complete.", "Section M") === "escalate", "k2-3v: FAR 30.202-7(a) adequacy-review VERBATIM → escalate");
+assert(cls("Demonstrate experience; the Disclosure Statement will be reviewed to ascertain whether it is current, accurate, and complete prior to award.", "Section M") === "escalate", "k2-3t: solicitation transposition → escalate");
+assert(cls("Demonstrate past performance; provisional billing rates must be audited by DCAA prior to award.", "Section M") === "escalate", "k2-1: billing rates AUDITED (stem unified) → escalate");
+assert(cls("Demonstrate capability; the CFAO will review the offeror's Disclosure Statement prior to contract award.", "Section M") === "escalate", "k2-2: CFAO actor + review stem → escalate");
+assert(cls("Demonstrate experience; cost accounting practices must meet the requirements of the Cost Accounting Standards.", "Section M") === "escalate", "k2-3: CAS meet-verb (stem unified) → escalate");
+// (B) offeror-subject geography — the round-7 headline standard form:
+assert(cls("Demonstrate capability; the offeror must be located within 50 miles of the installation.", "Section M") === "escalate", "k2-5: offeror-subject 'located within 50 miles' → escalate");
+assert(cls("Demonstrate experience; the contractor shall be located within a 30-mile radius of the base at time of award.", "Section M") === "escalate", "k2-5b: contractor-subject radius form → escalate");
+// (ii) possession phrasing + (v) negative participle:
+assert(cls("Demonstrate past performance; the offeror must have a collective bargaining agreement in place with the incumbent workforce prior to award.", "Section M") === "escalate", "k2-4: CBA 'in place' possession → escalate");
+assert(cls("Demonstrate capability; sources not qualified by the qualifying activity will be rejected.", "Section M") === "escalate", "k1-2: negative participle 'sources not qualified' → escalate");
+// RESTORED GUARD ROWS (round-6 j3-2 prescription — the bare bigram must NOT eat these ratables):
+assert(cls("Demonstrate prior experience providing qualification testing services for commercial customers.", "Section M") === "demote", "j3-2 GUARD RESTORED: qualification-testing consultancy narrative → demote");
+assert(cls("Demonstrate capability; personnel must meet the minimum qualification requirements in the PWS.", "Section M") === "demote", "k3-5 RELEASED: personnel-quals staffing grammar → demote (no award consequence)");
+assert(cls("Demonstrate experience; resumes shall show that key personnel meet the qualification standards for each labor category.", "Section M") === "demote", "k3-9 RELEASED: resume qualification-standards grammar → demote");
+// consequence-anchored forms still escalate (the shape kept its teeth):
+assert(cls("Demonstrate capability; the offeror meets qualification standards prior to award.", "Section M") === "escalate", "d1 re-verify: consequence-anchored qualification → escalate");
+assert(cls("Demonstrate past performance; products that have not passed qualification testing will not be considered for award.", "Section M") === "escalate", "d6 re-verify: 'not passed qualification testing … considered for award' → escalate");
+// pre-accepted ledger rows (round-7 K3, safe pole, ON THE RECORD):
+assert(cls("Demonstrate past performance with property management systems that meet customer needs.", "Section M") === "escalate", "accepted over-catch k3-1: 'systems that meet customer needs' escalates (noun-anchored stem cost)");
+// keeps:
+assert(cls(CHAPEL, "Section M, Technical Requirements, Item I") === "demote", "round-7 keep: chapel specimen still demotes");
+assert(cls("Demonstrate experience; staff met all customer requirements for accounting system support.", "Section M") === "demote", "k3-4 keep: 'met customer requirements … support' narrative → demote (met-stem noun-anchor discipline)");
+
 // ── P9 — POST-R10 COVERAGE STATEMENT (card #545 item 2): who protects the customer on each channel ──
 // (a) FINDINGS channel: an R10-escalated shape keeps its eligibility-bar typing → NHR pole (not BID_WITH_CAUTION),
 //     eligible=null under the tristate — protection restored WITHOUT the manifest backstop.
