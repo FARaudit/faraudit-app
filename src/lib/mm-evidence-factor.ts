@@ -113,7 +113,9 @@ const MM_EVAL_FRAMING: RegExp[] = [
   /\blowest[- ]price(?:d)?\s+technically\s+acceptable\b|\bLPTA\b/i,
 ];
 // §M POSITION — the citation/section anchor names §M / evaluation. A strong corroborator (not sufficient alone).
-const MM_POSITION = /\bsection\s+m\b|\b§\s?m\b|\bevaluation\s+(?:criteria|factors?)\b|\btechnical\s+requirements?\b/i;
+// The § arm anchors on (?:^|\W), NOT \b (ultra #240 Finding C): § is a non-word char, so \b§ only matches with a
+// word char GLUED before it — bare "§M" citations never hit that arm and silently fell through to escalation.
+const MM_POSITION = /\bsection\s+m\b|(?:^|\W)§\s?m\b|\bevaluation\s+(?:criteria|factors?)\b|\btechnical\s+requirements?\b/i;
 
 // ── R3 SOURCE CONTRADICTION — the document itself calls the substance optional/not-required. ────────────
 const OPTIONAL_DISCLAIMER: RegExp[] = [
@@ -200,7 +202,10 @@ export function demoteMmEvidenceFactor<T extends TypedFinding>(f: T, source?: st
     controllability: "bidder_controls",
     curableInWindow: true,
     cautionFloor: true,
-    mmEvidenceFactor: true, // marker only (audit/telemetry); deriveVerdict reads controllability/cautionFloor
+    // LOAD-BEARING (ultra #240 Finding B): kind/requiredAttribute survive the demote, so the tristate
+    // unverifiedGates filter in audit-decide.ts excludes on THIS marker — without it a demoted factor still
+    // clamps eligible=null and names the ML-authored attribute in the customer-facing caution.
+    mmEvidenceFactor: true,
   };
 }
 

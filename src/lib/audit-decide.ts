@@ -1931,7 +1931,11 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //     committal verdict these force eligible=null ("not determined", never a false green) + a mandatory
   //     verify-caution. requiredAttribute is REQUIRED so an attribute-less/bidder-controllable eligibility item
   //     (e.g. generic SAM registration) never false-fires a "not determined" on a verified firm (code-review #3/#4).
-  const unverifiedGates = dispositions.filter((f) => f.kind === "eligibility_bar" && !!f.requiredAttribute && firmStatus(f, inp.bidderProfile, inp.source) !== "satisfies");
+  //     A finding DEMOTED by the §M evidence-factor gate (card #538 R1) is EXCLUDED even though its kind/
+  //     requiredAttribute survive the demote: it is a competitive caution, not an eligibility gate, and letting it
+  //     through re-injects the "ELIGIBILITY NOT VERIFIED — confirm <ML-authored attribute>" framing the demote exists
+  //     to remove (ultra #240 Finding B). The `mmEvidenceFactor` marker is LOAD-BEARING on this one filter.
+  const unverifiedGates = dispositions.filter((f) => f.kind === "eligibility_bar" && !!f.requiredAttribute && !f.mmEvidenceFactor && firmStatus(f, inp.bidderProfile, inp.source) !== "satisfies");
   // GUARD 1 — the DETERMINISTIC manifest-sourced signal joins the finding-derived unverifiedGates. It fires the SAME
   //   "eligibility not verified" clamp WITHOUT depending on the proposer having emitted a correctly-typed
   //   eligibility_bar finding: the sealed construction manifest detected a set-aside in source under a null profile,
@@ -1941,7 +1945,9 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   const committalEligible = (): boolean | null => (eligibilityUnverified ? null : true);
   const committalCaution = (): string => {
     if (!eligibilityUnverified) return "";
-    const gates = unverifiedGates.length ? unverifiedGates.map((g) => g.requiredAttribute || g.requirement).join("; ") : "the set-aside / socioeconomic eligibility gate";
+    // Dedup (ultra #240 side-find): multiple findings carrying the SAME attribute rendered "setaside:WOSB" 5× in the
+    // live Gate-3 clamp — customer-facing text lists each distinct gate once.
+    const gates = unverifiedGates.length ? [...new Set(unverifiedGates.map((g) => g.requiredAttribute || g.requirement))].join("; ") : "the set-aside / socioeconomic eligibility gate";
     // Coherence (Brain #329 follow-up): the parenthetical must be TRUE to the input — a customer WITH a capability
     // statement on file was wrongly told "(bidder profile not provided)". When a profile IS present but does not
     // establish these specific gates (e.g. an SDVOSB cert vs a size/NMR/HUBZone gate; size/NMR are non-self-clearable),

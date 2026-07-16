@@ -144,5 +144,51 @@ assert(clrOff.verdict === "NEEDS_HUMAN_REVIEW" && clrOn.verdict === "NEEDS_HUMAN
 assert(clrOff.reason === clrOn.reason, "clearance bar reason is byte-identical across the flag (grounded → lead-time prose kept)");
 assert(/lead time exceeds the response window/i.test(clrOn.reason), "R4: a GROUNDED lead-time bar keeps the lead-time mechanic");
 
+// ── P5 — ULTRA #240 FINDING B: demote + tristate TOGETHER (both flags ON) must not re-clamp eligibility ──
+// Pre-fix: the demoted chapel finding kept kind="eligibility_bar" + requiredAttribute, so the tristate
+// unverifiedGates filter clamped eligible=null and named the ML-authored "prior_chapel_experience" in the
+// customer-facing caution — re-injecting the exact framing the demote exists to remove. The mmEvidenceFactor
+// marker is now LOAD-BEARING on that one filter.
+console.log("\n── P5 both-flags-ON (ultra #240 Finding B) — demoted §M factor must not clamp eligibility ──");
+const runBoth = (demote: boolean, tristate: boolean, inp: VerdictInputs) => {
+  const prevD = process.env.AUDIT_MM_EVIDENCE_FACTOR_DEMOTION;
+  const prevT = process.env.AUDIT_ELIGIBLE_TRISTATE;
+  if (demote) process.env.AUDIT_MM_EVIDENCE_FACTOR_DEMOTION = "true"; else delete process.env.AUDIT_MM_EVIDENCE_FACTOR_DEMOTION;
+  if (tristate) process.env.AUDIT_ELIGIBLE_TRISTATE = "true"; else delete process.env.AUDIT_ELIGIBLE_TRISTATE;
+  try { return deriveVerdict(inp); } finally {
+    if (prevD === undefined) delete process.env.AUDIT_MM_EVIDENCE_FACTOR_DEMOTION; else process.env.AUDIT_MM_EVIDENCE_FACTOR_DEMOTION = prevD;
+    if (prevT === undefined) delete process.env.AUDIT_ELIGIBLE_TRISTATE; else process.env.AUDIT_ELIGIBLE_TRISTATE = prevT;
+  }
+};
+const both = runBoth(true, true, base([chapelFinding]));
+assert(both.verdict === "BID_WITH_CAUTION", `both flags ON: chapel → BID_WITH_CAUTION [got ${both.verdict}]`);
+assert(both.eligible === true, `both flags ON: eligible === true (demoted factor is NOT an unverified gate) [got ${both.eligible}]`);
+assert(!/ELIGIBILITY NOT VERIFIED/i.test(both.reason), "both flags ON: no eligibility-not-verified clamp in the reason");
+assert(!/prior_chapel_experience/.test(both.reason), "both flags ON: the ML-authored attribute never reaches customer-facing text");
+// direction 2 — the marker exclusion must NOT swallow a GENUINE unverified gate riding alongside a demoted factor.
+const wosbGate = (id: string): TypedFinding => ({
+  id, requirement: "This acquisition is a 100% WOSB set-aside; only certified WOSBs are eligible for award.",
+  citation: "SF1449 block 10", excerpt: "100% WOSB set-aside.", kind: "eligibility_bar",
+  controllability: "bidder_controls", curableInWindow: true, requiredAttribute: "setaside:WOSB", grounded: true, lens: "smallbiz",
+});
+const mixed = runBoth(true, true, base([chapelFinding, wosbGate("panel:wosb-1")]));
+assert(mixed.eligible === null, `mixed: a GENUINE unverified gate still clamps eligible=null [got ${mixed.eligible}]`);
+assert(/ELIGIBILITY NOT VERIFIED/i.test(mixed.reason) && /setaside:WOSB/.test(mixed.reason), "mixed: clamp fires and names the genuine gate");
+assert(!/prior_chapel_experience/.test(mixed.reason), "mixed: the demoted factor's attribute stays OUT of the clamp");
+
+// ── P6 — ULTRA #240 SIDE-FIND: clamp text dedups repeated attributes (live Gate-3 showed 'setaside:WOSB' ×5) ──
+console.log("\n── P6 clamp dedup (ultra #240 side-find) ──");
+const dup = runBoth(true, true, base([chapelFinding, wosbGate("panel:wosb-1"), wosbGate("panel:wosb-2"), wosbGate("panel:wosb-3")]));
+const wosbMentions = (dup.reason.match(/setaside:WOSB/g) ?? []).length;
+assert(/ELIGIBILITY NOT VERIFIED/i.test(dup.reason), "dedup: clamp still fires on the genuine gates");
+assert(wosbMentions === 1, `dedup: 'setaside:WOSB' listed exactly once [got ${wosbMentions}]`);
+
+// ── P7 — ULTRA #240 FINDING C: bare "§M" citation must corroborate (the \b§ arm never matched) ──
+console.log("\n── P7 bare-§M citation (ultra #240 Finding C) ──");
+assert(cls(CHAPEL, "§M, Item I") === "demote", "bare '§M, Item I' cite → demote (pre-fix: \\b§ arm dead → not_applicable)");
+assert(cls(CHAPEL, "cite: §M, para 1") === "demote", "mid-string '§M' cite → demote");
+assert(cls(CHAPEL, "(§M)") === "demote", "parenthesized '(§M)' cite → demote");
+assert(cls(CHAPEL, "Attachment 3 — Forms") === "not_applicable", "guard: non-§M cite still does NOT corroborate (no over-match)");
+
 console.log(`\n${failures === 0 ? "✅ ALL GREEN" : `❌ ${failures} FAILURE(S)`}`);
 process.exit(failures === 0 ? 0 : 1);

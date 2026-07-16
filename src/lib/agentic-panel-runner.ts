@@ -312,18 +312,22 @@ export async function runPanelJudge(params: {
     }
     return mergePanelistOutputs(oks); // #4 REDUCE
   };
+  const fabricatedClauseLog: string[] = [];
+
+  const settled = await Promise.allSettled(PANELISTS.map(runOne));
   // FABRICATION-SUPPRESSION (fix b) — clause checker over the panel source. §L card #539 (flag
   // AUDIT_CLAUSE_SOURCE_FULLTEXT): the legacy union of per-lens BUNDLES is a SUBSET of the ingested package — a
   // clause in a section not assigned to ANY lens (e.g. §I contract clauses: 52.222-52/-53) is absent from the union
   // and false-suppressed as fabricated. A clause is fabricated ONLY if absent from the WHOLE ingested solicitation,
-  // so check against the full sectionText (all routed sections). Flag OFF ⇒ legacy bundle-union (byte-identical).
+  // so check against the full sectionText (all routed sections). Flag OFF ⇒ legacy bundle-union.
+  // ORDER CONSTRAINT (ultra #240 Finding A): this MUST be constructed AFTER the allSettled above —
+  // bundleByLens is populated inside runOne, and makeClauseSourceChecker normalizes its source at
+  // construction time. Built before the lenses run, the OFF-path checker closes over an EMPTY string
+  // and strips EVERY clause cite as fabricated (total false-suppression).
   const clauseCheckSource = process.env.AUDIT_CLAUSE_SOURCE_FULLTEXT === "true"
     ? Object.values(params.sectionText).join("\n")
     : [...bundleByLens.values()].join("\n");
   const clauseInSource = makeClauseSourceChecker(clauseCheckSource);
-  const fabricatedClauseLog: string[] = [];
-
-  const settled = await Promise.allSettled(PANELISTS.map(runOne));
   const panelists = PANELISTS.map((p, i) => {
     const r = settled[i];
     if (r.status !== "fulfilled") return { key: p.key, name: p.name, output: null, error: r.reason instanceof Error ? r.reason.message : String(r.reason) };
