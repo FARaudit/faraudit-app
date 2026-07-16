@@ -15,6 +15,8 @@
 // the checker closed over "" and EVERY 52.xxx/252.xxx cite in every lens output was stripped as
 // "[clause not in source — suppressed]" (total false-suppression on the prod default path).
 import { runPanelJudge } from "./agentic-panel-runner";
+import { PANELIST_SCHEMA, VERIFIER_SCHEMA } from "./agentic-panel";
+import { sanitizeSchema } from "./anthropic-structured";
 
 let failures = 0;
 const assert = (c: boolean, m: string) => { console.log(`${c ? "✅" : "❌"} ${m}`); if (!c) failures++; };
@@ -37,12 +39,18 @@ const envelope = (payload: unknown) => ({
   text: async () => "",
 });
 const realFetch = globalThis.fetch;
+// Dispatch pins on SCHEMA IDENTITY (red-team round-2 hardening) — the wire schema is the sanitized form of the
+// exported constants, so a rename updates both sides and no substring channel can mis-route a payload. An
+// unrecognized schema throws LOUD rather than feeding a default payload.
+const PANELIST_WIRE = JSON.stringify(sanitizeSchema(PANELIST_SCHEMA));
+const VERIFIER_WIRE = JSON.stringify(sanitizeSchema(VERIFIER_SCHEMA));
 globalThis.fetch = (async (_url: unknown, init?: { body?: string }) => {
   const body = JSON.parse(init?.body ?? "{}") as { output_config?: { format?: { schema?: unknown } } };
   const schemaStr = JSON.stringify(body.output_config?.format?.schema ?? {});
-  if (schemaStr.includes("named_hard_gates")) return envelope(PANELIST_PAYLOAD);           // lens call
-  if (schemaStr.includes("claims")) return envelope({ claims: [] });                       // verifier call
-  return envelope({ verdict: "BID_WITH_CAUTION", fit_score: 50, eligible: true, preserved_dissent: [], show_stoppers: [], rationale: "stub" }); // gatekeeper
+  if (schemaStr === PANELIST_WIRE) return envelope(PANELIST_PAYLOAD);   // lens call
+  if (schemaStr === VERIFIER_WIRE) return envelope({ claims: [] });    // verifier call
+  if (schemaStr.includes("show_stoppers")) return envelope({ verdict: "BID_WITH_CAUTION", fit_score: 50, eligible: true, preserved_dissent: [], show_stoppers: [], rationale: "stub" }); // gatekeeper
+  throw new Error(`stub: unrecognized schema — harness would go vacuous: ${schemaStr.slice(0, 120)}`);
 }) as typeof fetch;
 
 const SECTION_TEXT: Record<string, string> = {

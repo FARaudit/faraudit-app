@@ -189,12 +189,23 @@ assert(cls(CHAPEL, "§M, Item I") === "demote", "bare '§M, Item I' cite → dem
 assert(cls(CHAPEL, "cite: §M, para 1") === "demote", "mid-string '§M' cite → demote");
 assert(cls(CHAPEL, "(§M)") === "demote", "parenthesized '(§M)' cite → demote");
 assert(cls(CHAPEL, "Attachment 3 — Forms") === "not_applicable", "guard: non-§M cite still does NOT corroborate (no over-match)");
-// red-team round-1 tighten — the §M arm must NOT over-match (over-match widens demotion, against fail-toward-escalation):
+// red-team rounds 1-2 — the §M arm must NOT over-match (over-match widens demotion, against fail-toward-escalation):
 assert(cls(CHAPEL, "AFI 36-2618 § M") === "not_applicable", "R-T guard: a FOREIGN document's '§ M' (digit-designator prefix) does NOT corroborate");
 assert(cls(CHAPEL, "52.212-1 §m") === "not_applicable", "R-T guard: lowercase '§m' after a clause cite does NOT corroborate");
 assert(cls(CHAPEL, "see § m herein") === "not_applicable", "R-T guard: lowercase spaced '§ m' does NOT corroborate");
 assert(cls(CHAPEL, "RCW § M-DOT standard") === "not_applicable", "R-T guard: '§ M-DOT' (hyphen continuation) does NOT corroborate");
 assert(cls(CHAPEL, "per statute §m(3)") === "not_applicable", "R-T guard: statute subparagraph '§m(3)' does NOT corroborate");
+// round-2 BREAK (banked): the round-1 lookbehind was a SEPARATOR BLOCKLIST — one comma/semicolon/paren/em-dash
+// bridged the digit to § and resurrected the foreign-doc over-match with a proven verdict flip. Positive-bridge
+// re-shape kills the whole class regardless of separator:
+assert(cls(CHAPEL, "AFI 36-2618, § M") === "not_applicable", "R-T round-2: comma-bridged foreign-doc '§ M' does NOT corroborate");
+assert(cls(CHAPEL, "AFI 36-2618; § M") === "not_applicable", "R-T round-2: semicolon-bridged variant does NOT corroborate");
+assert(cls(CHAPEL, "AFI 36-2618 (§ M)") === "not_applicable", "R-T round-2: paren-bridged variant does NOT corroborate");
+assert(cls(CHAPEL, "DoDI 5200.01 — § M") === "not_applicable", "R-T round-2: em-dash-bridged variant does NOT corroborate");
+assert(cls(CHAPEL, "per statute §M(3)") === "not_applicable", "R-T round-2: UPPERCASE statute subparagraph '§M(3)' does NOT corroborate");
+// keep-set (round-2 under-match sweep) — genuine UCF §M cites still corroborate after the re-shape:
+assert(cls(CHAPEL, "See §M.") === "demote", "R-T round-2 keep: 'See §M.' still corroborates");
+assert(cls(CHAPEL, "– §M") === "demote", "R-T round-2 keep: en-dash-preceded bare '§M' still corroborates");
 
 console.log(`\n${failures === 0 ? "✅ ALL GREEN" : `❌ ${failures} FAILURE(S)`}`);
 process.exit(failures === 0 ? 0 : 1);
