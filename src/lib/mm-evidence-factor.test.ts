@@ -452,6 +452,14 @@ assert(cls("Demonstrate capability; personnel shall meet the qualification requi
 assert(cls("Demonstrate experience; staff met all customer requirements for accounting system support.", "Section M") === "demote", "k3-4 keep re-verify: stem-first 'met' narrative → demote (met is noun-first-only)");
 assert(cls(CHAPEL, "Section M, Technical Requirements, Item I") === "demote", "round-8 keep: chapel specimen still demotes");
 
+// ── P8k — ROUND-8 PART-C CLOSE (E1-overshoot corrected to the prescribed modal-anchored form) ──
+console.log("\n── P8k E1-width correction — restrictive forms escalate, supply-chain narratives demote ──");
+assert(cls("Demonstrate capability; quotations will be accepted only from qualified sources.", "Section M") === "escalate", "E1 keep: modal-anchored 'only from qualified sources' still escalates");
+assert(cls("Demonstrate experience; offerors must be prequalified by the Government prior to award.", "Section M") === "escalate", "E2 keep: 'prequalified by' still escalates");
+assert(cls("Demonstrate past performance; items shall be furnished only from sources previously approved by the Engineering Support Activity.", "Section M") === "escalate", "E3 keep: adverb-split approved-by still escalates");
+assert(cls("Demonstrate past performance performing as a qualified supplier under similar contracts.", "Section M") === "demote", "t3 GUARD: 'as a qualified supplier' ratable narrative → demote (bare bigram deleted)");
+assert(cls("Demonstrate past performance delivering parts sourced from qualified suppliers.", "Section M") === "demote", "t4 GUARD: 'sourced from qualified suppliers' narrative → demote");
+
 // ── P9 — POST-R10 COVERAGE STATEMENT (card #545 item 2): who protects the customer on each channel ──
 // (a) FINDINGS channel: an R10-escalated shape keeps its eligibility-bar typing → NHR pole (not BID_WITH_CAUTION),
 //     eligible=null under the tristate — protection restored WITHOUT the manifest backstop.
