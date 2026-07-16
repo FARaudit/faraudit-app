@@ -58,6 +58,75 @@ const HELD_CREDENTIAL_SHAPE: RegExp[] = [
   /\b(?:must|shall)\s+be\s+(?:eligible\s+for|granted|cleared|adjudicated|read\s+into)\b/i,
 ];
 
+// R10 THIRD-PARTY-STATUS SHAPE (card #545 ruling — the six red-team round-2/3 leak shapes). Each is a STATUS or
+// POSSESSION conferred by a third party (an agency audit, a labor agreement, a physical footprint, a credentialing
+// office, a source-approval authority) — never something the offeror AUTHORS INTO THE QUOTE. "Demonstrate your
+// DCAA-approved accounting system" carries evidence-language AND conferred-status substance; the status vetoes the
+// demote. SHAPE-allowlisted (structural form, position-checked second token — per the no-blocklist doctrine and
+// the round-2 comma lesson); over-catch errs toward ESCALATION, the safe pole. Any hit ⇒ escalate.
+// Re-shaped after red-team round-1 (grade F, ceo/redteam-545-r10.md): the first cut banked the six SPECIMENS,
+// not the FAMILIES — its second-token slots were closed vocab lists (the #507 treadmill inside allowlist
+// clothing; "acceptable" — the DFARS clauses' own adjective — leaked all three business-system arms). Each arm
+// now anchors on the family's POSITION-CHECKED structural noun and pairs it with a STEM family, both orders.
+const R10_THIRD_PARTY_STATUS: RegExp[] = [
+  // (i) BUSINESS-SYSTEM STATUS — anchor = the DFARS business-system noun; pair = an acceptability/approval/
+  //     review STEM (approv-/accept-/adequa-/validat-/audit-/review/compliant — covers the regulation-verbatim
+  //     "acceptable accounting system", DFARS 252.242-7006/252.215-7002), either order. Actor arm widened to any
+  //     cognizant office. CPSR review-completion form has its own arm (FAR 44.302).
+  //     Round-2 additions: bare "audit" (audit\w* — the \w+ quantifier missed the bare noun), survey/pre-award-
+  //     survey determination instruments, SF 1408, MMAS acronym, spelled-out agency names, arm 3 both orders.
+  //     Round-3 class-level closes: PREFIX-TOLERANT stems ((?:dis|in|un|non-)? — DFARS 252.215-7002's own
+  //     "disapprove/disapproval" and FAR 16.301-3's "adequate→inadequate" flipped the pole on a negation prefix),
+  //     the FULL FAR 53.209-1 pre-award survey form RANGE (SF 1403-1408, not the one banked specimen), and the
+  //     no-"system"-token CAS grammar (cost accounting practices / disclosure statement / billing rates).
+  /\b(?:accounting|billing|purchasing|estimating|property(?:\s+management)?|material\s+management(?:\s+and\s+accounting)?|business|earned[- ]value(?:\s+management)?|EVMS?|MMAS)\s+systems?\b[^.\n]{0,60}\b(?:dis|in|un|non[- ]?)?(?:approv\w+|accept\w+|adequa\w+|validat\w+|audit\w*|review\w*|surve\w+|compl\w+|meets?\b|met\b|satisf\w+|deficien\w+|material\s+weakness\w*|withh?[eo]ld\w*)\b/i,
+  /\b(?:dis|in|un|non[- ]?)?(?:approv\w+|accept\w+|adequa\w+|validat\w+|audit\w*|surve\w+|review\w*|compl\w+|meets?\b|satisf\w+|deficien\w+|material\s+weakness\w*|DCAA[- ]\w+|DCMA[- ]\w+)\b[^.\n]{0,45}\b(?:accounting|billing|purchasing|estimating|property(?:\s+management)?|material\s+management(?:\s+and\s+accounting)?|business|earned[- ]value|EVMS?|MMAS)\s+systems?\b/i,
+  /\b(?:DCAA[- ]\w+|DCMA[- ]\w+)\b[^.\n]{0,45}\b(?:accounting|billing|purchasing|estimating|property(?:\s+management)?|material\s+management(?:\s+and\s+accounting)?|business|earned[- ]value|EVMS?|MMAS)\s+systems?\b/i,
+  /\b(?:DCAA|DCMA|CFAO?|Defense\s+Contract\s+(?:Audit|Management)\s+Agency|[Cc]ognizant\s+[Ff]ederal\s+[Aa]gency|cognizant\s+(?:\w+\s+){0,2}(?:agency|auditor|activity|ACO))\b[^.\n]{0,80}\bsystems?\b/i,
+  /\bsystems?\b[^.\n]{0,80}\b(?:DCAA|DCMA|CFAO?|Defense\s+Contract\s+(?:Audit|Management)\s+Agency|[Cc]ognizant\s+[Ff]ederal\s+[Aa]gency|cognizant\s+(?:\w+\s+){0,2}(?:agency|auditor|activity|ACO))\b/i,
+  /\bCPSR\b|\bcontractor\s+purchasing\s+system\s+review\b|\bSF\s?140[3-8]\b|\bMMAS\b|\bEVMS\b|\bANSI\/?EIA[- ]?748\b|\bEIA[- ]?748\b|\bpre[- ]?award\s+survey\b/i,
+  /\b(?:dis|in|un|non[- ]?)?(?:approv\w+|accept\w+|adequa\w+|validat\w+|audit\w*|review\w*|surve\w+|compl\w+|meets?\b|satisf\w+|determin\w+|deficien\w+|material\s+weakness\w*|withh?[eo]ld\w*)\b[^.\n]{0,60}\b(?:cost\s+accounting\s+practices?|CAS\s+disclosure\s+statement|disclosure\s+statement|billing\s+rates?|forward\s+pricing\s+rates?)\b/i,
+  /\b(?:cost\s+accounting\s+practices?|CAS\s+disclosure\s+statement|disclosure\s+statement|billing\s+rates?|forward\s+pricing\s+rates?)\b[^.\n]{0,60}\b(?:dis|in|un|non[- ]?)?(?:approv\w+|accept\w+|adequa\w+|validat\w+|audit\w*|review\w*|surve\w+|compl\w+|meets?\b|met\b|satisf\w+|determin\w+|deficien\w+|material\s+weakness\w*|withh?[eo]ld\w*)\b/i,
+  // (ii) CBA STATUS — relation STEM (signatory/party-to/bound-by/adhere-to) × labor-agreement noun, both orders.
+  //      SCA 4(c) judgment carried on the card: "bound by" may read compliance-not-gate — escalate is the safe pole.
+  /\b(?:signator(?:y|ies)|party\s+to|bound\s+by|adher\w+\s+to|execut\w+|enter\w*\s+into)\b[^.\n]{0,80}\b(?:collective\s+bargaining|CBA\b|union|labor\s+agreement|master\s+labor|trades?\s+council|local\s+\d+|brotherhood|workers'?\s+(?:union|local))/i,
+  /\b(?:collective\s+bargaining|CBA\b|union|labor)\s+(?:agreement\s+)?(?:signator(?:y|ies)|part(?:y|ies))\b/i,
+  // (iii) FACILITY-GEOGRAPHY — the facility noun is the ABSOLUTE anchor (protects the temporal keep-set:
+  //       "within the past five years" has no facility noun). Preposition widened to bare in/at + located/radius;
+  //       place tokens widened to area/region/vicinity/metropolitan/commuting (round-1 leaks iii-1/2/5).
+  //       Round-3 (class-level, per the round-3 convergence ruling ask): EVERY slot number-tolerant BY
+  //       CONSTRUCTION (states?/cit(?:y|ies)/…, not hand-added plurals), family-(iv)'s installation nouns
+  //       imported (post/garrison — the on-post leak was an internal inconsistency between sibling arms),
+  //       facility-noun class widened with the round-3 open-class leaks (depot/branch/terminal/service center/
+  //       on-site presence) + the on-post/on-base compound forms. The noun slot remains ENUMERATED — an
+  //       open-class residual is explicitly carried to Brain on the card (round-3 F5 family-iii call).
+  /\b(?:facilit(?:y|ies)|offices?|warehouses?|yards?|shops?|plants?|depots?(?![- ]level)|branch(?:es)?|terminals?|storefronts?|service\s+centers?|dispatch\s+points?|place\s+of\s+business|(?:physical|on[- ]site|local)\s+(?:presence|location))\b[^.\n]{0,45}\b(?:within|in|at|on|near|no\s+(?:more|further)\s+than|located|situated|radius)\b[^.\n]{0,40}\b(?:miles?|kilometers?|km|minutes?|hours?|drive|count(?:y|ies)|states?|cit(?:y|ies)|towns?|installations?|bases?|posts?|garrisons?|sites?|areas?|regions?|vicinit(?:y|ies)|metropolitan|commuting|CONUS|OCONUS|nationwide|overseas|continental\s+United\s+States|United\s+States|place\s+of\s+performance)\b/i,
+  /\b(?:facilit(?:y|ies)|offices?|warehouses?|yards?|shops?|plants?|depots?(?![- ]level)|branch(?:es)?|service\s+centers?|(?:physical|on[- ]site)\s+presence)\b[^.\n]{0,30}\b(?:located\s+)?on[- ](?:post|base|site|installation)\b/i,
+  /\b(?:maintain|establish|have|possess|operate|staff)\b[^.\n]{0,25}\b(?:a\s+)?(?:local\s+|permanent\s+)?(?:facilit(?:y|ies)|offices?|physical\s+presence|on[- ]site\s+presence|place\s+of\s+business)\b[^.\n]{0,40}\bwithin\b/i,
+  // (iv) BASE-ACCESS CREDENTIALING — named credentials (DBIDS/RAPIDGate/CAC) + the installation-access pair in
+  //      BOTH orders with verb forms (badged/vetted) and entry nouns (entry/admittance) — round-1 iv-1/iv-2.
+  /\b(?:DBIDS|RAPIDGate|common\s+access\s+card)\b|\bCAC\s+(?:card|credential|eligib\w+|required)\b/i,
+  /\b(?:badg\w+|vett\w+|credential\w+|cleared)\b[^.\n]{0,40}\b(?:installation|base|post|site|garrison)(?:'s)?[-\s]+(?:access|entry|admittance)\b/i,
+  /\b(?:installation|base|post|site|garrison)(?:'s)?[-\s]+(?:access|entry|admittance)\b[^.\n]{0,40}\b(?:credential\w*|badg\w+|pass(?:es)?\b|clearance|vett\w+|background|registration|control\s+systems?)\b/i,
+  // (v) APPROVED-SOURCE — list forms (QSL/APL/approved-X-list), post-positive "source(s) approved by" and
+  //     hyphenated "source-approved" (the dominant DLA/ESA forms, round-1 v-1/v-2), status-as form ("as an
+  //     approved source"), and source-approval noun. The bare-narrative over-catch (an ASL-management
+  //     past-performance factor) is ACCEPTED and banked as a control — escalate is the safe pole.
+  //     Round-3: QPD (DLA's CURRENT name for the QPL — qpldocs.dla.mil), manufacturer/bidder/dealer/contractor
+  //     in the list-noun slot + AML, "qualifying activity" as an approval actor, list-noun database sibling.
+  /\b(?:approved|qualified)\s+(?:source|supplier|vendor|product|manufacturer|bidder|dealer|contractor)s?\s+(?:list|database)s?\b|\bQSL\b|\bAPL\b|\bAML\b|\bQPD\b|\bQBL\b|\bqualified\s+bidders\s+lists?\b/i,
+  /\b(?:sources?|manufacturers?|suppliers?|vendors?|dealers?|offerors?)\s+(?:\w+\s+){0,2}(?:approved|(?:pre)?qualified)\s+by\b|\bsource[- ]approv\w+\b|\bsource\s+approval\b|\bsource[- ]control(?:led)?\b|\bsource\s+control\s+(?:drawing|document)s?\b|\bqualifying\s+activity\b|\b(?:subject\s+to|satisf\w+|met)\s+(?:a\s+|all\s+(?:applicable\s+)?)?qualification\s+requirements?\b|\bstandards?\b[^.\n]{0,25}\bfor\s+qualification\b|\bqualification\s+(?:standards?|testing|requirements?)\b[^.\n]{0,60}\b(?:before|prior\s+to)\b[^.\n]{0,20}\baward\b|\b(?:pass\w*|meets?|met|satisf\w+|complet\w+)\b[^.\n]{0,30}\bqualification\b[^.\n]{0,60}\b(?:award|considered|prior\s+to|before)\b|\bqualification\b[^.\n]{0,40}\b(?:must|shall|will)\s+be\s+(?:completed?|complete|passed|satisfied|finished|accomplished)\b[^.\n]{0,60}\b(?:before|prior\s+to)\b[^.\n]{0,20}\baward\b|\bqualification\s+requirements?\b[^.\n]{0,140}\b(?:before|prior\s+to)\b[^.\n]{0,15}\baward\b/i,
+  // Round-7 closes: (B) the OFFEROR-SUBJECT location form — "the contractor must be located within 50 miles" —
+  // has no facility noun; anchor on the offeror-subject + located/situated/based + bounded place (HIGH-frequency
+  // standard form on service BPAs; no temporal collision — "located within the past five years" is not grammar).
+  /\b(?:offeror|contractor|firm|vendor|company|bidder|awardee)s?\b[^.\n]{0,25}\b(?:be\s+|is\s+|are\s+)?(?:located|situated|based|headquartered)\b[^.\n]{0,20}\b(?:within|in|at|near|no\s+(?:more|further)\s+than|more\s+than|beyond|outside|further\s+than)\b[^.\n]{0,40}\b(?:miles?|kilometers?|km|minutes?|hours?|radius|count(?:y|ies)|states?|cit(?:y|ies)|towns?|installations?|bases?|posts?|garrisons?|sites?|areas?|regions?|CONUS|OCONUS)\b/i,
+  // (ii) possession phrasing — "have a CBA in place":
+  /\b(?:collective\s+bargaining|CBA\b|labor)\s+agreement\b[^.\n]{0,25}\bin\s+place\b/i,
+  // (v) negative participle — "sources/items not qualified":
+  /\b(?:sources?|items?|products?|offerors?|manufacturers?)\b[^.\n]{0,20}\bnot\s+(?:been\s+)?qualified\b/i,
+  /\b(?:as|being|be)\s+an?\s+approved\s+(?:source|supplier|vendor)\b|\b(?:must|shall|only)\b[^.\n]{0,30}\b(?:approved|(?:pre-?)?qualified)\s+(?:source|supplier|vendor)s?\b/i,
+];
+
 // WHO-MAY-BID RESTRICTION SHAPE (Gauntlet round-4 BREAK) — an ACTOR-AGNOSTIC definitive eligibility restriction on
 // who may be awarded/compete ("only <any actor> are eligible/considered/awarded", "award limited/restricted to",
 // "OEM-authorized distributor"). classifyGateShape's who-may-bid arm only enumerated firms/offerors/contractors, so
@@ -181,6 +250,7 @@ export function classifyMmEvidenceFactor(
   const vetoed = (s: string): boolean => { const g = classifyGateShape(s); return g === "profile_bar" || g === "set_aside_caution"; };
   if (vetoed(requirement) || (excerpt && vetoed(excerpt))) return "escalate";
   if (anyHit(HELD_CREDENTIAL_SHAPE, text)) return "escalate";
+  if (anyHit(R10_THIRD_PARTY_STATUS, text)) return "escalate";  // conferred third-party status (card #545 R10 — the six leak shapes)
   if (anyHit(WHO_MAY_BID_RESTRICTION, text)) return "escalate"; // actor-agnostic who-may-bid restriction (round-4/5/6)
   if (BOA_IDIQ_HOLDER_BAR_RE.test(text)) return "escalate";      // contract-vehicle holder-only gate (round-7, ratified regex)
   // R1 — positive evidenced-in-quote substance is REQUIRED (the core discriminator). Corroboration then required:

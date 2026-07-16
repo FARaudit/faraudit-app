@@ -207,5 +207,279 @@ assert(cls(CHAPEL, "per statute §M(3)") === "not_applicable", "R-T round-2: UPP
 assert(cls(CHAPEL, "See §M.") === "demote", "R-T round-2 keep: 'See §M.' still corroborates");
 assert(cls(CHAPEL, "– §M") === "demote", "R-T round-2 keep: en-dash-preceded bare '§M' still corroborates");
 
+// ── P8 — R10 THIRD-PARTY-STATUS VETOES (card #545 ruling — the six red-team leak shapes must ESCALATE) ──
+// Round-2/3 red-team proved these six classify demote and, with the tristate co-armed, read eligible=true where a
+// KO sees a genuine gate. Each is a CONFERRED status (agency audit / labor agreement / physical footprint /
+// credentialing office / source-approval authority) — never quote-authored evidence.
+console.log("\n── P8 R10 vetoes — conferred third-party status escalates (all six leak shapes) ──");
+assert(cls("Offeror shall demonstrate an accounting system approved by DCAA.", "Section M, Evaluation Criteria") === "escalate", "R10-1: DCAA-approved accounting system → escalate");
+assert(cls("Demonstrate a DCMA-approved purchasing system in the capability statement.", "Section M") === "escalate", "R10-2: DCMA-approved purchasing system → escalate");
+assert(cls("Offeror shall demonstrate that it is a signatory to the applicable collective bargaining agreement.", "Section M, Evaluation Criteria") === "escalate", "R10-3: CBA-signatory status → escalate");
+assert(cls("Demonstrate capability; the offeror must maintain a facility within 50 miles of the installation.", "Section M") === "escalate", "R10-4: 50-mile facility geography → escalate");
+assert(cls("Demonstrate experience; personnel must possess current DBIDS credentials for base access.", "Section M") === "escalate", "R10-5: DBIDS base-access credential → escalate");
+assert(cls("Demonstrate past performance as an approved source for this item.", "Section M, Evaluation Criteria") === "escalate", "R10-6: approved-source restriction → escalate");
+// coupled form — evidence-language wrapping a conferred status still escalates:
+assert(cls("Provide a capability statement demonstrating your government-approved estimating system.", "Section M") === "escalate", "R10 coupled: capability-statement phrasing around an approved system → escalate");
+assert(cls("Submit past performance showing your office located within the county and staff badging.", "Section M") === "escalate", "R10 coupled: geography inside past-performance phrasing → escalate");
+// keep-set — genuine quote-evidenced factors are NOT swallowed by the new vetoes:
+assert(cls(CHAPEL, "Section M, Technical Requirements, Item I") === "demote", "R10 keep: chapel specimen still demotes");
+assert(cls("Offeror shall demonstrate past performance managing multiple facilities for government clients.", "Section M, Evaluation Criteria") === "demote", "R10 keep: 'managing facilities' (no bounded-location form) still demotes");
+assert(cls("Demonstrate relevant experience within the past five years delivering these services.", "Section M") === "demote", "R10 keep: 'within the past five years' (no facility noun + place token) still demotes");
+assert(cls("Provide a capability statement describing your quality system and technical approach.", "Section M") === "demote", "R10 keep: bare 'quality system' (no third-party approval structure) still demotes");
+
+// ── P8b — VOCAB-SWEEP BATTERY (red-team round-1 grade F, ceo/redteam-545-r10.md — the 19 family leaks, BANKED) ──
+// Doctrine ([[feedback_no_blocklist_shape_allowlist_doctrine]]): bank a vocab-sweep suite to DRY BEFORE arming.
+// Round-1 proved the first cut banked specimens, not families — every probe below LEAKED (classified demote,
+// 6 flip-proven to BID_WITH_CAUTION + eligible=true under the armed flags). All must ESCALATE.
+console.log("\n── P8b vocab-sweep — round-1 family leaks (all must escalate) ──");
+// family (i) business systems — incl. the DFARS-verbatim adjective the token slots omitted:
+assert(cls("Offeror shall demonstrate past performance and an acceptable accounting system in accordance with DFARS 252.242-7006.", "Section M, Evaluation Criteria") === "escalate", "i-1: DFARS-verbatim 'acceptable accounting system' → escalate");
+assert(cls("Demonstrate capability; the accounting system must be deemed acceptable by the cognizant audit agency.", "Section M") === "escalate", "i-2: 'deemed acceptable by the cognizant audit agency' → escalate");
+assert(cls("Demonstrate past performance; offeror must have successfully completed a Contractor Purchasing System Review (CPSR).", "Section M") === "escalate", "i-3: CPSR review-completion form → escalate");
+assert(cls("Demonstrate experience; the estimating system shall be acceptable to the cognizant ACO.", "Section M") === "escalate", "i-4: 'estimating system acceptable to the cognizant ACO' → escalate");
+assert(cls("Offeror shall maintain a DCAA-compliant accounting system and demonstrate past performance.", "Section M") === "escalate", "i-5: 'DCAA-compliant accounting system' → escalate");
+// family (ii) CBA:
+assert(cls("Demonstrate experience; the offeror must be a party to the area-wide collective bargaining agreement.", "Section M") === "escalate", "ii-1: 'party to the area-wide CBA' → escalate");
+assert(cls("Demonstrate capability; the contractor will be bound by and must adopt the applicable collective bargaining agreement.", "Section M") === "escalate", "ii-2: 'bound by the CBA' → escalate (safe pole; SCA 4(c) judgment carried on card)");
+// family (iii) geography:
+assert(cls("Offeror shall demonstrate capability and maintain an office in the local commuting area of the installation.", "Section M") === "escalate", "iii-1: 'office in the local commuting area' → escalate");
+assert(cls("Demonstrate past performance; the offeror must have a facility in Bexar County, Texas.", "Section M") === "escalate", "iii-2: 'facility in Bexar County' → escalate");
+assert(cls("Demonstrate experience; offeror shall establish and staff a local office in the Norfolk metropolitan area.", "Section M") === "escalate", "iii-5: 'local office in the metropolitan area' → escalate");
+// family (iv) base access — the synonym-flip inconsistency (iv-1) + verb-first vetting (iv-2):
+assert(cls("Demonstrate capability; all contractor personnel must be badged for installation entry.", "Section M") === "escalate", "iv-1: 'badged for installation entry' → escalate");
+assert(cls("Demonstrate experience; employees must be vetted through the installation access control system.", "Section M") === "escalate", "iv-2: 'vetted through the installation access control system' → escalate");
+// family (v) approved-source — the dominant post-positive/hyphenated/APL forms:
+assert(cls("Demonstrate past performance; the item shall be furnished only from a source approved by the Engineering Support Activity.", "Section M") === "escalate", "v-1: post-positive 'source approved by the ESA' → escalate");
+assert(cls("Demonstrate capability; offerors must be source-approved by the cognizant ESA prior to award.", "Section M") === "escalate", "v-2: hyphenated 'source-approved by' → escalate");
+assert(cls("Demonstrate experience; the proposed item must appear on the approved products list (APL).", "Section M") === "escalate", "v-3: 'approved products list (APL)' → escalate");
+
+// ── P8c — KEEP-SET CONTROLS (round-1 D2 keeps + accepted over-catches, banked both ways) ──
+console.log("\n── P8c keep-set — ratable narratives still demote; accepted over-catches stated ──");
+assert(cls("Demonstrate past performance providing services at government facilities nationwide.", "Section M, Evaluation Criteria") === "demote", "keep: 'at government facilities' narrative (no bounded-location form) → demote");
+assert(cls("Describe your accounting practices and quality system in the technical narrative.", "Section M") === "demote", "keep: 'accounting practices and quality system' (no system+status pair) → demote");
+assert(cls("Demonstrate experience providing services within the National Capital Region.", "Section M") === "demote", "keep: 'services within the NCR' (no facility noun) → demote");
+assert(cls("Demonstrate past performance on CBA-covered contracts of similar scope.", "Section M") === "demote", "keep: 'CBA-covered contracts' narrative (no relation lexeme) → demote");
+assert(cls("Demonstrate experience obtaining base access for staff at multiple installations.", "Section M") === "demote", "keep: 'obtaining base access' narrative (no credential pair) → demote");
+assert(cls("Demonstrate experience supporting Government-approved training system programs at customer sites.", "Section M") === "demote", "keep (round-1 d2-7 RELEASED): third-party 'Government-approved training system' narrative → demote (generic gov-approved-any-system arm dropped)");
+// ACCEPTED over-catches (escalate = safe pole; banked so a future rework KNOWS it changed them):
+assert(cls("Demonstrate experience maintaining an approved supplier list as part of your quality program.", "Section M") === "escalate", "accepted over-catch: ASL-management narrative escalates (safe pole, documented)");
+assert(cls("Describe your purchasing system and how it was audited internally.", "Section M") === "escalate", "accepted over-catch: internal-audit narrative escalates (no actor discipline — safe pole, documented)");
+
+// ── P8d — ROUND-2 BATTERY (ceo/redteam-545-r10-round2.md, grade D — banked to close the round) ──
+console.log("\n── P8d round-2 leaks (must escalate) + consistency matrix + adjudicated keeps ──");
+// family (i) — determination instruments + bare-noun/agency-name/order gaps:
+assert(cls("Demonstrate past performance; award is contingent upon a favorable pre-award survey of the offeror's accounting system (SF 1408).", "Section M") === "escalate", "u1: SF 1408 pre-award survey → escalate");
+assert(cls("Demonstrate capability; an audit of the offeror's accounting system by the Defense Contract Audit Agency will be required prior to award.", "Section M") === "escalate", "u2: bare 'audit' + spelled-out DCAA → escalate");
+assert(cls("Demonstrate experience; an audit of the accounting system by DCAA is required prior to award.", "Section M") === "escalate", "u2b/c3b: 'system … by DCAA' reverse order → escalate (consistency with 'audited by DCAA')");
+assert(cls("Demonstrate past performance and a DCMA-approved MMAS.", "Section M") === "escalate", "u3: MMAS acronym (DFARS 252.242-7004's own term) → escalate");
+// family (ii) — named locals:
+assert(cls("Demonstrate capability; the offeror must be signatory to Local 26 of the International Brotherhood of Electrical Workers.", "Section M") === "escalate", "u4: 'signatory to Local 26' → escalate");
+// family (iii) — grammatical number must never flip the pole + natural prepositions:
+assert(cls("Demonstrate capability; offeror must maintain offices within 25 miles of the installation.", "Section M") === "escalate", "plural 'offices within 25 miles' → escalate (number-flip closed)");
+assert(cls("Demonstrate capability; offeror must maintain warehouses within 25 miles of the port city.", "Section M") === "escalate", "plural 'warehouses within 25 miles' → escalate");
+assert(cls("Demonstrate experience; the contractor shall maintain a physical presence on the installation.", "Section M") === "escalate", "u7: 'physical presence ON the installation' → escalate");
+assert(cls("Demonstrate capability; an office within a one-hour drive of the place of performance is required.", "Section M") === "escalate", "u8: 'within a one-hour drive of the place of performance' → escalate");
+// family (v) — source-control sibling:
+assert(cls("Demonstrate past performance; this is a source-controlled item procured in accordance with the source control drawing.", "Section M") === "escalate", "u11: 'source-controlled item / source control drawing' → escalate");
+assert(cls("Demonstrate capability; offerors must submit a Source Approval Request (SAR).", "Section M") === "escalate", "u12: SAR → escalate (held from round 2)");
+// adjudicated keeps (round-2): SCA 4(c) successorship binds ANY awardee — compliance term, NOT who-may-bid; the
+// relation-stem restraint is deliberate. Family (iv) 'installation vetting' stays demote per the curability
+// precedent (round-1 iv-3 / round-2 u10) — personnel vetting is post-award-curable in most shops.
+assert(cls("Demonstrate experience; the successor contractor shall assume all obligations under the incumbent collective bargaining agreement.", "Section M") === "demote", "u5 keep: SCA 4(c) successorship obligation → demote (compliance term, adjudicated round-2)");
+assert(cls("Demonstrate capability; all personnel must pass installation vetting requirements prior to performance.", "Section M") === "demote", "u10 keep: 'installation vetting' → demote (curability precedent, documented)");
+// round-2 over-catch tripwires (all held; banked so widening never silently releases them):
+assert(cls("Offeror shall demonstrate acceptable past performance on similar contracts.", "Section M, Evaluation Criteria") === "demote", "tripwire: 'acceptable past performance' (no system noun) → demote");
+assert(cls("Demonstrate relevant experience and describe your review process for purchasing decisions.", "Section M") === "demote", "tripwire: purchasing review-process narrative → demote");
+// round-2 accepted over-catches (o9-o12 — escalate = safe pole, ON THE RECORD; o9/o10 = cost of widened preps):
+assert(cls("Demonstrate experience maintaining facilities in a clean and safe state of repair.", "Section M") === "escalate", "accepted over-catch o9: 'facilities in a … state of repair' escalates (widened bare-in + state token)");
+assert(cls("Demonstrate past performance managing an office at each customer site.", "Section M") === "escalate", "accepted over-catch o10: 'office at each customer site' escalates (widened at + site)");
+assert(cls("Demonstrate experience supporting DCAA audits and resolving findings for the client's accounting system.", "Section M") === "escalate", "accepted over-catch o11: DCAA-audit advisory narrative escalates");
+assert(cls("Demonstrate past performance supporting CPSR preparation for client firms.", "Section M") === "escalate", "accepted over-catch o12: CPSR consultancy narrative escalates (bare-literal arm)");
+
+// ── P8e — ROUND-3 BATTERY (ceo/redteam-545-r10-round3.md, grade D — class-level closes banked) ──
+console.log("\n── P8e round-3 leaks (must escalate) + F3 consistency matrix + adjudicated keeps ──");
+// family (i) — negation prefixes (DFARS 252.215-7002 'disapprove' verbatim), SF 140x range, CAS grammar:
+assert(cls("Demonstrate capability; offerors with a disapproved purchasing system will not be considered for award.", "Section M") === "escalate", "f1f: 'DISapproved purchasing system' → escalate (negation prefix closed)");
+assert(cls("Demonstrate experience; an offeror whose accounting system has been determined inadequate will not be considered.", "Section M") === "escalate", "f1g: 'determined INadequate' → escalate");
+assert(cls("Demonstrate past performance; award is contingent upon a favorable pre-award survey of the offeror (SF 1403).", "Section M") === "escalate", "f1d: SF 1403 (the RANGE, not the specimen) → escalate");
+assert(cls("Demonstrate capability; a favorable pre-award survey of production capacity (SF 1405) is required.", "Section M") === "escalate", "SF 1405 sibling → escalate");
+assert(cls("Demonstrate experience; offeror must have an approved billing system.", "Section M") === "escalate", "f1a: 'approved billing system' → escalate");
+assert(cls("Demonstrate capability and maintain adequate cost accounting practices.", "Section M") === "escalate", "f1b: 'adequate cost accounting practices' (no 'system' token) → escalate");
+assert(cls("Demonstrate experience; an adequate CAS Disclosure Statement determined by the cognizant federal agency official is required.", "Section M") === "escalate", "f1e: CAS Disclosure Statement → escalate");
+assert(cls("Demonstrate past performance; provisional billing rates approved by DCAA are required.", "Section M") === "escalate", "f1h: 'billing rates approved by DCAA' → escalate");
+// family (iii) — number tolerance BY CONSTRUCTION + on-post + open-class nouns from round 3:
+assert(cls("Demonstrate capability; offeror must maintain offices in all 50 states.", "Section M") === "escalate", "n1: 'offices in all 50 states' → escalate (place-slot number closed)");
+assert(cls("Demonstrate experience; a facility near the cities served is required.", "Section M") === "escalate", "n2: 'facility near the cities served' → escalate");
+assert(cls("Demonstrate capability; the offeror shall maintain a shop located on-post.", "Section M") === "escalate", "f3a: 'shop located on-post' → escalate (family-iv noun imported)");
+assert(cls("Demonstrate experience; operate an authorized service center within 100 miles of the installation.", "Section M") === "escalate", "f3e: 'service center within 100 miles' → escalate");
+assert(cls("Demonstrate capability; maintain a parts depot within 30 minutes of the base.", "Section M") === "escalate", "f3f: 'parts depot within 30 minutes' → escalate");
+assert(cls("Demonstrate experience; maintain an on-site presence at the installation.", "Section M") === "escalate", "f3g: 'on-site presence at the installation' → escalate");
+// family (v) — QPD (DLA's current name), AML, qualifying activity:
+assert(cls("Demonstrate past performance; items not appearing in the Qualified Products Database (QPD) will not be considered for award.", "Section M") === "escalate", "f5a: QPD → escalate");
+assert(cls("Demonstrate capability; the item must appear on the approved manufacturers list (AML).", "Section M") === "escalate", "f5d: AML / manufacturers list → escalate");
+assert(cls("Demonstrate experience; items shall be furnished by manufacturers approved by the qualifying activity.", "Section M") === "escalate", "f5e: 'manufacturers approved by the qualifying activity' → escalate");
+// adjudicated keeps (round-3): PLA party-to binds the AWARDEE post-selection (FAR 22.5) — curable, correct demote:
+assert(cls("Demonstrate experience; the successful offeror shall become a party to the PLA prior to performance.", "Section M") === "demote", "f2b keep: PLA successorship (awardee-binding, curable) → demote");
+// round-3 over-catch ledger (o1/o4/o6/o9 accepted safe-pole + the two anchor-discipline keeps):
+assert(cls("Demonstrate experience conducting customer satisfaction surveys for accounting system users.", "Section M") === "escalate", "accepted over-catch o1: survey+system narrative escalates (surve stem cost)");
+assert(cls("Demonstrate machining of source-controlled parts to spec.", "Section M") === "escalate", "accepted over-catch o4: source-controlled narrative escalates (bare-literal class)");
+assert(cls("Demonstrate experience; we audit purchasing system data for commercial clients.", "Section M") === "escalate", "accepted over-catch o6: bare-audit+system narrative escalates");
+assert(cls("Demonstrate experience supporting the Defense Contract Audit Agency in system modernization efforts.", "Section M") === "escalate", "accepted over-catch o9: spelled-agency+system narrative escalates");
+assert(cls("Demonstrate past performance providing services on installations nationwide.", "Section M") === "demote", "anchor keep o3: 'services on installations' (no facility noun) → demote");
+assert(cls("Demonstrate experience operating warehouse facilities in three states.", "Section M") === "escalate", "number-closed: 'warehouse facilities in three states' now escalates (was an accidental demote — place-slot number tolerance)");
+
+// ── P8f — ROUND-4 BATTERY (ceo/redteam-545-r10-round4.md, grade D — regulation-sourced closes banked) ──
+console.log("\n── P8f round-4 leaks (must escalate) + depot-level carve + ledger ──");
+// family (i) — the clause's own umbrella noun, plural anchors, consequence vocabulary, covered system names:
+assert(cls("Demonstrate past performance; the Contractor shall establish and maintain acceptable business systems in accordance with the terms of this contract.", "Section M") === "escalate", "i-a9: 'acceptable business systems' (DFARS 252.242-7005 verbatim) → escalate");
+assert(cls("Demonstrate capability; offeror must maintain an approved business system.", "Section M") === "escalate", "i-a4: 'approved business system' → escalate");
+assert(cls("Demonstrate experience; the offeror's accounting and estimating systems must be approved by DCAA.", "Section M") === "escalate", "i-a5: plural 'systems … approved by DCAA' → escalate (anchor number closed)");
+assert(cls("Demonstrate capability; offerors whose accounting systems have been disapproved will not be considered.", "Section M") === "escalate", "i-a6: plural + negation → escalate");
+assert(cls("Demonstrate past performance; an accounting system deemed deficient will not be considered.", "Section M") === "escalate", "i-a1p: 'deemed deficient' consequence word → escalate");
+assert(cls("Demonstrate capability; payments will be withheld if significant deficiencies exist in the offeror's purchasing system.", "Section M") === "escalate", "i-a2: deficiencies + withheld → escalate");
+assert(cls("Demonstrate experience; a material weakness in the offeror's estimating system may result in payment withholding.", "Section M") === "escalate", "i-a11: 'material weakness' (current 252.242-7005 vocabulary) → escalate");
+assert(cls("Demonstrate capability; the offeror must have an acceptable property management system.", "Section M") === "escalate", "i-a8: 'property MANAGEMENT system' (infix, covered system #5) → escalate");
+assert(cls("Demonstrate past performance; forward pricing rate agreements approved by the cognizant ACO are required.", "Section M") === "escalate", "i-a7: FPRA sibling → escalate");
+// family (ii) — gap budget + relation stems:
+assert(cls("Demonstrate experience; the offeror must be a signatory to the area-wide agreement with the International Brotherhood of Electrical Workers.", "Section M") === "escalate", "ii-v1: 51-char gap (budget widened to 80) → escalate");
+assert(cls("Demonstrate capability; the offeror must have executed a collective bargaining agreement prior to offer.", "Section M") === "escalate", "ii-a1: 'executed a CBA' relation stem → escalate");
+// family (iii) — place-slot CONUS class:
+assert(cls("Demonstrate experience; the offeror shall maintain a physical presence in CONUS.", "Section M") === "escalate", "iii-a6: 'physical presence in CONUS' → escalate");
+// family (iv) — possessive/hyphen joiner tolerance:
+assert(cls("Demonstrate capability; employees must be vetted through the installation's access control system.", "Section M") === "escalate", "iv-a1: possessive joiner → escalate");
+assert(cls("Demonstrate experience; personnel must obtain base-access credentials prior to performance.", "Section M") === "escalate", "iv-a2: hyphen joiner → escalate");
+// family (v) — FAR 9.2 statutory siblings:
+assert(cls("Demonstrate past performance; items not on the qualified bidders list (QBL) will not be considered.", "Section M") === "escalate", "v-a1: QBL (FAR 9.201's third list) → escalate");
+assert(cls("Demonstrate capability; the item offered is subject to a qualification requirement under FAR 9.202 and must have satisfied qualification prior to award.", "Section M") === "escalate", "v-a2: 'subject to a qualification requirement' (52.209-1 boilerplate) → escalate");
+// DEPOT-LEVEL CARVE (round-4 o-n4 — the worst over-catch, FIXED not ledgered): depot-level is a maintenance
+// TIER (organizational/intermediate/depot), a bread-and-butter §M experience factor, never a facility noun:
+assert(cls("The offeror shall demonstrate successful performance of depot-level maintenance on comparable engines at military installations.", "Section M, Evaluation Criteria") === "demote", "o-n4 CARVE: 'depot-level maintenance' tier → demote (false-NHR class fixed)");
+assert(cls("Demonstrate capability; maintain a parts depot within 30 minutes of the base.", "Section M") === "escalate", "carve guard: a real parts DEPOT (facility) still escalates");
+// round-4 over-catch ledger additions (accepted safe-pole, ON THE RECORD):
+assert(cls("Demonstrate experience correcting inadequate cost accounting practices for commercial clients.", "Section M") === "escalate", "accepted over-catch o-n1: CAS consultancy narrative escalates");
+assert(cls("Demonstrate past performance operating branches in multiple regions.", "Section M") === "escalate", "accepted over-catch o-n2: footprint narrative escalates");
+assert(cls("Demonstrate experience conducting site surveys at customer facilities in the region.", "Section M") === "escalate", "accepted over-catch o-n7: site-survey narrative escalates");
+// keep-set spot guards after the round-4 widening:
+assert(cls(CHAPEL, "Section M, Technical Requirements, Item I") === "demote", "round-4 keep: chapel specimen still demotes");
+assert(cls("Demonstrate experience; offices situated near transit hubs are preferred.", "Section M") === "demote", "round-4 keep: 'situated near transit' (no place token) still demotes");
+
+// ── P8g — ROUND-5 BATTERY (ceo/redteam-545-r10-round5.md — regulation-verbatim H1 sentences banked) ──
+console.log("\n── P8g round-5 regulation-verbatim breaks (must escalate) + morphology twins ──");
+// EVMS — the sixth covered system, its own provision + clause text (DFARS 252.234-7001/-7002):
+assert(cls("The offeror shall provide documentation that the Cognizant Federal Agency has determined that the proposed Earned Value Management System complies with the EVMS guidelines in ANSI/EIA-748.", "Section L/M") === "escalate", "i-r11: 252.234-7001 provision VERBATIM → escalate");
+assert(cls("Demonstrate capability; a Contractor's EVMS that has been formally reviewed and determined by the CFA to be in compliance with the EVMS guidelines is required.", "Section M") === "escalate", "i-r12: 252.234-7002(b) verbatim (bare EVMS + 'in compliance') → escalate");
+assert(cls("Demonstrate past performance; the offeror's EVMS must have been accepted by DCMA prior to award.", "Section M") === "escalate", "i-r13: bare-EVMS acronym + DCMA → escalate (acronym flip closed)");
+assert(cls("Demonstrate experience; the offeror shall use an EVMS that has been determined to be acceptable by the Cognizant Federal Agency.", "Section M") === "escalate", "i-r10x: 252.234-7002 no-dollar variant → escalate (no longer an accidental dollar-arm rescue)");
+assert(cls("Demonstrate capability; EVMS surveillance reviews will be conducted by DCMA.", "Section M") === "escalate", "h2-4: EVMS surveillance vocabulary → escalate");
+assert(cls("Demonstrate experience; the offeror shall have an EVMS accepted in accordance with DFARS 252.234-7002.", "Section M") === "escalate", "h2-5: by-clause-number EVMS citation → escalate");
+// comply/complies — the regulations' own operative VERB (morphology twins of compliant/compliance):
+assert(cls("Demonstrate capability with an earned value management system that complies with ANSI/EIA-748.", "Section M") === "escalate", "i-r14: 'system that COMPLIES' verb form → escalate");
+assert(cls("Demonstrate past performance; offeror shall maintain business systems that comply with the applicable business system clauses.", "Section M") === "escalate", "i-r15: 252.242-7005 definition vocabulary → escalate");
+assert(cls("Demonstrate experience; cost accounting practices must comply with Cost Accounting Standards.", "Section M") === "escalate", "h2-3: CAS comply-verb → escalate");
+// FAR 52.209-1's OWN grammar (enumerated from the provision, not the probe):
+assert(cls("Demonstrate capability; the product, manufacturer, or source must have demonstrated that it meets the standards prescribed for qualification before award of this contract.", "Section M") === "escalate", "v-r1: 52.209-1(b) VERBATIM → escalate");
+assert(cls("Demonstrate experience; the offeror meets the standards established for qualification before the date specified for award.", "Section M") === "escalate", "v-r3: FAR 9.202(c) shape → escalate");
+assert(cls("Demonstrate past performance; a qualification requirement means a Government requirement for testing or other quality assurance demonstration that must be completed before award.", "Section M") === "escalate", "v-r4: 52.209-1(a) definition shape → escalate");
+// round-5 over-catch guard — bare-EVMS narrative joins the ledger (accepted safe-pole cost of the token):
+assert(cls("Demonstrate experience implementing EVMS solutions for commercial clients.", "Section M") === "escalate", "accepted over-catch h3-1: EVMS consultancy narrative escalates (bare-token cost, documented)");
+// keeps after the round-5 widening:
+assert(cls(CHAPEL, "Section M, Technical Requirements, Item I") === "demote", "round-5 keep: chapel specimen still demotes");
+assert(cls("Demonstrate experience; describe how your quality processes comply with industry best practices.", "Section M") === "demote", "round-5 keep: generic 'comply with best practices' (no system/CAS noun) still demotes");
+
+// ── P8h — ROUND-6 BATTERY (ceo/redteam-545-r10-round6.md — family-(v) SHAPE + one-token closes banked) ──
+console.log("\n── P8h round-6 closes (must escalate) + keeps ──");
+// family (v) — the standards-for-qualification SHAPE (participle-agnostic; the arm previously enumerated
+// prescribed/established and leaked the subpart's OWN third participle + compound nouns):
+assert(cls("Demonstrate capability; the offeror meets qualification standards prior to award.", "Section M") === "escalate", "d1: 'meets qualification standards prior to award' → escalate (round-6 named exit probe)");
+assert(cls("Demonstrate experience; the source must meet the standards specified for qualification.", "Section M") === "escalate", "d2: 'standards SPECIFIED for qualification' (FAR 9.202(a)(2)(ii)/9.203(a)) → escalate");
+assert(cls("Demonstrate past performance; products that have not passed qualification testing will not be considered for award.", "Section M") === "escalate", "d6: 'passed qualification testing' (FAR 9.205(a)(6) vocabulary) → escalate");
+// family (i) — meet/satisfy verb class + reversed review + CFA actor:
+assert(cls("Demonstrate capability with an accounting system that meets the requirements of DFARS 252.242-7006.", "Section M") === "escalate", "j2-1: 'system that MEETS the requirements' → escalate");
+assert(cls("Demonstrate experience; an estimating system that satisfies the requirements of DFARS 252.215-7002 is required.", "Section M") === "escalate", "j2-2: 'system that SATISFIES' → escalate");
+assert(cls("Demonstrate past performance; the Government will review the offeror's accounting system prior to award.", "Section M") === "escalate", "j2-3: reversed 'review … system' (arm asymmetry closed) → escalate");
+assert(cls("Demonstrate capability; earned value management processes compliant with ANSI/EIA-748 as determined by the CFA.", "Section M") === "escalate", "j2-8: bare-CFA actor → escalate");
+// keeps after the round-6 widening (the meet/pass stems must not eat ratable narratives):
+assert(cls(CHAPEL, "Section M, Technical Requirements, Item I") === "demote", "round-6 keep: chapel specimen still demotes");
+assert(cls("Demonstrate past performance; describe how your services met customer expectations.", "Section M") === "demote", "round-6 keep: 'met customer expectations' (no system/qualification noun) → demote");
+assert(cls("Demonstrate experience; personnel qualifications shall be described in the technical volume.", "Section M") === "demote", "round-6 keep: bare 'personnel qualifications' (no compound/verb shape) → demote");
+
+// ── P8i — ROUND-7 BATTERY (ceo/redteam-545-r10-round7.md — CAS-arm unification, offeror-subject geography,
+// bare-bigram prescription compliance restored) ──
+console.log("\n── P8i round-7 closes (must escalate) + restored guard rows (must demote) ──");
+// (A) CAS-arm stem-subset asymmetry — 4 faces incl. the FAR 30.202-7(a) verbatim:
+assert(cls("Demonstrate capability; the CFAO will conduct a review of the Disclosure Statement to ascertain whether it is current, accurate, and complete.", "Section M") === "escalate", "k2-3v: FAR 30.202-7(a) adequacy-review VERBATIM → escalate");
+assert(cls("Demonstrate experience; the Disclosure Statement will be reviewed to ascertain whether it is current, accurate, and complete prior to award.", "Section M") === "escalate", "k2-3t: solicitation transposition → escalate");
+assert(cls("Demonstrate past performance; provisional billing rates must be audited by DCAA prior to award.", "Section M") === "escalate", "k2-1: billing rates AUDITED (stem unified) → escalate");
+assert(cls("Demonstrate capability; the CFAO will review the offeror's Disclosure Statement prior to contract award.", "Section M") === "escalate", "k2-2: CFAO actor + review stem → escalate");
+assert(cls("Demonstrate experience; cost accounting practices must meet the requirements of the Cost Accounting Standards.", "Section M") === "escalate", "k2-3: CAS meet-verb (stem unified) → escalate");
+// (B) offeror-subject geography — the round-7 headline standard form:
+assert(cls("Demonstrate capability; the offeror must be located within 50 miles of the installation.", "Section M") === "escalate", "k2-5: offeror-subject 'located within 50 miles' → escalate");
+assert(cls("Demonstrate experience; the contractor shall be located within a 30-mile radius of the base at time of award.", "Section M") === "escalate", "k2-5b: contractor-subject radius form → escalate");
+// (ii) possession phrasing + (v) negative participle:
+assert(cls("Demonstrate past performance; the offeror must have a collective bargaining agreement in place with the incumbent workforce prior to award.", "Section M") === "escalate", "k2-4: CBA 'in place' possession → escalate");
+assert(cls("Demonstrate capability; sources not qualified by the qualifying activity will be rejected.", "Section M") === "escalate", "k1-2: negative participle 'sources not qualified' → escalate");
+// RESTORED GUARD ROWS (round-6 j3-2 prescription — the bare bigram must NOT eat these ratables):
+assert(cls("Demonstrate prior experience providing qualification testing services for commercial customers.", "Section M") === "demote", "j3-2 GUARD RESTORED: qualification-testing consultancy narrative → demote");
+assert(cls("Demonstrate capability; personnel must meet the minimum qualification requirements in the PWS.", "Section M") === "demote", "k3-5 RELEASED: personnel-quals staffing grammar → demote (no award consequence)");
+assert(cls("Demonstrate experience; resumes shall show that key personnel meet the qualification standards for each labor category.", "Section M") === "demote", "k3-9 RELEASED: resume qualification-standards grammar → demote");
+// consequence-anchored forms still escalate (the shape kept its teeth):
+assert(cls("Demonstrate capability; the offeror meets qualification standards prior to award.", "Section M") === "escalate", "d1 re-verify: consequence-anchored qualification → escalate");
+assert(cls("Demonstrate past performance; products that have not passed qualification testing will not be considered for award.", "Section M") === "escalate", "d6 re-verify: 'not passed qualification testing … considered for award' → escalate");
+// pre-accepted ledger rows (round-7 K3, safe pole, ON THE RECORD):
+assert(cls("Demonstrate past performance with property management systems that meet customer needs.", "Section M") === "escalate", "accepted over-catch k3-1: 'systems that meet customer needs' escalates (noun-anchored stem cost)");
+// keeps:
+assert(cls(CHAPEL, "Section M, Technical Requirements, Item I") === "demote", "round-7 keep: chapel specimen still demotes");
+assert(cls("Demonstrate experience; staff met all customer requirements for accounting system support.", "Section M") === "demote", "k3-4 keep: 'met customer requirements … support' narrative → demote (met-stem noun-anchor discipline)");
+
+// ── P8j — ROUND-8 BATTERY (parts A+B, ceo/redteam-545-r10-round8-{A,B}.md — passive voice, exclusionary
+// distance, morphology closes banked) ──
+console.log("\n── P8j round-8 closes (must escalate) + guards ──");
+// part-A d2: passive-voice qualification-completion (the false-green class):
+assert(cls("Demonstrate capability; item qualification must be completed prior to award.", "Section M") === "escalate", "d2: passive 'qualification must be completed prior to award' → escalate");
+assert(cls("Demonstrate experience; product qualification must be finished before contract award.", "Section M") === "escalate", "d2b: passive variant → escalate");
+// part-B C-class (DRY-blocking): exclusionary-distance subject forms:
+assert(cls("Demonstrate capability; offerors located more than 50 miles from the installation will not be considered for award.", "Section M") === "escalate", "C1: 'located MORE THAN 50 miles FROM' exclusionary → escalate");
+assert(cls("Demonstrate experience; contractors situated beyond the local commuting area will not be considered.", "Section M") === "escalate", "C2: 'situated BEYOND the commuting area' → escalate");
+assert(cls("Demonstrate past performance; firms based outside the State of Alaska will not be considered for award.", "Section M") === "escalate", "C3: 'based OUTSIDE the State' → escalate");
+// part-B A2/E-class morphology:
+assert(cls("Demonstrate capability; the accounting system must have met the requirements of DFARS 252.242-7006.", "Section M") === "escalate", "A2: past-participle 'system must have MET' → escalate");
+assert(cls("Demonstrate experience; quotations will be accepted only from qualified sources.", "Section M") === "escalate", "E1: 'only from QUALIFIED sources' → escalate");
+assert(cls("Demonstrate capability; offerors must be prequalified by the Government prior to award.", "Section M") === "escalate", "E2: 'PREqualified by' glued morphology → escalate");
+assert(cls("Demonstrate past performance; items shall be furnished only from sources previously approved by the Engineering Support Activity.", "Section M") === "escalate", "E3: adverb-split 'sources PREVIOUSLY approved by' → escalate");
+// guards (part-B Cg + part-A released class + k3-4 direction discipline):
+assert(cls("Offeror shall demonstrate relevant experience delivering similar services for more than five years; submissions will be rated favorably.", "Section M, Evaluation Criteria") === "demote", "Cg GUARD: 'more than five years' ratable experience → demote (C-close did not eat it)");
+assert(cls("Demonstrate capability; personnel shall meet the qualification requirements of the labor category.", "Section M") === "demote", "part-A c1: personnel-quals stays released → demote");
+assert(cls("Demonstrate experience; staff met all customer requirements for accounting system support.", "Section M") === "demote", "k3-4 keep re-verify: stem-first 'met' narrative → demote (met is noun-first-only)");
+assert(cls(CHAPEL, "Section M, Technical Requirements, Item I") === "demote", "round-8 keep: chapel specimen still demotes");
+
+// ── P8k — ROUND-8 PART-C CLOSE (E1-overshoot corrected to the prescribed modal-anchored form) ──
+console.log("\n── P8k E1-width correction — restrictive forms escalate, supply-chain narratives demote ──");
+assert(cls("Demonstrate capability; quotations will be accepted only from qualified sources.", "Section M") === "escalate", "E1 keep: modal-anchored 'only from qualified sources' still escalates");
+assert(cls("Demonstrate experience; offerors must be prequalified by the Government prior to award.", "Section M") === "escalate", "E2 keep: 'prequalified by' still escalates");
+assert(cls("Demonstrate past performance; items shall be furnished only from sources previously approved by the Engineering Support Activity.", "Section M") === "escalate", "E3 keep: adverb-split approved-by still escalates");
+assert(cls("Demonstrate past performance performing as a qualified supplier under similar contracts.", "Section M") === "demote", "t3 GUARD: 'as a qualified supplier' ratable narrative → demote (bare bigram deleted)");
+assert(cls("Demonstrate past performance delivering parts sourced from qualified suppliers.", "Section M") === "demote", "t4 GUARD: 'sourced from qualified suppliers' narrative → demote");
+
+// ── P9 — POST-R10 COVERAGE STATEMENT (card #545 item 2): who protects the customer on each channel ──
+// (a) FINDINGS channel: an R10-escalated shape keeps its eligibility-bar typing → NHR pole (not BID_WITH_CAUTION),
+//     eligible=null under the tristate — protection restored WITHOUT the manifest backstop.
+// (b) MANIFEST backstop (audit-orchestrator.ts:1788-1790): keys SET-ASIDE manifest elements ONLY (+ null profile,
+//     under AUDIT_SETASIDE_ELIG_CLAMP) — code-read, unchanged by this pass.
+// (c) RESIDUAL (stated for Brain, carried on card #545): a proposer that emits NO typed finding for a
+//     non-set-aside gate (DCAA-class) is covered by NEITHER channel — same omission risk that predates #538.
+console.log("\n── P9 post-R10 coverage — findings channel restores the NHR pole on the leak shapes ──");
+const dcaaFinding: TypedFinding = {
+  id: "panel:dcaa", requirement: "Offeror shall demonstrate an accounting system approved by DCAA.",
+  citation: "Section M, Evaluation Criteria", excerpt: "accounting system approved by DCAA",
+  kind: "eligibility_bar", controllability: "bidder_cannot_move", curableInWindow: false,
+  requiredAttribute: "dcaa_approved_accounting_system", grounded: true, lens: "pricing",
+};
+const dcaaBoth = runBoth(true, true, base([dcaaFinding]));
+assert(dcaaBoth.verdict === "NEEDS_HUMAN_REVIEW", `P9: DCAA gate → NHR pole retained under both flags [got ${dcaaBoth.verdict}]`);
+assert(dcaaBoth.eligible === null, `P9: DCAA gate → eligible=null (never a false green) [got ${dcaaBoth.eligible}]`);
+const geoFinding: TypedFinding = { ...dcaaFinding, id: "panel:geo", requirement: "Demonstrate capability; the offeror must maintain a facility within 50 miles of the installation.", excerpt: "maintain a facility within 50 miles", requiredAttribute: "facility_within_50_miles" };
+const geoBoth = runBoth(true, true, base([geoFinding]));
+assert(geoBoth.verdict === "NEEDS_HUMAN_REVIEW" && geoBoth.eligible === null, `P9: geography gate → NHR + eligible=null [got ${geoBoth.verdict}/${geoBoth.eligible}]`);
+
 console.log(`\n${failures === 0 ? "✅ ALL GREEN" : `❌ ${failures} FAILURE(S)`}`);
 process.exit(failures === 0 ? 0 : 1);
