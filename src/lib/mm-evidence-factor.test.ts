@@ -386,6 +386,23 @@ assert(cls("Demonstrate experience implementing EVMS solutions for commercial cl
 assert(cls(CHAPEL, "Section M, Technical Requirements, Item I") === "demote", "round-5 keep: chapel specimen still demotes");
 assert(cls("Demonstrate experience; describe how your quality processes comply with industry best practices.", "Section M") === "demote", "round-5 keep: generic 'comply with best practices' (no system/CAS noun) still demotes");
 
+// ── P8h — ROUND-6 BATTERY (ceo/redteam-545-r10-round6.md — family-(v) SHAPE + one-token closes banked) ──
+console.log("\n── P8h round-6 closes (must escalate) + keeps ──");
+// family (v) — the standards-for-qualification SHAPE (participle-agnostic; the arm previously enumerated
+// prescribed/established and leaked the subpart's OWN third participle + compound nouns):
+assert(cls("Demonstrate capability; the offeror meets qualification standards prior to award.", "Section M") === "escalate", "d1: 'meets qualification standards prior to award' → escalate (round-6 named exit probe)");
+assert(cls("Demonstrate experience; the source must meet the standards specified for qualification.", "Section M") === "escalate", "d2: 'standards SPECIFIED for qualification' (FAR 9.202(a)(2)(ii)/9.203(a)) → escalate");
+assert(cls("Demonstrate past performance; products that have not passed qualification testing will not be considered for award.", "Section M") === "escalate", "d6: 'passed qualification testing' (FAR 9.205(a)(6) vocabulary) → escalate");
+// family (i) — meet/satisfy verb class + reversed review + CFA actor:
+assert(cls("Demonstrate capability with an accounting system that meets the requirements of DFARS 252.242-7006.", "Section M") === "escalate", "j2-1: 'system that MEETS the requirements' → escalate");
+assert(cls("Demonstrate experience; an estimating system that satisfies the requirements of DFARS 252.215-7002 is required.", "Section M") === "escalate", "j2-2: 'system that SATISFIES' → escalate");
+assert(cls("Demonstrate past performance; the Government will review the offeror's accounting system prior to award.", "Section M") === "escalate", "j2-3: reversed 'review … system' (arm asymmetry closed) → escalate");
+assert(cls("Demonstrate capability; earned value management processes compliant with ANSI/EIA-748 as determined by the CFA.", "Section M") === "escalate", "j2-8: bare-CFA actor → escalate");
+// keeps after the round-6 widening (the meet/pass stems must not eat ratable narratives):
+assert(cls(CHAPEL, "Section M, Technical Requirements, Item I") === "demote", "round-6 keep: chapel specimen still demotes");
+assert(cls("Demonstrate past performance; describe how your services met customer expectations.", "Section M") === "demote", "round-6 keep: 'met customer expectations' (no system/qualification noun) → demote");
+assert(cls("Demonstrate experience; personnel qualifications shall be described in the technical volume.", "Section M") === "demote", "round-6 keep: bare 'personnel qualifications' (no compound/verb shape) → demote");
+
 // ── P9 — POST-R10 COVERAGE STATEMENT (card #545 item 2): who protects the customer on each channel ──
 // (a) FINDINGS channel: an R10-escalated shape keeps its eligibility-bar typing → NHR pole (not BID_WITH_CAUTION),
 //     eligible=null under the tristate — protection restored WITHOUT the manifest backstop.
