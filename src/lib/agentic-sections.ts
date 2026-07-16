@@ -286,6 +286,13 @@ export function sectionLetterFromContent(text: string | null): string | null {
 // presence; the caller strips the fabricated cite before it can propagate or be scored. Pure → testable.
 const CLAUSE_NUM_RE = /\b2?52\.\d{3}-\d{1,4}\b/g;
 const normClauseCite = (s: string) => s.replace(/[‐-―]/g, "-").replace(/\s+/g, "");
+// §L card #539 (flag AUDIT_CLAUSE_SOURCE_FULLTEXT) — BOUNDARY-PRESERVING clause normalization. The legacy
+// normClauseCite strips ALL whitespace, which GLUES a preceding number onto the clause: "Feb 2026\n52.222-41" →
+// "…202652.222-41", and the (?<!\d) whole-token guard then rejects the match → a clause GENUINELY in source is
+// false-suppressed as fabricated (live root: FA303026Q0020 52.222-41, pricing-lens grade B). This variant collapses
+// whitespace ONLY around a dot/hyphen in a digit context (still joins a line-wrapped "52.222-\n41") while PRESERVING
+// token boundaries, so an adjacent date/page number no longer defeats the guard. Flag OFF ⇒ legacy behavior.
+const normClauseCiteBoundary = (s: string) => s.replace(/[‐-―]/g, "-").replace(/(\d)\s*([.-])\s*(\d)/g, "$1$2$3");
 
 /** Build a literal-source-presence checker for clause numbers (normalizes en-dashes + whitespace so
  *  "52.219 – 14" matches "52.219-14"). FULL-TOKEN match, not substring: a plain `includes` false-reports
@@ -294,9 +301,11 @@ const normClauseCite = (s: string) => s.replace(/[‐-―]/g, "-").replace(/\s+/
  *  (an absent bar clause certified present, then grounded on the wrong neighbor). Anchor both ends against
  *  an adjacent digit so only a whole clause number matches (T0-1, engine line-audit 2026-07-06). */
 export function makeClauseSourceChecker(sourceText: string): (clause: string) => boolean {
-  const norm = normClauseCite(sourceText);
+  // card #539: boundary-preserving normalization under the flag (default-OFF ⇒ legacy whitespace-strip, byte-identical).
+  const normFn = process.env.AUDIT_CLAUSE_SOURCE_FULLTEXT === "true" ? normClauseCiteBoundary : normClauseCite;
+  const norm = normFn(sourceText);
   return (clause: string) => {
-    const c = normClauseCite(clause);
+    const c = normFn(clause);
     if (!c) return false;
     const esc = c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // escape regex metachars (hyphen is literal outside a class)
     return new RegExp(`(?<!\\d)${esc}(?!\\d)`).test(norm);
