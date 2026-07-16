@@ -73,18 +73,24 @@ const R10_THIRD_PARTY_STATUS: RegExp[] = [
   //     review STEM (approv-/accept-/adequa-/validat-/audit-/review/compliant — covers the regulation-verbatim
   //     "acceptable accounting system", DFARS 252.242-7006/252.215-7002), either order. Actor arm widened to any
   //     cognizant office. CPSR review-completion form has its own arm (FAR 44.302).
-  /\b(?:accounting|purchasing|estimating|property|material\s+management|earned[- ]value(?:\s+management)?|EVMS?)\s+system\b[^.\n]{0,60}\b(?:approv\w+|accept\w+|adequa\w+|validat\w+|audit\w+|review\w*|compliant|compliance)\b/i,
-  /\b(?:approv\w+|accept\w+|adequa\w+|validat\w+|audit\w+|compliant|DCAA[- ]\w+|DCMA[- ]\w+)\b[^.\n]{0,45}\b(?:accounting|purchasing|estimating|property|material\s+management|earned[- ]value|EVMS?)\s+system\b/i,
-  /\b(?:DCAA|DCMA|cognizant\s+(?:\w+\s+){0,2}(?:agency|auditor|activity|ACO))\b[^.\n]{0,50}\bsystem\b/i,
-  /\bCPSR\b|\bcontractor\s+purchasing\s+system\s+review\b/i,
+  //     Round-2 additions: bare "audit" (audit\w* — the \w+ quantifier missed the bare noun), survey/pre-award-
+  //     survey determination instruments, SF 1408, MMAS acronym, spelled-out agency names, arm 3 both orders.
+  /\b(?:accounting|purchasing|estimating|property|material\s+management|earned[- ]value(?:\s+management)?|EVMS?|MMAS)\s+system\b[^.\n]{0,60}\b(?:approv\w+|accept\w+|adequa\w+|validat\w+|audit\w*|review\w*|surve\w+|compliant|compliance)\b/i,
+  /\b(?:approv\w+|accept\w+|adequa\w+|validat\w+|audit\w*|surve\w+|compliant|DCAA[- ]\w+|DCMA[- ]\w+)\b[^.\n]{0,45}\b(?:accounting|purchasing|estimating|property|material\s+management|earned[- ]value|EVMS?|MMAS)\s+system\b/i,
+  /\b(?:DCAA|DCMA|Defense\s+Contract\s+(?:Audit|Management)\s+Agency|cognizant\s+(?:\w+\s+){0,2}(?:agency|auditor|activity|ACO))\b[^.\n]{0,50}\bsystem\b/i,
+  /\bsystem\b[^.\n]{0,50}\b(?:DCAA|DCMA|Defense\s+Contract\s+(?:Audit|Management)\s+Agency|cognizant\s+(?:\w+\s+){0,2}(?:agency|auditor|activity|ACO))\b/i,
+  /\bCPSR\b|\bcontractor\s+purchasing\s+system\s+review\b|\bSF\s?1408\b|\bMMAS\b/i,
   // (ii) CBA STATUS — relation STEM (signatory/party-to/bound-by/adhere-to) × labor-agreement noun, both orders.
   //      SCA 4(c) judgment carried on the card: "bound by" may read compliance-not-gate — escalate is the safe pole.
-  /\b(?:signator(?:y|ies)|party\s+to|bound\s+by|adher\w+\s+to)\b[^.\n]{0,50}\b(?:collective\s+bargaining|CBA\b|union|labor\s+agreement|master\s+labor|trades?\s+council)/i,
+  /\b(?:signator(?:y|ies)|party\s+to|bound\s+by|adher\w+\s+to)\b[^.\n]{0,50}\b(?:collective\s+bargaining|CBA\b|union|labor\s+agreement|master\s+labor|trades?\s+council|local\s+\d+|brotherhood|workers'?\s+(?:union|local))/i,
   /\b(?:collective\s+bargaining|CBA\b|union|labor)\s+(?:agreement\s+)?(?:signator(?:y|ies)|part(?:y|ies))\b/i,
   // (iii) FACILITY-GEOGRAPHY — the facility noun is the ABSOLUTE anchor (protects the temporal keep-set:
   //       "within the past five years" has no facility noun). Preposition widened to bare in/at + located/radius;
   //       place tokens widened to area/region/vicinity/metropolitan/commuting (round-1 leaks iii-1/2/5).
-  /\b(?:facility|facilities|office|warehouse|yard|shop|plant|place\s+of\s+business|physical\s+(?:presence|location))\b[^.\n]{0,45}\b(?:within|in|at|near|no\s+(?:more|further)\s+than|located|radius)\b[^.\n]{0,40}\b(?:miles?|kilometers?|km|minutes?|county|counties|state|city|town|installation|base|site|area|region|vicinity|metropolitan|commuting)\b/i,
+  //       Round-2: nouns PLURALIZED (offices/warehouses leaked while singulars escalated — grammatical number
+  //       must never flip the pole), preposition "on" added (the natural installation preposition), time-distance
+  //       tokens hours/drive/place-of-performance added.
+  /\b(?:facilit(?:y|ies)|offices?|warehouses?|yards?|shops?|plants?|place\s+of\s+business|physical\s+(?:presence|location))\b[^.\n]{0,45}\b(?:within|in|at|on|near|no\s+(?:more|further)\s+than|located|radius)\b[^.\n]{0,40}\b(?:miles?|kilometers?|km|minutes?|hours?|drive|county|counties|state|city|town|installation|base|site|area|region|vicinity|metropolitan|commuting|place\s+of\s+performance)\b/i,
   /\b(?:maintain|establish|have|possess|operate)\b[^.\n]{0,25}\b(?:a\s+)?(?:local\s+|permanent\s+)?(?:facility|office|physical\s+presence|place\s+of\s+business)\b[^.\n]{0,40}\bwithin\b/i,
   // (iv) BASE-ACCESS CREDENTIALING — named credentials (DBIDS/RAPIDGate/CAC) + the installation-access pair in
   //      BOTH orders with verb forms (badged/vetted) and entry nouns (entry/admittance) — round-1 iv-1/iv-2.
@@ -96,7 +102,7 @@ const R10_THIRD_PARTY_STATUS: RegExp[] = [
   //     approved source"), and source-approval noun. The bare-narrative over-catch (an ASL-management
   //     past-performance factor) is ACCEPTED and banked as a control — escalate is the safe pole.
   /\b(?:approved|qualified)\s+(?:source|supplier|vendor|product)s?\s+list\b|\bQSL\b|\bAPL\b/i,
-  /\bsources?\s+approved\s+by\b|\bsource[- ]approv\w+\b|\bsource\s+approval\b/i,
+  /\bsources?\s+approved\s+by\b|\bsource[- ]approv\w+\b|\bsource\s+approval\b|\bsource[- ]control(?:led)?\b|\bsource\s+control\s+drawing\b/i,
   /\b(?:as|being|be)\s+an?\s+approved\s+(?:source|supplier|vendor)\b|\b(?:must|shall|only)\b[^.\n]{0,30}\bapproved\s+(?:source|supplier|vendor)s?\b/i,
 ];
 

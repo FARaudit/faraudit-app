@@ -265,6 +265,37 @@ assert(cls("Demonstrate experience supporting Government-approved training syste
 assert(cls("Demonstrate experience maintaining an approved supplier list as part of your quality program.", "Section M") === "escalate", "accepted over-catch: ASL-management narrative escalates (safe pole, documented)");
 assert(cls("Describe your purchasing system and how it was audited internally.", "Section M") === "escalate", "accepted over-catch: internal-audit narrative escalates (no actor discipline — safe pole, documented)");
 
+// ── P8d — ROUND-2 BATTERY (ceo/redteam-545-r10-round2.md, grade D — banked to close the round) ──
+console.log("\n── P8d round-2 leaks (must escalate) + consistency matrix + adjudicated keeps ──");
+// family (i) — determination instruments + bare-noun/agency-name/order gaps:
+assert(cls("Demonstrate past performance; award is contingent upon a favorable pre-award survey of the offeror's accounting system (SF 1408).", "Section M") === "escalate", "u1: SF 1408 pre-award survey → escalate");
+assert(cls("Demonstrate capability; an audit of the offeror's accounting system by the Defense Contract Audit Agency will be required prior to award.", "Section M") === "escalate", "u2: bare 'audit' + spelled-out DCAA → escalate");
+assert(cls("Demonstrate experience; an audit of the accounting system by DCAA is required prior to award.", "Section M") === "escalate", "u2b/c3b: 'system … by DCAA' reverse order → escalate (consistency with 'audited by DCAA')");
+assert(cls("Demonstrate past performance and a DCMA-approved MMAS.", "Section M") === "escalate", "u3: MMAS acronym (DFARS 252.242-7004's own term) → escalate");
+// family (ii) — named locals:
+assert(cls("Demonstrate capability; the offeror must be signatory to Local 26 of the International Brotherhood of Electrical Workers.", "Section M") === "escalate", "u4: 'signatory to Local 26' → escalate");
+// family (iii) — grammatical number must never flip the pole + natural prepositions:
+assert(cls("Demonstrate capability; offeror must maintain offices within 25 miles of the installation.", "Section M") === "escalate", "plural 'offices within 25 miles' → escalate (number-flip closed)");
+assert(cls("Demonstrate capability; offeror must maintain warehouses within 25 miles of the port city.", "Section M") === "escalate", "plural 'warehouses within 25 miles' → escalate");
+assert(cls("Demonstrate experience; the contractor shall maintain a physical presence on the installation.", "Section M") === "escalate", "u7: 'physical presence ON the installation' → escalate");
+assert(cls("Demonstrate capability; an office within a one-hour drive of the place of performance is required.", "Section M") === "escalate", "u8: 'within a one-hour drive of the place of performance' → escalate");
+// family (v) — source-control sibling:
+assert(cls("Demonstrate past performance; this is a source-controlled item procured in accordance with the source control drawing.", "Section M") === "escalate", "u11: 'source-controlled item / source control drawing' → escalate");
+assert(cls("Demonstrate capability; offerors must submit a Source Approval Request (SAR).", "Section M") === "escalate", "u12: SAR → escalate (held from round 2)");
+// adjudicated keeps (round-2): SCA 4(c) successorship binds ANY awardee — compliance term, NOT who-may-bid; the
+// relation-stem restraint is deliberate. Family (iv) 'installation vetting' stays demote per the curability
+// precedent (round-1 iv-3 / round-2 u10) — personnel vetting is post-award-curable in most shops.
+assert(cls("Demonstrate experience; the successor contractor shall assume all obligations under the incumbent collective bargaining agreement.", "Section M") === "demote", "u5 keep: SCA 4(c) successorship obligation → demote (compliance term, adjudicated round-2)");
+assert(cls("Demonstrate capability; all personnel must pass installation vetting requirements prior to performance.", "Section M") === "demote", "u10 keep: 'installation vetting' → demote (curability precedent, documented)");
+// round-2 over-catch tripwires (all held; banked so widening never silently releases them):
+assert(cls("Offeror shall demonstrate acceptable past performance on similar contracts.", "Section M, Evaluation Criteria") === "demote", "tripwire: 'acceptable past performance' (no system noun) → demote");
+assert(cls("Demonstrate relevant experience and describe your review process for purchasing decisions.", "Section M") === "demote", "tripwire: purchasing review-process narrative → demote");
+// round-2 accepted over-catches (o9-o12 — escalate = safe pole, ON THE RECORD; o9/o10 = cost of widened preps):
+assert(cls("Demonstrate experience maintaining facilities in a clean and safe state of repair.", "Section M") === "escalate", "accepted over-catch o9: 'facilities in a … state of repair' escalates (widened bare-in + state token)");
+assert(cls("Demonstrate past performance managing an office at each customer site.", "Section M") === "escalate", "accepted over-catch o10: 'office at each customer site' escalates (widened at + site)");
+assert(cls("Demonstrate experience supporting DCAA audits and resolving findings for the client's accounting system.", "Section M") === "escalate", "accepted over-catch o11: DCAA-audit advisory narrative escalates");
+assert(cls("Demonstrate past performance supporting CPSR preparation for client firms.", "Section M") === "escalate", "accepted over-catch o12: CPSR consultancy narrative escalates (bare-literal arm)");
+
 // ── P9 — POST-R10 COVERAGE STATEMENT (card #545 item 2): who protects the customer on each channel ──
 // (a) FINDINGS channel: an R10-escalated shape keeps its eligibility-bar typing → NHR pole (not BID_WITH_CAUTION),
 //     eligible=null under the tristate — protection restored WITHOUT the manifest backstop.
