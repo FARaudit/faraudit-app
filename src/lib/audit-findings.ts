@@ -128,6 +128,13 @@ export interface TypedFinding {
   // temporal/delivery impossibility, or a verified universal defect — all preserved. Marker only; deriveVerdict reads
   // controllability/cautionFloor, not this field.
   eligibilityAuthorityGuard?: boolean;
+  // §M EVIDENCE-FACTOR DEMOTION (Brain card #538 · flag AUDIT_MM_EVIDENCE_FACTOR_DEMOTION, default-OFF) — set when a
+  // §M evaluation/technical criterion whose substance is EVIDENCED INSIDE THE SUBMITTED QUOTE (capability statement /
+  // past-performance / prior-experience narrative) was re-typed from a would-be non-curable bar to a curable
+  // competitive caution (bidder_controls + curableInWindow + cautionFloor). NEVER fires on a coupled true bar
+  // (clearance/QPL/ITAR/holder-only), possession-at-offer, or who-may-bid ambiguity (those escalate). Marker only;
+  // deriveVerdict reads controllability/cautionFloor/curableInWindow, not this field.
+  mmEvidenceFactor?: boolean;
   // TEMPORAL SHARED-ARO / SEQUENTIAL-GATE NARROWING (Brain card 140, Step 7) — set on the FAT precondition
   // finding when the Step-2 universal-impossibility (no_one_can_move → NO_BID) was DECLINED under the Option-B
   // four-prong gate and the finding was floored to a KO-clarify caution instead (cautionFloor) — i.e. a temporal
