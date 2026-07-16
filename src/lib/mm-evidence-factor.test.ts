@@ -328,6 +328,41 @@ assert(cls("Demonstrate experience supporting the Defense Contract Audit Agency 
 assert(cls("Demonstrate past performance providing services on installations nationwide.", "Section M") === "demote", "anchor keep o3: 'services on installations' (no facility noun) → demote");
 assert(cls("Demonstrate experience operating warehouse facilities in three states.", "Section M") === "escalate", "number-closed: 'warehouse facilities in three states' now escalates (was an accidental demote — place-slot number tolerance)");
 
+// ── P8f — ROUND-4 BATTERY (ceo/redteam-545-r10-round4.md, grade D — regulation-sourced closes banked) ──
+console.log("\n── P8f round-4 leaks (must escalate) + depot-level carve + ledger ──");
+// family (i) — the clause's own umbrella noun, plural anchors, consequence vocabulary, covered system names:
+assert(cls("Demonstrate past performance; the Contractor shall establish and maintain acceptable business systems in accordance with the terms of this contract.", "Section M") === "escalate", "i-a9: 'acceptable business systems' (DFARS 252.242-7005 verbatim) → escalate");
+assert(cls("Demonstrate capability; offeror must maintain an approved business system.", "Section M") === "escalate", "i-a4: 'approved business system' → escalate");
+assert(cls("Demonstrate experience; the offeror's accounting and estimating systems must be approved by DCAA.", "Section M") === "escalate", "i-a5: plural 'systems … approved by DCAA' → escalate (anchor number closed)");
+assert(cls("Demonstrate capability; offerors whose accounting systems have been disapproved will not be considered.", "Section M") === "escalate", "i-a6: plural + negation → escalate");
+assert(cls("Demonstrate past performance; an accounting system deemed deficient will not be considered.", "Section M") === "escalate", "i-a1p: 'deemed deficient' consequence word → escalate");
+assert(cls("Demonstrate capability; payments will be withheld if significant deficiencies exist in the offeror's purchasing system.", "Section M") === "escalate", "i-a2: deficiencies + withheld → escalate");
+assert(cls("Demonstrate experience; a material weakness in the offeror's estimating system may result in payment withholding.", "Section M") === "escalate", "i-a11: 'material weakness' (current 252.242-7005 vocabulary) → escalate");
+assert(cls("Demonstrate capability; the offeror must have an acceptable property management system.", "Section M") === "escalate", "i-a8: 'property MANAGEMENT system' (infix, covered system #5) → escalate");
+assert(cls("Demonstrate past performance; forward pricing rate agreements approved by the cognizant ACO are required.", "Section M") === "escalate", "i-a7: FPRA sibling → escalate");
+// family (ii) — gap budget + relation stems:
+assert(cls("Demonstrate experience; the offeror must be a signatory to the area-wide agreement with the International Brotherhood of Electrical Workers.", "Section M") === "escalate", "ii-v1: 51-char gap (budget widened to 80) → escalate");
+assert(cls("Demonstrate capability; the offeror must have executed a collective bargaining agreement prior to offer.", "Section M") === "escalate", "ii-a1: 'executed a CBA' relation stem → escalate");
+// family (iii) — place-slot CONUS class:
+assert(cls("Demonstrate experience; the offeror shall maintain a physical presence in CONUS.", "Section M") === "escalate", "iii-a6: 'physical presence in CONUS' → escalate");
+// family (iv) — possessive/hyphen joiner tolerance:
+assert(cls("Demonstrate capability; employees must be vetted through the installation's access control system.", "Section M") === "escalate", "iv-a1: possessive joiner → escalate");
+assert(cls("Demonstrate experience; personnel must obtain base-access credentials prior to performance.", "Section M") === "escalate", "iv-a2: hyphen joiner → escalate");
+// family (v) — FAR 9.2 statutory siblings:
+assert(cls("Demonstrate past performance; items not on the qualified bidders list (QBL) will not be considered.", "Section M") === "escalate", "v-a1: QBL (FAR 9.201's third list) → escalate");
+assert(cls("Demonstrate capability; the item offered is subject to a qualification requirement under FAR 9.202 and must have satisfied qualification prior to award.", "Section M") === "escalate", "v-a2: 'subject to a qualification requirement' (52.209-1 boilerplate) → escalate");
+// DEPOT-LEVEL CARVE (round-4 o-n4 — the worst over-catch, FIXED not ledgered): depot-level is a maintenance
+// TIER (organizational/intermediate/depot), a bread-and-butter §M experience factor, never a facility noun:
+assert(cls("The offeror shall demonstrate successful performance of depot-level maintenance on comparable engines at military installations.", "Section M, Evaluation Criteria") === "demote", "o-n4 CARVE: 'depot-level maintenance' tier → demote (false-NHR class fixed)");
+assert(cls("Demonstrate capability; maintain a parts depot within 30 minutes of the base.", "Section M") === "escalate", "carve guard: a real parts DEPOT (facility) still escalates");
+// round-4 over-catch ledger additions (accepted safe-pole, ON THE RECORD):
+assert(cls("Demonstrate experience correcting inadequate cost accounting practices for commercial clients.", "Section M") === "escalate", "accepted over-catch o-n1: CAS consultancy narrative escalates");
+assert(cls("Demonstrate past performance operating branches in multiple regions.", "Section M") === "escalate", "accepted over-catch o-n2: footprint narrative escalates");
+assert(cls("Demonstrate experience conducting site surveys at customer facilities in the region.", "Section M") === "escalate", "accepted over-catch o-n7: site-survey narrative escalates");
+// keep-set spot guards after the round-4 widening:
+assert(cls(CHAPEL, "Section M, Technical Requirements, Item I") === "demote", "round-4 keep: chapel specimen still demotes");
+assert(cls("Demonstrate experience; offices situated near transit hubs are preferred.", "Section M") === "demote", "round-4 keep: 'situated near transit' (no place token) still demotes");
+
 // ── P9 — POST-R10 COVERAGE STATEMENT (card #545 item 2): who protects the customer on each channel ──
 // (a) FINDINGS channel: an R10-escalated shape keeps its eligibility-bar typing → NHR pole (not BID_WITH_CAUTION),
 //     eligible=null under the tristate — protection restored WITHOUT the manifest backstop.

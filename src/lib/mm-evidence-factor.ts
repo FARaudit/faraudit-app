@@ -79,17 +79,17 @@ const R10_THIRD_PARTY_STATUS: RegExp[] = [
   //     "disapprove/disapproval" and FAR 16.301-3's "adequate→inadequate" flipped the pole on a negation prefix),
   //     the FULL FAR 53.209-1 pre-award survey form RANGE (SF 1403-1408, not the one banked specimen), and the
   //     no-"system"-token CAS grammar (cost accounting practices / disclosure statement / billing rates).
-  /\b(?:accounting|billing|purchasing|estimating|property|material\s+management|earned[- ]value(?:\s+management)?|EVMS?|MMAS)\s+system\b[^.\n]{0,60}\b(?:dis|in|un|non[- ]?)?(?:approv\w+|accept\w+|adequa\w+|validat\w+|audit\w*|review\w*|surve\w+|compliant|compliance)\b/i,
-  /\b(?:dis|in|un|non[- ]?)?(?:approv\w+|accept\w+|adequa\w+|validat\w+|audit\w*|surve\w+|compliant)\b[^.\n]{0,45}\b(?:accounting|billing|purchasing|estimating|property|material\s+management|earned[- ]value|EVMS?|MMAS)\s+system\b/i,
-  /\b(?:DCAA[- ]\w+|DCMA[- ]\w+)\b[^.\n]{0,45}\b(?:accounting|billing|purchasing|estimating|property|material\s+management|earned[- ]value|EVMS?|MMAS)\s+system\b/i,
-  /\b(?:DCAA|DCMA|Defense\s+Contract\s+(?:Audit|Management)\s+Agency|cognizant\s+(?:\w+\s+){0,2}(?:agency|auditor|activity|ACO))\b[^.\n]{0,50}\bsystem\b/i,
-  /\bsystem\b[^.\n]{0,50}\b(?:DCAA|DCMA|Defense\s+Contract\s+(?:Audit|Management)\s+Agency|cognizant\s+(?:\w+\s+){0,2}(?:agency|auditor|activity|ACO))\b/i,
+  /\b(?:accounting|billing|purchasing|estimating|property(?:\s+management)?|material\s+management(?:\s+and\s+accounting)?|business|earned[- ]value(?:\s+management)?|EVMS?|MMAS)\s+systems?\b[^.\n]{0,60}\b(?:dis|in|un|non[- ]?)?(?:approv\w+|accept\w+|adequa\w+|validat\w+|audit\w*|review\w*|surve\w+|compliant|compliance|deficien\w+|material\s+weakness\w*|withh?[eo]ld\w*)\b/i,
+  /\b(?:dis|in|un|non[- ]?)?(?:approv\w+|accept\w+|adequa\w+|validat\w+|audit\w*|surve\w+|compliant|deficien\w+|material\s+weakness\w*|DCAA[- ]\w+|DCMA[- ]\w+)\b[^.\n]{0,45}\b(?:accounting|billing|purchasing|estimating|property(?:\s+management)?|material\s+management(?:\s+and\s+accounting)?|business|earned[- ]value|EVMS?|MMAS)\s+systems?\b/i,
+  /\b(?:DCAA[- ]\w+|DCMA[- ]\w+)\b[^.\n]{0,45}\b(?:accounting|billing|purchasing|estimating|property(?:\s+management)?|material\s+management(?:\s+and\s+accounting)?|business|earned[- ]value|EVMS?|MMAS)\s+systems?\b/i,
+  /\b(?:DCAA|DCMA|Defense\s+Contract\s+(?:Audit|Management)\s+Agency|cognizant\s+(?:\w+\s+){0,2}(?:agency|auditor|activity|ACO))\b[^.\n]{0,50}\bsystems?\b/i,
+  /\bsystems?\b[^.\n]{0,50}\b(?:DCAA|DCMA|Defense\s+Contract\s+(?:Audit|Management)\s+Agency|cognizant\s+(?:\w+\s+){0,2}(?:agency|auditor|activity|ACO))\b/i,
   /\bCPSR\b|\bcontractor\s+purchasing\s+system\s+review\b|\bSF\s?140[3-8]\b|\bMMAS\b|\bpre[- ]?award\s+survey\b/i,
-  /\b(?:dis|in|un|non[- ]?)?(?:approv\w+|accept\w+|adequa\w+|determin\w+)\b[^.\n]{0,40}\b(?:cost\s+accounting\s+practices?|CAS\s+disclosure\s+statement|disclosure\s+statement|billing\s+rates?)\b/i,
-  /\b(?:cost\s+accounting\s+practices?|CAS\s+disclosure\s+statement|disclosure\s+statement|billing\s+rates?)\b[^.\n]{0,40}\b(?:dis|in|un|non[- ]?)?(?:approv\w+|accept\w+|adequa\w+|determin\w+)\b/i,
+  /\b(?:dis|in|un|non[- ]?)?(?:approv\w+|accept\w+|adequa\w+|determin\w+)\b[^.\n]{0,40}\b(?:cost\s+accounting\s+practices?|CAS\s+disclosure\s+statement|disclosure\s+statement|billing\s+rates?|forward\s+pricing\s+rates?)\b/i,
+  /\b(?:cost\s+accounting\s+practices?|CAS\s+disclosure\s+statement|disclosure\s+statement|billing\s+rates?|forward\s+pricing\s+rates?)\b[^.\n]{0,40}\b(?:dis|in|un|non[- ]?)?(?:approv\w+|accept\w+|adequa\w+|determin\w+)\b/i,
   // (ii) CBA STATUS — relation STEM (signatory/party-to/bound-by/adhere-to) × labor-agreement noun, both orders.
   //      SCA 4(c) judgment carried on the card: "bound by" may read compliance-not-gate — escalate is the safe pole.
-  /\b(?:signator(?:y|ies)|party\s+to|bound\s+by|adher\w+\s+to)\b[^.\n]{0,50}\b(?:collective\s+bargaining|CBA\b|union|labor\s+agreement|master\s+labor|trades?\s+council|local\s+\d+|brotherhood|workers'?\s+(?:union|local))/i,
+  /\b(?:signator(?:y|ies)|party\s+to|bound\s+by|adher\w+\s+to|execut\w+|enter\w*\s+into)\b[^.\n]{0,80}\b(?:collective\s+bargaining|CBA\b|union|labor\s+agreement|master\s+labor|trades?\s+council|local\s+\d+|brotherhood|workers'?\s+(?:union|local))/i,
   /\b(?:collective\s+bargaining|CBA\b|union|labor)\s+(?:agreement\s+)?(?:signator(?:y|ies)|part(?:y|ies))\b/i,
   // (iii) FACILITY-GEOGRAPHY — the facility noun is the ABSOLUTE anchor (protects the temporal keep-set:
   //       "within the past five years" has no facility noun). Preposition widened to bare in/at + located/radius;
@@ -100,22 +100,22 @@ const R10_THIRD_PARTY_STATUS: RegExp[] = [
   //       facility-noun class widened with the round-3 open-class leaks (depot/branch/terminal/service center/
   //       on-site presence) + the on-post/on-base compound forms. The noun slot remains ENUMERATED — an
   //       open-class residual is explicitly carried to Brain on the card (round-3 F5 family-iii call).
-  /\b(?:facilit(?:y|ies)|offices?|warehouses?|yards?|shops?|plants?|depots?|branch(?:es)?|terminals?|storefronts?|service\s+centers?|dispatch\s+points?|place\s+of\s+business|(?:physical|on[- ]site|local)\s+(?:presence|location))\b[^.\n]{0,45}\b(?:within|in|at|on|near|no\s+(?:more|further)\s+than|located|situated|radius)\b[^.\n]{0,40}\b(?:miles?|kilometers?|km|minutes?|hours?|drive|count(?:y|ies)|states?|cit(?:y|ies)|towns?|installations?|bases?|posts?|garrisons?|sites?|areas?|regions?|vicinit(?:y|ies)|metropolitan|commuting|place\s+of\s+performance)\b/i,
-  /\b(?:facilit(?:y|ies)|offices?|warehouses?|yards?|shops?|plants?|depots?|branch(?:es)?|service\s+centers?|(?:physical|on[- ]site)\s+presence)\b[^.\n]{0,30}\b(?:located\s+)?on[- ](?:post|base|site|installation)\b/i,
+  /\b(?:facilit(?:y|ies)|offices?|warehouses?|yards?|shops?|plants?|depots?(?![- ]level)|branch(?:es)?|terminals?|storefronts?|service\s+centers?|dispatch\s+points?|place\s+of\s+business|(?:physical|on[- ]site|local)\s+(?:presence|location))\b[^.\n]{0,45}\b(?:within|in|at|on|near|no\s+(?:more|further)\s+than|located|situated|radius)\b[^.\n]{0,40}\b(?:miles?|kilometers?|km|minutes?|hours?|drive|count(?:y|ies)|states?|cit(?:y|ies)|towns?|installations?|bases?|posts?|garrisons?|sites?|areas?|regions?|vicinit(?:y|ies)|metropolitan|commuting|CONUS|OCONUS|nationwide|overseas|continental\s+United\s+States|United\s+States|place\s+of\s+performance)\b/i,
+  /\b(?:facilit(?:y|ies)|offices?|warehouses?|yards?|shops?|plants?|depots?(?![- ]level)|branch(?:es)?|service\s+centers?|(?:physical|on[- ]site)\s+presence)\b[^.\n]{0,30}\b(?:located\s+)?on[- ](?:post|base|site|installation)\b/i,
   /\b(?:maintain|establish|have|possess|operate|staff)\b[^.\n]{0,25}\b(?:a\s+)?(?:local\s+|permanent\s+)?(?:facilit(?:y|ies)|offices?|physical\s+presence|on[- ]site\s+presence|place\s+of\s+business)\b[^.\n]{0,40}\bwithin\b/i,
   // (iv) BASE-ACCESS CREDENTIALING — named credentials (DBIDS/RAPIDGate/CAC) + the installation-access pair in
   //      BOTH orders with verb forms (badged/vetted) and entry nouns (entry/admittance) — round-1 iv-1/iv-2.
   /\b(?:DBIDS|RAPIDGate|common\s+access\s+card)\b|\bCAC\s+(?:card|credential|eligib\w+|required)\b/i,
-  /\b(?:badg\w+|vett\w+|credential\w+|cleared)\b[^.\n]{0,40}\b(?:installation|base|post|site|garrison)\s+(?:access|entry|admittance)\b/i,
-  /\b(?:installation|base|post|site|garrison)\s+(?:access|entry|admittance)\b[^.\n]{0,40}\b(?:credential\w*|badg\w+|pass(?:es)?\b|clearance|vett\w+|background|registration|control\s+system)\b/i,
+  /\b(?:badg\w+|vett\w+|credential\w+|cleared)\b[^.\n]{0,40}\b(?:installation|base|post|site|garrison)(?:'s)?[-\s]+(?:access|entry|admittance)\b/i,
+  /\b(?:installation|base|post|site|garrison)(?:'s)?[-\s]+(?:access|entry|admittance)\b[^.\n]{0,40}\b(?:credential\w*|badg\w+|pass(?:es)?\b|clearance|vett\w+|background|registration|control\s+systems?)\b/i,
   // (v) APPROVED-SOURCE — list forms (QSL/APL/approved-X-list), post-positive "source(s) approved by" and
   //     hyphenated "source-approved" (the dominant DLA/ESA forms, round-1 v-1/v-2), status-as form ("as an
   //     approved source"), and source-approval noun. The bare-narrative over-catch (an ASL-management
   //     past-performance factor) is ACCEPTED and banked as a control — escalate is the safe pole.
   //     Round-3: QPD (DLA's CURRENT name for the QPL — qpldocs.dla.mil), manufacturer/bidder/dealer/contractor
   //     in the list-noun slot + AML, "qualifying activity" as an approval actor, list-noun database sibling.
-  /\b(?:approved|qualified)\s+(?:source|supplier|vendor|product|manufacturer|bidder|dealer|contractor)s?\s+(?:list|database)\b|\bQSL\b|\bAPL\b|\bAML\b|\bQPD\b/i,
-  /\b(?:sources?|manufacturers?|suppliers?|vendors?|dealers?)\s+(?:approved|qualified)\s+by\b|\bsource[- ]approv\w+\b|\bsource\s+approval\b|\bsource[- ]control(?:led)?\b|\bsource\s+control\s+(?:drawing|document)\b|\bqualifying\s+activity\b/i,
+  /\b(?:approved|qualified)\s+(?:source|supplier|vendor|product|manufacturer|bidder|dealer|contractor)s?\s+(?:list|database)s?\b|\bQSL\b|\bAPL\b|\bAML\b|\bQPD\b|\bQBL\b|\bqualified\s+bidders\s+lists?\b/i,
+  /\b(?:sources?|manufacturers?|suppliers?|vendors?|dealers?)\s+(?:approved|qualified)\s+by\b|\bsource[- ]approv\w+\b|\bsource\s+approval\b|\bsource[- ]control(?:led)?\b|\bsource\s+control\s+(?:drawing|document)s?\b|\bqualifying\s+activity\b|\b(?:subject\s+to|satisf\w+|met)\s+(?:a\s+|all\s+(?:applicable\s+)?)?qualification\s+requirements?\b/i,
   /\b(?:as|being|be)\s+an?\s+approved\s+(?:source|supplier|vendor)\b|\b(?:must|shall|only)\b[^.\n]{0,30}\bapproved\s+(?:source|supplier|vendor)s?\b/i,
 ];
 
