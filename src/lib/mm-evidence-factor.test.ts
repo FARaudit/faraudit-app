@@ -227,6 +227,44 @@ assert(cls("Offeror shall demonstrate past performance managing multiple facilit
 assert(cls("Demonstrate relevant experience within the past five years delivering these services.", "Section M") === "demote", "R10 keep: 'within the past five years' (no facility noun + place token) still demotes");
 assert(cls("Provide a capability statement describing your quality system and technical approach.", "Section M") === "demote", "R10 keep: bare 'quality system' (no third-party approval structure) still demotes");
 
+// ── P8b — VOCAB-SWEEP BATTERY (red-team round-1 grade F, ceo/redteam-545-r10.md — the 19 family leaks, BANKED) ──
+// Doctrine ([[feedback_no_blocklist_shape_allowlist_doctrine]]): bank a vocab-sweep suite to DRY BEFORE arming.
+// Round-1 proved the first cut banked specimens, not families — every probe below LEAKED (classified demote,
+// 6 flip-proven to BID_WITH_CAUTION + eligible=true under the armed flags). All must ESCALATE.
+console.log("\n── P8b vocab-sweep — round-1 family leaks (all must escalate) ──");
+// family (i) business systems — incl. the DFARS-verbatim adjective the token slots omitted:
+assert(cls("Offeror shall demonstrate past performance and an acceptable accounting system in accordance with DFARS 252.242-7006.", "Section M, Evaluation Criteria") === "escalate", "i-1: DFARS-verbatim 'acceptable accounting system' → escalate");
+assert(cls("Demonstrate capability; the accounting system must be deemed acceptable by the cognizant audit agency.", "Section M") === "escalate", "i-2: 'deemed acceptable by the cognizant audit agency' → escalate");
+assert(cls("Demonstrate past performance; offeror must have successfully completed a Contractor Purchasing System Review (CPSR).", "Section M") === "escalate", "i-3: CPSR review-completion form → escalate");
+assert(cls("Demonstrate experience; the estimating system shall be acceptable to the cognizant ACO.", "Section M") === "escalate", "i-4: 'estimating system acceptable to the cognizant ACO' → escalate");
+assert(cls("Offeror shall maintain a DCAA-compliant accounting system and demonstrate past performance.", "Section M") === "escalate", "i-5: 'DCAA-compliant accounting system' → escalate");
+// family (ii) CBA:
+assert(cls("Demonstrate experience; the offeror must be a party to the area-wide collective bargaining agreement.", "Section M") === "escalate", "ii-1: 'party to the area-wide CBA' → escalate");
+assert(cls("Demonstrate capability; the contractor will be bound by and must adopt the applicable collective bargaining agreement.", "Section M") === "escalate", "ii-2: 'bound by the CBA' → escalate (safe pole; SCA 4(c) judgment carried on card)");
+// family (iii) geography:
+assert(cls("Offeror shall demonstrate capability and maintain an office in the local commuting area of the installation.", "Section M") === "escalate", "iii-1: 'office in the local commuting area' → escalate");
+assert(cls("Demonstrate past performance; the offeror must have a facility in Bexar County, Texas.", "Section M") === "escalate", "iii-2: 'facility in Bexar County' → escalate");
+assert(cls("Demonstrate experience; offeror shall establish and staff a local office in the Norfolk metropolitan area.", "Section M") === "escalate", "iii-5: 'local office in the metropolitan area' → escalate");
+// family (iv) base access — the synonym-flip inconsistency (iv-1) + verb-first vetting (iv-2):
+assert(cls("Demonstrate capability; all contractor personnel must be badged for installation entry.", "Section M") === "escalate", "iv-1: 'badged for installation entry' → escalate");
+assert(cls("Demonstrate experience; employees must be vetted through the installation access control system.", "Section M") === "escalate", "iv-2: 'vetted through the installation access control system' → escalate");
+// family (v) approved-source — the dominant post-positive/hyphenated/APL forms:
+assert(cls("Demonstrate past performance; the item shall be furnished only from a source approved by the Engineering Support Activity.", "Section M") === "escalate", "v-1: post-positive 'source approved by the ESA' → escalate");
+assert(cls("Demonstrate capability; offerors must be source-approved by the cognizant ESA prior to award.", "Section M") === "escalate", "v-2: hyphenated 'source-approved by' → escalate");
+assert(cls("Demonstrate experience; the proposed item must appear on the approved products list (APL).", "Section M") === "escalate", "v-3: 'approved products list (APL)' → escalate");
+
+// ── P8c — KEEP-SET CONTROLS (round-1 D2 keeps + accepted over-catches, banked both ways) ──
+console.log("\n── P8c keep-set — ratable narratives still demote; accepted over-catches stated ──");
+assert(cls("Demonstrate past performance providing services at government facilities nationwide.", "Section M, Evaluation Criteria") === "demote", "keep: 'at government facilities' narrative (no bounded-location form) → demote");
+assert(cls("Describe your accounting practices and quality system in the technical narrative.", "Section M") === "demote", "keep: 'accounting practices and quality system' (no system+status pair) → demote");
+assert(cls("Demonstrate experience providing services within the National Capital Region.", "Section M") === "demote", "keep: 'services within the NCR' (no facility noun) → demote");
+assert(cls("Demonstrate past performance on CBA-covered contracts of similar scope.", "Section M") === "demote", "keep: 'CBA-covered contracts' narrative (no relation lexeme) → demote");
+assert(cls("Demonstrate experience obtaining base access for staff at multiple installations.", "Section M") === "demote", "keep: 'obtaining base access' narrative (no credential pair) → demote");
+assert(cls("Demonstrate experience supporting Government-approved training system programs at customer sites.", "Section M") === "demote", "keep (round-1 d2-7 RELEASED): third-party 'Government-approved training system' narrative → demote (generic gov-approved-any-system arm dropped)");
+// ACCEPTED over-catches (escalate = safe pole; banked so a future rework KNOWS it changed them):
+assert(cls("Demonstrate experience maintaining an approved supplier list as part of your quality program.", "Section M") === "escalate", "accepted over-catch: ASL-management narrative escalates (safe pole, documented)");
+assert(cls("Describe your purchasing system and how it was audited internally.", "Section M") === "escalate", "accepted over-catch: internal-audit narrative escalates (no actor discipline — safe pole, documented)");
+
 // ── P9 — POST-R10 COVERAGE STATEMENT (card #545 item 2): who protects the customer on each channel ──
 // (a) FINDINGS channel: an R10-escalated shape keeps its eligibility-bar typing → NHR pole (not BID_WITH_CAUTION),
 //     eligible=null under the tristate — protection restored WITHOUT the manifest backstop.

@@ -64,27 +64,40 @@ const HELD_CREDENTIAL_SHAPE: RegExp[] = [
 // DCAA-approved accounting system" carries evidence-language AND conferred-status substance; the status vetoes the
 // demote. SHAPE-allowlisted (structural form, position-checked second token — per the no-blocklist doctrine and
 // the round-2 comma lesson); over-catch errs toward ESCALATION, the safe pole. Any hit ⇒ escalate.
+// Re-shaped after red-team round-1 (grade F, ceo/redteam-545-r10.md): the first cut banked the six SPECIMENS,
+// not the FAMILIES — its second-token slots were closed vocab lists (the #507 treadmill inside allowlist
+// clothing; "acceptable" — the DFARS clauses' own adjective — leaked all three business-system arms). Each arm
+// now anchors on the family's POSITION-CHECKED structural noun and pairs it with a STEM family, both orders.
 const R10_THIRD_PARTY_STATUS: RegExp[] = [
-  // (i) AGENCY-APPROVED BUSINESS SYSTEM — DCAA/DCMA/government/cognizant-auditor approval of an accounting /
-  //     purchasing / estimating / property / EVMS system. The approval is granted by audit, not narrated.
-  /\b(?:DCAA|DCMA|government|cognizant\s+(?:federal\s+)?(?:agency|auditor|ACO))[- ]?(?:approved|validated|accepted|audited|determined[- ]adequate)\b[^.\n]{0,45}\bsystem\b/i,
-  /\b(?:accounting|purchasing|estimating|property|earned[- ]value(?:\s+management)?|EVMS?)\s+system\b[^.\n]{0,50}\b(?:approved|validated|accepted|deemed\s+adequate|determined\s+adequate|audited)\b/i,
-  /\b(?:approved|adequate)\s+(?:accounting|purchasing|estimating|property|earned[- ]value|EVMS?)\s+system\b/i,
-  // (ii) CBA-SIGNATORY STATUS — signatory to a collective bargaining / union / labor agreement is a held
-  //      labor-relations status, not quote-authored evidence.
-  /\bsignator(?:y|ies)\b[^.\n]{0,50}\b(?:collective\s+bargaining|CBA|union|labor\s+agreement)\b|\b(?:collective\s+bargaining|CBA|union|labor)\s+(?:agreement\s+)?signator(?:y|ies)\b/i,
-  // (iii) FACILITY-GEOGRAPHY — a physical facility/office/presence required AT or WITHIN a stated location or
-  //       radius (the 50-mile class). Requires the facility noun AND a bounded-location form (position-checked) —
-  //       "demonstrate experience within the past 5 years" has neither and stays demote-eligible.
-  /\b(?:facility|facilities|office|warehouse|yard|shop|plant|place\s+of\s+business|physical\s+(?:presence|location))\b[^.\n]{0,45}\b(?:within|no\s+(?:more|further)\s+than|located\s+(?:in|at|within)|in\s+the\s+vicinity\s+of|radius\s+of)\b[^.\n]{0,35}\b(?:miles?|kilometers?|km|minutes?|county|counties|state|city|town|installation|base|site)\b/i,
+  // (i) BUSINESS-SYSTEM STATUS — anchor = the DFARS business-system noun; pair = an acceptability/approval/
+  //     review STEM (approv-/accept-/adequa-/validat-/audit-/review/compliant — covers the regulation-verbatim
+  //     "acceptable accounting system", DFARS 252.242-7006/252.215-7002), either order. Actor arm widened to any
+  //     cognizant office. CPSR review-completion form has its own arm (FAR 44.302).
+  /\b(?:accounting|purchasing|estimating|property|material\s+management|earned[- ]value(?:\s+management)?|EVMS?)\s+system\b[^.\n]{0,60}\b(?:approv\w+|accept\w+|adequa\w+|validat\w+|audit\w+|review\w*|compliant|compliance)\b/i,
+  /\b(?:approv\w+|accept\w+|adequa\w+|validat\w+|audit\w+|compliant|DCAA[- ]\w+|DCMA[- ]\w+)\b[^.\n]{0,45}\b(?:accounting|purchasing|estimating|property|material\s+management|earned[- ]value|EVMS?)\s+system\b/i,
+  /\b(?:DCAA|DCMA|cognizant\s+(?:\w+\s+){0,2}(?:agency|auditor|activity|ACO))\b[^.\n]{0,50}\bsystem\b/i,
+  /\bCPSR\b|\bcontractor\s+purchasing\s+system\s+review\b/i,
+  // (ii) CBA STATUS — relation STEM (signatory/party-to/bound-by/adhere-to) × labor-agreement noun, both orders.
+  //      SCA 4(c) judgment carried on the card: "bound by" may read compliance-not-gate — escalate is the safe pole.
+  /\b(?:signator(?:y|ies)|party\s+to|bound\s+by|adher\w+\s+to)\b[^.\n]{0,50}\b(?:collective\s+bargaining|CBA\b|union|labor\s+agreement|master\s+labor|trades?\s+council)/i,
+  /\b(?:collective\s+bargaining|CBA\b|union|labor)\s+(?:agreement\s+)?(?:signator(?:y|ies)|part(?:y|ies))\b/i,
+  // (iii) FACILITY-GEOGRAPHY — the facility noun is the ABSOLUTE anchor (protects the temporal keep-set:
+  //       "within the past five years" has no facility noun). Preposition widened to bare in/at + located/radius;
+  //       place tokens widened to area/region/vicinity/metropolitan/commuting (round-1 leaks iii-1/2/5).
+  /\b(?:facility|facilities|office|warehouse|yard|shop|plant|place\s+of\s+business|physical\s+(?:presence|location))\b[^.\n]{0,45}\b(?:within|in|at|near|no\s+(?:more|further)\s+than|located|radius)\b[^.\n]{0,40}\b(?:miles?|kilometers?|km|minutes?|county|counties|state|city|town|installation|base|site|area|region|vicinity|metropolitan|commuting)\b/i,
   /\b(?:maintain|establish|have|possess|operate)\b[^.\n]{0,25}\b(?:a\s+)?(?:local\s+|permanent\s+)?(?:facility|office|physical\s+presence|place\s+of\s+business)\b[^.\n]{0,40}\bwithin\b/i,
-  // (iv) BASE-ACCESS CREDENTIALING — a named installation-access credential (DBIDS/RAPIDGate/CAC) or the
-  //      base-access + credential/vetting pair. Conferred by the installation's credentialing office.
+  // (iv) BASE-ACCESS CREDENTIALING — named credentials (DBIDS/RAPIDGate/CAC) + the installation-access pair in
+  //      BOTH orders with verb forms (badged/vetted) and entry nouns (entry/admittance) — round-1 iv-1/iv-2.
   /\b(?:DBIDS|RAPIDGate|common\s+access\s+card)\b|\bCAC\s+(?:card|credential|eligib\w+|required)\b/i,
-  /\b(?:base|installation|post|site|garrison)\s+access\b[^.\n]{0,40}\b(?:credential\w*|badge|pass(?:es)?\b|clearance|vetting|background|registration)\b/i,
-  // (v) APPROVED-SOURCE / QPL-ADJACENT — source/supplier approval conferred by the buying activity or OEM
-  //     (the QPL/QML forms are already vetoed upstream; this closes the adjacent "approved source" family).
-  /\bapproved\s+(?:source|supplier|vendor)s?\b|\bsource\s+approval\b|\bqualified\s+suppliers?\s+list\b|\bQSL\b/i,
+  /\b(?:badg\w+|vett\w+|credential\w+|cleared)\b[^.\n]{0,40}\b(?:installation|base|post|site|garrison)\s+(?:access|entry|admittance)\b/i,
+  /\b(?:installation|base|post|site|garrison)\s+(?:access|entry|admittance)\b[^.\n]{0,40}\b(?:credential\w*|badg\w+|pass(?:es)?\b|clearance|vett\w+|background|registration|control\s+system)\b/i,
+  // (v) APPROVED-SOURCE — list forms (QSL/APL/approved-X-list), post-positive "source(s) approved by" and
+  //     hyphenated "source-approved" (the dominant DLA/ESA forms, round-1 v-1/v-2), status-as form ("as an
+  //     approved source"), and source-approval noun. The bare-narrative over-catch (an ASL-management
+  //     past-performance factor) is ACCEPTED and banked as a control — escalate is the safe pole.
+  /\b(?:approved|qualified)\s+(?:source|supplier|vendor|product)s?\s+list\b|\bQSL\b|\bAPL\b/i,
+  /\bsources?\s+approved\s+by\b|\bsource[- ]approv\w+\b|\bsource\s+approval\b/i,
+  /\b(?:as|being|be)\s+an?\s+approved\s+(?:source|supplier|vendor)\b|\b(?:must|shall|only)\b[^.\n]{0,30}\bapproved\s+(?:source|supplier|vendor)s?\b/i,
 ];
 
 // WHO-MAY-BID RESTRICTION SHAPE (Gauntlet round-4 BREAK) — an ACTOR-AGNOSTIC definitive eligibility restriction on
