@@ -569,6 +569,48 @@ export function verifyRecitalInSource(fullSource: string, ob: string): { present
   return { present: true, continuation };
 }
 
+// ═══ CREDENTIAL-CONDITIONAL BAR — REASON-QUALITY SLICE — card #575b, flag AUDIT_CREDENTIAL_CONDITIONAL_REASON (OFF) ═══
+// BRAIN REFRAME (binding, card #575): the flagship bar-signal-POSITIVE classes deferred by #572 —
+// "maintain <credential> during performance" and "maintain an active SAM registration" — are CREDENTIAL-CONDITIONAL:
+// benign IFF the offeror actually HOLDS the credential, which NO shape/source check can determine (the discriminator is
+// a bidder-profile HOLD check, deferred to card #575 (a)+(c)+(d), platform-dependent). Pending it, their NHR routing is
+// CORRECT fail-toward-disqualifier behavior, NOT a defect — the OPEN defect is REASON QUALITY only. This slice upgrades
+// the NHR reason STRING from the opaque-disqualifier form to an actionable conditional ("this requires X — confirm your
+// firm holds it before bidding"). VERDICT IS UNCHANGED (deriveVerdict sole authority; the gateV2Outcome CAP is byte-
+// identical — only the reason prose differs). FABRICATION-INVARIANT COMPLIANT (mirror of the #574 defect class): the
+// credential phrase is extracted VERBATIM from the obligation's own text (grounded, never invented); the phrasing is
+// CONDITIONAL and makes ZERO claim about whether the bidder holds or lacks it. Flag-OFF ⇒ legacy reason byte-identical.
+const credentialConditionalReasonEnabled = () => process.env.AUDIT_CREDENTIAL_CONDITIONAL_REASON === "true";
+// A credential noun the "maintain … during performance" duty can govern (the firm-inherent-credential family, #557).
+// Deliberately EXCLUDES "qualif*" (Gauntlet F3 — "maintain qualified personnel during performance" is a staffing duty,
+// not a firm-inherent credential; the "confirm you hold it" framing would mislead).
+const CREDENTIAL_TOKEN_RE = /\b(?:licens\w*|certificat\w*|certification|accreditat\w*|clearance|registration)\b/i;
+// "maintain <objects> during/throughout performance" — capture the maintained objects VERBATIM (group 1). The class
+// excludes ";" so the lazy capture can't swallow an intervening clause (Gauntlet F4).
+const MAINTAIN_CREDENTIAL_RE = /\bmaintain\b([^.;]{0,180}?)\b(?:during\s+(?:the\s+)?(?:entire\s+)?(?:contract\s+|order\s+)?performance(?:\s+period)?|throughout\s+the\s+(?:life\s+of|period\s+of\s+performance|performance))\b/i;
+// "maintain an active SAM registration" / "active registration in SAM" — SAM token MANDATORY (Gauntlet F1: an optional
+// SAM token mislabeled ANY "maintain an active registration" — e.g. a state nursing-board registry — as SAM).
+const SAM_ACTIVE_RE = /\bmaintain\s+an?\s+active\s+(?:sam(?:\.gov)?|system\s+for\s+award\s+management)\s+registration\b|\bactive\s+registration\s+in\s+(?:sam\b|the\s+system\s+for\s+award\s+management)\b/i;
+
+/** Recognize a credential-conditional bar obligation and extract its credential phrase VERBATIM from the obligation
+ *  (card #575b). Returns { credential } or null. Pure; the flag gates the CALLER (gateV2Outcome). The credential text is
+ *  a grounded substring of `ob` (or a fixed grounded label for the SAM class) — it is NEVER a claim about the bidder. */
+export function credentialConditionalRecital(ob: string): { credential: string } | null {
+  // Prefer VERBATIM extraction from the maintain-during-performance duty (names the ACTUAL credential/registry — so a
+  // non-SAM registration isn't mislabeled as SAM). The credential-token gate runs on the TRUNCATED, dangling-conjunction-
+  // stripped string (Gauntlet F2) so the EMITTED phrase actually contains a credential noun — else we decline to legacy.
+  const m = MAINTAIN_CREDENTIAL_RE.exec(ob);
+  if (m) {
+    let obj = (m[1] ?? "").trim().replace(/^(?:the|a|an|its|their|all|any|required)\s+/i, "").replace(/[,;:\s]+$/, "").trim();
+    if (obj.length > 90) obj = obj.slice(0, 90).replace(/\s+\S*$/, "");                       // clean word-boundary truncation
+    obj = obj.replace(/[,;:]?\s+(?:and(?:\/or)?|or|but|with|for|to|of|any|all)$/i, "").replace(/[,;:\s]+$/, "").trim(); // drop dangling trailing conjunction
+    if (CREDENTIAL_TOKEN_RE.test(obj) && obj.length >= 3) return { credential: obj };
+  }
+  // SAM-active class (SAM token mandatory) — a fixed, grounded label for the registration the obligation names.
+  if (SAM_ACTIVE_RE.test(ob)) return { credential: "an active System for Award Management (SAM) registration" };
+  return null;
+}
+
 export interface CoverageV2 {
   /** Sections genuinely NOT fully read (unread / truncated / dropped-at-ingest) → legitimate INCOMPLETE. */
   unreadable: string[];
@@ -704,6 +746,14 @@ export function gateV2Outcome(cov: CoverageV2): GateV2Outcome {
       return `${cut}…".`;
     };
     const ctxNote = d.contextNote ? ` ${clampNote(d.contextNote)}` : "";
+    // card #575b (flag AUDIT_CREDENTIAL_CONDITIONAL_REASON, default-OFF) — for a CREDENTIAL-CONDITIONAL bar (maintain-
+    // credential-during-performance / SAM-active), upgrade the reason prose to an actionable conditional. CAP is
+    // UNCHANGED (still NEEDS_HUMAN_REVIEW — verdict untouched). The credential is grounded from the obligation and the
+    // phrasing makes NO claim about the bidder (fabrication-invariant compliant). Flag-OFF ⇒ the legacy line below.
+    if (credentialConditionalReasonEnabled()) {
+      const cc = credentialConditionalRecital(d.obligation);
+      if (cc) return { cap: "NEEDS_HUMAN_REVIEW", reason: `A credential-conditional requirement ${where} could not be grounded to a finding — it requires ${cc.credential}. Confirm your firm holds this before bidding — human verification needed: "${d.obligation.slice(0, 120)}".${ctxNote}` };
+    }
     return { cap: "NEEDS_HUMAN_REVIEW", reason: `A potential disqualifying requirement ${where} could not be grounded to a finding — human verification needed: "${d.obligation.slice(0, 120)}".${ctxNote}` };
   }
   const nonBar = cov.ungroundedNonBarSignal ?? [];
