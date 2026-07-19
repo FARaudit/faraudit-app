@@ -50,6 +50,7 @@ export interface AuditPackageInput {
   sectionFinderModel?: string;              // L3 (card 265/267) — grounded section-finder; default modelFor("finder") (Sonnet — the offset-match gate makes it fail-safe)
   onUsage?: (u: UsageCall) => void;         // per-run token tally (concurrency-safe); the prod executor records cost from it
   panelFindings?: TypedFinding[];           // card #523 (P2a-wire) — the expert panel's VERIFIED typed facts, UNIONed into the rail (additive to lenses); absent ⇒ byte-identical
+  panelFindingsPromise?: Promise<TypedFinding[] | undefined>;  // card #570 (AUDIT_PANEL_PARALLEL) — producer findings resolved AT the rail merge so the producer overlaps the expert-phase; union byte-identical to panelFindings
 }
 
 // ── J-1/J-2 JUDGMENT-LAYER CALLER SEAMS (Brain card 246/247 prod-wire) ──────────────────────────────────
@@ -196,6 +197,8 @@ export async function auditPackage(input: AuditPackageInput): Promise<AuditResul
     noticeType: input.noticeType ?? null,   // Layer-2 (card 262) — scopes the §L/§M requirement to solicitation-type buys
     formIdentified: input.formIdentified,   // Layer-2 (card 262) — corroborates whether the §L/§M-bearing primary was ingested
     panelFindings: input.panelFindings,     // card #523 (P2a-wire) — expert-panel VERIFIED facts unioned into the rail (undefined ⇒ byte-identical)
+    panelFindingsPromise: input.panelFindingsPromise,  // card #570 — parallel-path producer promise (resolved at the rail merge); exactly one of the two is set
+
     ...(judgment ? { judgmentReason: judgment.judgmentReason, judgmentEntail: judgment.judgmentEntail } : {}),
   });
 }

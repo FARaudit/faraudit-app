@@ -112,6 +112,11 @@ export interface OrchestratorInput {
   // RE-GROUNDED against the assembled source with the same isGrounded gate. deriveVerdict stays the SOLE authority.
   // Absent/empty ⇒ byte-identical (flag-OFF customer path never sets it).
   panelFindings?: TypedFinding[];
+  // PARALLELIZE (card #570, flag AUDIT_PANEL_PARALLEL) — when the executor runs the panel PRODUCER concurrently with
+  // this rail's expert-phase, it passes the producer's findings as a PROMISE resolved AT the merge point (:2227),
+  // AFTER the expert-phase has already run. The merged union is byte-identical to the serial `panelFindings` array
+  // (same set, same merge point, same dedup order) — only wall-clock differs. Exactly one of the two is ever set.
+  panelFindingsPromise?: Promise<TypedFinding[] | undefined>;
 }
 
 export interface AuditResult {
@@ -2224,11 +2229,16 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //         source with the SAME isGrounded gate the seed path uses — a panel excerpt not verbatim in ctx.fullSource
   //         is DROPPED (fail-safe, Rule 64 / I3). Panel ids ("panel:<ref>") are preserved for provenance. Only the
   //         executor supplies opts.panelFindings, and ONLY under AUDIT_PANEL_JUDGE ⇒ flag-OFF is byte-identical.
-  if (opts.panelFindings?.length) {
-    const reground = opts.panelFindings.map((f) => ({ ...f, grounded: isGrounded(ctx, f) })).filter((f) => f.grounded);
+  // JOIN POINT (card #570) — resolve the producer findings from the direct array (serial) OR the promise (parallel).
+  // This await sits AFTER the expert-phase (:2211) already ran, so awaiting the concurrently-started producer here
+  // overlaps their wall-clock. The resolved set is merged at this SAME point in both paths ⇒ the finding union into
+  // dedup/deriveVerdict is byte-identical; only latency differs. Exactly one of the two opts is set (executor-enforced).
+  const panelFindingsResolved = opts.panelFindings ?? (opts.panelFindingsPromise ? await opts.panelFindingsPromise : undefined);
+  if (panelFindingsResolved?.length) {
+    const reground = panelFindingsResolved.map((f) => ({ ...f, grounded: isGrounded(ctx, f) })).filter((f) => f.grounded);
     reground.forEach((f, j) => { f.id = f.id ?? `panel#${j}`; });
     if (reground.length) { perLens["panel"] = reground.length; findings.push(...reground); }
-    console.log(`[orchestrator] panel merge: ${opts.panelFindings.length} verified typed finding(s) → ${reground.length} re-grounded (${opts.panelFindings.length - reground.length} dropped: excerpt not in assembled source)`);
+    console.log(`[orchestrator] panel merge: ${panelFindingsResolved.length} verified typed finding(s) → ${reground.length} re-grounded (${panelFindingsResolved.length - reground.length} dropped: excerpt not in assembled source)`);
   }
 
   // P1.5 — DETERMINISTIC HIGH-SIGNAL GROUNDING SWEEP (Brain card 81 Step 1). DEFAULT-ON (Brain card 98 GO-LIVE

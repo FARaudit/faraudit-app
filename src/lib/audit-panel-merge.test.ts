@@ -99,6 +99,29 @@ const eq = (label: string, got: unknown, want: unknown) => {
   delete process.env.AUDIT_ABSENCE_GROUNDING_GATE;
   eq("2c-2 · absence gate ON → false 'no Section B' finding DROPPED", absOn.findings.some((f) => f.id === "panel:proposal:R2"), false);
 
+  // ── PARALLELIZE byte-identity (card #570, flag AUDIT_PANEL_PARALLEL) — the perf refactor MUST NOT change the union ──
+  // For each producer-findings fixture, the SERIAL path (panelFindings: X) and the PARALLEL path (panelFindingsPromise:
+  // Promise.resolve(X)) must produce a BYTE-IDENTICAL decision AND finding set. This proves the concurrency change is
+  // pure wall-clock — same set in, same merge point (:2232), same dedup order — never a finding-set change.
+  const parallelCases: Array<[string, TypedFinding[]]> = [
+    ["empty", []],
+    ["grounded advisory risk", [panelRisk]],
+    ["grounded eligibility bar (pole-mover)", [panelBar]],
+    ["ungrounded ghost (dropped)", [panelGhost]],
+    ["mixed set", [panelRisk, panelBar, panelGhost]],
+  ];
+  for (const [label, X] of parallelCases) {
+    const serial = await runAgenticAudit({ ctx, experts, callModel: stub, panelFindings: X });
+    const parallel = await runAgenticAudit({ ctx, experts, callModel: stub, panelFindingsPromise: Promise.resolve(X) });
+    eq(`parallel · ${label} → decision IDENTICAL to serial`, JSON.stringify(parallel.decision), JSON.stringify(serial.decision));
+    eq(`parallel · ${label} → findings IDENTICAL to serial (same set + order)`, JSON.stringify(parallel.findings), JSON.stringify(serial.findings));
+  }
+  // Producer promise that resolves to undefined (honest-fail producer under parallel) ⇒ identical to serial panelFindings: undefined.
+  const serialNone = await runAgenticAudit({ ctx, experts, callModel: stub });
+  const parallelNone = await runAgenticAudit({ ctx, experts, callModel: stub, panelFindingsPromise: Promise.resolve(undefined) });
+  eq("parallel · producer honest-fail (undefined) → decision IDENTICAL to no-panel serial", JSON.stringify(parallelNone.decision), JSON.stringify(serialNone.decision));
+  eq("parallel · producer honest-fail (undefined) → findings IDENTICAL to no-panel serial", JSON.stringify(parallelNone.findings), JSON.stringify(serialNone.findings));
+
   console.log(`\n──────────────  ${pass} pass · ${fail} fail`);
   process.exit(fail === 0 ? 0 : 1);
 })();
