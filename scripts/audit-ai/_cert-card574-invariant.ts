@@ -114,3 +114,14 @@ ok(oracleClean, "A-oracle: NO emitted reason asserts an ungrounded mechanic (fla
 
 console.log(`\n===== RESULT =====  PASS ${pass} · FAIL ${fail}`);
 process.exit(fail ? 1 : 0);
+
+/* ── OPEN RESIDUAL (Brain ruling on card #574 Gauntlet greenlight — LOG ONLY, do not resolve here) ──────────────
+ * The PRESERVATION arm is proven on CONSTRUCTED findings that carry REAL source excerpts (verbatim from banked
+ * solicitation sources: 697DCK long-lead · 70B01C clearance-at-inception/30-day · W9126G CMMC · FA813726 long-lead
+ * items). This is because ZERO banked runs ever produced a GROUNDED non-curable mechanic — in the whole banked
+ * corpus the "lead time exceeds the response window" phrase was ALWAYS ungrounded when it fired.
+ * Per Rule 64 (real-material discipline) + Rule 20 (merge ≠ closure): INVARIANT CLOSURE requires a FUTURE live/paid
+ * run that grounds a mechanic NATURALLY (a real solicitation carrying a genuine clearance/QPL/CMMC/long-lead bar
+ * typed non-curable) and emits it INTACT under the flag ON. Until that run exists, the preservation arm rests on
+ * real source excerpts, not banked typed findings. Tracked as an OPEN item on card #574 — this build is a gate, not
+ * closure. ───────────────────────────────────────────────────────────────────────────────────────────────────── */
