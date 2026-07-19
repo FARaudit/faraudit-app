@@ -1,0 +1,626 @@
+{
+ "generated": "static",
+ "oracle": "ELIGIBILITY_BAR_RE @ audit-orchestrator.ts:284",
+ "note": "Gate-2 ADVERSARIAL corpus \u2014 NOT a dccce793 replay; each specimen makes a gate WORK. real=extracted verbatim from local full-source corpus; synthetic=grounded in real clause/term-of-art, RE-validated.",
+ "rows": {
+  "R1_prefilter_miss": [
+   {
+    "id": "R1-real-001",
+    "shape": "OEM letter of supply / authorized reseller",
+    "sol": "36C25726Q0728-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "8) Offeror shall provide an authorized distributor letter from the Original Equipment Manufacturer (OEM).",
+    "reMiss": true,
+    "expected": "engine MUST surface as an ungrounded firm-eligibility bar \u2192 NHR/conditional-bar; today INVISIBLE (pre-filter miss) \u2192 catastrophic false-COMPLETE",
+    "label": "true_bar",
+    "label_note": "OEM authorized-distributor letter \u2014 firm must be an authorized distributor"
+   },
+   {
+    "id": "R1-real-002",
+    "shape": "self-perform % (limitation on subcontracting, no set-aside token)",
+    "sol": "W9124D26RA041-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "(1) In a joint venture comprised of a small business prot\u00e9g\u00e9 and its mentor approved by the Small Business Administration, the small business prot\u00e9g\u00e9 shall perform at least 40 percent of the work performed by the joint venture.",
+    "reMiss": true,
+    "expected": "expected-SKIP \u2014 performance/workmanship/noise sharing a token; the passive/noun-frame detector must NOT fire here (free OVER-FIRE test)",
+    "label": "performance_skip",
+    "label_note": "JV 40% work-share (limitation on subcontracting) \u2014 performance/compliance, bidder_controls"
+   },
+   {
+    "id": "R1-real-003",
+    "shape": "IT-I / position sensitivity / Tier investigation",
+    "sol": "W9124D26RA041-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "The contract company must conduct a pre-employment background screening on potential employees to ensure they can pass the Tier 1 background investigation that is required for a CAC and network access.",
+    "reMiss": true,
+    "expected": "expected-SKIP \u2014 performance/workmanship/noise sharing a token; the passive/noun-frame detector must NOT fire here (free OVER-FIRE test)",
+    "label": "performance_skip",
+    "label_note": "firm conducts pre-employment screening \u2014 performance obligation"
+   },
+   {
+    "id": "R1-real-004",
+    "shape": "IT-I / position sensitivity / Tier investigation",
+    "sol": "W9124D26RA041-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "1.6.5.2 Position Sensitivity.",
+    "reMiss": true,
+    "expected": "expected-SKIP \u2014 performance/workmanship/noise sharing a token; the passive/noun-frame detector must NOT fire here (free OVER-FIRE test)",
+    "label": "performance_skip",
+    "label_note": "'Position Sensitivity.' heading fragment \u2014 noise, no bar"
+   },
+   {
+    "id": "R1-real-005",
+    "shape": "IT-I / position sensitivity / Tier investigation",
+    "sol": "W9124D26RA041-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "In accordance with DOD 5200.2-R, the DoD Personnel Security Program, this contract requires personnel performing work on a sensitive AIS to be: 1) a US Citizen, and 2) assigned to positions which are designated at one of 3 sensitivity levels (IT-I, IT-II, or IT-III).",
+    "reMiss": true,
+    "expected": "expected-SKIP \u2014 performance/workmanship/noise sharing a token; the passive/noun-frame detector must NOT fire here (free OVER-FIRE test)",
+    "label": "performance_skip",
+    "label_note": "personnel US-citizen + IT-I/II/III designation \u2014 personnel/performance"
+   },
+   {
+    "id": "R1-real-006",
+    "shape": "IT-I / position sensitivity / Tier investigation",
+    "sol": "W9124D26RA041-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "The investigation requirement for these positions is completion of Tier 5 investigation (formerly SSBI) with favorable results.",
+    "reMiss": true,
+    "expected": "expected-SKIP \u2014 performance/workmanship/noise sharing a token; the passive/noun-frame detector must NOT fire here (free OVER-FIRE test)",
+    "label": "performance_skip",
+    "label_note": "Tier 5 (SSBI) personnel investigation \u2014 performance, obtainable in performance"
+   },
+   {
+    "id": "R1-real-007",
+    "shape": "IT-I / position sensitivity / Tier investigation",
+    "sol": "W9124D26RA041-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "The Investigation requirement for these positions is completion of a Tier 3 investigation (formerly NACLC) with favorable results.",
+    "reMiss": true,
+    "expected": "expected-SKIP \u2014 performance/workmanship/noise sharing a token; the passive/noun-frame detector must NOT fire here (free OVER-FIRE test)",
+    "label": "performance_skip",
+    "label_note": "Tier 3 (NACLC) personnel investigation \u2014 performance"
+   },
+   {
+    "id": "R1-real-008",
+    "shape": "IT-I / position sensitivity / Tier investigation",
+    "sol": "W9124D26RA041-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "The Investigation requirement for these positions is completion of a Tier 1 investigation (formerly NACI) with favorable results.",
+    "reMiss": true,
+    "expected": "expected-SKIP \u2014 performance/workmanship/noise sharing a token; the passive/noun-frame detector must NOT fire here (free OVER-FIRE test)",
+    "label": "performance_skip",
+    "label_note": "Tier 1 (NACI) personnel investigation \u2014 performance"
+   },
+   {
+    "id": "R1-real-009",
+    "shape": "IT-I / position sensitivity / Tier investigation",
+    "sol": "W9124D26RA041-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "A US Citizen that has a Tier 3 investigation in process and a successful local records check, can be allowed assignment to the positions before the completion of the investigation, in the best interest of the DOD, at the discretion of the Contracting Officer.",
+    "reMiss": true,
+    "expected": "expected-SKIP \u2014 performance/workmanship/noise sharing a token; the passive/noun-frame detector must NOT fire here (free OVER-FIRE test)",
+    "label": "performance_skip",
+    "label_note": "Tier 3 in-process, CO-discretion assignment \u2014 explicitly curable"
+   },
+   {
+    "id": "R1-real-010",
+    "shape": "self-perform % (limitation on subcontracting, no set-aside token)",
+    "sol": "W9124D26RA041-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "(1) In a joint venture comprised of a small business protege and its mentor approved by the Small Business Administration, the small business protege shall perform at least 40 percent of the work performed by the joint venture.",
+    "reMiss": true,
+    "expected": "expected-SKIP \u2014 performance/workmanship/noise sharing a token; the passive/noun-frame detector must NOT fire here (free OVER-FIRE test)",
+    "label": "performance_skip",
+    "label_note": "JV 40% work-share (dup) \u2014 performance/compliance"
+   },
+   {
+    "id": "R1-real-011",
+    "shape": "IT-I / position sensitivity / Tier investigation",
+    "sol": "W912KC26RA006-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "At the discretion of the sponsoring activity, an initial CAC may be issued based on a favorable review of the FBI fingerprint check and a successfully scheduled Tier 1 investigation at the Office of Personnel Management.",
+    "reMiss": true,
+    "expected": "expected-SKIP \u2014 performance/workmanship/noise sharing a token; the passive/noun-frame detector must NOT fire here (free OVER-FIRE test)",
+    "label": "performance_skip",
+    "label_note": "initial CAC on favorable check + Tier 1 \u2014 personnel/performance"
+   },
+   {
+    "id": "R1-real-012",
+    "shape": "IT-I / position sensitivity / Tier investigation",
+    "sol": "36C26226Q0469",
+    "origin": "real",
+    "sentence": "5.4.6 Personnel requiring VA system access must undergo a Tier 1 background investigation and receive favorable adjudication before performing duties.",
+    "reMiss": true,
+    "expected": "expected-SKIP \u2014 performance/workmanship/noise sharing a token; the passive/noun-frame detector must NOT fire here (free OVER-FIRE test)",
+    "label": "performance_skip",
+    "label_note": "VA-access Tier 1 before duties \u2014 personnel/performance"
+   },
+   {
+    "id": "R1-real-013",
+    "shape": "OEM letter of supply / authorized reseller",
+    "sol": "W50S8R26RA005-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "When required by manufacturer, folding panel partitions must be installed by an authorized dealer with a certified crew.",
+    "reMiss": true,
+    "expected": "expected-SKIP \u2014 performance/workmanship/noise sharing a token; the passive/noun-frame detector must NOT fire here (free OVER-FIRE test)",
+    "label": "performance_skip",
+    "label_note": "folding partitions installed by an authorized dealer \u2014 workmanship"
+   },
+   {
+    "id": "R1-real-014",
+    "shape": "QPL / QML product qualification",
+    "sol": "W50S8R26RA005-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "In product categories covered by ENERGY STAR or the Federal Energy Management Program, provide equipment SECTION 23 30 00 Page 8 REPAIR B403 FOR CYBER FA877006_B403 that is listed on the ENERGY STAR Qualified Products List or that meets or exceeds the FEMP-designated Efficiency Requirements.",
+    "reMiss": true,
+    "expected": "expected-SKIP \u2014 performance/workmanship/noise sharing a token; the passive/noun-frame detector must NOT fire here (free OVER-FIRE test)",
+    "label": "performance_skip",
+    "label_note": "equipment on ENERGY STAR QPL \u2014 PRODUCT spec (goods), not firm eligibility"
+   },
+   {
+    "id": "R1-real-015",
+    "shape": "TS/SCI clearance (noun)",
+    "sol": "W50S8R26RA005-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "FA877006 B CABLE CHART REPAIR B403 FOR CYBER NOTES COLOR NOTES TYPE GREEN UNCLASSIFIED MMF RED SECRET MMF YELLOW TS/SCI MMF BLUE SAP/SAR/SEC MMF ROSE/PINK SAP/SAR/TS MMF ORANGE SAP/SAR/SCI MMF A SHEET ID T-001 TYPE B-3 FINAL 1 2 3 4 5 6 7 8 9 10 GENERAL SHEET NOTES A.",
+    "reMiss": true,
+    "expected": "expected-SKIP \u2014 performance/workmanship/noise sharing a token; the passive/noun-frame detector must NOT fire here (free OVER-FIRE test)",
+    "label": "performance_skip",
+    "label_note": "TS/SCI in a cable-chart color legend \u2014 noise (classification label, not a bar)"
+   },
+   {
+    "id": "R1-real-016",
+    "shape": "OEM letter of supply / authorized reseller",
+    "sol": "W50S8R26RA005-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "1.3.4 Evidence of Experience and Qualifications 1.3.4.1 Contractor Qualifications Contractor or its subcontractor(s) must be a Value Added Resaler (VAR)/Authorized Dealer (AD) of the manufacturer line of products being installed.",
+    "reMiss": true,
+    "expected": "engine MUST surface as an ungrounded firm-eligibility bar \u2192 NHR/conditional-bar; today INVISIBLE (pre-filter miss) \u2192 catastrophic false-COMPLETE",
+    "label": "true_bar",
+    "label_note": "firm/sub must BE a VAR/Authorized Dealer of the product line"
+   },
+   {
+    "id": "R1-real-017",
+    "shape": "self-perform % (limitation on subcontracting, no set-aside token)",
+    "sol": "W9126G26RA087-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "\u2022 Small Business Work Share: The small business partner(s) must perform at least 40% of the work done by the joint venture itself.",
+    "reMiss": true,
+    "expected": "expected-SKIP \u2014 performance/workmanship/noise sharing a token; the passive/noun-frame detector must NOT fire here (free OVER-FIRE test)",
+    "label": "performance_skip",
+    "label_note": "SB partner 40% work-share \u2014 performance/compliance"
+   },
+   {
+    "id": "R1-real-018",
+    "shape": "OEM letter of supply / authorized reseller",
+    "sol": "1240LP26Q0067-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "Prospective vendors who are not the OEM or an authorized distributor must provide traceability for the quoteed product back to the manufacturer or authorized distributor.",
+    "reMiss": true,
+    "expected": "engine MUST surface as an ungrounded firm-eligibility bar \u2192 NHR/conditional-bar; today INVISIBLE (pre-filter miss) \u2192 catastrophic false-COMPLETE",
+    "label": "true_bar",
+    "label_note": "non-OEM/non-authorized vendors gated on traceability (supply-chain eligibility, conditional)"
+   },
+   {
+    "id": "R1-real-019",
+    "shape": "OEM letter of supply / authorized reseller",
+    "sol": "HU000126QE021-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "Authorized reseller letter from Fujifilm.",
+    "reMiss": true,
+    "expected": "engine MUST surface as an ungrounded firm-eligibility bar \u2192 NHR/conditional-bar; today INVISIBLE (pre-filter miss) \u2192 catastrophic false-COMPLETE",
+    "label": "true_bar",
+    "label_note": "authorized-reseller letter (Fujifilm) \u2014 firm must be an authorized reseller"
+   },
+   {
+    "id": "R1-real-020",
+    "shape": "IT-I / position sensitivity / Tier investigation",
+    "sol": "N4008526R0065-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "2.8.8 Access to Controlled Unclassified Information The Contractor personnel whose work involves access to controlled unclassified information shall undergo a Tier 3 Investigation to verify their trustworthiness.",
+    "reMiss": true,
+    "expected": "expected-SKIP \u2014 performance/workmanship/noise sharing a token; the passive/noun-frame detector must NOT fire here (free OVER-FIRE test)",
+    "label": "performance_skip",
+    "label_note": "personnel Tier 3 for CUI trustworthiness \u2014 personnel/performance"
+   },
+   {
+    "id": "R1-real-021",
+    "shape": "IT-I / position sensitivity / Tier investigation",
+    "sol": "N4008526R0065-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "If the Contractor personnel currently have a favorably adjudicated Tier 3 Investigation the Contractor shall notify the Government Command Security Manager who will validate this in the Joint Personnel Adjudication System (JPAS).",
+    "reMiss": true,
+    "expected": "expected-SKIP \u2014 performance/workmanship/noise sharing a token; the passive/noun-frame detector must NOT fire here (free OVER-FIRE test)",
+    "label": "performance_skip",
+    "label_note": "Tier 3 notification procedure \u2014 performance"
+   },
+   {
+    "id": "R1-real-022",
+    "shape": "IT-I / position sensitivity / Tier investigation",
+    "sol": "N4008526R0065-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "The Contractor shall request from the Government for access to the E-QIP Direct program for the Contractor employees to complete the SF-86 form online for a Tier 3 Investigation.",
+    "reMiss": true,
+    "expected": "expected-SKIP \u2014 performance/workmanship/noise sharing a token; the passive/noun-frame detector must NOT fire here (free OVER-FIRE test)",
+    "label": "performance_skip",
+    "label_note": "E-QIP/SF-86 processing \u2014 personnel/performance"
+   },
+   {
+    "id": "R1-real-023",
+    "shape": "IT-I / position sensitivity / Tier investigation",
+    "sol": "N4008526R0065-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "Upon a favorable Tier 3 Investigation, the Contractor personnel shall submit the original signed release statements, and an OF-306 Declaration for Federal Employment to the Security Manager per Section F.",
+    "reMiss": true,
+    "expected": "expected-SKIP \u2014 performance/workmanship/noise sharing a token; the passive/noun-frame detector must NOT fire here (free OVER-FIRE test)",
+    "label": "performance_skip",
+    "label_note": "OF-306 submission post-investigation \u2014 personnel/performance"
+   },
+   {
+    "id": "R1-synth-01",
+    "shape": "polygraph",
+    "sol": "SYNTHETIC(DoD/DOE/NISPOM/FAR term-of-art)",
+    "origin": "synthetic",
+    "sentence": "All contractor personnel assigned to this task order must be able to obtain and maintain a favorably adjudicated counterintelligence-scope polygraph prior to accessing the facility.",
+    "reMiss": true,
+    "expected": "PRE-FILTER MISS: ELIGIBILITY_BAR_RE does not match \u21d2 invisible to the whole chain \u21d2 today false-COMPLETE. Gate-2 MUST flag this class (a real bidder-disqualifier the engine cannot see) \u2014 the load-bearing catastrophic gap.",
+    "label": "true_bar",
+    "label_note": "synthetic firm-credential bar (clean by construction)"
+   },
+   {
+    "id": "R1-synth-02",
+    "shape": "polygraph",
+    "sol": "SYNTHETIC(DoD/DOE/NISPOM/FAR term-of-art)",
+    "origin": "synthetic",
+    "sentence": "Award is contingent on the key personnel holding a current full-scope (lifestyle) polygraph at the time of performance.",
+    "reMiss": true,
+    "expected": "PRE-FILTER MISS: ELIGIBILITY_BAR_RE does not match \u21d2 invisible to the whole chain \u21d2 today false-COMPLETE. Gate-2 MUST flag this class (a real bidder-disqualifier the engine cannot see) \u2014 the load-bearing catastrophic gap.",
+    "label": "true_bar",
+    "label_note": "synthetic firm-credential bar (clean by construction)"
+   },
+   {
+    "id": "R1-synth-03",
+    "shape": "DOE Q/L clearance",
+    "sol": "SYNTHETIC(DoD/DOE/NISPOM/FAR term-of-art)",
+    "origin": "synthetic",
+    "sentence": "Personnel performing on this contract shall possess an active DOE Q access authorization as of the date of award.",
+    "reMiss": true,
+    "expected": "PRE-FILTER MISS: ELIGIBILITY_BAR_RE does not match \u21d2 invisible to the whole chain \u21d2 today false-COMPLETE. Gate-2 MUST flag this class (a real bidder-disqualifier the engine cannot see) \u2014 the load-bearing catastrophic gap.",
+    "label": "true_bar",
+    "label_note": "synthetic firm-credential bar (clean by construction)"
+   },
+   {
+    "id": "R1-synth-04",
+    "shape": "DOE Q/L clearance",
+    "sol": "SYNTHETIC(DoD/DOE/NISPOM/FAR term-of-art)",
+    "origin": "synthetic",
+    "sentence": "This effort requires an L access authorization; offerors whose personnel cannot obtain it will not be able to perform.",
+    "reMiss": true,
+    "expected": "PRE-FILTER MISS: ELIGIBILITY_BAR_RE does not match \u21d2 invisible to the whole chain \u21d2 today false-COMPLETE. Gate-2 MUST flag this class (a real bidder-disqualifier the engine cannot see) \u2014 the load-bearing catastrophic gap.",
+    "label": "true_bar",
+    "label_note": "synthetic firm-credential bar (clean by construction)"
+   },
+   {
+    "id": "R1-synth-05",
+    "shape": "FCL / facility clearance level (abbrev)",
+    "sol": "SYNTHETIC(DoD/DOE/NISPOM/FAR term-of-art)",
+    "origin": "synthetic",
+    "sentence": "The offeror must possess an active FCL at the Secret level, verified in NISS, as of the proposal due date.",
+    "reMiss": true,
+    "expected": "PRE-FILTER MISS: ELIGIBILITY_BAR_RE does not match \u21d2 invisible to the whole chain \u21d2 today false-COMPLETE. Gate-2 MUST flag this class (a real bidder-disqualifier the engine cannot see) \u2014 the load-bearing catastrophic gap.",
+    "label": "true_bar",
+    "label_note": "synthetic firm-credential bar (clean by construction)"
+   },
+   {
+    "id": "R1-synth-06",
+    "shape": "CBA signatory",
+    "sol": "SYNTHETIC(DoD/DOE/NISPOM/FAR term-of-art)",
+    "origin": "synthetic",
+    "sentence": "Only offerors that are signatory to the applicable collective bargaining agreement (CBA) will be considered for award.",
+    "reMiss": true,
+    "expected": "PRE-FILTER MISS: ELIGIBILITY_BAR_RE does not match \u21d2 invisible to the whole chain \u21d2 today false-COMPLETE. Gate-2 MUST flag this class (a real bidder-disqualifier the engine cannot see) \u2014 the load-bearing catastrophic gap.",
+    "label": "true_bar",
+    "label_note": "synthetic firm-credential bar (clean by construction)"
+   },
+   {
+    "id": "R1-synth-07",
+    "shape": "TS/SCI clearance (noun)",
+    "sol": "SYNTHETIC(DoD/DOE/NISPOM/FAR term-of-art)",
+    "origin": "synthetic",
+    "sentence": "A current TS/SCI clearance is required for all personnel prior to performance; personnel who cannot obtain it may not be assigned.",
+    "reMiss": true,
+    "expected": "PRE-FILTER MISS: ELIGIBILITY_BAR_RE does not match \u21d2 invisible to the whole chain \u21d2 today false-COMPLETE. Gate-2 MUST flag this class (a real bidder-disqualifier the engine cannot see) \u2014 the load-bearing catastrophic gap.",
+    "label": "true_bar",
+    "label_note": "synthetic firm-credential bar (clean by construction)"
+   },
+   {
+    "id": "R1-synth-08",
+    "shape": "QPL / QML product qualification",
+    "sol": "SYNTHETIC(DoD/DOE/NISPOM/FAR term-of-art)",
+    "origin": "synthetic",
+    "sentence": "Items offered must appear on the applicable Qualified Products List (QPL) at the time of bid opening; non-listed items are not acceptable.",
+    "reMiss": true,
+    "expected": "PRE-FILTER MISS: ELIGIBILITY_BAR_RE does not match \u21d2 invisible to the whole chain \u21d2 today false-COMPLETE. Gate-2 MUST flag this class (a real bidder-disqualifier the engine cannot see) \u2014 the load-bearing catastrophic gap.",
+    "label": "true_bar",
+    "label_note": "synthetic firm-credential bar (clean by construction)"
+   }
+  ],
+  "R2_doc_class": [
+   {
+    "id": "R2-01",
+    "shape": "combined-synopsis (commercial, UCF-equiv \u00a7L/\u00a7M in body)",
+    "sol": "36C26226Q1021-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "This is a combined synopsis/solicitation for commercial services/items prepared in accordance with the format in FAR Subpart 12.6 in conjunction with FAR Part 13, as supplemented with additional information included in this notice.",
+    "expected": "U4 doc-class: commercial \u2192 structural-assertion must NOT fire on \u00a7A-M absence; \u00a7L/\u00a7M live in the body/52.212-1/-2."
+   },
+   {
+    "id": "R2-02",
+    "shape": "combined-synopsis (commercial, UCF-equiv \u00a7L/\u00a7M in body)",
+    "sol": "70Z03826QB0000144-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "This is a combined synopsis/solicitation for commercial items prepared in accordance with the format in FAR subpart 12.6, as supplemented with additional information included in this notice.",
+    "expected": "U4 doc-class: commercial \u2192 structural-assertion must NOT fire on \u00a7A-M absence; \u00a7L/\u00a7M live in the body/52.212-1/-2."
+   },
+   {
+    "id": "R2-03",
+    "shape": "combined-synopsis (commercial, UCF-equiv \u00a7L/\u00a7M in body)",
+    "sol": "FA442726Q1068-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "of the Combined Synopsis/Solicitation document.",
+    "expected": "U4 doc-class: commercial \u2192 structural-assertion must NOT fire on \u00a7A-M absence; \u00a7L/\u00a7M live in the body/52.212-1/-2."
+   },
+   {
+    "id": "R2-04",
+    "shape": "combined-synopsis (commercial, UCF-equiv \u00a7L/\u00a7M in body)",
+    "sol": "FA442726Q1068-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "of the Combined Synopsis/Solicitation document to HUBZone Small Business Set-Aside.",
+    "expected": "U4 doc-class: commercial \u2192 structural-assertion must NOT fire on \u00a7A-M absence; \u00a7L/\u00a7M live in the body/52.212-1/-2."
+   },
+   {
+    "id": "R2-01",
+    "shape": "SF1449 commercial cover",
+    "sol": "36C25626Q0947-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "DATE SIGNED AUTHORIZED FOR LOCAL REPRODUCTION STANDARD FORM 1449 (REV.",
+    "expected": "U4 doc-class: SF1449 preprints RFQ/IFB/RFP checkboxes \u2014 bare label \u2260 UCF signal; classify by doc CLASS."
+   },
+   {
+    "id": "R2-02",
+    "shape": "SF1449 commercial cover",
+    "sol": "36C25626Q0947-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "53 E.5 52.212-2 EVALUATION\u2014COMMERCIAL PRODUCTS AND COMMERCIAL SERVICES (OCT 2025) (DEVIATION)............................................................................53 Page 2 of 54 36C25626Q0947 SECTION B - CONTINUATION OF SF 1449 BLOCKS B.1 CONTRACT ADMINISTRATION DATA 1.",
+    "expected": "U4 doc-class: SF1449 preprints RFQ/IFB/RFP checkboxes \u2014 bare label \u2260 UCF signal; classify by doc CLASS."
+   },
+   {
+    "id": "R2-03",
+    "shape": "SF1449 commercial cover",
+    "sol": "36C25626Q0947-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "Offers may be submitted on the SF 1449, letterhead stationery, or as otherwise specified in the solicitation.",
+    "expected": "U4 doc-class: SF1449 preprints RFQ/IFB/RFP checkboxes \u2014 bare label \u2260 UCF signal; classify by doc CLASS."
+   }
+  ],
+  "R3_quantity_ambiguity": [
+   {
+    "id": "R3-01",
+    "shape": "quantity/LOE ambiguity (natural phrasing)",
+    "sol": "W9124D26RA041-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "If this contract is covered by the EO, the contractor must provide employees with 1 hour of paid sick leave for every 30 hours they work, up to 56 hours of paid sick leave each WAGE DETERMINATION NO.: 2015-0034 (Rev.",
+    "expected": "U5 recall: a genuine LOE/quantity ambiguity that is NOT a clean 'X or Y' terminal pair \u2192 engine should emit a BID_WITH_CAUTION caution, never over-fire on a single-NP subject."
+   },
+   {
+    "id": "R3-02",
+    "shape": "quantity/LOE ambiguity (natural phrasing)",
+    "sol": "12445026Q0028-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "Vegetation shall be maintained at a height range between 2 and 4 inches.",
+    "expected": "U5 recall: a genuine LOE/quantity ambiguity that is NOT a clean 'X or Y' terminal pair \u2192 engine should emit a BID_WITH_CAUTION caution, never over-fire on a single-NP subject."
+   },
+   {
+    "id": "R3-03",
+    "shape": "quantity/LOE ambiguity (natural phrasing)",
+    "sol": "W50S8R26RA005-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "1.4 ENVIRONMENTAL REQUIREMENTS Maintain a uniform temperature of not less than 60 degrees F nor more than 85 degrees F and a relative humidity of not more than 70 percent for 24 hours before, during, and 24 hours after installation of acoustical units.",
+    "expected": "U5 recall: a genuine LOE/quantity ambiguity that is NOT a clean 'X or Y' terminal pair \u2192 engine should emit a BID_WITH_CAUTION caution, never over-fire on a single-NP subject."
+   },
+   {
+    "id": "R3-04",
+    "shape": "quantity/LOE ambiguity (natural phrasing)",
+    "sol": "W50S8R26RA005-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "Store panels at temperatures between 40 and 90 degrees F, and between 20 and 70 percent humidity.",
+    "expected": "U5 recall: a genuine LOE/quantity ambiguity that is NOT a clean 'X or Y' terminal pair \u2192 engine should emit a BID_WITH_CAUTION caution, never over-fire on a single-NP subject."
+   },
+   {
+    "id": "R3-05",
+    "shape": "quantity/LOE ambiguity (natural phrasing)",
+    "sol": "W50S8R26RA005-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "Design load of1000 pounds on one square inch, at any point on panel, without a top-surface deflection more than 0.10 inch, and a permanent set not to exceed 0.01 inch in any of the specified tests.",
+    "expected": "U5 recall: a genuine LOE/quantity ambiguity that is NOT a clean 'X or Y' terminal pair \u2192 engine should emit a BID_WITH_CAUTION caution, never over-fire on a single-NP subject."
+   },
+   {
+    "id": "R3-06",
+    "shape": "quantity/LOE ambiguity (natural phrasing)",
+    "sol": "W50S8R26RA005-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "Design load of 2000 pounds on one square inch, at any point on panel, without a top-surface deflection more than 0.10 inch, and a permanent set not to exceed 0.01 inch in any of the specified tests.",
+    "expected": "U5 recall: a genuine LOE/quantity ambiguity that is NOT a clean 'X or Y' terminal pair \u2192 engine should emit a BID_WITH_CAUTION caution, never over-fire on a single-NP subject."
+   }
+  ],
+  "R4_finding_dedup": [
+   {
+    "id": "R4-01",
+    "shape": "repeated FAR/DFARS clause (dedup, bar-bearing)",
+    "sol": "36C25626Q0947-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "115-91)); (3) Covered telecommunications equipment or services used as a substantial or essential component of any system, or as critical technology as part of any system (paragraphs (a)(1)(A) of section 889 of the John S.",
+    "expected": "U6 dedup: a bar-bearing clause surfaced 2-3\u00d7 across concatenated panels must be PROTECTED (never collapse); plain non-bar dups may collapse. verdict-invariant."
+   },
+   {
+    "id": "R4-02",
+    "shape": "repeated FAR/DFARS clause (dedup, bar-bearing)",
+    "sol": "36C25626Q0947-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "(ii) This prohibition applies to using covered telecommunications equipment or services, regardless of whether that use is in performance of work under a Federal contract.",
+    "expected": "U6 dedup: a bar-bearing clause surfaced 2-3\u00d7 across concatenated panels must be PROTECTED (never collapse); plain non-bar dups may collapse. verdict-invariant."
+   },
+   {
+    "id": "R4-03",
+    "shape": "repeated FAR/DFARS clause (dedup, bar-bearing)",
+    "sol": "36C25626Q0947-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "Certification I hereby certify that if awarded the contract, _______ will comply with the limitations on subcontracting specified in this clause and in the resultant contract.",
+    "expected": "U6 dedup: a bar-bearing clause surfaced 2-3\u00d7 across concatenated panels must be PROTECTED (never collapse); plain non-bar dups may collapse. verdict-invariant."
+   },
+   {
+    "id": "R4-04",
+    "shape": "repeated FAR/DFARS clause (dedup, bar-bearing)",
+    "sol": "36C25626Q0947-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "(End of Clause) FAR Title Date Number 852.246-71 REJECTED GOODS OCT 2018 C.13 VAAR 852.219-75 VA NOTICE OF LIMITATIONS ON SUBCONTRACTING\u2014CERTIFICATE OF COMPLIANCE FOR SERVICES AND CONSTRUCTION (JAN 2023) (DEVIATION) (a) Pursuant to 38 U.S.C.",
+    "expected": "U6 dedup: a bar-bearing clause surfaced 2-3\u00d7 across concatenated panels must be PROTECTED (never collapse); plain non-bar dups may collapse. verdict-invariant."
+   },
+   {
+    "id": "R4-05",
+    "shape": "repeated FAR/DFARS clause (dedup, bar-bearing)",
+    "sol": "36C25626Q0947-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "8127(l)(2), the offeror certifies that\u2014 (1) If awarded a contract (see FAR 2.101 definition), it will comply with the limitations on subcontracting requirement as provided in the solicitation and the resultant contract, as follows: (i) [] Services.",
+    "expected": "U6 dedup: a bar-bearing clause surfaced 2-3\u00d7 across concatenated panels must be PROTECTED (never collapse); plain non-bar dups may collapse. verdict-invariant."
+   },
+   {
+    "id": "R4-06",
+    "shape": "repeated FAR/DFARS clause (dedup, bar-bearing)",
+    "sol": "36C25626Q0947-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "(c) The offeror further agrees to cooperate fully and make available any documents or records as may be required to enable VA to determine compliance with the limitations on subcontracting requirement.",
+    "expected": "U6 dedup: a bar-bearing clause surfaced 2-3\u00d7 across concatenated panels must be PROTECTED (never collapse); plain non-bar dups may collapse. verdict-invariant."
+   }
+  ],
+  "R5_garble_floor": [
+   {
+    "id": "R5-01",
+    "shape": "clean wage/CLIN/rate table (garble over-fire side)",
+    "sol": "36C26226Q1021-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "Wage Determination applicable to this project: SCA WD 2015-5613 revision 32 1.k.",
+    "expected": "#12 garble floor: clean ASCII wage/CLIN tables are LOW on common words BY NATURE \u21d2 must NEVER floor (score ~0 on looksMojibake). Under-fire side = genuine OCR mojibake (needs a scanned specimen)."
+   },
+   {
+    "id": "R5-02",
+    "shape": "clean wage/CLIN/rate table (garble over-fire side)",
+    "sol": "70Z03826QB0000144-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "The Contracting Officer has determined two possible places of performance and has included a Wage Determination as an attachment to this solicitation.",
+    "expected": "#12 garble floor: clean ASCII wage/CLIN tables are LOW on common words BY NATURE \u21d2 must NEVER floor (score ~0 on looksMojibake). Under-fire side = genuine OCR mojibake (needs a scanned specimen)."
+   },
+   {
+    "id": "R5-03",
+    "shape": "clean wage/CLIN/rate table (garble over-fire side)",
+    "sol": "70Z03826QB0000144-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "Wage determinations for additional possible places of performance will be provided if asked to do so in writing at Alex-Marie.B.Midgett@uscg.mil.",
+    "expected": "#12 garble floor: clean ASCII wage/CLIN tables are LOW on common words BY NATURE \u21d2 must NEVER floor (score ~0 on looksMojibake). Under-fire side = genuine OCR mojibake (needs a scanned specimen)."
+   },
+   {
+    "id": "R5-04",
+    "shape": "clean wage/CLIN/rate table (garble over-fire side)",
+    "sol": "70Z03826QB0000144-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "Offerors must request additional wage determinations no later than 2 days before solicitation close.",
+    "expected": "#12 garble floor: clean ASCII wage/CLIN tables are LOW on common words BY NATURE \u21d2 must NEVER floor (score ~0 on looksMojibake). Under-fire side = genuine OCR mojibake (needs a scanned specimen)."
+   },
+   {
+    "id": "R5-05",
+    "shape": "clean wage/CLIN/rate table (garble over-fire side)",
+    "sol": "70Z03826QB0000144-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "Offerors who intend to perform in a place or area of performance for which a wage determination has not been attached or requested may nevertheless submit quotations.",
+    "expected": "#12 garble floor: clean ASCII wage/CLIN tables are LOW on common words BY NATURE \u21d2 must NEVER floor (score ~0 on looksMojibake). Under-fire side = genuine OCR mojibake (needs a scanned specimen)."
+   },
+   {
+    "id": "R5-06",
+    "shape": "clean wage/CLIN/rate table (garble over-fire side)",
+    "sol": "70Z03826QB0000144-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "However, a wage determination shall be requested and incorporated in the resultant contract retroactive to the date of contract award, and there shall be no adjustment in the contract price.",
+    "expected": "#12 garble floor: clean ASCII wage/CLIN tables are LOW on common words BY NATURE \u21d2 must NEVER floor (score ~0 on looksMojibake). Under-fire side = genuine OCR mojibake (needs a scanned specimen)."
+   }
+  ],
+  "R6_covered_direct_belts": [
+   {
+    "id": "R6-01",
+    "shape": "\u00a7C/\u00a7H co-resident real bar (under-fire side)",
+    "sol": "W9126G26RA087-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "(1) The Contractor shall maintain an active Federal Government contracts registration in the System for Award Management (SAM) at https://www.sam.gov during contract performance and through final payment under this contract.",
+    "expected": "Phase-4 belt: a real \u00a7C/\u00a7H eligibility bar co-resident with a benign finding MUST surface (obligations_ungrounded), not be blanket-covered."
+   },
+   {
+    "id": "R6-02",
+    "shape": "\u00a7C/\u00a7H co-resident real bar (under-fire side)",
+    "sol": "W91QF026QA015-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "For any information assurance or privileged function performed on the DoD Impact Level 2 (IL2) information system, the candidate shall hold a certification meeting the applicable DoDM 8140 / DoD 8570.01-M baseline for that function, in place upon contract award in accordance with PWS 1.23.4.3.",
+    "expected": "Phase-4 belt: a real \u00a7C/\u00a7H eligibility bar co-resident with a benign finding MUST surface (obligations_ungrounded), not be blanket-covered."
+   },
+   {
+    "id": "R6-03",
+    "shape": "\u00a7C/\u00a7H co-resident real bar (under-fire side)",
+    "sol": "AOCSSB26R0023-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "(e) The Contractor shall maintain registration in SAM during contract performance and through final payment of any contract, basic agreement, basic ordering agreement, or blanket purchasing agreement.",
+    "expected": "Phase-4 belt: a real \u00a7C/\u00a7H eligibility bar co-resident with a benign finding MUST surface (obligations_ungrounded), not be blanket-covered."
+   }
+  ],
+  "X_commercial_ucf_equiv": [
+   {
+    "id": "X-01",
+    "shape": "commercial UCF-equivalent sections (52.212-1\u2261\u00a7L / 52.212-2\u2261\u00a7M)",
+    "sol": "36C25626Q0947-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "SOLICITATION INCORPORATES BY REFERENCE FAR 52.212-1, 52.212-4.",
+    "expected": "Cross-cut: hits U4 doc-class + Phase-4 section-routing + pre-filter at once \u2014 commercial buy whose \u00a7L/\u00a7M equivalents are 52.212-1/-2."
+   },
+   {
+    "id": "X-02",
+    "shape": "commercial UCF-equivalent sections (52.212-1\u2261\u00a7L / 52.212-2\u2261\u00a7M)",
+    "sol": "36C25626Q0947-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "53 E.5 52.212-2 EVALUATION\u2014COMMERCIAL PRODUCTS AND COMMERCIAL SERVICES (OCT 2025) (DEVIATION)............................................................................53 Page 2 of 54 36C25626Q0947 SECTION B - CONTINUATION OF SF 1449 BLOCKS B.1 CONTRACT ADMINISTRATION DATA 1.",
+    "expected": "Cross-cut: hits U4 doc-class + Phase-4 section-routing + pre-filter at once \u2014 commercial buy whose \u00a7L/\u00a7M equivalents are 52.212-1/-2."
+   },
+   {
+    "id": "X-03",
+    "shape": "commercial UCF-equivalent sections (52.212-1\u2261\u00a7L / 52.212-2\u2261\u00a7M)",
+    "sol": "36C25626Q0947-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "ADDENDUM to FAR 52.212-1 INSTRUCTIONS TO OFFERORS\u2014COMMERCIAL ITEMS Provisions that are incorporated by reference (by 2026-01, 03/13/2026), have the same force and effect as if they were given in full text.",
+    "expected": "Cross-cut: hits U4 doc-class + Phase-4 section-routing + pre-filter at once \u2014 commercial buy whose \u00a7L/\u00a7M equivalents are 52.212-1/-2."
+   },
+   {
+    "id": "X-04",
+    "shape": "commercial UCF-equivalent sections (52.212-1\u2261\u00a7L / 52.212-2\u2261\u00a7M)",
+    "sol": "36C25626Q0947-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "E.1 52.212-1 INSTRUCTIONS TO OFFERORS\u2014COMMERCIAL PRODUCTS AND COMMERCIAL SERVICES (SEP 2023) (a) North American Industry Classification System (NAICS) code and small business size standard.",
+    "expected": "Cross-cut: hits U4 doc-class + Phase-4 section-routing + pre-filter at once \u2014 commercial buy whose \u00a7L/\u00a7M equivalents are 52.212-1/-2."
+   },
+   {
+    "id": "X-05",
+    "shape": "commercial UCF-equivalent sections (52.212-1\u2261\u00a7L / 52.212-2\u2261\u00a7M)",
+    "sol": "36C25726Q0728-FULL-SOURCE",
+    "origin": "real",
+    "sentence": "12 E.2 52.212-1 INSTRUCTIONS TO OFFERORS\u2014COMMERCIAL PRODUCTS AND COMMERCIAL SERVICES (SEP 2023) .........................................................................",
+    "expected": "Cross-cut: hits U4 doc-class + Phase-4 section-routing + pre-filter at once \u2014 commercial buy whose \u00a7L/\u00a7M equivalents are 52.212-1/-2."
+   }
+  ]
+ }
+}

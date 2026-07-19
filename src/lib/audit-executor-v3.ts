@@ -404,6 +404,7 @@ export async function executeAgenticPrimary(
         detectedSections: panelInputs.detectedSections,
         unroutedBinding: panelInputs.unroutedBinding,
         manifest: panelInputs.manifest,   // card #525 — class-aware firing gate (UCF checkManifest / commercial biddable-content)
+        documentClass: panelInputs.documentClass, // UNIT 2.1 (cards #548/#549) — commercial lens-assignment map + content-class rescue (flag-gated)
         signal,
         onUsage: (u) => usageCalls.push(u),
       });

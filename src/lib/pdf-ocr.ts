@@ -52,6 +52,46 @@ export function looksGarbled(text: string): boolean {
   return per1k < 3;
 }
 
+// POSITIVE mojibake detector (Phase 3 Unit #12) — for the obligation garble FLOOR, where OVER-FIRE is the dangerous failure.
+// `looksGarbled` keys on common-English-WORD density, which clean wage/CLIN/price tables, clause-number lists, and acronym
+// blocks are LOW on BY NATURE (Gauntlet R1 F: it false-INCOMPLETEs exactly those clean classes). The right axis is a POSITIVE
+// CORRUPTION signal that clean ASCII text scores ~0 on: the density of characters that clean gov text essentially never
+// contains. Two arms, either fires:
+//   (A) HARD-corruption chars — C0 controls (except tab), the C1 block 0x80–0x9f (never in valid UTF-8 prose), the replacement
+//       char U+FFFD — at ≥2% density. Clean text (tables, codes, §/•/em-dash/accents) has 0% of these ⇒ ZERO over-fire.
+//   (B) non-ASCII NON-LETTER symbol density ≥25% — INCOHERENCE, not density (Gauntlet R2): a printable-Latin-1 font-dump
+//       ("¬þ Æ¢Ø¡™ ½¾¿ ×÷…") is a SYMBOL SALAD (¬¢¡™½¾¿×÷ are non-letter) ⇒ floors; but legit NON-LATIN CLEAN text (a
+//       bilingual notice, Vietnamese "Nguyễn Thị Hương", accented names) is COHERENT LETTERS — non-ASCII but Unicode
+//       letters — which are EXCLUDED from the count, so coherent foreign script NEVER floors (R2 P1/P2/P3 fix). A §/•/—/°/±
+//       -sprinkled clean section stays well under 25% symbol density. A homoglyph that stays mostly clean Latin-1 letters is
+//       a SAFE UNDER-fire (stays covered = status quo), the correct posture when the dangerous failure is over-fire.
+// Independent of AUDIT_TXT_INGEST (no density denominator) ⇒ no cross-flag coupling. <300 non-ws chars ⇒ not judged (the
+// relief valve is intended for genuinely-thin sections).
+// LAYOUT/STRUCTURAL glyphs a clean document legitimately uses in tables, ToCs and typeset prose — box-drawing/block/geometric
+// (table borders, ■□ checkboxes), general punctuation (en/em dash, curly quotes, bullets, ellipsis, dot leaders), arrows, and
+// § ¶ ° · (Gauntlet R2-cert): EXCLUDED from arm B, because a clean box-drawing table or a dot-leader ToC is not a mojibake
+// SALAD — real mojibake is Latin-1-symbols/math/currency/misc, not layout. (Coherent foreign LETTERS \p{L} are already excluded.)
+const fdIsLayoutGlyph = (c: number): boolean =>
+  c === 0xa7 || c === 0xb0 || c === 0xb6 || c === 0xb7 ||          // § ° ¶ ·
+  (c >= 0x2000 && c <= 0x206f) ||                                  // general punctuation (dashes, curly quotes, bullets, ellipsis, dot leaders)
+  (c >= 0x2190 && c <= 0x21ff) ||                                  // arrows
+  (c >= 0x2500 && c <= 0x25ff);                                    // box-drawing + block elements + geometric shapes (borders/bullets/checkboxes)
+export function looksMojibake(text: string): boolean {
+  const chars = [...(text ?? "").replace(/\s+/g, "")];
+  if (chars.length < 300) return false;
+  let hard = 0, symGarble = 0;
+  for (const ch of chars) {
+    const c = ch.codePointAt(0)!;
+    if (c < 0x20 && c !== 0x09) { hard++; continue; }               // C0 control (not tab)
+    if (c <= 0x7e) continue;                                         // basic ASCII (clean tables/codes/prose)
+    if ((c >= 0x80 && c <= 0x9f) || c === 0xfffd) { hard++; continue; } // C1 block / U+FFFD — never in valid prose
+    if (fdIsLayoutGlyph(c)) continue;                               // legit table/ToC/typographic layout glyph — not a mojibake salad
+    if (!/\p{L}/u.test(ch)) symGarble++;                            // non-ASCII NON-LETTER, NON-layout symbol (mojibake salad); coherent foreign LETTERS excluded
+  }
+  const n = chars.length;
+  return hard / n >= 0.02 || symGarble / n >= 0.25;
+}
+
 let _ocrAvailable: boolean | null = null;
 /** Probe whether the self-host OCR binary exists (cached). */
 export async function ocrAvailable(): Promise<boolean> {

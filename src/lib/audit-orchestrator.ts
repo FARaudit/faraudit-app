@@ -17,18 +17,19 @@ import { readSection, sectionFullText, procurementPart, requiresProposalSections
 import { constructionRequired, constructionCoreMissing, constructionCoverage } from "./audit-construction-manifest";
 import { runSectionFinder, type SectionFinderCall } from "./audit-section-finder";
 import { isBindingDoc, hasEngineText } from "./sam-attachments";
+import { looksMojibake } from "./pdf-ocr";
 import { NOTICE_BODY_DOC_NAME } from "./agentic-executor";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
 import { SITE_VISIT_CONCLUDED_RE, BOA_HOLDER_ONLY_EMIT_RE } from "./audit-site-visit-patterns";
-import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, applyInquiryDeadlineBenignGuard, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, EngineInvariantError, type Decision } from "./audit-decide";
+import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyNmrNaicsDormancy, applyCheckboxStateFidelity, applyPerfObligationInsuranceTyping, applyStructuralAssertionFidelity, applyQuantityAmbiguityFidelity, applyFindingDedup, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, applyInquiryDeadlineBenignGuard, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, EngineInvariantError, type Decision } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
 import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type ReasonCaller, type EntailmentCaller, type JudgmentCost, zeroCost } from "./audit-judgment-layer";
 import { highSignalSweep, boilerplateTrapSweep } from "./audit-grounding-sweep";
 import { createHash } from "node:crypto";
 import type { TypedFinding, BidderProfile, VerdictInputs } from "./audit-findings";
 import { scanPackageMarkers, absenceClaimContradicted } from "./absence-grounding-gate";
-import { GATE_V2_ENABLED, gradeCoverageV2, importanceOf, isLedgerDemotableNonBar } from "./audit-gate-v2";
+import { disqualifierTriggersOf, GATE_V2_ENABLED, gradeCoverageV2, groundingVariantToleranceEnabled, importanceOf, isLedgerDemotableNonBar } from "./audit-gate-v2";
 
 // B1 (Brain card #421 Fork-1) — §L/§M coverage-ledger honors boilerplate. A READ §L/§M whose ONLY ungrounded
 // obligation sentences are administrative BOILERPLATE (importanceOf==="boilerplate") reads COVERED-WITH-SIGNAL, not
@@ -339,19 +340,261 @@ function findingSection(f: TypedFinding): string | null {
   return m ? m[1].toUpperCase() : null;
 }
 
+// ── UNIT 2.2 (Brain cards #548/#549) — grounding-matcher VARIANT TOLERANCE ─────────────────────────────
+// Live driver (dccce793): the §7.3.2 obligation "Maintain licensing requirements, certifications,
+// accreditations, and the required insurance…" failed to ground against its §7.2.2 twin finding
+// "Maintain licensing requirements/certification/accreditation and required insurance coverage…" —
+// comma-form vs slash-form plus singular/plural drift means the two share NO exact 4-gram, and the
+// finding's citation ("PWS §7.2.2") parses to no UCF letter so the same-section constraint also failed.
+// → false-NHR on a sentence the audit itself had grounded. Fix, DETERMINISTIC BY CONSTRUCTION (no
+// vocabulary lists): a variant-normal form — lowercase, every non-alphanumeric run → one space (the
+// comma/slash/paren class collapses), closed-class articles {a,an,the} dropped, and a trailing "s"
+// stripped from tokens ≥4 chars (plural drift). 4-gram threshold UNCHANGED (R8 — no drift); matching is
+// token-boundary-safe (space-padded containment). Flag OFF ⇒ exact-gram path only, byte-identical.
+const ARTICLES = new Set(["a", "an", "the"]);
+const LEADING_CONJUNCTIONS = new Set(["and", "or"]); // R5-F3 — closed-class grammar, same class as ARTICLES
+// R1-F7 — singularization BY CONSTRUCTION (morphology, not vocabulary): -ies→y (facilities/facility),
+// sibilant -es strip (classes/class, matches/match), bare -s strip (requirements/requirement) with the
+// -ss guard (class stays class); possessive "'s" arrives as a standalone "s" token after the punctuation
+// collapse and is dropped (offeror's ≡ offerors ≡ offeror).
+const singular = (w: string): string => {
+  if (w.length < 4) return w;
+  if (w.endsWith("ies")) return `${w.slice(0, -3)}y`;
+  // R3-F4 — result-length guard on the sibilant strip: a ≤3-char result ("uses"→"us", "cases"→"cas")
+  // collides with distinct short words; decline the -es strip and FALL THROUGH to the plain -s strip
+  // ("uses"→"use", "cases"→"case" — which then canonicalize correctly against their singulars).
+  // R4-F5 truth-up: the fallthrough's REAL cost class is 3-letter stems (boxes→"boxe"≠box, taxes,
+  // gases, buses) — those misses fail SAFE toward NHR (a missed unification never grounds anything).
+  if (/(?:ses|xes|zes|ches|shes)$/.test(w) && w.length - 2 >= 4) return w.slice(0, -2);
+  if (w.endsWith("s") && !w.endsWith("ss")) return w.slice(0, -1);
+  return w;
+};
+// R2-F4 — the -ses ending is morphologically AMBIGUOUS (clause+s vs class+es); no strip picks right for
+// both. Canonicalize instead: after singularization, drop a trailing "e" on tokens ≥4 — "clauses"→"claus"
+// ≡ "clause"→"claus", "licenses"≡"license"→"licens", "cases"≡"case"→"cas", while "classes"≡"class" via the
+// -ss guard. Collisions this introduces (note/not, one/on-class) only matter inside a 4-gram (three
+// neighbors must also match) and only on the relaxed path, which now also demands contiguity + trigger
+// coverage — bounded by construction.
+const canonToken = (w: string): string => {
+  const s = singular(w);
+  // R3-F4 — result-length guard: strip the trailing e only when the RESULT stays ≥4 chars. A 3-char
+  // result collides with distinct short words (SAM≡"same", not≡"note", rac≡"race" — an executed
+  // eligibility-bar launder rode sam/same). Cost class (R4-F5 truth-up): 3-letter stems (box/boxes,
+  // tax/taxes, gas/gases) stay un-unified via the sibilant fallthrough — fail SAFE toward NHR; the
+  // 4-letter -se singulars (case/cases, size/sizes) DO unify via the -s fallthrough.
+  return s.length >= 5 && s.endsWith("e") ? s.slice(0, -1) : s;
+};
+export function normVariant(s: string): string {
+  return (s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").split(" ")
+    .filter((w) => w && w !== "s" && !ARTICLES.has(w))
+    .map(canonToken)
+    .join(" ");
+}
+const gramsOf = (tokens: string[], n: number): string[] => {
+  const out: string[] = [];
+  for (let i = 0; i + n <= tokens.length; i++) out.push(tokens.slice(i, i + n).join(" "));
+  return out;
+};
 /** C-12 (Brain C.d, R8) — a ≥4-word verbatim n-gram shared between an obligation sentence and a grounded finding's
  *  excerpt, AND the finding must be CITED to the SAME section as the obligation. This closes the cross-section
  *  false-attestation (a §C finding sharing a 4-gram with a §M obligation no longer attests §M covered). The n-gram
  *  threshold stays FROZEN at ≥4 (R8 — no drift). Same-span + same-section is the Rule-64 "this obligation IS
- *  grounded by that finding" proof. */
-function groundedBy(obligation: string, findings: TypedFinding[], sec: string): string[] {
+ *  grounded by that finding" proof.
+ *  UNIT 2.2 additions (flag AUDIT_GROUNDING_VARIANT_TOLERANCE, OFF ⇒ byte-identical):
+ *  (a) VARIANT grams (normVariant) accepted alongside exact grams — closes the comma/slash+plural class;
+ *  (b) SECTION-NULL relaxation: a finding whose citation parses to NO UCF letter (e.g. "PWS §7.2.2" on a
+ *      commercial package, where section keys are routed approximations) may ground an obligation IFF its
+ *      citation is NON-EMPTY (R1-F1c: an uncited finding is unprovenanced and never a grounder) AND its
+ *      excerpt is verbatim-contained in the SAME section's full text (`sectionNText`) — a same-span proof
+ *      STRONGER than the citation letter; a finding cited to a DIFFERENT letter still never crosses (S7).
+ *  R1-F1 + R2-F1 SUBSTANTIVE-COVERAGE BAR (the anti-laundering gate): EVERY relaxed acceptance —
+ *  variant-only grams and/or a section-null finding — additionally requires the shared material to be a
+ *  PROOF of same-substance, not a phrase coincidence:
+ *   (1) CONTIGUITY (kills scattered-gram assembly, R2-F1a3): the covered obligation tokens must contain
+ *       ONE contiguous run ≥50% of the obligation's variant tokens;
+ *   (2) TRIGGER-SPAN + SUBJECT (kills idiom bridging, R2-F1a1/a2): when the obligation carries a
+ *       DISQUALIFIER_RE trigger ("will not be considered", …), the qualifying run must cover the WHOLE
+ *       trigger AND extend ≥2 tokens beyond it (the finding must share the consequence AND its subject —
+ *       a finding quoting a DIFFERENT bar's identical consequence idiom shares no subject token).
+ *  The dccce793 twin shares its full head+tail contiguously (trigger-less, ~100% run) and PASSES all of
+ *  this by construction. The fail-toward-disqualifier doctrine is only ever released by that proof. */
+const RELAXED_COVERAGE_MIN = 0.5;
+// R8-F2 — per-excerpt sentence derivation is pure; memoized so a giant excerpt quoted by many findings
+// is split/normalized once, not once per (obligation × finding) pair. Bounded, cleared at 64 entries.
+const EXCERPT_SENTENCE_CACHE = new Map<string, Array<{ vEx: string; exToks: string[] }>>();
+/** covered-position mask from shared 4-grams (variant space). */
+function coveredMask(vToks: string[], vExcerptPadded: string): boolean[] {
+  const covered = new Array<boolean>(vToks.length).fill(false);
+  if (vToks.length < 4) return covered;
+  for (let i = 0; i + 4 <= vToks.length; i++) {
+    if (vExcerptPadded.includes(` ${vToks.slice(i, i + 4).join(" ")} `)) for (let k = i; k < i + 4; k++) covered[k] = true;
+  }
+  return covered;
+}
+/** find the trigger's token positions inside the obligation's variant tokens (consecutive subsequence). */
+/** R4-F2 — ALL occurrences of a token subsequence (a repeated consequence idiom maps to EVERY position,
+ *  so a clipped excerpt cannot attest a compound bar via the first occurrence alone). */
+function tokenSpansOf(vToks: string[], spanToks: string[]): Array<{ start: number; end: number }> {
+  const out: Array<{ start: number; end: number }> = [];
+  if (!spanToks.length || spanToks.length > vToks.length) return out;
+  for (let i = 0; i + spanToks.length <= vToks.length; i++) {
+    if (spanToks.every((t, j) => vToks[i + j] === t)) out.push({ start: i, end: i + spanToks.length - 1 });
+  }
+  return out;
+}
+function passesSubstantiveBar(obligation: string, vToks: string[], rawExcerpt: string): boolean {
+  const n = vToks.length;
+  if (n < 4) return false;
+  // R7-F2 — SIZE GUARD: no real obligation SENTENCE approaches 120 variant tokens; beyond it the
+  // "obligation" is a table/OCR block (obligationsOf caps the pool at whole-sentence granularity) and
+  // the relaxed bar's window×sentence scan cost multiplies across findings. Over-cap ⇒ refuse relaxed
+  // acceptance = fail SAFE toward NHR (the legacy exact path is untouched).
+  if (n > 120) return false;
+  const need = Math.ceil(RELAXED_COVERAGE_MIN * n);
+  // Obligation-side triggers, FAIL CLOSED (R3-F2) — computed once, enforced per-sentence below.
+  const trigSeqs: string[][] = [];
+  const trigSpans: Array<{ start: number; end: number }> = [];
+  const seenSeq = new Set<string>();
+  for (const t of disqualifierTriggersOf(obligation)) {
+    const seq = normVariant(t).split(" ").filter(Boolean);
+    const spans = tokenSpansOf(vToks, seq);
+    if (!spans.length) return false;                             // fail CLOSED (R3-F2)
+    trigSpans.push(...spans);
+    const key = seq.join(" ");
+    if (!seenSeq.has(key)) { seenSeq.add(key); trigSeqs.push(seq); }
+  }
+  // R5-F1/F2 — SENTENCE-SCOPED TWO-SIDED PROOF. Five rounds established that ANY release computed over
+  // obligation-side positions against a position-blind whole-excerpt mask will be bridged (tail bridges
+  // R2/R3, head bridges R5-F1, idiom tiling R5-F2). The proof is now scoped to ONE EXCERPT SENTENCE at a
+  // time: a grounding excerpt QUOTES the obligation sentence (with punctuation/plural variants and
+  // bounded insertions); matches assembled across different excerpt sentences are assembly, not
+  // quotation. Within a single sentence:
+  //   (1) contiguity: one covered run ≥50% of the obligation's variant tokens;
+  //   (0) DUAL endpoint anchor (R4-F1 + R5-F1): the run must include the obligation's HEAD (token 0 —
+  //       token 1 only behind a genuine leading conjunction, R5-F3: closed-class grammar {and, or},
+  //       the same class as the ARTICLES set, not bar vocabulary) AND its TAIL (token ≥ n-2): a
+  //       compound bar's laundered half always leaves one endpoint uncovered;
+  //   (2) triggers: EVERY occurrence inside the qualifying run, and the SENTENCE must carry at least
+  //       as many occurrences of each trigger sequence as the obligation (R4-F2/R5-F2 — an unrelated
+  //       same-idiom sentence elsewhere in the excerpt can no longer tile or inflate the count);
+  //   (3) subject test (triggered case): the qualifying runs cover ≥50% of NON-TRIGGER tokens.
+  // The dccce793 twin passes by construction: its mid-sentence insertion ("$1 mil per occurrence…")
+  // leaves the obligation's covered POSITIONS adjacent (0..8 + 9..end), one head+tail run, one sentence.
+  // R6-F3 — orthography-protected split (closed-class, not vocabulary): decimals/clause cites
+  // ("$1.5", "52.212-1") and letter-dot abbreviation chains ("U.S.", "e.g.") are NOT sentence
+  // boundaries; a newline is a boundary only before a blank line or an outline number (PDF hard-wraps
+  // are mid-sentence by default). A false split fragments a LEGIT twin and falsely refuses it — the
+  // exact false-NHR class this card exists to close.
+  // R7-F1 — a chain's FINAL dot stays a BOUNDARY when followed by a start-of-sentence signature
+  // (whitespace + capital/digit/open-quote): "…authorized in the U.S. Facsimile submissions…" is two
+  // sentences; "(e.g. professional liability)" / "U.S. citizens" stay one. Cost: a mid-sentence
+  // "U.S. Government" twin splits → false-refusal, fail-SAFE (documented ledger class). The digit
+  // protection keeps its no-whitespace shape (a space-dropped OCR glue "15.52.228-1" remains the
+  // documented n2 floor, Brain-sanction pending).
+  // R8-F1 — INVERTED default (doctrine polarity): after a letter-dot chain, whitespace means BOUNDARY
+  // unless a closed-class CONTINUATION signature follows (lowercase, comma/semicolon/colon, closing
+  // paren/bracket/quote incl. curly, currency "U.S. $1.5 million"). Unknown/exotic start glyphs now
+  // default to SPLIT = refuse = fail-toward-escalation (the prior allowlist of start glyphs failed
+  // toward acceptance — curly-quote/§/bracket-led second sentences kept the glue). No-whitespace
+  // ("U.S.-based") stays protected. Residual: a lowercase-led glue joins the n2 digit-glue floor
+  // (orthographically undecidable without vocabulary; Brain-sanction pending).
+  const protectedExcerpt = (rawExcerpt || "")
+    .replace(/(\d)\.(?=\d)/g, "$1\u0001")
+    .replace(/\b(?:[A-Za-z]\.){2,}/g, (m, offset: number, str: string) => {
+      // R9-F1/F2 (terminal shape) — the continuation class holds ONLY the glyphs that are unambiguous
+      // continuations after whitespace: a lowercase word (mid-sentence prose) or "$" (the "U.S. $1.5
+      // million" currency form). ASCII quotes after whitespace are OPENERS (a closing quote never
+      // follows whitespace) and every punctuation member was a glue carrier. Leading CLOSER glyphs are
+      // stripped before the test ("…the U.S.\" Facsimile…" — the closer hugs the dot, the boundary
+      // decision belongs to what follows it). Every excerpt-side split at a chain dot is structurally
+      // rescued by symmetric fragment pairing (obligationsOf raw-splits at every dot, so no pool entry
+      // straddles one) — proven zero-cost on the banked positives. Residual floors (Brain-sanction
+      // pending, banked): lowercase-led glue (q1), "$"-led second sentences (t9), digit-glue (n2).
+      const after = str.slice(offset + m.length).replace(/^["'\u201D\u2019)\]]+/, "");
+      const boundaryAfter = /^\s+/.test(after) && !/^\s*[a-z$]/.test(after);
+      const all = m.replace(/\./g, "\u0001");
+      return boundaryAfter ? `${all.slice(0, -1)}.` : all;
+    });
+  let sentences = EXCERPT_SENTENCE_CACHE.get(protectedExcerpt);
+  if (!sentences) {
+    sentences = protectedExcerpt.split(/[.;!?]+|\n\s*\n|\n(?=\s*\d+[.)\t ])/)
+      .map((raw) => { const vEx = normVariant(raw); return { vEx, exToks: vEx.split(" ").filter(Boolean) }; })
+      .filter((x) => x.exToks.length >= 4);
+    if (EXCERPT_SENTENCE_CACHE.size >= 64) EXCERPT_SENTENCE_CACHE.clear(); // bounded (R8-F2)
+    EXCERPT_SENTENCE_CACHE.set(protectedExcerpt, sentences);
+  }
+  for (const { vEx, exToks } of sentences) {
+    const covered = coveredMask(vToks, ` ${vEx} `);
+    const runs: Array<{ start: number; end: number }> = [];
+    for (let i = 0; i < covered.length; i++) {
+      if (!covered[i]) continue;
+      const start = i;
+      while (i + 1 < covered.length && covered[i + 1]) i++;
+      runs.push({ start, end: i });
+    }
+    // R6-F2 — the tail anchor requires the FINAL token (n-1), symmetric with the head: an un-typed
+    // endpoint tolerance is a swap surface (R5-F3 head ↔ R6-F2 tail — parallel §L rows differing only
+    // at the object noun). Cost: final-token morphology misses refuse → fail SAFE toward NHR.
+    let qualifying = runs.filter((r) => r.end - r.start + 1 >= need
+      && (r.start === 0 || (r.start === 1 && LEADING_CONJUNCTIONS.has(vToks[0])))
+      && r.end >= n - 1);
+    // R6-F1(i) — ORDER BINDING: the run's matched 4-gram windows must align MONOTONICALLY to the
+    // excerpt sentence (greedy non-decreasing assignment). Scattered-but-reordered chunk assembly
+    // inside one comma-joined sentence is assembly, not quotation. The in-order negation/preference
+    // wrapper remains the documented POLARITY FLOOR (Brain-sanction pending) — the same floor the
+    // pre-existing legacy exact path already has.
+    qualifying = qualifying.filter((r) => {
+      let prev = 0;
+      for (let i = r.start; i + 4 <= r.end + 1; i++) {
+        const g = vToks.slice(i, i + 4);
+        const occs = tokenSpansOf(exToks, g);
+        if (!occs.length) continue; // an unmatched window inside the run (covered via overlaps) imposes no constraint
+        const ok = occs.find((o) => o.start >= prev);
+        if (!ok) return false;
+        prev = ok.start;
+      }
+      return true;
+    });
+    if (!qualifying.length) continue;
+    let ok = true;
+    for (const sp of trigSpans) {
+      if (!qualifying.some((r) => r.start <= sp.start && r.end >= sp.end)) { ok = false; break; }
+    }
+    if (ok) for (const seq of trigSeqs) {
+      if (tokenSpansOf(exToks, seq).length < tokenSpansOf(vToks, seq).length) { ok = false; break; }
+    }
+    if (!ok) continue;
+    if (trigSpans.length) {
+      const inTrigger = new Array<boolean>(n).fill(false);
+      for (const sp of trigSpans) for (let k = sp.start; k <= sp.end; k++) inTrigger[k] = true;
+      const nonTrigTotal = inTrigger.filter((x) => !x).length;
+      if (nonTrigTotal === 0) continue; // all-trigger obligation carries no shareable subject
+      let nonTrigCovered = 0;
+      for (const r of qualifying) for (let k = r.start; k <= r.end; k++) if (!inTrigger[k]) nonTrigCovered++;
+      if (nonTrigCovered / nonTrigTotal < RELAXED_COVERAGE_MIN) continue;
+    }
+    return true;
+  }
+  return false;
+}
+function groundedBy(obligation: string, findings: TypedFinding[], sec: string, sectionNText?: string): string[] {
   const words = norm(obligation).split(" ").filter(Boolean);
-  const grams: string[] = [];
-  for (let i = 0; i + 4 <= words.length; i++) grams.push(words.slice(i, i + 4).join(" "));
+  const grams = gramsOf(words, 4);
+  const tol = groundingVariantToleranceEnabled();
+  const vToks = tol ? normVariant(obligation).split(" ").filter(Boolean) : [];
   const ids: string[] = [];
   for (const f of findings) {
+    if (!f.id) continue;
     const ex = norm(f.excerpt || "");
-    if (findingSection(f) === sec && grams.some((g) => ex.includes(g)) && f.id) ids.push(f.id);
+    const fSec = findingSection(f);
+    // Legacy path — UNCHANGED any flag state: same-letter citation + exact 4-gram.
+    if (fSec === sec && grams.some((g) => ex.includes(g))) { ids.push(f.id); continue; }
+    if (!tol) continue;
+    // Relaxed paths (flag ON) — all gated by the substantive-coverage bar.
+    const sectionOk = fSec === sec
+      || (fSec === null && (f.citation || "").trim().length > 0 && !!sectionNText && !!ex && sectionNText.includes(ex));
+    if (!sectionOk) continue;
+    if (passesSubstantiveBar(obligation, vToks, f.excerpt || "")) ids.push(f.id);
   }
   return [...new Set(ids)];
 }
@@ -1241,7 +1484,332 @@ const BOILERPLATE_ATTESTABLE = new Set(["I", "K"]);
 // ungrounded→INCOMPLETE proof); they are certified per-obligation instead.
 const PER_OBLIGATION_SECTIONS = new Set(["L", "M"]);
 
-export function completenessOf(ctx: AuditToolContext, required: string[], findings: TypedFinding[], sectionsRead: Set<string>, opts?: { sectionMDepth?: boolean; boilerplateAttest?: { sections: string[]; swept: boolean } }): { covered: string[]; missing: string[]; attestations: SectionAttestation[] } {
+// PHASE 4 (Brain, flag AUDIT_COVERED_DIRECT_BAR_FLOOR) — COVERED_DIRECT HARD-BAR FLOOR helper. The covered_direct
+// blanket short-circuit certifies a WHOLE non-per-obligation binding section ({B,C,D,E,F,H}) covered on a SINGLE
+// grounded finding cited to it, so a CO-RESIDENT ungrounded bidder-DISQUALIFIER (a §H facility-clearance/CMMC bar, a §C
+// set-aside restriction) sitting next to one benign grounded finding is NEVER enumerated → invisible to BOTH the V1
+// coverageComplete veto AND (prod state) gradeCoverageV2's importanceOf disqualifier scan (which reads status===covered
+// _direct as isCovered). §L/§M are already protected (T1-12 per-obligation fall-through); these six sections were not,
+// and they carry the bars. This helper mirrors the RATIFIED notice-body/attachment eligibility floors EXACTLY (same
+// covering-overlap + global ELIGIBILITY_BAR_RE scan + isSelfCertDemotableSentence over-fire reducer, cards #421/#441/
+// #509/#516) and returns the surviving ungrounded bar SENTENCES so the caller can emit obligations_ungrounded with the
+// REAL sentence — routing escalation through the engine's OWN importanceOf authority in BOTH flag states (V1: missing→
+// INCOMPLETE; V2: disqualifierUncovered→escalate). A clean section (no hard-bar) returns [] ⇒ covered_direct unchanged
+// BY CONSTRUCTION ⇒ zero over-fire on clean text. Over-fire (covered section → human review) is the SAFE direction;
+// under-fire (bar slips) is a hard zero. Pure → $0 gate-testable.
+// PHASE 4 R1→R2 (red-team over-fire remediation, project_covdirect-r1-findings) — the covered_direct floor scans the FULL
+// §B/C/D/E/F/H prose, a far larger + denser surface than the ratified notice-body floor, where ELIGIBILITY_BAR_RE's
+// subject-AGNOSTIC tokens (eligib/ineligible, "top secret", "iso 9001", a form-block "8(a)", a bare "size standard")
+// collocate on a WORK-PRODUCT / DATA / GOOD / FORM-FIELD rather than the bidder: "all welds shall conform to ISO 9001",
+// "documents classified up to Top Secret shall be stored…", "nonconforming units are ineligible for acceptance", "the
+// NAICS code and its size standard are listed…", "enter the value in block 8(a)". None is a bidder-eligibility bar →
+// crying-wolf false-INCOMPLETE (the cardinal sin per the quantity-ambiguity doctrine). CONVERGED POSITIVE INVARIANT
+// (recognizer-doctrine pivot [[feedback_reconstruction_treadmill_pivot_recognizer]]): skip a match whose sentence is
+// CONFIDENTLY about a non-offeror THING (a thing-noun — through an optional offeror genitive — leads it, or it is a
+// form-field ref, or an acceptance-of-goods object frame) — and pass EVERYTHING ELSE through. TWO BELTS guarantee the
+// airtight under-fire BY CONSTRUCTION: (1) belt-1 — an offeror DIRECTLY bound to an eligibility token ("eligible
+// offeror", "offeror shall be registered") ⇒ never skip; (2) belt-2 — any FIRM-INHERENT credential (a clearance/CMMC/
+// set-aside/8(a)-program/registration/debarment a GOOD can never hold) ⇒ never skip. Genuine ambiguity (no thing-subject,
+// no belt) still FLOORS (fails toward escalation). Converged R1→R4 under 3 independent adversarial passes; 37/37.
+// FIRM-INHERENT credentials — a good/document/weld can NEVER hold one, so naming it is itself bidder-direction (belt 2).
+// R3→R4: 8(a) as a socioeconomic PROGRAM is a firm-inherent SBA status like hubzone/sdvosb — but the 8(a) branch is
+// ANCHORED to a restriction/award verb (restrict/limit/reserve/award-to/available-to/open-to/eligible-to/performed-by)
+// or a program noun (participant/concern/certified-firm/designation/program-participant/set-aside), NOT a bare
+// "program"/"only"/"award" co-occurrence — so a form-block "program described in block 8(a)" / "only block 8(a)
+// requires an entry" / "section 8(a) of the FAR" falls through to FORM_FIELD_8A_RE and SKIPS (the R3 8(a)-reverse
+// ordering defect the final DRY-cert caught).
+const FIRM_CREDENTIAL_RE = /\b(?:facility|security|personnel|secret|top[\s-]?secret|ts[\s/]?sci|sci|interim)\s+clearance\b|\bclearance\s+(?:level|required|eligibilit)\b|\bcmmc\b|\bcleared\s+(?:to|at|for)\b|\bddtc\b|\bitar\b|\bset[\s-]?aside\b|\b(?:sdvosb|hubzone|wosb|edwosb|service[\s-]?disabled)\b|\b(?:restrict\w*|limit\w*|reserv\w*|award(?:ed)?\s+(?:only\s+)?to|available[^.!?]{0,15}?to|open[^.!?]{0,15}?to|eligible\s+(?:to|for)|performed\s+by)[^.!?]{0,30}?\b8\s?\(?a\)?\b|\b8\s?\(?a\)?\b[^.!?]{0,25}?(?:participants?|concerns?|certified\s+(?:firms?|business(?:es)?|concerns?|entit(?:y|ies)|small)|designations?|program\s+participants?|set[\s-]?aside)\b|\bregistered\s+in\s+sam\b|\bactive\s+sam(?:\.gov)?\s+registration\b|\bdebarr?ed\b|\bexcluded\s+part/i;
+// The sentence LEADS with a WORK-PRODUCT / DATA / GOOD / informational subject (the confident non-bidder case). R4:
+// an OPTIONAL offeror-genitive/attributive prefix ("the firm's samples", "contractor personnel") is allowed BEFORE the
+// thing-noun so a genitive possessor does not mask the thing subject (the belt-1 genitive over-fire the DRY-cert caught).
+const THING_LEAD_RE = /^(?:the\s+|all\s+|any\s+|each\s+|every\s+|nonconforming\s+|applicable\s+|a\s+|an\s+|its\s+|final\s+|delivered\s+|classified\s+)*(?:(?:offer(?:or|er)s?|bidders?|contractors?|subcontractors?|firms?|vendors?|concerns?|compan(?:y|ies)|prime)(?:'s|s')?\s+)?(?:supplies|goods|deliverables?|items?|products?|materials?|articles?|units?|lots?|shipments?|samples?|documents?|records?|data|files?|drawings?|welds?|parts?|components?|work|workmanship|services?|invoices?|packages?|containers?|personnel|naics(?:\s+code)?|codes?|size\s+standards?|clauses?|provisions?|values?|entries|fields?)\b/i;
+const FORM_FIELD_8A_RE = /\b(?:block|blk|line|item|box|field|section|entry|column|cell|part)\s*(?:no\.?\s*|number\s*|#\s*)?8\s?\(?a\)?\b/i;
+const ACCEPTANCE_OBJECT_RE = /\b(?:in)?eligib(?:le|ility)\b[^.!?]{0,25}?\bfor\s+(?:final\s+|government\s+)?(?:acceptance|payment|reimbursement|delivery|inspection)\b/i;
+// belt-1 (R4 DIRECT-BINDING, replaces the R3 30-char adjacency) — an offeror-class noun forces a floor ONLY when it is
+// DIRECTLY bound to an eligibility token as the party whose eligibility is at stake: "eligible OFFEROR", "OFFEROR that
+// is eligible", "OFFEROR shall be eligible/registered-in-sam/possess". A genitive possessor of a thing ("the firm's
+// samples shall be registered", "contractor personnel shall be registered") does NOT match → falls to the thing test
+// (the belt-1 adjacency over-fire the final DRY-cert caught). Ambiguity (offeror + eligibility but not directly bound)
+// falls to the thing test rather than force-floor — under-fire stays sealed by belt-2 + the firm-credential belt.
+const _OFF = "(?:offer(?:or|er)s?|bidders?|contractors?|subcontractors?|firms?|concerns?|vendors?|proposers?|quoters?|awardees?|applicants?)";
+// Gate-2 P0 (2026-07-19): belt-1 must also floor the POST-MODIFIER participle order — an offeror-class noun DIRECTLY
+// followed by a bare eligibility participle ("supplied only by offerors CERTIFIED to ISO 9001", "vendors ACCREDITED to
+// AS9100") is a genuine who-may-supply/bid bar the forward-order ("certified offeror") + directive arms missed, so a
+// THING-lead sentence ("Products shall be supplied by …") laundered the bar to covered_direct. Added "accredited"/
+// "approved"/"listed" to the participle set (forward + reversed). Reversed order is fail-toward-floor (safe direction).
+const OFFEROR_ELIG_BOUND_RE = new RegExp(`\\b(?:not\\s+)?(?:eligible|ineligible|qualified|certified|accredited|approved|listed|registered|cleared|responsible|debarred)\\s+(?:small\\s+business\\s+|prospective\\s+|apparent\\s+)?(?:${_OFF}|entit(?:y|ies)|participants?)\\b|\\b${_OFF}\\s+(?:that\\s+(?:are|is)|who\\s+(?:are|is))\\s+(?:not\\s+)?(?:eligible|ineligible|qualified|certified|accredited|approved|listed|registered|cleared|responsible)\\b|\\b${_OFF}\\s+(?:shall|must|will|is|are|to)\\s+(?:be\\s+)?(?:not\\s+)?(?:eligible|ineligible|qualified|certified|registered\\s+in\\s+sam|cleared|responsible|debarred|possess|hold|maintain)\\b|\\b${_OFF}\\s+(?:not\\s+)?(?:eligible|ineligible|qualified|certified|accredited|approved|listed|cleared|debarred)\\b`, "i");
+function isNonBidderEligibilitySentence(sentence: string): boolean {
+  if (FIRM_CREDENTIAL_RE.test(sentence)) return false;      // belt 2 — a firm-inherent credential a good can't hold → floor
+  if (OFFEROR_ELIG_BOUND_RE.test(sentence)) return false;   // belt 1 — offeror directly bound to the eligibility → floor
+  return THING_LEAD_RE.test(sentence) || FORM_FIELD_8A_RE.test(sentence) || ACCEPTANCE_OBJECT_RE.test(sentence);
+}
+
+// ── PHASE 5 (Brain card #560, flag AUDIT_ELIG_BAR_PASSIVE_FRAME default-OFF) — PASSIVE / NOUN-FRAME eligibility-bar SIBLING.
+// ELIGIBILITY_BAR_RE catches the ACTIVE-VERB frame ("[offeror] shall/must HOLD a [clearance]") but MISSES the passive /
+// noun frame ("a TS/SCI clearance IS REQUIRED", "an FCL at the Secret level", "Authorized reseller letter from …") AND a
+// class of OUT-OF-VOCAB firm-credential / supply-chain nouns (TS/SCI · DOE Q/L access authorization · FCL · polygraph ·
+// VAR / authorized dealer-distributor-reseller · ITAR/DDTC · NADCAP/Berry/FedRAMP · QPL/QML · CBA signatory). A bar in
+// this class is INVISIBLE to the WHOLE chain → the catastrophic false-COMPLETE Gate-2 Row-1 exposes (the load-bearing
+// pre-filter miss). Sibling detector — DOCTRINE #515: POSITIVE NOUN ALLOWLIST (no bar-vocabulary blocklist).
+// GAUNTLET R1→R3 PIVOT (recognizer-doctrine [[feedback_reconstruction_treadmill_pivot_recognizer]]): a naive "requirement
+// frame" is a TWO-SIDED treadmill (26 over-fires on benign credential MENTIONS — glossary/QPL-goods/"cover letter"/
+// "overhead clearance" — while STILL missing "will be found nonresponsive"/"ineligible for award"). The POSITIVE INVARIANT
+// that holds BY CONSTRUCTION: FLAG = a chartered credential NOUN + a BID/AWARD-SCOPED ELIGIBILITY CONSEQUENCE (the firm at
+// bid/award is ineligible / nonresponsive / not-considered / not-awardable / restricted-out — OR a DIRECTIVE-governed
+// possession of the noun ["offeror must possess an FCL"] OR the firm-credential noun immediately followed by "is required/
+// mandatory"), AND NOT a benign DEFINITION / incumbent-narrative / goods-installed-BY-agent / POST-AWARD-curable onboarding
+// / self-cert. Consequence/possession is the LOAD-BEARING gate; the noun is a bounded chartered allowlist. "personnel" is
+// deliberately NOT a thing here (a personnel clearance IS a firm bar) — the noun allowlist excludes the 19 personnel-Tier/
+// NACLC/SSBI INVESTIGATION specimens BY CONSTRUCTION (a process, never a standing credential). PRODUCT-COMPLIANCE nouns
+// (NADCAP/Berry/FedRAMP/QPL/QML) + labor CBA flag only via a STRONG bid-consequence or an OFFEROR-subject possession — a
+// bare "[product] is required / must appear on the QPL" is a product/process spec, not a firm bid bar (rounds 2-3).
+// SCOPE (banked for the CEO batch ruling, NOT chased — anti-treadmill): OUT-OF-VOCAB credential nouns (SCIF/COMSEC/JCP-
+// DD2345/FOCI/AS9100/DMEA) + genuinely-ambiguous performance/site-access framings ("condition of access", "precondition to
+// receiving the TDP") are documented under-fires, not defects. BINDING (card #560): the passive match routes through the
+// SAME demotion authority as ELIGIBILITY_BAR_RE (isSelfCertDemotableSentence, :765/:960/:977) — the self-cert path can
+// NEVER launder a passive bar (a coupled "registered in SAM AND an authorized reseller" escalates via TEST 4) — AND the
+// SAME emission channel (obligations_ungrounded → importanceOf escalation, both flag states). Over-fire (covered section →
+// human review) is the SAFE direction; under-fire (a firm bar → false-COMPLETE) is a hard zero. Pure → $0 gate-testable.
+// Gauntlet-DRY: R1 corpus 31/31 · 3 adversarial red-team rounds (79 specimens) 0 clear over-fire; certs
+// `_cert-phase5-{passive-corpus,coupling-prodpath,gauntlet-judge}.ts`.
+// GAUNTLET R1→R2 PIVOT (recognizer-doctrine [[feedback_reconstruction_treadmill_pivot_recognizer]]): a loose "requirement"
+// frame is a TWO-SIDED treadmill — it over-fires on 26 benign credential MENTIONS (a glossary "TS/SCI means…", a QPL goods
+// spec, a "cover letter", an "overhead clearance", a warranty "authorized dealer") while STILL missing the eligibility
+// idioms ("will be found nonresponsive", "ineligible for award", "need not respond"). The POSITIVE INVARIANT that holds
+// BY CONSTRUCTION: a passive eligibility bar = a chartered credential NOUN + an OFFEROR-scoped PRE-AWARD ELIGIBILITY
+// CONSEQUENCE (the firm, at bid/award, is disqualified / nonresponsive / not-considered / not-awardable, OR must POSSESS
+// the credential governed by a possession verb at a pre-award milestone) — and NOT a benign DEFINITION, a POST-AWARD-
+// curable onboarding, or a GOODS-installed-BY-agent workmanship. Consequence/possession is the load-bearing gate; the
+// noun stays a chartered allowlist (scope = card #560's explicit vocab; OOV credentials SCIF/COMSEC/JCP/FOCI/DMEA are
+// banked for the batch ruling, NOT chased — doctrine #515 anti-treadmill). Ambiguity FAILS TOWARD FLAG (human review).
+const PASSIVE_CREDENTIAL_NOUN_RE = new RegExp([
+  "\\bts[\\s/]?sci\\b",                                                   // TS/SCI
+  "\\b[ql]\\s+access\\s+authorization\\b",                               // DOE Q / L access authorization (level-specific)
+  "\\baccess\\s+authorization\\b",                                       // DOE access authorization (generic)
+  "\\bfcl\\b",                                                            // facility clearance level (abbrev) — consequence gate carries it
+  "\\b(?:facility|security|personnel|interim|top[\\s-]?secret|secret)\\s+clearance\\b", // spelled clearance
+  "\\bscif\\b|\\bsensitive\\s+compartmented\\s+information\\s+facilit\\w*\\b", // SCIF (card #562 Item 1) — WEAK-isreq (a bare "a SCIF is required to store …" is a facility spec)
+  "\\bcomsec\\s+account\\b",                                             // COMSEC ACCOUNT (card #562 Item 1) — the firm credential (bare "COMSEC is required for transmissions" = encryption, not a bar)
+  "\\bfoci\\b|\\bforeign\\s+ownership,?\\s+control",                    // FOCI / foreign ownership control or influence (card #562 Item 1)
+  "\\bpolygraph\\b",                                                     // polygraph (CI-scope / full-scope / lifestyle)
+  "\\bvalue[\\s-]?added\\s+res\\w*\\b",                                  // Value Added Reseller (typo-tolerant: "Resaler")
+  "\\bauthorized\\s+(?:dealer|distributor|resell?er)\\b",                // authorized dealer / distributor / reseller
+  "\\bitar\\b|\\bddtc\\b",                                               // ITAR / DDTC registration
+  "\\bnadcap\\b|\\bberry[\\s-]amendment\\b|\\bfedramp\\b",               // NADCAP / Berry(-)Amendment / FedRAMP (hyphen-tolerant)
+  "\\bqpl\\b|\\bqml\\b|\\bqualified\\s+products?\\s+list\\b",            // QPL / QML product qualification
+  "\\bcollective\\s+bargaining\\s+agreement\\b",                        // CBA signatory
+].join("|"), "i");
+// (A) DEFINITION / GLOSSARY / ACRONYM / PAST-PERFORMANCE-NARRATIVE context — the noun is DESCRIBED (or predicated of the
+// INCUMBENT), not required of THIS offeror (sentence-level). No bare-parenthetical arm — a real bar routinely parenthesises
+// its own acronym ("must be a Value Added Reseller (VAR)"); only an explicit definition verb / narrative subject skips.
+const PASSIVE_DEFINITION_CONTEXT_RE = /\b(?:means|refers?\s+to|is\s+defined\s+as|shall\s+mean|stands?\s+for|abbreviations?\s+(?:table|list)|as\s+used\s+herein)\b/i;
+// Gate-2 P1 (2026-07-19): incumbent / predecessor NARRATIVE — a credential predicated of the INCUMBENT (past-performance
+// context), NOT required of THIS offeror. Split out of PASSIVE_DEFINITION_CONTEXT_RE because the old bare sentence-scoped
+// token was POSITION-BLIND: a comparative bar that merely NAMES the incumbent ("Unlike the incumbent, any new offeror
+// lacking a facility clearance is ineligible for award"; "The incumbent holds a TS/SCI clearance; the offeror must
+// possess an FCL and will be found nonresponsive without it") was wrongly suppressed. Release on incumbent-narrative ONLY
+// when the sentence carries NO offeror-scoped eligibility CONSEQUENCE and NO offeror SUBJECT — i.e. the credential really
+// is the incumbent's, not this offeror's (ambiguity fails toward FLAG; over-fire is the safe direction).
+const PASSIVE_INCUMBENT_NARRATIVE_RE = /\bincumbent\b|\bpredecessor\s+contract\b|\bunder\s+the\s+(?:predecessor|prior|current)\s+contract\b/i;
+// (B) OFFER-LEVEL ELIGIBILITY CONSEQUENCE — the offeror/firm is gated at bid/award (sentence-level; the strong signals).
+// NOTE: bare pre-award-milestone timing tokens ("as of the date of award", "at proposal submission") are NOT consequences
+// on their own (they falsely fired on of-18's NEGATED "no offeror is required to hold … at proposal submission") — they
+// only count when a possession verb governs the credential (handled in (C) below).
+// GAUNTLET R2→R3: every consequence token is BID/AWARD-scoped — round 2 proved the broad forms ("mandatory",
+// "ineligible", "condition of access", "precondition", "contingent on", "disqualif", bare "not acceptable") over-fire on
+// PERFORMANCE / SITE-ACCESS / PRODUCT / PERSON eligibility that shares a credential noun. A credential framed only as a
+// SITE/IT-access or performance condition ("a clearance is a condition of access to Building 7", "precondition to
+// receiving the workstation image") is NOT flagged here — that framing is banked for the CEO batch ruling as an
+// ambiguous performance/access boundary (safe direction: avoid crying wolf, the co-resident explicit bar still catches).
+const PASSIVE_ELIG_CONSEQUENCE_RE = new RegExp([
+  "\\bineligib(?:le|ility)\\s+(?:for\\s+(?:award|consideration|this\\s+(?:procurement|acquisition|solicitation)|bid)|to\\s+(?:bid|propose|compete|be\\s+(?:considered|awarded)))\\b",
+  "\\beligib(?:le|ility)\\s+(?:for\\s+(?:award|consideration|this\\s+(?:procurement|acquisition|solicitation)|bid)|to\\s+(?:bid|propose|compete|be\\s+considered|be\\s+awarded|participate))\\b",
+  "\\beligibility\\s+is\\s+(?:restricted|limited)\\b",
+  "\\b(?:threshold\\s+|mandatory\\s+)?eligibility\\s+requirement\\b",
+  "\\b(?:restricted|limited)\\s+to\\s+[^.!?]{0,40}?(?:holders?|offer(?:or|er)s?|firms?|concerns?|contractors?|vendors?|suppliers?|manufacturers?|bidders?)\\b",
+  "\\bnon[\\s-]?responsi(?:ve|ble|bility)\\b",
+  "\\bfound\\s+(?:to\\s+be\\s+)?(?:non[\\s-]?responsi(?:ve|ble)|ineligible|not\\s+responsible)\\b",
+  "\\bunawardable\\b",
+  "\\baward\\s+(?:may\\s+only\\s+be\\s+made|will\\s+be\\s+made\\s+only|is\\s+contingent|may\\s+not\\s+be\\s+made)\\b",
+  "\\bcontingent\\s+(?:up)?on\\s+[^.!?]{0,40}?(?:holding|possess|\\bhold\\b|the\\s+(?:offeror|prime|firm|contractor|awardee)|being\\s+(?:a|an)|award\\s+to)\\b",
+  "\\bcondition\\s+of\\s+(?:award|eligibility|consideration)\\b",
+  "\\bprecondition\\s+(?:to|for|of)\\s+(?:award|bid|eligib|consideration|being\\s+considered|proposal\\s+submission)\\b",
+  // Gate-2 P0 (2026-07-19): 'prerequisite' is the load-bearing synonym of the covered 'precondition' — an in-vocab
+  // chartered credential framed "is a prerequisite for award / to submitting a proposal" is a real firm bar the active
+  // ELIGIBILITY_BAR_RE also misses (noun frame, no possession verb). Broader object list to catch the gerund forms.
+  "\\bprerequisite\\s+(?:to|for|of)\\s+(?:award|bid|bidding|eligib|consideration|being\\s+considered|proposal\\s+submission|submitting|proposing|competing|participating)\\b",
+  "\\bmandatory\\s+for\\s+(?:consideration|award|eligibility|bid)\\b",
+  "\\bwill\\s+not\\s+be\\s+considered\\b",
+  "\\bwill\\s+be\\s+considered\\s+for\\s+award\\b",
+  "\\bwill\\s+not\\s+be\\s+(?:able\\s+to\\s+(?:perform|bid|compete|propose)|evaluated)\\b",
+  "\\bneed\\s+not\\s+(?:respond|apply|bid|submit|propose)\\b",
+  "\\bmay\\s+not\\s+(?:bid|propose|participate|compete|submit|be\\s+considered|be\\s+assigned)\\b",
+  "\\bdisqualif\\w*\\s+(?:from\\s+(?:award|the\\s+(?:award|competition|procurement|solicitation)|consideration|bidding|being\\s+considered)|for\\s+award)\\b",
+  "\\bonly\\s+[^.!?]{0,45}?(?:holders?|offer(?:or|er)s?|firms?|concerns?|contractors?|vendors?|suppliers?|manufacturers?|bidders?|quoters?)[^.!?]{0,45}?(?:may\\s+(?:bid|propose|participate|compete|perform|be\\s+awarded)|are\\s+eligible|will\\s+be\\s+considered|eligible\\s+to\\s+bid)\\b",
+  "\\b(?:vendors?|offer(?:or|er)s?|firms?|suppliers?|quoters?|bidders?|contractors?)\\s+(?:who|that)\\s+(?:are|is)\\s+not\\s+(?:the\\s+)?(?:oem|an?\\s+)",  // conditional gate on non-credentialed offerors
+  "\\brejected\\s+(?:without\\s+evaluation|as\\s+(?:technically\\s+)?(?:unacceptable|nonresponsive|noncompliant))\\b",
+  "\\bnon-?(?:listed|compliant|qualified|conforming)\\s+[^.!?]{0,20}?(?:items?|products?|parts?|offers?|units?)\\s+(?:are|will\\s+be)\\s+(?:not\\s+acceptable|rejected|(?:technically\\s+)?unacceptable)\\b",  // bid-time product-qualification rejection
+  "\\bmust\\s+appear\\s+on\\b[^.!?]{0,45}?\\bat\\s+(?:the\\s+)?(?:time\\s+of\\s+(?:bid|proposal|award|submission)|bid\\s+opening|proposal\\s+submission)\\b",  // "must appear on the QPL AT THE TIME OF BID OPENING" (bid-time, not delivery)
+  "\\bauthorized\\s+(?:dealer|distributor|resell?er)\\s+letter\\b",
+  "\\bletter\\s+of\\s+(?:supply|authorization)\\b",
+  "\\b(?:facility|security|personnel)\\s+clearance\\s+requirement\\b",
+  "\\bsignatory\\s+to\\b",
+].join("|"), "i");
+// (C) POSSESSION governing the credential — a possession verb within ~5 words BEFORE the noun ("shall possess an active
+// [DOE Q]", "obtain and maintain a [polygraph]", "must provide the [authorized distributor] letter"). Copula "be" is
+// SEPARATED out ("be a/an/the/active/current/valid [VAR]") so a passive verb ("be performed at a [NADCAP] facility",
+// "be transferred") never falsely governs. Tested per-noun on the ~55-char pre-window so a distant verb (of-13's "must be
+// signed" ahead of a far CBA) never governs.
+// NOTE: "furnish"/"provide" are OMITTED — they collide with the ADJECTIVE forms ("Government-furnished equipment",
+// "contractor-provided") that are not possession of a credential (of-18 GFE over-fire); the corpus FLAGs that use them
+// ("shall provide an authorized distributor letter", "must provide traceability") are already carried by CONSEQUENCE
+// (the "authorized … letter" / conditional-non-credentialed-vendor arms), so possession does not need them.
+const PASSIVE_POSSESSION_GOVERN_RE = /\b(?:possess(?:es|ing|ion)?|hold(?:s|ing)?|maintain(?:s|ing)?|obtain(?:s|ing)?|have|has|having|appear(?:s|ing)?|signatory|enroll\w*|registered)\b(?:\s+[\w,'()./\-]+){0,5}\s*$/i;
+const PASSIVE_COPULA_GOVERN_RE = /\bbe\s+(?:a|an|the|active|current|valid|able\s+to\s+\w+)(?:\s+[\w,'()./\-]+){0,4}\s*$/i;
+// (C2) PASSIVE "[credential] IS REQUIRED" — the noun is the SUBJECT of a requirement predicate immediately after it
+// ("a TS/SCI clearance IS REQUIRED", "an FCL is mandatory"). The canonical passive frame card #560 names. GATED to
+// FIRM-CREDENTIAL nouns only — a PRODUCT-COMPLIANCE noun (NADCAP/Berry/FedRAMP/QPL/QML) "is required/mandatory" is
+// usually a PRODUCT/PROCESS spec ("compliance with the Berry Amendment is mandatory for textile deliverables"), not a
+// firm bid bar (round 2, r2-22); those flag only on a STRONG consequence (rejected / not-acceptable-offer / must-appear-on).
+const PASSIVE_IS_REQUIRED_AFTER_RE = /^[\s\w,'()./\-]{0,22}?\b(?:is|are|was|were|shall\s+be|will\s+be|remains?|being)\s+(?:required|mandatory)\b/i;
+// PRODUCT-COMPLIANCE / labor nouns — a NADCAP/Berry/FedRAMP/QPL/QML PRODUCT spec, or CBA "adherence is mandatory for the
+// workforce" (SCA performance), is not a firm bid bar on a bare requirement/possession. These flag ONLY via a STRONG
+// bid-consequence (rejected-at-evaluation / non-listed-not-acceptable / must-appear-on-at-bid-time / ineligible-for-award
+// / only-X-may-bid) OR an OFFEROR-SUBJECT directive possession ("the offeror must possess NADCAP accreditation"), never a
+// goods-subject possession ("all delivered valves must appear on the QPL") nor a bare "[noun] is required/mandatory".
+const PASSIVE_WEAK_ISREQ_NOUN_RE = /\bnadcap\b|\bberry[\s-]amendment\b|\bfedramp\b|\bqpl\b|\bqml\b|\bqualified\s+products?\s+list\b|\bcollective\s+bargaining\s+agreement\b|\bscif\b|\bsensitive\s+compartmented\s+information\s+facilit\w*\b/i;
+const PASSIVE_OFFEROR_SUBJECT_RE = /\b(?:offer(?:or|er)s?|firms?|contractors?|vendors?|bidders?|prime|concerns?|compan(?:y|ies)|awardees?|subcontractors?|proposers?|quoters?|applicants?)\b/i;
+// (C3) records-admin — the noun immediately governs "records/documentation/file(s)" → maintaining paperwork, not holding
+// the credential ("maintain the facility clearance RECORDS for the duration of performance") → skip that match.
+const PASSIVE_RECORDS_ADMIN_RE = /^\s*(?:records?|documentation|files?|logs?|registers?)\b/i;
+// (D) POST-AWARD / PERFORMANCE cure timing — the credential is OBTAINED after award / maintained through performance /
+// required at DELIVERY (a curable onboarding or product spec), with NO pre-award anchor → SKIP (safe: it is not a bid gate).
+// Bare "prior to performing/accessing" is DELIBERATELY excluded — "clearance required prior to performance" with NO cure
+// window is a real bar (corpus synth-01/07); only an explicit cure WINDOW / interim-acceptable / sponsorship demotes.
+const PASSIVE_POST_AWARD_CURE_RE = /\bwithin\s+(?:\d+|\w+)\s+(?:days?|months?|weeks?)\s+(?:of|after|from)\s+(?:contract\s+)?(?:award|start|the\s+start|commencement|performance|delivery|the\s+effective\s+date)\b|\bthroughout\s+(?:the\s+)?(?:period\s+of\s+)?(?:contract\s+)?performance\b|\b(?:during|for)\s+(?:the\s+)?(?:period\s+of\s+)?(?:duration\s+of\s+)?performance\b|\bfor\s+the\s+duration\s+of\s+(?:performance|the\s+contract)\b|\bafter\s+(?:contract\s+)?award\b|\bwill\s+sponsor\b|\bgovernment\s+will\s+(?:sponsor|process|arrange|obtain)\b|\bat\s+time\s+of\s+delivery\b|\binterim\s+(?:eligibility|clearance)\s+(?:is\s+)?acceptable\b/i;
+const PASSIVE_PRE_AWARD_ANCHOR_RE = /\bas\s+of\s+the\s+(?:date\s+of\s+award|proposal\s+due\s+date|award\s+date|closing\s+date)\b|\bat\s+(?:the\s+)?(?:time\s+of\s+(?:award|proposal|bid|submission)|proposal\s+submission|bid\s+opening)\b|\bprior\s+to\s+award\b|\bunawardable\b|\bineligible\s+for\s+(?:award|consideration)\b|\bnon[\s-]?responsi\w*\b/i;
+// (E) ACCESS-TO-BID carve-out (card #562 Item 2) — a credential that gates RECEIPT of the materials required to prepare a
+// responsive quote (the TDP / bid package / solicitation drawings) is a BID-eligibility bar → FLAG (NHR). This is the
+// COMPLEMENT of the frozen JCP/DD-2345 decision-gate key (`detectJcpGate`/`JCP_RE` in audit-engine.ts — NOT touched here):
+// that key stays inert when no TDP is required; this fires when a clearance/credential gates a REQUIRED TDP. Access-to-
+// PERFORM ("condition of access to Building 7", "may access the reading room") is NOT here — it stays SKIP. Ambiguity →
+// fail-toward-review (the credential + a receive/obtain-the-bid-materials shape), never a silent skip.
+const PASSIVE_ACCESS_TO_BID_RE = /\b(?:precondition|prerequisite|required|contingent(?:\s+(?:up)?on)?|condition\s+precedent|necessary)\b[^.!?]{0,45}?\b(?:to\s+)?(?:receiv\w+|obtain\w+|access(?:ing)?|be\s+(?:furnished|provided|granted|given))\b[^.!?]{0,30}?\b(?:the\s+)?(?:technical\s+data\s+package|\btdp\b|bid\s+(?:package|documents?|materials?|set)|solicitation\s+(?:package|documents?|attachments?|drawings?)|proposal\s+(?:package|materials?)|rfp\s+(?:package|documents?)|drawings?\s+(?:and\s+specifications?\s+)?(?:required|needed|necessary)|data\s+package)\b/i;
+// A GOOD installed / serviced / fabricated BY a supply-chain agent — the credential is predicated of the installer, not
+// the bidder. Physical-workmanship verbs only (NOT "provide"/"perform" — those are what the OFFEROR does).
+const SUPPLY_AGENT_INSTALL_RE = /\b(?:install|assembl|servic|maintain|repair|erect|mount|fabricat)\w*\s+(?:[\w,/:.\-]+\s+){0,4}?by\s+(?:an?\s+|the\s+)?(?:authorized\s+(?:dealer|distributor|installer|resell?er)|manufacturer|oem)\b/i;
+export function passiveFrameEligBarSentence(sentence: string, declaredSetAside?: string | null): boolean {
+  if (!PASSIVE_CREDENTIAL_NOUN_RE.test(sentence)) return false;         // no chartered credential / supply-chain noun → not this class
+  if (PASSIVE_DEFINITION_CONTEXT_RE.test(sentence)) return false;       // (A) glossary / acronym-legend describing the term → not a requirement
+  // (A2) incumbent/predecessor NARRATIVE — release ONLY when the credential is the incumbent's, i.e. NO offeror-scoped
+  // consequence and NO offeror subject in the sentence (Gate-2 P1: the old bare token suppressed comparative offeror bars).
+  if (PASSIVE_INCUMBENT_NARRATIVE_RE.test(sentence) && !PASSIVE_ELIG_CONSEQUENCE_RE.test(sentence) && !PASSIVE_ACCESS_TO_BID_RE.test(sentence) && !PASSIVE_OFFEROR_SUBJECT_RE.test(sentence)) return false;
+  if (SUPPLY_AGENT_INSTALL_RE.test(sentence)) return false;             // a GOOD installed BY a dealer (workmanship agent) → not a bidder bar
+  // (D) POST-AWARD-curable onboarding / product-delivery spec with NO pre-award anchor → SKIP (a bid gate it is not).
+  // Gate-2 P1: a bid/award CONSEQUENCE (or access-to-bid) VETOES the cure-release — a clearance "maintained throughout
+  // performance" that ALSO carries "will not be considered" / "only firms … may propose" is still a pre-award bar. The
+  // curable-timing phrase only releases when NO bid-scoped consequence rides along (PASSIVE_PRE_AWARD_ANCHOR_RE is a strict
+  // subset of the consequences, so it alone left this gap).
+  if (PASSIVE_POST_AWARD_CURE_RE.test(sentence) && !PASSIVE_PRE_AWARD_ANCHOR_RE.test(sentence) && !PASSIVE_ELIG_CONSEQUENCE_RE.test(sentence) && !PASSIVE_ACCESS_TO_BID_RE.test(sentence)) return false;
+  if (isSelfCertDemotableSentence(sentence, declaredSetAside)) return false; // BINDING — same demotion authority; self-cert cannot launder a passive bar
+  // (B/C) the load-bearing POSITIVE gate: an offeror-scoped eligibility CONSEQUENCE anywhere in the sentence, OR a
+  // possession verb GOVERNING (within ~5 words before) some credential-noun match. Ambiguity (noun present, no
+  // consequence, no governing possession) → SKIP (a bare mention is not a bar; the safe direction is proven by the
+  // over-fire corpus). A genuine bar always carries one or the other.
+  // Gate-2 P1 (assessed, deliberately NOT narrowed): a co-resident consequence about a DIFFERENT subject ("the pricing
+  // narrative will not be considered; welding is performed in the secret clearance annex") can over-fire here. Every
+  // attempted proximity/same-clause narrowing REGRESSED real split-clause bars into the catastrophic UNDER-fire direction
+  // (e.g. "Items offered must appear on the QPL at bid opening; non-listed items are not acceptable" — noun and the
+  // operative consequence legitimately live in different clauses). Over-fire is the SAFE direction (covered section →
+  // human review); under-fire is a hard zero. Per [[feedback_reconstruction_treadmill_pivot_recognizer]] this stays an
+  // accepted over-fire rather than a deeper reconstruction of the seam. The co-resident explicit bar still catches.
+  if (PASSIVE_ELIG_CONSEQUENCE_RE.test(sentence)) return true;
+  if (PASSIVE_ACCESS_TO_BID_RE.test(sentence)) return true;            // (E) credential gates receipt of the quote-prep materials → bid bar
+  for (const m of sentence.matchAll(new RegExp(PASSIVE_CREDENTIAL_NOUN_RE.source, "gi"))) {
+    const ns = m.index ?? 0, ne = ns + m[0].length;
+    const pre = sentence.slice(Math.max(0, ns - 72), ns);              // wide enough for "obtain and maintain a favorably adjudicated … [noun]"
+    const post = sentence.slice(ne, ne + 42);
+    if (/\b(?:no|not|without|n['’]t)\b[\s\w,'()./\-]{0,20}$/i.test(pre)) continue;    // negated ("no offeror is required to hold [X]") → not governing
+    if (PASSIVE_RECORDS_ADMIN_RE.test(post)) continue;                                // "[clearance] records" → paperwork admin, not holding it
+    if (/\blower[\s-]?tier\b|\bsub[\s-]?tier\b/i.test(pre)) continue;                 // "any LOWER-TIER supplier shall be an authorized distributor" → flow-down spec, not the prime's bid
+    // The possession / copula branch fires only when a DIRECTIVE governs it (must/shall/required to) — round 2 proved a
+    // BARE participle ("only personnel HOLDING a clearance may access") is a descriptive site-access rule, not a bid bar.
+    // Directive is checked in a WIDER window (~110) since "must" can sit ahead of a compound verb ("must be able to obtain
+    // and maintain a … polygraph"), while the possession verb itself stays in the tight ~72 pre-window.
+    const wide = sentence.slice(Math.max(0, ns - 110), ns);
+    const directive = /\b(?:must|shall|required\s+to|will\s+need\s+to|are\s+required\s+to|to\s+be)\b/i.test(wide);
+    // a PRODUCT-COMPLIANCE / labor noun needs an OFFEROR subject to be a firm-possession bar (else it is a product spec).
+    const okScope = !PASSIVE_WEAK_ISREQ_NOUN_RE.test(m[0]) || PASSIVE_OFFEROR_SUBJECT_RE.test(wide);
+    if (directive && okScope && PASSIVE_POSSESSION_GOVERN_RE.test(pre)) return true;  // "shall possess an active [FCL]", "must … maintain a [polygraph]"
+    if (directive && okScope && PASSIVE_COPULA_GOVERN_RE.test(pre)) return true;      // "must be a [VAR]"
+    if (!PASSIVE_WEAK_ISREQ_NOUN_RE.test(m[0]) && PASSIVE_IS_REQUIRED_AFTER_RE.test(post)) return true; // "[TS/SCI clearance] is required" (firm-credential only)
+  }
+  return false;
+}
+
+function sectionUngroundedEligBars(text: string, findings: TypedFinding[], declaredSetAside?: string | null): string[] {
+  if (!hasEngineText(text)) return [];                                   // unread / unreadable region — nothing to floor
+  const nText = norm(text);                                             // regex + excerpt spans share this coordinate space
+  // Decision-bearing (non-`dropped`) findings grounded IN this section, as [start,end) spans over nText. A finding COVERS
+  // a bar only when its grounded span OVERLAPS the bar's matched span — a benign finding grounded ELSEWHERE in the
+  // section can never mask an eligibility bar (the UNDER_ABSTAIN=0 guarantee; mirrors noticeBodyEligibilityUngrounded).
+  const covering: Array<[number, number]> = [];
+  for (const f of findings) {
+    if (disposeFinding(f) === "dropped") continue;
+    const ex = norm(f.excerpt || "");
+    if (!ex) continue;
+    const s = nText.indexOf(ex);
+    if (s >= 0) covering.push([s, s + ex.length]);
+  }
+  const bars: string[] = [];
+  const barSentences = new Set<string>();                              // dedupe: a bar caught by BOTH scans emits once
+  // BOUNDED WALK (DRY-stamp perf caveat): cap the boundary scan at ±SENT_WINDOW so a pathological terminator-free giant
+  // input is O(n) overall, not O(n²). Real solicitation sentences are far shorter than the window, so the extracted
+  // sentence is IDENTICAL on realistic (period-terminated) prose — fidelity-preserving; only a degenerate no-`.!?`
+  // mega-string is capped (which only makes the recognizer see LESS context ⇒ fails toward the floor, the safe pole).
+  const SENT_WINDOW = 600;
+  const enclosingSentence = (hs: number, he: number): string => {
+    let ss = hs; const ssMin = Math.max(0, hs - SENT_WINDOW); while (ss > ssMin && !".!?".includes(nText[ss - 1])) ss--;
+    let se = he; const seMax = Math.min(nText.length, he + SENT_WINDOW); while (se < seMax && !".!?".includes(nText[se])) se++;
+    return nText.slice(ss, se).trim();
+  };
+  const scan = new RegExp(ELIGIBILITY_BAR_RE.source, "gi");             // global clone; bounded-quantifier → linear
+  for (const m of nText.matchAll(scan)) {
+    const hs = m.index ?? 0, he = hs + m[0].length;
+    if (covering.some(([s, e]) => s < he && hs < e)) continue;          // grounded by an overlapping finding → analyzed
+    // enclosing sentence — sentence-precise (not a window) so a real bar elsewhere is never masked by a benign neighbour.
+    const sentence = enclosingSentence(hs, he);
+    if (isSelfCertDemotableSentence(sentence, declaredSetAside)) continue; // bidder-self-determinable → not a firm-only bar
+    if (isNonBidderEligibilitySentence(sentence)) continue;               // R1 — goods-acceptance / form-field eligibility, not a bidder bar
+    if (sentence) { barSentences.add(sentence); bars.push(sentence); }    // push every match (Phase-4 byte-identical); Set only feeds the passive cross-dedup
+  }
+  // PHASE 5 — passive / noun-frame scan (flag-gated; OFF ⇒ this block never runs ⇒ byte-identical to Phase 4, Rule 61).
+  // Same covering-overlap → enclosing-sentence → passiveFrameEligBarSentence (which itself routes the self-cert demotion
+  // authority). A passive firm-credential / supply-chain bar co-resident with a benign grounded finding surfaces here.
+  // KNOWN SCOPE (Gate-2 P2, accepted): this passive scan runs ONLY over §{B,C,D,E,F,H} section text (its sole caller is the
+  //   COVERED_DIRECT floor). Two documented residuals, both narrow: (P2-1) AUDIT_ELIG_BAR_PASSIVE_FRAME is functionally
+  //   SUBORDINATE to AUDIT_COVERED_DIRECT_BAR_FLOOR — the passive scan cannot run unless the covered_direct floor is also
+  //   armed (making them independent would run the covered_direct floor when its own flag is OFF, breaking that flag's
+  //   byte-identity the other way). The arming plan flips BOTH together (verified in the pre-fire checklist). (P2-2) a
+  //   passive-frame bar in the NOTICE BODY (not a §-lettered section) is out of this scan's scope; the notice-body floor
+  //   still catches it whenever the credential noun is an ACTIVE ELIGIBILITY_BAR_RE bare token (facility/security clearance,
+  //   TS/SCI-cleared, CMMC, AS9100, ISO9001, ITAR, eligible/ineligible/debarred, set-aside, socioeconomic programs) — the
+  //   residual is only a passive-framed bar whose noun is passive-vocab-only (e.g. bare polygraph / VAR / QPL) stated in the
+  //   synopsis body. Both are under-fire residuals in the safe-to-defer tail, carded for the CEO scope batch, NOT chased here.
+  if (process.env.AUDIT_ELIG_BAR_PASSIVE_FRAME === "true") {
+    for (const m of nText.matchAll(new RegExp(PASSIVE_CREDENTIAL_NOUN_RE.source, "gi"))) {
+      const hs = m.index ?? 0, he = hs + m[0].length;
+      if (covering.some(([s, e]) => s < he && hs < e)) continue;        // grounded by an overlapping finding → analyzed
+      const sentence = enclosingSentence(hs, he);
+      if (!sentence || barSentences.has(sentence)) continue;            // already emitted by the active-verb scan → once
+      if (!passiveFrameEligBarSentence(sentence, declaredSetAside)) continue; // noun+frame+not-agent+not-self-cert gate
+      barSentences.add(sentence); bars.push(sentence);
+    }
+  }
+  return bars;
+}
+
+export function completenessOf(ctx: AuditToolContext, required: string[], findings: TypedFinding[], sectionsRead: Set<string>, opts?: { sectionMDepth?: boolean; boilerplateAttest?: { sections: string[]; swept: boolean }; declaredSetAside?: string | null }): { covered: string[]; missing: string[]; attestations: SectionAttestation[] } {
   const attestations: SectionAttestation[] = [];
   // Brain card 288 — PART36 construction path (ANCHOR-based, compression-boundary-safe). `required` here is the sealed
   // construction element set. An element is covered iff (1) its compression-STABLE ANCHOR SURVIVED into the read source
@@ -1285,6 +1853,21 @@ export function completenessOf(ctx: AuditToolContext, required: string[], findin
     // in the section text. Without the findingSection guard, a §B-cited finding whose sentence coincidentally appears
     // in §H/§M text falsely certified §H/§M covered → false-COMPLETE. Same guard the covered_attested path uses (groundedBy).
     const direct = findings.filter((f) => f.excerpt && findingSection(f) === sec && nText.includes(norm(f.excerpt)));
+    // PHASE 4 (Brain, flag AUDIT_COVERED_DIRECT_BAR_FLOOR) — COVERED_DIRECT HARD-BAR FLOOR. Before the covered_direct
+    // blanket short-circuit (below) OR the read_no_obligation valve can certify a non-per-obligation binding section
+    // ({B,C,D,E,F,H}) covered, refuse if the section carries an UNGROUNDED (non-self-cert-demotable) eligibility bar
+    // co-resident with the grounded finding. Emit the REAL bar sentence as obligations_ungrounded so escalation flows
+    // through the engine's OWN importanceOf authority in BOTH flag states (V1 missing→INCOMPLETE · V2 disqualifier
+    // Uncovered→escalate). Scoped away from §L/§M (already per-obligation) and §I/§K (boilerplate-attest + self-cert).
+    // Clean sections return [] ⇒ byte-identical. Flag default-OFF ⇒ guard never runs ⇒ byte-identical (Rule 61).
+    if (process.env.AUDIT_COVERED_DIRECT_BAR_FLOOR === "true" && !PER_OBLIGATION_SECTIONS.has(sec) && !BOILERPLATE_ATTESTABLE.has(sec)) {
+      const eligBars = sectionUngroundedEligBars(text, findings, opts?.declaredSetAside);
+      if (eligBars.length) {
+        console.warn(`[coverage] covered_direct HARD-BAR floor: §${sec} carries ${eligBars.length} ungrounded eligibility bar(s) ("${eligBars[0].slice(0, 90)}") co-resident with a grounded finding — blanket covered_direct REFUSED → obligations_ungrounded (escalate via importanceOf)`);
+        attestations.push({ section: sec, status: "obligations_ungrounded", obligations: eligBars, citedFindingIds: direct.map((f) => f.id!).filter(Boolean), ungrounded: eligBars });
+        continue;
+      }
+    }
     // T1-12 — restrict the covered_direct blanket short-circuit to NON-per-obligation sections. For §L/§M a
     // single grounded obligation cannot flip the whole section covered; fall through to the per-obligation
     // proof below (the direct findings still count there via groundedBy, so a fully-grounded §L/§M certifies
@@ -1337,10 +1920,24 @@ export function completenessOf(ctx: AuditToolContext, required: string[], findin
     // event with no direct grounded finding ⇒ obligations_ungrounded ⇒ INCOMPLETE (never a silent COMPLETE).
     if (!obligationSet.length) {
       if (lensTruncated) { attestations.push({ section: sec, status: "obligations_ungrounded", obligations: [], citedFindingIds: [], ungrounded: [`[truncated] §${sec} exceeds the lens read-cap — tail not read, cannot certify complete`] }); continue; }
+      // UNIT #12 (Brain, obligationsOf orthography) — GARBLE FLOOR on the read_no_obligation relief valve. obligationsOf finds
+      // obligations by matching whole-sentence `shall/must/provide/…` verbs; on an OCR-MOJIBAKE section those verbs are corrupted,
+      // so the section returns ZERO obligations and would FALSELY attest "read_no_obligation" → covered → false coverageComplete →
+      // deriveVerdict skips its INCOMPLETE cap. The dangerous failure for THIS gate is OVER-FIRE (a clean-but-unusual section →
+      // false-INCOMPLETE → a covered section to human review), so the discriminator is a POSITIVE corruption signal (`looksMojibake`
+      // — hard-corruption char density OR ≥30% non-ASCII), NOT common-word density: clean wage/CLIN/price tables, clause-number
+      // lists, and acronym blocks are LOW on common words BY NATURE and must NEVER floor (Gauntlet R1). Clean ASCII text scores ~0
+      // on the corruption axis ⇒ zero over-fire by construction; a homoglyph-that-stays-clean-Latin-1 is a SAFE under-fire (stays
+      // covered = status quo). Dropped-periods/glue instead UNDER-count to one mega-sentence (non-empty → grounded-or-ungrounded
+      // path), already fail-safe. Flag default-OFF ⇒ unchanged.
+      if (process.env.AUDIT_OBLIGATION_GARBLE_FLOOR === "true" && looksMojibake(text)) {
+        console.warn(`[coverage] read_no_obligation valve REJECTED for §${sec} — section text is OCR-mojibake (looksMojibake: corruption-char density); obligationsOf cannot certify "no obligation" on garbage → obligations_ungrounded (INCOMPLETE)`);
+        attestations.push({ section: sec, status: "obligations_ungrounded", obligations: [], citedFindingIds: [], ungrounded: [`[garbled] §${sec} text is OCR-garbled — obligationsOf cannot be trusted to certify "no obligation"; requires clean text or a grounded finding`] }); continue;
+      }
       attestations.push({ section: sec, status: "read_no_obligation", obligations: [], citedFindingIds: direct.map((f) => f.id!).filter(Boolean), ungrounded: [] }); continue;
     }
     const cited = new Set<string>(); const ungrounded: string[] = [];
-    for (const ob of obligationSet) { const ids = groundedBy(ob, findings, sec); if (ids.length) ids.forEach((i) => cited.add(i)); else ungrounded.push(ob); }
+    for (const ob of obligationSet) { const ids = groundedBy(ob, findings, sec, nText); if (ids.length) ids.forEach((i) => cited.add(i)); else ungrounded.push(ob); }
     if (obTruncated) ungrounded.push(`[truncated] §${sec} has more than ${MAX_OBLIGATIONS} obligation sentences — tail not proven`);
     // Fork-1(i): a READ §L/§M whose ungrounded obligations are ALL boilerplate (and none are a [truncated] marker) →
     // covered-with-signal, not missing. Any disqualifier/ambiguous ungrounded obligation, or a truncation marker,
@@ -1364,6 +1961,181 @@ export function completenessOf(ctx: AuditToolContext, required: string[], findin
   }
   const covered = attestations.filter((a) => a.status === "covered_direct" || a.status === "covered_attested" || a.status === "covered_attested_boilerplate" || a.status === "covered_boilerplate_signal" || a.status === "read_no_obligation").map((a) => a.section);
   return { covered, missing: required.filter((s) => !covered.includes(s)), attestations };
+}
+
+// ── UNIT 2.2 (cards #548/#549) — TRUE-LOCATION attribution for the gate reason ─────────────────────────
+// On commercial packages the attestation's `section` key is a routed approximation (routeCommercialSections
+// carves by content anchor) — dccce793's NHR banner said "in §L" for a sentence that lives at PWS §7.3.2,
+// a fabricated attribution on the customer's verdict banner. This locator resolves an obligation sentence
+// to its true position: the document region that contains it + the nearest preceding heading shape, plus
+// any adjacent reference-only/scope note (carried INFORMATIONALLY into the reason — the pole never moves).
+// Deterministic; heading/scope detection is SHAPE-based (numbered headings, SECTION letters, PWS labels;
+// scope notes = explicit "reference only"-class phrases), never a vocabulary judgment about bar language.
+// R1-F2 — heading candidates are VALIDATED, not just shape-matched: the numbered alternative captures the
+// number AND its same-line tail; acceptance requires every outline component ≤ 99 (kills dotted dates
+// "12.31.2025"), 2–4 components, and a letter-bearing tail (a real heading names something — kills bare
+// wage-rate/table numerics "23.55" at line starts, ubiquitous in extracted WD tables).
+// R3-F5 — 4th alternative: a BARE outline number alone on its line (title on the NEXT line — ubiquitous
+// PDF-extraction rendering). Neither invisible (no decline) nor blindly accepted: headingAt validates it
+// against the next line (depth ≥3 + letter-bearing next line ⇒ accepted heading; anything else ⇒ a
+// rejected-numbered candidate that forces the decline).
+const HEADING_SHAPE_RE = /(?:^|\n)[ \t]*(?:(?:PWS|SOW)\s*)?(?:§\s*)?(\d+(?:\.\d+){1,3})([.)\t ]+)([^\n]{0,80})|(?:^|\n)[ \t]*(SECTION\s+[A-M]\b[^\n]{0,60})|(?:^|\n)[ \t]*((?:PWS|Performance Work Statement|Statement of Work)\b[^\n]{0,60})|(?:^|\n)[ \t]*(?:§\s*)?(\d+(?:\.\d+){1,3})[ \t]*(?=\n|$)/gi;
+const headingLabelOf = (m: RegExpExecArray): string | null => {
+  if (m[1]) {
+    const parts = m[1].split(".");
+    if (parts.length < 2 || parts.length > 4 || parts.some((p) => Number(p) > 99)) return null;
+    if (!/[A-Za-z]{2,}/.test(m[3] ?? "")) return null; // a heading names something — bare numerics rejected
+    // R1-F2 (round 2): a DEPTH-2 number must be punctuation-delimited ("7.2. Key personnel" / "7.2)") —
+    // a space-delimited two-component number with a text tail is the wage-rate/table shape
+    // ("23.55 per hour"). Depth ≥3 ("7.3.2 Maintain…") reads as outline regardless of delimiter.
+    if (parts.length === 2 && !/^[.)]/.test(m[2] ?? "")) return null;
+    return `§${m[1]}`;
+  }
+  return (m[4] || m[5] || "").trim() || null;
+};
+const SCOPE_NOTE_RE = /[^.\n]{0,120}\b(?:for reference only|reference only|reference staffing|position is only for|only billable position|not (?:a )?required line items?|for (?:information(?:al)?|estimating) (?:purposes )?only|no separate payment)\b[^.\n]{0,120}/i;
+export function locateObligationContext(fullSource: string, ob: string): { locatedAt: string; contextNote?: string } | null {
+  if (!groundingVariantToleranceEnabled()) return null;
+  // EXACT-FIRST: the obligation is a source sentence — a whitespace-tolerant literal search on its head
+  // pins THE sentence (a variant-tolerant needle would hit a punctuation twin, mislocating again — the
+  // exact failure being fixed). Variant needle only as fallback (e.g. extraction-normalized whitespace).
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const head = ob.trim().slice(0, 80).trim();
+  const exactNeedle = head.length >= 20 ? new RegExp(esc(head).replace(/\s+/g, "\\s+"), "i") : null;
+  // fallback needle from RAW leading tokens (articles KEPT — they exist in the source; only plural drift
+  // and the punctuation class are tolerated)
+  const rawTokens = ob.toLowerCase().replace(/[^a-z0-9]+/g, " ").split(" ").filter(Boolean).slice(0, 6);
+  const variantNeedle = rawTokens.length >= 4
+    ? new RegExp(rawTokens.map((t) => `${esc(t.length >= 4 && t.endsWith("s") ? t.slice(0, -1) : t)}s?`).join("[^a-z0-9]{1,6}"), "i")
+    : null;
+  if (!exactNeedle && !variantNeedle) return null;
+  // TWO-PHASE region scan: the exact needle across ALL regions first — only when the literal sentence
+  // exists nowhere does the variant fallback run (else the fallback hits a punctuation TWIN in an earlier
+  // region and mislocates — the exact failure class being fixed). R1-F8: PRIMARY region scanned first per
+  // phase (a cover letter quoting the PWS must not steal the attribution).
+  const all = docRegions(fullSource ?? "");
+  const regions = [...all.filter((r) => r.isPrimary), ...all.filter((r) => !r.isPrimary)];
+  // For a heading candidate at a hit: scan to the END OF THE HIT'S LINE (not the hit index) — when the
+  // outline number prefixes the located sentence itself ("7.4.1. Personnel who fail…"), cutting at the
+  // hit would leave the heading tail empty and reject the TRUE heading.
+  const headingAt = (regionText: string, index: number): { label: string; pos: number } | null => {
+    const lineEnd = regionText.indexOf("\n", index);
+    const scanText = regionText.slice(0, lineEnd === -1 ? regionText.length : lineEnd);
+    let heading: { label: string; pos: number } | null = null;
+    let rejectedNumberedPos = -1;
+    const hre = new RegExp(HEADING_SHAPE_RE.source, "gi");
+    let hm: RegExpExecArray | null;
+    // R3-F5 + R4-F4 — bare-number line handler: accept as a heading ONLY when the LINE is just a deep
+    // outline number (≥3 components, all ≤99), the NEXT line carries the title (letter-bearing), AND the
+    // number is OUTLINE-CONSISTENT — a previously ACCEPTED numbered heading in this scan shares its first
+    // component (real PDF-split outlines have their tree in-document; datelines "1.2.26" and version
+    // numbers in cover letters don't). Else it is a rejected-numbered candidate that forces the decline.
+    // Reached both via the dedicated bare alternative (m[6]) and via a first-alternative candidate whose
+    // backtracked number+delimiter+tail reassembles to a bare number ("10.2.1" → "10.2"+"."+"1").
+    const acceptedNumbers = new Set<string>(); // full accepted outline numbers — the R5-F4 parent-prefix key
+    const bareNumberLabel = (matchStart: number, matchText: string): string | "rejected" => {
+      const lineStart = matchText.startsWith("\n") ? matchStart + 1 : matchStart;
+      const le = regionText.indexOf("\n", lineStart);
+      const line = regionText.slice(lineStart, le === -1 ? regionText.length : le);
+      const bare = /^[ \t]*(?:§\s*)?(\d+(?:\.\d+){1,3})[ \t]*$/.exec(line);
+      if (!bare) return "rejected";
+      const parts = bare[1].split(".");
+      const nlEnd = le === -1 ? regionText.length : regionText.indexOf("\n", le + 1);
+      const nextLine = regionText.slice(le + 1, nlEnd === -1 ? regionText.length : nlEnd);
+      // R5-F4 — PARENT-PREFIX consistency (not first-component: root "1" is seeded by any outline and
+      // datelines' first components 1-12 are all plausible roots): a bare "1.2.26" is accepted only when
+      // "1.2" itself was an ACCEPTED heading. Residual (Brain-sanction pending): a real accepted parent
+      // followed by a same-prefix dateline still fabricates — the inherent floor of any consistency gate.
+      if (parts.length >= 3 && parts.length <= 4 && parts.every((p) => Number(p) <= 99)
+        && /[A-Za-z]{2,}/.test(nextLine) && acceptedNumbers.has(parts.slice(0, -1).join("."))) return `§${bare[1]}`;
+      return "rejected";
+    };
+    while ((hm = hre.exec(scanText)) !== null) {
+      const label = headingLabelOf(hm);
+      if (label) {
+        heading = { label, pos: hm.index };
+        const num = /^§([\d.]+)/.exec(label);
+        if (num) acceptedNumbers.add(num[1]);
+        continue;
+      }
+      if (hm[1] || hm[6]) {
+        const bare = bareNumberLabel(hm.index, hm[0]);
+        if (bare !== "rejected") {
+          heading = { label: bare, pos: hm.index };
+          acceptedNumbers.add(bare.slice(1));
+        } else rejectedNumberedPos = hm.index;
+      }
+    }
+    // R2-F2 — DECLINE, don't fall back: if a REJECTED numbered candidate sits NEARER the sentence than
+    // the last accepted heading (mixed-delimiter docs, OCR-dropped dots), attributing to the farther
+    // accepted heading is a confident misattribution. Null ⇒ the caller renders the legacy "in §<key>".
+    if (rejectedNumberedPos > (heading?.pos ?? -1)) return null;
+    return heading;
+  };
+  // R1-F8 (round 2) — a sentence DUPLICATED across documents (cover letters quote the PWS): collect the
+  // exact hit in EVERY region and prefer (1) the primary region, (2) the deepest validated outline
+  // heading (a §7.3.2 work-statement row outranks a cover letter's §1.1), (3) document order.
+  const depthOf = (h: { label: string } | null) => (h && h.label.startsWith("§") ? h.label.split(".").length : h ? 1 : 0);
+  let hit: { region: { name: string; text: string; isPrimary: boolean }; index: number; heading: { label: string; pos: number } | null } | null = null;
+  if (exactNeedle) {
+    const candidates = regions
+      .map((region) => ({ region, m: exactNeedle.exec(region.text) }))
+      .filter((c): c is { region: typeof regions[number]; m: RegExpExecArray } => !!c.m)
+      .map((c) => ({ region: c.region, index: c.m.index, heading: headingAt(c.region.text, c.m.index) }));
+    if (candidates.length) {
+      // Depth outranks primary: write-order "primary" fallback (attachment-coverage flag OFF) can be a
+      // cover letter quoting the PWS — the deepest validated outline heading is the sentence's true home.
+      candidates.sort((a, b) => depthOf(b.heading) - depthOf(a.heading) || Number(b.region.isPrimary) - Number(a.region.isPrimary));
+      hit = candidates[0];
+    }
+  }
+  if (!hit && variantNeedle) {
+    for (const region of regions) {
+      const m = variantNeedle.exec(region.text);
+      if (m) { hit = { region, index: m.index, heading: headingAt(region.text, m.index) }; break; }
+    }
+  }
+  if (!hit) return null;
+  {
+    const { region, index, heading } = hit;
+    const before = region.text.slice(0, index);
+    // R1-F8: no VALIDATED heading ⇒ decline (the caller renders the legacy "in §<routed key>" reason) —
+    // never a precise-sounding "(unheaded region)" on the customer banner.
+    if (!heading) return null;
+    // PWS/SOW context prefix when the numbered heading sits inside a work-statement region
+    const pwsTail = /\b(?:PWS|Performance Work Statement|Statement of Work)\b/i.test(before) && heading.label.startsWith("§");
+    const docName = region.name && region.name !== "(primary solicitation)" ? `${region.name} · ` : "";
+    const locatedAt = `${docName}${pwsTail ? "PWS " : ""}${heading.label}`;
+    // Scope note (R1-F3 + R2-F3): a note is ASSERTED as surrounding context ONLY when it sits in the
+    // sentence's own outline node — in the near window AND with NO validated heading between note and
+    // sentence (an intervening heading means the note belongs to the PREVIOUS node, e.g. a Physician
+    // reference-note directly above a Nurse bar). Anything else — distant, or near-but-cross-node — is
+    // carried in the LABELED verify-applicability form, which asserts nothing about governance.
+    const windowStart = Math.max(0, index - 1200);
+    const nearWindow = region.text.slice(windowStart, index + 600);
+    const nearMatch = SCOPE_NOTE_RE.exec(nearWindow);
+    let note: string | undefined;
+    if (nearMatch) {
+      const noteText = nearMatch[0].replace(/\s+/g, " ").trim();
+      const noteAbs = windowStart + nearMatch.index;
+      // same-node check (R2-F3 + R3-F8): the node STARTS at the located sentence's own accepted heading
+      // (heading.pos) — a note BEFORE that heading belongs to the previous node (Physician note above a
+      // Nurse bar). ALL forward notes (after the sentence) are labeled — a following note may open the
+      // NEXT node; asserting it is never safe. Only a note between the sentence's own heading and the
+      // sentence itself is ASSERTED as surrounding context.
+      const crossNode = noteAbs < heading.pos;
+      note = crossNode || noteAbs >= index
+        ? (noteAbs < index ? `An earlier scope note appears in this document (verify it governs this requirement): "${noteText}".` : `A nearby scope note appears in this document (verify it governs this requirement): "${noteText}".`)
+        : `Surrounding context: "${noteText}".`;
+    } else {
+      const sre = new RegExp(SCOPE_NOTE_RE.source, "gi");
+      let far: string | undefined;
+      let sm: RegExpExecArray | null;
+      while ((sm = sre.exec(before)) !== null) far = sm[0];
+      if (far) note = `An earlier scope note appears in this document (verify it governs this requirement): "${far.replace(/\s+/g, " ").trim()}".`;
+    }
+    return { locatedAt, ...(note ? { contextNote: note } : {}) };
+  }
 }
 
 /** Default P2 — with no skeptic injected, soundness rests on Layer-1 grounding: every finding is already
@@ -1497,7 +2269,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //       ungrounded binding obligations completenessOf already surfaces (computed early here, re-run at P4).
   let judgmentCost: JudgmentCost = zeroCost();
   if (judgmentLayerEnabled() && opts.judgmentReason) {
-    const early = completenessOf(ctx, required, findings, sectionsRead);
+    const early = completenessOf(ctx, required, findings, sectionsRead, { declaredSetAside: opts.setAside });
     const ungrounded = early.attestations.flatMap((a) => a.ungrounded);
     const _tJ1 = Date.now();
     const j1 = await runJudgmentProducer(findings, ctx.fullSource, ungrounded, { reason: opts.judgmentReason, log: (m) => console.log(`[j1] ${m}`) });
@@ -1565,6 +2337,9 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   const { covered, missing, attestations } = completenessOf(ctx, required, findings, sectionsRead, {
     sectionMDepth: process.env.AUDIT_SECTION_M_DEPTH === "true",
     ...(boilerplateAttestOn ? { boilerplateAttest: { sections: ["I", "K"], swept: true } } : {}),
+    // Phase 4 floor reuses the notice-body floor's declaredSetAside so a self-certifiable set-aside sentence is demoted
+    // by the SAME authority (isSelfCertDemotableSentence); absent when the flag is off ⇒ helper never runs.
+    declaredSetAside: opts.setAside,
   });
   // C-2 (Brain C.f) — a binding ATTACHMENT ingested-with-text but unanalyzed (no finding grounded in it, and it
   // carries obligations) is an incomplete read, just like an unread section.
@@ -1768,6 +2543,56 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     findings = applyNmrFirmStatusGate(findings, bidderProfile, { enabled: true });
   }
 
+  // P4.6-bis — NMR NAICS-DORMANCY GATE (Phase 3 Unit 2, Brain cards #548/#550), default-OFF (=== "true"). The NMR
+  //      (52.219-33 / 13 CFR 121.406) governs SUPPLY buys only; on a services/construction ASSIGNED NAICS it is
+  //      legally dormant (13 CFR 121.406(b)(3)-(4)). Keys on the SAM-resolved NAICS FACT (opts.naics, Rule 64 — not
+  //      a source regex), so a ☒-checked 52.219-33 on a services set-aside (the seq-2 dccce793 false-AUTO-F, NAICS
+  //      561320) is demoted to a verdict-inert P2 applicability flag regardless of which lens emitted it. Runs after
+  //      the firm-status gate (its own flag, so it fires even when AUDIT_NMR_FIRMSTATUS_GATE is off) and before
+  //      deriveVerdict. Null/unknown NAICS ⇒ NO demotion (fail-toward-escalation). Flag off ⇒ byte-identical.
+  findings = applyNmrNaicsDormancy(findings, opts.naics, { enabled: process.env.AUDIT_NMR_NAICS_DORMANCY === "true" });
+
+  // P4.6-ter — CHECKBOX-STATE FIDELITY GATE (Phase 3 Unit 3, Brain card #551 design C), default-OFF (=== "true"). The
+  //      Section I clause matrix records incorporation MECHANICS (☒/☐), never obligation existence. When a finding
+  //      frames a clause as checked/incorporated but the matrix shows an unambiguous ☐ (the seq-2 dccce793 fabricated
+  //      "☒ 52.219-14 checked in Section I" while source is ☐), CORRECT the checkbox-state provenance and re-attribute
+  //      to a verified-present basis, KEEPING the obligation at severity (non-destructive; box-state is not a
+  //      suppression authority). Fail-toward-keep on any ambiguity. Flag off ⇒ byte-identical.
+  findings = applyCheckboxStateFidelity(findings, ctx.fullSource, { enabled: process.env.AUDIT_CHECKBOX_STATE_FIDELITY === "true" });
+
+  // P4.6-quater — PERF-OBLIGATION INSURANCE DO-THE-WORK GATE (Phase 3 Unit 1), default-OFF (=== "true"). Insurance is a
+  //      do-the-work gate the bidder CLEARS by obtaining a policy (self-acquirable in the window, exactly like a bond) —
+  //      NEVER a non-curable profile credential. The seq-2 dccce793 record typed "must maintain professional liability
+  //      insurance $1M/occ $3M aggregate throughout performance" (#49) as a bidder_cannot_move eligibility_bar — a
+  //      fabricated show-stopper contributing to the false AUTO-F — while the SAME requirement is correctly typed as a
+  //      do-the-work submission elsewhere (#74). This gate re-types a bidder_cannot_move finding whose trigger positively
+  //      matches the insurance do-the-work SHAPE → bidder_controls + curable. Strict safety (a demotion is the dangerous
+  //      direction): keep-the-bar veto on STRUCTURAL_BAR_RE_114, never a verified universal defect, positive-shape
+  //      allowlist on citation+requirement only. Own flag (fires independent of the other guards). Flag off ⇒ byte-identical.
+  findings = applyPerfObligationInsuranceTyping(findings, { enabled: process.env.AUDIT_PERF_OBLIGATION_INSURANCE === "true" });
+
+  // P4.6-quinquies — STRUCTURAL-ASSERTION FIDELITY GATE (Phase 3 Unit 4, Brain #551 Unit-3/Unit-4 boundary), default-OFF
+  //      (=== "true"). A finding may attribute its clause/obligation to a UCF SECTION heading absent from the ingested
+  //      source (the seq-2 dccce793 commercial RFQ has only Sections G/L/M, yet findings cite "Section I/B/C …" —
+  //      grounded excerpts decorated with an INVENTED location). Build the present-section set by positive-shape parse;
+  //      when a finding's CITATION attributes it to an absent letter, APPEND an honest structural-provenance correction
+  //      and mark it, KEEPING kind/controllability/severity/excerpt. VERDICT-INERT (deriveVerdict does not read the
+  //      marker) — this only stops a fabricated section heading from reaching render as verified provenance. Source
+  //      with no detectable sections ⇒ fail-toward-keep. Own flag. Flag off ⇒ byte-identical.
+  findings = applyStructuralAssertionFidelity(findings, ctx.fullSource, { enabled: process.env.AUDIT_STRUCTURAL_ASSERTION_FIDELITY === "true" });
+
+  // P4.6-sexies — QUANTITY-AMBIGUITY FIDELITY GATE (Phase 3 Unit 5), default-OFF (=== "true"). A solicitation may pose
+  //      a MATERIAL quantity as an EXPLICIT, unresolved either/or — the seq-2 dccce793 Q&A asks "Is the total requirement
+  //      520 hours or 1,040 hours?" (Schedule says 520; 20 hrs/wk × 52 wks = 1,040 — a 2× LOE/pricing spread the CO did
+  //      NOT settle) — while a lens LAUNDERED it into "base period estimated at 520 hours" (#3), hiding the risk (silent
+  //      under-caution toward committal). This DETERMINISTIC BACKSTOP parses the source for the positive shape of a
+  //      source-posed quantity question (two same-unit DIFFERING quantities joined by "or", inside an interrogative) and
+  //      EMITS one caution finding surfacing the UNRESOLVED ambiguity, floored to BID_WITH_CAUTION (cautionFloor — never
+  //      a bar, never NHR/NO_BID). ADDITIVE + NON-DESTRUCTIVE (no existing finding mutated; deduped if a lens already
+  //      flagged the pair as unresolved). Latent numeric conflicts (no explicit question) are OUT of scope — a latent
+  //      detector is the over-fire treadmill. No interrogative either/or shape ⇒ byte-identical. Own flag.
+  findings = applyQuantityAmbiguityFidelity(findings, ctx.fullSource, { enabled: process.env.AUDIT_QUANTITY_AMBIGUITY_FIDELITY === "true" });
+
   // P5 — DECIDE deterministically from the typed grounded facts. manifestComplete enforces the card-58
   //      asymmetry cap: a no-bar verdict (BID/CAUTION) on a package with an unfetched manifest attachment,
   //      an over-budget source, OR a MISSING CORE UCF SECTION (panel B-2) is capped to INCOMPLETE — the
@@ -1851,7 +2676,16 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     findings = findings.filter((f) => !absenceClaimContradicted(f.requirement ?? "", absMarkers));
     if (findings.length < beforeAbs) console.log(`[orchestrator] absence-grounding: dropped ${beforeAbs - findings.length} contradicted absence finding(s) — asserted absence of an element the package contains`);
   }
-  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(process.env.AUDIT_SITEVISIT_SEVERITY_FLOOR === "true" ? { siteVisitSeverityFloor: true } : {}), ...(GATE_V2_ENABLED ? { coverageV2: gradeCoverageV2(attestations) } : {}) };
+  // P4.6-septies (Phase 3 Unit 6) — FINDING-DEDUP. The agentic panel concatenates two expert passes, so the SAME FAR/DFARS
+  //      clause is surfaced 2–3× by the equivalent lens of each pass (dccce793: 93 rows for ~35 concerns; 52.217-8 ×3, 52.219-33
+  //      ×3 splitting one bar across typed+untyped rows). Collapse same-single-clause rows into ONE, keeping the MOST-CONSERVATIVE
+  //      disposition (controllability most-disqualifying, severity=max, curability least, cautionFloor OR, grounded OR) and
+  //      PRESERVING every distinct requirement facet. VERDICT-SAFE by construction: the show-stopper set + logicalShowStopperCount
+  //      are unchanged, so deriveVerdict reaches the same pole (hard-tested OFF==ON). Over-merge-guarded (exactly-one-clause key,
+  //      citation+requirement only, facets kept). Runs LAST — after every re-typing guard/emitter — right before deriveVerdict.
+  //      Flag AUDIT_FINDING_DEDUP default-OFF ⇒ byte-identical.
+  findings = applyFindingDedup(findings, { enabled: process.env.AUDIT_FINDING_DEDUP === "true" });
+  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(process.env.AUDIT_SITEVISIT_SEVERITY_FLOOR === "true" ? { siteVisitSeverityFloor: true } : {}), ...(GATE_V2_ENABLED ? { coverageV2: gradeCoverageV2(attestations, { locate: (ob) => locateObligationContext(ctx.fullSource, ob) }) } : {}) };
   if (process.env.CONSTRUCTION_DEBUG === "true") {
     const kc: Record<string, number> = {}, dc: Record<string, number> = {};
     for (const f of findings) { kc[f.kind] = (kc[f.kind] ?? 0) + 1; const d = disposeFinding(f); dc[d] = (dc[d] ?? 0) + 1; }

@@ -1,0 +1,32 @@
+{
+  "generated": "card #560 corpus gap #3",
+  "oracle": "looksMojibake @ pdf-ocr.ts:79 (AUDIT_OBLIGATION_GARBLE_FLOOR)",
+  "note": "The UNDER-fire side #12 needed: a genuine OCR-mojibake section that MUST floor. Grounded synthetic pair — a real SCA wage-determination/payroll obligation paragraph, clean vs failed-scan (U+FFFD replacement chars where glyphs unresolved, obligation verbs destroyed). Measured both directions.",
+  "specimens": [
+    {
+      "id": "R5-under-clean",
+      "origin": "synthetic-grounded",
+      "expected": "skip",
+      "floors": false,
+      "density": {
+        "n": 491,
+        "hardPct": 0,
+        "symPct": 0
+      },
+      "sentence": "SECTION - WAGE DETERMINATION AND CERTIFIED PAYROLL. The Contractor shall comply with Wage Determination No. 2015-4571, Revision 23, incorporated into this contract, and shall pay each service employee performing work under this contract not less than the monetary wages and fringe benefits listed therein. The Contractor shall submit a certified payroll for each week in which any contract work is performed, and shall maintain records as required by 29 CFR 4.6(g). Health and welfare benefits shall be paid at the rate of $4.98 per hour for all hours paid for, up to 40 hours per week."
+    },
+    {
+      "id": "R5-under-garbled",
+      "origin": "synthetic-grounded",
+      "expected": "flag",
+      "floors": true,
+      "density": {
+        "n": 421,
+        "hardPct": 11.64,
+        "symPct": 0
+      },
+      "arm": "A (hard-corruption)",
+      "sentence": "SECT10N — WAGE DETERM�NAT�ON AND CERT�F�ED PAYR�LL. Th� C0ntract�r sha�� c0mp�y w�th Wage Deterrn�nat�on N0. 2Ol5-457l, Rev�s�0n 23, �nc0rp0rated �nt0 th�s c0ntract, and sha�� pay each serv�ce emp�0yee perf0rm�ng w0rk under th�s c0ntract n0t �ess than the m0netary wages and fr�nge benef�ts ��sted there�n. The C0ntract0r sha�� subm�t a cert�f�ed payr0�� f0r each week �n wh�ch any c0ntract w0rk �s perf0rmed, and sha�� ma�nta�n rec0rds as requ�red by 29 CFR 4.6(g). Hea�th and we�fare �enef�ts."
+    }
+  ]
+}

@@ -13,9 +13,11 @@
 
 import { createHash } from "node:crypto"; // Fork-5 (card 240): deterministic sha256 for the verified-defect excerpt binding (server-side, same as agentic-ingest/model-runs). Pure — no network, no randomness.
 import type { VerdictInputs, TypedFinding, BidderProfile, Controllability, RequirementKind } from "./audit-findings";
+import { NMR_CAUTION } from "./audit-keyfact-detector"; // the canonical NMR requirement text — the positive-shape allowlist for the dormancy gate (Gauntlet Unit 2 R3)
 import { GATE_V2_ENABLED, gateV2Outcome } from "./audit-gate-v2";
 import { SITE_VISIT_RE, SITE_VISIT_CONCLUDED_RE, BOA_IDIQ_HOLDER_BAR_RE } from "./audit-site-visit-patterns";
 import { demoteMmEvidenceFactor, hasGroundedLeadTimeBasis } from "./mm-evidence-factor"; // card #538 (flag AUDIT_MM_EVIDENCE_FACTOR_DEMOTION)
+import { classifyGateShape } from "./panel-findings-bridge"; // ratified positive who-can-win shape classifier — the Unit-1 perf-obligation gate's keep-the-bar veto (Gauntlet R1: no bar-vocab blocklist). Type-only elsewhere ⇒ no import cycle.
 
 export type Verdict = "BID" | "BID_WITH_CAUTION" | "NO_BID" | "INELIGIBLE" | "NEEDS_HUMAN_REVIEW" | "INCOMPLETE";
 export type Disposition = "met" | "gate_to_clear" | "disqualifying" | "dropped";
@@ -276,6 +278,175 @@ export function applyRoutineClauseOvertypeGuard(findings: TypedFinding[], opts?:
     if (f.controllability === "bidder_cannot_move" && BONDING_CLAUSE_RE.test(trigger))
       return { ...f, controllability: "bidder_controls", curableInWindow: true, routineClauseGuard: true };
     return f;
+  });
+}
+
+// ── PERFORMANCE-OBLIGATION INSURANCE DO-THE-WORK GATE (Phase 3 Unit 1, flag AUDIT_PERF_OBLIGATION_INSURANCE default-OFF) ──
+// Insurance is a DO-THE-WORK gate the bidder CLEARS by obtaining a policy — self-acquirable inside the window, exactly
+// like a bond (applyRoutineClauseOvertypeGuard arm (b)). It is NEVER a non-curable PROFILE credential the firm must
+// independently already hold (that is a facility clearance / QPL / CMMC-at-award / cert-to-be-held — those stay bars).
+// The seq-2 dccce793 record (12318726Q0165) typed "Drug/Alcohol Abuse Counselor must maintain professional liability
+// insurance $1M/occurrence $3M aggregate throughout performance" (finding #49) as a NON-CURABLE eligibility_bar /
+// bidder_cannot_move — a fabricated show-stopper that contributed to the false AUTO-F — while the SAME requirement also
+// appears CORRECTLY typed as a do-the-work submission elsewhere in the record (#74: bidder_controls / curable, "provide
+// required insurance with proof at award"). This gate re-types a bidder_cannot_move finding whose trigger positively
+// matches the INSURANCE do-the-work SHAPE → bidder_controls + curable, so deriveVerdict stops failing the package on it.
+//
+// STRIP-THEN-RESIDUAL POSITIVE GATE (Gauntlet Unit 1 R1+R2 lessons — [[feedback_no_blocklist_shape_allowlist_doctrine]]).
+//   R1 proved a keep-the-bar BAR-VOCAB BLOCKLIST leaks (held bars outside the enumerated vocab demote → false BID). R2
+//   proved that replacing it with a positive HELD-CREDENTIAL SHAPE whose verb-list + noun-class are FIXED ENUMERATIONS
+//   is "a blocklist in disguise for the RESIDUAL" — held/conferred bars outside the shape (OEM-authorized, approved-by-a-
+//   body, FedRAMP authorization, in-good-standing, listed-on-a-roster) still demoted → false BID; and the co-stated
+//   insurance verb "provide … insurance" contaminated classifyGateShape(WHOLE trigger) into "do_the_work", clearing the
+//   credential side. The doctrine's terminal rule (R2 prescription #3): AMBIGUITY MUST FAIL TOWARD KEEP-THE-BAR, and the
+//   gate must be broad enough that a NOVEL-but-genuine held bar co-stated with insurance ESCALATES BY DEFAULT.
+//
+//   The design that satisfies that: RECOGNIZE + REMOVE the insurance obligation span (with its governing modal), then
+//   treat ANY substantive RESIDUAL obligation/status as keep-the-bar — the gate demotes ONLY when insurance is
+//   essentially the SOLE operative obligation. A novel bar co-stated with insurance leaves residual content (a second
+//   modal-obligation, a held/conferred status, a set-aside) → KEEP by default, with no dependence on enumerating the
+//   bar's vocabulary. Classifying the RESIDUAL (not the whole trigger) also removes the R2 insurance-verb contamination.
+//   FIRE requires ALL of:
+//     (1) controllability === "bidder_cannot_move" (only a NON-curable mis-type is a candidate; never softens an
+//         already-biddable finding or a no_one_can_move universal defect).
+//     (2) NOT universalDefect / verifiedBy (a verified impossibility stands) AND NOT requiredAttribute (a finding that
+//         carries its own eligibility attribute IS a typed who-can-win gate — never demote it, whatever the prose).
+//     (3) POSITIVE insurance shape on the TRIGGER (citation+requirement), INSURANCE_DOWORK_RE — it IS an insurance
+//         obligation. Trigger only (never the excerpt): the proposer's actual over-type carries insurance in its OWN
+//         requirement. A bare industry "insurance" (NAICS / "Federal Deposit Insurance" / a firm named "…Insurance Co")
+//         does not match.
+//     (4) The RESIDUAL — the trigger with every insurance-obligation span (and its governing modal) STRIPPED via
+//         INSURANCE_STRIP_RE — carries NO second obligation or held/conferred eligibility status. ANY of the following in
+//         the residual ⇒ KEEP-THE-BAR (fail toward keep; a novel bar escalates by default):
+//         (4a) RESIDUAL_OBLIGATION_RE — a leftover modal-obligation ("must / shall / is required to / responsible for /
+//              be <certified|licensed|authorized|approved|…>"). Because the insurance clause's own modal was stripped in
+//              (4)'s span, a SURVIVING modal signals a SECOND, distinct obligation of unknown nature → keep.
+//         (4b) classifyGateShape(residual) ∈ {profile_bar, set_aside_caution} — the ratified classifier, now run on the
+//              insurance-stripped residual (no do-the-work-verb contamination), recognizes a bar / set-aside.
+//         (4c) HELD_CREDENTIAL_SHAPE(residual) — a possession/state verb-or-adjective over a generic credential-class
+//              noun, board-certified/-eligible, a clearance level, or bonding-capacity.
+//         (4d) CONFERRED_STATUS_SHAPE(residual) — a THIRD-PARTY-conferred held status (authorized/authorization,
+//              approved-by/approved-source, accredited, designated, enrolled, member, in-good-standing, eligible,
+//              qualified, listed-on-an-approved/qualified/vendor list-or-roster, source-approval, prequalified). This is
+//              the "conferral" family R2 surfaced — a status GRANTED BY ANOTHER PARTY, not self-acquirable.
+//         (4e) SOCIOECONOMIC_SETASIDE_RE(residual) — set-aside shape backstop.
+//         (4f) NARROW STRUCTURAL_BAR_RE on the FULL hay incl. excerpt — a genuine HARD bar (clearance/QPL/sole-source)
+//              quoted ANYWHERE; secondary backstop that can only ADD keep-the-bar conservatism.
+// Flag-gated; OFF (default) ⇒ findings unchanged byte-for-byte.
+const INSURANCE_DOWORK_RE = /(?:maintain|carr(?:y|ies|ied)|provid(?:e|es|ed|ing)|furnish(?:es|ed)?|obtain(?:s|ed|ing)?|procure|secure|purchase|hold|keep)\b[^.\n]{0,40}?\binsur(?:ance|ed)\b|\binsur(?:ance|ed)\b[^.\n]{0,60}?(?:per occurrence|aggregate|\$[\d,]+|policy limits?|limits? of (?:liability|insurance|not less than|at least)|coverage of)|(?:certificate|proof|evidence|acord)\b[^.\n]{0,25}?\binsur(?:ance|ed)\b|professional liability insurance|general liability insurance|commercial general liability|workers.{0,4}comp(?:ensation)? insurance|errors (?:and|&) omissions|\bE&O\b|automobile liability insurance|umbrella (?:liability )?insurance|cyber (?:liability )?insurance/i;
+// INSURANCE OBLIGATION SPAN (global, for STRIPPING) — consumes the insurance clause INCLUDING an optional governing
+// subject + modal + do-work verb, plus trailing coverage descriptors/magnitudes, so what remains (the residual) is the
+// NON-insurance content and no dangling modal is left behind to look like a second obligation.
+// INSURANCE_MOD — the closed class of insurance-TYPE modifiers allowed BETWEEN the do-work verb and the "insurance"
+// noun. Restricting the verb→insurance gap to these (not arbitrary \w) stops the strip from swallowing a CO-STATED bar
+// that sits between the verb and a later "insurance" (R2 "submit proof of manufacturer authorization and carry … insurance").
+const INSURANCE_MOD = "(?:(?:the|a|an|its|their|any|all|such|required|appropriate|adequate|sufficient|minimum|maximum|commercial|general|public|professional|automobile|auto|motor|vehicle|umbrella|excess|cyber|technology|workers'?|workmen'?s?|comp(?:ensation)?|liability|business|employers?|property|casualty|primary|statutory|contractual|e&o|errors|omissions|malpractice|indemnity|bodily|injury|medical|aviation|marine|pollution|builders?[-\\s]?risk)\\s+)"; // NOTE: 'and' deliberately excluded — it must NOT let MOD* bridge across a clause boundary to a second insurance noun (Gauntlet R3 FAA-145 false-clear); "errors and omissions" is handled by the named-line arms.
+const INSURANCE_STRIP_RE = new RegExp([
+  "(?:(?:the\\s+)?(?:contractor|offeror|firm|bidder|awardee|vendor|subcontractor|prime|provider|personnel|staff|employees?|counselor)\\s+)?(?:(?:must|shall|will|is\\s+to|are\\s+to|is\\s+required\\s+to|are\\s+required\\s+to|required\\s+to|to)\\s+)?(?:(?:purchase|procure|obtain)\\s+and\\s+maintain|maintain|carr(?:y|ies|ied)|provid(?:e|es|ed|ing)|furnish(?:es|ed)?|obtain(?:s|ed|ing)?|procure|secure|purchase|keep|show|submit|demonstrate|have|be\\s+insured|remain\\s+insured)\\s+(?:proof\\s+of\\s+|evidence\\s+of\\s+|a\\s+certificate\\s+of\\s+|certificates?\\s+of\\s+)?" + INSURANCE_MOD + "*insur(?:ance|ed)\\b",
+  "(?:a\\s+)?(?:certificate|proof|evidence|acord)s?\\s+of\\s+insur(?:ance|ed)",
+  "professional\\s+liability\\s+insurance|general\\s+liability\\s+insurance|commercial\\s+general\\s+liability|workers.{0,4}comp(?:ensation)?\\s+insurance|errors\\s+(?:and|&)\\s+omissions|\\bE&O\\b|automobile\\s+liability\\s+insurance|umbrella\\s+(?:liability\\s+)?insurance|cyber\\s+(?:liability\\s+)?insurance",
+  "\\binsur(?:ance|ed)\\b",
+  "(?:at\\s+(?:a\\s+)?minimum(?:\\s+of)?\\s+)?\\$[\\d,]+(?:\\.\\d+)?(?:\\s*(?:per\\s+occurrence|/|aggregate|million|mil\\b|m\\b|k\\b))?",
+  "per\\s+occurrence|aggregate|policy\\s+limits?|limits?\\s+of\\s+(?:liability|insurance|not\\s+less\\s+than|at\\s+least)|coverage(?:\\s+of)?|throughout\\s+(?:the\\s+)?(?:entire\\s+)?performance(?:\\s+period)?|during\\s+(?:the\\s+)?(?:entire\\s+)?performance(?:\\s+period)?|acceptable\\s+to\\s+the\\s+[A-Z]{2,3}\\b|prior\\s+to\\s+(?:commencing|starting|contract\\s+start|award)|with\\s+proof|proof\\s+being\\s+submitted",
+].join("|"), "gi");
+// RESIDUAL SECOND-OBLIGATION signal — ANY surviving modal ("must"/"shall"/…) or "be <held-status>" after the insurance
+// span (incl. its own governing modal) was stripped ⇒ a SECOND, distinct obligation of UNKNOWN nature ⇒ keep-the-bar.
+// This is the doctrine linchpin (R2 #3): a novel co-stated bar escalates BY DEFAULT — its modal survives the strip.
+const RESIDUAL_OBLIGATION_RE = /\b(?:must|shall|will\s+(?:be|have|hold|possess|remain)|is\s+required\s+to|are\s+required\s+to|is\s+to\s+be|are\s+to\s+be|responsible\s+for|be\s+(?:certified|licensed|accredited|authorized|approved|registered|enrolled|eligible|cleared|bonded|a\s+member))\b/i;
+// POSITIONAL HELD-CREDENTIAL SHAPE — a possession/state verb-or-adjective governing a GENERIC credential-class noun, a
+// professional-cert adjective, a clearance level, or a held financial capacity (run on the residual). The "of insurance"
+// lookahead keeps a do-the-work certificate-of-insurance token from reading as a held certification.
+const HELD_CREDENTIAL_SHAPE = /(?:hold|holds|holding|possess(?:es|ing)?|maintain(?:s|ing)?|\bhave\b|\bhas\b|\bhad\b|current|active|valid|interim|existing|registered|licensed|accredited|cleared|granted|require[ds]?)\b[^.\n]{0,45}?\b(?:licens(?:e|ure|ed)|clearance|certificat(?:e|ion)|accreditat\w*|registrat(?:ion)?|credential)\b(?!\s+of\s+insurance)|board[-\s]?(?:certified|eligible)|(?:hold|holds|possess(?:es|ing)?|require[ds]?|granted|interim|active|final|current|existing|need[s]?)\s+(?:a\s+|an\s+)?(?:top[-\s]?secret|secret|ts\/sci)\b|\btop[-\s]?secret\b|\bts\/sci\b|security clearance|facility (?:security )?clearance|\bpolygraph\b|\bpoly\b|bond(?:ing)?\s+capacit\w*|bondabilit\w*/i;
+// CONFERRED-STATUS SHAPE — a held status GRANTED BY A THIRD PARTY (not self-acquirable): authorization / approved-by /
+// accreditation / designation / enrollment / membership / good-standing / eligibility / qualification / listed-on-an-
+// approved-list / source-approval / prequalification. This is the R2 "conferral" family; a positional/relational shape
+// (a conferral relationship), not an enumeration of specific named programs.
+const CONFERRED_STATUS_SHAPE = /\bauthoriz(?:e|es|ed|ation)\b|approv(?:ed|al)\s+(?:by|source|vendor|manufacturer|supplier|dealer|provider|list)|\boem[-\s]?authorized\b|original\s+equipment\s+manufacturer|accredit(?:ed|ation)|\bdesignat(?:ed|ion)\b|enroll(?:ed|ment)|member(?:ship)?\s+(?:in|of|with)|in\s+good\s+standing|\bgood\s+standing\b|eligib(?:le|ility)|qualif(?:ied|ication)|listed\s+(?:on|in|with)\b|on\s+(?:the\s+)?(?:approved|qualified|preferred|vendor)\s+(?:list|roster|source|register)|source\s+approval|pre[-\s]?qualif|\bin[-\s]?network\b/i;
+// CITATION-SLOT BENIGN-REFERENCE ALLOWLIST (Gauntlet Unit 1 R4). The terminal anchor (5) inspects `f.requirement`
+// only; a bare-noun bar smuggled into `f.citation` ("Section L, TWIC/Insurance", "This is an AbilityOne mandatory
+// source item") escapes both the modal/verb-anchored residual vetoes (4a-4f, which R3 proved miss bare nouns) and the
+// requirement-only anchor → false CLEAR. The citation is a STRUCTURED REFERENCE field; a legitimate insurance-finding
+// citation is a pure section/clause pointer (the real dccce793 record: "PWS §7.2.2", "Section L, Insurance/Bonding",
+// "AGAR 452.204-71; FAR 52.204-9"). So every citation TOKEN must be a benign reference / insurance-family / generic-UCF
+// word — a POSITIVE allowlist. Any UNRECOGNIZED token (a credential/program noun: TWIC/SCIF/AbilityOne/FAA-Part-145/…)
+// ⇒ keep-the-bar (fail-toward-keep; a novel program noun escalates by default, no bar-vocab enumeration). Cost: an
+// insurance finding with a wordy non-benign citation is left as a bar — a SAFE false-negative (honest NHR).
+const CITATION_BENIGN_TOKEN = /^(?:section|sect|attachment|attach|exhibit|appendix|annex|clause|clauses|part|paragraph|para|article|schedule|item|items|note|notes|pws|sow|qasp|rfp|rfq|rfi|sf|clin|slin|amendment|amend|mod|provision|header|list|checked|reference|ref|see|submission|submit|question|questions|q&a|qa|response|deliverable|deliverables|task|tasks|period|acceptance|offer|offers|factor|factors|technical|management|past|performance|cost|price|pricing|evaluation|security|general|special|requirement|requirements|instructions|instruction|solicitation|addendum|table|figure|volume|tab|line|page|pages|and|or|of|for|to|the|a|an|at|in|on|no|number|nbr|per|insurance|insured|bonding|bond|bonds|coverage|liability|surety|indemnity|errors|omissions|e&o|far|dfars|agar|dfar|dod|dodi|cfr|usc|nfs|hhsar|dear|[a-z]|[ivxlcdm]+|\d[\d.,-]*)$/i;
+// AFFIRMATIVELY-INSURANCE-ONLY OBLIGATION TEMPLATE (Gauntlet Unit 1 R3 — the terminal "ambiguity fails toward keep"
+// inversion). R3 proved the verb/modal-anchored residual vetoes miss a genuine bar phrased as a BARE DECLARATIVE NOUN
+// PHRASE ("TWIC card required", "SCIF access is a prerequisite", "This is an AbilityOne mandatory source item", "FAA
+// Part 145 repair station certification") — it carries no surviving modal/status token, so the residual classifies as
+// "neither" and the bar is demoted → false CLEAR. The fix: the gate FIRES ONLY when the WHOLE requirement anchor-matches
+// a single pure-insurance obligation SENTENCE — an optional subject/role lead-in (no clause/sentence boundary), an
+// optional governing modal, a do-work verb, the insurance noun (with only INSURANCE_MOD adjectives between), and only
+// benign coverage/limit/period descriptors trailing to end-of-string. A CO-STATED bar clause (bare-noun or otherwise)
+// leaves material OUTSIDE this template, so the anchored match FAILS → keep-the-bar. Novel bars escalate BY DEFAULT: any
+// requirement that is not affirmatively-recognized as insurance-only keeps (a missed pure-insurance phrasing is only a
+// safe false-NEGATIVE → honest NHR, never a false BID). The leading class excludes sentence/clause punctuation (. ; :)
+// so the subject lead-in cannot span a second clause.
+const INSURANCE_ONLY_OBLIGATION_RE = new RegExp(
+  "^\\s*" +
+  // optional subject / role / citation lead-in — TEMPERED: each word must NOT be a clause-word (and/or/is/are/…), an
+  // obligation predicate (required/mandatory/prerequisite/must/shall/…), or a held-verb (hold/possess/…) — so the lead
+  // is a pure noun-phrase SUBJECT and cannot span a co-stated bar clause (R3 "…item AND the vendor shall …" false-clear).
+  "(?:(?!(?:and|or|is|are|was|were|be|been|being|its|their|required|mandatory|prerequisite|must|shall|will|should|prior|hold|holds|holding|possess|possesses|maintain|maintains|carry|carries|provide|provides|furnish|obtain|submit|have|has|had|approved|authorized|accredited|certified|licensed|eligible|enrolled|listed|member|certification|certificate|clearance|licen[sc]e|licensure|accreditation|registration|credential|authorization|designation|membership|qualification)\\b)[\\w§'/-]+[ ,]+){0,8}?" +
+  "(?:(?:must|shall|will|is\\s+to|are\\s+to|is\\s+required\\s+to|are\\s+required\\s+to|required\\s+to|to|should)\\s+)?" + // optional governing modal
+  "(?:(?:(?:purchase|procure|obtain)\\s+and\\s+maintain|maintain|carr(?:y|ies|ied)|provid(?:e|es|ed|ing)|furnish(?:es|ed)?|obtain(?:s|ed|ing)?|procure|secure|purchase|keep|show|submit|demonstrate|have|hold|be\\s+insured|remain\\s+insured|be\\s+covered\\s+by)\\s+)?" + // OPTIONAL do-work verb (longest arm first; passive "X insurance … required" also fires)
+  "(?:proof\\s+of\\s+|evidence\\s+of\\s+|a\\s+certificate\\s+of\\s+|certificates?\\s+of\\s+|adequate\\s+|sufficient\\s+|the\\s+following\\s+)?" +
+  "(?:" + INSURANCE_MOD + "*insur(?:ance|ed)|errors\\s+(?:and|&)\\s+omissions|\\be&o\\b|professional\\s+liability|general\\s+liability|commercial\\s+general\\s+liability)\\b" + // the insurance noun (INSURANCE_MOD adjectives) or a named commercial line
+  "(?:" + [                                                              // benign coverage / limit / period tail (repeatable), to end-of-string — NONE of these can begin a co-stated bar noun
+    "\\s+(?:coverage|policy|policies|limits?|protection|insurance)",
+    "\\s+(?:with|of|at|in|on|for|to|not|no|less|than|least|a|an|the|and|&|its|their|any|all|each|both|either|up)\\b",
+    "\\s+per\\s+(?:occurrence|claim|person|accident|year|loss)", "\\s+aggregate", "\\s+combined\\s+single\\s+limit", "\\s+bodily\\s+injury", "\\s+property\\s+damage",
+    "\\s*\\$\\s?[\\d,]+(?:\\.\\d+)?", "\\s*(?:per\\s+occurrence|million|mil|m|k|each)\\b", "\\s*/\\s*",
+    "\\s+(?:throughout|during|for|over)\\s+(?:the\\s+)?(?:entire\\s+)?(?:performance|contract|project|period|term|life)(?:\\s+(?:period|term|of\\s+the\\s+contract))?",
+    "\\s+(?:prior\\s+to|before|upon|at)\\s+(?:commencing|commencement|starting|start\\s+of|contract\\s+start|award|performance|work|notice\\s+to\\s+proceed)",
+    "\\s+acceptable\\s+to\\s+the\\s+[A-Za-z]{2,}", "\\s+as\\s+(?:required|specified|set\\s+forth|described|applicable)", "\\s+(?:is\\s+)?(?:required|mandatory)\\b",
+    "\\s+(?:at\\s+all\\s+times|hereunder|in\\s+effect|in\\s+force)", // NOTE: 'and bonds/bonding' deliberately NOT a tail token (Gauntlet R4-2) — it could swallow a co-stated bond obligation; bonds are handled by the routine-clause bonding guard.
+    "\\s+for\\s+(?:all\\s+)?(?:on-?site\\s+)?(?:personnel|employees?|staff|workers|its\\s+employees|the\\s+work|the\\s+services|the\\s+project|the\\s+duration|liability)",
+    "\\s+(?:commencing\\s+)?(?:work|services|performance)", "\\s+minimum", "\\s+combined", "\\s+naming\\s+the\\s+government",
+    "\\s*/?\\s*(?:e&o|occ|agg|ea|yr|pp)\\b",                            // common coverage shorthand: (E&O), /occ, /agg, /ea
+    "[\\s,;./:()&-]+",                                                  // trailing punctuation / whitespace (incl. parens for "(E&O)")
+  ].join("|") + ")*" +
+  "\\s*$",
+  "i"
+);
+
+/** Re-type an INSURANCE do-the-work obligation the proposer over-typed as a non-curable profile bar → bidder_controls
+ *  + curable (Phase 3 Unit 1). Pure → gate-tested. STRIP-THEN-RESIDUAL (Gauntlet R1+R2): fires ONLY on a
+ *  bidder_cannot_move finding that IS an insurance obligation AND whose insurance-stripped residual carries NO second
+ *  obligation / held-or-conferred eligibility status. Ambiguity fails toward keep-the-bar; a novel co-stated bar
+ *  escalates by default. Flag-gated; OFF (default) ⇒ byte-identical. */
+export function applyPerfObligationInsuranceTyping(findings: TypedFinding[], opts?: { enabled?: boolean }): TypedFinding[] {
+  if (!opts?.enabled) return findings; // default-off ⇒ byte-for-byte unchanged
+  return findings.map((f) => {
+    if (f.controllability !== "bidder_cannot_move") return f;          // (1) only a NON-curable mis-type is a candidate
+    if (f.universalDefect || f.verifiedBy || f.requiredAttribute) return f; // (2) verified defect / typed eligibility gate → never demote
+    // (2b) CITATION-SLOT guard (Gauntlet R4): the anchor (5) inspects f.requirement only; a bare-noun bar in the
+    //      citation slot escapes both the residual vetoes and the anchor. The citation is a structured reference — every
+    //      token must be a benign reference/insurance/UCF word; an unrecognized token (a credential/program noun) ⇒ keep.
+    const citTokens = (f.citation ?? "").split(/[\s/,;:()&.–—§#-]+/).filter((t) => t.length > 0);
+    if (citTokens.some((t) => !CITATION_BENIGN_TOKEN.test(t))) return f;
+    const trigger = `${f.citation ?? ""} ${f.requirement ?? ""}`;
+    const hay = `${trigger} ${f.excerpt ?? ""}`;
+    if (!INSURANCE_DOWORK_RE.test(trigger)) return f;                  // (3) it IS an insurance obligation (trigger only)
+    // (4) STRIP the insurance obligation span(s) → the residual is the NON-insurance content. ANY residual obligation /
+    //     held-or-conferred status ⇒ keep-the-bar. Fail toward keep; a novel co-stated bar escalates by default.
+    const residual = trigger.replace(INSURANCE_STRIP_RE, " ").replace(/\s+/g, " ").trim(); // collapse whitespace ONLY — preserve "8(a)"/"set-aside" punctuation the veto shapes key on
+    if (RESIDUAL_OBLIGATION_RE.test(residual)) return f;              // (4a) a surviving second modal-obligation
+    const gsR = classifyGateShape(residual);
+    if (gsR === "profile_bar" || gsR === "set_aside_caution") return f; // (4b) residual classifies as a bar / set-aside (no insurance-verb contamination)
+    if (HELD_CREDENTIAL_SHAPE.test(residual)) return f;              // (4c) positional held-credential shape
+    if (CONFERRED_STATUS_SHAPE.test(residual)) return f;            // (4d) third-party-conferred held status (R2 conferral family)
+    if (SOCIOECONOMIC_SETASIDE_RE.test(residual)) return f;         // (4e) set-aside shape backstop
+    if (STRUCTURAL_BAR_RE.test(hay)) return f;                      // (4f) narrow hard-bar backstop on the full hay (incl. excerpt)
+    // (5) TERMINAL POSITIVE GATE (Gauntlet R3 inversion): FIRE only when the WHOLE requirement anchor-matches a single
+    //     pure-insurance obligation sentence. A bare-declarative-noun bar co-stated with insurance ("TWIC card required;
+    //     … maintain insurance") leaves content OUTSIDE the template → no match → keep. Ambiguity fails toward keep; a
+    //     requirement that is not affirmatively insurance-only keeps (a missed pure-insurance phrasing is a safe false-
+    //     negative → honest NHR, never a false BID).
+    if (!INSURANCE_ONLY_OBLIGATION_RE.test(f.requirement ?? "")) return f;
+    return { ...f, controllability: "bidder_controls", curableInWindow: true, perfObligationGuard: true };
   });
 }
 
@@ -995,6 +1166,776 @@ export function applyNmrFirmStatusGate(findings: TypedFinding[], profile: Bidder
     // (attribute-specific); unknown → the FORK-7 NMR-unknown NHR branch (curability text), never a lead-time bar.
     return { ...f, controllability: "bidder_cannot_move", kind: "eligibility_bar", curableInWindow: false, cautionFloor: undefined, nmrGuard: true };
   });
+}
+
+// ── NMR NAICS-DORMANCY GATE (Phase 3 Unit 2 · Brain cards #548/#550, flag AUDIT_NMR_NAICS_DORMANCY default-OFF) ──
+// The Nonmanufacturer Rule (FAR 52.219-33 / 13 CFR 121.406) governs SUPPLY acquisitions only. On a solicitation whose
+// ASSIGNED NAICS is a services/construction code the NMR is LEGALLY DORMANT — 13 CFR 121.406(b)(3)-(4): it does not
+// apply to a services-classified buy (nor to its incidental supply component). The seq-2 false-AUTO-F (dccce793,
+// 12318726Q0165, NAICS 561320 Total SB) rendered a ☒-checked 52.219-33 as a P0 show-stopper despite the assigned NAICS
+// being services. This gate NEUTRALIZES that NMR AUTO-F contributor (it does NOT by itself clear the seq-2 verdict — a
+// separate professional-liability-insurance bar in that record is out of scope, likely its own mis-type). It keys on
+// the SAM-resolved NAICS *fact* (opts.naics, Rule 64 — NEVER a source regex, which would recreate the keyfact
+// detector's T1-9 circular-signal trap) and DEMOTES a finding that is UNAMBIGUOUSLY the NMR (see isNmrFinding) to a
+// verdict-inert P2 applicability flag on a non-supply sector. It runs over the WHOLE rail (after every NMR emitter)
+// so it catches the bar regardless of which lens raised it, without false-clearing a distinct bar that merely co-cites it.
+//
+// APPLICABILITY TABLE — 13 CFR 121.406(b)(3): the NMR applies to procurements assigned a "manufacturing or supply
+//   NAICS code, OR the Information Technology Value Added Resellers (ITVAR) exception to NAICS code 541519". Supply
+//   NAICS 2-digit sector ∈ {31,32,33 Manufacturing · 42 Wholesale Trade · 44,45 Retail Trade}; PLUS the exact ITVAR
+//   code 541519 (a sector-54 SERVICES code where the NMR nonetheless applies by statutory exception — Gauntlet Unit 2
+//   R1 P0). Every OTHER sector (services, construction 23, agriculture 11, etc.) → DORMANT. Fail-toward-LIVE on the
+//   exception (keep the bar on 541519) and fail-toward-ESCALATION on unknown NAICS (a null/unparseable code is NOT
+//   demoted — the bar stands and routes to human review, never a silent clear).
+export const NMR_SUPPLY_SECTORS: ReadonlySet<string> = new Set(["31", "32", "33", "42", "44", "45"]);
+export const NMR_ITVAR_NAICS = "541519"; // 13 CFR 121.406(b)(3) ITVAR exception — NMR is LIVE here despite sector 54
+/** True iff the assigned NAICS is one the NMR governs (13 CFR 121.406(b)(3)): a supply sector, OR the ITVAR 541519
+ *  exception. Unknown/malformed ⇒ false (not provably applicable — the caller then leaves the bar rather than demote
+ *  on a guess). The ITVAR carve-out is fail-toward-LIVE: on 541519 we keep the bar (never false-clear a live NMR). */
+export function isNmrApplicableNaics(naics: string | null | undefined): boolean {
+  const digits = (naics ?? "").replace(/\D/g, "");
+  if (digits.length < 2) return false;
+  if (digits.slice(0, 6) === NMR_ITVAR_NAICS) return true;  // ITVAR exception (R1 P0); slice(0,6) is robust to a trailing/decimal digit (R2 P3) — fail-toward-live
+  return NMR_SUPPLY_SECTORS.has(digits.slice(0, 2));
+}
+// NMR-FINDING IDENTITY — POSITIVE-SHAPE ALLOWLIST (Gauntlet Unit 2 R3; doctrine [[feedback_no_blocklist_shape_allowlist_doctrine]]).
+// R1/R2 tried to identify "an NMR finding co-stating a DISTINCT bar" via a BLOCKLIST of foreign-bar vocabulary
+// (FOREIGN_BAR_RE) — R3 proved that blocklist leaks (EAR/DCAA/bonding/ISO-9001/CMMC/AS9100/FAA-145/Buy-American all
+// absent → 10/10 false-CLEAR leaks), exactly the #507 vocab treadmill Brain permanently forbade. The doctrine-correct
+// identity is a POSITIVE shape, not a negative vocabulary: demote ONLY a finding positively recognized as the pure
+// keyfact NMR — `requiredAttribute === NMR_ATTRIBUTE` AND `requirement === NMR_CAUTION` (the exact fixed text the sole
+// NMR-attribute emitter, audit-keyfact-detector, produces; applyNmrSingleEmitter guarantees a single such carrier).
+// A finding of that exact shape is PURE NMR by construction — nothing else to erase — so demotion is safe. EVERY other
+// finding (bundled citation, fused requirement, foreign attribute, bare prose, a distinct bar merely quoting 52.219-33
+// in its grounding excerpt) FAILS TOWARD ESCALATION — left intact, never false-cleared. No bar vocabulary is enumerated.
+const isNmrFinding = (f: TypedFinding): boolean =>
+  f.requiredAttribute === NMR_ATTRIBUTE && f.requirement === NMR_CAUTION;
+
+/** Demote NMR-family findings to a verdict-inert P2 applicability flag when the solicitation's assigned NAICS is a
+ *  non-supply (services/construction) sector, per 13 CFR 121.406(b)(3)-(4). Mirrors the structural-downgrade re-type
+ *  (kind "other" · bidder_controls · P2 · requiredAttribute + cautionFloor cleared) so nothing downstream types it as
+ *  an active eligibility bar. Keys on the NAICS FACT only — a null/unknown NAICS demotes NOTHING (fail-toward-
+ *  escalation). MIXED-SOLICITATION boundary (Brain build-note b): a services-classified buy with incidental supply
+ *  CLINs is STILL governed by its ASSIGNED NAICS — the gate demotes (dormant), because SBA size/NMR applicability
+ *  follows the assigned code, not embedded CLIN language. Default-OFF via caller; a supply-sector NAICS ⇒ byte-
+ *  identical. Pure; order-independent. */
+export function applyNmrNaicsDormancy(
+  findings: TypedFinding[],
+  naics: string | null | undefined,
+  opts?: { enabled?: boolean },
+): TypedFinding[] {
+  if (!opts?.enabled) return findings;                 // Rule 61 default-off ⇒ byte-identical
+  const digits = (naics ?? "").replace(/\D/g, "");
+  // A real NAICS is EXACTLY 6 digits. Anything else (null, truncated, padded, decimal-suffixed, leading-zero — R2 P3)
+  // is malformed ⇒ we cannot confidently classify the sector ⇒ leave the bar (fail-toward-escalation, never a false
+  // clear). This is stricter than the SAM path needs (opts.naics = solicitation.naicsCode is a clean 6-digit code)
+  // but closes the whole malformed-NAICS family deterministically.
+  if (digits.length !== 6) return findings;
+  if (isNmrApplicableNaics(digits)) return findings;   // supply sector or ITVAR 541519 ⇒ NMR is live ⇒ untouched
+  const sector = digits.slice(0, 2);
+  let touched = false;
+  const next = findings.map((f): TypedFinding => {
+    if (!isNmrFinding(f)) return f;
+    touched = true;
+    return {
+      ...f,
+      kind: "other" as RequirementKind,
+      controllability: "bidder_controls" as Controllability,
+      requiredAttribute: undefined,
+      curableInWindow: true,
+      cautionFloor: undefined,
+      severity: "P2" as const,
+      nmrGuard: true,
+      requirement: `Applicability flag: the Nonmanufacturer Rule (FAR 52.219-33) is legally DORMANT on this acquisition — the assigned NAICS ${digits} (sector ${sector}) is not a supply/manufacturing/wholesale/retail code, so 13 CFR 121.406(b)(3)-(4) makes the NMR inapplicable (it governs supply buys only). Present in the clause matrix but not an eligibility bar for this buy; confirm scope with the Contracting Officer.`,
+    };
+  });
+  if (touched) console.log(`[decide] NMR NAICS-dormancy: assigned NAICS ${digits} (sector ${sector}) non-supply → 52.219-33 demoted to P2 applicability flag (13 CFR 121.406(b)(3)-(4))`);
+  return touched ? next : findings;
+}
+
+// ── CHECKBOX-STATE FIDELITY GATE (Phase 3 Unit 3 · Brain card #551 design C, flag AUDIT_CHECKBOX_STATE_FIDELITY default-OFF) ──
+// The Section I clause matrix records INCORPORATION MECHANICS (☒ checked / ☐ unchecked), NEVER obligation EXISTENCE
+// (Brain #551: box-state is not a suppression authority — option A rejected). The seq-2 AUTO-F asserted "☒ 52.219-14
+// (checked in Section I)" while source is "☐ 52.219-14 Limitations on Subcontracting" — a FABRICATED checkbox state
+// (the box is unchecked; the 52.219-14 limitation is nonetheless real, CO-affirmed in the Q&A). Fix (design C,
+// NON-DESTRUCTIVE): build the authoritative ☐/☒ matrix map by POSITIVE-SHAPE parse; when a finding FRAMES a clause as
+// checked/clause-list-incorporated but the matrix shows an UNAMBIGUOUS ☐, CORRECT the checkbox-state provenance (state
+// the true ☐; re-attribute the obligation to a VERIFIED-PRESENT basis, anchored not asserted) and KEEP the obligation
+// at its severity/typing. Fail-toward-keep: NO clause suppressed, NO severity lowered; any ambiguity (clause absent
+// from the matrix, both-states, unparseable) leaves the finding byte-identical. UNIT-3/UNIT-4 BOUNDARY: this gate acts
+// only on a clause that IS in a real Section-I matrix with a legible ☐; a fabricated SECTION/structure (an invented
+// heading a finding cites) is a fabricated-structural-assertion — Unit 4's domain, never touched here.
+const CB_CHECKED_RE = /[☒☑]/;
+const CB_UNCHECKED_RE = /☐/;
+const CB_INCORP_FRAMING_RE = /clause list|checked|incorporated|\bsection\s*[IK]\b|☒|☑/i;          // the fabricated "it is checked/incorporated" framing
+const CB_CLAUSE_RE = /\b((?:8?52|252|53)\.\d{3}-\d{1,3}[A-Za-z]?)\b/g;                            // clause numbers (global — a finding may cite several)
+
+// The between-glyph-and-clause span of a GENUINE checkbox-matrix row is a PURE lead-in — whitespace, table borders,
+// list/outline markers, punctuation — NO words. This is the positive shape (Unit-2 doctrine): the ubiquitous FAR
+// by-reference form "☐ Alternate I (Nov 2025) of 52.240-91" (the ☐ governs the ALTERNATE, the BASE clause is
+// incorporated) has WORDS ("Alternate", "of") between the ☐ and the trailing clause number, so it is REJECTED —
+// never mis-attributing the Alternate's ☐ to the base clause (R4 BREAK 1, live-record fabrication).
+const CB_PURE_LEADIN_RE = /^[\s()[\]|>*·.,:;#–—-]*$/;
+export function parseCheckboxMatrix(source: string | null | undefined): Map<string, "checked" | "unchecked"> {
+  const checked = new Set<string>();
+  const unchecked = new Set<string>();
+  // WRAP-JOIN only a GLYPH-ONLY row (a glyph alone on its line) to its next-line clause — never a checkbox-AFTER-label
+  // row like "<clause> <label> ☒" (R4 BREAK 2: that would drop the glyph's true owner and fabricate state on the next clause).
+  const merged = (source ?? "").replace(/^([^\S\n]*[☒☑☐][^\S\n]*)\n/gm, "$1 ");
+  for (const line of merged.split(/\r?\n/)) {
+    for (const m of line.matchAll(CB_CLAUSE_RE)) {
+      const prefix = line.slice(0, m.index ?? 0);
+      const gi = Math.max(prefix.lastIndexOf("☒"), prefix.lastIndexOf("☑"), prefix.lastIndexOf("☐"));
+      if (gi < 0) continue;                                   // no glyph before this clause on its row → absent from the matrix
+      if (!CB_PURE_LEADIN_RE.test(prefix.slice(gi + 1))) continue; // words between glyph and clause (e.g. "Alternate I … of") → not a matrix row
+      if (prefix[gi] === "☐") unchecked.add(m[1]); else checked.add(m[1]);
+    }
+  }
+  const map = new Map<string, "checked" | "unchecked">();
+  for (const c of checked) map.set(c, "checked");
+  for (const c of unchecked) if (!checked.has(c)) map.set(c, "unchecked");
+  return map;
+}
+
+const cbClauses = (s: string | null | undefined): string[] => [...new Set([...(s ?? "").matchAll(CB_CLAUSE_RE)].map((m) => m[1]))];
+
+/** The clause the gate would correct: the SOLE matrix-present clause the finding cites, and ONLY if it is ☐ unchecked
+ *  with NO checked matrix-clause co-cited (R1 #4: a positional first-match could grab an unchecked cross-ref instead of
+ *  the finding's real checked subject). Mixed/multiple/none ⇒ null ⇒ fail-toward-keep. */
+const cbTargetClause = (f: TypedFinding, matrix: Map<string, "checked" | "unchecked">): string | null => {
+  const cited = [...cbClauses(f.citation), ...cbClauses(f.requirement)];
+  const inMatrix = [...new Set(cited)].filter((c) => matrix.has(c));
+  const unchecked = inMatrix.filter((c) => matrix.get(c) === "unchecked");
+  const checked = inMatrix.filter((c) => matrix.get(c) === "checked");
+  return unchecked.length === 1 && checked.length === 0 ? unchecked[0] : null; // exactly one ☐, no co-cited ☒ → unambiguous
+};
+
+/** Correct a fabricated ☒/checked framing on a finding whose clause is UNAMBIGUOUSLY ☐ in the Section-I matrix, keeping
+ *  the obligation at severity (Brain #551 design C). Default-OFF via caller; supply-clean ⇒ byte-identical. Pure. */
+export function applyCheckboxStateFidelity(
+  findings: TypedFinding[],
+  source: string | null | undefined,
+  opts?: { enabled?: boolean },
+): TypedFinding[] {
+  if (!opts?.enabled) return findings;                       // Rule 61 default-off ⇒ byte-identical
+  const matrix = parseCheckboxMatrix(source);
+  if (matrix.size === 0) return findings;
+  let touched = false;
+  const next = findings.map((f): TypedFinding => {
+    const clause = cbTargetClause(f, matrix);
+    if (!clause) return f;                                              // absent / checked / ambiguous / mixed-cite → keep
+    if (!CB_INCORP_FRAMING_RE.test(`${f.citation ?? ""} ${f.requirement ?? ""}`)) return f; // no fabricated framing → nothing to correct
+    // VERIFIED-PRESENT basis (Brain #551: anchor, don't assert): the finding's OWN grounded excerpt is present-by-
+    // definition; we do NOT claim the body "affirms" (R1 #1 — the clause number appearing elsewhere ≠ affirmation).
+    const basis = (f.grounded === true && !!f.excerpt) ? "the obligation is grounded in the solicitation text (see the excerpt)"
+      : "a basis outside the Section I checkbox — confirm the obligation with the Contracting Officer";
+    touched = true;
+    // APPEND the correction — never REPLACE (R2 #1): a wholesale rewrite deletes provenance phrases downstream guards
+    // key on (e.g. "incorporated by reference", which isByReferenceMarkingOnly / detectSetAsideConflict read from the
+    // citation — card #534). Appending preserves the original citation intact AND states the true ☐; the
+    // checkboxCorrected marker carries the structured signal for the render.
+    return {
+      ...f,                                                             // KEEP kind, controllability, severity, curableInWindow, excerpt, original citation — the obligation stands
+      citation: `${f.citation ?? ""} · [checkbox-state correction: ${clause} is UNCHECKED (☐) in the Section I clause matrix — the box records incorporation mechanics, not the obligation; ${basis}.]`,
+      checkboxCorrected: true,
+    };
+  });
+  if (touched) console.log("[decide] checkbox-state fidelity: corrected fabricated ☒/checked framing → true ☐ state (obligation KEPT at severity)");
+  return touched ? next : findings;
+}
+
+// ── STRUCTURAL-ASSERTION FIDELITY GATE (Phase 3 Unit 4 · Brain #551 Unit-3/Unit-4 boundary, flag AUDIT_STRUCTURAL_ASSERTION_FIDELITY default-OFF) ──
+// A finding may attribute its clause/obligation to a UCF SECTION heading that DOES NOT EXIST in the ingested
+// solicitation — a fabricated STRUCTURE (distinct from Unit 3's fabricated checkbox-STATE on a real matrix row).
+// The seq-2 dccce793 record is a commercial SF1449 RFQ whose ingested source contains only Sections G, L, M, yet
+// 8 findings cite "Section I …", 5 cite "Section B …", 1 cites "Section C …" — grounded excerpts decorated with an
+// INVENTED UCF location. The structure is fabricated even though the underlying obligation (the quoted excerpt) is
+// real. Fix (mirror Unit 3 design C, NON-DESTRUCTIVE + VERDICT-INERT): build the set of section letters GENUINELY
+// present in the source by positive-shape parse; when a finding's CITATION attributes it to a section letter absent
+// from that set, APPEND an honest structural-provenance correction (never replace — downstream guards key on the
+// original citation text; card #534) and mark structuralAssertionCorrected, KEEPING kind/controllability/severity/
+// excerpt untouched (this gate NEVER changes a verdict — deriveVerdict does not read the marker; it only stops a
+// fabricated section heading from reaching render as verified provenance). Fail-toward-keep: if the source has NO
+// detectable section letters at all (we cannot prove this doc is UCF-sectioned — e.g. a garbled/OCR ingest), the
+// gate is byte-identical; a cited letter that IS present is left intact. UNIT-3/UNIT-4 BOUNDARY: Unit 3 owns a real
+// matrix row lying about ☐/☒; Unit 4 owns a section heading that isn't there.
+//
+// R1 REMEDIATION (Gauntlet round 1, P0) — ASYMMETRIC parsers. Over-fire (defaming a REAL grounded citation as
+// fabricated) is the CARDINAL sin; under-fire (missing a fabrication) is the safe direction. So the two sides use
+// DELIBERATELY DIFFERENT regexes:
+//   • SOURCE-side present-set = WIDE. Any plausible section reference marks the letter present — the abbreviation
+//     "Sec."/"Sec", spaced/tab/NBSP separators, a hyphenated PDF page-wrap ("Section-\nI"), a plain line-wrap, an
+//     "§" glyph. Widening the SOURCE parser can ONLY ENLARGE the present-set ⇒ it can only SUPPRESS a correction
+//     (fail-toward-keep), NEVER create a false one. The letter must be the first alnum after the heading token
+//     (heading shape), so prose like "Section 5.2, item M" or "second" never spuriously marks a letter present.
+//   • CITATION-side = STRICT (the original "Section <L>" form). A finding that cites an abbreviated/roman/§ form is
+//     simply not parsed ⇒ not corrected ⇒ under-fire (safe). Keeping this strict means widening the source side can
+//     never grow over-fire.
+// Net: on a doc that abbreviates the very section a finding cites in full, the letter is now PRESENT ⇒ no false
+// correction. The 14 live seq-2 B/C/I fabrications still fire (those letters appear in NO form in that source).
+//
+// R2–R5 REMEDIATION → R5 DOCUMENT-CLASS PIVOT. Five rounds proved that deciding "is UCF Section X present in messy
+// extracted source" by parsing HEADINGS is a treadmill with an IRREDUCIBLE two-horned failure: a detector wide enough
+// to catch every real bare-header form (all-caps / paraphrased / decorated / next-line) inevitably matches short PROSE
+// sentences that begin with a lone A–M letter + a title keyword ("I. Clauses apply as written." → drops the live
+// Section-I corrections; R5-F2/P1 gate-defeat), while any detector tight enough to reject that prose misses real
+// paraphrased headers ("BASIS FOR AWARD", "DELIVERABLES", "QUALITY ASSURANCE", "PERFORMANCE WORK STATEMENT" → defames
+// a true grounded citation; R5-F1/P0). Length/case/keyword shape signals cannot separate a short header from a short
+// sentence. The REAL discriminator is not the heading — it is the DOCUMENT CLASS:
+//   • A UCF-format solicitation (SF33/SF1442/negotiated, "Uniform Contract Format") HAS all Sections A–M by definition,
+//     so ANY "Section X" citation is legitimate → the gate must NEVER fire (firing there is the cardinal over-fire).
+//   • A COMMERCIAL / SIMPLIFIED-acquisition RFQ (SF1449, commercial products/services, FAR 12/13) has NO UCF A–M
+//     structure — it uses the SF1449 + continuation sheets — so a finding that attributes a clause to "Section I/B/C"
+//     is fabricating a UCF skeleton the doc does not have (the seq-2 dccce793 record IS exactly this: SF1449 + RFQ +
+//     commercial, zero UCF markers; 14 findings cite absent B/C/I).
+// So: FIRE only when the doc is POSITIVELY commercial/simplified AND carries NO UCF/negotiated marker; SUPPRESS
+// (fail-toward-keep) otherwise. On a suppressed (UCF/ambiguous) doc, defaming a real UCF section is now STRUCTURALLY
+// IMPOSSIBLE — which closes the entire R1–R5 over-fire class at its root. The bare-UCF-header detector is REMOVED
+// (it was the sole source of both the recurring P0 misses and the P1 prose poison); the present-set is the inline
+// word-form section detector ONLY. Trade-off: a fabricated UCF-section citation on a UCF-format doc is NOT caught
+// (under-fire) — but on a UCF doc those sections are genuinely present, so there is little to catch and never a
+// defamation. Verdict-inert throughout (this only annotates a citation's provenance for render).
+const SA_CITED_SECTION_RE = /\bsection\s+([A-M])\b/gi;                             // STRICT — citation provenance: "Section I", "Section M – Evaluation Criteria"
+// WIDE inline source heading detector: § | Sec/Sect/Section/Article/Part | letter-spaced "S E C T I O N" + single
+// linear separator run (whitespace incl CRLF/blank-line, dot/colon/underscore/paren/comma/dash) + the FIRST [A-M].
+const SA_PRESENT_SECTION_RE = /(?:§\s*|\b(?:sec(?:t(?:ion)?)?|article|part)\b\.?|\bs\W*e\W*c\W*t\W*i\W*o\W*n)[\s.:_(),–—-]*([A-M])\b/gi;
+// DOCUMENT-CLASS markers. COMMERCIAL/SIMPLIFIED (gate active): SF1449, commercial products/services, RFQ/quote,
+// combined synopsis, FAR 12/13 / simplified acquisition, SF18. UCF/NEGOTIATED (gate SUPPRESSED — A–M are real):
+// SF33/SF1442/SF1447, "uniform contract format", "solicitation, offer and award" (the SF33 banner).
+// R7 tightening — bare "commercial services" in a FAR-15 RFP's SCOPE prose is NOT a commercial-acquisition-method
+// signal (an ambiguous over-fire trigger). Require the FAR-12 term "commercial item(s)" or the SF1449 title phrase
+// "commercial products and/or commercial services". The live seq-2 doc carries the full SF1449 title (+ SF1449) so it
+// still fires; a negotiated RFP that merely mentions "commercial services" in scope no longer trips the gate.
+const SA_COMMERCIAL_DOC_RE = /\bSF[-\s]?1449\b|standard\s+form\s+1449|commercial\s+items?\b|commercial\s+products?\s+(?:and|or|\/|&)\s+commercial\s+services?|request\s+for\s+quot|\bRFQ\b|combined\s+synopsis|simplified\s+acquisition|\bFAR\s+(?:part\s+)?1[23]\b|\bSF[-\s]?18\b/i;
+// R6 remediation — the banner spellings a real CO writes: FULL "Standard Form 1442/1447/33" (FAR 36.701(a) names the
+// form verbatim "Standard Form 1442, Solicitation, Offer, and Award …") and the OXFORD-COMMA "Solicitation, Offer, and
+// Award". Widening the UCF suppressor is strictly safe (can only SUPPRESS a correction). Verified inline: closes the 3
+// R6-F1b defamations (STANDARD FORM 1442 / 1447 / SF-33 UCF docs mis-read as commercial).
+// R7 remediation — the UCF/negotiated doc-class signals a real CO uses: period-dotted "S.F. 33/1442", and the
+// negotiated-procurement class itself (FAR Part 15 / "negotiated procurement" / "Sections A through M") which is UCF
+// BY REGULATION (FAR 15.204-1: negotiated solicitations use the uniform contract format = Sections A–M). All are
+// strictly suppressor-side (safe). SF30 / DD1707 are deliberately EXCLUDED (an SF30 can amend a commercial SF1449).
+// R8 — the FAR-14 sealed-bidding class ALSO uses the UCF (FAR 14.201-1). Add the genuine sealed-bid TELLS, but NOT
+// the bare "IFB"/"RFP"/"Invitation for Bids" labels: the commercial SF1449 form prints ALL THREE solicitation-type
+// checkboxes ("REQUEST FOR QUOTE (RFQ) / INVITATION FOR BID (IFB) / REQUEST FOR PROPOSAL (RFP)") as boilerplate — the
+// live seq-2 SF1449 literally contains "(IFB)" and "(RFP)" — so those labels are NOT reliable UCF signals. The safe
+// tells ("sealed bid(ding)", "FAR part 14", "publicly opened", "lowest responsive[,] responsible bidder") appear only
+// on a genuine sealed-bid IFB, never on the SF1449 form (verified absent from the live source).
+const SA_UCF_DOC_RE = /uniform\s+contract\s+format|\bS\.?\s*F\.?[-\s]?(?:33|144[27])\b|standard\s+form\s+(?:33|144[27])|solicitation,?\s+offer,?\s+and\s+award|\bnegotiated\s+(?:procurement|acquisition|solicitation)\b|\bFAR\s+(?:part\s+)?1[45]\b|\bsections?\s+a\s*(?:through|thru|to|[-–—])\s*m\b|\bsealed\s+bid(?:ding)?\b|\bpublicly\s+opened\b|\blowest\s+responsive,?\s+responsible\s+bidder\b/i;
+/** True when the gate should fire: the ingested doc is positively a commercial/simplified-acquisition RFQ (which has
+ *  NO UCF A–M structure) AND carries no UCF/negotiated marker. Fail-toward-keep on anything not positively commercial. */
+const saGateApplies = (source: string | null | undefined): boolean => {
+  const s = source ?? "";
+  if (SA_UCF_DOC_RE.test(s)) return false;                                        // explicit UCF / negotiated form → A–M are real → never fire
+  if (!SA_COMMERCIAL_DOC_RE.test(s)) return false;                                // not positively commercial → fail-toward-keep
+  // STRUCTURAL UCF signal (marker-INDEPENDENT belt-and-suspenders for a banner-less / unusual-spelling UCF RFP): a
+  // commercial SF1449 RFQ never lays out the early UCF SCHEDULE sections A–F (it uses the SF1449 form blocks +
+  // continuation sheets), so an inline reference to ≥2 distinct early sections {A,B,C,D,E,F} is a UCF layout →
+  // suppress. This escapes the classifier's vocabulary treadmill by keying on STRUCTURE, not a marker phrase. (The
+  // live seq-2 present-set is {G,L,M} — ZERO early sections — so it still fires.)
+  const present = new Set(saPresentSectionLetters(s));
+  const earlySections = ["A", "B", "C", "D", "E", "F"].filter((l) => present.has(l)).length;
+  if (earlySections >= 2) return false;                                           // UCF-structured schedule (banner-less) → suppress
+  return true;
+};
+const saCitedSectionLetters = (s: string | null | undefined): string[] =>
+  [...new Set([...(s ?? "").matchAll(SA_CITED_SECTION_RE)].map((m) => m[1].toUpperCase()))];
+const saPresentSectionLetters = (s: string | null | undefined): string[] =>
+  [...new Set([...(s ?? "").matchAll(SA_PRESENT_SECTION_RE)].map((m) => m[1].toUpperCase()))]; // inline word-form sections only
+/** Correct a finding that attributes its obligation to a SECTION heading absent from the ingested source (Brain #551
+ *  boundary). Provenance-only + verdict-inert; supply-clean ⇒ byte-identical. Pure → gate-tested. Default-OFF via caller. */
+export function applyStructuralAssertionFidelity(
+  findings: TypedFinding[],
+  source: string | null | undefined,
+  opts?: { enabled?: boolean },
+): TypedFinding[] {
+  if (!opts?.enabled) return findings;                                            // Rule 61 default-off ⇒ byte-identical
+  if (!saGateApplies(source)) return findings;                                    // R5 doc-class gate: only a commercial/simplified RFQ lacks UCF A–M → fire; else fail-toward-keep
+  const present = new Set(saPresentSectionLetters(source));                       // inline word-form sections the commercial doc genuinely references
+  if (present.size === 0) return findings;                                        // no sections referenced at all → nothing to compare against → fail-toward-keep
+  let touched = false;
+  const next = findings.map((f): TypedFinding => {
+    const cited = saCitedSectionLetters(f.citation);                              // STRICT: structural provenance lives in the CITATION, not the requirement/excerpt
+    const fabricated = cited.filter((l) => !present.has(l));                      // section letters the finding claims that the source does not contain
+    if (fabricated.length === 0) return f;                                        // cites only present sections (or none) → nothing fabricated
+    touched = true;
+    const presentList = [...present].sort().join(", ");
+    const fabList = fabricated.sort().join(", ");
+    // APPEND, never replace (Unit 3 doctrine): keep the original citation intact AND state the true structural fact.
+    return {
+      ...f,                                                                        // KEEP kind, controllability, severity, curableInWindow, excerpt, grounded — the obligation stands
+      citation: `${f.citation ?? ""} · [structural-assertion correction: Section ${fabList} ${fabricated.length > 1 ? "are" : "is"} not present in the ingested solicitation (sections found: ${presentList}) — the obligation is grounded in the quoted excerpt, not that section heading.]`,
+      structuralAssertionCorrected: true,
+    };
+  });
+  if (touched) console.log("[decide] structural-assertion fidelity: caveated fabricated UCF-section attribution → grounded-excerpt provenance (obligation KEPT, verdict-inert)");
+  return touched ? next : findings;
+}
+
+// ── QUANTITY-AMBIGUITY FIDELITY GATE (Phase 3 Unit 5, flag AUDIT_QUANTITY_AMBIGUITY_FIDELITY default-OFF) ──
+// A solicitation may pose a MATERIAL quantity as an EXPLICIT, unresolved either/or — the seq-2 dccce793 record's Q&A
+// asks verbatim "Is the total requirement 520 hours or 1,040 hours?" (the Schedule says "520 hrs"; 20 hrs/wk × 52 wks
+// = 1,040 — a 2× level-of-effort/pricing spread the CO's answer did not settle). The audit's lens LAUNDERED this into a
+// confident single number — finding #3 "base period estimated at 520 hours" — picking one horn of a patent, unanswered
+// ambiguity and hiding the 2× pricing risk (silent under-caution toward committal). The engine flags such ambiguities
+// only EMERGENTLY (whichever lens happens to catch it), so on the next record a lens miss → a silent 2× under-bid.
+// This gate is the DETERMINISTIC BACKSTOP: parse the source for the POSITIVE SHAPE of a source-posed quantity question
+// (two same-unit quantities that DIFFER, joined by "or", inside an interrogative sentence) and EMIT one caution finding
+// surfacing the UNRESOLVED ambiguity, floored to BID_WITH_CAUTION (cautionFloor — never a bar, never NHR/NO_BID). It is
+// ADDITIVE and NON-DESTRUCTIVE: no existing finding is mutated, so the laundered "estimated at 520" lens finding stands
+// beside an explicit "actually unresolved: 520 OR 1,040 — confirm with the CO" caution the render now shows.
+//
+// DOCTRINE (no-blocklist / positive-shape; the over-fire cardinal sin for an EMITTER is crying wolf on every doc): the
+// discriminator is STRUCTURE, not a number scan. A latent numeric conflict (Schedule says X, PWS math implies Y, nobody
+// asked) is DELIBERATELY out of scope — a deterministic latent-conflict detector is the over-fire treadmill (every
+// option-year schedule and every wage-determination "40 hours per week" table carries differing same-unit numbers). We
+// fire ONLY on the doc's OWN explicit either/or QUESTION, which is the unambiguous signal that the source itself left a
+// quantity unresolved. Fail-toward-keep: no interrogative either/or shape ⇒ byte-identical.
+//   • QTY token = number + a measure-word (positive shape "a quantity is <n> <unit>", NOT a bar-vocab blocklist).
+//   • Interrogative REQUIRED — "price 520 or 1,040 hours as directed" is a DIRECTIVE choice, not an unanswered ambiguity;
+//     only a QUESTION ("Is it 520 or 1,040 hours?") signals the source did not resolve it. This is the primary over-fire
+//     guard (a declarative option-menu never trips the gate).
+//   • Same unit FAMILY + DIFFERING values required (520 hours vs 1,040 hours). Equal values / cross-unit ("2 hours or 2
+//     days") are not a quantity ambiguity → skipped.
+//   • Dedup: if a finding ALREADY presents this exact pair as unresolved/ambiguous, suppress the emission (no double).
+const QA_UNIT_RE = "(hours?|hrs?|days?|weeks?|months?|years?|ftes?|units?|each|ea\\.?|positions?|copies|pages?|sets?|lots?|items?)";
+// Two same-shape quantities joined by "or" (the either/or core). Family/difference/interrogative checked in code.
+const QA_EITHER_OR_RE = new RegExp(`(\\d[\\d,]{0,7})\\s*${QA_UNIT_RE}\\s+or\\s+(\\d[\\d,]{0,7})\\s*${QA_UNIT_RE}`, "gi");
+const qaNum = (s: string): number => parseInt(s.replace(/,/g, ""), 10);
+const qaUnitFamily = (u: string): string => {
+  const s = u.toLowerCase().replace(/\.$/, "");
+  if (/^(hours?|hrs?)$/.test(s)) return "hour";
+  if (/^days?$/.test(s)) return "day";
+  if (/^weeks?$/.test(s)) return "week";
+  if (/^months?$/.test(s)) return "month";
+  if (/^years?$/.test(s)) return "year";
+  if (/^ftes?$/.test(s)) return "fte";
+  if (/^(each|ea)$/.test(s)) return "each";
+  if (/^positions?$/.test(s)) return "position";
+  if (/^copies$/.test(s)) return "copy";
+  if (/^pages?$/.test(s)) return "page";
+  if (/^sets?$/.test(s)) return "set";
+  if (/^lots?$/.test(s)) return "lot";
+  if (/^units?$/.test(s)) return "unit";
+  if (/^items?$/.test(s)) return "item";
+  return s;
+};
+// R1 REMEDIATION (Gauntlet R1, P0 — cardinal-sin OVER-FIRE). The prior guard declared a match "interrogative" iff a "?"
+// appeared before the next .!\n — a PUNCTUATION scan mislabeled as a question check. So a DECLARATIVE same-unit either/or
+// sharing a clause with an unrelated trailing "?" (FAQ "…; questions on this CLIN?", rhetorical "…, correct?", a "— which
+// will the Gov confirm?" tail, a parenthetical aside) laundered into a false ambiguity caution → flipped a clean BID →
+// BID_WITH_CAUTION (the emitter cardinal sin). ROOT FIX: the enclosing clause must be a QUESTION IN FORM — the clause that
+// CONTAINS the either/or pair must OPEN with an interrogative marker (is/are/which/whether/isn't…), tested on the FIRST
+// token only (so "Offerors shall price…" does NOT count off a mid-clause "shall"). Clause = delimited by [.!?;:\n] (so a
+// "Question 4:" / "Q&A #1:" prefix is skipped to the real question head); a genuine "Which is correct: 520 or 1,040?" is
+// kept by ALSO accepting an interrogative head on the segment BEFORE a leading ":". Fail-toward-keep: no interrogative-
+// headed clause binds the pair to a terminating "?" ⇒ null (byte-identical). Validated vs the 7 R1 over-fires (all → no
+// fire) + DRIVER + "Question N:" prefix + genuine "Isn't the requirement X or Y…?" (all → fire).
+const QA_INTERROG_HEAD_RE = /^(is|are|was|were|do|does|did|has|have|had|shall|should|will|would|can|could|may|might|which|what|whether|how\s+(?:many|much)|is\s*n['’]?t|are\s*n['’]?t|was\s*n['’]?t|were\s*n['’]?t|do\s*n['’]?t|does\s*n['’]?t|did\s*n['’]?t|wo\s*n['’]?t|should\s*n['’]?t|could\s*n['’]?t|would\s*n['’]?t|ca\s*n['’]?t)\b/i;
+// R2 REMEDIATION (Gauntlet R2, P0) — the R1 head test checked only the FIRST TOKEN, so a fronted auxiliary that is NOT a
+// question mood laundered a benign either/or: (1) a CONDITIONAL/subjunctive PROTASIS ("Should offerors require 520 or
+// 1,040 hours, they must request approval?" = "If offerors require…") and (2) a `\b`-tokenized DATE/HYPHEN-COMPOUND opener
+// whose first token merely spells an auxiliary ("May 2026 …", "Should-cost analysis", "Will-call", "Would-be"). A first-
+// token check is a word-position scan mislabeled as a syntactic-mood check. Tighten the head test: the aux must be a real
+// standalone word (NOT hyphen-suffixed, NOT followed by a bare year/number — those are compound nouns / dates, not a
+// clause subject). Verdict-safe: fail-toward-keep (reject ⇒ null ⇒ byte-identical).
+const qaIsInterrogativeHead = (clause: string): boolean => {
+  const m = clause.match(QA_INTERROG_HEAD_RE);
+  if (!m) return false;
+  const after = clause.slice(m[0].length);
+  if (/^-/.test(after)) return false;                               // hyphenated compound noun (Should-cost, Will-call, Would-be, Can-do)
+  if (/^\s+\d/.test(after)) return false;                           // aux followed by a bare number/year (May 2026) → a date opener, not a question
+  return after === "" || /^\s+\S/.test(after) || /^['’]/.test(after); // a real word boundary (a subject follows), not a glued suffix
+};
+// R5 REMEDIATION (Gauntlet R5, P0) — R1's head test proved the clause OPENS with an interrogative marker but never bound the
+// PAIR to the question's FOCUS, and R2–R4 only ever hardened the CONDITIONAL branch. So an INTERROGATIVE-headed sentence whose
+// either/or pair is a DECLARATIVE ASIDE — the question asks about something else — still over-fired ("Does the offeror
+// understand the estimate IS 520 or 1,040 hours?", "Are offerors required to price THE 520 or 1,040 hours reflected in
+// Attachment 3?", "How many volumes COVER the 520 or 1,040 hours?"). ROOT FIX (verb-vocabulary-independent SHAPE): the pair
+// must be the INTERROGATED CONTENT — (i) the SUBJECT region between the interrogative head and the pair is a bare noun phrase
+// (NO embedded finite verb / complementizer, and NOT ending in a determiner/preposition that makes the pair an object), and
+// (ii) the TAIL after the pair is TERMINAL (only a trailing SUBORDINATE clause allowed — never a main-clause apodosis /
+// predicate). This UNIFIES + subsumes the R2–R4 conditional handling: a conditional protasis puts a finite verb in the
+// subject region ("Should offerors REQUIRE…") or a main clause in the tail ("…, notify the KO?" / "…the CO will confirm?").
+// R8 REMEDIATION (Gauntlet R8, P1 — DOCTRINE-DECISIVE). R5's subject-region check detected an embedded clause by a CLOSED
+// report-verb list (lists|states|shows|covers|…) — a verb BLOCKLIST masquerading as a shape check, so an embedded declarative
+// whose finite verb is OPEN-CLASS ("Is it clear the schedule ASSUMES 520 or 1,040 hours?" — assumes/projects/allocates/carries
+// /yields…) slipped → over-fire. A verb list is always one open-class lemma behind (the treadmill R4 named, [[feedback_no_
+// blocklist_shape_allowlist_doctrine]]). ROOT FIX (verb-vocabulary-INDEPENDENT, morphology+function-word SHAPE): a genuine
+// which-quantity question has the pair as the interrogative head's own predicate complement, so the SUBJECT region between the
+// head and the pair is a bare noun phrase with NO finite verb. Detect a finite verb by SHAPE:
+//   • QA_AUX_RE — a closed set of grammatical FUNCTION words (auxiliary/copula/modal/complementizer). Closed by definition.
+//   • QA_FINITE_MORPH_RE — 3rd-person-present (-s/-es, NOT a possessive 's) or past (-ed) VERB MORPHOLOGY, which catches the
+//     unbounded open class of embedded finite verbs by inflection, not by lemma. (A plural-noun subject ending in -s becomes a
+//     SAFE under-fire — fail-toward-keep.) This ends the verb-list treadmill: a bare-NP allowlist (POS shape), not a blocklist.
+// NOTE: "be/been/being/am" are DELIBERATELY excluded — after a modal head ("Should the estimate BE 520 or 1,040 hours?")
+// "be" is the question's OWN predicate copula, not an embedded finite verb; an embedded clause uses finite "is/are" (caught).
+const QA_AUX_RE = /\b(is|are|was|were|isn'?t|aren'?t|wasn'?t|weren'?t|has|have|had|do|does|did|that|whether|who|whom|whose|which|shall|will|must|would|should|can|could|may|might)\b/i;
+const QA_FINITE_MORPH_RE = /\b[a-z]{2,}(?:es|ed)\b|\b[a-z]+[^s'’\s]s\b/i;   // -es/-ed inflection, or a bare -s NOT preceded by an apostrophe (excludes possessive 's)
+const qaSubjectHasFiniteVerb = (region: string): boolean => QA_AUX_RE.test(region) || QA_FINITE_MORPH_RE.test(region);
+// R9 — frame-shaped guards (verb-vocabulary-independent) that close the base-form / no-morphology-irregular embedded verb:
+const QA_EXPLETIVE_RE = /^(it|there)\b(.*\S.*)$/i;                          // expletive subject followed by MORE content (extraposition) → embedded clause
+const QA_DO_SUPPORT_RE = /^(do|does|did)$/i;                                // a do-support head always embeds a lexical main verb
+// R10 — POSITIONAL bare-NP shape (verb-vocabulary-independent, subsumes the R9 frame enumeration). A genuine which-quantity
+// question has a SINGLE determiner-headed noun-phrase subject; an embedded content clause ("Is the assumption YOU bill…?",
+// "Is the premise THE base run…?") introduces a SECOND clause-subject — a personal subject pronoun (with other content) or a
+// SECOND determiner-headed NP. Either marks a second predication holding the pair → reject.
+const QA_SUBJ_PRONOUN_RE = /\b(i|you|we|they|he|she|it)\b/i;                // a personal SUBJECT pronoun (not possessive your/our/their) — an embedded-clause subject
+const QA_DETERMINER_G_RE = /\b(the|a|an|this|that|these|those)\b/gi;        // count determiner-headed NPs; ≥2 ⇒ a second NP ⇒ embedded clause
+// R11 REMEDIATION (Brain #553 fast-follow — TERMINAL SINGLE-NP CHECK; bank the known terminal fix, don't leave permanent).
+// R10's second-subject detection keyed on the 2nd subject's POS (subject pronoun / 2nd determiner-headed NP), so a
+// BARE-noun / possessive-headed / proper-noun 2nd subject with an UNINFLECTED (base/irregular) verb slipped: "Is the
+// assumption staff bill 520 hours or 1,040 hours?" (elided `that` + base verb `bill`) — the contrived-but-real R11-1 residual.
+// DOCTRINE-CLEAN CLOSE (redteam-unit5-r11.md §4, "reject ANY second predication regardless of the 2nd subject's POS"):
+// a genuine copula which-quantity subject is a SINGLE short noun phrase whose head IS the interrogative's predicate-complement
+// subject; ANY second predication needs a 2nd subject PLUS a finite-verb-position token, which necessarily occupies a THIRD
+// content slot after the NP head. So require the subject region — after an optional leading determiner/possessive NP-opener —
+// to be ≤ 2 further whitespace tokens (one bounded NP: opener + modifier + head). A 3rd+ token is the embedded clause's verb
+// position regardless of the 2nd subject's POS → reject. POS-INDEPENDENT (no verb/noun lemma list — the no-blocklist doctrine,
+// [[feedback_no_blocklist_shape_allowlist_doctrine]]). Fail-toward-keep: a genuine 3-word subject NP ("the base period
+// requirement") now UNDER-fires — the emitter's safe direction; the recall trade is measured at Ultra Gate-2 on a purpose-built
+// corpus (Brain #553 caveat), NOT a dccce793 replay. PURELY ADDITIVE (a new rejection; can only under-fire, never add an
+// over-fire). Fires "the total requirement" / "the offeror's base" / "CLIN 0001" / "staffing" / "these"; rejects the whole
+// R11-1 bare/possessive/proper 2nd-subject family.
+const QA_NP_OPENER_RE = /^(the|a|an|this|that|these|those|my|your|our|his|her|their|its)\b/i;
+const qaSubjectIsSingleNP = (region: string): boolean => {
+  const t = region.trim();
+  if (t === "") return true;                                              // empty subject region (preColon "Which is correct: …") → fires
+  const rest = t.replace(QA_NP_OPENER_RE, "").trim();                     // drop one leading NP-opener (determiner/possessive)
+  const toks = rest === "" ? [] : rest.split(/\s+/);
+  return toks.length <= 2;                                                // ≤2 further tokens = a single bounded NP; ≥3 = room for a 2nd subject+verb
+};
+// QA_OBJECT_MARKER_RE — a determiner/preposition as the LAST token of the subject region makes the pair an OBJECT noun phrase
+// ("price the 520…", "questions on the 520…"), not the interrogative head's predicate complement.
+// R8: require PRECEDING content (\S\s+) so a determiner is flagged only as a mid-region OBJECT head ("price the 520…"), not
+// when a demonstrative is the WHOLE subject region (a pronoun subject — "Are these 520 or 1,040 hours?" fires).
+const QA_OBJECT_MARKER_RE = /\S\s+(the|a|an|this|these|those|its|their|your|our|his|her|my|of|on|in|to|for|at|by|with|from|into|onto|over|under|per|about|regarding|concerning|between)\s*$/i;
+// A trailing SUBORDINATE clause is allowed after the pair ("…3 FTEs or 5 FTEs, since the PWS is unclear?"); a main clause is not.
+// R7 REMEDIATION (Gauntlet R6+R7, P1) — TERMINAL-PAIR PIVOT (ends the tail-clause treadmill). R5 allowed a trailing
+// SUBORDINATE clause after the pair, stripped by a greedy `[^,?]*` run to the next comma/"?". That greedy strip was the
+// persistent seam: a main-clause apodosis GLUED to a subordinator with no comma ("…per Attachment 3 notify the CO?" [R6],
+// "…since funding lapsed proceed with the base only?" [R7]) had its whole tail swallowed → the terminal check saw nothing →
+// over-fire. R6 shrank the strippable subordinator SET; R7 proved the greedy STRIP itself is the root (it re-opened on the
+// kept causal set). Separating a genuine trailing subordinate clause from a glued apodosis by shape is an irreducible
+// treadmill (same lesson as Unit 4's header-parsing pivot). ESCAPE: require the pair to be TERMINAL — nothing but whitespace/
+// punctuation between the pair and the "?". A genuine which-quantity question puts the alternatives at the END ("Is the total
+// requirement 520 hours or 1,040 hours?" — the live seq-2 defect, and the real dccce793 span, are terminal); every glued
+// apodosis / conditional / declarative-aside has trailing words → rejected, with NO tail parsing to exploit. Trade-off: a
+// genuine question with a trailing clause/PP/adverb ("…, since the PWS is unclear?", "…per Attachment 3?", "…annually?") is
+// now a SAFE under-fire (recall traded for airtight over-fire robustness — the emitter's fail-toward-keep doctrine). This
+// closes the R6/R7 glued-apodosis class at its root and removes the entire greedy-strip attack surface.
+const qaEnclosingQuestion = (source: string, matchStart: number, matchEnd: number): string | null => {
+  // (a) the pair's clause must END in "?" — the next terminator after the pair among [.!?\n] is a "?".
+  const rest = source.slice(matchEnd);
+  const q = rest.indexOf("?");
+  const stop = rest.search(/[.!\n]/);
+  if (q < 0 || (stop >= 0 && stop < q)) return null;                 // clause ends in .!\n before any "?" → not a question
+  // (b) the enclosing SENTENCE = from the previous sentence terminator [.!?\n] to the terminating "?".
+  const before = source.slice(0, matchStart);
+  const sentStart = Math.max(before.lastIndexOf("."), before.lastIndexOf("!"), before.lastIndexOf("?"), before.lastIndexOf("\n")) + 1;
+  const sentPrefix = source.slice(sentStart, matchStart);           // sentence text up to the pair
+  // (c) the pair's CLAUSE (delimited within the sentence by : ; or ,) must OPEN with an interrogative marker (question in
+  //     form). "Question 4: Is the total…?" → clause head "Is …".
+  const clauseStart = Math.max(sentPrefix.lastIndexOf(":"), sentPrefix.lastIndexOf(";"), sentPrefix.lastIndexOf(",")) + 1;
+  const clauseHead = sentPrefix.slice(clauseStart).trimStart();
+  // (d) SAFE widening — a genuine "Which is correct: 520 or 1,040 hours?" carries the marker BEFORE the ":"; accept it too.
+  //     R6: use the LAST pre-pair colon and take the segment AFTER the previous boundary, so a label prefix ("Section L:" /
+  //     "Q&A:") does not mask the real interrogative head ("Section L: Which is correct: 520 or 1,040?" → head "Which …").
+  const colon = sentPrefix.lastIndexOf(":");
+  const preColonBoundary = colon >= 0 ? Math.max(sentPrefix.slice(0, colon).lastIndexOf(":"), sentPrefix.slice(0, colon).lastIndexOf(";"), sentPrefix.slice(0, colon).lastIndexOf(".")) : -1;
+  const preColonHead = colon >= 0 ? sentPrefix.slice(preColonBoundary + 1, colon).trimStart() : "";
+  const clauseHeadOk = qaIsInterrogativeHead(clauseHead);
+  // R10 — the preColon widening ("Which is correct: 520 or 1,040?") is valid only when the pre-colon body is the wh-word's OWN
+  // copula predicate ("is correct"/"is right") with NO second subject: a do-support inversion or a determiner-headed / pronoun
+  // second subject ("Which do THE PARTIES bill: 520 or 1,040?") means the pair is that clause's OBJECT, not a fronted subject.
+  const preColonBody = colon >= 0 ? preColonHead.slice(preColonHead.match(QA_INTERROG_HEAD_RE)?.[0].length ?? 0) : "";
+  const preColonOk = colon >= 0 && qaIsInterrogativeHead(preColonHead)
+    && !/\b(do|does|did)\b/i.test(preColonBody)
+    && !QA_SUBJ_PRONOUN_RE.test(preColonBody)
+    && (preColonBody.match(QA_DETERMINER_G_RE) ?? []).length === 0;
+  if (!clauseHeadOk && !preColonOk) return null;
+  // (e) INTERROGATED-CONTENT check (R5): the SUBJECT region between the qualifying head and the pair must be a bare noun
+  //     phrase. clauseHead path → the text AFTER the interrogative marker; preColon path → the POST-colon text (the pair
+  //     lives after the ":"). An embedded finite verb/complementizer, or a trailing determiner/preposition, means the pair is
+  //     NOT what the question interrogates.
+  const subjectRegion = clauseHeadOk
+    ? clauseHead.slice(clauseHead.match(QA_INTERROG_HEAD_RE)?.[0].length ?? 0)
+    : sentPrefix.slice(colon + 1);
+  // R9 REMEDIATION — the morphology check catches only INFLECTED finite verbs; a base-form ("you allocate") or a no-
+  // morphology irregular ("the base ran") embedded verb evades it. Close the class POSITIONALLY by the FRAME (not the verb):
+  // every such over-fire is an EXTRAPOSITION ("Is it clear <clause>…") or DO-SUPPORT ("Does <subj> <verb>…"), neither of which
+  // a genuine which-quantity question uses. (Bare "Is it 520 or 1,040 hours?" — nothing after "it" — still fires.)
+  const subjTrim = subjectRegion.trim();
+  const headMarker = (clauseHeadOk ? clauseHead : preColonHead).match(QA_INTERROG_HEAD_RE)?.[0] ?? "";
+  if (QA_DO_SUPPORT_RE.test(headMarker.trim())) return null;        // do-support head → the pair is a lexical verb's object, never the copula complement
+  if (QA_EXPLETIVE_RE.test(subjTrim)) return null;                  // expletive "there …" (+ "it …") extraposition → embedded clause
+  if (QA_SUBJ_PRONOUN_RE.test(subjTrim) && !/^(i|you|we|they|he|she|it)$/i.test(subjTrim)) return null; // R10: a subject pronoun + other content = an embedded clause subject (subsumes R9 "it/there" extraposition)
+  if ((subjTrim.match(QA_DETERMINER_G_RE) ?? []).length >= 2) return null; // R10: a SECOND determiner-headed NP = an embedded content clause
+  if (!qaSubjectIsSingleNP(subjTrim)) return null;                  // R11 (Brain #553): >1 NP-worth of content = a 2nd subject+verb (any POS) → reject
+  if (qaSubjectHasFiniteVerb(subjectRegion)) return null;           // an embedded finite clause (inflected verb / aux, by morphology) holds the pair
+  if (QA_OBJECT_MARKER_RE.test(subjectRegion)) return null;         // pair is an object NP, not the head's complement
+  // (f) TERMINAL-PAIR check (R7 pivot): the pair must run straight to the "?" — any alphanumeric word between the pair and the
+  //     "?" is a trailing clause (a conditional apodosis, a declarative-aside predicate, or a different question) → reject.
+  if (/[A-Za-z0-9]/.test(rest.slice(0, q))) return null;
+  return source.slice(sentStart, matchEnd + q + 1).trim();
+};
+type QaAmbiguity = { a: number; b: number; unit: string; sentence: string };
+/** All EXPLICIT unresolved quantity ambiguities the source poses (two same-family differing quantities in a question). */
+export function detectQuantityAmbiguities(source: string | null | undefined): QaAmbiguity[] {
+  const s = source ?? "";
+  const out: QaAmbiguity[] = [];
+  const seen = new Set<string>();
+  for (const m of s.matchAll(QA_EITHER_OR_RE)) {
+    const fam1 = qaUnitFamily(m[2]), fam2 = qaUnitFamily(m[4]);
+    if (fam1 !== fam2) continue;                                     // "2 hours or 2 days" — not a same-quantity ambiguity
+    const a = qaNum(m[1]), b = qaNum(m[3]);
+    if (!Number.isFinite(a) || !Number.isFinite(b) || a === b) continue; // equal values → no ambiguity
+    const sentence = qaEnclosingQuestion(s, m.index ?? 0, (m.index ?? 0) + m[0].length);
+    if (!sentence) continue;                                         // not inside a question → a directive/option-menu, not an unanswered ambiguity
+    const lo = Math.min(a, b), hi = Math.max(a, b);
+    const key = `${lo}|${hi}|${fam1}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ a: lo, b: hi, unit: fam1, sentence: sentence.slice(0, 300) });
+  }
+  return out;
+}
+/** Emit a caution finding for each EXPLICIT unresolved quantity ambiguity the source poses, unless an existing finding
+ *  already presents that exact pair as unresolved/ambiguous. Additive + non-destructive + caution-floored (never a bar).
+ *  Default-OFF via caller; no ambiguity shape ⇒ byte-identical. Pure → gate-tested. */
+export function applyQuantityAmbiguityFidelity(
+  findings: TypedFinding[],
+  source: string | null | undefined,
+  opts?: { enabled?: boolean },
+): TypedFinding[] {
+  if (!opts?.enabled) return findings;                              // Rule 61 default-off ⇒ byte-identical
+  const ambiguities = detectQuantityAmbiguities(source);
+  if (ambiguities.length === 0) return findings;                    // no source-posed either/or question → nothing to backstop
+  // R4 REMEDIATION (Gauntlet R4, P1 — dangerous false dedup-suppression toward committal). The dedup must fire ONLY when a
+  // prior finding ACTUALLY named THIS quantity pair as unresolved. Two tightenings: (1) the ambiguity marker no longer
+  // includes a bare "or … ?" alternate (that matched nearly any §L/Q&A question containing "or" → silenced real emissions);
+  // (2) hasNum is a DELIMITED token match, so a clause/CAGE/section digit-run that merely EMBEDS the digits (520 ⊂ 5W520,
+  // 1040 ⊂ 52.219-1040, 520 ⊂ PWS 5.2.520) does NOT satisfy the number test.
+  const AMBIG_MARK_RE = /\b(ambig|unresolved|which is (?:the )?correct|discrepan|conflict)/i;
+  const hasNum = (blob: string, n: number): boolean => {
+    const forms = [String(n), n.toLocaleString("en-US")].map((f) => f.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    // Delimited: reject a leading letter/digit/dot/comma/hyphen (so 520 ⊄ 5W520, 1040 ⊄ 52.219-1040, 520 ⊄ PWS 5.2.520);
+    // on the RIGHT reject only a digit-continuation or glued letter (R5 P2: a trailing ./,/- punctuation like "1,040-hour",
+    // "1,040." must STILL match a genuine prior finding → no double emission).
+    return new RegExp(`(?<![\\w.,-])(?:${forms.join("|")})(?![\\w])(?![.,-]\\d)`).test(blob);
+  };
+  const emitted: TypedFinding[] = [];
+  ambiguities.forEach((amb, i) => {
+    // DEDUP — a lens already surfaced this exact pair AS unresolved (both numbers present + an ambiguity marker) → skip.
+    const already = findings.some((f) => {
+      const blob = `${f.requirement ?? ""} ${f.citation ?? ""} ${f.excerpt ?? ""}`;
+      return hasNum(blob, amb.a) && hasNum(blob, amb.b) && AMBIG_MARK_RE.test(blob);
+    });
+    if (already) return;
+    const ratio = amb.a > 0 ? Math.round((amb.b / amb.a) * 10) / 10 : 0;
+    const risk = amb.unit === "hour" || amb.unit === "fte" || amb.unit === "week" || amb.unit === "month" || amb.unit === "year"
+      ? "level-of-effort / pricing" : "quantity / pricing";
+    emitted.push({
+      id: `quantity_ambiguity#${i}`,
+      requirement: `Unresolved quantity ambiguity: the solicitation poses the requirement as ${amb.a} ${amb.unit}(s) OR ${amb.b} ${amb.unit}(s)${ratio > 1 ? ` (a ${ratio}× spread)` : ""} and does not resolve it — a material ${risk} risk. Price both scenarios and/or submit a clarifying question to the Contracting Officer before bid.`,
+      citation: "Solicitation / Q&A — explicit unresolved quantity question",
+      excerpt: amb.sentence,                                        // verbatim source span (grounded by construction)
+      kind: "pricing",
+      controllability: "bidder_controls",                           // gate-to-clear (seek clarification / price both) — NEVER a bar
+      grounded: true,
+      lens: "quantity-ambiguity-fidelity",
+      severity: "P1",
+      curableInWindow: true,
+      cautionFloor: true,                                           // floors verdict to BID_WITH_CAUTION minimum; never NHR/NO_BID, never a show-stopper
+      quantityAmbiguityFlagged: true,
+    });
+  });
+  if (emitted.length === 0) return findings;                        // every ambiguity already surfaced as unresolved → byte-identical
+  console.log(`[decide] quantity-ambiguity fidelity: surfaced ${emitted.length} unresolved source-posed quantity question(s) as caution (BID_WITH_CAUTION floor; additive, non-destructive)`);
+  return [...findings, ...emitted];
+}
+
+// ── FINDING-DEDUP GATE (Phase 3 Unit 6, flag AUDIT_FINDING_DEDUP default-OFF) ─────────────────────────────
+// The agentic panel concatenates TWO expert passes (a snake_case fleet — `pricing_analyst`, `contracts_attorney`, … —
+// and a Title-Case fleet — `Pricing & Contracts Risk Analyst`, `Proposal Compliance Manager`, …), so the SAME regulatory
+// clause is surfaced two/three times by the equivalent lens of each pass. On the seq-2 dccce793 record that is 93 finding
+// ROWS for ~35 distinct concerns — e.g. FAR 52.217-8 (Option to Extend) appears 3× as {P0, P2, untyped}; FAR 52.219-33
+// (Nonmanufacturer Rule) appears 3× as {P2, untyped, bidder_cannot_move}. The inflated grid buries the real signal and, in
+// the 52.219-33 case, SPLITS a single logical bar across a typed row and two untyped rows. This gate COLLAPSES same-clause
+// rows into ONE, keeping the MOST-CONSERVATIVE disposition of the group (never softens; never drops a bar).
+//
+// VERDICT-SAFE BY CONSTRUCTION: the survivor's controllability = the most disqualifying in the group, severity = the group
+// MAX, curableInWindow = the least curable among bar-class members, cautionFloor = OR, grounded = OR. So the show-stopper
+// SET is preserved (a bar member ⇒ a bar survivor) and `logicalShowStopperCount` (card-53, clusters by object-id downstream)
+// is unchanged — deriveVerdict reaches the same pole on the deduped set as on the full set (a HARD-TESTED invariant).
+// OVER-MERGE is the cardinal sin (collapsing two genuinely DISTINCT obligations that merely share a clause number → a real
+// concern vanishes from the grid). Guards: (1) only findings naming EXACTLY ONE distinct clause number merge (0 or ≥2 →
+// left standalone, fail-toward-keep — a multi-clause finding is never absorbed); (2) the clause key is read from
+// `citation`+`requirement` ONLY (NOT `excerpt`, which quotes neighbouring clauses → false-merge risk); (3) the survivor
+// PRESERVES every distinct requirement facet (a member requirement that is not a near-restatement of the accumulated text
+// is appended with " · "), so a same-clause-but-different-obligation pair keeps BOTH statements visible under one row.
+// Idempotent (a merged survivor still has 1 clause key; singleton groups pass through). Flag OFF ⇒ byte-identical (Rule 61).
+//
+// SCOPE (Brain Gate-1): merge is keyed on the FAR/DFARS clause number only — the stable, unambiguous "same regulatory
+// object" signal ([[feedback_token_substring_collision_doctrine]]: a DELIMITED clause token, not a loose keyword). Findings
+// with NO clause number (capture/PP/technical prose) are DELIBERATELY out of scope — a text-similarity merge across the two
+// paraphrasing panels is the over-merge treadmill (the panels phrase the same concern differently, so text similarity both
+// misses real dups AND risks fusing distinct concerns). Under-merge (leaving a non-clause dup) is the safe direction.
+// R2 REMEDIATION (Gauntlet R1, P2 — false clause key from a phone-number collision). The prior `\d{3}\.\d{3}-\d{1,4}`
+// numeric shape matched a phone number ("252.555-1212") → fused an unrelated bar into a benign row. Every real FAR/DFARS/
+// agency-supplement CLAUSE lives in SUBPART .2 (FAR 52.2xx, DFARS 252.2xx, GSAR 552.2xx, VAAR 852.2xx, …) — the subpart
+// digit after the prefix dot is ALWAYS "2". Requiring `.2\d\d` keeps every real clause (all `.2xx` on the live record) and
+// rejects a phone exchange like `.555` ([[feedback_token_substring_collision_doctrine]]: a token's numeric SHAPE ≠ its
+// meaning; anchor on the stable structural fact). A residual `.2xx`-exchange phone is a P3 contrived edge (needs a phone in
+// a citation/requirement field colliding with a real same-clause group) — under-key is the safe direction.
+// R2 REMEDIATION (Gauntlet R2, P3-1): `.2\d{2}` blanket-missed the DFARS subpart-`.70` family (252.7003-1 …) — real clauses,
+// recall loss. Widen the subpart anchor to `.2xx` OR `.7xxx` (the two shapes real FAR/DFARS/agency clauses take), which still
+// rejects a 3-digit phone exchange (`.555`) — the P2 collision guard holds.
+const FD_CLAUSE_RE = /\b(?:2?52|\d{3,4})\.(?:2\d{2}|7\d{3})-\d{1,4}\b/g;   // FAR 52.2xx-x / DFARS 252.2xx-xxxx + 252.70xx-x / agency-supp NNN.(2xx|7xxx)-x; -\d suffix excludes CFR "121.406(b)"
+const FD_SEV_RANK: Record<string, number> = { P0: 3, P1: 2, P2: 1 };
+const fdSevRank = (s?: string): number => (s ? (FD_SEV_RANK[s] ?? 0) : 0);
+const FD_CTRL_RANK: Record<string, number> = { no_one_can_move: 4, bidder_cannot_move: 3, bidder_controls: 2, already_satisfied: 1 };
+const fdCtrlRank = (c?: string): number => (c ? (FD_CTRL_RANK[c] ?? 0) : 0);  // higher = more conservative (keep a bar over a curable over already-satisfied)
+// KIND rank for the survivor's disposition bundle (R2 P0-2): `boilerplate` is LOWEST (disposeFinding DROPS it — must never win
+// when a real kind exists); `eligibility_bar` is HIGHEST (carries the bar's category); every other kind is decision-bearing middle.
+const fdKindRank = (k?: string): number => (k === "eligibility_bar" ? 3 : k === "boilerplate" ? 0 : 2);
+/** The distinct FAR/DFARS clause numbers a finding is ABOUT (citation + requirement only — never the source-quote excerpt). */
+const fdClauseKeys = (f: TypedFinding): string[] => {
+  const blob = `${f.citation ?? ""} ${f.requirement ?? ""}`;
+  return [...new Set(blob.match(FD_CLAUSE_RE) ?? [])];
+};
+// R2 REMEDIATION (Gauntlet R1, P0/P1/P3 — `{...primary}` stripped verdict-load-bearing markers off ABSORBED non-primary
+// members, flipping a verified NO_BID → NHR and dropping a distinct requiredAttribute). ROOT: deriveVerdict reads markers
+// (`universalDefect`/`verifiedBy`/`requiredAttribute`/`nmrGuard`/`mmEvidenceFactor`/…) that can live on a non-primary member;
+// the merge only re-derived the disposition ladder. FIX (ALLOW-LIST, not a marker block-list — [[feedback_no_blocklist_
+// shape_allowlist_doctrine]]): a finding may be ABSORBED (dropped into a survivor) ONLY if EVERY key it carries is in the
+// KNOWN-SAFE disposition set the merge provably preserves. ANY special marker / attribute (present OR future) ⇒ the finding
+// is PROTECTED — it passes through UNTOUCHED (its full verdict weight reaches deriveVerdict), exactly the gate's existing
+// "multi-clause never absorbed" conservatism. Fail-safe by default: a new marker not in this set makes its finding protected,
+// never silently dropped.
+export const FD_ABSORBABLE_KEYS = new Set<string>([
+  "id", "requirement", "citation", "excerpt", "kind", "controllability", "grounded", "lens", "severity",
+  "curableInWindow", "cautionFloor", "unverified", "documentProvenance", "locatedAt", "contextNote",
+]);  // NB: `requiredAttribute` is DELIBERATELY excluded — an attribute-bearing finding is verdict-load-bearing (R1 P1) → protected.
+// BRAIN #555 STRUCTURAL-COMPLETENESS CONTRACT (converts the "verdict-safe" claim from inductive → structural). deriveVerdict
+// is the SOLE verdict authority, so it must be the SOLE definition of "verdict-driving." The dedup is safe iff EVERY finding
+// field deriveVerdict/disposeFinding/firmStatus reads is either (a) MERGE-PRESERVED (the survivor re-derives it conservatively
+// from ALL members, so an absorbed member never loses it), (b) PROTECTION-TRIGGERING (∉ FD_ABSORBABLE_KEYS ⇒ its bearer is a
+// PROTECTED finding, never absorbed/altered), or (c) documented VERDICT-INERT on the ABSORBABLE class (non-bar plain findings).
+// The structural guard test (`finding-dedup.test.ts`) FAILS if deriveVerdict ever reads a field none of these cover — i.e. a
+// field the dedup treats as ignorable that the verdict authority actually reads.
+export const FD_MERGE_PRESERVED_FIELDS = new Set<string>([
+  "controllability",  // survivor = most-conservative plain member's controllability
+  "kind",             // survivor = most-decision-bearing kind (never boilerplate)
+  "severity",         // survivor = group max
+  "cautionFloor",     // OR across members
+  "grounded",         // OR across members
+  "requirement",      // maximal facets, order-canonical (no distinct obligation text lost)
+]);
+export const FD_VERDICT_INERT_ON_PLAINS = new Set<string>([
+  // deriveVerdict reads these, but they are inert for an ABSORBABLE (non-bar, marker-free, attribute-free) finding:
+  "curableInWindow",  // read only on a BAR (curable vs non-curable) — an absorbable finding is non-bar by construction
+  "excerpt",          // read only to re-hash a `verifiedBy` universalDefect — an absorbable finding carries no verifiedBy (protected)
+  "citation",         // read only in reason-string assembly for bars/defects — inert on a plain finding's disposition
+]);
+/** A finding is safe to ABSORB (drop into a survivor) only if (1) it is NOT a bar (bidder_cannot_move / no_one_can_move) AND
+ *  (2) it carries no key outside the known-safe disposition set. R4 REMEDIATION (Gauntlet R4 self-audit): EVERY prior P0 lived
+ *  in merging a bar / marker-bearer — a bar's profile-RESOLVED disposition (nmrFirmStatus, firmStatus over an attribute) and
+ *  its jointly-read markers (nmrGuard+requiredAttribute at firmStatus L2713; mmEvidenceFactor+kind+requiredAttribute at the
+ *  unverifiedGates filter) can DESYNC when disposition comes from `worst` but markers ride from a different `primary`. Doctrine-
+ *  clean escape (same family as Unit 4's doc-class + Unit 5's terminal-pair pivots — stop fighting an irreducible seam): a bar
+ *  is NEVER absorbed. Bars + marker-bearers pass through UNTOUCHED, so every verdict-DRIVING finding reaches deriveVerdict with
+ *  its full identity intact; only plain, NON-bar dups collapse. A bar is the survivor's disposition source ONLY when it is the
+ *  sole protected member (forced survivor = worst = the SAME bar → coherent). Verdict-invariant BY CONSTRUCTION. */
+const fdBaseAbsorbable = (f: TypedFinding): boolean => !isBarClass(f) && Object.keys(f).every((k) => FD_ABSORBABLE_KEYS.has(k));
+// R3 REMEDIATION (Gauntlet R3, P2-1): the ≥3-char floor discarded 1–2-char DISTINGUISHERS (a CLIN/option "1"/"2", a section
+// "A"/"B") so "option 1" vs "option 2" collapsed. Keep a token if it is ≥3 chars, OR contains a digit (any length — "1",
+// "0001AA"), OR is a lone letter (section/option marker) — the fail-toward-keep tokens that make two same-clause facets distinct.
+const fdNormTokens = (s: string): Set<string> => new Set((s || "").toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length >= 3 || /\d/.test(t) || t.length === 1));
+// R2 REMEDIATION (Gauntlet R1, P2 — over-merge: a 0.8 containment dropped a genuinely distinct facet whose distinguishing
+// tokens were short/ordinal, e.g. "base year option" vs "FIRST option" — ~90% shared tokens). ROOT: a fractional-overlap
+// threshold cannot tell "same obligation, reworded" from "different obligation, mostly-same wording" when the DISTINGUISHING
+// token (base/first/option-number/CLIN) is a small fraction of the text. FIX (fail-toward-keep-the-facet): a true restatement
+// introduces NO new distinctive token — drop the candidate ONLY if EVERY one of its ≥3-char tokens is already present in the
+// accumulated text (cand ⊆ acc). Any new identity token ⇒ a distinct facet ⇒ APPENDED. Over-append (verbose survivor) is the
+// safe direction; over-merge (a vanished concern) is the cardinal sin.
+const fdIsRestatement = (candReq: string, acc: string): boolean => {
+  const a = fdNormTokens(candReq), b = fdNormTokens(acc);
+  for (const t of a) if (!b.has(t)) return false;                  // cand introduces a distinctive token absent from acc → NOT a restatement (keep)
+  return true;                                                     // cand ⊆ acc (adds nothing new) → a restatement → drop
+};
+/** Collapse findings that name the SAME single FAR/DFARS clause into one most-conservative, facet-preserving row.
+ *  Verdict-safe by construction; over-merge-guarded (exactly-one-clause key, citation+requirement only, facets kept).
+ *  Default-OFF via caller; no eligible same-clause group ⇒ byte-identical. Pure → gate-tested. Order-stable. */
+export function applyFindingDedup(
+  findings: TypedFinding[],
+  opts?: { enabled?: boolean },
+): TypedFinding[] {
+  if (!opts?.enabled) return findings;                              // Rule 61 default-off ⇒ byte-identical
+  // Group indices by single-clause key; ineligible findings (0 or ≥2 clauses) never absorb (fail-toward-keep).
+  const keyOf = findings.map(fdClauseKeys);
+  const groupByKey = new Map<string, number[]>();                   // clause → member indices (only exactly-1-clause findings)
+  keyOf.forEach((keys, i) => { if (keys.length === 1) { const k = keys[0]; (groupByKey.get(k) ?? groupByKey.set(k, []).get(k)!).push(i); } });
+  const merged = new Set<number>();                                 // indices absorbed into an earlier survivor
+  const survivorPatch = new Map<number, TypedFinding>();            // anchor index → merged finding
+  // JUDGE-2 REMEDIATION (the DECISIVE pivot). Four rounds + two judge passes proved that ABSORBING or RE-DISPOSING a
+  // PROTECTED finding (a bar, or any marker/attribute-bearer) is an irreducible verdict-safety seam: a bar's profile-resolved
+  // disposition, its jointly-read markers (nmrGuard+requiredAttribute at firmStatus; mmEvidenceFactor+kind+requiredAttribute at
+  // unverifiedGates), and its eligibility clamp cannot be safely reconstructed on a survivor whose disposition is sourced from a
+  // DIFFERENT member — each fix re-opened the seam one axis deeper (R1 markers, R2 ctrl/kind/curable, R3 requiredAttribute,
+  // judge tiebreak). ESCAPE (same doctrine as Unit 4's document-class + Unit 5's terminal-pair pivots — stop reconstructing an
+  // irreducible thing): a PROTECTED finding is NEVER touched — it passes through with its FULL identity, so every verdict-
+  // DRIVING finding reaches deriveVerdict exactly as the full set had it. ONLY plain, NON-bar, marker-free, attribute-free dups
+  // collapse — and their merged survivor is itself plain/non-bar (no controllability bar, no requiredAttribute, no marker), so
+  // it can neither create nor soften a bar/clamp/defect. VERDICT-INVARIANT BY CONSTRUCTION (deriveVerdict's every driver is a
+  // protected finding, all untouched). Over-merging two distinct plain obligations is guarded by facet-preservation.
+  for (const [clause, idx] of groupByKey) {
+    // Only plain (non-bar, marker-free, attribute-free) members are eligible to collapse; protected members pass through.
+    const plainIdx = idx.filter((i) => fdBaseAbsorbable(findings[i]));
+    if (plainIdx.length < 2) continue;                              // <2 plain dups on this clause → nothing to collapse
+    const members = plainIdx.map((i) => findings[i]);
+    // Survivor disposition = the most-conservative PLAIN member, taken whole (a plain has no bar/attr/marker, so this is a
+    // coherent, verdict-inert base): most-disqualifying ctrl → most-decision-bearing kind (never `boilerplate`) → higher severity.
+    const worst = members.slice().sort((a, b) =>
+      (fdCtrlRank(b.controllability) - fdCtrlRank(a.controllability)) ||
+      (fdKindRank(b.kind) - fdKindRank(a.kind)) ||
+      (fdSevRank(b.severity) - fdSevRank(a.severity)) ||
+      ((b.requirement?.length ?? 0) - (a.requirement?.length ?? 0))
+    )[0];
+    const maxSev = members.reduce((m, f) => Math.max(m, fdSevRank(f.severity)), 0);
+    const survivorSeverity = (["P2", "P1", "P0"][maxSev - 1] as "P0" | "P1" | "P2" | undefined) ?? worst.severity;
+    // Facet-preservation (order-canonical): keep a member requirement iff it is MAXIMAL — not ⊆ any OTHER member's requirement
+    // (ties broken by earliest index); canonical sort (fullest first) ⇒ the rendered requirement is deterministic + loses nothing.
+    const reqs = members.map((m) => m.requirement ?? "");
+    const facets = members
+      .map((_, i) => i)
+      .filter((i) => reqs[i] && !members.some((_, j) => {
+        if (j === i || !reqs[j]) return false;
+        const iSubJ = fdIsRestatement(reqs[i], reqs[j]);            // req[i] ⊆ req[j]
+        if (!iSubJ) return false;
+        const jSubI = fdIsRestatement(reqs[j], reqs[i]);            // equal token sets?
+        return !jSubI || j < i;                                    // proper subset of j, OR equal-and-j-earlier → i is non-maximal → drop
+      }))
+      .map((i) => reqs[i])
+      .sort((a, b) => (b.length - a.length) || (a < b ? -1 : a > b ? 1 : 0));
+    const survivor: TypedFinding = {
+      ...worst,                                                     // plain base — no bar controllability, no requiredAttribute, no marker
+      requirement: facets.length ? facets.join(" · ") : (worst.requirement ?? ""),
+      severity: survivorSeverity,
+      grounded: members.some((f) => f.grounded),
+      ...(members.some((f) => f.cautionFloor) ? { cautionFloor: true } : {}),
+      findingDedupMerged: true,
+      mergedLensCount: members.length,
+      mergedClause: clause,
+    };
+    const anchor = Math.min(...plainIdx);                           // survivor keeps the EARLIEST plain index (order-stable)
+    survivorPatch.set(anchor, survivor);
+    plainIdx.filter((i) => i !== anchor).forEach((i) => merged.add(i));
+  }
+  if (survivorPatch.size === 0) return findings;                    // no same-clause group with ≥2 plain dups → byte-identical
+  const out = findings.map((f, i) => survivorPatch.get(i) ?? f).filter((_, i) => !merged.has(i));
+  console.log(`[decide] finding-dedup: collapsed ${findings.length} → ${out.length} rows (${survivorPatch.size} same-clause groups merged; most-conservative disposition, verdict-safe, facets preserved)`);
+  return out;
 }
 
 // ── KNOWN-CLAUSE SEMANTICS GUARD (Brain card 135 — Step 5a; verified clause→disposition map) ──────────────

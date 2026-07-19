@@ -1,0 +1,214 @@
+{
+ "generated": "static",
+ "oracle": "ELIGIBILITY_BAR_RE @ audit-orchestrator.ts:284",
+ "note": "reMiss=true means the ratified pre-filter does NOT match ⇒ a bidder bar invisible to the whole chain (the load-bearing Gate-2 class)",
+ "specimens": [
+  {
+   "id": "R1-001",
+   "shape": "OEM letter of supply / authorized reseller",
+   "sol": "36C25726Q0728-FULL-SOURCE",
+   "file": "ceo/Solicitation + Export Reviews/2026-07-04-stress-set/36C25726Q0728-FULL-SOURCE.txt",
+   "sentence": "8) Offeror shall provide an authorized distributor letter from the Original Equipment Manufacturer (OEM).",
+   "reMiss": true,
+   "expected": "engine MUST surface as an ungrounded eligibility bar → NHR/conditional-bar; today it is INVISIBLE (pre-filter miss) → this is the catastrophic false-COMPLETE the corpus must expose"
+  },
+  {
+   "id": "R1-002",
+   "shape": "self-perform % (limitation on subcontracting, no set-aside token)",
+   "sol": "W9124D26RA041-FULL-SOURCE",
+   "file": "ceo/Solicitation + Export Reviews/2026-07-04-stress-set/W9124D26RA041-FULL-SOURCE.txt",
+   "sentence": "(1) In a joint venture comprised of a small business protégé and its mentor approved by the Small Business Administration, the small business protégé shall perform at least 40 percent of the work performed by the joint venture.",
+   "reMiss": true,
+   "expected": "engine MUST surface as an ungrounded eligibility bar → NHR/conditional-bar; today it is INVISIBLE (pre-filter miss) → this is the catastrophic false-COMPLETE the corpus must expose"
+  },
+  {
+   "id": "R1-003",
+   "shape": "IT-I / position sensitivity / Tier investigation",
+   "sol": "W9124D26RA041-FULL-SOURCE",
+   "file": "ceo/Solicitation + Export Reviews/2026-07-04-stress-set/W9124D26RA041-FULL-SOURCE.txt",
+   "sentence": "The contract company must conduct a pre-employment background screening on potential employees to ensure they can pass the Tier 1 background investigation that is required for a CAC and network access.",
+   "reMiss": true,
+   "expected": "engine MUST surface as an ungrounded eligibility bar → NHR/conditional-bar; today it is INVISIBLE (pre-filter miss) → this is the catastrophic false-COMPLETE the corpus must expose"
+  },
+  {
+   "id": "R1-004",
+   "shape": "IT-I / position sensitivity / Tier investigation",
+   "sol": "W9124D26RA041-FULL-SOURCE",
+   "file": "ceo/Solicitation + Export Reviews/2026-07-04-stress-set/W9124D26RA041-FULL-SOURCE.txt",
+   "sentence": "1.6.5.2 Position Sensitivity.",
+   "reMiss": true,
+   "expected": "engine MUST surface as an ungrounded eligibility bar → NHR/conditional-bar; today it is INVISIBLE (pre-filter miss) → this is the catastrophic false-COMPLETE the corpus must expose"
+  },
+  {
+   "id": "R1-005",
+   "shape": "IT-I / position sensitivity / Tier investigation",
+   "sol": "W9124D26RA041-FULL-SOURCE",
+   "file": "ceo/Solicitation + Export Reviews/2026-07-04-stress-set/W9124D26RA041-FULL-SOURCE.txt",
+   "sentence": "In accordance with DOD 5200.2-R, the DoD Personnel Security Program, this contract requires personnel performing work on a sensitive AIS to be: 1) a US Citizen, and 2) assigned to positions which are designated at one of 3 sensitivity levels (IT-I, IT-II, or IT-III).",
+   "reMiss": true,
+   "expected": "engine MUST surface as an ungrounded eligibility bar → NHR/conditional-bar; today it is INVISIBLE (pre-filter miss) → this is the catastrophic false-COMPLETE the corpus must expose"
+  },
+  {
+   "id": "R1-006",
+   "shape": "IT-I / position sensitivity / Tier investigation",
+   "sol": "W9124D26RA041-FULL-SOURCE",
+   "file": "ceo/Solicitation + Export Reviews/2026-07-04-stress-set/W9124D26RA041-FULL-SOURCE.txt",
+   "sentence": "The investigation requirement for these positions is completion of Tier 5 investigation (formerly SSBI) with favorable results.",
+   "reMiss": true,
+   "expected": "engine MUST surface as an ungrounded eligibility bar → NHR/conditional-bar; today it is INVISIBLE (pre-filter miss) → this is the catastrophic false-COMPLETE the corpus must expose"
+  },
+  {
+   "id": "R1-007",
+   "shape": "IT-I / position sensitivity / Tier investigation",
+   "sol": "W9124D26RA041-FULL-SOURCE",
+   "file": "ceo/Solicitation + Export Reviews/2026-07-04-stress-set/W9124D26RA041-FULL-SOURCE.txt",
+   "sentence": "The Investigation requirement for these positions is completion of a Tier 3 investigation (formerly NACLC) with favorable results.",
+   "reMiss": true,
+   "expected": "engine MUST surface as an ungrounded eligibility bar → NHR/conditional-bar; today it is INVISIBLE (pre-filter miss) → this is the catastrophic false-COMPLETE the corpus must expose"
+  },
+  {
+   "id": "R1-008",
+   "shape": "IT-I / position sensitivity / Tier investigation",
+   "sol": "W9124D26RA041-FULL-SOURCE",
+   "file": "ceo/Solicitation + Export Reviews/2026-07-04-stress-set/W9124D26RA041-FULL-SOURCE.txt",
+   "sentence": "The Investigation requirement for these positions is completion of a Tier 1 investigation (formerly NACI) with favorable results.",
+   "reMiss": true,
+   "expected": "engine MUST surface as an ungrounded eligibility bar → NHR/conditional-bar; today it is INVISIBLE (pre-filter miss) → this is the catastrophic false-COMPLETE the corpus must expose"
+  },
+  {
+   "id": "R1-009",
+   "shape": "IT-I / position sensitivity / Tier investigation",
+   "sol": "W9124D26RA041-FULL-SOURCE",
+   "file": "ceo/Solicitation + Export Reviews/2026-07-04-stress-set/W9124D26RA041-FULL-SOURCE.txt",
+   "sentence": "A US Citizen that has a Tier 3 investigation in process and a successful local records check, can be allowed assignment to the positions before the completion of the investigation, in the best interest of the DOD, at the discretion of the Contracting Officer.",
+   "reMiss": true,
+   "expected": "engine MUST surface as an ungrounded eligibility bar → NHR/conditional-bar; today it is INVISIBLE (pre-filter miss) → this is the catastrophic false-COMPLETE the corpus must expose"
+  },
+  {
+   "id": "R1-010",
+   "shape": "self-perform % (limitation on subcontracting, no set-aside token)",
+   "sol": "W9124D26RA041-FULL-SOURCE",
+   "file": "ceo/Solicitation + Export Reviews/2026-07-04-stress-set/W9124D26RA041-FULL-SOURCE.txt",
+   "sentence": "(1) In a joint venture comprised of a small business protege and its mentor approved by the Small Business Administration, the small business protege shall perform at least 40 percent of the work performed by the joint venture.",
+   "reMiss": true,
+   "expected": "engine MUST surface as an ungrounded eligibility bar → NHR/conditional-bar; today it is INVISIBLE (pre-filter miss) → this is the catastrophic false-COMPLETE the corpus must expose"
+  },
+  {
+   "id": "R1-011",
+   "shape": "IT-I / position sensitivity / Tier investigation",
+   "sol": "W912KC26RA006-FULL-SOURCE",
+   "file": "ceo/Solicitation + Export Reviews/2026-07-04-stress-set/W912KC26RA006-FULL-SOURCE.txt",
+   "sentence": "At the discretion of the sponsoring activity, an initial CAC may be issued based on a favorable review of the FBI fingerprint check and a successfully scheduled Tier 1 investigation at the Office of Personnel Management.",
+   "reMiss": true,
+   "expected": "engine MUST surface as an ungrounded eligibility bar → NHR/conditional-bar; today it is INVISIBLE (pre-filter miss) → this is the catastrophic false-COMPLETE the corpus must expose"
+  },
+  {
+   "id": "R1-012",
+   "shape": "IT-I / position sensitivity / Tier investigation",
+   "sol": "36C26226Q0469",
+   "file": "ceo/Solicitation + Export Reviews/2026-07-04-stress-set-v2/36C26226Q0469_1/36C26226Q0469_1-FULL-SOURCE.txt",
+   "sentence": "5.4.6 Personnel requiring VA system access must undergo a Tier 1 background investigation and receive favorable adjudication before performing duties.",
+   "reMiss": true,
+   "expected": "engine MUST surface as an ungrounded eligibility bar → NHR/conditional-bar; today it is INVISIBLE (pre-filter miss) → this is the catastrophic false-COMPLETE the corpus must expose"
+  },
+  {
+   "id": "R1-013",
+   "shape": "OEM letter of supply / authorized reseller",
+   "sol": "W50S8R26RA005-FULL-SOURCE",
+   "file": "ceo/Solicitation + Export Reviews/2026-07-04-stress-set-v2/W50S8R26RA005/W50S8R26RA005-FULL-SOURCE.txt",
+   "sentence": "When required by manufacturer, folding panel partitions must be installed by an authorized dealer with a certified crew.",
+   "reMiss": true,
+   "expected": "engine MUST surface as an ungrounded eligibility bar → NHR/conditional-bar; today it is INVISIBLE (pre-filter miss) → this is the catastrophic false-COMPLETE the corpus must expose"
+  },
+  {
+   "id": "R1-014",
+   "shape": "QPL / QML product qualification",
+   "sol": "W50S8R26RA005-FULL-SOURCE",
+   "file": "ceo/Solicitation + Export Reviews/2026-07-04-stress-set-v2/W50S8R26RA005/W50S8R26RA005-FULL-SOURCE.txt",
+   "sentence": "In product categories covered by ENERGY STAR or the Federal Energy Management Program, provide equipment SECTION 23 30 00 Page 8 REPAIR B403 FOR CYBER FA877006_B403 that is listed on the ENERGY STAR Qualified Products List or that meets or exceeds the FEMP-designated Efficiency Requirements.",
+   "reMiss": true,
+   "expected": "engine MUST surface as an ungrounded eligibility bar → NHR/conditional-bar; today it is INVISIBLE (pre-filter miss) → this is the catastrophic false-COMPLETE the corpus must expose"
+  },
+  {
+   "id": "R1-015",
+   "shape": "TS/SCI clearance (noun)",
+   "sol": "W50S8R26RA005-FULL-SOURCE",
+   "file": "ceo/Solicitation + Export Reviews/2026-07-04-stress-set-v2/W50S8R26RA005/W50S8R26RA005-FULL-SOURCE.txt",
+   "sentence": "FA877006 B CABLE CHART REPAIR B403 FOR CYBER NOTES COLOR NOTES TYPE GREEN UNCLASSIFIED MMF RED SECRET MMF YELLOW TS/SCI MMF BLUE SAP/SAR/SEC MMF ROSE/PINK SAP/SAR/TS MMF ORANGE SAP/SAR/SCI MMF A SHEET ID T-001 TYPE B-3 FINAL 1 2 3 4 5 6 7 8 9 10 GENERAL SHEET NOTES A.",
+   "reMiss": true,
+   "expected": "engine MUST surface as an ungrounded eligibility bar → NHR/conditional-bar; today it is INVISIBLE (pre-filter miss) → this is the catastrophic false-COMPLETE the corpus must expose"
+  },
+  {
+   "id": "R1-016",
+   "shape": "OEM letter of supply / authorized reseller",
+   "sol": "W50S8R26RA005-FULL-SOURCE",
+   "file": "ceo/Solicitation + Export Reviews/2026-07-04-stress-set-v2/W50S8R26RA005/W50S8R26RA005-FULL-SOURCE.txt",
+   "sentence": "1.3.4 Evidence of Experience and Qualifications 1.3.4.1 Contractor Qualifications Contractor or its subcontractor(s) must be a Value Added Resaler (VAR)/Authorized Dealer (AD) of the manufacturer line of products being installed.",
+   "reMiss": true,
+   "expected": "engine MUST surface as an ungrounded eligibility bar → NHR/conditional-bar; today it is INVISIBLE (pre-filter miss) → this is the catastrophic false-COMPLETE the corpus must expose"
+  },
+  {
+   "id": "R1-017",
+   "shape": "self-perform % (limitation on subcontracting, no set-aside token)",
+   "sol": "W9126G26RA087-FULL-SOURCE",
+   "file": "ceo/Solicitation + Export Reviews/2026-07-04-stress-set-v2/W9126G26RA087/W9126G26RA087-FULL-SOURCE.txt",
+   "sentence": "• Small Business Work Share: The small business partner(s) must perform at least 40% of the work done by the joint venture itself.",
+   "reMiss": true,
+   "expected": "engine MUST surface as an ungrounded eligibility bar → NHR/conditional-bar; today it is INVISIBLE (pre-filter miss) → this is the catastrophic false-COMPLETE the corpus must expose"
+  },
+  {
+   "id": "R1-018",
+   "shape": "OEM letter of supply / authorized reseller",
+   "sol": "1240LP26Q0067-FULL-SOURCE",
+   "file": "scripts/audit-ai/gold-sets/1240LP26Q0067-FULL-SOURCE.txt",
+   "sentence": "Prospective vendors who are not the OEM or an authorized distributor must provide traceability for the quoteed product back to the manufacturer or authorized distributor.",
+   "reMiss": true,
+   "expected": "engine MUST surface as an ungrounded eligibility bar → NHR/conditional-bar; today it is INVISIBLE (pre-filter miss) → this is the catastrophic false-COMPLETE the corpus must expose"
+  },
+  {
+   "id": "R1-019",
+   "shape": "OEM letter of supply / authorized reseller",
+   "sol": "HU000126QE021-FULL-SOURCE",
+   "file": "scripts/audit-ai/gold-sets/HU000126QE021-FULL-SOURCE.txt",
+   "sentence": "Authorized reseller letter from Fujifilm.",
+   "reMiss": true,
+   "expected": "engine MUST surface as an ungrounded eligibility bar → NHR/conditional-bar; today it is INVISIBLE (pre-filter miss) → this is the catastrophic false-COMPLETE the corpus must expose"
+  },
+  {
+   "id": "R1-020",
+   "shape": "IT-I / position sensitivity / Tier investigation",
+   "sol": "N4008526R0065-FULL-SOURCE",
+   "file": "scripts/audit-ai/gold-sets/N4008526R0065-FULL-SOURCE.txt",
+   "sentence": "2.8.8 Access to Controlled Unclassified Information The Contractor personnel whose work involves access to controlled unclassified information shall undergo a Tier 3 Investigation to verify their trustworthiness.",
+   "reMiss": true,
+   "expected": "engine MUST surface as an ungrounded eligibility bar → NHR/conditional-bar; today it is INVISIBLE (pre-filter miss) → this is the catastrophic false-COMPLETE the corpus must expose"
+  },
+  {
+   "id": "R1-021",
+   "shape": "IT-I / position sensitivity / Tier investigation",
+   "sol": "N4008526R0065-FULL-SOURCE",
+   "file": "scripts/audit-ai/gold-sets/N4008526R0065-FULL-SOURCE.txt",
+   "sentence": "If the Contractor personnel currently have a favorably adjudicated Tier 3 Investigation the Contractor shall notify the Government Command Security Manager who will validate this in the Joint Personnel Adjudication System (JPAS).",
+   "reMiss": true,
+   "expected": "engine MUST surface as an ungrounded eligibility bar → NHR/conditional-bar; today it is INVISIBLE (pre-filter miss) → this is the catastrophic false-COMPLETE the corpus must expose"
+  },
+  {
+   "id": "R1-022",
+   "shape": "IT-I / position sensitivity / Tier investigation",
+   "sol": "N4008526R0065-FULL-SOURCE",
+   "file": "scripts/audit-ai/gold-sets/N4008526R0065-FULL-SOURCE.txt",
+   "sentence": "The Contractor shall request from the Government for access to the E-QIP Direct program for the Contractor employees to complete the SF-86 form online for a Tier 3 Investigation.",
+   "reMiss": true,
+   "expected": "engine MUST surface as an ungrounded eligibility bar → NHR/conditional-bar; today it is INVISIBLE (pre-filter miss) → this is the catastrophic false-COMPLETE the corpus must expose"
+  },
+  {
+   "id": "R1-023",
+   "shape": "IT-I / position sensitivity / Tier investigation",
+   "sol": "N4008526R0065-FULL-SOURCE",
+   "file": "scripts/audit-ai/gold-sets/N4008526R0065-FULL-SOURCE.txt",
+   "sentence": "Upon a favorable Tier 3 Investigation, the Contractor personnel shall submit the original signed release statements, and an OF-306 Declaration for Federal Employment to the Security Manager per Section F.",
+   "reMiss": true,
+   "expected": "engine MUST surface as an ungrounded eligibility bar → NHR/conditional-bar; today it is INVISIBLE (pre-filter miss) → this is the catastrophic false-COMPLETE the corpus must expose"
+  }
+ ]
+}
