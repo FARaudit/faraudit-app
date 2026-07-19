@@ -417,6 +417,158 @@ export function isLedgerDemotableNonBar(ob: string): boolean {
   return false;
 }
 
+// ═══ BENIGN-IN-SOURCE RECITAL TRIAGE — card #572, flag AUDIT_BENIGN_RECITAL_COVERED (default-OFF) ═══
+// THE PROBLEM: the coverage grader over-fires NHR on BENIGN in-source boilerplate recitals. A recital like the LBJ
+// SOW "Maintain licensing/certification/accreditation and required insurance coverage during the entire performance
+// period…" is a CONTINUING-performance obligation, NOT a pre-award eligibility gate — but it carries the licens/certif/
+// accredit tokens so hasBarSignal is TRUE, which means the ratified AMBIGUOUS_SIGNAL_DEMOTION belt (bar-negative only)
+// correctly REFUSES to demote it → it escalates to a FALSE NHR. This is the exact bar-signal-POSITIVE class the prior
+// demotion cannot reach (autopsy corpus items 1 + 3).
+//
+// SCOPE AFTER THE GAUNTLET (2 code-review rounds): the card's original bar-signal-POSITIVE target (maintain-credential
+// / SAM-registration recitals — autopsy items 1 + 3) was proven UNSAFE by shape (see the dropped-ARM-1 note below) and
+// is DEFERRED to Brain. What ships here are the four bar-signal-NEGATIVE recital classes that DO separate cleanly:
+// protest/GAO, reps-certs-completion, excise-tax-election, site-visit-logistics.
+//
+// THE FIX (grounding-precision ONLY — no committal threshold moves; deriveVerdict stays sole authority): a POSITIVE
+// SHAPE ALLOWLIST (#507 doctrine — affirmatively define the benign frame, never a blocklist of NHR phrases) of four
+// benign-recital classes, EACH position/context-checked, PLUS a load-bearing source-presence check (the recital's own
+// text must be verifiably present in the assembled source), demotes a matched recital to an INFORMATIONAL
+// benignCoveredRecital bucket (skipped, like boilerplate — never disqualifierUncovered). FAIL-TOWARD-DISQUALIFIER IS
+// INTACT BY CONSTRUCTION: the block runs ONLY on the `ambiguous` class (AFTER importanceOf's disqualifier branch — a
+// DISQUALIFIER_RE hit can never be claimed); three shared refusal guards (award-phase / rejection-consequence /
+// restriction) plus a continuation-window tail veto (the obligationsOf `\n`/URL-dot split severs sentences — the
+// severed tail is re-scanned for a bar) refuse anything ambiguous between benign and bar → falls through to the
+// existing escalate path. Flag-OFF ⇒ the block short-circuits, the CoverageV2 field is omitted ⇒ byte-identical.
+const benignRecitalCoveredEnabled = () => process.env.AUDIT_BENIGN_RECITAL_COVERED === "true";
+
+// SHARED REFUSAL GUARDS — a hit on ANY of these over the obligation (or its severed tail) REFUSES the benign claim.
+// These can only SHRINK the benign set (never define it) — the positive arm frame is what defines membership (#507).
+// G-AWARD — award-phase possession framing is never a benign continuing recital (near-miss family: "…at (the) time of
+// award", "…prior to award" possession, "certification required prior to award", "…through/until award"). (Gauntlet
+// F5 — "at time of award" without "the" and "through/until award" were slipping the veto.)
+const BENIGN_AWARD_PHASE_VETO_RE = /\b(?:at\s+(?:the\s+)?time\s+of\s+(?:award|offer)|prior\s+to\s+award|before\s+award|as\s+a\s+condition\s+of\s+award|upon\s+award|through\s+(?:contract\s+)?award|until\s+(?:contract\s+)?award)\b/i;
+// G-CONSEQ — an explicit rejection / ineligibility / failure consequence rider ("…or be found nonresponsive", "…shall
+// render the offer ineligible", "failure to X…"). Keys on "ineligible"/"not (be) eligible" (NOT bare "eligible", which
+// appears in benign purpose tails) plus the categorical award-bar verbs. Note `\brender\b` requires an object (render +
+// ineligible/unacceptable is already caught by those tokens; a bare "services rendered" is NOT a bar — Gauntlet nit).
+const BENIGN_CONSEQUENCE_VETO_RE = /\bnon-?responsive\b|\bineligible\b|\bnot\s+(?:be\s+)?eligible\b|\breject(?:ed|ion|s|ing)?\b|\bwill\s+not\s+be\s+(?:considered|awarded)\b|\bdisqualif|\b(?:excluded|eliminated|removed|precluded)\s+from\b|\brender(?:s|ed|ing)?\s+the\b|\bdeemed\s+(?:technically\s+)?unacceptable\b|\bfailure\s+to\b/i;
+// G-RESTRICT — access/attendance restriction framing ("Holders ONLY", "must attend", "restricted/limited to").
+const BENIGN_RESTRICTION_VETO_RE = /\bonly\b|\bmust\s+attend\b|\brestricted\s+to\b|\blimited\s+to\b/i;
+const benignGuardRefuses = (s: string): boolean =>
+  BENIGN_AWARD_PHASE_VETO_RE.test(s) || BENIGN_CONSEQUENCE_VETO_RE.test(s) || BENIGN_RESTRICTION_VETO_RE.test(s);
+
+// (ARM-1 "maintain-<credential>-during-performance" was DROPPED after the second Gauntlet round — the bar-signal-
+// POSITIVE flagship class it targeted (LBJ item #1, SAM item #3) is SHAPE-INDISTINGUISHABLE from a real firm-inherent-
+// credential bar and collides with CERTIFIED card #557. Proof: a coordinated "maintain the required insurance coverage,
+// an active Secret facility clearance, and DCSA accreditation during the entire performance period" demotes by the exact
+// same shape the LBJ recital relies on — the credential tokens that make LBJ read "benign" ARE the #557 bar tokens, so
+// any residue/strip check that catches the clearance-list also refuses LBJ. The positive invariant is NOT in the
+// sentence shape (reconstruction-treadmill signal). RELAYED for a Brain ruling: this class needs a non-shape
+// discriminator — e.g. a bidder-profile cross-check (does the offeror actually HOLD the credential?) — not a regex.
+// The four arms below are all bar-signal-NEGATIVE recital classes that DO separate cleanly by shape.)
+// ARM-2 "protest/GAO recital" — the ratified PROTEST_DISPUTES_RE filing-mechanics frame PLUS the truncated copy-of-
+// protest fragment the base RE misses (autopsy item 8b — "the copy of any protest must be received…").
+const BENIGN_PROTEST_RECITAL_RE = new RegExp(PROTEST_DISPUTES_RE.source + "|\\bcop(?:y|ies)\\s+of\\s+(?:any\\s+|the\\s+)?protest\\b|\\bfiling\\s+a\\s+protest\\s+with\\b", "i");
+// ARM-3 "reps-certs completion recital" — the reps/certs LIST as the object of a meet/complete/include enumeration;
+// NEVER the substance of one specific representation (risk R5 — a covered-telecom FASCSA rep carries no list-reference).
+const BENIGN_REPS_CERTS_RECITAL_RE = /\b(?:representations?\s+and\s+certifications?|annual\s+representations?)\b/i;
+const BENIGN_REPS_CERTS_FRAME_RE = /\b(?:required\s+to\s+meet|shall\s+(?:complete|meet|provide\s+a\s+statement)|has\s+completed|to\s+include|completed\s+.{0,40}\belectronically)\b/i;
+// ARM-4 "excise-tax election [select one]" — the ratified 52.229-11 election frame; the literal "[Offeror must select
+// one]" bracket only counts when it CO-OCCURS with excise-tax context (Gauntlet F2 — a bare bracket alone matches §K
+// reps of every kind, e.g. an 8(a) participation rep, which must keep escalating).
+const BENIGN_EXCISE_ELECTION_RE = new RegExp(
+  FOREIGN_TAX_REP_RE.source
+  + "|excise\\s+tax[^.]{0,60}\\[\\s*offerors?\\s+must\\s+select\\s+one\\s*\\]"
+  + "|\\[\\s*offerors?\\s+must\\s+select\\s+one\\s*\\][^.]{0,60}excise\\s+tax", "i");
+// ARM-5 "site-visit logistics recital" — scheduling / RSVP mechanics ONLY. Attendance-conditioned-eligibility ("must
+// attend … eligible to propose") NEVER matches this frame AND is vetoed by G-RESTRICT (`must attend`) — double belt.
+const BENIGN_SITE_VISIT_LOGISTICS_RE = /\brsvp\b[^.]{0,90}\b(?:received|submitted|sent|email|forward)\b|\bsite\s+visit\b[^.]{0,90}\b(?:was\s+held|concluded|is\s+set\s+for|scheduled|sign[\s-]?in)\b/i;
+// (ARM-6 SAM-registration maintenance was DROPPED after the Gauntlet: the FA3030 SAM recital enters NHR via the
+// INDEPENDENT notice-body pole (noticeBodyBarUngrounded, audit-decide.ts) not the coverage grader, so demoting it here
+// changed no verdict — all of the card #459 SAM-registration-hardening softening risk, zero verdict payoff. Relayed for
+// Brain: if the notice-body pole is ever wired to this classifier, re-evaluate a SAM-maintenance arm with #459 in mind.)
+
+// The benign arms as data entries (mirrors the NOOP_REP_FAMILY data-shape doctrine): [name, frame, optional extra
+// predicate]. A member is claimed by the FIRST whose frame matches AND extra holds AND the RESIDUE belt passes.
+const BENIGN_RECITAL_ARMS: Array<{ name: string; re: RegExp; extra?: (ob: string) => boolean }> = [
+  { name: "protest-recital", re: BENIGN_PROTEST_RECITAL_RE },
+  { name: "reps-certs-completion", re: BENIGN_REPS_CERTS_RECITAL_RE, extra: (ob) => BENIGN_REPS_CERTS_FRAME_RE.test(ob) },
+  { name: "excise-tax-election", re: BENIGN_EXCISE_ELECTION_RE },
+  { name: "site-visit-logistics", re: BENIGN_SITE_VISIT_LOGISTICS_RE },
+];
+
+/** POSITIVE benign-recital classifier (card #572). Returns the matching arm name, or null (⇒ existing fail-toward-
+ *  disqualifier path). Pure, flag-independent — the flag gates the CALLER. Order: (1) a shared-guard hit on the
+ *  obligation itself refuses BEFORE any arm; (2) the first arm whose frame+extra match; (3) the RATIFIED RESIDUE BELT —
+ *  strip the matched benign span and require !hasBarSignal on the remainder, so a COMPOUND sentence pairing a benign
+ *  clause with an unenumerated real bar ("…maintain insurance during performance AND shall hold a Secret clearance")
+ *  refuses (Gauntlet F1; the same strip-then-!hasBarSignal pattern as isGovtEvalMethodologyNonBar). Exported for the
+ *  asymmetric-proof suite. */
+export function classifyBenignRecital(ob: string): string | null {
+  if (benignGuardRefuses(ob)) return null;                                   // award-phase / consequence / restriction on the sentence itself
+  for (const arm of BENIGN_RECITAL_ARMS) {
+    const m = arm.re.exec(ob);
+    if (!m) continue;
+    if (arm.extra && !arm.extra(ob)) continue;
+    const residue = ob.slice(0, m.index) + " " + ob.slice(m.index + m[0].length);
+    if (hasBarSignal(residue)) return null;                                  // a co-resident bar outside the benign span ⇒ refuse the whole sentence
+    return arm.name;
+  }
+  return null;
+}
+
+/** Continuation-window tail veto (card #572 fragmentation defense). obligationsOf splits on `[.;\n]` — a benign-looking
+ *  fragment can be the head of a sentence whose SEVERED TAIL carries the bar. The tail is re-scanned with the FULL
+ *  shared refusal predicate (award-phase / consequence / restriction) AND hasBarSignal — so the tail defense is at
+ *  least as strong as the residue belt's (Gauntlet round 2: the guards alone are a weaker vocabulary than BAR_SIGNAL,
+ *  so a severed "…and shall hold an active Secret facility clearance" tail slipped through). Recall trade: a benign
+ *  tail carrying bar vocabulary refuses (the safe fail-toward-disqualifier direction). */
+export function recitalTailVeto(continuation: string | undefined | null): boolean {
+  return !!continuation && (benignGuardRefuses(continuation) || hasBarSignal(continuation));
+}
+
+const benignNorm = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+/** Load-bearing source-presence verifier (card #572). The recital must be VERIFIABLY PRESENT in the assembled source
+ *  (normalized containment) with a ≥5-token substance floor (a trivial fragment can never be "verifiably present").
+ *  The severed tails of EVERY occurrence (whitespace/case-tolerant match → next sentence terminator, ≤240 chars each)
+ *  are concatenated and returned so the caller can tail-veto against ALL of them. FAIL-CLOSED (Gauntlet F3): if the
+ *  recital normalizes-present but is NOT raw-locatable (OCR/caps drift the naive indexOf missed), return null ⇒ NO
+ *  benign claim ⇒ fail toward disqualifier — the tail defense is never silently skipped, and a duplicated boilerplate
+ *  recital can never hide a bar-carrying instance behind a benign twin. Pure; supplied to gradeCoverageV2. */
+export function verifyRecitalInSource(fullSource: string, ob: string): { present: boolean; continuation: string } | null {
+  const src = fullSource ?? "";
+  const nob = benignNorm(ob);
+  if (nob.split(" ").filter(Boolean).length < 5) return null;               // substance floor
+  if (!benignNorm(src).includes(nob)) return null;                          // must be verbatim-present (normalized)
+  // Whitespace/case-tolerant locate over ALL raw occurrences (the escaped obligation is the needle — no injection).
+  const pattern = ob.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+  let continuation = "", found = false;
+  try {
+    const re = new RegExp(pattern, "gi");
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(src)) !== null) {
+      found = true;
+      // The tail defense targets a sentence SEVERED mid-clause (obligationsOf split at a line-break or a URL-internal
+      // dot). If the match ALREADY ends at a real sentence terminator, the sentence is complete — there is NO severed
+      // tail, and reading further would bleed into the NEXT (possibly bar-carrying) sentence → a false veto. So scan a
+      // continuation ONLY for a mid-sentence fragment (match does not end in .?!), up to the first real terminator
+      // (terminator + whitespace/EOF, so a URL-internal "www.sam" dot doesn't cut the tail short). A tail on a NEW line
+      // is a SEPARATE obligation (independently classified) → stop at the newline.
+      if (!/[.!?]["')\]]?\s*$/.test(m[0])) {
+        const after = src.slice(m.index + m[0].length, m.index + m[0].length + 240);
+        const nl = after.indexOf("\n");
+        const line = nl >= 0 ? after.slice(0, nl) : after;
+        const end = line.search(/[.!?](?=\s|$)/);
+        continuation += " " + (end >= 0 ? line.slice(0, end + 1) : line);
+      }
+      if (re.lastIndex === m.index) re.lastIndex++;                         // zero-width safety
+    }
+  } catch { found = false; }
+  if (!found) return null;                                                  // normalized-present but raw-unlocatable ⇒ can't verify the tail ⇒ refuse
+  return { present: true, continuation };
+}
+
 export interface CoverageV2 {
   /** Sections genuinely NOT fully read (unread / truncated / dropped-at-ingest) → legitimate INCOMPLETE. */
   unreadable: string[];
@@ -434,6 +586,11 @@ export interface CoverageV2 {
    *  here, never in disqualifierUncovered, never dropped. Empty unless AUDIT_AMBIGUOUS_SIGNAL_DEMOTION is on.
    *  Optional so pre-existing partial CoverageV2 literals (older callers/tests) still typecheck; readers default []. */
   ungroundedNonBarSignal?: Array<{ section: string; obligation: string }>;
+  /** Ungrounded obligations affirmatively classified as BENIGN in-source recitals (card #572, positive shape allowlist
+   *  + verified source-presence): demoted OFF the escalation path to an informational bucket, never disqualifierUncovered.
+   *  Present ONLY when AUDIT_BENIGN_RECITAL_COVERED is on ⇒ flag-OFF the serialized coverageV2 is byte-identical (do NOT
+   *  copy ungroundedNonBarSignal's always-present-array shape — run-records serialize exactly the pre-#572 key set). */
+  benignCoveredRecital?: Array<{ section: string; obligation: string; arm: string }>;
   /** Importance-weighted covered fraction in [0,1] — surfaced as a signal (never a veto). 1 when nothing required. */
   coverageGrade: number;
 }
@@ -445,11 +602,16 @@ export function gradeCoverageV2(attestations: SectionAttestation[], opts?: {
    *  adjacent scope-context note. Supplied by the orchestrator (which holds ctx.fullSource); absent ⇒ entries
    *  carry only the routed section key (byte-identical to the pre-#548 shape). Informational only. */
   locate?: (ob: string) => { locatedAt: string; contextNote?: string } | null;
+  /** card #572 — verify a benign-recital candidate is VERIFIABLY PRESENT in the assembled source (+ return its severed
+   *  tail for the continuation veto). Supplied by the orchestrator (holds ctx.fullSource). Double-gated: a caller-
+   *  supplied fn NEVER runs flag-OFF (the block short-circuits before it is consulted). Absent ⇒ no benign claim. */
+  verifyRecitalPresence?: (ob: string) => { present: boolean; continuation: string } | null;
 }): CoverageV2 {
   const unreadable: string[] = [];
   const ungroundedRead: string[] = [];
   const disqualifierUncovered: Array<{ section: string; obligation: string; locatedAt?: string; contextNote?: string }> = [];
   const ungroundedNonBarSignal: Array<{ section: string; obligation: string }> = [];
+  const benignCoveredRecital: Array<{ section: string; obligation: string; arm: string }> = [];
   const enrich = (e: { section: string; obligation: string }) => {
     // Double-gated (R1 probe 5b): the production locator self-guards on the flag, but a caller-supplied
     // locate fn might not — enrichment NEVER runs flag-OFF regardless of the injected fn.
@@ -485,6 +647,18 @@ export function gradeCoverageV2(attestations: SectionAttestation[], opts?: {
         const imp = importanceOf(ob);
         if (imp === "boilerplate") continue;
         if (imp === "disqualifier") { disqualifierUncovered.push(enrich({ section: a.section, obligation: ob })); continue; }
+        // BENIGN-IN-SOURCE RECITAL TRIAGE (card #572, flag AUDIT_BENIGN_RECITAL_COVERED, default-OFF). Runs ONLY on the
+        // ambiguous class (a DISQUALIFIER_RE hit already returned above — never laundered) and BEFORE the ambiguous
+        // demotion, so a claimed recital is recorded as affirmatively-benign-and-present rather than merely bar-negative.
+        // A positive arm match REQUIRES verified source-presence AND no severed-tail bar; any miss/absence ⇒ fall
+        // through to the unchanged escalate path (fail-toward-disqualifier). Flag-OFF ⇒ this block is never reached.
+        if (benignRecitalCoveredEnabled()) {
+          const arm = classifyBenignRecital(ob);
+          const ver = arm ? (opts?.verifyRecitalPresence?.(ob) ?? null) : null;
+          if (arm && ver?.present && !recitalTailVeto(ver.continuation)) {
+            benignCoveredRecital.push({ section: a.section, obligation: ob, arm }); continue;
+          }
+        }
         if (ambiguousSignalDemotionEnabled() && (!hasBarSignal(ob) || isGovtEvalMethodologyNonBar(ob)
               || (conditionalTinaDemotionEnabled() && isConditionalTinaBoilerplate(ob)))) {
           ungroundedNonBarSignal.push({ section: a.section, obligation: ob }); continue;
@@ -498,6 +672,9 @@ export function gradeCoverageV2(attestations: SectionAttestation[], opts?: {
     ungroundedRead,
     disqualifierUncovered,
     ungroundedNonBarSignal,
+    // card #572 — include the benign-recital bucket ONLY when the flag is on, so the flag-OFF serialized coverageV2
+    // (persisted into run-records at result.inputs.coverageV2) keeps its exact pre-#572 key set (byte-identical).
+    ...(benignRecitalCoveredEnabled() ? { benignCoveredRecital } : {}),
     coverageGrade: totalWeight === 0 ? 1 : coveredWeight / totalWeight,
   };
 }
@@ -533,7 +710,13 @@ export function gateV2Outcome(cov: CoverageV2): GateV2Outcome {
   const demoted = nonBar.length
     ? ` ${nonBar.length} ungrounded non-bar obligation(s) demoted to signal (ungrounded_nonbar_signal).`
     : "";
+  // card #572 — append the benign-recital note only when the field is present + non-empty (flag-ON) ⇒ flag-OFF the
+  // reason string is byte-identical. Mirrors the `demoted` note shape.
+  const benign = cov.benignCoveredRecital ?? [];
+  const benignNote = benign.length
+    ? ` ${benign.length} benign recital(s) verified present in source (benign_covered_recital).`
+    : "";
   return { cap: null, reason: (cov.ungroundedRead.length
     ? `Read complete; ${cov.ungroundedRead.length} section(s) have unquoted boilerplate obligations (coverage grade ${(cov.coverageGrade * 100).toFixed(0)}%) — a signal, not a veto.`
-    : `Coverage complete (grade ${(cov.coverageGrade * 100).toFixed(0)}%).`) + demoted };
+    : `Coverage complete (grade ${(cov.coverageGrade * 100).toFixed(0)}%).`) + demoted + benignNote };
 }
