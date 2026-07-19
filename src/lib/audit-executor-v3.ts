@@ -168,6 +168,11 @@ export async function executeAgenticPrimary(
   // GAP A — assemble the engine's single fullSource string from the intake docs
   // (notice body + primary + every attachment). Reuses the same extraction the shadow path uses.
   const primaryBytes = input.pdfBuffer ?? (input.pdfBase64 ? Buffer.from(input.pdfBase64, "base64") : null);
+  // PRE-PANEL TIMING INSTRUMENTATION (card #567, log-only, flag AUDIT_TIMING_PREPANEL default-OFF ⇒ byte-identical).
+  // Splits the ~132s blind stretch inside the 270s budget (ingest → assembly → grounding) so a stall is diagnosed,
+  // not assumed. Emits nothing behavior-affecting — pure console timing, gated so flag-OFF is a strict no-op.
+  const _timeOn = process.env.AUDIT_TIMING_PREPANEL === "true";
+  const _tIngest = Date.now();
   let docs = await buildAgenticDocs({
     primaryName: input.primaryDocName ?? "primary solicitation",
     primaryBytes,
@@ -175,6 +180,7 @@ export async function executeAgenticPrimary(
     attachments: input.attachmentPdfs?.map((a) => ({ name: a.name, base64: a.base64 })) ?? null,
     noticeBody,
   });
+  if (_timeOn) console.log(`[timing] prepanel:ingest-buildDocs ${Date.now() - _tIngest}ms · ${docs.length} doc(s) · ${docs.reduce((n, d) => n + (d.text?.length || 0), 0)} chars extracted`);
   if (noticeBody) {
     console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: L1 notice body ingested as first-class doc (${noticeBody.text.length} chars)`);
   }
@@ -226,6 +232,7 @@ export async function executeAgenticPrimary(
   // When lossless is ON it handles ALL packages (fits-whole → untouched whole read; over-budget → binding-filter;
   // filtered-still-over → honest INCOMPLETE) — so it fully supersedes the compressor, and reads MORE whole (up to the
   // 1M window) than the old 1.4M budgeted/chunked paths did.
+  const _tAssembly = Date.now();
   if (losslessOn) {
     const la = assembleFullSourceLossless(docs, losslessMaxChars);
     assembled = { source: la.source, truncated: la.truncated, keptDocs: la.keptDocs, droppedDocs: la.droppedDocs, contentLossDocs: la.contentLossDocs };
@@ -249,6 +256,7 @@ export async function executeAgenticPrimary(
     assembled = { ...assembleFullSourceBudgeted(docs), contentLossDocs: [] };
     if (chunkedOn) readModes = docs.map((d) => ({ name: d.name, mode: "full" as DocReadMode, chunks: 0, spansKept: 0, spansRejected: 0, failedWindows: 0 }));
   }
+  if (_timeOn) console.log(`[timing] prepanel:assembly ${Date.now() - _tAssembly}ms · mode=${losslessOn ? "lossless" : chunkedOn ? "chunked" : "budgeted"} · ${(assembled.source.length / 1e6).toFixed(2)}M chars`);
   // Abort mid-ingest (budget/wall-clock) is an HONEST hard-fail — never spend the Opus auditPackage verdict on a
   // partial read, and never persist a partial digest as complete (Brain R1: abort = honest-fail, not a degrade).
   if (signal?.aborted) throw new Error("agentic engine aborted during ingest (budget/wall-clock) — honest-fail, not a partial read");
@@ -399,6 +407,7 @@ export async function executeAgenticPrimary(
   if (AGENTIC_PANEL_ENABLED) {
     try {
       const panelInputs = buildPanelInputs(fullSource);
+      const _tPanelProducer = Date.now();
       panelResult = await runPanelJudge({
         sectionText: panelInputs.sectionText,
         detectedSections: panelInputs.detectedSections,
@@ -409,6 +418,7 @@ export async function executeAgenticPrimary(
         onUsage: (u) => usageCalls.push(u),
       });
       console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: panel [${panelInputs.documentClass}] ${panelResult.fired ? `fired → ${panelResult.typedFindings.length} verified typed finding(s) merged` : `honest-fail (${panelResult.manifest.missing.length ? "gate: " + panelResult.manifest.missing.join(", ") : "no verdict"}) → 0 findings`}`);
+      if (_timeOn) console.log(`[timing] prepanel:panel-producer(runPanelJudge) ${Date.now() - _tPanelProducer}ms · ${panelResult.fired ? panelResult.typedFindings.length + " findings" : "honest-fail"}`);
     } catch (e) {
       // DOCTRINE (ultra #236 bug_005): the panel NEVER blocks the audit. runPanelJudge honest-fails gracefully for
       // lens/verifier failures, but the chief-judge call RETHROWS (retry-ladder ceiling / rate-limit / AbortError
@@ -420,6 +430,7 @@ export async function executeAgenticPrimary(
       console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: panel threw (${e instanceof Error ? e.message : e}) → degraded to panel-off; rail proceeds on v3 findings`);
     }
   }
+  const _tPackage = Date.now();
   const res = await auditPackage({
     fullSource, bidderProfile, signal, manifestComplete: manifestComplete && !constructionOOS, constructionManifest, groundingSource,
     panelFindings: panelResult?.typedFindings,   // card #523 (P2a-wire) — VERIFIED panel facts unioned into the rail (undefined when flag OFF ⇒ byte-identical)
@@ -436,6 +447,7 @@ export async function executeAgenticPrimary(
   // write would overwrite the terminal-failed status the wrapper already set and strand
   // a half-finished verdict as if it were final. Reject so the worker's terminal path owns it.
   if (signal?.aborted) throw new Error("agentic engine aborted after verdict (overall budget) — not persisting a late-complete row");
+  if (_timeOn) console.log(`[timing] prepanel:auditPackage-total ${Date.now() - _tPackage}ms · (contains expert-phase/j1/verify/grounding/decide — compare to their sub-timings to expose hidden overhead)`);
   const generatedAt = new Date().toISOString();
   // Card #481 (ruling-4) — reframe a "no set-aside is present" finding against the authoritative masthead set_aside so it
   // stops contradicting the "Set-aside: SBA" header (display-only, no verdict impact). Flag-OFF ⇒ untouched (byte-identical).

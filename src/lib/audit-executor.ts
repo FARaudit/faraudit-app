@@ -218,6 +218,9 @@ export async function executeAudit(
       // degrade to the SAME path the pre-existing .catch already takes (null →
       // "leave facts to extraction / honest-unknown" below). Best-effort fact
       // enrichment, never a blocker.
+      // PRE-PANEL TIMING (card #567) — SAM facts cross-ref is a network fetch OUTSIDE the 270s engine budget; timing it
+      // proves whether retrieval latency (vs the in-budget engine) drives wall-clock. Log-only, flag AUDIT_TIMING_PREPANEL.
+      const _tSam = Date.now();
       const samFacts = await withBudget(
         () => fetchSolicitationByNoticeId(solNum),
         FACTS_SAM_BUDGET_MS,
@@ -226,6 +229,7 @@ export async function executeAudit(
         console.warn(`[FACTS] SAM cross-ref for ${solNum} failed/timed out (non-fatal): ${e instanceof Error ? e.message : e}`);
         return null;
       });
+      if (process.env.AUDIT_TIMING_PREPANEL === "true") console.log(`[timing] prepanel:sam-facts-fetch ${Date.now() - _tSam}ms · ${samFacts ? "hit" : "miss/timeout"}`);
       if (samFacts) {
         // A SAM record with no set-aside is DEFINITIVELY full & open — record that
         // as a known fact, never leave it blank/unknown.
