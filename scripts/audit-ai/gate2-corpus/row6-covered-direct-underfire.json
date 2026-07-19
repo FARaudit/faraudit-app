@@ -1,0 +1,34 @@
+{
+  "generated": "card #560 corpus gap #4",
+  "oracle": "completenessOf covered_direct floor (AUDIT_COVERED_DIRECT_BAR_FLOOR + AUDIT_ELIG_BAR_PASSIVE_FRAME)",
+  "note": "R6 UNDER-fire side: dense §C/§H cleared-work SOW sections with a benign GROUNDED finding co-resident with an UNGROUNDED passive firm bar (TS/SCI clearance / FCL / VAR). Each MUST floor to obligations_ungrounded, not blanket covered_direct. Proven through the real completenessOf() production path.",
+  "specimens": [
+    {
+      "id": "R6-under-H-tssci",
+      "origin": "synthetic-grounded",
+      "section": "H",
+      "expected": "flag_obligations_ungrounded",
+      "benign_grounded": "The Government will provide workspace and IT equipment at the contractor's on-site facility.",
+      "ungrounded_bar": "a current ts/sci clearance is required for all personnel prior to performance; personnel who cannot obtain it may not be assigned",
+      "sentence": "SECTION H - SPECIAL CONTRACT REQUIREMENTS\nH.1 The Government will provide workspace and IT equipment at the contractor's on-site facility.\nH.2 Work under this effort involves access to Sensitive Compartmented Information. A current TS/SCI clearance is required for all personnel prior to performance; personnel who cannot obtain it may not be assigned.\nH.3 The contractor shall coordinate visitor access requests through the Government security office."
+    },
+    {
+      "id": "R6-under-C-fcl",
+      "origin": "synthetic-grounded",
+      "section": "C",
+      "expected": "flag_obligations_ungrounded",
+      "benign_grounded": "The contractor shall perform routine and preventive maintenance on the described systems.",
+      "ungrounded_bar": "the offeror must possess an active fcl at the secret level, verified in niss, as of the proposal due date",
+      "sentence": "SECTION C - DESCRIPTION / SPECIFICATIONS / STATEMENT OF WORK\nC.1 Scope. The contractor shall perform routine and preventive maintenance on the described systems.\nC.2 Facility. The offeror must possess an active FCL at the Secret level, verified in NISS, as of the proposal due date.\nC.3 The contractor shall deliver a monthly status report in accordance with the CDRL."
+    },
+    {
+      "id": "R6-under-C-var",
+      "origin": "synthetic-grounded",
+      "section": "C",
+      "expected": "flag_obligations_ungrounded",
+      "benign_grounded": "The contractor shall furnish all labor, tools, and consumables to complete the installation.",
+      "ungrounded_bar": "2 contractor or its subcontractor(s) must be a value added reseller (var)/authorized dealer (ad) of the manufacturer line of products being installed",
+      "sentence": "SECTION C - DESCRIPTION / SPECIFICATIONS / STATEMENT OF WORK\nC.1 The contractor shall furnish all labor, tools, and consumables to complete the installation.\nC.2 Contractor or its subcontractor(s) must be a Value Added Reseller (VAR)/Authorized Dealer (AD) of the manufacturer line of products being installed.\nC.3 Warranty. All work shall carry the manufacturer's standard warranty."
+    }
+  ]
+}

@@ -12,7 +12,7 @@ import {
   PANELISTS, VERIFIER, CHIEF_JUDGE, PANELIST_SCHEMA, VERIFIER_SCHEMA, CHIEF_JUDGE_SCHEMA,
   checkManifest, type ManifestResult, type PanelTier,
 } from "./agentic-panel";
-import { assembleLensPasses, excerptInSource, LENS_SECTIONS, makeClauseSourceChecker, stripFabricatedClauses, type PanelLensKey } from "./agentic-sections";
+import { assembleLensPasses, excerptInSource, lensAssignedSections, makeClauseSourceChecker, stripFabricatedClauses, type PanelLensKey } from "./agentic-sections";
 import { panelFindingsToTyped } from "./panel-findings-bridge";
 import { scanPackageMarkers, absenceClaimContradicted } from "./absence-grounding-gate";
 import type { TypedFinding } from "./audit-findings";
@@ -267,6 +267,11 @@ export async function runPanelJudge(params: {
    *  commercial → checkBiddableContent). When supplied, it REPLACES the runner's own checkManifest so the panel fires
    *  correctly on non-UCF buys. Absent ⇒ checkManifest(detectedSections) (byte-identical for existing callers/tests). */
   manifest?: ManifestResult;
+  /** UNIT 2.1 (cards #548/#549) — the package's document class from buildPanelInputs. On the commercial route
+   *  (with AUDIT_LENS_EMISSION_INTEGRITY on) lens assignment uses LENS_SECTIONS_COMMERCIAL, closing the
+   *  assignment blindness that starved the pricing lens of §C/§I content (the dccce793 SCA/WD never-computed
+   *  root). Absent or flag OFF ⇒ the ratified UCF map ⇒ byte-identical. */
+  documentClass?: "ucf" | "commercial";
 }): Promise<PanelResult> {
   const manifest = params.manifest ?? checkManifest(params.detectedSections);
   if (!manifest.ok) {
@@ -283,7 +288,7 @@ export async function runPanelJudge(params: {
   // #4 — read EVERY assigned section in full: bin-pack into passes (chunked if oversized), one lens
   // call per pass, then REDUCE. A binding section is never dropped for budget — it costs a pass.
   const runOne = async (p: typeof PANELISTS[number]): Promise<PanelistOutput> => {
-    const { passes, missingSections, sourceConcat } = assembleLensPasses(p.key as PanelLensKey, params.sectionText);
+    const { passes, missingSections, sourceConcat } = assembleLensPasses(p.key as PanelLensKey, params.sectionText, { docClass: params.documentClass });
     bundleByLens.set(p.key, sourceConcat);
     const missingNote = missingSections.length
       ? ` ASSIGNED SECTIONS NOT FOUND IN PACKAGE: ${missingSections.join(", ")} — do not assume their content; if your judgment needs them, say so and lower confidence.`
@@ -295,7 +300,7 @@ export async function runPanelJudge(params: {
         ? ` NOTE: your assigned sections were chunked for size — this is SOURCE PART ${idx + 1} of ${passes.length}; analyze THIS part fully (findings are merged across parts; do not assume parts you haven't seen).`
         : "";
       const task =
-        `Read your ASSIGNED SOURCE above (UCF §${LENS_SECTIONS[p.key as PanelLensKey].join(", §")}) and apply YOUR lens. ` +
+        `Read your ASSIGNED SOURCE above (UCF §${lensAssignedSections(p.key as PanelLensKey, params.documentClass).join(", §")}) and apply YOUR lens. ` +
         `For EVERY named_hard_gate and risk, copy the VERBATIM source sentence(s) into its \`excerpt\` field (exact text, not a paraphrase) so it can be independently verified — use "" only if the claim genuinely has no supporting source text. ` +
         `Return ONLY the structured JSON; populate every required field.${missingNote}${partNote}`;
       return panelCall<PanelistOutput>({

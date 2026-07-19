@@ -24,6 +24,7 @@
 
 import { detectSections } from "./section-boundary-detector";
 import type { ExtractedDocument } from "./pdf-text-extractor";
+import { isEnvOn } from "./env-flags";
 
 export type PanelLensKey =
   | "capture_strategist"
@@ -40,6 +41,131 @@ export const LENS_SECTIONS: Record<PanelLensKey, string[]> = {
   pricing_contracts_risk: ["B", "H", "J"],
   smallbiz_eligibility_counsel: ["A", "B", "I"],
 };
+
+// ── UNIT 2.1 (Brain cards #548/#549) — LENS-ASSIGNMENT INTEGRITY on the commercial route ──────────────
+// Root (card #549, dccce793): LENS_SECTIONS is a UCF-shaped map, but routeCommercialSections can only
+// produce {B,C,I,L,M} — so on a commercial package a lens assigned UCF-only keys goes structurally BLIND
+// to content routed under keys it doesn't hold. The proven instance: pricing [B,H,J] with the SCA clause
+// matrix routed to §I and the embedded wage determination routed to §C — the one lens briefed to emit
+// wage-determination findings never received either, so the finding was NEVER-COMPUTED (the render was
+// faithful to an empty emission; AUDIT_CLAUSE_SOURCE_FULLTEXT vets emitted cites and could not help).
+// Fix (i): a COMMERCIAL-class assignment map. Full-map audit against the router's producible keys
+// {B,C,I,L,M} (every lens, not just pricing — the Brain ruling's in-file audit):
+//   capture_strategist        [B,C,L,M]   — already full-breadth on producible keys; unchanged.
+//   proposal_compliance       [H,I]→+L    — H is never producible commercially; provisions/instructions
+//                                           content it is briefed on lives in the routed L slice.
+//   source_selection_evaluator[L,M]       — both producible; unchanged.
+//   pricing_contracts_risk    [B,H,J]→+C,+I — THE dccce793 blindness: PWS/WD tail routes to C, the
+//                                           labor-standards clause matrix to I. H/J kept (benign if absent).
+//   smallbiz_eligibility_counsel[A,B,I]→+L — A is never producible commercially; set-aside statements and
+//                                           provision checkboxes land in the routed L slice.
+// Over-provision is safe by ruling (a lens receiving extra text is benign; chunk-reduce means budget
+// pressure costs an extra pass, never a dropped section). Flag-gated default-OFF; OFF ⇒ byte-identical.
+export const LENS_SECTIONS_COMMERCIAL: Record<PanelLensKey, string[]> = {
+  capture_strategist: ["B", "C", "L", "M"],
+  proposal_compliance: ["H", "I", "L"],
+  source_selection_evaluator: ["L", "M"],
+  pricing_contracts_risk: ["B", "C", "I", "H", "J"],
+  smallbiz_eligibility_counsel: ["A", "B", "I", "L"],
+};
+const lensEmissionIntegrityEnabled = () => isEnvOn(process.env.AUDIT_LENS_EMISSION_INTEGRITY);
+/** The assignment map for a lens given the package's document class. Commercial + flag ON ⇒ the
+ *  commercial map; anything else (UCF, unknown class, flag OFF) ⇒ the ratified UCF map, byte-identical. */
+export function lensAssignedSections(lens: PanelLensKey, docClass?: "ucf" | "commercial"): string[] {
+  if (lensEmissionIntegrityEnabled() && docClass === "commercial") return LENS_SECTIONS_COMMERCIAL[lens] ?? [];
+  return LENS_SECTIONS[lens] ?? [];
+}
+
+// Fix (ii) — CONTENT-CLASS RESCUE (labor standards). Deterministic SHAPE anchors (WD register headers,
+// WD-number shapes, the 52.222-41 clause family, the H&W rate line) — never a vocabulary blocklist.
+// A block is the anchor's surrounding paragraph region (blank-line bounded, size-capped). Ambiguity
+// routes TOWARD rescue (over-provision is benign by ruling; an extra pass is the worst case).
+const LABOR_STANDARDS_ANCHORS: RegExp[] = [
+  /REGISTER OF WAGE DETERMINATIONS?/i,
+  // WD numbers: canonical "2015-4417" AND the short-form year "WD 15-4417" / "Wage Determination No.: 15-4417" (R1-F9)
+  /\b(?:WD|WAGE DETERMINATION)\s*(?:NO\.?|NUMBER|:)?\s*:?\s*\d{2,4}-\d{4}\b/i,
+  /\b\d{4}-\d{4}\b[^\n]{0,80}\bRev(?:ision)?\b/i,
+  // SCA clause family
+  /\b52\.222-(?:4[1-6]|5[1-5])\b/,
+  // Davis-Bacon (R1-F5): the DBA clause family, the "GENERAL DECISION NUMBER" header, and the
+  // state-coded decision-number shape (e.g. TX20240001)
+  /\b52\.222-(?:[5-9]|1[0-5])\b/,
+  /\bGENERAL DECISION (?:NUMBER|NO\.?)\b/i,
+  /\b[A-Z]{2}\d{8}\b/,
+  /\bDAVIS[- ]BACON\b/i,
+  /\bHEALTH\s*&\s*WELFARE\b[^\n]{0,60}\$?\d/i,
+  /\bSERVICE CONTRACT (?:LABOR STANDARDS|ACT)\b/i,
+];
+const RESCUE_BLOCK_CAP = 20_000;   // per-block cap — a WD table is big; keep the rescue bounded
+const RESCUE_TOTAL_CAP = 60_000;   // total rescued chars ≤ one lens budget (worst case: one extra pass batch)
+export interface LaborStandardsBlock {
+  /** the block text (anchored paragraphs + one leading/trailing context paragraph). */
+  text: string;
+  /** the FIRST ANCHORED paragraph (R1-F4: never key on prepended context, which is routinely
+   *  duplicated boilerplate in extracted PDFs and silently defeated the rescue). */
+  anchor: string;
+  /** the ANCHORED paragraphs only (no leading/trailing context) — the R4-F3 dedupe key: context paras
+   *  span section boundaries in the joined routed text, so full-`text` containment over-rescues, while
+   *  endpoint sampling under-rescues (boilerplate header+outro). The core is the content itself.
+   *  EXPLICIT RESIDUALS (R5-F7/F8, Brain-sanction pending): (a) a block whose anchored core is
+   *  byte-identical to an already-assembled block is deduped even when its unanchored CONTEXT paragraph
+   *  differs — context ≠ content by this key's construction (any core byte-difference rescues); (b)
+   *  separator drift (\n\n\n vs \n\n) defeats containment and re-ships a duplicate rescue pass —
+   *  over-provision, benign by ruling, bounded by RESCUE_TOTAL_CAP. */
+  core: string;
+}
+/** Extract labor-standards content blocks from `source` by shape anchor. Each block is the contiguous
+ *  paragraph region (blank-line bounded) around an anchor hit, expanded forward while following
+ *  paragraphs still carry an anchor (a WD's rate table spans many paragraphs). Pure, deterministic.
+ *  R1-F6 (no-silent-caps): blocks beyond RESCUE_TOTAL_CAP are counted in `droppedForCap` and logged by
+ *  consumers — never silently vanished. */
+export function extractLaborStandardsBlocks(source: string): { blocks: LaborStandardsBlock[]; droppedForCap: number } {
+  const src = source ?? "";
+  if (!src) return { blocks: [], droppedForCap: 0 };
+  const paras = src.split(/\n\s*\n/);
+  const blocks: LaborStandardsBlock[] = [];
+  let droppedForCap = 0;
+  let cur: string[] = [];
+  let curCore: string[] = [];
+  let curAnchor: string | null = null;
+  let total = 0;
+  const anchored = (p: string) => LABOR_STANDARDS_ANCHORS.some((re) => re.test(p));
+  const flush = () => {
+    if (!cur.length || curAnchor === null) { cur = []; curCore = []; curAnchor = null; return; }
+    const raw = cur.join("\n\n");
+    // R1-F6: a per-block cut is MARKED inside the block (never a silently-dissected table).
+    const text = raw.length > RESCUE_BLOCK_CAP
+      ? `${raw.slice(0, RESCUE_BLOCK_CAP)}\n[block truncated at rescue cap — content continues in the full section]`
+      : raw;
+    const core = curCore.join("\n\n").slice(0, RESCUE_BLOCK_CAP);
+    if (total + text.length <= RESCUE_TOTAL_CAP) { blocks.push({ text, anchor: curAnchor, core }); total += text.length; }
+    else droppedForCap++;
+    cur = []; curCore = []; curAnchor = null;
+  };
+  for (let i = 0; i < paras.length; i++) {
+    if (anchored(paras[i])) {
+      // R2-F5: a run of anchored paragraphs CHAINS into successive blocks at the per-block cap instead of
+      // truncating the run (a WD after ~20K of anchored preamble was cut with only the in-block marker).
+      const curLen = cur.reduce((a, p) => a + p.length + 2, 0);
+      if (cur.length && curLen + paras[i].length > RESCUE_BLOCK_CAP) flush();
+      // open (or extend) a block: include one preceding paragraph of context when starting fresh
+      if (!cur.length && i > 0 && !anchored(paras[i - 1])) cur.push(paras[i - 1]);
+      cur.push(paras[i]);
+      curCore.push(paras[i]);
+      if (curAnchor === null) curAnchor = paras[i];
+    } else if (cur.length) {
+      // one unanchored paragraph of trailing context, then close (WD tables carry anchors densely)
+      cur.push(paras[i]);
+      flush();
+    }
+  }
+  flush();
+  return { blocks, droppedForCap };
+}
+/** Header line for a rescue pass — grep-able in probes and honest to the lens about provenance. */
+export const RESCUE_PASS_HEADER = "## CONTENT-CLASS RESCUE (labor standards — routed to this lens by shape anchor, independent of section key)";
+/** The panel lenses that receive the labor-standards rescue (the briefed emitters). */
+const RESCUE_LENSES: ReadonlySet<PanelLensKey> = new Set(["pricing_contracts_risk"]);
 
 /** Default per-lens source budget (chars). Bounded so a lens call stays cheap; a section cut for
  *  budget is reported in `droppedForBudget` and MUST degrade coverage upstream — never silent. */
@@ -63,10 +189,10 @@ export interface LensSourceBundle {
 export function assembleLensSource(
   lens: PanelLensKey,
   sectionText: Record<string, string>,
-  opts: { perLensBudgetChars?: number } = {}
+  opts: { perLensBudgetChars?: number; docClass?: "ucf" | "commercial" } = {}
 ): LensSourceBundle {
   const budget = opts.perLensBudgetChars ?? DEFAULT_LENS_BUDGET_CHARS;
-  const assigned = LENS_SECTIONS[lens] ?? []; // guard: an unknown lens key → empty, never a TypeError
+  const assigned = lensAssignedSections(lens, opts.docClass); // guard: an unknown lens key → empty, never a TypeError
   const includedSections: string[] = [];
   const missingSections: string[] = [];
   const droppedForBudget: string[] = [];
@@ -135,10 +261,10 @@ export function chunkText(text: string, maxChars: number): string[] {
 export function assembleLensPasses(
   lens: PanelLensKey,
   sectionText: Record<string, string>,
-  opts: { perLensBudgetChars?: number } = {}
+  opts: { perLensBudgetChars?: number; docClass?: "ucf" | "commercial" } = {}
 ): { passes: LensSourceBundle[]; missingSections: string[]; sourceConcat: string } {
   const budget = opts.perLensBudgetChars ?? DEFAULT_LENS_BUDGET_CHARS;
-  const assigned = LENS_SECTIONS[lens] ?? [];
+  const assigned = lensAssignedSections(lens, opts.docClass);
   const missingSections: string[] = [];
   // 1) build blocks; chunk any single section that alone exceeds budget (header preserved per part).
   const blocks: Array<{ key: string; text: string }> = [];
@@ -169,6 +295,30 @@ export function assembleLensPasses(
   }
   flush();
   if (!passes.length) passes.push({ lens, text: "", includedSections: [], missingSections, droppedForBudget: [] });
+  // UNIT 2.1 fix (ii) — content-class rescue: labor-standards blocks anywhere in the ROUTED package that did
+  // not reach this briefed lens's assembled passes ride an extra RESCUE pass (section-key independent). The
+  // containment check dedupes (a block already inside an assigned section adds nothing); over-provision is
+  // benign by ruling. Flag OFF ⇒ no rescue ⇒ byte-identical.
+  if (lensEmissionIntegrityEnabled() && RESCUE_LENSES.has(lens)) {
+    const assembled = passes.map((p) => p.text).join("\n\n");
+    const allRouted = Object.values(sectionText).join("\n\n");
+    const { blocks, droppedForCap } = extractLaborStandardsBlocks(allRouted);
+    // R1-F4: dedupe on the ANCHORED paragraph (never the prepended context, which is routinely duplicated
+    // boilerplate and silently defeated the rescue).
+    // R3-F6 + R4-F3 — dedupe on FULL block-text containment. Any sampled-endpoint scheme loses to
+    // boilerplate ends (the standard WD's repeated occupation-header AND verbatim conformance outro made
+    // a head+tail check vacuous — the unique rate rows in the middle were never checked, silent loss).
+    // A false-miss here produces a duplicate rescue pass — over-provision, benign by ruling; it can never
+    // produce a silent drop.
+    const missingBlocks = blocks.filter((b) => !assembled.includes(b.core));
+    if (droppedForCap > 0) console.warn(`[lens-rescue] ${lens}: ${droppedForCap} labor-standards block(s) beyond RESCUE_TOTAL_CAP not rescued (no-silent-caps)`);
+    if (missingBlocks.length) {
+      const capNote = droppedForCap > 0 ? `\n\n[rescue-capped: ${droppedForCap} additional labor-standards block(s) exceeded the rescue budget and are NOT included — the section reads remain the authority]` : "";
+      const rescueBody = missingBlocks.map((b) => b.text).join("\n\n") + capNote;
+      for (const chunk of chunkText(rescueBody, Math.max(1, budget - RESCUE_PASS_HEADER.length - 20)))
+        passes.push({ lens, text: `${RESCUE_PASS_HEADER}\n${chunk}`, includedSections: [], missingSections, droppedForBudget: [] });
+    }
+  }
   return { passes, missingSections, sourceConcat: passes.map((p) => p.text).join("\n\n") };
 }
 

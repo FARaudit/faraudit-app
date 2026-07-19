@@ -7,7 +7,7 @@
 // is a fact the harness can verify, not something the model asserts.
 
 import { detectSections, type FormatType } from "./section-boundary-detector";
-import { makeClauseSourceChecker } from "./agentic-sections";
+import { extractLaborStandardsBlocks, makeClauseSourceChecker } from "./agentic-sections";
 import type { ConstructionManifest } from "./audit-construction-manifest";
 import { isBindingDoc } from "./sam-attachments";
 import { isEnvOn } from "./env-flags";
@@ -132,11 +132,38 @@ export function requiresProposalSections(noticeType: string | null | undefined):
 // section (sectionFullText) so an obligation past the cap surfaces as ungrounded ⇒ INCOMPLETE, never a false COMPLETE.
 export const SECTION_READ_CAP = 12000;
 
+// UNIT 2.1 fix (ii), V3-engine instance (cards #548/#549) — same-class emission blindness via the read-cap:
+// on dccce793 the routed §C slice was 63,785 chars with the embedded wage determination in its TAIL — beyond
+// every lens's SECTION_READ_CAP view, so the pricing lens honestly reported the fringe rate "not stated in the
+// provided text" while it sat in the unseen tail. Rescue: when the truncated tail carries labor-standards
+// content (shape anchors — WD headers / 52.222-41 family / H&W rate lines), append those blocks to the lens
+// view under an explicit marker. Additive-only over-provision (benign by ruling); `truncated` stays true (the
+// read is still partial); the completeness proof is unaffected (it reads sectionFullText, uncapped).
+// Flag OFF ⇒ byte-identical.
+const SECTION_RESCUE_CAP = 12000; // rescued content bound — the lens view at most doubles, never unbounded
+export const SECTION_RESCUE_MARKER = "[CONTENT-CLASS RESCUE — labor-standards content beyond the read cap]";
 /** Tool — read a UCF section's text. The expert reads only what it needs (just-in-time), never a stuffed dump.
  *  `truncated` = the full section exceeds the lens read-cap (the expert saw only the first SECTION_READ_CAP chars). */
 export function readSection(ctx: AuditToolContext, key: string): { key: string; present: boolean; text: string; truncated: boolean } {
   const s = sectionsOf(ctx)[(key || "").toUpperCase()] ?? "";
-  return { key: (key || "").toUpperCase(), present: !!s, text: s.slice(0, SECTION_READ_CAP), truncated: s.length > SECTION_READ_CAP };
+  let text = s.slice(0, SECTION_READ_CAP);
+  const truncated = s.length > SECTION_READ_CAP;
+  if (truncated && isEnvOn(process.env.AUDIT_LENS_EMISSION_INTEGRITY)) {
+    const tail = s.slice(SECTION_READ_CAP);
+    const { blocks, droppedForCap } = extractLaborStandardsBlocks(tail);
+    if (blocks.length) {
+      const joined = blocks.map((b) => b.text).join("\n\n");
+      const cut = joined.length > SECTION_RESCUE_CAP;
+      // R1-F6 (no-silent-caps): a mid-block cut and any dropped blocks are MARKED — the lens is told the
+      // rescue is partial, never handed a silently-dissected table.
+      const capNote = cut || droppedForCap > 0
+        ? `\n[rescue truncated at cap${droppedForCap > 0 ? `; ${droppedForCap} additional block(s) not included` : ""} — content continues in the full section]`
+        : "";
+      text += `\n\n${SECTION_RESCUE_MARKER}\n${joined.slice(0, SECTION_RESCUE_CAP)}${capNote}`;
+      if (cut || droppedForCap > 0) console.warn(`[read-rescue] §${(key || "").toUpperCase()}: labor-standards rescue partial (cut=${cut}, droppedBlocks=${droppedForCap})`);
+    }
+  }
+  return { key: (key || "").toUpperCase(), present: !!s, text, truncated };
 }
 
 /** The FULL text of a section (uncapped) — used by the completeness proof so no obligation is invisible to it,

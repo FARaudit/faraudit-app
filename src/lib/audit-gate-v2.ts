@@ -19,6 +19,7 @@
 // (AUDIT_GATE_V2); with the flag off nothing here is reached and V1 is byte-identical.
 
 import type { SectionAttestation } from "./audit-orchestrator";
+import { isEnvOn } from "./env-flags";
 
 export const GATE_V2_ENABLED = process.env.AUDIT_GATE_V2 === "true";
 
@@ -388,6 +389,26 @@ export function isConditionalTinaBoilerplate(ob: string): boolean {
 // importanceOf==="disqualifier" FIRST, and hasBarSignal keeps every real bar escalating, so nothing real is laundered.
 // Flag-OFF ⇒ the #472 belt is byte-identical.
 const ledgerBroadAmbiguousEnabled = () => process.env.AUDIT_LEDGER_BROAD_AMBIGUOUS === "true";
+// UNIT 2.2 (cards #548/#549) — grounding-matcher variant tolerance + true-location attribution. Single flag for
+// the unit; consumed by groundedBy (orchestrator), the gradeCoverageV2 locator wiring, and readable by tests.
+export const groundingVariantToleranceEnabled = () => isEnvOn(process.env.AUDIT_GROUNDING_VARIANT_TOLERANCE); // R5-F5 — same tolerant parser as unit 2.1 (no per-flag drift within one card)
+/** R2-F1 + R3-F2/F3 — ALL of the obligation's DISQUALIFIER-trigger substrings, each snapped FORWARD to
+ *  the next word boundary (the failure-to alternative's regex ends mid-word on `reject`/`disqualif`
+ *  prefixes — an unsnapped trigger is unlocatable in token space and the requirement would silently
+ *  vanish). The relaxed grounding paths require EVERY trigger span to be covered by shared material —
+ *  see passesSubstantiveBar (groundedBy). */
+export function disqualifierTriggersOf(ob: string): string[] {
+  const src = ob ?? "";
+  const re = new RegExp(DISQUALIFIER_RE.source, "gi");
+  const out: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(src)) !== null) {
+    const cont = /^[A-Za-z0-9]+/.exec(src.slice(m.index + m[0].length))?.[0] ?? "";
+    out.push(m[0] + cont);
+    if (re.lastIndex === m.index) re.lastIndex++; // zero-width safety
+  }
+  return out;
+}
 export function isLedgerDemotableNonBar(ob: string): boolean {
   if (!ambiguousSignalDemotionEnabled()) return false;
   if (isGovtEvalMethodologyNonBar(ob)) return true;
@@ -401,8 +422,13 @@ export interface CoverageV2 {
   unreadable: string[];
   /** Read sections whose (boilerplate) obligations weren't verbatim-grounded → the FALSE-INCOMPLETE source; no veto. */
   ungroundedRead: string[];
-  /** Ungrounded obligations carrying genuine disqualification language → escalate to NEEDS_HUMAN_REVIEW. */
-  disqualifierUncovered: Array<{ section: string; obligation: string }>;
+  /** Ungrounded obligations carrying genuine disqualification language → escalate to NEEDS_HUMAN_REVIEW.
+   *  UNIT 2.2 (cards #548/#549): `locatedAt` is the obligation's TRUE location in the source (doc + nearest
+   *  heading, e.g. "PWS §7.3.2"), resolved by the caller's locator — on a commercial package the `section`
+   *  key is a routed approximation (the dccce793 NHR banner said "§L" for a PWS key-personnel row).
+   *  `contextNote` carries adjacent scope context (e.g. a reference-only/non-billable note) so the rendered
+   *  reason tells the reader what surrounds the sentence. INFORMATIONAL ONLY — never changes the pole. */
+  disqualifierUncovered: Array<{ section: string; obligation: string; locatedAt?: string; contextNote?: string }>;
   /** Ungrounded, ambiguous, BAR-SIGNAL-NEGATIVE obligations (benign proposal-prep: formatting/POC/page-limits, or a
    *  government-eval-methodology sentence) DEMOTED off the escalation path to a coverage SIGNAL (card #460). Visible
    *  here, never in disqualifierUncovered, never dropped. Empty unless AUDIT_AMBIGUOUS_SIGNAL_DEMOTION is on.
@@ -414,11 +440,23 @@ export interface CoverageV2 {
 
 /** Re-read the V1 attestations through the V2 lens. Pure. Does NOT change any finding or invent coverage —
  *  it only classifies WHY a section is uncovered (genuinely unreadable vs read-but-unquoted) and weights it. */
-export function gradeCoverageV2(attestations: SectionAttestation[]): CoverageV2 {
+export function gradeCoverageV2(attestations: SectionAttestation[], opts?: {
+  /** UNIT 2.2 — resolve an obligation sentence to its TRUE source location (doc + nearest heading) plus any
+   *  adjacent scope-context note. Supplied by the orchestrator (which holds ctx.fullSource); absent ⇒ entries
+   *  carry only the routed section key (byte-identical to the pre-#548 shape). Informational only. */
+  locate?: (ob: string) => { locatedAt: string; contextNote?: string } | null;
+}): CoverageV2 {
   const unreadable: string[] = [];
   const ungroundedRead: string[] = [];
-  const disqualifierUncovered: Array<{ section: string; obligation: string }> = [];
+  const disqualifierUncovered: Array<{ section: string; obligation: string; locatedAt?: string; contextNote?: string }> = [];
   const ungroundedNonBarSignal: Array<{ section: string; obligation: string }> = [];
+  const enrich = (e: { section: string; obligation: string }) => {
+    // Double-gated (R1 probe 5b): the production locator self-guards on the flag, but a caller-supplied
+    // locate fn might not — enrichment NEVER runs flag-OFF regardless of the injected fn.
+    if (!groundingVariantToleranceEnabled()) return e;
+    const loc = opts?.locate?.(e.obligation) ?? null;
+    return loc ? { ...e, locatedAt: loc.locatedAt, ...(loc.contextNote ? { contextNote: loc.contextNote } : {}) } : e;
+  };
   let coveredWeight = 0, totalWeight = 0;
 
   for (const a of attestations) {
@@ -446,12 +484,12 @@ export function gradeCoverageV2(attestations: SectionAttestation[]): CoverageV2 
       for (const ob of realUngrounded) {
         const imp = importanceOf(ob);
         if (imp === "boilerplate") continue;
-        if (imp === "disqualifier") { disqualifierUncovered.push({ section: a.section, obligation: ob }); continue; }
+        if (imp === "disqualifier") { disqualifierUncovered.push(enrich({ section: a.section, obligation: ob })); continue; }
         if (ambiguousSignalDemotionEnabled() && (!hasBarSignal(ob) || isGovtEvalMethodologyNonBar(ob)
               || (conditionalTinaDemotionEnabled() && isConditionalTinaBoilerplate(ob)))) {
           ungroundedNonBarSignal.push({ section: a.section, obligation: ob }); continue;
         }
-        disqualifierUncovered.push({ section: a.section, obligation: ob });
+        disqualifierUncovered.push(enrich({ section: a.section, obligation: ob }));
       }
     }
   }
@@ -474,7 +512,22 @@ export function gateV2Outcome(cov: CoverageV2): GateV2Outcome {
     return { cap: "INCOMPLETE", reason: `Could not fully read binding content: §${cov.unreadable.join(", §")} (unread/truncated at ingest) — the honest incomplete.` };
   if (cov.disqualifierUncovered.length) {
     const d = cov.disqualifierUncovered[0];
-    return { cap: "NEEDS_HUMAN_REVIEW", reason: `A potential disqualifying requirement in §${d.section} could not be grounded to a finding — human verification needed: "${d.obligation.slice(0, 120)}".` };
+    // UNIT 2.2 — report the obligation at its TRUE location when the locator resolved one (the routed section
+    // key is an approximation on commercial packages; dccce793's "§L" banner was a PWS key-personnel row).
+    // Any adjacent scope context (e.g. a reference-only note) rides along so the reader sees what the human
+    // review is actually judging. Pole unchanged — fail-toward-disqualifier stands.
+    const where = d.locatedAt ? `at ${d.locatedAt}` : `in §${d.section}`;
+    // contextNote arrives PRE-LABELED by the locator (R1-F3: "Surrounding context…" when in the sentence's
+    // own block; "An earlier scope note… (verify it governs…)" when document-level) — append verbatim.
+    // R5-F6 — word-boundary clamp (the 69dbbe9e reason-garble class): never a mid-word cut with an
+    // unclosed quote on the customer banner. Cap ≥ the locator's construction max (~380).
+    const clampNote = (s: string): string => {
+      if (s.length <= 380) return s;
+      const cut = s.slice(0, 380).replace(/\s+\S*$/, "");
+      return `${cut}…".`;
+    };
+    const ctxNote = d.contextNote ? ` ${clampNote(d.contextNote)}` : "";
+    return { cap: "NEEDS_HUMAN_REVIEW", reason: `A potential disqualifying requirement ${where} could not be grounded to a finding — human verification needed: "${d.obligation.slice(0, 120)}".${ctxNote}` };
   }
   const nonBar = cov.ungroundedNonBarSignal ?? [];
   const demoted = nonBar.length
