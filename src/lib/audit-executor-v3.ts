@@ -404,11 +404,19 @@ export async function executeAgenticPrimary(
   // ledger) via onUsage. A panel honest-fail (manifest gate / all-lenses-failed) yields typedFindings=[] — the rail
   // proceeds on the v3 lens findings alone, never blocked by the panel. The judge is REASON-only (2d, not yet folded).
   let panelResult: PanelResult | null = null;
-  if (AGENTIC_PANEL_ENABLED) {
+  // PARALLELIZE (card #570, flag AUDIT_PANEL_PARALLEL default-OFF) — the panel PRODUCER (runPanelJudge, ~165s) does not
+  // depend on the auditPackage expert-phase (~66s), and auditPackage merges the producer findings only AFTER its own
+  // expert-phase (orchestrator :2232 JOIN). So under the flag the producer runs CONCURRENTLY with the expert-phase and
+  // joins at that merge (wall-clock = max, not sum). The finding UNION into deriveVerdict is byte-identical to serial
+  // (same set, same merge point, same dedup order). Flag-OFF ⇒ the serial `await runPanel()` path below ⇒ byte-identical.
+  const panelParallel = AGENTIC_PANEL_ENABLED && process.env.AUDIT_PANEL_PARALLEL === "true";
+  let panelPromise: Promise<PanelResult | null> | null = null;
+  // The producer, with its graceful degradation preserved EXACTLY (non-abort throw → panel-off; abort → rethrow).
+  const runPanel = async (): Promise<PanelResult | null> => {
     try {
       const panelInputs = buildPanelInputs(fullSource);
       const _tPanelProducer = Date.now();
-      panelResult = await runPanelJudge({
+      const r = await runPanelJudge({
         sectionText: panelInputs.sectionText,
         detectedSections: panelInputs.detectedSections,
         unroutedBinding: panelInputs.unroutedBinding,
@@ -417,8 +425,9 @@ export async function executeAgenticPrimary(
         signal,
         onUsage: (u) => usageCalls.push(u),
       });
-      console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: panel [${panelInputs.documentClass}] ${panelResult.fired ? `fired → ${panelResult.typedFindings.length} verified typed finding(s) merged` : `honest-fail (${panelResult.manifest.missing.length ? "gate: " + panelResult.manifest.missing.join(", ") : "no verdict"}) → 0 findings`}`);
-      if (_timeOn) console.log(`[timing] prepanel:panel-producer(runPanelJudge) ${Date.now() - _tPanelProducer}ms · ${panelResult.fired ? panelResult.typedFindings.length + " findings" : "honest-fail"}`);
+      console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: panel [${panelInputs.documentClass}] ${r.fired ? `fired → ${r.typedFindings.length} verified typed finding(s) merged` : `honest-fail (${r.manifest.missing.length ? "gate: " + r.manifest.missing.join(", ") : "no verdict"}) → 0 findings`}`);
+      if (_timeOn) console.log(`[timing] prepanel:panel-producer(runPanelJudge) ${Date.now() - _tPanelProducer}ms · ${r.fired ? r.typedFindings.length + " findings" : "honest-fail"}${panelParallel ? " · PARALLEL" : ""}`);
+      return r;
     } catch (e) {
       // DOCTRINE (ultra #236 bug_005): the panel NEVER blocks the audit. runPanelJudge honest-fails gracefully for
       // lens/verifier failures, but the chief-judge call RETHROWS (retry-ladder ceiling / rate-limit / AbortError
@@ -426,14 +435,26 @@ export async function executeAgenticPrimary(
       // were charged, stranding the row in 'processing'. Degrade to panel-off → deriveVerdict proceeds on the v3 lens
       // findings alone. EXCEPT an overall-budget abort, which must still own the terminal-failed path (never a silent degrade).
       if (signal?.aborted) throw e;
-      panelResult = null;
       console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: panel threw (${e instanceof Error ? e.message : e}) → degraded to panel-off; rail proceeds on v3 findings`);
+      return null;
+    }
+  };
+  if (AGENTIC_PANEL_ENABLED) {
+    if (panelParallel) {
+      panelPromise = runPanel();           // start CONCURRENTLY; auditPackage awaits it at the rail merge (:2232)
+      panelPromise.catch(() => {});        // abort-teardown safety: real handling is auditPackage's await of the derived promise + the await below
+    } else {
+      panelResult = await runPanel();      // SERIAL (today's path — byte-identical)
     }
   }
   const _tPackage = Date.now();
   const res = await auditPackage({
     fullSource, bidderProfile, signal, manifestComplete: manifestComplete && !constructionOOS, constructionManifest, groundingSource,
-    panelFindings: panelResult?.typedFindings,   // card #523 (P2a-wire) — VERIFIED panel facts unioned into the rail (undefined when flag OFF ⇒ byte-identical)
+    // card #523 (P2a-wire) — VERIFIED panel facts unioned into the rail (undefined when flag OFF ⇒ byte-identical).
+    // card #570 — serial passes the resolved array; parallel passes the PRODUCER PROMISE (resolved at the rail merge so
+    // the producer overlaps the expert-phase). Exactly one is set; the merged union is byte-identical either way.
+    panelFindings: panelParallel ? undefined : panelResult?.typedFindings,
+    panelFindingsPromise: panelParallel ? panelPromise!.then((r) => r?.typedFindings) : undefined,
     noticeBodyText: noticeBody?.text,   // B3 (card 421 Fork-3) — delimiter-independent notice-body eligibility floor
 
     naics: solicitation?.naicsCode ?? null, setAside: solicitation?.typeOfSetAside ?? null,
@@ -448,6 +469,9 @@ export async function executeAgenticPrimary(
   // a half-finished verdict as if it were final. Reject so the worker's terminal path owns it.
   if (signal?.aborted) throw new Error("agentic engine aborted after verdict (overall budget) — not persisting a late-complete row");
   if (_timeOn) console.log(`[timing] prepanel:auditPackage-total ${Date.now() - _tPackage}ms · (contains expert-phase/j1/verify/grounding/decide — compare to their sub-timings to expose hidden overhead)`);
+  // card #570 — in the parallel path the producer promise is already resolved (auditPackage awaited it at the rail
+  // merge); surface panelResult here so the downstream judgment-fold / logging see the SAME producer result as serial.
+  if (panelParallel && panelPromise) panelResult = await panelPromise;
   const generatedAt = new Date().toISOString();
   // Card #481 (ruling-4) — reframe a "no set-aside is present" finding against the authoritative masthead set_aside so it
   // stops contradicting the "Set-aside: SBA" header (display-only, no verdict impact). Flag-OFF ⇒ untouched (byte-identical).
