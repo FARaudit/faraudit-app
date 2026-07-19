@@ -29,7 +29,7 @@ import { highSignalSweep, boilerplateTrapSweep } from "./audit-grounding-sweep";
 import { createHash } from "node:crypto";
 import type { TypedFinding, BidderProfile, VerdictInputs } from "./audit-findings";
 import { scanPackageMarkers, absenceClaimContradicted } from "./absence-grounding-gate";
-import { disqualifierTriggersOf, GATE_V2_ENABLED, gradeCoverageV2, groundingVariantToleranceEnabled, importanceOf, isLedgerDemotableNonBar } from "./audit-gate-v2";
+import { disqualifierTriggersOf, GATE_V2_ENABLED, gradeCoverageV2, groundingVariantToleranceEnabled, importanceOf, isLedgerDemotableNonBar, verifyRecitalInSource } from "./audit-gate-v2";
 
 // B1 (Brain card #421 Fork-1) — §L/§M coverage-ledger honors boilerplate. A READ §L/§M whose ONLY ungrounded
 // obligation sentences are administrative BOILERPLATE (importanceOf==="boilerplate") reads COVERED-WITH-SIGNAL, not
@@ -2695,7 +2695,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      citation+requirement only, facets kept). Runs LAST — after every re-typing guard/emitter — right before deriveVerdict.
   //      Flag AUDIT_FINDING_DEDUP default-OFF ⇒ byte-identical.
   findings = applyFindingDedup(findings, { enabled: process.env.AUDIT_FINDING_DEDUP === "true" });
-  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(process.env.AUDIT_SITEVISIT_SEVERITY_FLOOR === "true" ? { siteVisitSeverityFloor: true } : {}), ...(GATE_V2_ENABLED ? { coverageV2: gradeCoverageV2(attestations, { locate: (ob) => locateObligationContext(ctx.fullSource, ob) }) } : {}) };
+  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(process.env.AUDIT_SITEVISIT_SEVERITY_FLOOR === "true" ? { siteVisitSeverityFloor: true } : {}), ...(GATE_V2_ENABLED ? { coverageV2: gradeCoverageV2(attestations, { locate: (ob) => locateObligationContext(ctx.fullSource, ob), verifyRecitalPresence: (ob) => verifyRecitalInSource(ctx.fullSource, ob) }) } : {}) };
   if (process.env.CONSTRUCTION_DEBUG === "true") {
     const kc: Record<string, number> = {}, dc: Record<string, number> = {};
     for (const f of findings) { kc[f.kind] = (kc[f.kind] ?? 0) + 1; const d = disposeFinding(f); dc[d] = (dc[d] ?? 0) + 1; }
