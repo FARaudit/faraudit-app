@@ -541,10 +541,15 @@ async function buildInput(row: UserPendingRow): Promise<AuditExecutionInput> {
     // (assembled stays null → ingestion meta null → no banner).
     let assembled: AssembledDocumentSet | null = null;
     if (/^[a-f0-9]{32}$/i.test(row.notice_id)) {
+      // PRE-PANEL TIMING (card #567) — SAM document-set retrieval (manifest + per-attachment download + text extract) is
+      // the "retrieval" phase, OUTSIDE the 270s engine budget. Timing it proves whether retrieval (vs the in-budget
+      // engine) drives wall-clock, and whether upload-direct — which skips this — would complete under budget. Log-only.
+      const _tSamDl = Date.now();
       assembled = await assembleSamDocumentSet(row.notice_id, row.solicitation_number).catch((err) => {
         console.warn(`[audit-worker] FA-136: document-set assembly failed for ${row.notice_id} — legacy single-URL path: ${err instanceof Error ? err.message : err}`);
         return null;
       });
+      if (process.env.AUDIT_TIMING_PREPANEL === "true") console.log(`[timing] prepanel:sam-retrieval(assembleSamDocumentSet) ${Date.now() - _tSamDl}ms · ${assembled ? `${assembled.ingestion.files_ingested}/${assembled.ingestion.files_total} docs` : "failed→legacy"}`);
     }
     if (assembled?.primary) {
       pdfBase64 = assembled.primary.base64;
