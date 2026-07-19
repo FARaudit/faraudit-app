@@ -2843,6 +2843,15 @@ export function enforceVerdictWordInvariant(d: Decision): Decision {
   return d;
 }
 
+// FABRICATION INVARIANT — the mechanic clause (Brain card #574, Option B by-construction). The single source of
+// the "lead time exceeds the response window" mechanic literal: it is emitted ONLY by groundedMechanicClause, and
+// ONLY when a finding carries a GROUNDED lead-time/possession-at-award basis. Reason templates hold no mechanic
+// literal, so by construction no reason can assert a mechanic the findings don't ground. Returns "" when ungrounded.
+const GROUNDED_LEADTIME_MECHANIC = " — lead time exceeds the response window";
+function groundedMechanicClause(findings: Array<{ requirement?: string; excerpt?: string }>): string {
+  return hasGroundedLeadTimeBasis(findings) ? GROUNDED_LEADTIME_MECHANIC : "";
+}
+
 /** Derive the verdict deterministically from typed grounded findings. The LLM experts supply the FACTS
  *  (requirement + grounded excerpt + kind + controllability); this code makes the DECISION. The ladder is
  *  the same one that used to live in the chief-judge prompt — relocated from prose to TypeScript so it is
@@ -3101,15 +3110,21 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //     curability-carrying NHR branch below. A GENUINE structural non-curable bar (clearance/QPL/TDP) still leads.
   const nonCurable = unknownBars.filter((f) => f.curableInWindow === false && f.nmrGuard !== true);
   if (nonCurable.length) {
-    // R4 FABRICATED-MECHANIC GUARD (Brain card #538 · AUDIT_MM_EVIDENCE_FACTOR_DEMOTION) — the "lead time exceeds the
-    // response window" mechanic may be asserted ONLY when a non-curable finding carries a GROUNDED long-lead /
-    // possession-at-award basis (clearance/QPL/CMMC/lead-time/hold-at-offer). Ungrounded (the FA303026Q0020 specimen)
-    // → state the hold-it-or-walk conditional WITHOUT the fabricated lead-time claim. Flag OFF ⇒ leadTimeGrounded is
-    // forced true ⇒ the original prose emits unchanged (byte-identical).
-    const leadTimeGrounded = !mmDemote || hasGroundedLeadTimeBasis(nonCurable);
-    const barLine = leadTimeGrounded
-      ? `Non-curable bar(s) — lead time exceeds the response window. CONDITIONAL NO-BID: if your firm does not ALREADY hold the following and cannot obtain it before the deadline, this is a NO-BID — it cannot be cured in the window: ${names(nonCurable)}`
-      : `Structural bar(s) the firm may be unable to satisfy within the response window. CONDITIONAL NO-BID: if your firm does not ALREADY hold the following and cannot obtain it before the deadline, this is a NO-BID: ${names(nonCurable)}`;
+    // FABRICATION INVARIANT (Brain card #574, Option B by-construction · flag AUDIT_FABRICATION_INVARIANT, default-OFF,
+    // Rule 61). The reason TEMPLATE below carries CONSEQUENCE ONLY — it holds no mechanic literal. The mechanic clause
+    // is emitted solely by groundedMechanicClause(), which returns the lead-time/possession mechanic IFF a finding
+    // carries a GROUNDED basis (clearance/QPL/CMMC/long-lead/hold-at-offer) and "" otherwise — so no code path can
+    // assert a mechanic the findings don't ground (the FA303026Q0020 chapel fabrication class, engine-wide).
+    //   Flag ON  → grounding decision is DECOUPLED from mmDemote: mechanic emits iff grounded (the invariant).
+    //   Flag OFF → legacy mmDemote-coupled decision (card #538 R4), byte-identical to pre-#574 (grounded prose when
+    //              !mmDemote OR a grounded basis exists; neutral consequence prose otherwise).
+    const fabricationInvariant = process.env.AUDIT_FABRICATION_INVARIANT === "true";
+    const mechanic = fabricationInvariant
+      ? groundedMechanicClause(nonCurable)
+      : ((!mmDemote || hasGroundedLeadTimeBasis(nonCurable)) ? GROUNDED_LEADTIME_MECHANIC : "");
+    const lead = mechanic ? "Non-curable bar(s)" : "Structural bar(s) the firm may be unable to satisfy within the response window";
+    const cure = mechanic ? " — it cannot be cured in the window" : "";
+    const barLine = `${lead}${mechanic}. CONDITIONAL NO-BID: if your firm does not ALREADY hold the following and cannot obtain it before the deadline, this is a NO-BID${cure}: ${names(nonCurable)}`;
     return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), barLine, dispositions, nonCurable);
   }
 
