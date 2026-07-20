@@ -17,7 +17,7 @@ import { knifeEdgeIndices } from "./audit-decide";
 /** One skeptic ruling on a finding (by its index in the set). upheld=false ⇒ overturned (dropped). When
  *  `corrected` is present, the skeptic RE-TYPES the finding instead — escalation feeds deriveVerdict better
  *  inputs; it never re-derives the top-line itself (Brain card-54 point 3). */
-export interface SkepticVerdict { index: number; upheld: boolean; reason: string; entailmentFail?: boolean; corrected?: { controllability?: Controllability; curableInWindow?: boolean } }
+export interface SkepticVerdict { index: number; id?: string; upheld: boolean; reason: string; entailmentFail?: boolean; corrected?: { controllability?: Controllability; curableInWindow?: boolean } }
 /** The adversarial challenger over the finding set. opts.escalateIdx = the knife-edge subset to scrutinize. */
 export type SkepticFn = (ctx: AuditToolContext, findings: TypedFinding[], opts?: { escalateIdx?: number[] }) => Promise<SkepticVerdict[]>;
 
@@ -41,7 +41,10 @@ export function makeAgenticVerifier(skeptic: SkepticFn): VerifyFn {
     //     does NOT sink soundness. A stray informational finding the skeptic never reached must not honest-fail
     //     the whole clean audit — the customer-readiness gap card 285 closes.
     // Flag OFF ⇒ byte-identical to the pre-card-285 rule: unresolved ⇒ `complete=false` ⇒ not sound (whole-run NHR).
-    const residueDoctrine = process.env.AUDIT_VERIFIER_BATCHING === "true";
+    // AUDIT_VERIFIER_SHARDED (card #609) rides the SAME residue doctrine: the sharded path's coverage guarantee means
+    // residue is near-zero, but any finding the shards genuinely never rule must escalate PER-FINDING (verdict-driving
+    // → NHR; informational → unverified) exactly as the batched path does. Flag-OFF for BOTH ⇒ byte-identical old rule.
+    const residueDoctrine = process.env.AUDIT_VERIFIER_BATCHING === "true" || process.env.AUDIT_VERIFIER_SHARDED === "true";
     // CONSERVATIVE verdict-driving predicate (adversarial-review hardening, card 285). A finding is "informational"
     // (safe to leave UNRESOLVED without sinking soundness) ONLY when its KIND is one the engine defines as
     // structurally NEVER-a-bar: procedural_obligation (coverage-only, invisible to the verdict) or boilerplate
@@ -183,6 +186,65 @@ export function makeBatchedSkeptic(base: SkepticFn, opts?: { batchSize?: number;
     // catch routes the run to sound:false → NHR — symmetric with the ≤batchSize path above where a base throw
     // propagates. A PARTIAL outage (≥1 batch ruled) stays the intended residue behavior (unruled → classified).
     if (!anySucceeded) throw (lastError instanceof Error ? lastError : new Error("batched skeptic: every batch call failed (total skeptic outage)"));
+    return merged;
+  };
+}
+
+/** HARDENED SHARDED SKEPTIC (Brain card #609 — the skeptic-truncation fix; the cab687da dominant blocker).
+ *  The batched skeptic (above) closed the O(findings) truncation on the HAPPY path but three gaps remained, each a
+ *  false honest-fail path on a large finding set: (1) shards were keyed by POSITIONAL index — fragile if a shard
+ *  reorders; (2) a truncated shard call THREW inside the adapter → the whole shard's returned prefix was DISCARDED
+ *  (never salvaged) and, worse, a total first-call throw sank the run; (3) there was no CODE-OWNED assertion that the
+ *  union of shard rulings actually COVERS every input finding — coverage was implicit. This wrapper closes all three:
+ *   • ≤15 claims/shard (hard cap), so a single shard's output cannot approach the 4096-token skeptic ceiling.
+ *   • Rulings keyed to finding_id (not position): every merged verdict carries `id`, and residue is named per-id.
+ *   • SALVAGE-AWARE re-request: the base is expected to RETURN its parseable prefix on truncation (structuredAdapter-
+ *     Salvaging, wired in audit-package) rather than throw; the retry loop re-requests ONLY the still-unruled remainder
+ *     by local index — verify-returned-prefix + re-request remainder, NEVER discard-all.
+ *   • CODE-OWNED COVERAGE LEDGER: after all shards, assert ruledIds ⊇ allIds. Any genuinely-unruled finding is left
+ *     ABSENT from the merged verdicts (so makeAgenticVerifier classifies it — verdict-driving → NHR, informational →
+ *     unverified) AND named in a per-finding residue log. Residue escalates PER-FINDING, not per-run.
+ *  Pure orchestration over the injected base; adds no model of its own. Flag-gated in audit-package (AUDIT_VERIFIER_
+ *  SHARDED); OFF ⇒ never constructed ⇒ byte-identical. The ≤batchSize fast-path stays a single identical base call. */
+export function makeShardedSkeptic(base: SkepticFn, opts?: { shardSize?: number; retries?: number }): SkepticFn {
+  const shardSize = Math.min(15, Math.max(1, opts?.shardSize ?? 12)); // HARD CAP ≤15 (card #609)
+  const retries = Math.max(0, opts?.retries ?? 2);
+  return async (ctx, findings, _opts) => {
+    // card #609-(8) part 5: `_opts` (escalateIdx) is FULL-SET indexed — NEVER forward it into a per-shard SUBSET call
+    // (the stale-index trap); shard base calls receive no opts. Escalation is makeTieredSkeptic's job, not the base's.
+    void _opts;
+    const merged: SkepticVerdict[] = [];
+    let anySucceeded = false; let lastError: unknown = null;
+    // ≤shardSize ⇒ ONE shard — still routed through the retry+coverage loop (no bypass), so a truncated small set is
+    // salvaged + re-requested + coverage-asserted exactly like a large one (card-274 small-set contract, #609-(8)).
+    for (let start = 0; start < findings.length; start += shardSize) {
+      const shard = findings.slice(start, start + shardSize);
+      const ruled = new Map<number, SkepticVerdict>(); // local shard index → verdict
+      for (let attempt = 0; attempt <= retries && ruled.size < shard.length; attempt++) {
+        const remainIdx = shard.map((_, i) => i).filter((i) => !ruled.has(i)); // still-unruled remainder ONLY
+        const remain = remainIdx.map((i) => shard[i]);
+        let vs: SkepticVerdict[];
+        // A salvaging base returns its parseable PREFIX on truncation (fewer verdicts than requested) — those are kept,
+        // the missing remainder re-requested next attempt. A hard throw (network/parse) leaves the remainder unruled.
+        try { vs = await base(ctx, remain); anySucceeded = true; } catch (e) { lastError = e; break; }
+        for (const v of vs) {
+          const local = remainIdx[v.index];
+          if (local !== undefined && !ruled.has(local)) ruled.set(local, { ...v, index: local, id: shard[local]?.id });
+        }
+      }
+      for (const [local, v] of ruled) merged.push({ ...v, index: start + local, id: findings[start + local]?.id }); // remap to full-set index; key by id
+    }
+    // T0-4 parity: a TOTAL outage (no shard call ever returned) must route to sound:false → NHR, not a silent empty pass.
+    if (!anySucceeded) throw (lastError instanceof Error ? lastError : new Error("sharded skeptic: every shard call failed (total skeptic outage)"));
+    // CODE-OWNED COVERAGE ASSERT (card #609-(8) part 5 — a real assertion, NOT a log). The union of shard rulings MUST
+    // cover every input finding. A residual gap after ≤15-shard + retry + salvage means the adversary genuinely did not
+    // rule some finding → refuse a partial verdict set → THROW so makeAgenticVerifier routes the run to sound:false →
+    // NHR. The sharded path fails CLOSED on incomplete coverage (card-274 no-partial-trust, made structural).
+    if (merged.length < findings.length) {
+      const ruledIds = new Set(merged.map((v) => v.id).filter((x): x is string => x != null));
+      const residueIds = findings.map((f) => f.id).filter((id) => id != null && !ruledIds.has(id));
+      throw new Error(`sharded skeptic: incomplete coverage ${merged.length}/${findings.length} after ${retries + 1} attempt(s)/shard (unruled: ${residueIds.map((id) => `#${id}`).join(",") || "index-only"}) — refusing a partial verdict set (card-274)`);
+    }
     return merged;
   };
 }
