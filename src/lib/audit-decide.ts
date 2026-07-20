@@ -1837,6 +1837,12 @@ const fdClauseKeys = (f: TypedFinding): string[] => {
 export const FD_ABSORBABLE_KEYS = new Set<string>([
   "id", "requirement", "citation", "excerpt", "kind", "controllability", "grounded", "lens", "severity",
   "curableInWindow", "cautionFloor", "unverified", "documentProvenance", "locatedAt", "contextNote",
+  // checkboxCorrected — card #609-(2) dedup normalization: a VERDICT-INERT render/telemetry marker (set at :1340, read
+  // by NO verdict authority — deriveVerdict/disposeFinding/firmStatus/selfClearablePackageBars/killShotClass). Making it
+  // absorbable lets same-clause provenance-suffixed dups (the checkbox-corrected 52.219-14 row) collapse with their
+  // homogeneous siblings "irrespective of citation-provenance suffixes"; the marker is UNIONED onto the survivor below so
+  // the render signal survives. The finding-dedup.test.ts structural contract FAILS if this were ever verdict-read.
+  "checkboxCorrected",
 ]);  // NB: `requiredAttribute` is DELIBERATELY excluded — an attribute-bearing finding is verdict-load-bearing (R1 P1) → protected.
 // BRAIN #555 STRUCTURAL-COMPLETENESS CONTRACT (converts the "verdict-safe" claim from inductive → structural). deriveVerdict
 // is the SOLE verdict authority, so it must be the SOLE definition of "verdict-driving." The dedup is safe iff EVERY finding
@@ -1923,6 +1929,7 @@ function collapseHomogeneousByAnchor(
       severity: survivorSeverity,
       ...(members.some((f) => f.grounded === true) ? { grounded: true } : { grounded: base.grounded }),
       ...(members.some((f) => f.cautionFloor === true) ? { cautionFloor: true } : {}),  // STRICT === true — no off-domain-truthy laundering
+      ...(members.some((f) => (f as { checkboxCorrected?: boolean }).checkboxCorrected === true) ? { checkboxCorrected: true } : {}),  // card #609-(2) — verdict-inert render marker UNIONED onto the survivor (strict === true)
       ...markerOf(members, sigOf.get(anchor)!),
     };
     survivorPatch.set(anchor, survivor);
