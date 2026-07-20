@@ -611,6 +611,52 @@ export function credentialConditionalRecital(ob: string): { credential: string }
   return null;
 }
 
+// ═══ ORDINARY-COURSE PERFORMANCE-UPKEEP → CAVEAT (not NHR) — card #576, flag AUDIT_PERFORMANCE_UPKEEP_CAVEAT (OFF) ═══
+// BRAIN RULING (card #576, CEO customer-failure reframe): a "maintain <ORDINARY-COURSE credential> DURING performance"
+// recital is a POST-AWARD performance obligation, NOT a pre-award eligibility bar — escalating it to NEEDS_HUMAN_REVIEW
+// is a CUSTOMER FAILURE ("why did I pay you to tell me to review it myself"). It must stop driving NHR and instead attach
+// as a prominent CAVEAT to a committal verdict. This RECALIBRATES fail-toward-disqualifier (does NOT abandon it): NHR
+// stays reserved for pre-award gates, long-lead credentials, genuine ambiguity, and completeness failures.
+//
+// TWO-AXIS DISCRIMINATOR — BOTH axes must pass to demote; AMBIGUOUS ON EITHER → escalate (doctrine intact):
+//   Axis 1 TEMPORAL — during/throughout-performance UPKEEP framing → demote-eligible. HOLD/POSSESS-at-award/at-offer/
+//     prior-to-award → ESCALATE ALWAYS (a real pre-award gate). The temporal frame is checked over the obligation PLUS
+//     its source continuation (the LBJ live fragment is line-wrap-severed BEFORE "…coverage during the performance
+//     period" — Brain's production-shape acceptance binds us to demote THAT fragment, so the severed tail must be seen).
+//   Axis 2 ORDINARINESS — an affirmative ordinary-course allowlist (#507: business licensing, insurance, SAM-registration
+//     maintenance, generic quality/safety certs) → demote-eligible. A long-lead/scarce credential (facility clearance,
+//     CMMC, FAA/airworthiness, QPL/QML, and the #574 grounded-mechanic taxonomy) → ESCALATE REGARDLESS of temporal frame.
+const performanceUpkeepCaveatEnabled = () => process.env.AUDIT_PERFORMANCE_UPKEEP_CAVEAT === "true";
+// Axis 1 — during/throughout-performance UPKEEP frame (post-award), and the maintain/keep verb.
+const PERF_UPKEEP_TEMPORAL_RE = /\b(?:during|throughout)\s+(?:the\s+)?(?:entire\s+)?(?:contract\s+|order\s+|period\s+of\s+)?performance(?:\s+period)?\b|\bperiod\s+of\s+performance\b|\bthroughout\s+the\s+(?:life\s+of|term\s+of|duration\s+of)\b|\bfor\s+the\s+(?:entire\s+)?(?:duration|term|life)\s+of\s+the\s+(?:contract|order|performance)\b/i;
+const UPKEEP_VERB_RE = /\b(?:maintain|keep|retain|have\s+and\s+(?:shall\s+)?maintain|hold\s+and\s+(?:shall\s+)?maintain|continue\s+to\s+(?:hold|maintain|keep))\b/i;
+// Axis 1 NEGATIVE — pre-award possession framing ⇒ a real gate ⇒ escalate ALWAYS (checked over obligation + continuation).
+const PREAWARD_POSSESSION_RE = /\b(?:at\s+(?:the\s+)?time\s+of\s+(?:award|offer|proposal\s+submission)|prior\s+to\s+award|before\s+award|as\s+a\s+condition\s+of\s+award|upon\s+award|at\s+(?:the\s+)?time\s+of\s+submission|by\s+(?:the\s+)?(?:time\s+of\s+)?award|must\s+(?:currently\s+)?(?:hold|possess)\b)\b/i;
+// Axis 2 POSITIVE — ordinary-course credential allowlist (affirmative, #507).
+const ORDINARY_COURSE_CRED_RE = /\b(?:business\s+licens\w*|state\s+licens\w*|local\s+licens\w*|licens\w*\s+requirements?|professional\s+licens\w*|insurance|liability\s+(?:insurance|coverage)|workers'?\s+compensation|sam(?:\.gov)?\s+registration|registration\s+in\s+sam|active\s+registration|system\s+for\s+award\s+management|iso\s?90{2}\d|quality\s+(?:control|assurance|management)\s+(?:system|program|plan|certificat\w*)?|safety\s+(?:program|plan|certificat\w*|training)|osha)\b/i;
+// Axis 2 NEGATIVE — long-lead / scarce credential ⇒ escalate REGARDLESS of temporal frame (Brain-listed, over ob+continuation).
+const LONG_LEAD_CRED_RE = /\b(?:facility\s+(?:security\s+)?clearance|\bfcl\b|personnel\s+(?:security\s+)?clearance|security\s+clearance|top[\s-]?secret|\bts\/?sci\b|\bsecret\b\s+(?:clearance|facility)|cmmc|nist\s+sp?\s?800-171|\bfaa\b|part\s+145|airworthiness|type\s+certificat\w*|\bqpl\b|\bqml\b|qualified\s+products?\s+list|qualified\s+manufacturers?\s+list|\bfoci\b|\bitar\b|dd[\s-]?254|nispom)\b/i;
+
+/** Two-axis ordinary-course-performance-upkeep discriminator (card #576). Returns { credential } to DEMOTE (recital →
+ *  caveat, not NHR), or null to ESCALATE. Pure. `continuation` = the source tail of a line-wrap-severed obligation
+ *  (from verifyRecitalInSource), so the temporal frame + the long-lead/at-award negatives are seen even when the
+ *  fragment was cut before them. AMBIGUOUS ON EITHER AXIS → null (escalate); the negatives are checked over BOTH the
+ *  obligation and its continuation so a bar riding the severed tail can never be laundered. */
+export function classifyPerformanceUpkeepRecital(ob: string, continuation?: string | null): { credential: string } | null {
+  const full = `${ob} ${continuation ?? ""}`;
+  if (PREAWARD_POSSESSION_RE.test(full)) return null;          // Axis 1 NEG: pre-award possession → escalate always
+  if (LONG_LEAD_CRED_RE.test(full)) return null;               // Axis 2 NEG: long-lead/scarce → escalate regardless
+  if (!UPKEEP_VERB_RE.test(ob)) return null;                   // the maintain/keep verb must be in the obligation itself
+  if (!PERF_UPKEEP_TEMPORAL_RE.test(full)) return null;        // Axis 1 POS: during-performance frame (in ob or its tail)
+  if (!ORDINARY_COURSE_CRED_RE.test(ob)) return null;          // Axis 2 POS: an ordinary-course credential in the obligation
+  // credential = the maintained objects, extracted VERBATIM from the obligation (grounded; reuse the #575b extraction).
+  const cc = credentialConditionalRecital(ob);
+  if (cc) return cc;                                           // reuses the verbatim maintain-object / SAM-label extraction
+  // fallback: name the ordinary-course object that matched (still verbatim from ob).
+  const om = ORDINARY_COURSE_CRED_RE.exec(ob);
+  return om ? { credential: om[0] } : null;
+}
+
 export interface CoverageV2 {
   /** Sections genuinely NOT fully read (unread / truncated / dropped-at-ingest) → legitimate INCOMPLETE. */
   unreadable: string[];
@@ -633,6 +679,11 @@ export interface CoverageV2 {
    *  Present ONLY when AUDIT_BENIGN_RECITAL_COVERED is on ⇒ flag-OFF the serialized coverageV2 is byte-identical (do NOT
    *  copy ungroundedNonBarSignal's always-present-array shape — run-records serialize exactly the pre-#572 key set). */
   benignCoveredRecital?: Array<{ section: string; obligation: string; arm: string }>;
+  /** Ordinary-course PERFORMANCE-UPKEEP recitals (card #576) demoted OFF the NHR path: a "maintain <ordinary-course
+   *  credential> during performance" obligation is a post-award performance duty, NOT a pre-award bar — it stops driving
+   *  NHR and instead attaches as a CAVEAT (credential named verbatim) to the committal verdict. Present ONLY when
+   *  AUDIT_PERFORMANCE_UPKEEP_CAVEAT is on ⇒ flag-OFF the serialized coverageV2 is byte-identical. */
+  caveatRecital?: Array<{ section: string; obligation: string; credential: string }>;
   /** Importance-weighted covered fraction in [0,1] — surfaced as a signal (never a veto). 1 when nothing required. */
   coverageGrade: number;
 }
@@ -654,6 +705,7 @@ export function gradeCoverageV2(attestations: SectionAttestation[], opts?: {
   const disqualifierUncovered: Array<{ section: string; obligation: string; locatedAt?: string; contextNote?: string }> = [];
   const ungroundedNonBarSignal: Array<{ section: string; obligation: string }> = [];
   const benignCoveredRecital: Array<{ section: string; obligation: string; arm: string }> = [];
+  const caveatRecital: Array<{ section: string; obligation: string; credential: string }> = [];
   const enrich = (e: { section: string; obligation: string }) => {
     // Double-gated (R1 probe 5b): the production locator self-guards on the flag, but a caller-supplied
     // locate fn might not — enrichment NEVER runs flag-OFF regardless of the injected fn.
@@ -701,6 +753,16 @@ export function gradeCoverageV2(attestations: SectionAttestation[], opts?: {
             benignCoveredRecital.push({ section: a.section, obligation: ob, arm }); continue;
           }
         }
+        // ORDINARY-COURSE PERFORMANCE-UPKEEP → CAVEAT (card #576, flag AUDIT_PERFORMANCE_UPKEEP_CAVEAT, default-OFF). A
+        // two-axis-qualifying "maintain <ordinary-course credential> during performance" recital STOPS driving NHR
+        // (routed to caveatRecital, not disqualifierUncovered) — the verdict is decided by the remainder and a caveat
+        // attaches. The source continuation is threaded so the LBJ line-wrap-severed fragment's "during performance"
+        // tail + any long-lead/at-award negative are seen. Ambiguous on either axis ⇒ classifier returns null ⇒ escalate.
+        if (performanceUpkeepCaveatEnabled()) {
+          const ver = opts?.verifyRecitalPresence?.(ob) ?? null;
+          const up = classifyPerformanceUpkeepRecital(ob, ver?.continuation ?? null);
+          if (up) { caveatRecital.push({ section: a.section, obligation: ob, credential: up.credential }); continue; }
+        }
         if (ambiguousSignalDemotionEnabled() && (!hasBarSignal(ob) || isGovtEvalMethodologyNonBar(ob)
               || (conditionalTinaDemotionEnabled() && isConditionalTinaBoilerplate(ob)))) {
           ungroundedNonBarSignal.push({ section: a.section, obligation: ob }); continue;
@@ -717,6 +779,8 @@ export function gradeCoverageV2(attestations: SectionAttestation[], opts?: {
     // card #572 — include the benign-recital bucket ONLY when the flag is on, so the flag-OFF serialized coverageV2
     // (persisted into run-records at result.inputs.coverageV2) keeps its exact pre-#572 key set (byte-identical).
     ...(benignRecitalCoveredEnabled() ? { benignCoveredRecital } : {}),
+    // card #576 — include the caveat bucket ONLY when the flag is on ⇒ flag-OFF serialized coverageV2 byte-identical.
+    ...(performanceUpkeepCaveatEnabled() ? { caveatRecital } : {}),
     coverageGrade: totalWeight === 0 ? 1 : coveredWeight / totalWeight,
   };
 }

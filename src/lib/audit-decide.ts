@@ -1755,6 +1755,32 @@ export function applyQuantityAmbiguityFidelity(
   return [...findings, ...emitted];
 }
 
+// ═══ PERFORMANCE-UPKEEP CAVEAT emitter — card #576 (flag AUDIT_PERFORMANCE_UPKEEP_CAVEAT, gated by the caller) ═══
+// An ordinary-course "maintain <credential> during performance" recital that gradeCoverageV2 DEMOTED off the NHR path
+// (coverageV2.caveatRecital) is surfaced here as a BID_WITH_CAUTION-floor CAVEAT naming the credential VERBATIM — so the
+// customer gets a real committal verdict PLUS a prominent "confirm you can maintain X" note, never an NHR punt (the CEO
+// customer-failure reframe, card #576). Fabrication-invariant compliant: the credential is grounded from the obligation
+// (verbatim); the prose makes ZERO claim about whether the bidder holds it. Additive/non-destructive; a caution-floor,
+// never a show-stopper, never NHR/NO_BID. Caller gates on the flag + supplies coverageV2.caveatRecital.
+export function emitPerformanceUpkeepCaveats(findings: TypedFinding[], caveats: Array<{ section: string; obligation: string; credential: string }>): TypedFinding[] {
+  if (!caveats?.length) return findings;
+  const emitted: TypedFinding[] = caveats.map((c, i) => ({
+    id: `performance_upkeep_caveat#${i}`,
+    requirement: `Performance-period upkeep: you must maintain ${c.credential} during performance. This is an ordinary-course performance obligation, not a pre-award bar — confirm your firm can maintain it before award.`,
+    citation: `Solicitation §${c.section} — performance-period upkeep obligation`,
+    excerpt: c.obligation,                                           // verbatim source span (grounded by construction)
+    kind: "other",
+    controllability: "bidder_controls",                             // gate-to-clear (confirm you can maintain) — NEVER a bar
+    grounded: true,
+    lens: "performance-upkeep-caveat",
+    severity: "P2",
+    curableInWindow: true,
+    cautionFloor: true,                                             // floors verdict to BID_WITH_CAUTION minimum; never NHR/NO_BID, never a show-stopper
+  }));
+  console.log(`[decide] performance-upkeep caveat: surfaced ${emitted.length} ordinary-course upkeep recital(s) as BID_WITH_CAUTION caveat (demoted off NHR; additive)`);
+  return [...findings, ...emitted];
+}
+
 // ── FINDING-DEDUP GATE (Phase 3 Unit 6, flag AUDIT_FINDING_DEDUP default-OFF) ─────────────────────────────
 // The agentic panel concatenates TWO expert passes (a snake_case fleet — `pricing_analyst`, `contracts_attorney`, … —
 // and a Title-Case fleet — `Pricing & Contracts Risk Analyst`, `Proposal Compliance Manager`, …), so the SAME regulatory
