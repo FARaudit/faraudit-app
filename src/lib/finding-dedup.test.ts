@@ -65,6 +65,7 @@ const bodyOf = (declRe: RegExp): string => {
 const verdictSrc = [
   /export function deriveVerdict\(/, /export function disposeFinding\(/, /export function firmStatus\(/,
   /function nmrFirmStatus\(/,
+  /function selfClearablePackageBars\(/,   // card #590 — deriveVerdict-CALLED package-wide recognizer (added after cross-fleet R3 exposed its excerpt/kind×ctrl reads)
 ].map(bodyOf).join("\n");
 // Every finding-field the verdict authority reads (f.X / finding.X / s.X where the var is a finding). Conservative: also catch
 // destructured `f.` on any single-letter/`finding` receiver used across these functions.

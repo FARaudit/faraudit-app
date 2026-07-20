@@ -1820,11 +1820,6 @@ export function emitPerformanceUpkeepCaveats(findings: TypedFinding[], caveats: 
 const FD_CLAUSE_RE = /\b(?:2?52|\d{3,4})\.(?:2\d{2}|7\d{3})-\d{1,4}\b/g;   // FAR 52.2xx-x / DFARS 252.2xx-xxxx + 252.70xx-x / agency-supp NNN.(2xx|7xxx)-x; -\d suffix excludes CFR "121.406(b)"
 const FD_SEV_RANK: Record<string, number> = { P0: 3, P1: 2, P2: 1 };
 const fdSevRank = (s?: string): number => (s ? (FD_SEV_RANK[s] ?? 0) : 0);
-const FD_CTRL_RANK: Record<string, number> = { no_one_can_move: 4, bidder_cannot_move: 3, bidder_controls: 2, already_satisfied: 1 };
-const fdCtrlRank = (c?: string): number => (c ? (FD_CTRL_RANK[c] ?? 0) : 0);  // higher = more conservative (keep a bar over a curable over already-satisfied)
-// KIND rank for the survivor's disposition bundle (R2 P0-2): `boilerplate` is LOWEST (disposeFinding DROPS it — must never win
-// when a real kind exists); `eligibility_bar` is HIGHEST (carries the bar's category); every other kind is decision-bearing middle.
-const fdKindRank = (k?: string): number => (k === "eligibility_bar" ? 3 : k === "boilerplate" ? 0 : 2);
 /** The distinct FAR/DFARS clause numbers a finding is ABOUT (citation + requirement only — never the source-quote excerpt). */
 const fdClauseKeys = (f: TypedFinding): string[] => {
   const blob = `${f.citation ?? ""} ${f.requirement ?? ""}`;
@@ -1845,122 +1840,203 @@ export const FD_ABSORBABLE_KEYS = new Set<string>([
 ]);  // NB: `requiredAttribute` is DELIBERATELY excluded — an attribute-bearing finding is verdict-load-bearing (R1 P1) → protected.
 // BRAIN #555 STRUCTURAL-COMPLETENESS CONTRACT (converts the "verdict-safe" claim from inductive → structural). deriveVerdict
 // is the SOLE verdict authority, so it must be the SOLE definition of "verdict-driving." The dedup is safe iff EVERY finding
-// field deriveVerdict/disposeFinding/firmStatus reads is either (a) MERGE-PRESERVED (the survivor re-derives it conservatively
-// from ALL members, so an absorbed member never loses it), (b) PROTECTION-TRIGGERING (∉ FD_ABSORBABLE_KEYS ⇒ its bearer is a
-// PROTECTED finding, never absorbed/altered), or (c) documented VERDICT-INERT on the ABSORBABLE class (non-bar plain findings).
-// The structural guard test (`finding-dedup.test.ts`) FAILS if deriveVerdict ever reads a field none of these cover — i.e. a
-// field the dedup treats as ignorable that the verdict authority actually reads.
+// field the verdict authority reads — deriveVerdict/disposeFinding/firmStatus/nmrFirmStatus AND the deriveVerdict-CALLED
+// package-wide recognizer selfClearablePackageBars (card #590, added to the guard's scanned set after cross-fleet R3) — is
+// either (a) MERGE-PRESERVED (the survivor re-derives it from ALL members, so an absorbed member never loses it), (b)
+// PROTECTION-TRIGGERING (∉ FD_ABSORBABLE_KEYS ⇒ its bearer is a PROTECTED finding, never absorbed/altered), or (c) documented
+// VERDICT-INERT on the ABSORBABLE class. The structural guard test (`finding-dedup.test.ts`) FAILS if any verdict-read field
+// is none of these. NB (DISPOSITION-HOMOGENEOUS pivot, card #604 ruling): `controllability`+`kind` are the GROUP KEY — every
+// member of a collapsed group shares them and the survivor is a REAL member, so they are preserved by IDENTITY (never
+// synthesized — the R1 kind ride-along and R3 kind×ctrl composite are impossible by construction).
 export const FD_MERGE_PRESERVED_FIELDS = new Set<string>([
-  "controllability",  // survivor = most-conservative plain member's controllability
-  "kind",             // survivor = most-decision-bearing kind (never boilerplate)
+  "controllability",  // GROUP KEY — identical across the group; survivor is a real member (preserved by identity)
+  "kind",             // GROUP KEY — identical across the group; survivor is a real member (never a synthesized composite)
   "severity",         // survivor = group max
-  "cautionFloor",     // OR across members
-  "grounded",         // OR across members
-  "requirement",      // maximal facets, order-canonical (no distinct obligation text lost)
+  "cautionFloor",     // OR across members, STRICT === true (no off-domain-truthy laundering)
+  "grounded",         // OR across members, STRICT === true
+  "requirement",      // normalized-exact facet union (no distinct obligation text/meaning lost)
+  "excerpt",          // UNION across members (card #590 selfClearablePackageBars scans excerpts PACKAGE-WIDE ⇒ no member's excerpt may be dropped)
 ]);
 export const FD_VERDICT_INERT_ON_PLAINS = new Set<string>([
-  // deriveVerdict reads these, but they are inert for an ABSORBABLE (non-bar, marker-free, attribute-free) finding:
-  "curableInWindow",  // read only on a BAR (curable vs non-curable) — an absorbable finding is non-bar by construction
-  "excerpt",          // read only to re-hash a `verifiedBy` universalDefect — an absorbable finding carries no verifiedBy (protected)
+  // the verdict authority reads these, but they are inert for an ABSORBABLE (ctrl ∈ {bidder_controls, already_satisfied},
+  // marker-free, attribute-free) finding:
+  "curableInWindow",  // read only on a DISQUALIFYING finding (selfClearablePackageBars) / a BAR — an absorbable finding is neither by construction
   "citation",         // read only in reason-string assembly for bars/defects — inert on a plain finding's disposition
 ]);
-/** A finding is safe to ABSORB (drop into a survivor) only if (1) it is NOT a bar (bidder_cannot_move / no_one_can_move) AND
- *  (2) it carries no key outside the known-safe disposition set. R4 REMEDIATION (Gauntlet R4 self-audit): EVERY prior P0 lived
- *  in merging a bar / marker-bearer — a bar's profile-RESOLVED disposition (nmrFirmStatus, firmStatus over an attribute) and
- *  its jointly-read markers (nmrGuard+requiredAttribute at firmStatus L2713; mmEvidenceFactor+kind+requiredAttribute at the
- *  unverifiedGates filter) can DESYNC when disposition comes from `worst` but markers ride from a different `primary`. Doctrine-
- *  clean escape (same family as Unit 4's doc-class + Unit 5's terminal-pair pivots — stop fighting an irreducible seam): a bar
- *  is NEVER absorbed. Bars + marker-bearers pass through UNTOUCHED, so every verdict-DRIVING finding reaches deriveVerdict with
- *  its full identity intact; only plain, NON-bar dups collapse. A bar is the survivor's disposition source ONLY when it is the
- *  sole protected member (forced survivor = worst = the SAME bar → coherent). Verdict-invariant BY CONSTRUCTION. */
-const fdBaseAbsorbable = (f: TypedFinding): boolean => !isBarClass(f) && Object.keys(f).every((k) => FD_ABSORBABLE_KEYS.has(k));
-// R3 REMEDIATION (Gauntlet R3, P2-1): the ≥3-char floor discarded 1–2-char DISTINGUISHERS (a CLIN/option "1"/"2", a section
-// "A"/"B") so "option 1" vs "option 2" collapsed. Keep a token if it is ≥3 chars, OR contains a digit (any length — "1",
-// "0001AA"), OR is a lone letter (section/option marker) — the fail-toward-keep tokens that make two same-clause facets distinct.
-const fdNormTokens = (s: string): Set<string> => new Set((s || "").toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length >= 3 || /\d/.test(t) || t.length === 1));
-// R2 REMEDIATION (Gauntlet R1, P2 — over-merge: a 0.8 containment dropped a genuinely distinct facet whose distinguishing
-// tokens were short/ordinal, e.g. "base year option" vs "FIRST option" — ~90% shared tokens). ROOT: a fractional-overlap
-// threshold cannot tell "same obligation, reworded" from "different obligation, mostly-same wording" when the DISTINGUISHING
-// token (base/first/option-number/CLIN) is a small fraction of the text. FIX (fail-toward-keep-the-facet): a true restatement
-// introduces NO new distinctive token — drop the candidate ONLY if EVERY one of its ≥3-char tokens is already present in the
-// accumulated text (cand ⊆ acc). Any new identity token ⇒ a distinct facet ⇒ APPENDED. Over-append (verbose survivor) is the
-// safe direction; over-merge (a vanished concern) is the cardinal sin.
-const fdIsRestatement = (candReq: string, acc: string): boolean => {
-  const a = fdNormTokens(candReq), b = fdNormTokens(acc);
-  for (const t of a) if (!b.has(t)) return false;                  // cand introduces a distinctive token absent from acc → NOT a restatement (keep)
-  return true;                                                     // cand ⊆ acc (adds nothing new) → a restatement → drop
-};
-/** Collapse findings that name the SAME single FAR/DFARS clause into one most-conservative, facet-preserving row.
- *  Verdict-safe by construction; over-merge-guarded (exactly-one-clause key, citation+requirement only, facets kept).
- *  Default-OFF via caller; no eligible same-clause group ⇒ byte-identical. Pure → gate-tested. Order-stable. */
+// ── DISPOSITION-HOMOGENEOUS COLLAPSE CORE (Brain card #604 ruling — supersedes the 44c6f44 survivor-synthesis) ──────────
+// The prior gate SYNTHESIZED a "most-conservative" survivor (worst ctrl → most-decision-bearing kind → sev-max). The
+// cross-fleet Gauntlet R1–R3 proved that synthesis is a reconstruction treadmill against an evolving deriveVerdict:
+//   R1 a boilerplate kind rides onto the survivor → disposeFinding drops it → BID→NHR;
+//   R2 an off-enum/undefined controllability (blind-cast model output) is fail-closed to a show-stopper by disposeFinding
+//      but is not a bar per isBarClass → absorbed → its escalation vanishes → NHR→BID;
+//   R3 card #590 selfClearablePackageBars reads kind×ctrl JOINTLY + scans excerpts PACKAGE-WIDE → a synthesized composite /
+//      a dropped excerpt flips the verdict. [[feedback_reconstruction_treadmill_pivot_recognizer]].
+// THE PIVOT (positive invariant, ends the treadmill): NEVER synthesize a disposition. A group collapses only if
+// DISPOSITION-HOMOGENEOUS — identical kind AND controllability, with controllability in the KNOWN-SAFE, non-escalating set
+// {bidder_controls, already_satisfied} — so the survivor's (kind×ctrl) is a REAL member's pair (no composite manufactured),
+// off-enum/undefined ctrl is NEVER absorbed (protected passthrough, R2 kill), and boilerplate never rides onto a decision-
+// bearing survivor (R1 kill — the survivor IS a boilerplate member iff every member is boilerplate, matching flag-OFF). The
+// survivor is a whole real member; severity=max; cautionFloor/grounded OR over STRICT === true (no off-domain-truthy
+// laundering); EXCERPTS unioned (card #590 package-wide scan loses nothing); facets de-duped by NORMALIZED-EXACT equality
+// (negation / ≤ / ≥ / ± / unicode distinguishers always kept). Verdict-invariant BY CONSTRUCTION — proven by the structural-
+// completeness contract (now covering selfClearablePackageBars) AND a 2×3888 sweep under both AUDIT_SELF_CLEARABLE_PACKAGE
+// states. Shared by applyFindingDedup (anchor = clause number) and applyCrossFleetDedup (anchor = calendar date).
+const FD_ABSORBABLE_CTRL = new Set<string>(["bidder_controls", "already_satisfied"]);  // known-safe, non-escalating; anything else (bar/off-enum/undefined) → protected
+const fdHomoAbsorbable = (f: TypedFinding): boolean =>
+  FD_ABSORBABLE_CTRL.has(f.controllability as string) && Object.keys(f).every((k) => FD_ABSORBABLE_KEYS.has(k));
+const fdNormReqEq = (s: string): string => (s || "").toLowerCase().replace(/\s+/g, " ").trim();  // normalized-exact key: only a verbatim dup drops
+/** Collapse DISPOSITION-HOMOGENEOUS absorbable findings sharing anchorOf(f) (non-null) into one REAL-member survivor.
+ *  Returns null ⇒ no eligible group ⇒ caller returns the input by reference (byte-identical). Pure. Order-stable (survivor =
+ *  earliest member). markerOf attaches the gate-specific telemetry (findingDedupMerged/mergedClause · crossFleetMerged/mergedDateSig). */
+function collapseHomogeneousByAnchor(
+  findings: TypedFinding[],
+  anchorOf: (f: TypedFinding) => string | null,
+  markerOf: (members: TypedFinding[], sig: string) => Partial<TypedFinding>,
+): TypedFinding[] | null {
+  const groupByKey = new Map<string, number[]>();                   // (anchor, kind, ctrl) → member indices — homogeneous groups only
+  const sigOf = new Map<number, string>();
+  findings.forEach((f, i) => {
+    if (!fdHomoAbsorbable(f)) return;                               // protected (bar / marker / attr / off-enum-ctrl) never groups
+    const a = anchorOf(f); if (a == null) return;                  // no anchor ⇒ never merges (fail-toward-keep)
+    sigOf.set(i, a);
+    const key = `${a} ${f.kind ?? ""} ${f.controllability}`;
+    (groupByKey.get(key) ?? groupByKey.set(key, []).get(key)!).push(i);
+  });
+  const merged = new Set<number>();
+  const survivorPatch = new Map<number, TypedFinding>();
+  for (const [, idx] of groupByKey) {
+    if (idx.length < 2) continue;                                  // <2 homogeneous dups on this (anchor,kind,ctrl) → nothing to collapse
+    const members = idx.map((i) => findings[i]);
+    const anchor = Math.min(...idx);                               // survivor = the earliest member, WHOLE (real disposition, never synthesized)
+    const base = findings[anchor];
+    const maxSev = members.reduce((m, f) => Math.max(m, fdSevRank(f.severity)), 0);
+    const survivorSeverity = (["P2", "P1", "P0"][maxSev - 1] as "P0" | "P1" | "P2" | undefined) ?? base.severity;
+    const facets: string[] = []; const seen = new Set<string>();   // normalized-exact facet dedup (only a verbatim dup drops)
+    for (const m of members) { const r = m.requirement ?? ""; const n = fdNormReqEq(r); if (r && !seen.has(n)) { seen.add(n); facets.push(r); } }
+    facets.sort((a, b) => (b.length - a.length) || (a < b ? -1 : a > b ? 1 : 0));
+    const excerpts: string[] = []; const seenX = new Set<string>();  // UNION excerpts — a package-wide credential scan must see all of them
+    for (const m of members) { const x = m.excerpt ?? ""; const n = fdNormReqEq(x); if (x && !seenX.has(n)) { seenX.add(n); excerpts.push(x); } }
+    const survivor: TypedFinding = {
+      ...base,                                                     // WHOLE real disposition — kind & ctrl are the group's shared, unsynthesized values
+      requirement: facets.length ? facets.join(" · ") : (base.requirement ?? ""),
+      ...(excerpts.length ? { excerpt: excerpts.join(" · ") } : {}),
+      severity: survivorSeverity,
+      ...(members.some((f) => f.grounded === true) ? { grounded: true } : { grounded: base.grounded }),
+      ...(members.some((f) => f.cautionFloor === true) ? { cautionFloor: true } : {}),  // STRICT === true — no off-domain-truthy laundering
+      ...markerOf(members, sigOf.get(anchor)!),
+    };
+    survivorPatch.set(anchor, survivor);
+    idx.filter((i) => i !== anchor).forEach((i) => merged.add(i));
+  }
+  if (survivorPatch.size === 0) return null;
+  return findings.map((f, i) => survivorPatch.get(i) ?? f).filter((_, i) => !merged.has(i));
+}
+/** Collapse DISPOSITION-HOMOGENEOUS findings that name the SAME single FAR/DFARS clause into one real-member, facet-
+ *  preserving row (card #604 pivot — supersedes 44c6f44 synthesis). Verdict-safe by construction (no disposition synthesized;
+ *  off-enum ctrl never absorbed; excerpts unioned). Default-OFF via caller; no eligible group ⇒ byte-identical. Order-stable. */
 export function applyFindingDedup(
   findings: TypedFinding[],
   opts?: { enabled?: boolean },
 ): TypedFinding[] {
   if (!opts?.enabled) return findings;                              // Rule 61 default-off ⇒ byte-identical
-  // Group indices by single-clause key; ineligible findings (0 or ≥2 clauses) never absorb (fail-toward-keep).
-  const keyOf = findings.map(fdClauseKeys);
-  const groupByKey = new Map<string, number[]>();                   // clause → member indices (only exactly-1-clause findings)
-  keyOf.forEach((keys, i) => { if (keys.length === 1) { const k = keys[0]; (groupByKey.get(k) ?? groupByKey.set(k, []).get(k)!).push(i); } });
-  const merged = new Set<number>();                                 // indices absorbed into an earlier survivor
-  const survivorPatch = new Map<number, TypedFinding>();            // anchor index → merged finding
-  // JUDGE-2 REMEDIATION (the DECISIVE pivot). Four rounds + two judge passes proved that ABSORBING or RE-DISPOSING a
-  // PROTECTED finding (a bar, or any marker/attribute-bearer) is an irreducible verdict-safety seam: a bar's profile-resolved
-  // disposition, its jointly-read markers (nmrGuard+requiredAttribute at firmStatus; mmEvidenceFactor+kind+requiredAttribute at
-  // unverifiedGates), and its eligibility clamp cannot be safely reconstructed on a survivor whose disposition is sourced from a
-  // DIFFERENT member — each fix re-opened the seam one axis deeper (R1 markers, R2 ctrl/kind/curable, R3 requiredAttribute,
-  // judge tiebreak). ESCAPE (same doctrine as Unit 4's document-class + Unit 5's terminal-pair pivots — stop reconstructing an
-  // irreducible thing): a PROTECTED finding is NEVER touched — it passes through with its FULL identity, so every verdict-
-  // DRIVING finding reaches deriveVerdict exactly as the full set had it. ONLY plain, NON-bar, marker-free, attribute-free dups
-  // collapse — and their merged survivor is itself plain/non-bar (no controllability bar, no requiredAttribute, no marker), so
-  // it can neither create nor soften a bar/clamp/defect. VERDICT-INVARIANT BY CONSTRUCTION (deriveVerdict's every driver is a
-  // protected finding, all untouched). Over-merging two distinct plain obligations is guarded by facet-preservation.
-  for (const [clause, idx] of groupByKey) {
-    // Only plain (non-bar, marker-free, attribute-free) members are eligible to collapse; protected members pass through.
-    const plainIdx = idx.filter((i) => fdBaseAbsorbable(findings[i]));
-    if (plainIdx.length < 2) continue;                              // <2 plain dups on this clause → nothing to collapse
-    const members = plainIdx.map((i) => findings[i]);
-    // Survivor disposition = the most-conservative PLAIN member, taken whole (a plain has no bar/attr/marker, so this is a
-    // coherent, verdict-inert base): most-disqualifying ctrl → most-decision-bearing kind (never `boilerplate`) → higher severity.
-    const worst = members.slice().sort((a, b) =>
-      (fdCtrlRank(b.controllability) - fdCtrlRank(a.controllability)) ||
-      (fdKindRank(b.kind) - fdKindRank(a.kind)) ||
-      (fdSevRank(b.severity) - fdSevRank(a.severity)) ||
-      ((b.requirement?.length ?? 0) - (a.requirement?.length ?? 0))
-    )[0];
-    const maxSev = members.reduce((m, f) => Math.max(m, fdSevRank(f.severity)), 0);
-    const survivorSeverity = (["P2", "P1", "P0"][maxSev - 1] as "P0" | "P1" | "P2" | undefined) ?? worst.severity;
-    // Facet-preservation (order-canonical): keep a member requirement iff it is MAXIMAL — not ⊆ any OTHER member's requirement
-    // (ties broken by earliest index); canonical sort (fullest first) ⇒ the rendered requirement is deterministic + loses nothing.
-    const reqs = members.map((m) => m.requirement ?? "");
-    const facets = members
-      .map((_, i) => i)
-      .filter((i) => reqs[i] && !members.some((_, j) => {
-        if (j === i || !reqs[j]) return false;
-        const iSubJ = fdIsRestatement(reqs[i], reqs[j]);            // req[i] ⊆ req[j]
-        if (!iSubJ) return false;
-        const jSubI = fdIsRestatement(reqs[j], reqs[i]);            // equal token sets?
-        return !jSubI || j < i;                                    // proper subset of j, OR equal-and-j-earlier → i is non-maximal → drop
-      }))
-      .map((i) => reqs[i])
-      .sort((a, b) => (b.length - a.length) || (a < b ? -1 : a > b ? 1 : 0));
-    const survivor: TypedFinding = {
-      ...worst,                                                     // plain base — no bar controllability, no requiredAttribute, no marker
-      requirement: facets.length ? facets.join(" · ") : (worst.requirement ?? ""),
-      severity: survivorSeverity,
-      grounded: members.some((f) => f.grounded),
-      ...(members.some((f) => f.cautionFloor) ? { cautionFloor: true } : {}),
-      findingDedupMerged: true,
-      mergedLensCount: members.length,
-      mergedClause: clause,
-    };
-    const anchor = Math.min(...plainIdx);                           // survivor keeps the EARLIEST plain index (order-stable)
-    survivorPatch.set(anchor, survivor);
-    plainIdx.filter((i) => i !== anchor).forEach((i) => merged.add(i));
+  // Anchor = the finding's SINGLE FAR/DFARS clause number; 0 or ≥2 clauses ⇒ null ⇒ never absorbs (fail-toward-keep — a
+  // multi-clause finding is never merged). Homogeneity (same kind+ctrl) + protection is enforced by the shared core.
+  const out = collapseHomogeneousByAnchor(
+    findings,
+    (f) => { const k = fdClauseKeys(f); return k.length === 1 ? k[0] : null; },
+    (members, clause) => ({ findingDedupMerged: true, mergedLensCount: members.length, mergedClause: clause }),
+  );
+  if (!out) return findings;
+  console.log(`[decide] finding-dedup: collapsed ${findings.length} → ${out.length} rows (same-clause disposition-homogeneous groups; real-member survivor, excerpt-unioned, verdict-safe, facets preserved)`);
+  return out;
+}
+
+// ── CROSS-FLEET DEADLINE-DEDUP GATE (Phase 3 Unit 6 follow-on, flag AUDIT_CROSS_FLEET_DEDUP default-OFF) ─────
+// SIBLING of applyFindingDedup, running immediately after it. The clause-keyed gate collapses same-CLAUSE dups; this
+// gate collapses the OTHER cross-fleet inflation source — no-clause obligations restated by the paired lens of the two
+// paraphrasing panels (snake_case `pricing_analyst`… + Title-Case `Pricing & Contracts Risk Analyst`…). On the seq-2
+// dccce793 record the single deadline "submit offer by July 22, 2026" surfaces 5× and "questions due July 14, 2026" 2×,
+// each phrased differently by every lens (no clause number ⇒ the clause gate can't touch them). This gate keys on the
+// STRUCTURED CALENDAR DATE — a specific solicitation date is overwhelmingly a single deadline obligation, and the stable,
+// delimited "same obligation" signal for the no-clause axis (the date analogue of the clause number). Same-date plain rows
+// collapse into ONE facet-preserving row.
+//
+// WHY DATE-ONLY (the doctrine-clean scope — [[feedback_no_blocklist_shape_allowlist_doctrine]] + the over-merge treadmill):
+//   • A calendar DATE is a specific, structural, low-frequency anchor: distinct deadlines carry distinct dates ⇒ distinct
+//     keys ⇒ no cross-deadline merge. It is the ONE no-clause anchor that reliably maps to a single obligation.
+//   • MONEY / QUANTITY anchors are DELIBERATELY excluded: they are cited FACTS, not obligation identities — a wage rate
+//     "$25.27" recurs across three DISTINCT pricing findings (floor-compliance, thin-margin risk, unresolved-fringe), so a
+//     money key would FUSE distinct concerns. There is no exact/subset key that separates "same obligation, reworded" from
+//     "distinct obligations, shared fact" (content-token overlap gives no clean threshold — that IS the paraphrase treadmill
+//     the prior arc correctly refused). Date is the safe subset; the prose residual (price-list / FFP / tradeoff clusters,
+//     no structured anchor) is an UPSTREAM problem (two paraphrasing fleets), not a downstream gate — see the exit card.
+//
+// VERDICT-SAFE BY A STRICTER CONSTRUCTION THAN applyFindingDedup (this gate is SELF-CONTAINED — it does NOT reuse the clause
+// gate's survivor synthesis, which the cross-fleet Gauntlet R1–R3 proved is a reconstruction treadmill against an EVOLVING
+// deriveVerdict). Three seams the naive "synthesize a most-conservative survivor" approach reopened one axis at a time:
+//   R1 (kind): a ctrl-first `worst`-sort drags a `boilerplate` kind onto the survivor → disposeFinding drops it → BID→NHR.
+//   R2 (ctrl): an off-enum/undefined controllability (blind-cast model output) is fail-closed to a show-stopper by
+//              disposeFinding but is not a bar per isBarClass → absorbed → its escalation vanishes → NHR→BID.
+//   R3 (composite + excerpt): card #590 `selfClearablePackageBars` (live under AUDIT_SELF_CLEARABLE_PACKAGE) reads kind×ctrl
+//              JOINTLY and scans excerpts PACKAGE-WIDE — so a survivor whose kind and ctrl come from DIFFERENT members
+//              manufactures a (kind×ctrl) pair that existed on no member, and absorbing a member DROPS its credential excerpt
+//              → 270/3888 verdict flips. [[feedback_reconstruction_treadmill_pivot_recognizer]].
+// THE PIVOT (positive invariant, ends the treadmill BY CONSTRUCTION): NEVER SYNTHESIZE a disposition. A group collapses only
+// if its members are DISPOSITION-HOMOGENEOUS — identical `kind` AND identical `controllability` (both in the KNOWN-SAFE,
+// non-escalating set {bidder_controls, already_satisfied}) — so the survivor's (kind×ctrl) is a REAL member's pair, present
+// before and after (no composite manufactured; a package-wide kind×ctrl read is unchanged, its count merely N→1). Every
+// member excerpt is UNIONED onto the survivor (no package-wide excerpt-scan input lost). severity=max, cautionFloor=OR over
+// STRICT `=== true` (an off-domain truthy value is never laundered into a verdict-live floor), grounded=OR-strict. Requirement
+// facets are de-duplicated by NORMALIZED-EXACT equality only (case/whitespace-insensitive, all other chars preserved) so a
+// negation / ≤ / ≥ / ± / unicode distinguisher is ALWAYS kept — no obligation text or meaning lost. Protected passthrough for
+// every bar / marker / attribute-bearer / off-enum-ctrl / mismatched-disposition finding. Flag OFF ⇒ byte-identical (Rule 61).
+// Idempotent (a merged survivor still yields the same date+kind+ctrl key; singletons pass through). Order-stable.
+const CFD_MONTHS = "january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov|dec";
+const CFD_MONTH_NUM: Record<string, string> = {
+  january:"01",jan:"01",february:"02",feb:"02",march:"03",mar:"03",april:"04",apr:"04",may:"05",june:"06",jun:"06",
+  july:"07",jul:"07",august:"08",aug:"08",september:"09",sept:"09",sep:"09",october:"10",oct:"10",november:"11",nov:"11",december:"12",dec:"12",
+};
+// Four full, year-bearing calendar-date shapes (delimited-token, not a bare "22" or "2026"): month-first "July 22, 2026" /
+// "Jul 22 2026", DoD day-first "22 July 2026" (R-CF attack-6 recall fix), and numeric "7/22/2026" / "07-22-2026". A
+// year-less or bare month/day phrase is NOT an anchor (fail-toward-keep). Capture groups: [1..3]=monFirst mon,day,year;
+// [4..6]=dayFirst day,mon,year; [7..9]=numeric m,d,year.
+const CFD_DATE_RE = new RegExp(
+  `\\b(?:(${CFD_MONTHS})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?,?\\s+(\\d{4})` +
+  `|(\\d{1,2})(?:st|nd|rd|th)?\\s+(${CFD_MONTHS})\\.?,?\\s+(\\d{4})` +
+  `|(\\d{1,2})[\\/\\-](\\d{1,2})[\\/\\-](\\d{4}))\\b`, "gi");
+// Only a REAL calendar date is an anchor: month 1-12, day 1-31 (R-CF attack-5 — reject "13/13/2026" and other bogus keys).
+const cfdValid = (y: string, mo: number, d: number): string | null =>
+  (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) ? `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}` : null;
+/** The distinct normalized calendar dates (YYYY-MM-DD) a finding names in its REQUIREMENT ONLY. R-CF attack-4: citation is
+ *  DELIBERATELY excluded — a citation carries document-metadata dates (amendment-issuance "Amendment 0002, dated 07/15/2026")
+ *  that are NOT deadlines, so keying on them fuses unrelated obligations; the actual deadline is stated in the requirement.
+ *  Excerpt is excluded for the same reason the clause gate excludes it (quotes neighbouring dates). Empty ⇒ never merges. */
+const cfdDateKeys = (f: TypedFinding): string[] => {
+  const out = new Set<string>();
+  for (const m of (f.requirement ?? "").matchAll(CFD_DATE_RE)) {
+    let k: string | null = null;
+    if (m[1]) k = cfdValid(m[3], Number(CFD_MONTH_NUM[m[1].toLowerCase()]), Number(m[2]));            // month-first
+    else if (m[5]) k = cfdValid(m[6], Number(CFD_MONTH_NUM[m[5].toLowerCase()]), Number(m[4]));       // day-first (DoD)
+    else if (m[7]) k = cfdValid(m[9], Number(m[7]), Number(m[8]));                                     // numeric m/d/y
+    if (k) out.add(k);
   }
-  if (survivorPatch.size === 0) return findings;                    // no same-clause group with ≥2 plain dups → byte-identical
-  const out = findings.map((f, i) => survivorPatch.get(i) ?? f).filter((_, i) => !merged.has(i));
-  console.log(`[decide] finding-dedup: collapsed ${findings.length} → ${out.length} rows (${survivorPatch.size} same-clause groups merged; most-conservative disposition, verdict-safe, facets preserved)`);
+  return [...out].sort();
+};
+/** Collapse DISPOSITION-HOMOGENEOUS findings that name the SAME calendar date(s) into one real-member, facet-preserving row.
+ *  Same shared core + verdict-safety construction as applyFindingDedup; anchor = the date signature instead of the clause.
+ *  Default-OFF via caller; no eligible same-(date,kind,ctrl) group ⇒ byte-identical. Order-stable. */
+export function applyCrossFleetDedup(
+  findings: TypedFinding[],
+  opts?: { enabled?: boolean },
+): TypedFinding[] {
+  if (!opts?.enabled) return findings;                              // Rule 61 default-off ⇒ byte-identical
+  const out = collapseHomogeneousByAnchor(
+    findings,
+    (f) => { const k = cfdDateKeys(f); return k.length ? k.join("|") : null; },
+    (members, sig) => ({ crossFleetMerged: true, mergedLensCount: members.length, mergedDateSig: sig }),
+  );
+  if (!out) return findings;
+  console.log(`[decide] cross-fleet-dedup: collapsed ${findings.length} → ${out.length} rows (same-date disposition-homogeneous groups; real-member survivor, excerpt-unioned, verdict-safe, facets preserved)`);
   return out;
 }
 
