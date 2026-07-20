@@ -2970,11 +2970,23 @@ function groundedMechanicClause(findings: Array<{ requirement?: string; excerpt?
 // text OVERRIDES the floor — NEVER stamped curable (fail-closed on a hidden at-award possession or a clearance/QPL). The
 // override is computed over requirement+EXCERPT only (NOT the citation label — the UCF section label "Insurance/Bonding"
 // falsely trips the long-lead `bond` token; card #609-(4) collision). Flag-OFF ⇒ findings byte-identical.
+// card #609-(8) part 2 — POSITIVE SELF-CLEARABLE SHAPE (not vocab-topic). Each arm requires the finding to positively
+// exhibit a SELF-ACQUIRE / MAINTAIN OBLIGATION on the ordinary-course credential — a bare topic mention ("under the size
+// standard", "in the System for Award Management", "licensure requirements apply") does NOT match, so an eligibility BAR
+// that merely references the topic fails toward escalation ([[feedback_no_blocklist_shape_allowlist_doctrine]] + #507).
+// 52.219-14 is matched on its specific clause identity (it IS the self-perform limitation); the rest require an obligation
+// verb governing the credential. SIZE matches ONLY the self-CERTIFICATION shape (a size STANDARD the firm must meet is a
+// who-can-win bar, never self-clearable — dropped). Combined with part-1 (attribute-bearers exempt) + the possession/
+// long-lead override, a real 8(a)/HUBZone/size/scarce-licensure bar can never be floored.
 const RATIFIED_TYPING_CLAUSES: Array<{ attr: string; re: RegExp }> = [
-  { attr: "limitation_on_subcontracting_self_perform", re: /\b52\.219-14\b|limitation on subcontract|50\s*%?\s*(?:rule|self-?perform)|self-?perform(?:ance)?\s+(?:at least|minimum|50)/i },
-  { attr: "sam_registration", re: /\b52\.204-7\b|system for award management|registration in sam|sam\.gov registration|register(?:ed|ing)? in sam/i },
-  { attr: "business_license_maintenance", re: /\b(?:state|business|professional|local)\s+licens\w*|licens\w*\s+requirements?|licensure/i },
-  { attr: "size_standard_self_certification", re: /\bsize standard\b|small business size (?:standard|status)|self-?certif\w* (?:as )?small/i },
+  // limitation-on-subcontracting: the clause is inherently a self-performance obligation the prime clears by staffing.
+  { attr: "limitation_on_subcontracting_self_perform", re: /\b52\.219-14\b|limitation on subcontract|(?:self-?perform|perform)\w*\s+(?:at least\s+)?(?:50\s*%|the required percentage)/i },
+  // SAM registration: require a REGISTER/REGISTRATION obligation adjacent to SAM — never a bare "System for Award Management" mention.
+  { attr: "sam_registration", re: /\b52\.204-7\b|\b(?:register|registration|registered|registering)\b[^.\n]{0,25}\b(?:sam|system for award management)\b|\b(?:sam|system for award management)\b[^.\n]{0,25}\b(?:register|registration|registered|active registration)\b/i },
+  // ordinary licensure: require a MAINTAIN/HOLD/OBTAIN/keep-current OBLIGATION on a license — not a bare "licensure requirements".
+  { attr: "business_license_maintenance", re: /\b(?:maintain|obtain|keep|hold|carry|possess|acquire)\w*\s+(?:a\s+|the\s+|all\s+|any\s+|required\s+|applicable\s+|current\s+|valid\s+)*(?:state|business|professional|local|occupational|trade|operating)?\s*licens\w*|licens\w*\s+(?:must be|shall be|to be)\s+(?:maintained|obtained|kept current|renewed)/i },
+  // size SELF-CERTIFICATION only (self-clearable); a size STANDARD the firm must meet is a who-can-win bar → NOT here.
+  { attr: "size_standard_self_certification", re: /self-?certif\w*\s+(?:as\s+)?(?:a\s+)?small\b|(?:small business|size)\s+self-?certif\w*|represent\w*\s+(?:itself\s+)?as\s+(?:a\s+)?small\s+business/i },
   { attr: "insurance_maintenance", re: INSURANCE_DOWORK_RE },
 ];
 export function applyClauseKeyedTypingFloor(findings: TypedFinding[], o: { enabled: boolean }): TypedFinding[] {
@@ -2982,7 +2994,12 @@ export function applyClauseKeyedTypingFloor(findings: TypedFinding[], o: { enabl
   return findings.map((f) => {
     // Candidate: a still-UNTYPED disqualifying eligibility bar (never softens an already-typed or non-bar finding).
     if (f.kind !== "eligibility_bar" || f.controllability !== "bidder_cannot_move") return f;
-    if (f.requiredAttribute && f.curableInWindow !== undefined) return f;         // already typed → leave it
+    // card #609-(8) CARDINAL-SIN FIX (Brain ruling part 1): a requiredAttribute IS the who-can-win eligibility credential
+    // (8(a)/HUBZone/size/socioeconomic — the firm must HOLD it; it is NOT self-acquirable in the response window). NEVER
+    // floor an attribute-bearing bar — that demotes a real disqualifier to a gate-to-clear which bypasses firmStatus → a
+    // false BID_WITH_CAUTION on a genuine eligibility failure. Mirrors applyPerfObligationInsuranceTyping's rule #2. The
+    // cab687da target bars (52.219-14, insurance) are emitted with NO requiredAttribute, so the caveat fix is preserved.
+    if (f.requiredAttribute) return f;
     const operative = `${f.requirement ?? ""} ${f.excerpt ?? ""}`;                // NB: NOT citation (Bonding label collision)
     // OVERRIDE (fail-closed): possession-at-award frame OR a scarce/long-lead credential ⇒ never stamp curable.
     if (hasPreAwardPossession(operative) || hasLongLeadCredential(operative)) return f;
