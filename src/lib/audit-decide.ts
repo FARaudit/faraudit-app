@@ -14,7 +14,7 @@
 import { createHash } from "node:crypto"; // Fork-5 (card 240): deterministic sha256 for the verified-defect excerpt binding (server-side, same as agentic-ingest/model-runs). Pure — no network, no randomness.
 import type { VerdictInputs, TypedFinding, BidderProfile, Controllability, RequirementKind } from "./audit-findings";
 import { NMR_CAUTION } from "./audit-keyfact-detector"; // the canonical NMR requirement text — the positive-shape allowlist for the dormancy gate (Gauntlet Unit 2 R3)
-import { GATE_V2_ENABLED, gateV2Outcome } from "./audit-gate-v2";
+import { GATE_V2_ENABLED, gateV2Outcome, hasLongLeadCredential, hasPreAwardPossession } from "./audit-gate-v2";
 import { SITE_VISIT_RE, SITE_VISIT_CONCLUDED_RE, BOA_IDIQ_HOLDER_BAR_RE } from "./audit-site-visit-patterns";
 import { demoteMmEvidenceFactor, hasGroundedLeadTimeBasis } from "./mm-evidence-factor"; // card #538 (flag AUDIT_MM_EVIDENCE_FACTOR_DEMOTION)
 import { classifyGateShape } from "./panel-findings-bridge"; // ratified positive who-can-win shape classifier — the Unit-1 perf-obligation gate's keep-the-bar veto (Gauntlet R1: no bar-vocab blocklist). Type-only elsewhere ⇒ no import cycle.
@@ -2882,6 +2882,37 @@ function groundedMechanicClause(findings: Array<{ requirement?: string; excerpt?
  *  (requirement + grounded excerpt + kind + controllability); this code makes the DECISION. The ladder is
  *  the same one that used to live in the chief-judge prompt — relocated from prose to TypeScript so it is
  *  stable, reproducible, and auditable. */
+// ═══ SELF-CLEARABLE PACKAGE recognizer — card #590 Modified-B (flag AUDIT_SELF_CLEARABLE_PACKAGE, default-OFF) ═══
+// POSITIVE-shape, verifier-SOVEREIGN (only reached AFTER deriveVerdict's verifierSound gate + coverage/documents gates +
+// show-stopper gates), typed-input-to-deriveVerdict (never its own verdict). A package is self-clearable IFF EVERY
+// disqualifying bar is bidder-self-determinable AND fully typed AND curable, and NO long-lead/scarce credential appears
+// anywhere decision-bearing, and no disqualifying bar carries an at-award/possession frame. ANY exclusion ⇒ null (inert)
+// ⇒ the existing NHR/INELIGIBLE ladder is byte-identical. On eligible, deriveVerdict floors to BID_WITH_CAUTION with the
+// FULL named self-cert caveat list (never a plain BID). Red-team: packages that LOOK self-clearable but hide a
+// CMMC/clearance/QPL bar, an at-award possession frame, or an untyped bar. Flag-OFF ⇒ never called ⇒ byte-identical.
+const selfClearablePackageEnabled = () => process.env.AUDIT_SELF_CLEARABLE_PACKAGE === "true";
+function selfClearablePackageBars(dispositions: DecidedFinding[]): DecidedFinding[] | null {
+  const live = dispositions.filter((f) => f.disposition !== "dropped");
+  const hayOf = (f: DecidedFinding) => `${f.requirement ?? ""} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""}`;
+  // The self-cert bars to ENUMERATE (Brain: "every bidder_controls bar" — SAM, licensure, insurance, size). No self-cert
+  // eligibility bar to caveat ⇒ this is not the recognizer's case (a genuinely clean package keeps its own ladder pole).
+  const selfCertBars = live.filter((f) => f.kind === "eligibility_bar" && f.controllability === "bidder_controls");
+  if (selfCertBars.length === 0) return null;
+  // PACKAGE-WIDE exclusion: a long-lead/scarce credential ANYWHERE decision-bearing (even mis-typed to a non-bar) means
+  // the package is not clearable by an ordinary small business — the buried-CMMC/clearance/QPL red-team.
+  for (const f of live) if (hasLongLeadCredential(hayOf(f))) return null;
+  // ANY DISQUALIFYING bar must be bidder-self-determinable, TYPED, curable, and carry no at-award possession frame.
+  // A single non-self-clearable disqualifier ⇒ the package is NOT self-clearable ⇒ inert (existing NHR/INELIGIBLE ladder).
+  for (const f of live.filter((f) => f.disposition === "disqualifying")) {
+    if (f.controllability === "no_one_can_move") return null;                             // universal impossibility
+    if (f.controllability === "bidder_cannot_move" && f.curableInWindow !== true) return null;   // no self-clear pathway
+    if (!f.requiredAttribute || f.curableInWindow === undefined) return null;             // untyped disqualifier = ineligible, never ignorable
+    if (f.curableInWindow === false) return null;                                         // non-curable structural bar
+    if (hasPreAwardPossession(hayOf(f))) return null;                                     // at-award / possession frame
+  }
+  return selfCertBars;                                                 // enumerate the bidder-self-determinable eligibility bars
+}
+
 export function deriveVerdict(inp: VerdictInputs): Decision {
   // ── NULL-PROFILE ELIGIBILITY GUARANTEE (Brain card 206-A), single flag AUDIT_ELIGIBLE_TRISTATE, default-OFF.
   //    Graduates the tristate + adds two paired behaviors — ONE guarantee: the engine never asserts a firm is
@@ -3113,6 +3144,20 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   // 4. Unresolved material conflict between experts the loop could not reconcile.
   if (inp.conflict)
     return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), "Unresolved material conflict between experts.", dispositions, []);
+
+  // 4b. SELF-CLEARABLE PACKAGE (card #590 Modified-B, flag AUDIT_SELF_CLEARABLE_PACKAGE, default-OFF). VERIFIER-SOVEREIGN
+  //     — only reached with verifierSound=true (step 2) + coverage/documents complete + no show-stopper/universal defect
+  //     (steps 1-3) + no unresolved conflict. If EVERY disqualifying bar is bidder-self-determinable + typed + curable
+  //     and no long-lead/scarce credential or at-award frame appears, the package is a committal BID_WITH_CAUTION with
+  //     the full named self-cert caveat list — NOT the stacked-honest-fail NHR the coverage/typing gates would return.
+  //     ANY exclusion ⇒ null ⇒ falls through to the existing unknown-bar ladder (byte-identical). Flag-OFF ⇒ never runs.
+  if (selfClearablePackageEnabled() && inp.verifierSound) {
+    const scBars = selfClearablePackageBars(dispositions);
+    if (scBars)
+      return enforceVerdictWordInvariant(mk("BID_WITH_CAUTION", null,
+        `${committalCaution()}Self-clearable package — every requirement below is bidder-self-determinable; confirm each before bidding: ${scBars.map((f) => f.requirement).join("; ")}`,
+        dispositions, []));
+  }
 
   // 5. Disqualifying bars whose firm-status is UNKNOWN (null profile, or no attribute to check). The old
   //    ladder blanket-routed these to BID_WITH_CAUTION — a hole (Brain card-44 §2): a NON-CURABLE structural
