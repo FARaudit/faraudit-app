@@ -631,11 +631,14 @@ const performanceUpkeepCaveatEnabled = () => process.env.AUDIT_PERFORMANCE_UPKEE
 const PERF_UPKEEP_TEMPORAL_RE = /\b(?:during|throughout)\s+(?:the\s+)?(?:entire\s+)?(?:contract\s+|order\s+|period\s+of\s+)?performance(?:\s+period)?\b|\bperiod\s+of\s+performance\b|\bthroughout\s+the\s+(?:life\s+of|term\s+of|duration\s+of)\b|\bfor\s+the\s+(?:entire\s+)?(?:duration|term|life)\s+of\s+the\s+(?:contract|order|performance)\b/i;
 const UPKEEP_VERB_RE = /\b(?:maintain|keep|retain|have\s+and\s+(?:shall\s+)?maintain|hold\s+and\s+(?:shall\s+)?maintain|continue\s+to\s+(?:hold|maintain|keep))\b/i;
 // Axis 1 NEGATIVE — pre-award possession framing ⇒ a real gate ⇒ escalate ALWAYS (checked over obligation + continuation).
-const PREAWARD_POSSESSION_RE = /\b(?:at\s+(?:the\s+)?time\s+of\s+(?:award|offer|proposal\s+submission)|prior\s+to\s+award|before\s+award|as\s+a\s+condition\s+of\s+award|upon\s+award|at\s+(?:the\s+)?time\s+of\s+submission|by\s+(?:the\s+)?(?:time\s+of\s+)?award|must\s+(?:currently\s+)?(?:hold|possess)\b)\b/i;
-// Axis 2 POSITIVE — ordinary-course credential allowlist (affirmative, #507).
-const ORDINARY_COURSE_CRED_RE = /\b(?:business\s+licens\w*|state\s+licens\w*|local\s+licens\w*|licens\w*\s+requirements?|professional\s+licens\w*|insurance|liability\s+(?:insurance|coverage)|workers'?\s+compensation|sam(?:\.gov)?\s+registration|registration\s+in\s+sam|active\s+registration|system\s+for\s+award\s+management|iso\s?90{2}\d|quality\s+(?:control|assurance|management)\s+(?:system|program|plan|certificat\w*)?|safety\s+(?:program|plan|certificat\w*|training)|osha)\b/i;
-// Axis 2 NEGATIVE — long-lead / scarce credential ⇒ escalate REGARDLESS of temporal frame (Brain-listed, over ob+continuation).
-const LONG_LEAD_CRED_RE = /\b(?:facility\s+(?:security\s+)?clearance|\bfcl\b|personnel\s+(?:security\s+)?clearance|security\s+clearance|top[\s-]?secret|\bts\/?sci\b|\bsecret\b\s+(?:clearance|facility)|cmmc|nist\s+sp?\s?800-171|\bfaa\b|part\s+145|airworthiness|type\s+certificat\w*|\bqpl\b|\bqml\b|qualified\s+products?\s+list|qualified\s+manufacturers?\s+list|\bfoci\b|\bitar\b|dd[\s-]?254|nispom)\b/i;
+const PREAWARD_POSSESSION_RE = /\b(?:at\s+(?:the\s+)?time\s+of\s+(?:award|offer|proposal\s+submission)|at\s+(?:the\s+)?(?:contract\s+)?award\b|prior\s+to\s+(?:award|contract\s+award|contract\s+start|commencement|the\s+start\s+of\s+performance|performance\s+start)|before\s+award|as\s+a\s+condition\s+of\s+award|as\s+of\s+(?:the\s+)?(?:date\s+of\s+)?award|upon\s+award|at\s+(?:the\s+)?time\s+of\s+submission|by\s+(?:the\s+)?(?:time\s+of\s+)?award|(?:shall|must|to)\s+(?:currently\s+)?(?:hold|possess)\b)\b/i;
+// Axis 2 POSITIVE — ordinary-course credential allowlist (affirmative, #507). NOTE (Gauntlet F5): bare "active
+// registration" was REMOVED (it matched scarce registries e.g. DEA); SAM registration is covered by its explicit tokens.
+const ORDINARY_COURSE_CRED_RE = /\b(?:business\s+licens\w*|state\s+licens\w*|local\s+licens\w*|professional\s+licens\w*|licens\w*\s+requirements?|insurance|liability\s+(?:insurance|coverage)|workers'?\s+compensation|sam(?:\.gov)?\s+registration|registration\s+in\s+sam|system\s+for\s+award\s+management|iso\s?90{2}\d|iso\s?14001|osha)\b/i;
+// Axis 2 NEGATIVE — long-lead / scarce credential ⇒ escalate REGARDLESS of temporal frame. Brain-listed + Gauntlet-F6
+// additions (EAR/export-control, DEA, bonding/surety, OEM/brand authorization, NRC, AS9100/Nadcap). Defense-in-depth on
+// top of the recitalTailVeto belt (which already catches BAR_SIGNAL-vocab bars in the severed tail).
+const LONG_LEAD_CRED_RE = /\b(?:facility\s+(?:security\s+)?clearance|\bfcl\b|personnel\s+(?:security\s+)?clearance|security\s+clearance|top[\s-]?secret|\bts\/?sci\b|\bsecret\b\s+(?:clearance|facility)|cmmc|nist\s+sp?\s?800-171|\bfaa\b|part\s+145|airworthiness|type\s+certificat\w*|\bqpl\b|\bqml\b|qualified\s+products?\s+list|qualified\s+manufacturers?\s+list|\bfoci\b|\bitar\b|\bear\b|\bddtc\b|export\s+(?:administration|control|licens\w*)|dd[\s-]?254|nispom|\bdea\b|drug\s+enforcement|bond(?:ing)?\b|surety|treasury[\s-]?listed|authorized\s+(?:oem\s+)?(?:distributor|dealer|reseller)|\boem\b|nuclear\s+regulatory|\bnrc\b|as\s?9100|nadcap)\b/i;
 
 /** Two-axis ordinary-course-performance-upkeep discriminator (card #576). Returns { credential } to DEMOTE (recital →
  *  caveat, not NHR), or null to ESCALATE. Pure. `continuation` = the source tail of a line-wrap-severed obligation
@@ -760,7 +763,12 @@ export function gradeCoverageV2(attestations: SectionAttestation[], opts?: {
         // tail + any long-lead/at-award negative are seen. Ambiguous on either axis ⇒ classifier returns null ⇒ escalate.
         if (performanceUpkeepCaveatEnabled()) {
           const ver = opts?.verifyRecitalPresence?.(ob) ?? null;
-          const up = classifyPerformanceUpkeepRecital(ob, ver?.continuation ?? null);
+          // Gauntlet R1 (F1/F2/F3): demote ONLY when the recital is source-VERIFIED present (FAIL-CLOSED — a
+          // paraphrased/raw-unlocatable obligation escalates, mirroring #572; also keeps the emitted excerpt genuinely
+          // grounded, closing the #574 fabrication breach) AND its severed tail carries NO bar via recitalTailVeto
+          // (hasBarSignal || benignGuardRefuses — strictly STRONGER than the two #576 negatives; catches bonding/surety
+          // and any BAR_SIGNAL-vocab bar riding the tail that the enumerated long-lead list would miss).
+          const up = (ver?.present && !recitalTailVeto(ver.continuation)) ? classifyPerformanceUpkeepRecital(ob, ver.continuation) : null;
           if (up) { caveatRecital.push({ section: a.section, obligation: ob, credential: up.credential }); continue; }
         }
         if (ambiguousSignalDemotionEnabled() && (!hasBarSignal(ob) || isGovtEvalMethodologyNonBar(ob)
