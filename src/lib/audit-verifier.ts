@@ -210,9 +210,13 @@ export function makeShardedSkeptic(base: SkepticFn, opts?: { shardSize?: number;
   const shardSize = Math.min(15, Math.max(1, opts?.shardSize ?? 12)); // HARD CAP ≤15 (card #609)
   const retries = Math.max(0, opts?.retries ?? 2);
   return async (ctx, findings, _opts) => {
-    if (findings.length <= shardSize) return base(ctx, findings, _opts); // no sharding needed → identical single call
+    // card #609-(8) part 5: `_opts` (escalateIdx) is FULL-SET indexed — NEVER forward it into a per-shard SUBSET call
+    // (the stale-index trap); shard base calls receive no opts. Escalation is makeTieredSkeptic's job, not the base's.
+    void _opts;
     const merged: SkepticVerdict[] = [];
     let anySucceeded = false; let lastError: unknown = null;
+    // ≤shardSize ⇒ ONE shard — still routed through the retry+coverage loop (no bypass), so a truncated small set is
+    // salvaged + re-requested + coverage-asserted exactly like a large one (card-274 small-set contract, #609-(8)).
     for (let start = 0; start < findings.length; start += shardSize) {
       const shard = findings.slice(start, start + shardSize);
       const ruled = new Map<number, SkepticVerdict>(); // local shard index → verdict
@@ -222,7 +226,7 @@ export function makeShardedSkeptic(base: SkepticFn, opts?: { shardSize?: number;
         let vs: SkepticVerdict[];
         // A salvaging base returns its parseable PREFIX on truncation (fewer verdicts than requested) — those are kept,
         // the missing remainder re-requested next attempt. A hard throw (network/parse) leaves the remainder unruled.
-        try { vs = await base(ctx, remain, _opts); anySucceeded = true; } catch (e) { lastError = e; break; }
+        try { vs = await base(ctx, remain); anySucceeded = true; } catch (e) { lastError = e; break; }
         for (const v of vs) {
           const local = remainIdx[v.index];
           if (local !== undefined && !ruled.has(local)) ruled.set(local, { ...v, index: local, id: shard[local]?.id });
@@ -232,12 +236,15 @@ export function makeShardedSkeptic(base: SkepticFn, opts?: { shardSize?: number;
     }
     // T0-4 parity: a TOTAL outage (no shard call ever returned) must route to sound:false → NHR, not a silent empty pass.
     if (!anySucceeded) throw (lastError instanceof Error ? lastError : new Error("sharded skeptic: every shard call failed (total skeptic outage)"));
-    // CODE-OWNED COVERAGE LEDGER (card #609) — assert the union of shard rulings covers every input finding by id.
-    const allIds = findings.map((f) => f.id);
-    const ruledIds = new Set(merged.map((v) => v.id).filter((x): x is string => x != null));
-    const residueIds = allIds.filter((id) => id != null && !ruledIds.has(id));
-    if (merged.length < findings.length || residueIds.length > 0)
-      console.log(`[sharded-skeptic] coverage ${merged.length}/${findings.length} ruled (${Math.ceil(findings.length / shardSize)} shards @≤${shardSize}); PER-FINDING residue (${residueIds.length}): ${residueIds.map((id) => `#${id}`).join(", ") || "(index-only)"} — left absent for makeAgenticVerifier to classify (verdict-driving → NHR, informational → unverified)`);
+    // CODE-OWNED COVERAGE ASSERT (card #609-(8) part 5 — a real assertion, NOT a log). The union of shard rulings MUST
+    // cover every input finding. A residual gap after ≤15-shard + retry + salvage means the adversary genuinely did not
+    // rule some finding → refuse a partial verdict set → THROW so makeAgenticVerifier routes the run to sound:false →
+    // NHR. The sharded path fails CLOSED on incomplete coverage (card-274 no-partial-trust, made structural).
+    if (merged.length < findings.length) {
+      const ruledIds = new Set(merged.map((v) => v.id).filter((x): x is string => x != null));
+      const residueIds = findings.map((f) => f.id).filter((id) => id != null && !ruledIds.has(id));
+      throw new Error(`sharded skeptic: incomplete coverage ${merged.length}/${findings.length} after ${retries + 1} attempt(s)/shard (unruled: ${residueIds.map((id) => `#${id}`).join(",") || "index-only"}) — refusing a partial verdict set (card-274)`);
+    }
     return merged;
   };
 }

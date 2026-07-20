@@ -158,7 +158,9 @@ export function salvageVerdictsPrefix(text: string): SkepticVerdict[] {
     if (c === '"') { inStr = true; continue; }
     if (c === "{") { if (depth === 0) objStart = i; depth++; }
     else if (c === "}") { depth--; if (depth === 0 && objStart >= 0) {
-      try { const o = JSON.parse(text.slice(objStart, i + 1)); if (o && typeof o.index === "number" && typeof o.upheld === "boolean") out.push(o as SkepticVerdict); } catch { /* skip malformed */ }
+      // card #609-(8) part 5 — require ALL schema-required fields (index, upheld, reason). A truncated object cut before
+      // its `reason` value must NOT be trusted as a complete ruling — skip it (the sharded loop re-requests it).
+      try { const o = JSON.parse(text.slice(objStart, i + 1)); if (o && typeof o.index === "number" && typeof o.upheld === "boolean" && typeof o.reason === "string") out.push(o as SkepticVerdict); } catch { /* skip malformed */ }
       objStart = -1; } }
     else if (c === "]" && depth === 0) break; // array closed cleanly
   }

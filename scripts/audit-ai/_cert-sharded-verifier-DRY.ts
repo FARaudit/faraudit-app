@@ -53,18 +53,30 @@ const verifyAll = makeAgenticVerifier(shardedAll);
   const rSalv: any = await makeAgenticVerifier(shardedSalv)(ctx, findings as any);
   ok("T4 salvage+re-request converges to sound", rSalv.sound === true && rSalv.ledger?.counts?.unresolvedTotal === 0, `sound=${rSalv.sound} unresolved=${rSalv.ledger?.counts?.unresolvedTotal}`);
 
-  // ---- T5: per-finding residue — stub never rules 2 specific findings → they're named residue + sink per-finding ----
+  // ---- T5 (card #609-(8) part 5): incomplete coverage now THROWS (real assert, not log) → NHR, not silent partial ----
   const skipIds = new Set([findings[3].id, findings[7].id]);
   const stubSkip: SkepticFn = async (_c, fs2) => fs2.map((f, i): SkepticVerdict | null => skipIds.has((f as any).id) ? null : ({ index: i, upheld: true, reason: "ok" })).filter(Boolean) as SkepticVerdict[];
   const rSkip: any = await makeAgenticVerifier(makeShardedSkeptic(stubSkip, { shardSize: 15 }))(ctx, findings as any);
-  // 2 verdict-driving residue → not sound; unresolvedIndices names them per-finding
-  ok("T5 per-finding residue: 2 unresolved named", (rSkip.ledger?.counts?.unresolvedTotal ?? 0) === 2, `unresolved=${rSkip.ledger?.counts?.unresolvedTotal}`);
+  ok("T5 coverage gap THROWS → sound=false (NHR), not silent partial", rSkip.sound === false && rSkip.ledger?.failureMode === "skeptic_throw", `sound=${rSkip.sound} mode=${rSkip.ledger?.failureMode}`);
 
   // ---- T6: ≤15 hard cap (request 20 → clamps to 15) ----
   let maxShardSeen = 0;
   const stubMeasure: SkepticFn = async (_c, fs2) => { maxShardSeen = Math.max(maxShardSeen, fs2.length); return fs2.map((_f, i): SkepticVerdict => ({ index: i, upheld: true, reason: "m" })); };
   await makeShardedSkeptic(stubMeasure, { shardSize: 20 })(ctx, findings.slice(0, 40) as any);
   ok("T6 ≤15 hard cap on shardSize", maxShardSeen <= 15, `maxShard=${maxShardSeen}`);
+
+  // ---- T7 (card #609-(8) part 5): SMALL-SET (≤shardSize) truncation is NOT bypassed — card-274 contract holds ----
+  // A ≤15 set whose base truncates on EVERY attempt (never rules the tail) → coverage gap → throw → NHR.
+  const small = findings.slice(0, 10);
+  const stubSmallTrunc: SkepticFn = async (_c, fs2) => fs2.slice(0, fs2.length - 1).map((_f, i): SkepticVerdict => ({ index: i, upheld: true, reason: "t" })); // always drops the last → never converges
+  const rSmall: any = await makeAgenticVerifier(makeShardedSkeptic(stubSmallTrunc, { shardSize: 15, retries: 2 }))(ctx, small as any);
+  ok("T7 small-set persistent truncation → sound=false (no fast-path bypass)", rSmall.sound === false, `sound=${rSmall.sound}`);
+
+  // ---- T8 (card #609-(8) part 5): stale full-set escalateIdx is NOT forwarded into per-shard base calls ----
+  let sawEscalate = false;
+  const stubOptsProbe: SkepticFn = async (_c, fs2, o) => { if (o && (o as any).escalateIdx) sawEscalate = true; return fs2.map((_f, i): SkepticVerdict => ({ index: i, upheld: true, reason: "o" })); };
+  await makeShardedSkeptic(stubOptsProbe, { shardSize: 15 })(ctx, findings as any, { escalateIdx: [0, 1, 2, 99] });
+  ok("T8 escalateIdx NOT forwarded into shard base calls", sawEscalate === false);
 
   console.log(`\n=== CERT: ${pass} pass / ${fail} fail ===`);
   process.exit(fail ? 1 : 0);
