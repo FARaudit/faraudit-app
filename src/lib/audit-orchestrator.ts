@@ -22,7 +22,7 @@ import { NOTICE_BODY_DOC_NAME } from "./agentic-executor";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
 import { SITE_VISIT_CONCLUDED_RE, BOA_HOLDER_ONLY_EMIT_RE } from "./audit-site-visit-patterns";
-import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyNmrNaicsDormancy, applyCheckboxStateFidelity, applyPerfObligationInsuranceTyping, applyStructuralAssertionFidelity, applyQuantityAmbiguityFidelity, applyFindingDedup, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, applyInquiryDeadlineBenignGuard, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, emitPerformanceUpkeepCaveats, EngineInvariantError, type Decision } from "./audit-decide";
+import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyNmrNaicsDormancy, applyCheckboxStateFidelity, applyPerfObligationInsuranceTyping, applyStructuralAssertionFidelity, applyQuantityAmbiguityFidelity, applyFindingDedup, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, applyInquiryDeadlineBenignGuard, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, emitPerformanceUpkeepCaveats, deriveShadowVerdict, EngineInvariantError, type Decision, type ShadowVerdict } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
 import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type ReasonCaller, type EntailmentCaller, type JudgmentCost, zeroCost } from "./audit-judgment-layer";
 import { highSignalSweep, boilerplateTrapSweep } from "./audit-grounding-sweep";
@@ -165,6 +165,7 @@ export interface RunDiagnostics {
   preProcessingFindings: TypedFinding[];        // the finding set consumed by the flag-gated tail (before applyFindingDedup) — the dedup/coverage-stage replay corpus
   stageCounts: Record<string, number>;          // pre/post finding counts around the flag-gated tail (e.g. preDedup, postDedup, final)
   verifierLedger?: VerifierLedger;              // R1 · card #592 — the P2 skeptic's per-claim ledger + the mechanical unsoundness cause; present only when banking is on
+  shadowVerdict?: ShadowVerdict;               // Phase-1 SHADOW · cards #596/#597 — the positive-shape pole computed BESIDE the real verdict; present only when AUDIT_POSITIVE_VERDICT_POLE is on; NEVER authoritative
 }
 
 /** P0 — the manifest: binding UCF sections that are actually PRESENT (non-empty) in this package's source.
@@ -2744,6 +2745,13 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // emitter is a no-op ⇒ byte-identical.
   if (coverageV2?.caveatRecital?.length) findings = emitPerformanceUpkeepCaveats(findings, coverageV2.caveatRecital);
   const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(process.env.AUDIT_SITEVISIT_SEVERITY_FLOOR === "true" ? { siteVisitSeverityFloor: true } : {}), ...(coverageV2 ? { coverageV2 } : {}) };
+  // Phase-1 SHADOW (cards #596/#597) — compute the positive-shape pole BESIDE the real verdict and bank it. VERDICT-INERT:
+  // the shadow is never routed on; the live deriveVerdict below is untouched. Gated on AUDIT_POSITIVE_VERDICT_POLE (default-
+  // OFF ⇒ never computed ⇒ byte-identical) AND banking on (the diagnostics carrier). naics is the SAM fact (Rule 64).
+  if (_bankDiag && process.env.AUDIT_POSITIVE_VERDICT_POLE === "true") {
+    try { _bankDiag.shadowVerdict = deriveShadowVerdict(inputs, { naics: opts.naics }); }
+    catch (e) { console.log(`[shadow] deriveShadowVerdict threw (verdict-inert, ignored): ${e instanceof Error ? e.message : e}`); }
+  }
   if (process.env.CONSTRUCTION_DEBUG === "true") {
     const kc: Record<string, number> = {}, dc: Record<string, number> = {};
     for (const f of findings) { kc[f.kind] = (kc[f.kind] ?? 0) + 1; const d = disposeFinding(f); dc[d] = (dc[d] ?? 0) + 1; }

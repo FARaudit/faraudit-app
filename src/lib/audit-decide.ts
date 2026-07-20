@@ -2913,6 +2913,116 @@ function selfClearablePackageBars(dispositions: DecidedFinding[]): DecidedFindin
   return selfCertBars;                                                 // enumerate the bidder-self-determinable eligibility bars
 }
 
+// ── PHASE-1 SHADOW · POSITIVE-SHAPE VERDICT POLE (Brain-approved cards #596/#597) ─────────────────────────
+// Flag AUDIT_POSITIVE_VERDICT_POLE default-OFF. SHADOW ONLY — computed BESIDE deriveVerdict and BANKED; NEVER
+// authoritative (the live verdict is untouched ⇒ flag-OFF byte-identical). Mirrors the NO_BID pole's positive-
+// allowlist / default-deny doctrine onto the NHR pole: ONLY a kill-shot-CLASS candidate in the DECIDING SET may veto;
+// every other finding is enrichment (advisory-by-construction — cannot veto, even if a lens mis-typed its
+// controllability). BINDING-a: unknown/unclassifiable kill-shot → NHR (positive-shape bounds vetoes, never caps honest
+// uncertainty). Package gates split HARD (ingestion/integrity → honest-fail STANDS) vs SOFT (interpretive → a FIXED,
+// corpus-tuned budget, zero learned params — Brain design-rulings 1+2). Triage runs AFTER the lens sweep as a
+// deciding-vs-enrichment re-partition of the existing findings (Brain design-ruling 3).
+export type KillShotClass = "socioeconomic_eligibility" | "size_standard" | "nmr_applicability" | "hard_credential" | "at_award_possession" | "bonding" | "limitation_on_subcontracting" | "mandatory_hard_gate";
+export interface ShadowVerdict {
+  verdict: Verdict; reason: string;
+  decidingCount: number; enrichmentCount: number;
+  killShotClasses: KillShotClass[]; vetoes: string[];
+  softBudget: { disqualifierUncovered: number; noticeBodyBarUngrounded: boolean; unreadEvidence: number; tripped: boolean };
+  hardGate: string | null;
+}
+const NMR_SHAPE_RE = /non-?manufacturer|52\.219-33/i;
+/** POSITIVE kill-shot CLASS classifier — keyed on typed signals + the existing positional detectors, NEVER a bar-vocab
+ *  blocklist ([[feedback_no_blocklist_shape_allowlist_doctrine]]). Returns null ⇒ ENRICHMENT (cannot veto). The class
+ *  sub-labels (bond/limitation/etc.) are DIAGNOSTIC only — the actual veto/no-veto is decided by SHAPE downstream
+ *  (recognizer: typed + curable + no possession), never by these labels. */
+function killShotClass(f: TypedFinding, naics: string | null | undefined): KillShotClass | null {
+  const hay = `${f.requirement ?? ""} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""} ${f.citation ?? ""}`;
+  // NMR-applicability (folds R3a, the legally-correct fix): 52.219-33 is a kill-shot ONLY on a supply NAICS. On a
+  // services/construction NAICS the rule is DORMANT (13 CFR 121.406(b)(3)-(4)) ⇒ enrichment, never a veto. A null NAICS
+  // fails toward INCLUDE (cannot confirm dormancy ⇒ leave it a candidate → BINDING-a routes an untyped one to NHR).
+  if (NMR_SHAPE_RE.test(hay)) return (isNmrApplicableNaics(naics) || !naics) ? "nmr_applicability" : null;
+  // Positional at-award / long-lead detectors (catch a mis-typed buried kill-shot — the recognizer's red-team).
+  if (hasLongLeadCredential(hay)) return "hard_credential";
+  if (hasPreAwardPossession(hay)) return "at_award_possession";
+  // A TYPED eligibility bar is a kill-shot candidate by construction (positive: kind=eligibility_bar).
+  if (f.kind === "eligibility_bar") {
+    if (/\bbond\b|bid guarantee|performance bond|payment bond/i.test(hay)) return "bonding";
+    if (/limitation on subcontract|52\.219-14/i.test(hay)) return "limitation_on_subcontracting";
+    if (canonicalizeEligibilityAttr(f.requiredAttribute ?? "") || /set-?aside|8\(a\)|hubzone|sdvosb|wosb|edwosb|vosb/i.test(hay)) return "socioeconomic_eligibility";
+    if (/size standard|small business (size|concern)/i.test(hay)) return "size_standard";
+    return "mandatory_hard_gate";
+  }
+  // Everything else (technical_spec · pricing · submission · past_performance · clause_flowdown · other · boilerplate ·
+  // procedural_obligation) is ENRICHMENT — cannot veto even if mis-typed bidder_cannot_move (the LBJ CPARS case).
+  return null;
+}
+/** Compute the Phase-1 SHADOW verdict over the SAME VerdictInputs deriveVerdict sees. Pure; reuses deriveVerdict's own
+ *  helpers so the two poles share vocabulary. Verdict-inert (the caller banks it, never routes on it). */
+export function deriveShadowVerdict(inp: VerdictInputs, opts?: { naics?: string | null }): ShadowVerdict {
+  const naics = opts?.naics ?? null;
+  const findings = inp.findings ?? [];
+  const anyInp = inp as unknown as { coverageV2?: { disqualifierUncovered?: unknown[]; unreadable?: unknown[] }; noticeBodyBarUngrounded?: boolean; unreadEvidence?: unknown[]; setAsideConflict?: unknown };
+  // TRIAGE — re-partition AFTER the lens sweep into deciding (kill-shot candidates) vs enrichment.
+  const classOf = new Map<TypedFinding, KillShotClass>();
+  for (const f of findings) { const k = killShotClass(f, naics); if (k) classOf.set(f, k); }
+  const deciding = findings.filter((f) => classOf.has(f));
+  const enrichmentCount = findings.length - deciding.length;
+  const killShotClasses = [...new Set(classOf.values())];
+  const cov2 = anyInp.coverageV2 ?? {};
+  const softBudget = { disqualifierUncovered: (cov2.disqualifierUncovered ?? []).length, noticeBodyBarUngrounded: !!anyInp.noticeBodyBarUngrounded, unreadEvidence: (anyInp.unreadEvidence ?? []).length, tripped: false };
+  const mk = (verdict: Verdict, reason: string, extra?: Partial<ShadowVerdict>): ShadowVerdict =>
+    ({ verdict, reason, decidingCount: deciding.length, enrichmentCount, killShotClasses, vetoes: [], softBudget, hardGate: null, ...extra });
+
+  // ── HARD package gates (ingestion/integrity → honest-fail STANDS) ──
+  if (inp.primaryIndeterminate) return mk("NEEDS_HUMAN_REVIEW", "HARD: no base solicitation identified", { hardGate: "primaryIndeterminate" });
+  if (anyInp.setAsideConflict) return mk("NEEDS_HUMAN_REVIEW", "HARD: set-aside conflict — eligible pool ambiguous", { hardGate: "setAsideConflict" });
+  // COVERAGE/MANIFEST AUTHORITY (Brain #599-1): the GATE_V2 outcome, NOT the legacy `documentsComplete` boolean (retired
+  // — it was contaminated by the false-INCOMPLETE root). Mirrors deriveVerdict's own coverage ladder exactly: GATE_V2
+  // outcome when coverageV2 is present (INCOMPLETE cap = unreadable ingest; NHR cap = uncovered real disqualifier), else
+  // the legacy coverageComplete fallback for pre-GATE_V2 records. This subsumes the old manual disqualifierUncovered SOFT
+  // check (that bucket IS the GATE_V2 NHR cap).
+  if (inp.coverageV2) {
+    const v2 = gateV2Outcome(inp.coverageV2);
+    if (v2.cap === "INCOMPLETE") return mk("INCOMPLETE", `HARD (GATE_V2 coverage): ${v2.reason}`, { hardGate: "gateV2:incomplete" });
+    if (v2.cap === "NEEDS_HUMAN_REVIEW") { softBudget.tripped = true; return mk("NEEDS_HUMAN_REVIEW", `GATE_V2 coverage cap — uncovered disqualifier: ${v2.reason}`, { hardGate: "gateV2:nhr" }); }
+  } else if (inp.coverageComplete === false) {
+    return mk("INCOMPLETE", "HARD: coverage not complete (legacy record, no coverageV2)", { hardGate: "coverageComplete" });
+  }
+
+  // ── DECIDING-SET soundness (the shadow verifier over the SMALL set — the whole thesis) ──
+  // A deciding kill-shot candidate that is UNGROUNDED cannot be trusted → NHR (BINDING-a). Note: the shadow does NOT
+  // read inp.verifierSound — that was soundness over the OLD ~90-finding set; the shadow's soundness is the deciding set.
+  const decidingUngrounded = deciding.filter((f) => (f as unknown as { grounded?: boolean }).grounded === false);
+  if (decidingUngrounded.length) return mk("NEEDS_HUMAN_REVIEW", `BINDING-a: ${decidingUngrounded.length} deciding kill-shot candidate(s) ungrounded → NHR`, { vetoes: decidingUngrounded.map((f) => f.citation) });
+
+  // ── POSITIVE VETO over the deciding set ──
+  const dispositions: DecidedFinding[] = deciding.map((f) => ({ ...f, disposition: disposeFinding(f) }));
+  const provenFails = deciding.filter((f) => firmStatus(f, inp.bidderProfile, inp.source) === "fails");
+  if (provenFails.length) return mk("INELIGIBLE", `Proven ineligible on ${provenFails.length} deciding gate(s)`, { vetoes: provenFails.map((f) => f.citation) });
+  const decidingBars = dispositions.filter((d) => d.disposition === "disqualifying");
+  // BINDING-a: an untyped deciding bar is unclassifiable → NHR (never a silent pass).
+  const untypedBars = decidingBars.filter((f) => !f.requiredAttribute || f.curableInWindow === undefined);
+  if (untypedBars.length) return mk("NEEDS_HUMAN_REVIEW", `BINDING-a: ${untypedBars.length} deciding disqualifying bar(s) unclassifiable (untyped) → NHR`, { vetoes: untypedBars.map((f) => f.citation) });
+  // A real, non-self-clearable structural bar in the deciding set → NHR.
+  const hardBars = decidingBars.filter((f) => f.controllability === "no_one_can_move" || (f.controllability === "bidder_cannot_move" && f.curableInWindow !== true) || f.curableInWindow === false);
+  if (hardBars.length) return mk("NEEDS_HUMAN_REVIEW", `${hardBars.length} deciding structural bar(s) not bidder-self-determinable → NHR`, { vetoes: hardBars.map((f) => f.citation) });
+
+  // NOTE (Brain #599-1): the disqualifierUncovered SOFT check is now the GATE_V2 NHR cap above (single authority) — a
+  // record WITH coverageV2 and an uncovered real disqualifier already returned NHR there. softBudget stays reported for
+  // diagnostics. noticeBodyBarUngrounded / unreadEvidence remain interpretive signals (advisory; not a unilateral veto).
+
+  // ── COMMITTAL — every deciding kill-shot is bidder-self-determinable (or there are none) ──
+  // ASYMMETRY CAP (mirrors deriveVerdict routes 21/22): never COMMIT over an incomplete manifest — a package whose
+  // binding manifest was not fully read cannot green-light, even with a clean deciding set. Corpus-surfaced gap
+  // (FA442726Q1068 8eab14c2 committed BID over manifestComplete=false). documentsComplete=false is already a HARD gate
+  // above; this catches the computed manifestComplete=false case. → INCOMPLETE, an honest-fail, never a caution.
+  const manifestIncomplete = (inp as unknown as { manifestComplete?: boolean }).manifestComplete === false;
+  const scBars = selfClearablePackageBars(dispositions);
+  if (manifestIncomplete) return mk("INCOMPLETE", `Deciding set clears but the binding manifest is incomplete — honest-fail, never a commit over an unread manifest`, { hardGate: "manifestComplete", vetoes: (scBars ?? []).map((f) => f.citation) });
+  if (scBars && scBars.length) return mk("BID_WITH_CAUTION", `Self-clearable package — ${scBars.length} bidder-self-determinable eligibility bar(s); ${enrichmentCount} enrichment finding(s) advisory`, { vetoes: scBars.map((f) => f.citation) });
+  return mk("BID", `Clean BID — deciding set (${deciding.length}) carries no disqualifying or self-cert bar`);
+}
+
 export function deriveVerdict(inp: VerdictInputs): Decision {
   // ── NULL-PROFILE ELIGIBILITY GUARANTEE (Brain card 206-A), single flag AUDIT_ELIGIBLE_TRISTATE, default-OFF.
   //    Graduates the tristate + adds two paired behaviors — ONE guarantee: the engine never asserts a firm is
