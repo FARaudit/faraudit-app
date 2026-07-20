@@ -2954,6 +2954,37 @@ function groundedMechanicClause(findings: Array<{ requirement?: string; excerpt?
   return hasGroundedLeadTimeBasis(findings) ? GROUNDED_LEADTIME_MECHANIC : "";
 }
 
+// ── CLAUSE-KEYED TYPING FLOOR (Brain card #609-(2)a, flag AUDIT_CLAUSE_TYPING_FLOOR default-OFF) ──────────────
+// Deterministic re-typing for a Brain-RATIFIED CLOSED clause set — closes the stochastic lens-typing divergence
+// (cab687da: the lens emitted 52.219-14 as untyped bidder_cannot_move; the gold-set typed it bidder_controls+curable).
+// For a finding whose OPERATIVE shape matches ONE of the ratified self-clearable clauses, stamp
+// controllability=bidder_controls + curableInWindow=true + requiredAttribute, so disposeFinding yields gate_to_clear
+// (a named caveat) instead of a disqualifying bar. SAFETY (Brain ruling): possession-frame OR long-lead/scarce-credential
+// text OVERRIDES the floor — NEVER stamped curable (fail-closed on a hidden at-award possession or a clearance/QPL). The
+// override is computed over requirement+EXCERPT only (NOT the citation label — the UCF section label "Insurance/Bonding"
+// falsely trips the long-lead `bond` token; card #609-(4) collision). Flag-OFF ⇒ findings byte-identical.
+const RATIFIED_TYPING_CLAUSES: Array<{ attr: string; re: RegExp }> = [
+  { attr: "limitation_on_subcontracting_self_perform", re: /\b52\.219-14\b|limitation on subcontract|50\s*%?\s*(?:rule|self-?perform)|self-?perform(?:ance)?\s+(?:at least|minimum|50)/i },
+  { attr: "sam_registration", re: /\b52\.204-7\b|system for award management|registration in sam|sam\.gov registration|register(?:ed|ing)? in sam/i },
+  { attr: "business_license_maintenance", re: /\b(?:state|business|professional|local)\s+licens\w*|licens\w*\s+requirements?|licensure/i },
+  { attr: "size_standard_self_certification", re: /\bsize standard\b|small business size (?:standard|status)|self-?certif\w* (?:as )?small/i },
+  { attr: "insurance_maintenance", re: INSURANCE_DOWORK_RE },
+];
+export function applyClauseKeyedTypingFloor(findings: TypedFinding[], o: { enabled: boolean }): TypedFinding[] {
+  if (!o.enabled) return findings;
+  return findings.map((f) => {
+    // Candidate: a still-UNTYPED disqualifying eligibility bar (never softens an already-typed or non-bar finding).
+    if (f.kind !== "eligibility_bar" || f.controllability !== "bidder_cannot_move") return f;
+    if (f.requiredAttribute && f.curableInWindow !== undefined) return f;         // already typed → leave it
+    const operative = `${f.requirement ?? ""} ${f.excerpt ?? ""}`;                // NB: NOT citation (Bonding label collision)
+    // OVERRIDE (fail-closed): possession-at-award frame OR a scarce/long-lead credential ⇒ never stamp curable.
+    if (hasPreAwardPossession(operative) || hasLongLeadCredential(operative)) return f;
+    const match = RATIFIED_TYPING_CLAUSES.find((c) => c.re.test(operative));
+    if (!match) return f;
+    return { ...f, controllability: "bidder_controls" as Controllability, curableInWindow: true, requiredAttribute: f.requiredAttribute ?? match.attr };
+  });
+}
+
 /** Derive the verdict deterministically from typed grounded findings. The LLM experts supply the FACTS
  *  (requirement + grounded excerpt + kind + controllability); this code makes the DECISION. The ladder is
  *  the same one that used to live in the chief-judge prompt — relocated from prose to TypeScript so it is
