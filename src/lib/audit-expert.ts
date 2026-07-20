@@ -231,7 +231,11 @@ export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: 
         lastMsg.content = [{ type: "text", text: lastMsg.content, cache_control: EPHEMERAL }];
       }
     }
-    const req: Record<string, unknown> = { model, max_tokens: opts?.maxTokens ?? 4096, system: systemField, tools, messages };
+    // DETERMINISM (card #596 root — the finding layer is the run-to-run variance root: 86 vs 89 findings across two
+    // runs of the same solicitation). Grounded extraction is a temperature-0 task; pin it to 0 to remove sampling
+    // noise from the finding set (mirrors anthropic-structured.ts, which already pins temperature:0 on the structured
+    // path). Reduces — does not eliminate — variance (path-dependent agentic trajectories remain). Reversion = drop the field.
+    const req: Record<string, unknown> = { model, max_tokens: opts?.maxTokens ?? 4096, temperature: 0, system: systemField, tools, messages };
     if (forceSubmit) req.tool_choice = { type: "tool", name: "submit_findings" }; // last turn → must produce findings
     // Pass the overall-budget signal so a breach cancels the in-flight paid call (stops
     // spend) instead of abandoning a Promise that keeps costing. Absent signal = no-op.
