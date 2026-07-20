@@ -2975,9 +2975,19 @@ export function deriveShadowVerdict(inp: VerdictInputs, opts?: { naics?: string 
 
   // ── HARD package gates (ingestion/integrity → honest-fail STANDS) ──
   if (inp.primaryIndeterminate) return mk("NEEDS_HUMAN_REVIEW", "HARD: no base solicitation identified", { hardGate: "primaryIndeterminate" });
-  if (inp.documentsComplete === false) return mk("INCOMPLETE", "HARD: a posted binding document was not fetched/read", { hardGate: "documentsComplete" });
-  if ((cov2.unreadable ?? []).length) return mk("INCOMPLETE", "HARD: a binding section is unreadable at ingest", { hardGate: "coverageUnreadable" });
   if (anyInp.setAsideConflict) return mk("NEEDS_HUMAN_REVIEW", "HARD: set-aside conflict — eligible pool ambiguous", { hardGate: "setAsideConflict" });
+  // COVERAGE/MANIFEST AUTHORITY (Brain #599-1): the GATE_V2 outcome, NOT the legacy `documentsComplete` boolean (retired
+  // — it was contaminated by the false-INCOMPLETE root). Mirrors deriveVerdict's own coverage ladder exactly: GATE_V2
+  // outcome when coverageV2 is present (INCOMPLETE cap = unreadable ingest; NHR cap = uncovered real disqualifier), else
+  // the legacy coverageComplete fallback for pre-GATE_V2 records. This subsumes the old manual disqualifierUncovered SOFT
+  // check (that bucket IS the GATE_V2 NHR cap).
+  if (inp.coverageV2) {
+    const v2 = gateV2Outcome(inp.coverageV2);
+    if (v2.cap === "INCOMPLETE") return mk("INCOMPLETE", `HARD (GATE_V2 coverage): ${v2.reason}`, { hardGate: "gateV2:incomplete" });
+    if (v2.cap === "NEEDS_HUMAN_REVIEW") { softBudget.tripped = true; return mk("NEEDS_HUMAN_REVIEW", `GATE_V2 coverage cap — uncovered disqualifier: ${v2.reason}`, { hardGate: "gateV2:nhr" }); }
+  } else if (inp.coverageComplete === false) {
+    return mk("INCOMPLETE", "HARD: coverage not complete (legacy record, no coverageV2)", { hardGate: "coverageComplete" });
+  }
 
   // ── DECIDING-SET soundness (the shadow verifier over the SMALL set — the whole thesis) ──
   // A deciding kill-shot candidate that is UNGROUNDED cannot be trusted → NHR (BINDING-a). Note: the shadow does NOT
@@ -2997,9 +3007,9 @@ export function deriveShadowVerdict(inp: VerdictInputs, opts?: { naics?: string 
   const hardBars = decidingBars.filter((f) => f.controllability === "no_one_can_move" || (f.controllability === "bidder_cannot_move" && f.curableInWindow !== true) || f.curableInWindow === false);
   if (hardBars.length) return mk("NEEDS_HUMAN_REVIEW", `${hardBars.length} deciding structural bar(s) not bidder-self-determinable → NHR`, { vetoes: hardBars.map((f) => f.citation) });
 
-  // ── SOFT budget (interpretive; FIXED threshold): a REAL uncovered disqualifier tips to NHR; benign recitals do not.
-  // disqualifierUncovered is coverageV2's real-bar bucket (benign recitals live in benignCoveredRecital/caveatRecital).
-  if (softBudget.disqualifierUncovered > 0) { softBudget.tripped = true; return mk("NEEDS_HUMAN_REVIEW", `SOFT budget tripped: ${softBudget.disqualifierUncovered} uncovered disqualifier(s) → NHR`); }
+  // NOTE (Brain #599-1): the disqualifierUncovered SOFT check is now the GATE_V2 NHR cap above (single authority) — a
+  // record WITH coverageV2 and an uncovered real disqualifier already returned NHR there. softBudget stays reported for
+  // diagnostics. noticeBodyBarUngrounded / unreadEvidence remain interpretive signals (advisory; not a unilateral veto).
 
   // ── COMMITTAL — every deciding kill-shot is bidder-self-determinable (or there are none) ──
   // ASYMMETRY CAP (mirrors deriveVerdict routes 21/22): never COMMIT over an incomplete manifest — a package whose
