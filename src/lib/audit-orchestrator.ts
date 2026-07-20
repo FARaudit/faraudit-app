@@ -22,7 +22,7 @@ import { NOTICE_BODY_DOC_NAME } from "./agentic-executor";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
 import { SITE_VISIT_CONCLUDED_RE, BOA_HOLDER_ONLY_EMIT_RE } from "./audit-site-visit-patterns";
-import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyNmrNaicsDormancy, applyCheckboxStateFidelity, applyPerfObligationInsuranceTyping, applyStructuralAssertionFidelity, applyQuantityAmbiguityFidelity, applyFindingDedup, applyCrossFleetDedup, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, applyInquiryDeadlineBenignGuard, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, emitPerformanceUpkeepCaveats, deriveShadowVerdict, EngineInvariantError, type Decision, type ShadowVerdict } from "./audit-decide";
+import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyNmrNaicsDormancy, applyCheckboxStateFidelity, applyPerfObligationInsuranceTyping, applyClauseKeyedTypingFloor, applyStructuralAssertionFidelity, applyQuantityAmbiguityFidelity, applyFindingDedup, applyCrossFleetDedup, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, applyInquiryDeadlineBenignGuard, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, emitPerformanceUpkeepCaveats, deriveShadowVerdict, EngineInvariantError, type Decision, type ShadowVerdict } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
 import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type ReasonCaller, type EntailmentCaller, type JudgmentCost, zeroCost } from "./audit-judgment-layer";
 import { highSignalSweep, boilerplateTrapSweep } from "./audit-grounding-sweep";
@@ -2616,6 +2616,11 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      direction): keep-the-bar veto on STRUCTURAL_BAR_RE_114, never a verified universal defect, positive-shape
   //      allowlist on citation+requirement only. Own flag (fires independent of the other guards). Flag off ⇒ byte-identical.
   findings = applyPerfObligationInsuranceTyping(findings, { enabled: process.env.AUDIT_PERF_OBLIGATION_INSURANCE === "true" });
+
+  // CLAUSE-KEYED TYPING FLOOR (Brain card #609-(2)a, AUDIT_CLAUSE_TYPING_FLOOR default-OFF) — deterministic re-typing for
+  // the ratified closed self-clearable clause set (52.219-14 · insurance · SAM/52.204-7 · state-licensure · size-self-cert),
+  // possession/long-lead OVERRIDE (never stamp curable). Runs pre-deriveVerdict/-deriveShadowVerdict. Flag OFF ⇒ byte-identical.
+  findings = applyClauseKeyedTypingFloor(findings, { enabled: process.env.AUDIT_CLAUSE_TYPING_FLOOR === "true" });
 
   // P4.6-quinquies — STRUCTURAL-ASSERTION FIDELITY GATE (Phase 3 Unit 4, Brain #551 Unit-3/Unit-4 boundary), default-OFF
   //      (=== "true"). A finding may attribute its clause/obligation to a UCF SECTION heading absent from the ingested
