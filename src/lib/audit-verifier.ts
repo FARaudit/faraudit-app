@@ -10,7 +10,7 @@
 // The skeptic is INJECTED → unit-testable with a stub ($0). makeStructuredSkeptic wires the real model.
 
 import { findInSource, ATTACHMENT_COVERAGE_ENABLED, type AuditToolContext } from "./audit-tools";
-import type { VerifyFn, VerifyResult, CorrectedDrop } from "./audit-orchestrator";
+import type { VerifyFn, VerifyResult, CorrectedDrop, VerifierLedger, VerifierClaimRuling } from "./audit-orchestrator";
 import type { TypedFinding, BidderProfile, Controllability } from "./audit-findings";
 import { knifeEdgeIndices } from "./audit-decide";
 
@@ -27,26 +27,11 @@ export type SkepticFn = (ctx: AuditToolContext, findings: TypedFinding[], opts?:
  *  actually completed); an incomplete/failed challenge ⇒ not sound ⇒ human review. */
 export function makeAgenticVerifier(skeptic: SkepticFn): VerifyFn {
   return async (ctx: AuditToolContext, findings: TypedFinding[], opts?: { bidderProfile?: BidderProfile | null }): Promise<VerifyResult> => {
-    // (1) deterministic re-grounding — never trust a finding whose excerpt isn't in source.
-    const grounded = findings.filter((f) => f.excerpt && findInSource(ctx, f.excerpt).hits.length > 0);
-    const droppedUngrounded = findings.filter((f) => !grounded.includes(f));
-
-    // VERIFIED-FLOOR positive precondition (Brain card 224 fork 1): soundness requires that ≥1 finding
-    // SURVIVE a real challenge — not merely that the skeptic "ruled on every finding". Zero grounded findings
-    // means nothing was verified (extraction produced nothing / every excerpt failed re-grounding), so the run
-    // is NOT sound → deriveVerdict routes to NEEDS_HUMAN_REVIEW, never a default BID over an empty set.
-    if (grounded.length === 0) return { sound: false, survived: [], rejected: droppedUngrounded };
-
-    // (2) knife-edge selection (deterministic, over the SAME grounded array the skeptic sees — no index drift)
-    //     + adversarial challenge. The skeptic re-types / overturns; the proven deriveVerdict runs downstream.
-    const escalateIdx = knifeEdgeIndices(grounded, opts?.bidderProfile ?? null);
-    let verdicts: SkepticVerdict[];
-    try { verdicts = await skeptic(ctx, grounded, { escalateIdx }); }
-    catch { return { sound: false, survived: grounded, rejected: droppedUngrounded }; } // challenge failed → not sound
-
-    const byIdx = new Map(verdicts.map((v) => [v.index, v]));
-    const survived: TypedFinding[] = []; const rejected: TypedFinding[] = [...droppedUngrounded];
-    const correctedDrops: CorrectedDrop[] = [];
+    // R1 · card #592 — VERIFIER LEDGER capture gate. Rides AUDIT_BANK_RUN_RECORD (like #582 diagnostics): flag-OFF the
+    // ledger is never built and the VerifyResult is byte-identical to the pre-R1 return. Capture-only; deriveVerdict
+    // never reads it. The residue predicate + preview helpers are HOISTED above the challenge so the zero-grounded and
+    // skeptic-throw exits — which occur before the per-claim loop — can still emit a full ledger.
+    const bankOn = process.env.AUDIT_BANK_RUN_RECORD === "true";
     // RESIDUE DOCTRINE (Brain card 285, Fix 1), flag-gated AUDIT_VERIFIER_BATCHING. An UNRESOLVED finding (the
     // skeptic returned no ruling for its index — truncation / claim-explosion residue) is classified:
     //   • VERDICT-DRIVING (bar-class OR knife-edge — could support/block a committal) → the run is NOT sound
@@ -69,9 +54,41 @@ export function makeAgenticVerifier(skeptic: SkepticFn): VerifyFn {
     // batched skeptic rules every finding; this is the fail-SAFE fallback for the rare truncation tail.
     const SAFE_INFORMATIONAL_KINDS = new Set(["procedural_obligation", "boilerplate"]);
     const isVerdictDriving = (f: TypedFinding, _i: number): boolean => !SAFE_INFORMATIONAL_KINDS.has(f.kind);
+    const previewOf = (f: TypedFinding) => (f.requirement.length > 160 ? f.requirement.slice(0, 160) + "…" : f.requirement);
+    const baseRow = (f: TypedFinding, i: number): VerifierClaimRuling => ({ index: i, id: f.id, citation: f.citation, kind: f.kind, controllability: f.controllability, requirementPreview: previewOf(f), disposition: "upheld" });
+
+    // (1) deterministic re-grounding — never trust a finding whose excerpt isn't in source.
+    const grounded = findings.filter((f) => f.excerpt && findInSource(ctx, f.excerpt).hits.length > 0);
+    const droppedUngrounded = findings.filter((f) => !grounded.includes(f));
+
+    // VERIFIED-FLOOR positive precondition (Brain card 224 fork 1): soundness requires that ≥1 finding
+    // SURVIVE a real challenge — not merely that the skeptic "ruled on every finding". Zero grounded findings
+    // means nothing was verified (extraction produced nothing / every excerpt failed re-grounding), so the run
+    // is NOT sound → deriveVerdict routes to NEEDS_HUMAN_REVIEW, never a default BID over an empty set.
+    if (grounded.length === 0) return { sound: false, survived: [], rejected: droppedUngrounded,
+      ...(bankOn ? { ledger: { failureMode: "zero_grounded", residueDoctrine, counts: { input: findings.length, grounded: 0, droppedUngrounded: droppedUngrounded.length, survived: 0, rejected: droppedUngrounded.length, ruled: 0, unresolvedTotal: 0, unresolvedVerdictDriving: 0 }, unresolvedIndices: [], rulings: [] } satisfies VerifierLedger } : {}) };
+
+    // (2) knife-edge selection (deterministic, over the SAME grounded array the skeptic sees — no index drift)
+    //     + adversarial challenge. The skeptic re-types / overturns; the proven deriveVerdict runs downstream.
+    const escalateIdx = knifeEdgeIndices(grounded, opts?.bidderProfile ?? null);
+    let verdicts: SkepticVerdict[];
+    try { verdicts = await skeptic(ctx, grounded, { escalateIdx }); }
+    catch (err) { return { sound: false, survived: grounded, rejected: droppedUngrounded, // challenge failed → not sound
+      ...(bankOn ? { ledger: { // WHOLE-SET failure: no verdicts returned → every grounded finding is unresolved by the throw.
+        failureMode: "skeptic_throw", throwMessage: err instanceof Error ? err.message : String(err), residueDoctrine,
+        counts: { input: findings.length, grounded: grounded.length, droppedUngrounded: droppedUngrounded.length, survived: grounded.length, rejected: droppedUngrounded.length, ruled: 0, unresolvedTotal: grounded.length, unresolvedVerdictDriving: grounded.filter((f, i) => isVerdictDriving(f, i)).length },
+        unresolvedIndices: grounded.map((_, i) => i),
+        rulings: grounded.map((f, i) => ({ ...baseRow(f, i), disposition: "unresolved", cause: "skeptic_throw", verdictDriving: isVerdictDriving(f, i) })),
+      } satisfies VerifierLedger } : {}) }; }
+
+    const byIdx = new Map(verdicts.map((v) => [v.index, v]));
+    const survived: TypedFinding[] = []; const rejected: TypedFinding[] = [...droppedUngrounded];
+    const correctedDrops: CorrectedDrop[] = [];
+    const rulings: VerifierClaimRuling[] = []; // R1 — one row per grounded finding, in index order (bankOn only)
     let unresolvedVerdictDriving = 0;
     grounded.forEach((f, i) => {
       const v = byIdx.get(i);
+      const row = bankOn ? baseRow(f, i) : null;
       // Card #373 Option 1 — ENTAILMENT HARD-DROP, STRUCTURALLY DOMINANT. Evaluated FIRST, before the substantive
       // (corrected) and upheld branches: a fabricated finding (the skeptic set entailmentFail=true because the
       // `requirement` is not supported by its own `excerpt`) is DROPPED regardless of any `corrected` payload — so a
@@ -83,6 +100,7 @@ export function makeAgenticVerifier(skeptic: SkepticFn): VerifyFn {
       if (ATTACHMENT_COVERAGE_ENABLED && v?.entailmentFail === true) {
         rejected.push(f); // hard drop — no corrected override, no upheld override
         correctedDrops.push({ index: i, id: f.id, requirement: f.requirement, citation: f.citation, refutation: v.reason, dropReason: "entailment_fail" });
+        if (row) { row.disposition = "entailment_drop"; row.reason = v.reason; rulings.push(row); }
         return;
       }
       // RE-TYPE requires a SUBSTANTIVE correction (Brain card 274 RULING 1). An empty/non-substantive
@@ -92,16 +110,21 @@ export function makeAgenticVerifier(skeptic: SkepticFn): VerifyFn {
       const substantive = !!v?.corrected && (v.corrected.controllability !== undefined || v.corrected.curableInWindow !== undefined);
       if (substantive) {
         survived.push({ ...f, ...(v!.corrected!.controllability ? { controllability: v!.corrected!.controllability } : {}), ...(v!.corrected!.curableInWindow !== undefined ? { curableInWindow: v!.corrected!.curableInWindow } : {}) }); // RE-TYPE
+        if (row) { row.disposition = "retyped"; row.reason = v!.reason; row.retype = { ...(v!.corrected!.controllability ? { controllability: v!.corrected!.controllability } : {}), ...(v!.corrected!.curableInWindow !== undefined ? { curableInWindow: v!.corrected!.curableInWindow } : {}) }; rulings.push(row); }
       } else if (v && !v.upheld) {
         rejected.push(f); // overturned → drop (INCLUDES the empty-corrected:{} case that formerly resurrected)
         correctedDrops.push({ index: i, id: f.id, requirement: f.requirement, citation: f.citation, refutation: v.reason, dropReason: v.corrected ? "empty_corrected" : "overturned" });
+        if (row) { row.disposition = "overturned"; row.reason = v.reason; rulings.push(row); }
       } else if (v) {
         survived.push(f); // upheld as-is (upheld=true, no substantive correction)
+        if (row) { row.disposition = "upheld"; row.reason = v.reason; rulings.push(row); }
       } else if (residueDoctrine && !isVerdictDriving(f, i)) {
         survived.push({ ...f, unverified: true }); // UNRESOLVED informational → kept, marked, does not sink soundness
+        if (row) { row.disposition = "unresolved"; row.cause = "no_ruling_returned"; row.verdictDriving = false; rulings.push(row); }
       } else {
         survived.push(f);                          // UNRESOLVED verdict-driving (or flag-off residue) → attached…
         if (isVerdictDriving(f, i)) unresolvedVerdictDriving++; // …and it sinks soundness → NHR
+        if (row) { row.disposition = "unresolved"; row.cause = "no_ruling_returned"; row.verdictDriving = isVerdictDriving(f, i); rulings.push(row); }
       }
     });
     if (correctedDrops.some((d) => d.dropReason === "empty_corrected"))
@@ -113,7 +136,18 @@ export function makeAgenticVerifier(skeptic: SkepticFn): VerifyFn {
     const unresolvedCount = residueDoctrine ? unresolvedVerdictDriving : grounded.filter((_, i) => !byIdx.has(i)).length;
     if (residueDoctrine && unresolvedVerdictDriving > 0)
       console.log(`[verifier] ${unresolvedVerdictDriving} VERDICT-DRIVING finding(s) unresolved after the skeptic pass → run NOT sound → NHR (card 285 residue doctrine; findings attached, never dropped)`);
-    return { sound: unresolvedCount === 0 && survived.length > 0, survived, rejected, correctedDrops };
+    const sound = unresolvedCount === 0 && survived.length > 0;
+    return { sound, survived, rejected, correctedDrops,
+      // R1 · card #592 — the completed-challenge ledger. failureMode disambiguates the two non-throw NHR causes the
+      // banked record could not tell apart: residue_unresolved (≥1 index un-ruled → the LBJ signature) vs
+      // total_overturn (skeptic overturned everything → survived empty). unresolvedTotal counts ALL un-ruled indices;
+      // unresolvedVerdictDriving is the residue-doctrine subset that actually sinks soundness when the flag is on.
+      ...(bankOn ? { ledger: {
+        failureMode: sound ? "sound" : (survived.length === 0 ? "total_overturn" : "residue_unresolved"), residueDoctrine,
+        counts: { input: findings.length, grounded: grounded.length, droppedUngrounded: droppedUngrounded.length, survived: survived.length, rejected: rejected.length, ruled: byIdx.size, unresolvedTotal: grounded.filter((_, i) => !byIdx.has(i)).length, unresolvedVerdictDriving },
+        unresolvedIndices: grounded.map((_, i) => i).filter((i) => !byIdx.has(i)),
+        rulings,
+      } satisfies VerifierLedger } : {}) };
   };
 }
 
