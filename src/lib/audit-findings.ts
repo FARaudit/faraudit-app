@@ -126,6 +126,8 @@ export interface TypedFinding {
   findingDedupMerged?: boolean; // Phase 3 Unit 6 — set on the SURVIVOR of a same-clause dedup (two/three concatenated-panel rows for one FAR/DFARS clause collapsed into one). The survivor keeps the MOST-CONSERVATIVE disposition of the group (controllability most-disqualifying, severity=max, curability least, cautionFloor OR) and PRESERVES every distinct requirement facet. Verdict-safe by construction (show-stopper set + logicalShowStopperCount unchanged); deriveVerdict reads controllability/severity, not this marker.
   mergedLensCount?: number;     // Phase 3 Unit 6 — how many lens rows the dedup survivor absorbed (telemetry/render "N lenses concur").
   mergedClause?: string;        // Phase 3 Unit 6 — the FAR/DFARS clause number the dedup grouped on (e.g. "52.217-8").
+  crossFleetMerged?: boolean;   // Phase 3 Unit 6 follow-on — set on the SURVIVOR of a same-DATE cross-fleet dedup (the no-clause deadline analogue of findingDedupMerged: plain rows restating one dated deadline across the two paraphrasing panels collapsed into one). Verdict-safe by construction (plain-only + protected-passthrough; survivor is plain); facets preserved. deriveVerdict reads controllability/severity, not this marker.
+  mergedDateSig?: string;       // Phase 3 Unit 6 follow-on — the normalized calendar-date signature (YYYY-MM-DD, pipe-joined) the cross-fleet dedup grouped on (e.g. "2026-07-22").
   // ELIGIBILITY-AUTHORITY ALLOW-LIST (Brain card 329) — set when the deterministic allow-list re-typed a hard
   // eligibility/`no_one_can_move` show-stopper whose cited clause is NOT in an enumerated bidder-eligibility / size /
   // set-aside authority (FAR 19 / 52.219-x / 13 CFR 121-128 / 52.204-8 / 52.212-3 / 52.209) → bidder_controls +

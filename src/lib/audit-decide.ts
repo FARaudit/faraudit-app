@@ -1964,6 +1964,142 @@ export function applyFindingDedup(
   return out;
 }
 
+// ── CROSS-FLEET DEADLINE-DEDUP GATE (Phase 3 Unit 6 follow-on, flag AUDIT_CROSS_FLEET_DEDUP default-OFF) ─────
+// SIBLING of applyFindingDedup, running immediately after it. The clause-keyed gate collapses same-CLAUSE dups; this
+// gate collapses the OTHER cross-fleet inflation source — no-clause obligations restated by the paired lens of the two
+// paraphrasing panels (snake_case `pricing_analyst`… + Title-Case `Pricing & Contracts Risk Analyst`…). On the seq-2
+// dccce793 record the single deadline "submit offer by July 22, 2026" surfaces 5× and "questions due July 14, 2026" 2×,
+// each phrased differently by every lens (no clause number ⇒ the clause gate can't touch them). This gate keys on the
+// STRUCTURED CALENDAR DATE — a specific solicitation date is overwhelmingly a single deadline obligation, and the stable,
+// delimited "same obligation" signal for the no-clause axis (the date analogue of the clause number). Same-date plain rows
+// collapse into ONE facet-preserving row.
+//
+// WHY DATE-ONLY (the doctrine-clean scope — [[feedback_no_blocklist_shape_allowlist_doctrine]] + the over-merge treadmill):
+//   • A calendar DATE is a specific, structural, low-frequency anchor: distinct deadlines carry distinct dates ⇒ distinct
+//     keys ⇒ no cross-deadline merge. It is the ONE no-clause anchor that reliably maps to a single obligation.
+//   • MONEY / QUANTITY anchors are DELIBERATELY excluded: they are cited FACTS, not obligation identities — a wage rate
+//     "$25.27" recurs across three DISTINCT pricing findings (floor-compliance, thin-margin risk, unresolved-fringe), so a
+//     money key would FUSE distinct concerns. There is no exact/subset key that separates "same obligation, reworded" from
+//     "distinct obligations, shared fact" (content-token overlap gives no clean threshold — that IS the paraphrase treadmill
+//     the prior arc correctly refused). Date is the safe subset; the prose residual (price-list / FFP / tradeoff clusters,
+//     no structured anchor) is an UPSTREAM problem (two paraphrasing fleets), not a downstream gate — see the exit card.
+//
+// VERDICT-SAFE BY A STRICTER CONSTRUCTION THAN applyFindingDedup (this gate is SELF-CONTAINED — it does NOT reuse the clause
+// gate's survivor synthesis, which the cross-fleet Gauntlet R1–R3 proved is a reconstruction treadmill against an EVOLVING
+// deriveVerdict). Three seams the naive "synthesize a most-conservative survivor" approach reopened one axis at a time:
+//   R1 (kind): a ctrl-first `worst`-sort drags a `boilerplate` kind onto the survivor → disposeFinding drops it → BID→NHR.
+//   R2 (ctrl): an off-enum/undefined controllability (blind-cast model output) is fail-closed to a show-stopper by
+//              disposeFinding but is not a bar per isBarClass → absorbed → its escalation vanishes → NHR→BID.
+//   R3 (composite + excerpt): card #590 `selfClearablePackageBars` (live under AUDIT_SELF_CLEARABLE_PACKAGE) reads kind×ctrl
+//              JOINTLY and scans excerpts PACKAGE-WIDE — so a survivor whose kind and ctrl come from DIFFERENT members
+//              manufactures a (kind×ctrl) pair that existed on no member, and absorbing a member DROPS its credential excerpt
+//              → 270/3888 verdict flips. [[feedback_reconstruction_treadmill_pivot_recognizer]].
+// THE PIVOT (positive invariant, ends the treadmill BY CONSTRUCTION): NEVER SYNTHESIZE a disposition. A group collapses only
+// if its members are DISPOSITION-HOMOGENEOUS — identical `kind` AND identical `controllability` (both in the KNOWN-SAFE,
+// non-escalating set {bidder_controls, already_satisfied}) — so the survivor's (kind×ctrl) is a REAL member's pair, present
+// before and after (no composite manufactured; a package-wide kind×ctrl read is unchanged, its count merely N→1). Every
+// member excerpt is UNIONED onto the survivor (no package-wide excerpt-scan input lost). severity=max, cautionFloor=OR over
+// STRICT `=== true` (an off-domain truthy value is never laundered into a verdict-live floor), grounded=OR-strict. Requirement
+// facets are de-duplicated by NORMALIZED-EXACT equality only (case/whitespace-insensitive, all other chars preserved) so a
+// negation / ≤ / ≥ / ± / unicode distinguisher is ALWAYS kept — no obligation text or meaning lost. Protected passthrough for
+// every bar / marker / attribute-bearer / off-enum-ctrl / mismatched-disposition finding. Flag OFF ⇒ byte-identical (Rule 61).
+// Idempotent (a merged survivor still yields the same date+kind+ctrl key; singletons pass through). Order-stable.
+const CFD_MONTHS = "january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov|dec";
+const CFD_MONTH_NUM: Record<string, string> = {
+  january:"01",jan:"01",february:"02",feb:"02",march:"03",mar:"03",april:"04",apr:"04",may:"05",june:"06",jun:"06",
+  july:"07",jul:"07",august:"08",aug:"08",september:"09",sept:"09",sep:"09",october:"10",oct:"10",november:"11",nov:"11",december:"12",dec:"12",
+};
+// Four full, year-bearing calendar-date shapes (delimited-token, not a bare "22" or "2026"): month-first "July 22, 2026" /
+// "Jul 22 2026", DoD day-first "22 July 2026" (R-CF attack-6 recall fix), and numeric "7/22/2026" / "07-22-2026". A
+// year-less or bare month/day phrase is NOT an anchor (fail-toward-keep). Capture groups: [1..3]=monFirst mon,day,year;
+// [4..6]=dayFirst day,mon,year; [7..9]=numeric m,d,year.
+const CFD_DATE_RE = new RegExp(
+  `\\b(?:(${CFD_MONTHS})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?,?\\s+(\\d{4})` +
+  `|(\\d{1,2})(?:st|nd|rd|th)?\\s+(${CFD_MONTHS})\\.?,?\\s+(\\d{4})` +
+  `|(\\d{1,2})[\\/\\-](\\d{1,2})[\\/\\-](\\d{4}))\\b`, "gi");
+// Only a REAL calendar date is an anchor: month 1-12, day 1-31 (R-CF attack-5 — reject "13/13/2026" and other bogus keys).
+const cfdValid = (y: string, mo: number, d: number): string | null =>
+  (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) ? `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}` : null;
+/** The distinct normalized calendar dates (YYYY-MM-DD) a finding names in its REQUIREMENT ONLY. R-CF attack-4: citation is
+ *  DELIBERATELY excluded — a citation carries document-metadata dates (amendment-issuance "Amendment 0002, dated 07/15/2026")
+ *  that are NOT deadlines, so keying on them fuses unrelated obligations; the actual deadline is stated in the requirement.
+ *  Excerpt is excluded for the same reason the clause gate excludes it (quotes neighbouring dates). Empty ⇒ never merges. */
+const cfdDateKeys = (f: TypedFinding): string[] => {
+  const out = new Set<string>();
+  for (const m of (f.requirement ?? "").matchAll(CFD_DATE_RE)) {
+    let k: string | null = null;
+    if (m[1]) k = cfdValid(m[3], Number(CFD_MONTH_NUM[m[1].toLowerCase()]), Number(m[2]));            // month-first
+    else if (m[5]) k = cfdValid(m[6], Number(CFD_MONTH_NUM[m[5].toLowerCase()]), Number(m[4]));       // day-first (DoD)
+    else if (m[7]) k = cfdValid(m[9], Number(m[7]), Number(m[8]));                                     // numeric m/d/y
+    if (k) out.add(k);
+  }
+  return [...out].sort();
+};
+// Self-contained safety primitives (NOT the clause gate's shared helpers — see the header treadmill note).
+const CFD_ABSORBABLE_CTRL = new Set<string>(["bidder_controls", "already_satisfied"]);  // known-safe, non-escalating; anything else → protected
+const cfdAbsorbable = (f: TypedFinding): boolean =>
+  CFD_ABSORBABLE_CTRL.has(f.controllability as string) && Object.keys(f).every((k) => FD_ABSORBABLE_KEYS.has(k));
+const cfdNormReq = (s: string): string => (s || "").toLowerCase().replace(/\s+/g, " ").trim();  // normalized-exact facet key
+/** The disposition-homogeneity key: findings merge only if they share this WHOLE key (date-sig + kind + ctrl), so the
+ *  survivor's (kind×ctrl) is a real member's pair — never a synthesized composite that a package-wide recognizer misreads. */
+const cfdGroupKey = (f: TypedFinding, dateSig: string): string => `${dateSig}##${f.kind ?? ""}##${f.controllability}`;
+/** Collapse DISPOSITION-HOMOGENEOUS plain findings that name the SAME calendar date(s) into one facet-preserving row.
+ *  Verdict-safe by construction (no disposition synthesized; excerpts unioned; protected-passthrough). Default-OFF via
+ *  caller; no eligible same-(date,kind,ctrl) plain group ⇒ byte-identical. Pure → gate-tested. Order-stable. */
+export function applyCrossFleetDedup(
+  findings: TypedFinding[],
+  opts?: { enabled?: boolean },
+): TypedFinding[] {
+  if (!opts?.enabled) return findings;                              // Rule 61 default-off ⇒ byte-identical
+  const groupByKey = new Map<string, number[]>();                   // (dateSig, kind, ctrl) → member indices — homogeneous groups only
+  const sigOf = new Map<number, string>();
+  findings.forEach((f, i) => {
+    if (!cfdAbsorbable(f)) return;                                  // protected (bar / marker / off-enum-ctrl) members never group
+    const keys = cfdDateKeys(f);
+    if (!keys.length) return;                                       // no date anchor ⇒ never merges (fail-toward-keep)
+    const sig = keys.join("|");
+    sigOf.set(i, sig);
+    const k = cfdGroupKey(f, sig);
+    (groupByKey.get(k) ?? groupByKey.set(k, []).get(k)!).push(i);
+  });
+  const merged = new Set<number>();
+  const survivorPatch = new Map<number, TypedFinding>();
+  for (const [, idx] of groupByKey) {
+    if (idx.length < 2) continue;                                   // <2 homogeneous dups on this (date,kind,ctrl) → nothing to collapse
+    const members = idx.map((i) => findings[i]);
+    const anchor = Math.min(...idx);                                // survivor = the earliest member, WHOLE (real disposition), never synthesized
+    const base = findings[anchor];
+    const maxSev = members.reduce((m, f) => Math.max(m, fdSevRank(f.severity)), 0);
+    const survivorSeverity = (["P2", "P1", "P0"][maxSev - 1] as "P0" | "P1" | "P2" | undefined) ?? base.severity;
+    // Requirement facets: keep every DISTINCT normalized requirement (first occurrence), joined — negation/symbol distinguishers survive.
+    const facets: string[] = [];
+    const seen = new Set<string>();
+    for (const m of members) { const r = m.requirement ?? ""; const n = cfdNormReq(r); if (r && !seen.has(n)) { seen.add(n); facets.push(r); } }
+    facets.sort((a, b) => (b.length - a.length) || (a < b ? -1 : a > b ? 1 : 0));
+    // Excerpts: UNION every distinct member excerpt (a package-wide credential scan must see all of them).
+    const excerpts: string[] = [];
+    const seenX = new Set<string>();
+    for (const m of members) { const x = m.excerpt ?? ""; const n = cfdNormReq(x); if (x && !seenX.has(n)) { seenX.add(n); excerpts.push(x); } }
+    const survivor: TypedFinding = {
+      ...base,                                                      // WHOLE real disposition (kind, ctrl are the group's shared, unsynthesized values)
+      requirement: facets.length ? facets.join(" · ") : (base.requirement ?? ""),
+      ...(excerpts.length ? { excerpt: excerpts.join(" · ") } : {}),
+      severity: survivorSeverity,
+      ...(members.some((f) => f.grounded === true) ? { grounded: true } : { grounded: base.grounded }),
+      ...(members.some((f) => f.cautionFloor === true) ? { cautionFloor: true } : {}),  // STRICT === true — no off-domain truthy laundering
+      crossFleetMerged: true,
+      mergedLensCount: members.length,
+      mergedDateSig: sigOf.get(anchor)!,
+    };
+    survivorPatch.set(anchor, survivor);
+    idx.filter((i) => i !== anchor).forEach((i) => merged.add(i));
+  }
+  if (survivorPatch.size === 0) return findings;
+  const out = findings.map((f, i) => survivorPatch.get(i) ?? f).filter((_, i) => !merged.has(i));
+  console.log(`[decide] cross-fleet-dedup: collapsed ${findings.length} → ${out.length} rows (${survivorPatch.size} same-(date,kind,ctrl) groups merged; disposition-homogeneous, excerpt-unioned, verdict-safe, facets preserved)`);
+  return out;
+}
+
 // ── KNOWN-CLAUSE SEMANTICS GUARD (Brain card 135 — Step 5a; verified clause→disposition map) ──────────────
 // CAP-ONLY guard keyed on the finding's OWN `citation` field (Rule-64 grounded; exact clause-number match with
 // digit-boundary lookarounds — NOT a fullSource keyword scan, which would be the surface-keyword trap). For a

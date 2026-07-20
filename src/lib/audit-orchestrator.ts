@@ -22,7 +22,7 @@ import { NOTICE_BODY_DOC_NAME } from "./agentic-executor";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
 import { SITE_VISIT_CONCLUDED_RE, BOA_HOLDER_ONLY_EMIT_RE } from "./audit-site-visit-patterns";
-import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyNmrNaicsDormancy, applyCheckboxStateFidelity, applyPerfObligationInsuranceTyping, applyStructuralAssertionFidelity, applyQuantityAmbiguityFidelity, applyFindingDedup, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, applyInquiryDeadlineBenignGuard, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, emitPerformanceUpkeepCaveats, deriveShadowVerdict, EngineInvariantError, type Decision, type ShadowVerdict } from "./audit-decide";
+import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyNmrNaicsDormancy, applyCheckboxStateFidelity, applyPerfObligationInsuranceTyping, applyStructuralAssertionFidelity, applyQuantityAmbiguityFidelity, applyFindingDedup, applyCrossFleetDedup, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, applyInquiryDeadlineBenignGuard, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, emitPerformanceUpkeepCaveats, deriveShadowVerdict, EngineInvariantError, type Decision, type ShadowVerdict } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
 import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type ReasonCaller, type EntailmentCaller, type JudgmentCost, zeroCost } from "./audit-judgment-layer";
 import { highSignalSweep, boilerplateTrapSweep } from "./audit-grounding-sweep";
@@ -2736,6 +2736,11 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   const _bankInstrOn = process.env.AUDIT_BANK_RUN_RECORD === "true";
   const _preDedupFindings = _bankInstrOn ? findings.slice() : null;
   findings = applyFindingDedup(findings, { enabled: process.env.AUDIT_FINDING_DEDUP === "true" });
+  // CROSS-FLEET DEADLINE-DEDUP (Phase 3 Unit 6 follow-on) — collapses the no-clause cross-fleet inflation the clause gate
+  // can't reach: plain rows restating one dated deadline across the two paraphrasing panels. Runs right after the clause
+  // gate, on its output. Verdict-safe by the same protected-passthrough construction (plain-only; survivor plain). Flag
+  // AUDIT_CROSS_FLEET_DEDUP default-OFF ⇒ byte-identical.
+  findings = applyCrossFleetDedup(findings, { enabled: process.env.AUDIT_CROSS_FLEET_DEDUP === "true" });
   const _bankDiag: RunDiagnostics | undefined = _preDedupFindings
     ? { preProcessingFindings: _preDedupFindings, stageCounts: { preDedup: _preDedupFindings.length, postDedup: findings.length }, ...(ver.ledger ? { verifierLedger: ver.ledger } : {}) }
     : undefined;

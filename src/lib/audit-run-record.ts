@@ -17,7 +17,7 @@
 import type { AuditResult, RunDiagnostics } from "./audit-orchestrator";
 import { buildManifest, completenessOf, coreMissingFor, locateObligationContext } from "./audit-orchestrator";
 import { detectFormat, procurementPart, type AuditToolContext } from "./audit-tools";
-import { deriveVerdict, applyFindingDedup } from "./audit-decide";
+import { deriveVerdict, applyFindingDedup, applyCrossFleetDedup } from "./audit-decide";
 import { gradeCoverageV2, verifyRecitalInSource, type CoverageV2 } from "./audit-gate-v2";
 import type { TypedFinding, VerdictInputs, BidderProfile } from "./audit-findings";
 
@@ -237,7 +237,8 @@ export function replayCoverageStage(rec: RunRecord): CoverageStageReplay {
   const pre = rec.result.diagnostics?.preProcessingFindings ?? null;
   let dedup: CoverageStageReplay["dedup"] = null;
   if (pre) {
-    const post = applyFindingDedup(pre, { enabled: process.env.AUDIT_FINDING_DEDUP === "true" });
+    const clauseDeduped = applyFindingDedup(pre, { enabled: process.env.AUDIT_FINDING_DEDUP === "true" });
+    const post = applyCrossFleetDedup(clauseDeduped, { enabled: process.env.AUDIT_CROSS_FLEET_DEDUP === "true" });  // mirror the live path (clause gate then cross-fleet gate)
     dedup = { pre: pre.length, post: post.length, delta: pre.length - post.length };
   }
   return {
