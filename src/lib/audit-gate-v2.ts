@@ -684,6 +684,12 @@ const ORDINARY_COURSE_CRED_RE = /\b(?:business\s+licens\w*|state\s+licens\w*|loc
 // top of the recitalTailVeto belt (which already catches BAR_SIGNAL-vocab bars in the severed tail).
 const LONG_LEAD_CRED_RE = /\b(?:facility\s+(?:security\s+)?clearance|\bfcl\b|personnel\s+(?:security\s+)?clearance|security\s+clearance|top[\s-]?secret|\bts\/?sci\b|\bsecret\b\s+(?:clearance|facility)|cmmc|nist\s+sp?\s?800-171|\bfaa\b|part\s+145|airworthiness|type\s+certificat\w*|\bqpl\b|\bqml\b|qualified\s+products?\s+list|qualified\s+manufacturers?\s+list|\bfoci\b|\bitar\b|\bear\b|\bddtc\b|export\s+(?:administration|control|licens\w*)|dd[\s-]?254|nispom|\bdea\b|drug\s+enforcement|bond(?:ing)?\b|surety|treasury[\s-]?listed|authorized\s+(?:oem\s+)?(?:distributor|dealer|reseller)|\boem\b|nuclear\s+regulatory|\bnrc\b|as\s?9100|nadcap)\b/i;
 
+/** Card #590 — the #576 Axis-2 scarce-credential + Axis-1 pre-award-possession predicates, exported for the
+ *  SELF_CLEARABLE_PACKAGE recognizer (audit-decide). A long-lead/scarce credential or an at-award/possession frame
+ *  anywhere in a bar means the package is NOT bidder-self-clearable. Pure, flag-independent. */
+export const hasLongLeadCredential = (s: string): boolean => LONG_LEAD_CRED_RE.test(s);
+export const hasPreAwardPossession = (s: string): boolean => PREAWARD_POSSESSION_RE.test(s);
+
 /** Two-axis ordinary-course-performance-upkeep discriminator (card #576). Returns { credential } to DEMOTE (recital →
  *  caveat, not NHR), or null to ESCALATE. Pure. `continuation` = the source tail of a line-wrap-severed obligation
  *  (from verifyRecitalInSource), so the temporal frame + the long-lead/at-award negatives are seen even when the
