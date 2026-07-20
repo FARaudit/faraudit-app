@@ -78,6 +78,23 @@ const verifyAll = makeAgenticVerifier(shardedAll);
   await makeShardedSkeptic(stubOptsProbe, { shardSize: 15 })(ctx, findings as any, { escalateIdx: [0, 1, 2, 99] });
   ok("T8 escalateIdx NOT forwarded into shard base calls", sawEscalate === false);
 
+  // ---- T9 (card #611): LATENCY-SHAPED — parallel shards (cap 4) beat sequential N×latency ----
+  const SLEEP = 80;
+  const sleepStub: SkepticFn = async (_c, fs2) => { await new Promise((r) => setTimeout(r, SLEEP)); return fs2.map((_f, i): SkepticVerdict => ({ index: i, upheld: true, reason: "s" })); };
+  const big = findings.slice(0, 90); // 90 findings @ shardSize 15 → 6 shards
+  const t0 = performance.now();
+  await makeShardedSkeptic(sleepStub, { shardSize: 15 })(ctx, big as any);
+  const elapsed = performance.now() - t0;
+  const seqEstimate = 6 * SLEEP; // 6 shards sequential
+  const parEstimate = Math.ceil(6 / 4) * SLEEP; // cap 4 → 2 waves
+  ok("T9 parallel shards << sequential (6 shards, cap 4)", elapsed < seqEstimate * 0.6, `elapsed=${Math.round(elapsed)}ms seq≈${seqEstimate}ms par≈${parEstimate}ms`);
+
+  // ---- T10 (card #611): DETERMINISM — same input → byte-identical merged output (order independent of completion) ----
+  const detStub: SkepticFn = async (_c, fs2) => fs2.map((f, i): SkepticVerdict => ({ index: i, upheld: (f as any).id?.length % 2 === 0, reason: `r${i}` }));
+  const r1 = JSON.stringify(await makeShardedSkeptic(detStub, { shardSize: 15 })(ctx, findings as any));
+  const r2 = JSON.stringify(await makeShardedSkeptic(detStub, { shardSize: 15 })(ctx, findings as any));
+  ok("T10 determinism: parallel merge is byte-identical across runs", r1 === r2 && JSON.parse(r1).length === findings.length);
+
   console.log(`\n=== CERT: ${pass} pass / ${fail} fail ===`);
   process.exit(fail ? 1 : 0);
 })();
