@@ -307,7 +307,16 @@ export function importanceOf(ob: string): "disqualifier" | "boilerplate" | "ambi
  *  flag-independent — exposes the existing guard for (a) the ARC-D-1c ambiguous-signal-demotion escalation semantics
  *  (Brain card #459: ambiguous+bar-signal-positive still ESCALATES the belt; ambiguous+bar-signal-negative demotes to
  *  the coverage-signal pole) and (b) the corpus safety proof that gates that build. No behavior change on its own. */
+// TOKEN-COLLISION FIX — card #587b (flag AUDIT_BOND_PAPER_NONBAR, default-OFF). The BAR_SIGNAL_RE `\bbond\b` token (a
+// surety/bid/performance BOND — a real pricing/eligibility bar) collides with "bond paper" (a PAPER STOCK), so the LBJ
+// §L submission-format instruction "…submitted on SF-1444 or bond paper" (45f9bacd) reads as a bar-signal-POSITIVE →
+// stays disqualifierUncovered → NHR, even after #587 demotes the insurance recital. Neutralize ONLY the "bond paper"
+// paper-stock sense before the guard runs (strictly narrowing — it can only REMOVE a false surety hit, never add one;
+// a real "bid bond"/"performance bond"/"payment bond" is untouched). Flag-OFF ⇒ byte-identical. Sibling of the Unit-5
+// digit-collision + Unit-4 preprint-marker cases (feedback_token_substring_collision_doctrine).
+const bondPaperNonBarEnabled = () => process.env.AUDIT_BOND_PAPER_NONBAR === "true";
 export function hasBarSignal(ob: string): boolean {
+  if (bondPaperNonBarEnabled()) ob = ob.replace(/\bbond(?:ed)?[\s-]+paper\b/gi, " ");   // "bond paper" (paper stock) ≠ a surety bond
   return BAR_SIGNAL_RE.test(ob);
 }
 
@@ -536,6 +545,44 @@ const benignNorm = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]+/g,
  *  recital normalizes-present but is NOT raw-locatable (OCR/caps drift the naive indexOf missed), return null ⇒ NO
  *  benign claim ⇒ fail toward disqualifier — the tail defense is never silently skipped, and a duplicated boilerplate
  *  recital can never hide a bar-carrying instance behind a benign twin. Pure; supplied to gradeCoverageV2. */
+// LINE-WRAP CONTINUATION BRIDGE — card #587 (flag AUDIT_RECITAL_LINEWRAP_BRIDGE, default-OFF). The LBJ fire (45f9bacd)
+// proved #576/#572/#575b are defeated by an OCR line-wrap: the recital "…required insurance coverage at a⏎minimum of
+// $1M…during the entire performance⏎period with proof…" is severed at "…coverage at a", and the old continuation stops
+// at the FIRST newline → the "during the entire performance period" frame (next lines) is never seen → escalate → NHR.
+// FIX (positive shape, over-fire-guarded): BRIDGE a soft line-wrap — join a newline into the continuation ONLY when the
+// next line's first content char is lowercase / digit / '$' (a wrapped clause continues), and STOP at a line that begins
+// a NEW sentence (capital), a blank line (paragraph break), or an enumerator/bullet. This recovers the temporal frame
+// WITHOUT bleeding into a genuinely-separate next-line obligation — critically, the pre-award "Proof of insurance is
+// needed at time of award" that immediately follows the LBJ recital starts capitalized → STOP (never bridged, so its
+// "at time of award" can never be laundered into the caveat frame). Flag-OFF ⇒ the old single-line behavior ⇒ byte-
+// identical. Over-fire (bridging into a separate lowercase-led obligation) is the Gauntlet red-team focus.
+const recitalLineWrapBridgeEnabled = () => process.env.AUDIT_RECITAL_LINEWRAP_BRIDGE === "true";
+function recitalContinuation(after: string): string {
+  if (!recitalLineWrapBridgeEnabled()) {                                    // flag-OFF — legacy: stop at the first newline
+    const nl = after.indexOf("\n");
+    const line = nl >= 0 ? after.slice(0, nl) : after;
+    const end = line.search(/[.!?](?=\s|$)/);
+    return (end >= 0 ? line.slice(0, end + 1) : line).trim();
+  }
+  let out = "";
+  for (let p = 0; p < after.length; ) {
+    const ch = after[p];
+    if (ch === "\n" || ch === "\r") {
+      let q = p + 1;
+      while (q < after.length && (after[q] === " " || after[q] === "\t" || after[q] === "\r")) q++;
+      if (q >= after.length || after[q] === "\n") break;                    // blank line / EOF → paragraph break → separate obligation
+      const rest = after.slice(q, q + 6);
+      if (/^(?:[-*•·]|\(?[a-z0-9]{1,3}[.)]|§|#)\s/i.test(rest)) break;       // bullet / enumerator ("12.", "(a)", "-") → new item
+      if (/[a-z0-9$]/.test(after[q])) { out += " "; p = q; continue; }       // soft wrap: next line continues the clause → join
+      break;                                                                // capital start → new sentence → stop
+    }
+    out += ch;
+    if (/[.!?]/.test(ch) && (p + 1 >= after.length || /\s/.test(after[p + 1]))) break;   // real sentence terminator → stop
+    p++;
+  }
+  return out.trim();
+}
+
 export function verifyRecitalInSource(fullSource: string, ob: string): { present: boolean; continuation: string } | null {
   const src = fullSource ?? "";
   const nob = benignNorm(ob);
@@ -556,11 +603,8 @@ export function verifyRecitalInSource(fullSource: string, ob: string): { present
       // (terminator + whitespace/EOF, so a URL-internal "www.sam" dot doesn't cut the tail short). A tail on a NEW line
       // is a SEPARATE obligation (independently classified) → stop at the newline.
       if (!/[.!?]["')\]]?\s*$/.test(m[0])) {
-        const after = src.slice(m.index + m[0].length, m.index + m[0].length + 240);
-        const nl = after.indexOf("\n");
-        const line = nl >= 0 ? after.slice(0, nl) : after;
-        const end = line.search(/[.!?](?=\s|$)/);
-        continuation += " " + (end >= 0 ? line.slice(0, end + 1) : line);
+        const after = src.slice(m.index + m[0].length, m.index + m[0].length + 300);   // card #587: window spans a wrap
+        continuation += " " + recitalContinuation(after);
       }
       if (re.lastIndex === m.index) re.lastIndex++;                         // zero-width safety
     }
