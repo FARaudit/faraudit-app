@@ -130,6 +130,15 @@ export interface AuditResult {
   trace: Record<string, { converged: boolean; turns: number; sectionsRead: string[]; tools: Array<{ turn: number; tools: Array<{ name: string; input: Record<string, unknown> }> }> }>; // per-lens
   verifierDrops?: CorrectedDrop[];                                                        // card 274 RULING 1 — skeptic drops (empty-corrected + overturned), telemetry-visible; absent when none
   judgmentCost?: JudgmentCost;                                                            // J-1/J-2 per-audit token/call ledger (card 246 acceptance h); absent when the layer is off
+  diagnostics?: RunDiagnostics;                                                           // card #582 CAPTURE-ONLY — verdict-inert bank instrumentation (pre-dedup snapshot + stage counts); present only when AUDIT_BANK_RUN_RECORD is on; NEVER read by deriveVerdict
+}
+
+/** Capture-only bank instrumentation (card #582). VERDICT-INERT — populated for the run-record bank / coverage-stage
+ *  replay so a banked run can be replayed with class-B flags toggled to isolate each flag's delta. deriveVerdict never
+ *  reads it. Present ONLY when AUDIT_BANK_RUN_RECORD is on ⇒ flag-OFF the AuditResult is byte-identical. */
+export interface RunDiagnostics {
+  preProcessingFindings: TypedFinding[];        // the finding set consumed by the flag-gated tail (before applyFindingDedup) — the dedup/coverage-stage replay corpus
+  stageCounts: Record<string, number>;          // pre/post finding counts around the flag-gated tail (e.g. preDedup, postDedup, final)
 }
 
 /** P0 — the manifest: binding UCF sections that are actually PRESENT (non-empty) in this package's source.
@@ -2694,7 +2703,15 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      are unchanged, so deriveVerdict reaches the same pole (hard-tested OFF==ON). Over-merge-guarded (exactly-one-clause key,
   //      citation+requirement only, facets kept). Runs LAST — after every re-typing guard/emitter — right before deriveVerdict.
   //      Flag AUDIT_FINDING_DEDUP default-OFF ⇒ byte-identical.
+  // CAPTURE-ONLY (card #582, verdict-inert) — snapshot the pre-dedup finding set + counts for the run-record bank /
+  // coverage-stage replay. Rides the AUDIT_BANK_RUN_RECORD flag: when banking is off the snapshot is never taken and
+  // `_bankDiag` stays undefined ⇒ AuditResult.diagnostics absent ⇒ byte-identical. Never read by deriveVerdict.
+  const _bankInstrOn = process.env.AUDIT_BANK_RUN_RECORD === "true";
+  const _preDedupFindings = _bankInstrOn ? findings.slice() : null;
   findings = applyFindingDedup(findings, { enabled: process.env.AUDIT_FINDING_DEDUP === "true" });
+  const _bankDiag: RunDiagnostics | undefined = _preDedupFindings
+    ? { preProcessingFindings: _preDedupFindings, stageCounts: { preDedup: _preDedupFindings.length, postDedup: findings.length } }
+    : undefined;
   const coverageV2 = GATE_V2_ENABLED ? gradeCoverageV2(attestations, { locate: (ob) => locateObligationContext(ctx.fullSource, ob), verifyRecitalPresence: (ob) => verifyRecitalInSource(ctx.fullSource, ob) }) : undefined;
   // card #576 — an ordinary-course performance-upkeep recital demoted off NHR (coverageV2.caveatRecital, present ONLY
   // flag-ON) is surfaced as a BID_WITH_CAUTION-floor caveat before deriveVerdict. Flag-OFF ⇒ caveatRecital absent ⇒
@@ -2725,5 +2742,5 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     throw e;
   }
 
-  return { decision, inputs, findings, coverage: { required, covered, missing, attestations, coreMissing }, perLens, conflict, sectionsRead: [...sectionsRead], trace, ...(verifierDrops.length ? { verifierDrops } : {}), ...(judgmentLayerEnabled() && (opts.judgmentReason || opts.judgmentEntail) ? { judgmentCost } : {}) };
+  return { decision, inputs, findings, coverage: { required, covered, missing, attestations, coreMissing }, perLens, conflict, sectionsRead: [...sectionsRead], trace, ...(verifierDrops.length ? { verifierDrops } : {}), ...(judgmentLayerEnabled() && (opts.judgmentReason || opts.judgmentEntail) ? { judgmentCost } : {}), ...(_bankDiag ? { diagnostics: _bankDiag } : {}) };
 }

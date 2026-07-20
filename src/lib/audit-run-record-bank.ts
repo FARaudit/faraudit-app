@@ -15,7 +15,7 @@
 //   • SIDE-WRITE ONLY: it reads the finished AuditResult; it never mutates it or the verdict path.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { buildRunRecord, type RunRecordMeta, type RunRecordInput } from "./audit-run-record";
+import { buildRunRecord, captureAuditFlagEnv, type RunRecordMeta, type RunRecordInput } from "./audit-run-record";
 import type { AuditResult } from "./audit-orchestrator";
 
 export const RUN_RECORD_BANK_ENABLED = process.env.AUDIT_BANK_RUN_RECORD === "true";
@@ -46,6 +46,7 @@ export async function bankRunRecord(
       runId: args.auditId,
       startedAt: args.startedAt,
       flags: args.flags,
+      flagEnv: captureAuditFlagEnv(process.env),   // card #582 — the FULL AUDIT_* env, so the banked run is per-flag minable (supersedes the ~5-key curated `flags` for mining)
       sol: args.sol,
       ...(args.models ? { models: args.models } : {}),
       ...(args.wallClockSec != null ? { wallClockSec: args.wallClockSec } : {}),
