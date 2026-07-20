@@ -14,10 +14,11 @@
 // the replay recomputes the DETERMINISTIC coverage (required/missing/grounding) and flags any drift vs what
 // was recorded — a mismatch means the record is stale or the deterministic stages changed since the run.
 
-import type { AuditResult } from "./audit-orchestrator";
-import { buildManifest, completenessOf, coreMissingFor } from "./audit-orchestrator";
+import type { AuditResult, RunDiagnostics } from "./audit-orchestrator";
+import { buildManifest, completenessOf, coreMissingFor, locateObligationContext } from "./audit-orchestrator";
 import { detectFormat, procurementPart, type AuditToolContext } from "./audit-tools";
-import { deriveVerdict } from "./audit-decide";
+import { deriveVerdict, applyFindingDedup } from "./audit-decide";
+import { gradeCoverageV2, verifyRecitalInSource, type CoverageV2 } from "./audit-gate-v2";
 import type { TypedFinding, VerdictInputs, BidderProfile } from "./audit-findings";
 
 export const RUN_RECORD_SCHEMA = "run-record/v1" as const;
@@ -26,10 +27,23 @@ export interface RunRecordMeta {
   runId: string;
   startedAt: string;                            // ISO 8601
   wallClockSec?: number;
-  flags: Record<string, string | undefined>;   // run-env flags that gate deterministic behavior (audit trail + replay fidelity)
+  flags: Record<string, string | undefined>;   // curated run-env flags (legacy — a hand-picked subset; kept for back-compat)
+  flagEnv?: Record<string, string>;             // card #582 — the FULL deterministic AUDIT_* flag env at run time (every AUDIT_* key). Optional ⇒ old records without it still load.
   models?: Record<string, string>;             // role → model id (provenance; not used by replay)
   sol?: string;                                 // solicitation id / label
   note?: string;
+}
+
+/** Snapshot the full deterministic AUDIT_* flag env (card #582). PURE — takes the env, returns every AUDIT_* key with a
+ *  defined string value, sorted for stable diffs. This is the audit trail that makes a banked run per-flag minable (the
+ *  curated `flags` subset recorded only ~5 keys, so 13 class-B flags were unrecoverable — card #578/#580 finding). */
+export function captureAuditFlagEnv(env: Record<string, string | undefined>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const k of Object.keys(env).filter((k) => k.startsWith("AUDIT_")).sort()) {
+    const v = env[k];
+    if (typeof v === "string") out[k] = v;
+  }
+  return out;
 }
 
 export interface RunRecordInput {
@@ -61,6 +75,7 @@ export interface RunRecord {
     conflict: boolean;
     sectionsRead: string[];
     perLens: Record<string, number>;
+    diagnostics?: RunDiagnostics;                // card #582 — pre-dedup finding snapshot + stage counts for the coverage-stage replay. Optional ⇒ pre-#582 records still load.
   };
   billing: { honestFail: boolean; billable: boolean };
 }
@@ -97,6 +112,7 @@ export function buildRunRecord(args: BuildRunRecordArgs): RunRecord {
       conflict: args.result.conflict,
       sectionsRead: args.result.sectionsRead,
       perLens: args.result.perLens,
+      ...(args.result.diagnostics ? { diagnostics: args.result.diagnostics } : {}),   // card #582 — capture-only, present iff the run banked it
     },
     billing: args.billing,
   };
@@ -193,4 +209,44 @@ export function formatReplayReport(rec: RunRecord, r: ReplayResult): string {
   L.push(`replay deriveVerdict(inputs)=${r.replayVerdict} eligible=${r.replayEligible}  → verdictReproduced=${r.verdictReproduced}`);
   L.push(r.drift.length ? `DRIFT (record vs replay):\n  - ${r.drift.join("\n  - ")}` : `drift: none (record is faithful)`);
   return L.join("\n");
+}
+
+export interface CoverageStageReplay {
+  gradeV2Ran: boolean;                          // gradeCoverageV2 was re-run from the record's attestations
+  coverageV2: CoverageV2;                        // the grader output under the CURRENT process.env (caller toggles flags around the call)
+  benignCoveredRecital: number;                  // #572 signature (0 unless AUDIT_BENIGN_RECITAL_COVERED on AND a recital matched)
+  caveatRecital: number;                         // #576 signature (0 unless AUDIT_PERFORMANCE_UPKEEP_CAVEAT on AND an upkeep recital matched)
+  disqualifierUncovered: number;                 // escalating ungrounded disqualifiers (the NHR driver)
+  ungroundedNonBarSignal: number;                // AUDIT_AMBIGUOUS_SIGNAL_DEMOTION signature
+  dedup: { pre: number; post: number; delta: number } | null;   // AUDIT_FINDING_DEDUP delta on the captured pre-dedup findings (null if the record predates #582 diagnostics)
+}
+
+/** COVERAGE-STAGE REPLAY (card #582 item c) — the per-flag mining primitive. Re-runs the flag-gated coverage/dedup tail
+ *  from a banked record at $0, under the CURRENT process.env, so a caller can isolate a class-B flag's delta by toggling
+ *  it around two calls (env OFF → replay → env ON → replay → diff the bucket counts). gradeCoverageV2 runs from the
+ *  record's persisted attestations + fullSource (works on EXISTING records — attestations were always banked); the dedup
+ *  delta needs the #582 pre-dedup snapshot (`diagnostics`), null on older records. PURE except reading process.env for
+ *  the flag toggle (the same faithful-to-run-env contract as replayRunRecord's opts). Never mutates the record. */
+export function replayCoverageStage(rec: RunRecord): CoverageStageReplay {
+  const src = rec.input.fullSource;
+  const atts = rec.result.coverage.attestations;
+  const cov = gradeCoverageV2(atts, {
+    locate: (ob) => locateObligationContext(src, ob),
+    verifyRecitalPresence: (ob) => verifyRecitalInSource(src, ob),
+  });
+  const pre = rec.result.diagnostics?.preProcessingFindings ?? null;
+  let dedup: CoverageStageReplay["dedup"] = null;
+  if (pre) {
+    const post = applyFindingDedup(pre, { enabled: process.env.AUDIT_FINDING_DEDUP === "true" });
+    dedup = { pre: pre.length, post: post.length, delta: pre.length - post.length };
+  }
+  return {
+    gradeV2Ran: true,
+    coverageV2: cov,
+    benignCoveredRecital: (cov.benignCoveredRecital ?? []).length,
+    caveatRecital: (cov.caveatRecital ?? []).length,
+    disqualifierUncovered: (cov.disqualifierUncovered ?? []).length,
+    ungroundedNonBarSignal: (cov.ungroundedNonBarSignal ?? []).length,
+    dedup,
+  };
 }
