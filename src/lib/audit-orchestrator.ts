@@ -27,7 +27,7 @@ import { applyKeyfactDetector } from "./audit-keyfact-detector";
 import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type ReasonCaller, type EntailmentCaller, type JudgmentCost, zeroCost } from "./audit-judgment-layer";
 import { highSignalSweep, boilerplateTrapSweep } from "./audit-grounding-sweep";
 import { createHash } from "node:crypto";
-import type { TypedFinding, BidderProfile, VerdictInputs } from "./audit-findings";
+import type { TypedFinding, BidderProfile, VerdictInputs, Controllability } from "./audit-findings";
 import { scanPackageMarkers, absenceClaimContradicted } from "./absence-grounding-gate";
 import { disqualifierTriggersOf, GATE_V2_ENABLED, gradeCoverageV2, groundingVariantToleranceEnabled, importanceOf, isLedgerDemotableNonBar, verifyRecitalInSource } from "./audit-gate-v2";
 
@@ -55,7 +55,32 @@ const norm = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
  *  finding whose `corrected` object was non-substantive (the false-INELIGIBLE/NO_BID resurrection hole, now closed);
  *  `overturned` = a plain upheld=false drop. Persisted so every drop is auditable, never silent. */
 export interface CorrectedDrop { index: number; id?: string; requirement: string; citation: string; refutation: string; dropReason: "empty_corrected" | "overturned" | "entailment_fail"; }
-export interface VerifyResult { sound: boolean; survived: TypedFinding[]; rejected: TypedFinding[]; correctedDrops?: CorrectedDrop[]; }
+/** R1 · card #592 — VERIFIER LEDGER (capture-only, verdict-inert). One row per grounded finding the skeptic saw,
+ *  recording the disposition + the MECHANICAL cause the run went unsound. Built ONLY when AUDIT_BANK_RUN_RECORD is on
+ *  ⇒ flag-OFF `ledger` is undefined and VerifyResult / AuditResult are byte-identical. deriveVerdict NEVER reads it.
+ *  `cause` granularity is the maximum the verifier boundary actually has: a per-index residue (the skeptic returned a
+ *  verdicts array but omitted this index) is `no_ruling_returned` — parse-miss vs mid-array truncation are
+ *  indistinguishable HERE (both = absent index); the SUB-type of a whole-set failure lives in `throwMessage`
+ *  (total-outage vs tiered non-escalation vs structured parse-fail — the throw strings already differ). */
+export type VerifierDisposition = "upheld" | "retyped" | "overturned" | "entailment_drop" | "unresolved";
+export interface VerifierClaimRuling {
+  index: number; id?: string; citation: string; kind: string; controllability: string;
+  requirementPreview: string;                 // truncated — the ledger is a diagnostic, not a second copy of findings
+  disposition: VerifierDisposition;
+  verdictDriving?: boolean;                    // set on `unresolved` — did this residue sink soundness?
+  cause?: "skeptic_throw" | "no_ruling_returned"; // set on `unresolved` — the mechanical reason no ruling landed
+  reason?: string;                             // skeptic reason where one was returned
+  retype?: { controllability?: Controllability; curableInWindow?: boolean }; // set on `retyped`
+}
+export interface VerifierLedger {
+  failureMode: "sound" | "zero_grounded" | "skeptic_throw" | "residue_unresolved" | "total_overturn";
+  throwMessage?: string;                       // present iff failureMode==="skeptic_throw" — distinguishes the throw sub-type
+  residueDoctrine: boolean;                    // AUDIT_VERIFIER_BATCHING state at run time (governs which residue sinks soundness)
+  counts: { input: number; grounded: number; droppedUngrounded: number; survived: number; rejected: number; ruled: number; unresolvedTotal: number; unresolvedVerdictDriving: number };
+  unresolvedIndices: number[];                 // grounded indices the skeptic left un-ruled
+  rulings: VerifierClaimRuling[];              // one per grounded finding (empty on zero_grounded)
+}
+export interface VerifyResult { sound: boolean; survived: TypedFinding[]; rejected: TypedFinding[]; correctedDrops?: CorrectedDrop[]; ledger?: VerifierLedger; }
 /** P2 — adversarial cross-examination. Default impl is an agentic skeptic; injected as a stub in tests.
  *  bidderProfile is passed so the verifier can compute the deterministic knife-edge set (Brain card-54/55). */
 export type VerifyFn = (ctx: AuditToolContext, findings: TypedFinding[], opts?: { bidderProfile?: BidderProfile | null }) => Promise<VerifyResult>;
@@ -139,6 +164,7 @@ export interface AuditResult {
 export interface RunDiagnostics {
   preProcessingFindings: TypedFinding[];        // the finding set consumed by the flag-gated tail (before applyFindingDedup) — the dedup/coverage-stage replay corpus
   stageCounts: Record<string, number>;          // pre/post finding counts around the flag-gated tail (e.g. preDedup, postDedup, final)
+  verifierLedger?: VerifierLedger;              // R1 · card #592 — the P2 skeptic's per-claim ledger + the mechanical unsoundness cause; present only when banking is on
 }
 
 /** P0 — the manifest: binding UCF sections that are actually PRESENT (non-empty) in this package's source.
@@ -2710,7 +2736,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   const _preDedupFindings = _bankInstrOn ? findings.slice() : null;
   findings = applyFindingDedup(findings, { enabled: process.env.AUDIT_FINDING_DEDUP === "true" });
   const _bankDiag: RunDiagnostics | undefined = _preDedupFindings
-    ? { preProcessingFindings: _preDedupFindings, stageCounts: { preDedup: _preDedupFindings.length, postDedup: findings.length } }
+    ? { preProcessingFindings: _preDedupFindings, stageCounts: { preDedup: _preDedupFindings.length, postDedup: findings.length }, ...(ver.ledger ? { verifierLedger: ver.ledger } : {}) }
     : undefined;
   const coverageV2 = GATE_V2_ENABLED ? gradeCoverageV2(attestations, { locate: (ob) => locateObligationContext(ctx.fullSource, ob), verifyRecitalPresence: (ob) => verifyRecitalInSource(ctx.fullSource, ob) }) : undefined;
   // card #576 — an ordinary-course performance-upkeep recital demoted off NHR (coverageV2.caveatRecital, present ONLY
