@@ -16,7 +16,7 @@ import { callStructuredClaude } from "./anthropic-structured";
 import { modelFor } from "./model-registry";
 import { makeAnthropicCallModel } from "./audit-expert";
 import { auditLenses } from "./audit-lenses";
-import { makeAgenticVerifier, makeStructuredSkeptic, makeTieredSkeptic, makeBatchedSkeptic, type SkepticFn, type SkepticVerdict } from "./audit-verifier";
+import { makeAgenticVerifier, makeStructuredSkeptic, makeTieredSkeptic, makeBatchedSkeptic, makeShardedSkeptic, type SkepticFn, type SkepticVerdict } from "./audit-verifier";
 import { runAgenticAudit, docRegions, type AuditResult } from "./audit-orchestrator";
 import { judgmentLayerEnabled, type ReasonCaller, type EntailmentCaller, type ProducedFinding, type EntailmentState } from "./audit-judgment-layer";
 import { makeJudgmentFirstProposer, makePerDocProposer, runJudgmentFirst, type JudgmentStructuredCaller, type JudgmentFirstInput, type JudgmentFirstResult, type RailFn } from "./audit-judgment-first";
@@ -140,6 +140,52 @@ function structuredAdapter(apiKey: string, signal?: AbortSignal, onUsage?: (u: U
   };
 }
 
+/** SALVAGE the parseable PREFIX of a truncated skeptic response (card #609). On stop_reason=max_tokens the JSON is
+ *  cut mid-array; JSON.parse of the whole text fails. This walks the `verdicts` array and returns every COMPLETE
+ *  object element (dropping the truncated tail). Used ONLY by the sharded path: the salvaged prefix is trusted (each
+ *  element is a complete, schema-shaped ruling) and the sharded skeptic re-requests the still-unruled remainder —
+ *  "verify-returned-prefix + re-request remainder, never discard-all". A malformed element is skipped, not fatal. */
+export function salvageVerdictsPrefix(text: string): SkepticVerdict[] {
+  const key = text.indexOf('"verdicts"');
+  if (key < 0) return [];
+  const open = text.indexOf("[", key);
+  if (open < 0) return [];
+  const out: SkepticVerdict[] = [];
+  let depth = 0, objStart = -1, inStr = false, esc = false;
+  for (let i = open + 1; i < text.length; i++) {
+    const c = text[i];
+    if (inStr) { if (esc) esc = false; else if (c === "\\") esc = true; else if (c === '"') inStr = false; continue; }
+    if (c === '"') { inStr = true; continue; }
+    if (c === "{") { if (depth === 0) objStart = i; depth++; }
+    else if (c === "}") { depth--; if (depth === 0 && objStart >= 0) {
+      try { const o = JSON.parse(text.slice(objStart, i + 1)); if (o && typeof o.index === "number" && typeof o.upheld === "boolean") out.push(o as SkepticVerdict); } catch { /* skip malformed */ }
+      objStart = -1; } }
+    else if (c === "]" && depth === 0) break; // array closed cleanly
+  }
+  return out;
+}
+
+/** Truncation-TOLERANT skeptic parse (card #609, sharded path only). On max_tokens it SALVAGES the complete-element
+ *  prefix instead of throwing — the sharded skeptic then re-requests the unruled remainder. Non-truncation failures
+ *  (unparseable / missing verdicts[]) STILL throw (→ NHR), preserving the card-274 no-empty-swallow guarantee. */
+export function parseSkepticResponsePartial(res: { text: string; stopReason: string | null }, model: string): { verdicts: SkepticVerdict[] } {
+  if (res.stopReason === "max_tokens") {
+    const salvaged = salvageVerdictsPrefix(res.text);
+    console.log(`[skeptic] max_tokens truncation (model=${model}) — salvaged ${salvaged.length} complete ruling(s) from the prefix; remainder re-requested (card #609, no discard-all)`);
+    return { verdicts: salvaged }; // may be [] → sharded loop re-requests the whole remainder
+  }
+  return parseSkepticResponse(res, model); // clean stop → strict parse (throws on unparseable/missing, card 274)
+}
+
+/** Salvaging adapter — like structuredAdapter but tolerates truncation via parseSkepticResponsePartial. Wired ONLY
+ *  when AUDIT_VERIFIER_SHARDED is on; the sharded skeptic's re-request loop depends on getting the prefix back. */
+function structuredAdapterSalvaging(apiKey: string, signal?: AbortSignal, onUsage?: (u: UsageCall) => void) {
+  return async (args: { model: string; system: string; user: string; schema: Record<string, unknown> }): Promise<{ verdicts: SkepticVerdict[] }> => {
+    const res = await callStructuredClaude({ apiKey, model: args.model, system: args.system, userPrompt: args.user, schema: args.schema, maxTokens: 4096, signal, onUsage });
+    return parseSkepticResponsePartial(res, args.model);
+  };
+}
+
 /** Run the full agentic audit over a package and DERIVE the verdict. PAID. The SOLE engine (V1/V2 deleted). */
 export async function auditPackage(input: AuditPackageInput): Promise<AuditResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -151,9 +197,16 @@ export async function auditPackage(input: AuditPackageInput): Promise<AuditResul
   const adapt = structuredAdapter(apiKey, input.signal, input.onUsage);
   // Card 285 Fix 1: batch the BASE skeptic behind AUDIT_VERIFIER_BATCHING so its O(findings) output can't truncate
   // on a realistic finding count (the claim-explosion root). Flag OFF ⇒ the single-call base, byte-identical.
-  const baseSkeptic: SkepticFn = makeStructuredSkeptic(adapt, input.skepticBaseModel ?? modelFor("lens"));
+  // Card #609 — AUDIT_VERIFIER_SHARDED (default-OFF) is the HARDENED truncation fix: the base runs on a SALVAGING
+  // adapter (returns the parseable prefix on max_tokens) wrapped in makeShardedSkeptic (≤15/shard, id-keyed, coverage-
+  // asserted, per-finding residue). OFF ⇒ adaptBase===adapt and the skeptic is exactly the prior batched-or-single
+  // base ⇒ byte-identical. The escalation judge keeps the strict adapter (small contested set; truncation there → NHR).
+  const _sharded = process.env.AUDIT_VERIFIER_SHARDED === "true";
+  const adaptBase = _sharded ? structuredAdapterSalvaging(apiKey, input.signal, input.onUsage) : adapt;
+  const baseSkeptic: SkepticFn = makeStructuredSkeptic(adaptBase, input.skepticBaseModel ?? modelFor("lens"));
   const skeptic = makeTieredSkeptic(
-    process.env.AUDIT_VERIFIER_BATCHING === "true" ? makeBatchedSkeptic(baseSkeptic) : baseSkeptic,
+    _sharded ? makeShardedSkeptic(baseSkeptic)
+      : (process.env.AUDIT_VERIFIER_BATCHING === "true" ? makeBatchedSkeptic(baseSkeptic) : baseSkeptic),
     makeStructuredSkeptic(adapt, input.skepticEscalateModel ?? modelFor("judge")),
   );
   const verify = makeAgenticVerifier(skeptic);
@@ -236,9 +289,16 @@ export async function runJudgmentFirstAudit(input: AuditPackageInput): Promise<J
   const adapt = structuredAdapter(apiKey, input.signal, input.onUsage);
   // Card 285 Fix 1: batch the BASE skeptic behind AUDIT_VERIFIER_BATCHING so its O(findings) output can't truncate
   // on a realistic finding count (the claim-explosion root). Flag OFF ⇒ the single-call base, byte-identical.
-  const baseSkeptic: SkepticFn = makeStructuredSkeptic(adapt, input.skepticBaseModel ?? modelFor("lens"));
+  // Card #609 — AUDIT_VERIFIER_SHARDED (default-OFF) is the HARDENED truncation fix: the base runs on a SALVAGING
+  // adapter (returns the parseable prefix on max_tokens) wrapped in makeShardedSkeptic (≤15/shard, id-keyed, coverage-
+  // asserted, per-finding residue). OFF ⇒ adaptBase===adapt and the skeptic is exactly the prior batched-or-single
+  // base ⇒ byte-identical. The escalation judge keeps the strict adapter (small contested set; truncation there → NHR).
+  const _sharded = process.env.AUDIT_VERIFIER_SHARDED === "true";
+  const adaptBase = _sharded ? structuredAdapterSalvaging(apiKey, input.signal, input.onUsage) : adapt;
+  const baseSkeptic: SkepticFn = makeStructuredSkeptic(adaptBase, input.skepticBaseModel ?? modelFor("lens"));
   const skeptic = makeTieredSkeptic(
-    process.env.AUDIT_VERIFIER_BATCHING === "true" ? makeBatchedSkeptic(baseSkeptic) : baseSkeptic,
+    _sharded ? makeShardedSkeptic(baseSkeptic)
+      : (process.env.AUDIT_VERIFIER_BATCHING === "true" ? makeBatchedSkeptic(baseSkeptic) : baseSkeptic),
     makeStructuredSkeptic(adapt, input.skepticEscalateModel ?? modelFor("judge")),
   );
   const verify = makeAgenticVerifier(skeptic);

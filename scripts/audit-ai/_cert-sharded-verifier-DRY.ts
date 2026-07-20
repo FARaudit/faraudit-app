@@ -1,0 +1,71 @@
+// Card #609 DRY cert — sharded skeptic truncation fix. $0, stub skeptics only (NO paid calls).
+import * as fs from "fs";
+import { makeShardedSkeptic, makeAgenticVerifier, type SkepticFn, type SkepticVerdict } from "../../src/lib/audit-verifier";
+import { salvageVerdictsPrefix, parseSkepticResponsePartial } from "../../src/lib/audit-package";
+import type { AuditToolContext } from "../../src/lib/audit-tools";
+
+process.env.AUDIT_BANK_RUN_RECORD = "true";
+process.env.AUDIT_VERIFIER_SHARDED = "true";
+
+const rec = JSON.parse(fs.readFileSync("scripts/audit-ai/run-records/_new-cab687da.json","utf8"));
+const findings = rec.result.findings as any[];
+const fullSource = rec.input.fullSource ?? rec.input.groundingSource ?? "";
+const ctx: AuditToolContext = { fullSource, sections: rec.input.sections ?? [], groundingSource: rec.input.groundingSource, noticeBodyText: rec.input.noticeBodyText } as any;
+
+let pass = 0, fail = 0;
+const ok = (name: string, cond: boolean, extra = "") => { (cond ? pass++ : fail++); console.log(`${cond ? "✅" : "❌"} ${name}${extra ? " — " + extra : ""}`); };
+
+// ---- T1: salvageVerdictsPrefix recovers complete elements from a TRUNCATED array ----
+const truncated = '{"verdicts":[{"index":0,"upheld":true,"reason":"ok"},{"index":1,"upheld":false,"reason":"drop"},{"index":2,"upheld":tru';
+const sal = salvageVerdictsPrefix(truncated);
+ok("T1 salvage prefix: 2 complete of 3 truncated", sal.length === 2 && sal[0].index === 0 && sal[1].index === 1, `got ${sal.length}`);
+const clean = '{"verdicts":[{"index":0,"upheld":true,"reason":"a"},{"index":1,"upheld":true,"reason":"b"}]}';
+ok("T1b salvage clean: recovers all", salvageVerdictsPrefix(clean).length === 2);
+
+// ---- T2: parseSkepticResponsePartial returns prefix on max_tokens (does NOT throw) ----
+let threw = false; let partial: any;
+try { partial = parseSkepticResponsePartial({ text: truncated, stopReason: "max_tokens" }, "stub"); } catch { threw = true; }
+ok("T2 partial parse on max_tokens: salvages, no throw", !threw && partial.verdicts.length === 2);
+// clean stop still strict-throws on garbage (card 274 preserved)
+let threw2 = false; try { parseSkepticResponsePartial({ text: "not json", stopReason: "end_turn" }, "stub"); } catch { threw2 = true; }
+ok("T2b partial parse clean-stop garbage still throws", threw2);
+
+// ---- T3: cab687da 100-claim replay — stub rules EVERY finding → sound, all ruled ----
+const stubAll: SkepticFn = async (_c, fs2) => fs2.map((_f, i): SkepticVerdict => ({ index: i, upheld: true, reason: "stub-uphold" }));
+const shardedAll = makeShardedSkeptic(stubAll, { shardSize: 15 });
+const verifyAll = makeAgenticVerifier(shardedAll);
+(async () => {
+  const r: any = await verifyAll(ctx, findings as any);
+  const grounded = r.ledger?.counts?.grounded ?? 0;
+  ok("T3 replay: verifierSound=true", r.sound === true, `sound=${r.sound}`);
+  ok("T3 replay: all grounded ruled (residue 0)", r.ledger?.counts?.unresolvedTotal === 0 && r.ledger?.counts?.ruled === grounded, `ruled=${r.ledger?.counts?.ruled}/${grounded} unresolved=${r.ledger?.counts?.unresolvedTotal}`);
+  ok("T3 replay: findings count preserved", r.survived.length === grounded, `survived=${r.survived.length} grounded=${grounded}`);
+  console.log(`   (input findings=${findings.length}, grounded=${grounded}, shards=${Math.ceil(grounded/15)})`);
+
+  // ---- T4: salvage+re-request — shard base drops its LAST verdict on first attempt, full on retry ----
+  const attemptByLen: Record<number, number> = {};
+  const stubSalvage: SkepticFn = async (_c, fs2) => {
+    const n = fs2.length; attemptByLen[n] = (attemptByLen[n] ?? 0) + 1;
+    const drop = attemptByLen[n] === 1 ? 1 : 0; // first time we see this remainder-size, drop last (simulate truncation prefix)
+    return fs2.slice(0, n - drop).map((_f, i): SkepticVerdict => ({ index: i, upheld: true, reason: "salv" }));
+  };
+  const shardedSalv = makeShardedSkeptic(stubSalvage, { shardSize: 15, retries: 2 });
+  const rSalv: any = await makeAgenticVerifier(shardedSalv)(ctx, findings as any);
+  ok("T4 salvage+re-request converges to sound", rSalv.sound === true && rSalv.ledger?.counts?.unresolvedTotal === 0, `sound=${rSalv.sound} unresolved=${rSalv.ledger?.counts?.unresolvedTotal}`);
+
+  // ---- T5: per-finding residue — stub never rules 2 specific findings → they're named residue + sink per-finding ----
+  const skipIds = new Set([findings[3].id, findings[7].id]);
+  const stubSkip: SkepticFn = async (_c, fs2) => fs2.map((f, i): SkepticVerdict | null => skipIds.has((f as any).id) ? null : ({ index: i, upheld: true, reason: "ok" })).filter(Boolean) as SkepticVerdict[];
+  const rSkip: any = await makeAgenticVerifier(makeShardedSkeptic(stubSkip, { shardSize: 15 }))(ctx, findings as any);
+  // 2 verdict-driving residue → not sound; unresolvedIndices names them per-finding
+  ok("T5 per-finding residue: 2 unresolved named", (rSkip.ledger?.counts?.unresolvedTotal ?? 0) === 2, `unresolved=${rSkip.ledger?.counts?.unresolvedTotal}`);
+
+  // ---- T6: ≤15 hard cap (request 20 → clamps to 15) ----
+  let maxShardSeen = 0;
+  const stubMeasure: SkepticFn = async (_c, fs2) => { maxShardSeen = Math.max(maxShardSeen, fs2.length); return fs2.map((_f, i): SkepticVerdict => ({ index: i, upheld: true, reason: "m" })); };
+  await makeShardedSkeptic(stubMeasure, { shardSize: 20 })(ctx, findings.slice(0, 40) as any);
+  ok("T6 ≤15 hard cap on shardSize", maxShardSeen <= 15, `maxShard=${maxShardSeen}`);
+
+  console.log(`\n=== CERT: ${pass} pass / ${fail} fail ===`);
+  process.exit(fail ? 1 : 0);
+})();
