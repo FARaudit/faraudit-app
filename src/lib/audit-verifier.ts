@@ -215,10 +215,16 @@ export function makeShardedSkeptic(base: SkepticFn, opts?: { shardSize?: number;
     void _opts;
     const merged: SkepticVerdict[] = [];
     let anySucceeded = false; let lastError: unknown = null;
-    // ≤shardSize ⇒ ONE shard — still routed through the retry+coverage loop (no bypass), so a truncated small set is
-    // salvaged + re-requested + coverage-asserted exactly like a large one (card-274 small-set contract, #609-(8)).
-    for (let start = 0; start < findings.length; start += shardSize) {
-      const shard = findings.slice(start, start + shardSize);
+    // card #611 PARALLELIZE: shards are DISJOINT finding subsets → process them with BOUNDED CONCURRENCY (cap 4) instead
+    // of sequentially. Verdict-IDENTICAL — each shard rules the same findings; results are collected in SHARD ORDER
+    // (shardResults[idx]) so the merge is deterministic regardless of completion order. This cuts the P2 wall-clock from
+    // N×latency to ~ceil(N/4)×latency (the 77s→~20s fix). anySucceeded/lastError are closure vars mutated inside the
+    // per-shard loop — safe under JS's single-threaded async (no preemption between statements). ≤shardSize ⇒ ONE shard,
+    // still through the same retry+coverage loop (card-274 small-set contract).
+    const CONCURRENCY = 4;
+    const shards: Array<{ start: number; shard: TypedFinding[] }> = [];
+    for (let start = 0; start < findings.length; start += shardSize) shards.push({ start, shard: findings.slice(start, start + shardSize) });
+    const processShard = async ({ start, shard }: { start: number; shard: TypedFinding[] }): Promise<SkepticVerdict[]> => {
       const ruled = new Map<number, SkepticVerdict>(); // local shard index → verdict
       for (let attempt = 0; attempt <= retries && ruled.size < shard.length; attempt++) {
         const remainIdx = shard.map((_, i) => i).filter((i) => !ruled.has(i)); // still-unruled remainder ONLY
@@ -232,8 +238,14 @@ export function makeShardedSkeptic(base: SkepticFn, opts?: { shardSize?: number;
           if (local !== undefined && !ruled.has(local)) ruled.set(local, { ...v, index: local, id: shard[local]?.id });
         }
       }
-      for (const [local, v] of ruled) merged.push({ ...v, index: start + local, id: findings[start + local]?.id }); // remap to full-set index; key by id
-    }
+      return [...ruled.entries()].map(([local, v]) => ({ ...v, index: start + local, id: findings[start + local]?.id })); // remap to full-set index; key by id
+    };
+    const shardResults: SkepticVerdict[][] = new Array(shards.length);
+    let nextShard = 0;
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, shards.length) }, async () => {
+      while (nextShard < shards.length) { const idx = nextShard++; shardResults[idx] = await processShard(shards[idx]); }
+    }));
+    for (const r of shardResults) for (const v of r) merged.push(v); // deterministic: shard order, not completion order
     // T0-4 parity: a TOTAL outage (no shard call ever returned) must route to sound:false → NHR, not a silent empty pass.
     if (!anySucceeded) throw (lastError instanceof Error ? lastError : new Error("sharded skeptic: every shard call failed (total skeptic outage)"));
     // CODE-OWNED COVERAGE ASSERT (card #609-(8) part 5 — a real assertion, NOT a log). The union of shard rulings MUST
