@@ -43,6 +43,17 @@ const JUSTIFIED_ABSENT: Record<string, string> = {
   // (none this package — all live-proven members are IN)
 };
 
+// ARMED, CERT-DRY, LIVE-PROOF-OWED (atomic-arming invariant #578-2) — flags flipped =true on audit-worker THIS turn for
+// the LBJ 12318726Q0165 fire (Brain card #609 bundle, PR #262 merged main 195ba83). Cert-DRY, verdict-safe by the
+// adversarial re-Gauntlet; live-proof owed at the CEO fire. Documentation map (void-guarded — does not gate the assert);
+// its purpose is the atomic same-turn RECORD that these armed flags exist (an armed flag absent here = the #463 defect).
+const ARMED_CERT_DRY_UNPROVEN_609: Record<string, string> = {
+  AUDIT_VERIFIER_SHARDED: "#609/#609-(8) sharded P2 skeptic — truncation→NHR fix + real coverage-throw; DRY 12/12; live-proof at LBJ fire",
+  AUDIT_CLAUSE_TYPING_FLOOR: "#609-(2)/(8) clause-keyed typing floor — false-BID CLOSED (attr-exempt + positive-shape regexes); adversarial corpus 21/21 FALSE-BIDs=0; live-proof at LBJ fire",
+  AUDIT_EMISSION_SPLIT: "#609 emission-split — one-obligation-per-finding + anti-dilution; DRY 7/7; live-proof at LBJ fire",
+};
+void ARMED_CERT_DRY_UNPROVEN_609;
+
 // The proposed flip-set for the next run (the 22-flag package: 19 prior + DEADLINE_RECONCILE + the 2 batch fixes).
 const PROPOSED = (process.argv[2]?.split(",").map((s) => s.trim()).filter(Boolean)) ?? [
   "AUDIT_CLARIFICATION_ALLOWLIST", "AUDIT_AMBIGUOUS_SIGNAL_DEMOTION", "AUDIT_SITEVISIT_CONCLUDED_NOTICEWIDE",
