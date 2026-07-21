@@ -36,6 +36,24 @@ const NO_VERDICT_POLES = new Set(["NEEDS_HUMAN_REVIEW", "INCOMPLETE", "OUT_OF_SC
 
 const s = (v: unknown): string => (v == null ? "" : String(v));
 
+// Strip ENGINE-INTERNAL annotations that leaked into customer prose (card #612-(3d)).
+// The engine tags some eligibility findings with a bracketed adjudication note, and
+// emits eligibility-gap KEYS as snake_case identifiers (panel-findings-bridge.ts) — the
+// customer sees "[cited clause is not a recognized …]" and "confirm set_aside_eligibility;
+// size_standard" verbatim. This removes/humanizes ONLY those two KNOWN machine artifacts;
+// it never paraphrases substance, so the rationale stays verbatim in spirit. Applied at the
+// single build points (mapFinding + rationale) so all three renderers inherit clean prose.
+export function sanitizeProse(v: unknown): string {
+  let t = s(v);
+  if (!t) return t;
+  // (1) eligibility-authority-allowlist adjudication note → concise customer phrasing.
+  t = t.replace(/\s*[—-]?\s*\[cited clause is not a recognized[^\]]*\]/gi, " (advisory — not a recognized eligibility bar; confirm)");
+  // (2) bare snake_case gap keys → spaced words (set_aside_eligibility → set-aside eligibility;
+  //     size_standard → size standard). Customer prose never carries a legitimate snake_case token.
+  t = t.replace(/\b[a-z]+(?:_[a-z]+)+\b/g, (m) => m.replace(/_/g, " ").replace(/\bset aside\b/gi, "set-aside"));
+  return t.replace(/[ \t]{2,}/g, " ").trim();
+}
+
 // ── derived-view candidate matchers (_DERIVATION-SPEC.md) ──
 // Require an explicit UCF section anchor (§L / L-6) — a BARE letter must NOT pull a finding into the wrong
 // section (review fix: "Proposal" ends in 'l' → was matching §L; "M0001" amendment → was matching §M). A
@@ -66,7 +84,7 @@ function unionFindings(showStoppers: FindingLite[], findings: FindingLite[]): Fi
 }
 
 function mapFinding(f: FindingLite): V4Finding {
-  const out: V4Finding = { req: s(f.requirement), cite: s(f.citation) };
+  const out: V4Finding = { req: sanitizeProse(f.requirement), cite: s(f.citation) };
   if (f.excerpt) out.excerpt = s(f.excerpt);
   // "Clears when" callout: the curability note. curableInWindow implies a gate the bidder can clear.
   if (f.note) out.curability = s(f.note);
@@ -392,7 +410,7 @@ export function buildV4Data(audit: Record<string, unknown>): V4Data {
     noVerdict: NO_VERDICT_POLES.has(pole),
     noCharge: NO_VERDICT_POLES.has(pole) && !(NHR_NOCHARGE_SUPPRESS && pole === "NEEDS_HUMAN_REVIEW"),
     eligible: p.eligible ?? null,          // tri-state; render suppresses the chip on OUT_OF_SCOPE (explicit pole rule)
-    rationale: s(p.reason),                // VERBATIM — never paraphrase or trim
+    rationale: sanitizeProse(p.reason),    // verbatim in substance; strips only leaked machine artifacts (#612-3d)
   };
 
   // union showStoppers + findings for the §L/§M/CLIN derivations (kind/citation-based,
