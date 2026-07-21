@@ -47,7 +47,9 @@ export function sanitizeProse(v: unknown): string {
   let t = s(v);
   if (!t) return t;
   // (1) eligibility-authority-allowlist adjudication note → concise customer phrasing.
-  t = t.replace(/\s*[—-]?\s*\[cited clause is not a recognized[^\]]*\]/gi, " (advisory — not a recognized eligibility bar; confirm)");
+  // NB: no internal "; " in the replacement — the caveat splitter separates on "; ", so a
+  // semicolon here would orphan "confirm)" onto its own bullet (Design flag, PR #266).
+  t = t.replace(/\s*[—-]?\s*\[cited clause is not a recognized[^\]]*\]/gi, " (advisory — not a recognized eligibility bar, confirm)");
   // (2) the KNOWN eligibility-gap keys emitted by panel-findings-bridge (setAsideAttribute) —
   //     the only underscore-bearing machine tokens that reach customer prose — humanised via an
   //     EXPLICIT allowlist. A blanket snake_case regex would corrupt legitimate underscores in

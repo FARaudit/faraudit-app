@@ -13,7 +13,7 @@ const assert = (c: boolean, m: string) => { console.log(`${c ? "✅" : "❌"} ${
   const out = sanitizeProse(raw);
   assert(!/\[cited clause is not a recognized/.test(out), "adjudication bracket removed");
   assert(!out.includes("]"), "no dangling bracket left");
-  assert(/\(advisory — not a recognized eligibility bar; confirm\)/.test(out), "replaced with concise customer phrasing");
+  assert(/\(advisory — not a recognized eligibility bar, confirm\)/.test(out), "replaced with concise customer phrasing");
   assert(out.startsWith("DOL Approval for Alcohol and Drug Abuse Specialist"), "substance before the bracket preserved");
 }
 

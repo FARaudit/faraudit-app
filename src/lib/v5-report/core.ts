@@ -96,22 +96,55 @@ function coverageSub(cov: V4Data["coverage"]): string {
 // A normal single-sentence rationale (no list intro, or a trivial tail) returns unchanged
 // with an empty caveat list, so non-package poles are byte-identical.
 const CAVEAT_INTRO_RE = /(\bconfirm each before bidding:\s*)([\s\S]+)$/i;
+// A self-clearable item ALWAYS opens with a capital letter, a digit (clause number), or a
+// bracket. A fragment opening lowercase is a mid-clause CONTINUATION — the engine's semicolon
+// list carries clause-internal "; " (52.219-14 "…self-perform at least 50% of the work; it
+// will not pay…"), and splitting on "; " would orphan the "it will not pay…" half onto its own
+// bullet (Design flag, PR #266). Re-join continuations so every bullet is a whole clause.
+const CAVEAT_CONTINUATION_RE = /^[a-z]/;
+const CAVEAT_STOP = new Set(["a", "an", "the", "of", "for", "to", "with", "under", "and", "or", "in", "on", "at", "this", "that", "must", "be", "is", "are", "as", "by"]);
+
+// Signature for near-dup collapse = sorted CONTENT tokens of the LEADING clause (up to the first
+// . ; :). Two items whose leading clause carries the same substance modulo word-order/filler
+// (the reworded set-aside pair "…with a $34 million size standard" vs "…, size standard $34
+// million") collide and fold — so a restatement never spends a premium top-5 slot. Short leads
+// (<4 content tokens) return "" so distinct terse items are never over-collapsed.
+function caveatSignature(s: string): string {
+  const lead = (s.split(/[.;:]/)[0] || s).toLowerCase();
+  const toks = lead.replace(/[^a-z0-9]+/g, " ").split(/\s+/).filter((w) => w && !CAVEAT_STOP.has(w));
+  return toks.length < 4 ? "" : toks.sort().join(" ");
+}
+
+// Belt: a truncated tail must never render "(" without a matching ")".
+function balanceParens(s: string): string {
+  const opens = (s.match(/\(/g) || []).length, closes = (s.match(/\)/g) || []).length;
+  return opens > closes ? s + ")".repeat(opens - closes) : s;
+}
+
 export function splitCaveatRationale(rationale: unknown): { lede: string; caveats: string[] } {
   const t = esc(rationale) === "" ? "" : String(rationale ?? "");
   const m = t.match(CAVEAT_INTRO_RE);
   if (!m) return { lede: t, caveats: [] };
   const lede = t.slice(0, m.index! + m[1].length).trim();
-  // De-duplicate case/space-insensitively while preserving first-seen order, so an exact
-  // restatement doesn't consume a top-N slot (near-dups are handled by the finding deduper).
+  // (1) split on the item separator, RE-JOINING continuation fragments so a clause with an
+  //     internal semicolon stays ONE whole bullet (never a lowercase-leading orphan).
+  const merged: string[] = [];
+  for (const raw of m[2].split(/\s*;\s*/)) {
+    const piece = raw.trim();
+    if (!piece) continue;
+    if (merged.length && CAVEAT_CONTINUATION_RE.test(piece)) merged[merged.length - 1] += "; " + piece;
+    else merged.push(piece);
+  }
+  // (2) de-dup on exact-normalized OR leading-clause signature (first-seen order = rank), then
+  //     (3) balance any dangling paren. Both defects live in the CEO-read top slots (Design flag).
   const seen = new Set<string>();
   const caveats: string[] = [];
-  for (const raw of m[2].split(/\s*;\s*/)) {
-    const c = raw.trim();
-    if (!c) continue;
-    const key = c.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    caveats.push(c);
+  for (const piece of merged) {
+    const k1 = piece.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const k2 = caveatSignature(piece);
+    if (seen.has(k1) || (k2 && seen.has(k2))) continue;
+    seen.add(k1); if (k2) seen.add(k2);
+    caveats.push(balanceParens(piece));
   }
   if (caveats.length < 2) return { lede: t, caveats: [] }; // not a real list → leave the sentence whole
   return { lede, caveats };
