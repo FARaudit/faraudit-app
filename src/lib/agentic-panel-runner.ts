@@ -350,6 +350,10 @@ export interface PanelResult {
  *  grader short-circuit, and any caller all defer to THIS. Pure → gate-testable. */
 export function coverageTruth(panel: PanelResult): { complete: boolean; reason: string } {
   if (!panel.fired) return { complete: false, reason: `manifest incomplete — required sections missing: ${panel.manifest.missing.join(", ") || "(unknown)"}` };
+  // (card #612-(4e)) — under AUDIT_PANEL_ASYNC_RATIONALE `judgment` is null until judgmentPromise resolves. Reading
+  // the null verdict here would skip the INCOMPLETE branch and false-report COMPLETE. Fail TOWARD incomplete until
+  // the judge resolves (a caller must await panel.judgmentPromise first). (No live caller today — defensive.)
+  if (panel.judgmentPromise && !panel.judgment) return { complete: false, reason: "panel judgment still resolving (async rationale) — coverage cannot be confirmed; await judgmentPromise" };
   if (panel.judgment?.verdict === "INCOMPLETE") return { complete: false, reason: panel.judgment.rationale };
   if (panel.droppedSectionsForBudget?.length) return { complete: false, reason: `binding content not read: ${panel.droppedSectionsForBudget.join(", ")}` };
   return { complete: true, reason: "all required sections read; amendments resolved to current version; nothing dropped or unrouted" };
@@ -392,13 +396,17 @@ export async function runPanelJudge(params: {
   const onUsage = (u: StructuredUsage) => { _instr.push(u); params.onUsage?.(u); };  // tee: measure AND forward to the COGS ledger
   const logInstr = () => { if (PANEL_TIMING_ON() && _instr.length) console.log(formatPanelInstrumentation(summarizePanelUsage(_instr), Date.now() - _tProducer)); };
 
-  // ── PRODUCER PREFIX CACHE — ONE shared solicitation prefix, PRIMED once, read by all 5 lenses ──
+  // ── PRODUCER PREFIX CACHE — ONE shared solicitation prefix, byte-identical across all 5 lenses ──
   // Flag OFF (or source over the single-block cap) ⇒ sharedPrefix=null ⇒ the per-lens path below runs
-  // byte-identical. When set, every lens caches the SAME prefix (deterministic key order) and the primer
-  // writes it before the fan-out so the lenses cache_read it instead of 5 cold writes.
+  // byte-identical. When set, every lens caches the SAME prefix (deterministic key order). NOTE: no separate
+  // primer is issued — with mixed tiers + parallel cold writes the shared prefix reads little, and the $0 probe
+  // already settled that it costs MORE here; this path exists for the record + live measurement, not arming.
   const sharedSource = PRODUCER_PREFIX_CACHE() ? buildSharedSolicitationSource(params.sectionText) : "";
+  // Sanitize ONCE and reuse for BOTH the cached prefix and grounding — so excerptInSource checks against the
+  // exact text the lens read (not the raw source), avoiding a false EXCERPT-UNGROUNDED on any char sanitize rewrites.
+  const sharedSourceSanitized = sharedSource ? sanitizePdfText(sharedSource).sanitized : "";
   const sharedPrefix = sharedSource && sharedSource.length <= PREFIX_CACHE_MAX_CHARS
-    ? `${PANEL_SECURITY}\n\n<solicitation-source>\n${sanitizePdfText(sharedSource).sanitized}\n</solicitation-source>\n\n${PANEL_SECURITY}`
+    ? `${PANEL_SECURITY}\n\n<solicitation-source>\n${sharedSourceSanitized}\n</solicitation-source>\n\n${PANEL_SECURITY}`
     : null;
   if (PRODUCER_PREFIX_CACHE() && !sharedPrefix) console.log(`[panel] producer-prefix-cache: source ${sharedSource.length} chars > ${PREFIX_CACHE_MAX_CHARS} cap — per-lens fallback (byte-identical)`);
 
@@ -415,7 +423,7 @@ export async function runPanelJudge(params: {
     // ── SHARED-PREFIX PATH (PRODUCER_PREFIX_CACHE) — one call, full source cached+shared, focus in the prompt ──
     if (sharedPrefix) {
       const assigned = lensAssignedSections(p.key as PanelLensKey, params.documentClass);
-      bundleByLens.set(p.key, sharedSource);   // the lens SAW the full source ⇒ ground excerpts against it (an excerpt from any section is genuinely in the package)
+      bundleByLens.set(p.key, sharedSourceSanitized);   // the lens SAW the sanitized full source ⇒ ground excerpts against THAT exact text (any section's excerpt is genuinely in the package)
       const task =
         `The FULL solicitation source is provided above for reference. Apply YOUR lens, FOCUSING on your assigned scope (UCF §${assigned.join(", §")}). ` +
         `For EVERY named_hard_gate and risk, copy the VERBATIM source sentence(s) into its \`excerpt\` field (exact text, not a paraphrase) so it can be independently verified — use "" only if the claim genuinely has no supporting source text. ` +
@@ -644,9 +652,12 @@ export async function runPanelJudge(params: {
 
   // ── (card #612-(4e)) ASYNC RATIONALE — the judge is REPORT-ONLY, so don't block the verdict on it ──
   // When ON, return typedFindings NOW + a judgmentPromise the executor awaits at the reason-fold (after
-  // deriveVerdict), so the ~20-40s judge overlaps the rail. A judge FAILURE degrades to an unfolded reason
-  // (rationale is a nice-to-have) and — unlike the sync path's panel-off degrade — PRESERVES the verified
-  // typedFindings (fail-closed: verified facts still reach deriveVerdict; an abort still propagates).
+  // deriveVerdict), so the ~20-40s judge overlaps the rail. VERDICT-INERT on the judge-SUCCESS path (identical
+  // typedFindings + identical floored judgment, proven by panel-runner-async-cache.test.ts). NOT byte-identical
+  // on the judge-FAILURE path — and INTENTIONALLY so: where the sync path's judge-throw degrades the WHOLE panel
+  // to off (verified typedFindings LOST → deriveVerdict runs on v3 findings alone), async keeps the unfolded
+  // reason but PRESERVES typedFindings (fail-closed: more verified facts reach deriveVerdict ⇒ can only escalate,
+  // never false-BID). Abort re-throws (owned by the executor's post-await abort guard, mirroring the sync path).
   if (PANEL_ASYNC_RATIONALE()) {
     const judgmentPromise = judgeCall()
       .then((raw) => finishJudgment(raw))

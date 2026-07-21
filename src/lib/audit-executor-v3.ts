@@ -486,8 +486,15 @@ export async function executeAgenticPrimary(
   const COMMITTAL_JUDGE_VERDICT = new Set(["BID", "BID_WITH_CAUTION", "NO_BID", "INELIGIBLE"]);
   // (card #612-(4e)) — under AUDIT_PANEL_ASYNC_RATIONALE the judge ran non-blocking; resolve it HERE (after
   // deriveVerdict) so the ~20-40s judge overlapped the rail. Flag OFF ⇒ judgmentPromise is undefined ⇒ reads
-  // the synchronous `.judgment` (byte-identical). Write the resolved value back so the object stays consistent.
-  const panelJudgment = panelResult?.judgmentPromise ? await panelResult.judgmentPromise : (panelResult?.judgment ?? null);
+  // the synchronous `.judgment` (byte-identical). The judgmentPromise resolves null on a non-abort judge failure
+  // (rationale is report-only); on ABORT it re-throws — convert that into the SAME controlled terminal error the
+  // line-470 guard emits, so an abort landing DURING this overlapped await never escapes as a raw AbortError and
+  // never lets the run persist a late-complete row. Write the resolved value back so the object stays consistent.
+  let panelJudgment: Awaited<ReturnType<typeof runPanelJudge>>["judgment"] = panelResult?.judgment ?? null;
+  if (panelResult?.judgmentPromise) {
+    try { panelJudgment = await panelResult.judgmentPromise; }
+    catch (e) { if (signal?.aborted) throw new Error("agentic engine aborted after verdict (overall budget) — not persisting a late-complete row"); throw e; }
+  }
   if (panelResult) panelResult.judgment = panelJudgment;
   if (panelResult?.typedFindings.length && panelJudgment?.rationale && COMMITTAL_JUDGE_VERDICT.has(panelJudgment.verdict)) {
     res.decision = { ...res.decision, reason: foldPanelReason(res.decision.reason, panelJudgment.rationale) };
