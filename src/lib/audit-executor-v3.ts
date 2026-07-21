@@ -484,8 +484,13 @@ export async function executeAgenticPrimary(
   // gating only on typedFindings would leak an honest-fail rationale into a committal derived reason — contradicting
   // the pole. Skip the fold on INCOMPLETE / NEEDS_HUMAN_REVIEW / OUT_OF_SCOPE judge verdicts. Flag-OFF ⇒ untouched.
   const COMMITTAL_JUDGE_VERDICT = new Set(["BID", "BID_WITH_CAUTION", "NO_BID", "INELIGIBLE"]);
-  if (panelResult?.typedFindings.length && panelResult.judgment?.rationale && COMMITTAL_JUDGE_VERDICT.has(panelResult.judgment.verdict)) {
-    res.decision = { ...res.decision, reason: foldPanelReason(res.decision.reason, panelResult.judgment.rationale) };
+  // (card #612-(4e)) — under AUDIT_PANEL_ASYNC_RATIONALE the judge ran non-blocking; resolve it HERE (after
+  // deriveVerdict) so the ~20-40s judge overlapped the rail. Flag OFF ⇒ judgmentPromise is undefined ⇒ reads
+  // the synchronous `.judgment` (byte-identical). Write the resolved value back so the object stays consistent.
+  const panelJudgment = panelResult?.judgmentPromise ? await panelResult.judgmentPromise : (panelResult?.judgment ?? null);
+  if (panelResult) panelResult.judgment = panelJudgment;
+  if (panelResult?.typedFindings.length && panelJudgment?.rationale && COMMITTAL_JUDGE_VERDICT.has(panelJudgment.verdict)) {
+    res.decision = { ...res.decision, reason: foldPanelReason(res.decision.reason, panelJudgment.rationale) };
   }
   const payload = buildV3Payload(res.decision, res.coverage, res.findings, generatedAt);
 
