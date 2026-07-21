@@ -235,7 +235,7 @@ interface ErrorClass {
   ledeRetrievalAccurate: boolean;
 }
 
-function classifyError(errorMessage: string): ErrorClass {
+export function classifyError(errorMessage: string): ErrorClass {
   // Prompt-too-large / token-max (HTTP 400 invalid_request_error) — a HARD,
   // DETERMINISTIC size error, NOT transient: the assembled document set exceeded
   // the model's context window, so re-running with the SAME inputs fails
@@ -272,8 +272,12 @@ function classifyError(errorMessage: string): ErrorClass {
   }
   // SAM.gov retrieval failures — note: bare "fetch" removed (too broad; it caught
   // the engine call errors above). SAM failures carry sam.gov / download /
-  // attachment / retrieval / 40x context.
-  if (/sam\.gov|sam api|http 40[34]|attachment|download|retriev/i.test(errorMessage)) {
+  // attachment / retrieval / 40x context. A SAM-side fetch that stalls out on its
+  // OWN time budget ("SAM PDF fetch exceeded its total time budget" — pdf.ts;
+  // "SAM fetch exceeded its total time budget" — sam-url-guard.ts) is a
+  // retrieval-STAGE stall, so it belongs here (stage 01, retrieval-accurate lede),
+  // not the engine-stall branch below — matched via the SAM + fetch pairing.
+  if (/sam\.gov|sam api|\bsam\b[^.]{0,15}\bfetch\b|http 40[34]|attachment|download|retriev/i.test(errorMessage)) {
     return {
       headline: "The solicitation package could not be retrieved from SAM.gov.",
       explainer: "SAM.gov refused the download request for this notice's attachment package. This usually means the attachments are behind a controlled-access wall (export-controlled or JCP-gated documents), or SAM.gov is rate-limiting automated retrieval. <b>It is not a problem with your account.</b>",
@@ -282,10 +286,25 @@ function classifyError(errorMessage: string): ErrorClass {
       ledeRetrievalAccurate: true,
     };
   }
-  if (/timeout|timed out|abort/i.test(errorMessage)) {
+  // Timeout / STALL / infra hiccup — the engine's overall wall-clock budget was
+  // exceeded ("agentic V3 primary overall budget (360s) exceeded — engine
+  // stalled", audit-executor.ts withBudget), a stage aborted, or an infra
+  // 5xx/socket error slipped past the engine-call branch above. ALL of these are
+  // "the run stalled before a verdict" — a TRANSIENT infra failure, never a
+  // verdict-quality outcome. The customer MUST land on the retry-forward failed
+  // page, never a verdict-style surface. Previously the stall message matched no
+  // branch and fell to the generic "hit an unexpected error" default — honest
+  // framing for a KNOWN stall is "it took too long / we're on it, retry", so it
+  // gets the transient-timeout class explicitly (Brain card #612-(2)).
+  // The 5xx tokens are HTTP-anchored (`http 50x`) or phrase-anchored (bad gateway /
+  // service unavailable / gateway timeout — the latter also caught by "timeout")
+  // NOT a bare `\b50[234]\b`, which would false-match a delimited 502/503/504 that
+  // is DATA — a dollar amount, page/qty count, SPRS score — in a PERMANENT failure
+  // and wrongly promise "retrying usually succeeds" (review 2026-07-21).
+  if (/timeout|timed out|abort|engine stalled|overall budget|maxduration|\bhard[\s-]?kill\b|http\s?50[234]\b|\bbad gateway\b|\bservice unavailable\b|econnreset|socket hang ?up|network error/i.test(errorMessage)) {
     return {
-      headline: "The audit engine timed out before analysis completed.",
-      explainer: "The analysis ran longer than the engine's time limit and was stopped before a verdict was produced. Large solicitation packages occasionally exceed the window — this is usually transient, and <b>retrying the audit often succeeds</b>. It is not a problem with your account.",
+      headline: "The audit engine ran out of time before analysis completed.",
+      explainer: "The run took longer than the engine's time limit and was stopped before a verdict was produced — <b>no verdict was scored, so nothing below is a result</b>. Large solicitation packages occasionally exceed the window. This is almost always transient — <b>we're on it, and retrying the audit usually succeeds</b>. It is not a problem with your account or your documents.",
       failedStage: "02 — Engine analysis",
       tag: "Stopped during engine analysis.",
       ledeRetrievalAccurate: false,
