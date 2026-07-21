@@ -154,7 +154,9 @@ export async function POST(
   let extractedFormat: "docx" | "xlsx" | "doc" | "txt" | null = null;
   let pdfSource: PdfSource = "sam_unavailable";
   let pdfUnavailableReason: string | null = null;
-  let attachmentPdfs: Array<{ name: string; base64: string; buffer: Buffer }> | null = null;
+  // `text` (Brain #624-1) carries the assembler's already-extracted text so buildAgenticDocs
+  // skips a second parse+OCR pass.
+  let attachmentPdfs: Array<{ name: string; base64: string; buffer: Buffer; text?: string }> | null = null;
   let primaryDocName: string | null = null;
   let ingestion: IngestionMeta | null = null;
 
@@ -170,6 +172,9 @@ export async function POST(
       pdfBuffer = assembled.primary.buffer;
       pdfSource = "sam_fetched";
       attachmentPdfs = assembled.attachments;
+      // Reuse the primary form's already-extracted text (Brain #624-1) so buildAgenticDocs
+      // does not parse+OCR the primary a second time. null when truncated/image-only.
+      extractedText = assembled.primary.text ?? null;
       primaryDocName = assembled.primary.name;
       ingestion = assembled.ingestion;
     } else if (assembled) {
