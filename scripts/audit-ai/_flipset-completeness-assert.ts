@@ -116,16 +116,15 @@ const ARMED_CERT_DRY_UNPROVEN_CERT3: Record<string, string> = {
 };
 void ARMED_CERT_DRY_UNPROVEN_CERT3;
 
-// BUILT + FLAG-GATED OFF, NOT RECOMMENDED FOR ARMING (card #612-(3), CEO ruling 2026-07-21) — the ruling ordered
-// PRODUCER_PREFIX_CACHE built as a cost-saver; implementation + a $0 probe (_cache-cost-probe.ts) DISPROVED the
-// premise (mixed tiers ⇒ only 3 sonnet lenses shareable; each lens reads a SMALL assigned bundle, not full source; the
-// 1.25× prime on the large shared prefix outweighs the 0.10× reads ⇒ ~+26% cost). Kept default-OFF + instrumented; do
-// NOT flip =true without a fresh CEO ruling on the finding (an armed cost-INCREASER = the anti-goal). Documented here so
-// its existence is on the atomic record even though it is intentionally UNARMED (the inverse of the #463 defect).
-const BUILT_NOT_ARMED_CERT3: Record<string, string> = {
-  AUDIT_PRODUCER_PREFIX_CACHE: "#3-(3) shared-prefix cache — BUILT, flag-OFF byte-identical; $0 probe shows +26% cost in this architecture ⇒ HELD, not armed",
+// EVALUATED + REJECTED, CODE DELETED (card #612-(3), CEO ruling 2026-07-21) — the ruling ordered PRODUCER_PREFIX_CACHE
+// built as a cost-saver; the $0 probe (_cache-cost-probe.ts) DISPROVED the premise (mixed tiers ⇒ only 3 sonnet lenses
+// shareable; each lens reads a SMALL assigned bundle, not full source; the 1.25× write on the large shared prefix
+// outweighs the 0.10× reads ⇒ ~+26% cost). Per the follow-up ruling the shared-prefix fork was DELETED; NO flag exists.
+// Recorded here so the atomic registry carries the decision (there is nothing to arm, and nothing to accidentally arm).
+const EVALUATED_REJECTED_CERT3: Record<string, string> = {
+  AUDIT_PRODUCER_PREFIX_CACHE: "#3-(3) shared-prefix cache — REJECTED at $0 (+26% cost) → code DELETED; evidence _cache-cost-probe.ts; no flag",
 };
-void BUILT_NOT_ARMED_CERT3;
+void EVALUATED_REJECTED_CERT3;
 
 // The proposed flip-set for the next run (the 22-flag package: 19 prior + DEADLINE_RECONCILE + the 2 batch fixes).
 const PROPOSED = (process.argv[2]?.split(",").map((s) => s.trim()).filter(Boolean)) ?? [

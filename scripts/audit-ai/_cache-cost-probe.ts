@@ -1,6 +1,11 @@
 import { assembleLensPasses } from "../../src/lib/agentic-sections";
-import { buildSharedSolicitationSource } from "../../src/lib/agentic-panel-runner";
 import { readFileSync, readdirSync } from "fs";
+// $0 EVIDENCE (card #612-(3)) — this probe REJECTED the producer-prefix-cache (~+26%), so it was deleted from
+// the runner. The shared-source builder is inlined here so the documented answer stays runnable.
+const buildSharedSolicitationSource = (sectionText: Record<string, string>): string =>
+  Object.keys(sectionText).sort()
+    .map((k) => { const raw = (sectionText[k] ?? "").trim(); return raw ? `## SECTION ${k}\n${raw}` : ""; })
+    .filter(Boolean).join("\n\n");
 const dir = "scripts/audit-ai/run-records";
 let sectionText: Record<string,string> | null = null;
 let usedFile = "";
