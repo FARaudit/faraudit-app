@@ -47,7 +47,10 @@ export interface AuditExecutionInput {
   // documents in deterministic order + the ingestion-completeness meta
   // persisted to compliance_json.ingestion. Absent on single-doc/upload
   // arms (ingestion null → no banner, pre-FA-136 behavior).
-  attachmentPdfs?: Array<{ name: string; base64: string; buffer: Buffer }> | null;
+  // `text` (Brain #624-1): the extraction the assembler already produced for this buffer,
+  // threaded to buildAgenticDocs to avoid a second parse+OCR pass. Absent on legacy/upload
+  // arms that don't pre-extract ⇒ extracted downstream as before.
+  attachmentPdfs?: Array<{ name: string; base64: string; buffer: Buffer; text?: string }> | null;
   primaryDocName?: string | null;
   ingestion?: IngestionMeta | null;
   // N5 — the auditing firm's self-asserted capability profile (open-world; socioeconomic

@@ -54,7 +54,12 @@ export async function buildAgenticDocs(opts: {
   primaryName: string;
   primaryBytes: Buffer | null;
   primaryText: string | null;
-  attachments: Array<{ name: string; base64: string }> | null;
+  // `text`, when present, is the extraction the SAM/upload assembler ALREADY produced
+  // (pdf-parse / OCR) for this exact buffer — reused as `existing` so a scanned doc is
+  // not OCR'd a SECOND time here (Brain #624-1 double-extraction fix). Absent/empty ⇒
+  // extracted below exactly as before (byte-identical). Only carried for NON-truncated
+  // buffers, so the reused text always corresponds to the delivered bytes.
+  attachments: Array<{ name: string; base64: string; text?: string | null }> | null;
   // L1 (Brain card 264 Ruling 1) — the SAM-published notice body. For a combined-synopsis
   // buy the §L/§M/clauses/set-aside live ONLY here; it was resolved by FA-148 into
   // solicitation.description but never read into fullSource (the notice-body-blind
@@ -116,7 +121,7 @@ export async function buildAgenticDocs(opts: {
     const built = await Promise.all(
       batch.map(async (a): Promise<AgenticDoc> => {
         const bytes = Buffer.from(a.base64, "base64");
-        return { name: a.name, bytes, text: await textOf(bytes, null) };
+        return { name: a.name, bytes, text: await textOf(bytes, a.text ?? null) };
       })
     );
     docs.push(...built);

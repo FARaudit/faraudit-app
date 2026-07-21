@@ -182,7 +182,7 @@ export async function executeAgenticPrimary(
     primaryName: input.primaryDocName ?? "primary solicitation",
     primaryBytes,
     primaryText: input.extractedText ?? null,
-    attachments: input.attachmentPdfs?.map((a) => ({ name: a.name, base64: a.base64 })) ?? null,
+    attachments: input.attachmentPdfs?.map((a) => ({ name: a.name, base64: a.base64, text: a.text ?? null })) ?? null,
     noticeBody,
   });
   if (_timeOn) console.log(`[timing] prepanel:ingest-buildDocs ${Date.now() - _tIngest}ms · ${docs.length} doc(s) · ${docs.reduce((n, d) => n + (d.text?.length || 0), 0)} chars extracted`);
