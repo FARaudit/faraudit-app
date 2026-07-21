@@ -87,3 +87,32 @@ function coverageSub(cov: V4Data["coverage"]): string {
   if (miss.length) return `all read · ${miss.length} section${miss.length === 1 ? "" : "s"} to confirm`;
   return "read · completeness not certified";
 }
+
+// Split a self-clearable-package rationale into a LEDE + the enumerated caveat list
+// (card #612-(3c)). The engine inlines the entire self-clearable list after a "confirm
+// each before bidding:" intro — a ~50-item semicolon wall dumped verbatim into the bottom
+// line, redundant with the Findings section. This lets the renderer show the lede + a
+// ranked top-N (engine order = rank), with the remainder grouped ("+N more in Findings").
+// A normal single-sentence rationale (no list intro, or a trivial tail) returns unchanged
+// with an empty caveat list, so non-package poles are byte-identical.
+const CAVEAT_INTRO_RE = /(\bconfirm each before bidding:\s*)([\s\S]+)$/i;
+export function splitCaveatRationale(rationale: unknown): { lede: string; caveats: string[] } {
+  const t = esc(rationale) === "" ? "" : String(rationale ?? "");
+  const m = t.match(CAVEAT_INTRO_RE);
+  if (!m) return { lede: t, caveats: [] };
+  const lede = t.slice(0, m.index! + m[1].length).trim();
+  // De-duplicate case/space-insensitively while preserving first-seen order, so an exact
+  // restatement doesn't consume a top-N slot (near-dups are handled by the finding deduper).
+  const seen = new Set<string>();
+  const caveats: string[] = [];
+  for (const raw of m[2].split(/\s*;\s*/)) {
+    const c = raw.trim();
+    if (!c) continue;
+    const key = c.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    caveats.push(c);
+  }
+  if (caveats.length < 2) return { lede: t, caveats: [] }; // not a real list → leave the sentence whole
+  return { lede, caveats };
+}

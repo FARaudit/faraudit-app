@@ -18,7 +18,7 @@
    Every interpolated field routes through esc() (stored-XSS safe).
    ============================================================================= */
 import type { V4Data, V4Verdict, V4Findings, V4Finding, V4Date, V4Temporal, V4SubmissionL, V4EvalM, V4Clins, V4Provenance, Tone } from "@/lib/v4-report/render";
-import { esc, TONE_LABEL, SEVLAB, eligInfo, eyebrowFor, plur, cap, scorecardTiles, type EligInfo } from "./core";
+import { esc, TONE_LABEL, SEVLAB, eligInfo, eyebrowFor, plur, cap, scorecardTiles, splitCaveatRationale, type EligInfo } from "./core";
 
 // AUDIT_V5_SEAL — "Decision Seal" masthead redesign (flag-gated; default-OFF = byte-identical).
 const V5_SEAL = process.env.AUDIT_V5_SEAL === "true";
@@ -131,6 +131,20 @@ function commandHeader(d: V4Data): string {
   const tilesHTML = scorecardTiles(d).map((t) =>
     `<div class="cmd-tile${t.textv ? " is-textv" : ""}" data-tone="${t.tone}"><div class="ct-v">${esc(t.v)}</div><div class="ct-k">${esc(t.k)}</div><div class="ct-sub">${esc(t.sub)}</div></div>`).join("");
 
+  // Bottom line — lede + ranked top-5 self-clearable caveats, remainder grouped (card #612-(3c)).
+  // Replaces the ~50-item semicolon wall the rationale dumped inline (redundant with Findings).
+  // A non-package rationale returns caveats=[] → the lede IS the whole sentence (byte-identical).
+  const CAVEAT_TOP_N = 5;
+  const { lede: blLede, caveats: blCaveats } = splitCaveatRationale(v.rationale);
+  const blTop = blCaveats.slice(0, CAVEAT_TOP_N);
+  const blRest = blCaveats.length - blTop.length;
+  const bottomLineBody =
+    `<p class="cmd-bl-t">${esc(blLede)}</p>` +
+    (blTop.length
+      ? `<ul class="cmd-bl-caveats">${blTop.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` +
+        (blRest > 0 ? `<p class="cmd-bl-more">+${blRest} more self-clearable item${blRest === 1 ? "" : "s"} — <a href="#findings">see Findings below</a></p>` : "")
+      : "");
+
   if (V5_SEAL) {
     // Record band — Agency (two-tier) · Offers due (two-tier) · Set-aside · NAICS.
     const agencyFact = facts.find((ft) => /agency/i.test(ft.k));
@@ -170,7 +184,7 @@ function commandHeader(d: V4Data): string {
           <div class="gv2-word">${esc(v.band)}</div>
           <div class="cmd-bl">
             <span class="cmd-bl-k">Bottom line</span>
-            <p class="cmd-bl-t">${esc(v.rationale)}</p>
+            ${bottomLineBody}
           </div>
         </div>
       </div>
@@ -202,7 +216,7 @@ function commandHeader(d: V4Data): string {
         <div class="cmd-detail">
           <div class="cmd-bl">
             <span class="cmd-bl-k">Bottom line</span>
-            <p class="cmd-bl-t">${esc(v.rationale)}</p>
+            ${bottomLineBody}
           </div>
           ${driverHTML}
         </div>
