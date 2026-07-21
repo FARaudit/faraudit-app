@@ -32,6 +32,10 @@ const E133_PROFILE: StructuredUsage[] = [
 //  `margin_n` comes from marginForN (the SOLE margin source). Every break-even char figure in docs/tests MUST derive
 //  from this same formula — no independently-stated numbers. The refusal record logs BOTH cap and effective gate so
 //  each refusal shows the exact number it was refused against.
+//  REGISTRY NOTE (Brain card #616.1): the margin schedule is DECLARED but DORMANT pending completed-row tracking —
+//  the gate is fixed at the n=1 posture (20% margin / $2.00 effective gate). n=1 is the TRUE state of the calibration
+//  data (one anchor), so this is the honest posture and it fails safe (refuses more, never less). Do NOT thread a
+//  synthetic n; wire the schedule only when a real completed-row counter exists (future slope re-derivation cards).
 
 /** Safety margin as a FUNCTION OF n (completed-row count) — n=1→20% · n≥5→15% · n≥10→10% (card #614, declared
  *  so the gate's movement is auditable). The SOLE margin source. Shrinks as the anchor gains real data. */
