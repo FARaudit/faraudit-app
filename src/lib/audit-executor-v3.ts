@@ -484,8 +484,20 @@ export async function executeAgenticPrimary(
   // gating only on typedFindings would leak an honest-fail rationale into a committal derived reason — contradicting
   // the pole. Skip the fold on INCOMPLETE / NEEDS_HUMAN_REVIEW / OUT_OF_SCOPE judge verdicts. Flag-OFF ⇒ untouched.
   const COMMITTAL_JUDGE_VERDICT = new Set(["BID", "BID_WITH_CAUTION", "NO_BID", "INELIGIBLE"]);
-  if (panelResult?.typedFindings.length && panelResult.judgment?.rationale && COMMITTAL_JUDGE_VERDICT.has(panelResult.judgment.verdict)) {
-    res.decision = { ...res.decision, reason: foldPanelReason(res.decision.reason, panelResult.judgment.rationale) };
+  // (card #612-(4e)) — under AUDIT_PANEL_ASYNC_RATIONALE the judge ran non-blocking; resolve it HERE (after
+  // deriveVerdict) so the ~20-40s judge overlapped the rail. Flag OFF ⇒ judgmentPromise is undefined ⇒ reads
+  // the synchronous `.judgment` (byte-identical). The judgmentPromise resolves null on a non-abort judge failure
+  // (rationale is report-only); on ABORT it re-throws — convert that into the SAME controlled terminal error the
+  // line-470 guard emits, so an abort landing DURING this overlapped await never escapes as a raw AbortError and
+  // never lets the run persist a late-complete row. Write the resolved value back so the object stays consistent.
+  let panelJudgment: Awaited<ReturnType<typeof runPanelJudge>>["judgment"] = panelResult?.judgment ?? null;
+  if (panelResult?.judgmentPromise) {
+    try { panelJudgment = await panelResult.judgmentPromise; }
+    catch (e) { if (signal?.aborted) throw new Error("agentic engine aborted after verdict (overall budget) — not persisting a late-complete row"); throw e; }
+  }
+  if (panelResult) panelResult.judgment = panelJudgment;
+  if (panelResult?.typedFindings.length && panelJudgment?.rationale && COMMITTAL_JUDGE_VERDICT.has(panelJudgment.verdict)) {
+    res.decision = { ...res.decision, reason: foldPanelReason(res.decision.reason, panelJudgment.rationale) };
   }
   const payload = buildV3Payload(res.decision, res.coverage, res.findings, generatedAt);
 

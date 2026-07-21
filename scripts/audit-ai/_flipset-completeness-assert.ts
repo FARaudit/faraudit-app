@@ -96,6 +96,36 @@ const ARMED_CERT_DRY_UNPROVEN_609: Record<string, string> = {
 };
 void ARMED_CERT_DRY_UNPROVEN_609;
 
+// ARMED, CERT-DRY, LIVE-PROOF-OWED (atomic-arming invariant #578-2) — the cert-3 fire bundle armed THIS turn (resume
+// steps 1–2). Cert-DRY + adversarial-clean; ONE paid run (cert-3, CEO front-door) proves both live. Documentation map
+// (void-guarded); an armed flag absent here = the #463 defect.
+const ARMED_CERT_DRY_UNPROVEN_CERT3: Record<string, string> = {
+  // #2 — cross-fleet deadline-dedup (Unit-6 #604–606 sibling of AUDIT_FINDING_DEDUP; date-anchored collapse of the
+  // no-clause paraphrase inflation). FIRES on the real dccce793 record (88→83); verdict-safe by construction (shared
+  // disposition-homogeneous core). Cert: _cert-unit6cf-DRY.ts + _cert-unit6cf-realrecord.ts + _rt-unit6cf-r1/r2/r3;
+  // gold-set 21/21 FALSE-BIDs=0 both flag states.
+  AUDIT_CROSS_FLEET_DEDUP: "#2 Unit-6 cross-fleet date-dedup — FIRES real-record 88→83; DRY + r1/r2/r3 clean; gold-set 21/21 both states; live-proof at cert-3",
+  // #3-(4e) — async judge-rationale. VERDICT-INERT: the chief judge is report-only (deriveVerdict owns the verdict via
+  // typedFindings); ON returns typedFindings without blocking on the ~20-40s judge. End-to-end $0 proof
+  // (panel-runner-async-cache.test.ts): OFF≡ON judgment + typedFindings; judge-fail preserves typedFindings; gold-set
+  // 21/21. The sound wall-clock lever of the #612-(3) arc.
+  AUDIT_PANEL_ASYNC_RATIONALE: "#3-(4e) async judge-rationale — verdict-inert; e2e OFF≡ON + robustness proof; gold-set 21/21; live-proof at cert-3",
+  // #3-(3) — producer stopwatch. PURE LOGGING ⇒ verdict/finding-inert in every state. Arms for the cert-3 fire so the
+  // run MEASURES per-lens wall-clock + per-segment token cost + cache-hit stats (the measurement the arc needs).
+  AUDIT_PANEL_TIMING: "#3-(3) producer stopwatch — pure logging, verdict-inert; arms cert-3 for live measurement",
+};
+void ARMED_CERT_DRY_UNPROVEN_CERT3;
+
+// EVALUATED + REJECTED, CODE DELETED (card #612-(3), CEO ruling 2026-07-21) — the ruling ordered PRODUCER_PREFIX_CACHE
+// built as a cost-saver; the $0 probe (_cache-cost-probe.ts) DISPROVED the premise (mixed tiers ⇒ only 3 sonnet lenses
+// shareable; each lens reads a SMALL assigned bundle, not full source; the 1.25× write on the large shared prefix
+// outweighs the 0.10× reads ⇒ ~+26% cost). Per the follow-up ruling the shared-prefix fork was DELETED; NO flag exists.
+// Recorded here so the atomic registry carries the decision (there is nothing to arm, and nothing to accidentally arm).
+const EVALUATED_REJECTED_CERT3: Record<string, string> = {
+  AUDIT_PRODUCER_PREFIX_CACHE: "#3-(3) shared-prefix cache — REJECTED at $0 (+26% cost) → code DELETED; evidence _cache-cost-probe.ts; no flag",
+};
+void EVALUATED_REJECTED_CERT3;
+
 // The proposed flip-set for the next run (the 22-flag package: 19 prior + DEADLINE_RECONCILE + the 2 batch fixes).
 const PROPOSED = (process.argv[2]?.split(",").map((s) => s.trim()).filter(Boolean)) ?? [
   "AUDIT_CLARIFICATION_ALLOWLIST", "AUDIT_AMBIGUOUS_SIGNAL_DEMOTION", "AUDIT_SITEVISIT_CONCLUDED_NOTICEWIDE",
