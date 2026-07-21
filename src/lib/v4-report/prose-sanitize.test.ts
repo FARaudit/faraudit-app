@@ -31,6 +31,16 @@ const assert = (c: boolean, m: string) => { console.log(`${c ? "✅" : "❌"} ${
   const raw = "FAR 52.219-14 Limitations on Subcontracting: the prime must self-perform at least 50% of the work.";
   assert(sanitizeProse(raw) === raw, "clean prose (hyphens, %, clause cites) is untouched");
 }
+
+// ── CRITICAL: legitimate underscores in load-bearing prose are NOT mangled (review 2026-07-21).
+// The old blanket snake_case regex broke KO emails, attachment filenames, and portal URLs. ──
+for (const raw of [
+  "Submit questions to contract_officer@navy.mil no later than the deadline.",
+  "Complete the wage_determination form and price_schedule.xlsx before award.",
+  "Portal: https://sam.gov/opp/some_notice_here/view",
+]) {
+  assert(sanitizeProse(raw) === raw, `legitimate underscore prose untouched: "${raw.slice(0, 42)}…"`);
+}
 {
   assert(sanitizeProse("") === "", "empty → empty");
   assert(sanitizeProse(null) === "", "null → empty");

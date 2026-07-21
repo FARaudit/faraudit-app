@@ -38,6 +38,22 @@ const hasStep = (steps: any[], label: RegExp) => steps.some((s) => label.test(s.
   assert(/\bL\b/.test(steps[0].detail), "LBJ: the flagged section (L) is named in the coverage step");
 }
 
+// ── committal verdict over a genuine PARTIAL read (read<total, no flagged section) ──
+// The coverage step must acknowledge the unread documents, not assert non-existent
+// "flagged sections" (review 2026-07-21) — and stay consistent with the tile copy.
+{
+  const steps = reasoningSteps(data({
+    verdict: { pole: "BID_WITH_CAUTION", noVerdict: false, eligible: null },
+    coverage: { state: "INCOMPLETE", read: 3, total: 7, missing: [] },
+    findings: { p1: [{ cite: "§C", req: "x", driver: false }] },
+  }));
+  const cov = steps[0].detail;
+  assert(/3 of 7 documents read/.test(cov), "partial read: names read/total");
+  assert(/unread/.test(cov), "partial read: acknowledges the unread documents");
+  assert(!/flagged section/i.test(cov), "partial read: does NOT assert non-existent flagged sections");
+  assert(!/the sequence stops here/i.test(cov) && !steps.some((s) => s.skip), "partial read on a committal verdict still narrates the full chain");
+}
+
 // ── genuine INCOMPLETE pole: terminal copy + skip MUST remain ──
 {
   const steps = reasoningSteps(data({

@@ -11,7 +11,15 @@ const F = (req: string, cite = "") => ({ req, cite });
 {
   const out = dedupeNearFindings([F("Provide a Quality Control Plan within 10 days after award", "§C"), F("Provide Quality Control Plan within 10 days after award", "§L")]);
   assert(out.length === 1, "trivial 'a'/spacing restatement → 1 row");
-  assert(out[0].cite === "§C", "keeps the first occurrence (and its cite)");
+  // dual-authority provenance is PRESERVED, not dropped (review 2026-07-21)
+  assert(out[0].cite === "§C · §L", "collapsed row merges both citations (protest-relevant dual-cite kept)");
+}
+// merging de-dupes identical cites and does not mutate the source finding
+{
+  const src = [F("Maintain an active SAM registration", "52.204-7"), F("Maintain active SAM registration", "52.204-7"), F("Maintain the active SAM registration", "§K rep 3")];
+  const out = dedupeNearFindings(src);
+  assert(out.length === 1 && out[0].cite === "52.204-7 · §K rep 3", "identical cite not duplicated; distinct cite appended");
+  assert(src[0].cite === "52.204-7", "source finding object not mutated by the cite-merge");
 }
 
 // distinct licensure gates survive (the dangerous over-collapse case)

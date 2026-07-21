@@ -48,9 +48,12 @@ export function sanitizeProse(v: unknown): string {
   if (!t) return t;
   // (1) eligibility-authority-allowlist adjudication note → concise customer phrasing.
   t = t.replace(/\s*[—-]?\s*\[cited clause is not a recognized[^\]]*\]/gi, " (advisory — not a recognized eligibility bar; confirm)");
-  // (2) bare snake_case gap keys → spaced words (set_aside_eligibility → set-aside eligibility;
-  //     size_standard → size standard). Customer prose never carries a legitimate snake_case token.
-  t = t.replace(/\b[a-z]+(?:_[a-z]+)+\b/g, (m) => m.replace(/_/g, " ").replace(/\bset aside\b/gi, "set-aside"));
+  // (2) the KNOWN eligibility-gap keys emitted by panel-findings-bridge (setAsideAttribute) —
+  //     the only underscore-bearing machine tokens that reach customer prose — humanised via an
+  //     EXPLICIT allowlist. A blanket snake_case regex would corrupt legitimate underscores in
+  //     KO emails (contract_officer@…), attachment filenames (wage_determination.pdf), and portal
+  //     URLs (…/opp/some_notice) that appear verbatim in submission-instruction prose.
+  t = t.replace(/\bset_aside_eligibility\b/gi, "set-aside eligibility").replace(/\bsize_standard\b/gi, "size standard");
   return t.replace(/[ \t]{2,}/g, " ").trim();
 }
 
@@ -153,13 +156,24 @@ function buildFindings(showStoppers: FindingLite[], all: FindingLite[]): V4Findi
 const normReqKey = (r: string): string =>
   s(r).toLowerCase().replace(/\b(?:a|an|the)\b/g, " ").replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
 export function dedupeNearFindings(list: V4Finding[]): V4Finding[] {
-  const seen = new Set<string>();
+  const byKey = new Map<string, V4Finding>();
   const out: V4Finding[] = [];
   for (const f of list) {
     const k = normReqKey(f.req);
-    if (k && seen.has(k)) continue;   // exact-normalized restatement → collapse (keep first, which keeps its cite)
-    if (k) seen.add(k);
-    out.push(f);
+    if (!k) { out.push(f); continue; }          // empty req is never a dedup key
+    const survivor = byKey.get(k);
+    if (survivor) {
+      // Same obligation restated. Keep the first row but PRESERVE the dropped row's citation —
+      // a restatement grounded in a second authority (clause + rep/cert, §C + §H) is protest-
+      // relevant dual-cite the report must still show. Merge distinct, non-empty cites with " · ".
+      const cites = survivor.cite.split(/\s*·\s*/).filter(Boolean);
+      const add = s(f.cite).trim();
+      if (add && !cites.some((c) => c.toLowerCase() === add.toLowerCase())) survivor.cite = [...cites, add].join(" · ");
+      continue;
+    }
+    const copy: V4Finding = { ...f };            // clone so the cite-merge never mutates the source finding
+    byKey.set(k, copy);
+    out.push(copy);
   }
   return out;
 }

@@ -190,6 +190,11 @@ body{margin:0; background:#0c1420; font-family:var(--sans);}
 .vd-bl .bl-k{font-family:var(--mono); font-size:11px; font-weight:600; letter-spacing:.15em; text-transform:uppercase;
   color:var(--accent-deep); margin-bottom:12px;}
 .vd-bl .bl-t{font-size:23px; line-height:1.5; color:var(--ink); font-weight:500; text-wrap:pretty;}
+/* Ranked top-5 self-clearable caveats, remainder grouped (card #612-(3c)). */
+.vd-bl .bl-caveats{list-style:none; margin:14px 0 0; padding:0;}
+.vd-bl .bl-caveats li{position:relative; padding-left:22px; margin-top:8px; font-size:17px; line-height:1.45; color:var(--ink-2, #3a4553); text-wrap:pretty;}
+.vd-bl .bl-caveats li::before{content:"›"; position:absolute; left:3px; color:var(--tone-c, #185FA5); font-weight:700;}
+.vd-bl .bl-more{margin:11px 0 0; font-size:15px; color:var(--ink-3, #6b7887); font-weight:600;}
 .vd-facts{border-top:1px solid var(--line); padding-top:26px; display:flex; flex-direction:row; gap:60px; flex-wrap:wrap;}
 .vd-f .vf-k{font-family:var(--mono); font-size:10.5px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-4);}
 .vd-f{flex:0 0 auto;}

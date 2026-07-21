@@ -272,8 +272,18 @@ export function reasoningSteps(d: V4Data): ReasoningStep[] {
     // shows COMPLETE; the read is NOT what halts the sequence, the next step is.
     coverageDetail = `${cov.read} of ${cov.total} documents read. The read is not what halts the sequence here — see the next step.`;
   } else {
-    // committal verdict reached over a section flagged for confirmation
-    coverageDetail = `${cov.read} of ${cov.total} documents read${miss.length ? `; ${miss.length === 1 ? "section" : "sections"} ${miss.join(" · ")} could not be fully confirmed from the posted set and ${miss.length === 1 ? "is" : "are"} flagged for your confirmation` : ""}. The decision below still rests on the record that was read — ${miss.length === 1 ? "that section is a caveat" : "any flagged sections are caveats"}, not a stop.`;
+    // committal verdict reached despite a coverage flag. Two INDEPENDENT dimensions can
+    // each stamp INCOMPLETE — unread documents (read < total) and/or a section left
+    // unconfirmed (cov.missing) — so narrate whichever actually applies rather than
+    // asserting "flagged sections" that may not exist (matches coverageSub's tile copy).
+    const partialRead = cov.read != null && cov.total != null && cov.read < cov.total;
+    const clauses: string[] = [`${cov.read} of ${cov.total} documents read`];
+    if (partialRead) clauses.push(`the ${cov.total - cov.read} unread contain no required section relied on for this call`);
+    if (miss.length) clauses.push(`${miss.length === 1 ? "section" : "sections"} ${miss.join(" · ")} could not be fully confirmed from the posted set and ${miss.length === 1 ? "is" : "are"} flagged for your confirmation`);
+    const caveatTail = (partialRead || miss.length)
+      ? ` The decision below still rests on the record that was read — ${miss.length ? (miss.length === 1 ? "that flagged section is a caveat" : "the flagged sections are caveats") : "the unread set is a caveat"}, not a stop.`
+      : " The decision below rests on the record that was read.";
+    coverageDetail = clauses.join("; ") + "." + caveatTail;
   }
   steps.push({
     tone: complete ? "go" : "slate", label: "Coverage read",

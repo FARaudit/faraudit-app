@@ -22,7 +22,21 @@
         vs the mock's "Eligibility · Not applicable" — doctrine §5 suppresses the
         eligibility chip on OUT_OF_SCOPE, so the advisory count is the honest tile.
    ============================================================================= */
-import { esc, eligInfo, TONE_LABEL, eyebrowFor, scorecardTiles, type EligInfo } from "@/lib/v5-report/core";
+import { esc, eligInfo, TONE_LABEL, eyebrowFor, scorecardTiles, splitCaveatRationale, type EligInfo } from "@/lib/v5-report/core";
+
+// Bottom line — lede + ranked top-5 self-clearable caveats, remainder grouped (card #612-(3c)).
+// SHARED logic (splitCaveatRationale) with the web + deck surfaces so the Executive Brief PDF
+// never dumps the ~50-item semicolon wall; only the wrapper HTML/classes differ per surface.
+function bottomLinePdf(rationale: unknown): string {
+  const { lede, caveats } = splitCaveatRationale(rationale);
+  const top = caveats.slice(0, 5);
+  const rest = caveats.length - top.length;
+  return `<div class="bl-t">${esc(lede)}</div>` +
+    (top.length
+      ? `<ul class="bl-caveats">${top.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` +
+        (rest > 0 ? `<div class="bl-more">+${rest} more self-clearable item${rest === 1 ? "" : "s"} — see Findings</div>` : "")
+      : "");
+}
 import { reasoningSteps, REACHED_INTRO, splitMethod } from "@/lib/v5-report/render";
 import { REPORT_PDF_CSS, REPORT_PDF_SEAL_CSS } from "@/lib/v5-report/styles-pdf";
 import { FONTS_CSS } from "@/lib/v5-report/fonts";
@@ -128,7 +142,7 @@ function cover(d: V4Data): string {
 
       <div class="gb-bl">
         <div class="bl-k">Bottom line</div>
-        <div class="bl-t">${esc(v.rationale || "")}</div>
+        ${bottomLinePdf(v.rationale)}
       </div>
 
       ${ids ? `<div class="gb-idgrid gb-dcgrid">${ids}</div>` : ""}
