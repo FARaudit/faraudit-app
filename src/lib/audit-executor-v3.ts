@@ -43,6 +43,7 @@ import { confirmResidualTokens } from "./ocr-accuracy-gate";
 import { makeVisionConfirmer, makeTableVisionConfirmer } from "./ocr-vision-confirm";
 import { detectRateTable, gateRateTable } from "./ocr-table-gate";
 import { clampToWord, reframeNoSetAsideFindings } from "./audit-decide";
+import { costPrescreen, sizeBoundaryRecord, SIZE_BOUNDARY_STATUS } from "./cost-prescreen";
 
 /** The agentic V3 engine is the SOLE engine. V1/V2 are DELETED (2026-06-28) — there is no
  *  fallback path in the code at all, and no env flag can switch engines. `executeAudit` calls
@@ -394,6 +395,68 @@ export async function executeAgenticPrimary(
   const constructionOOS = process.env.AUDIT_CONSTRUCTION_DECIDED === "true"
     && !!detectConstructionOutOfScope({ naicsCode: solicitation?.naicsCode ?? null, fullText: docs.map((d) => d.text).join("\n") });
   if (constructionOOS) console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: construction OUT_OF_SCOPE (design-build, no resolvable offer/submission structure) → honest-fail, no charge`);
+
+  // ── SIZE-AWARE FAIL-FAST COST PRE-SCREEN (Brain cards #613/#614/#615, flag AUDIT_COST_PRESCREEN default-OFF) ──
+  // Placement (card #615.2): ingest/buildDocs → manifest/completeness gate (above) → HERE → producer. Project the panel
+  // $ cost from the ASSEMBLED machine-readable char count (the same quantity the E133 anchor was calibrated on) via the
+  // canonical formula, and REFUSE before any lens fires when it exceeds the effective gate (gate = CAP × (1 − margin_n)).
+  // SIZE_BOUNDARY is a TERMINAL state, never a verdict (never BID/NO_BID/INELIGIBLE) and never a charge — the cost analog
+  // of the honest-fail guard (refuse before spend = refuse before fabrication). INCOMPLETE/OOS WINS if both would fire:
+  // the gate only arms on a would-be-COMPLETE package (`manifestComplete && !constructionOOS`), so a genuinely partial
+  // read still reads honest-INCOMPLETE and is never mislabeled "too big". Flag OFF ⇒ this block is a STRICT no-op ⇒
+  // byte-identical. BINDING ARM-GATE (code-review a951c50, verified): NO surface renders `status=size_boundary`
+  // yet — report route, status route, worker recommendation, sync-route response, refetch, and the watcher email
+  // all currently mistreat it (a flag-ON run falls through to the "INCOMPLETE — payload could not be loaded, re-run"
+  // shell, NOT the refusal copy). So arming AUDIT_COST_PRESCREEN has THREE binding preconditions (Brain card #616.2):
+  //   (a) cert-3 routing log reads `fallback: none` on 36C24426Q0675 (slope is intrinsic, not #525-bug-inflated);
+  //   (b) the SIZE_BOUNDARY render surface shipped + Design-stamped (moved PRE-arm because this in-code gate makes it
+  //       a precondition) — covers report/status/worker/sync-route/refetch/watcher;
+  //   (c) the Rule 61 arm card itself (atomic arm + flipset-assert registration).
+  // None is this pass. While OFF this block is provably inert (3 independent finders confirmed byte-identity); the
+  // risk is ONLY on arming.
+  if (process.env.AUDIT_COST_PRESCREEN === "true" && manifestComplete && !constructionOOS) {
+    const prescreen = costPrescreen(fullSource.length);
+    if (!prescreen.pass) {
+      const record = sizeBoundaryRecord(prescreen);
+      console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: SIZE_BOUNDARY — ${fullSource.length} machine-readable chars → projected $${prescreen.projectedUsd.toFixed(2)} > gate $${prescreen.gateUsd.toFixed(2)} (cap $${prescreen.capUsd.toFixed(2)}, margin ${prescreen.marginPct}%, ${prescreen.modelVersion}) → REFUSE before any lens fires (no charge)`);
+      if (signal?.aborted) throw new Error("agentic engine aborted at size pre-screen (overall budget) — not writing a late row");
+      const boundaryAt = new Date().toISOString();
+      const boundaryUpdate = {
+        status: SIZE_BOUNDARY_STATUS,
+        current_stage: SIZE_BOUNDARY_STATUS,
+        completed_at: boundaryAt,
+        compliance_score: null,
+        overview_summary: record.message,
+        compliance_summary: record.message,
+        bid_recommendation: record.message,
+        compliance_json: {
+          engine: "agentic_v3",
+          analysis_phase: SIZE_BOUNDARY_STATUS,
+          honest_fail: true,               // no committal verdict was produced → no-charge, like an honest-fail
+          documents_complete: manifestComplete,
+          generated_at: boundaryAt,
+          source_chars: fullSource.length,
+          doc_count: docs.length,
+          size_boundary: record,           // re-checkable refusal record (projected $ · cap · effective gate · model version)
+        },
+      };
+      let boundaryErr: string | null = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        const { error } = await supabase.from("audits").update(boundaryUpdate).eq("id", auditId);
+        if (!error) { boundaryErr = null; break; }
+        boundaryErr = error.message;
+        console.warn(`[AGENTIC-V3-PRIMARY] size-boundary persist attempt ${attempt}/3 failed for ${auditId}: ${error.message}`);
+        if (attempt < 3) await new Promise((r) => setTimeout(r, 600 * attempt));
+      }
+      if (boundaryErr) throw new Error(`agentic size-boundary persist failed after 3 attempts: ${boundaryErr}`);
+      // No producer/auditPackage spend occurred → no charge. Best-effort $0 ledger + no-charge quota mark (fail-safe:
+      // decrementAuditQuota + recordAuditCost never throw). usageCalls holds only any ingest-time OCR confirm cost.
+      await decrementAuditQuota(supabase, auditId, { billable: false, honestFail: true, verdict: SIZE_BOUNDARY_STATUS });
+      const { perModel, totals } = aggregate(usageCalls);
+      await recordAuditCost(supabase, auditId, { perModel, totals, source: "customer" });
+      return { recommendation: "SIZE_BOUNDARY", compliance_score: null, bid_recommendation: record.message };
+    }
+  }
   // Brain card 291 — grounding corpus = the pre-compression full text (all docs), so per-doc-decomposition findings
   // ground against source, not the digest. Only consumed when AUDIT_PERDOC_DECOMP is on; otherwise inert.
   const groundingSource = docs.map((d) => d.text).join("\n\n");

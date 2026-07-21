@@ -92,6 +92,12 @@ export function buildPanelInputs(fullSource: string): PanelInputs {
       : {};
   const sectionText = { ...base, ...ucfSectionText };
   const detectedSections = new Set(Object.keys(sectionText));
+  // ROUTING-INTEGRITY LOG (Brain card #614 addition-1, 2026-07-21) — PERMANENT, every commercial run. Whether
+  // routeCommercialSections SLICED or fell back to whole-source (#525) decides if the cost-model slope is
+  // intrinsic or bug-inflated (a lens reading the full source pays for content outside its ownership). Never
+  // inferable-only again; the AUDIT_COST_PRESCREEN arm-card gates on this line reading "fallback: none".
+  const _charsPerLens = Object.entries(sectionText).map(([k, v]) => `${k}:${(v ?? "").length}`).join(",");
+  console.log(`[routing] sections routed: [${Object.keys(sectionText).join(",")}] · chars/lens: [${_charsPerLens}] · fallback: ${routed.routed ? "none" : "WHOLE-SOURCE (#525 — each lens reads full source; cost-slope INFLATED)"}`);
   return {
     sectionText,
     detectedSections,
