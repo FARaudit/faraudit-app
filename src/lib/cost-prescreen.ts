@@ -123,17 +123,29 @@ export interface PackageCensus {
   imageBytes: number;            // bytes of the scanned/vision docs (diagnostic; subset of totalBytes)
 }
 
-/** Project the whole-pipeline wall-clock SECONDS for a package census. `claims` overrides the char-based estimate
- *  (used by the re-cert to reproduce the anchors exactly). Pure. */
-export function projectWallClockSeconds(census: PackageCensus, claimsOverride?: number): number {
+// ── #525 WHOLE-SOURCE ROUTING FALLBACK MULTIPLIER (Brain card #628-3, interim honesty patch) ──
+// While the #525 whole-source routing bug lives, the panel routing FALLS BACK to whole-source: each reading lens
+// reads the FULL assembled source instead of its assigned §-slice. So the panel's effective char load is
+// PANEL_LENS_FANOUT × chars, not chars. The clean-routing projection (fanout=1) UNDER-predicts a #525 run — proven
+// live by N0016726Q1089 (projected $0.80/208s clean, ACTUAL $3.25/328s under whole-source fallback). Until #525 is
+// fixed, the gate must project the WORST CASE (fanout=PANEL_LENS_FANOUT) so it stays HONEST — it never claims a
+// rosy footprint the engine can't deliver. Once #525 lands (routing = `fallback:none` guaranteed), fanout drops to
+// 1 and packages project on their real per-slice footprint. n=1 routing observation (5 reading lenses: [B,C,L,M,I]).
+export const PANEL_LENS_FANOUT = 5;
+
+/** Project the whole-pipeline wall-clock SECONDS for a package census. `opts.claimsOverride` overrides the
+ *  char-based claims estimate (re-cert reproduces anchors exactly). `opts.lensFanout` (default 1 = clean routing)
+ *  multiplies the PANEL char basis to model the #525 whole-source fallback (each lens reads the full source). Pure. */
+export function projectWallClockSeconds(census: PackageCensus, opts?: { claimsOverride?: number; lensFanout?: number }): number {
   const c = WALLCLOCK_COEF;
   const mb = Math.max(0, census.totalBytes) / 1_000_000;
-  const claims = claimsOverride ?? estimateVerifierClaims(census.machineReadableChars);
+  const claims = opts?.claimsOverride ?? estimateVerifierClaims(census.machineReadableChars);
+  const lensFanout = Math.max(1, opts?.lensFanout ?? 1);
   return (
     c.fetchPerMB * mb +
     c.ingestPerMB * mb + c.ingestPerDoc * census.docCount +
     c.ocrPerScannedDoc * census.scannedDocCount +
-    c.panelConst + c.panelPerChar * census.machineReadableChars +
+    c.panelConst + c.panelPerChar * (lensFanout * census.machineReadableChars) +   // #525: panel reads full source PER LENS
     c.verifierConst + c.verifierPerClaim * claims
   );
 }
@@ -146,24 +158,27 @@ export interface WallClockPrescreenResult {
   headroomPct: number;
   scannedDocCount: number;
   totalBytesMB: number;
+  lensFanout: number;            // 1 = clean routing · PANEL_LENS_FANOUT = #525 whole-source worst case
   modelVersion: string;
 }
 
 /** The WALL-CLOCK gate. Refuse ⇔ projected > budget × (1 − headroom). `budgetMs` should be the SAME budget the
- *  engine enforces (AGENTIC_V3_PRIMARY_BUDGET_MS or the caller's tighter override). Pure. */
+ *  engine enforces (AGENTIC_V3_PRIMARY_BUDGET_MS or the caller's tighter override). `lensFanout` (default 1)
+ *  models the #525 whole-source fallback (each lens reads the full source). Pure. */
 export function wallClockPrescreen(
   census: PackageCensus,
-  opts?: { budgetMs?: number; headroom?: number; claimsOverride?: number },
+  opts?: { budgetMs?: number; headroom?: number; claimsOverride?: number; lensFanout?: number },
 ): WallClockPrescreenResult {
   const budgetMs = opts?.budgetMs ?? (Number(process.env.AGENTIC_V3_PRIMARY_BUDGET_MS) || 360_000);
   const headroom = opts?.headroom ?? 0.20;   // the HARD pre-fire line (Brain #611): ≥20% headroom
   const budgetSeconds = budgetMs / 1000;
   const effectiveLimitSeconds = budgetSeconds * (1 - headroom);
-  const projectedSeconds = projectWallClockSeconds(census, opts?.claimsOverride);
+  const lensFanout = Math.max(1, opts?.lensFanout ?? 1);
+  const projectedSeconds = projectWallClockSeconds(census, { claimsOverride: opts?.claimsOverride, lensFanout });
   return {
     pass: projectedSeconds <= effectiveLimitSeconds,
     projectedSeconds, budgetSeconds, effectiveLimitSeconds, headroomPct: headroom * 100,
-    scannedDocCount: census.scannedDocCount, totalBytesMB: census.totalBytes / 1_000_000,
+    scannedDocCount: census.scannedDocCount, totalBytesMB: census.totalBytes / 1_000_000, lensFanout,
     modelVersion: WALLCLOCK_MODEL_VERSION,
   };
 }
@@ -217,19 +232,24 @@ export interface PipelinePrescreenResult {
   cost: CostPrescreenResult;
   wallClock: WallClockPrescreenResult;
   census: PackageCensus;
+  lensFanout: number;            // routing-fallback multiplier applied to BOTH gates (1 = clean, PANEL_LENS_FANOUT = #525)
 }
 
-/** THE COMBINED WHOLE-PIPELINE GATE (Build C). Refuse ⇔ EITHER the $ cost gate OR the wall-clock gate fails.
- *  36C fails ONLY the wall-clock gate (low $); E133 fails BOTH. Pure; caller applies AUDIT_COST_PRESCREEN + the
- *  would-be-COMPLETE precondition + SIZE_BOUNDARY persistence, exactly as the char-only gate. */
+/** THE COMBINED WHOLE-PIPELINE GATE (Build C + #628-3 fallback multiplier). Refuse ⇔ EITHER the $ cost gate OR the
+ *  wall-clock gate fails. `wholeSourceFallback` (DEFAULT TRUE — the honest posture while #525 lives): both gates
+ *  project the whole-source worst case (each of PANEL_LENS_FANOUT lenses reads the full source). Set false ONLY when
+ *  routing is guaranteed clean (`fallback:none`, i.e. after the #525 fix arms) → gates use the real per-slice
+ *  footprint. 36C fails ONLY wall-clock (low $); E133 fails BOTH. Pure; caller applies AUDIT_COST_PRESCREEN etc. */
 export function pipelinePrescreen(
   census: PackageCensus,
-  opts?: { n?: number; cap?: number; budgetMs?: number; headroom?: number; claimsOverride?: number },
+  opts?: { n?: number; cap?: number; budgetMs?: number; headroom?: number; claimsOverride?: number; wholeSourceFallback?: boolean },
 ): PipelinePrescreenResult {
-  const cost = costPrescreen(census.machineReadableChars, { n: opts?.n, cap: opts?.cap });
-  const wallClock = wallClockPrescreen(census, { budgetMs: opts?.budgetMs, headroom: opts?.headroom, claimsOverride: opts?.claimsOverride });
+  const lensFanout = (opts?.wholeSourceFallback ?? true) ? PANEL_LENS_FANOUT : 1;
+  // #525: under whole-source fallback each lens bills the full source, so the $ cost basis is fanout × chars too.
+  const cost = costPrescreen(lensFanout * census.machineReadableChars, { n: opts?.n, cap: opts?.cap });
+  const wallClock = wallClockPrescreen(census, { budgetMs: opts?.budgetMs, headroom: opts?.headroom, claimsOverride: opts?.claimsOverride, lensFanout });
   const refusedBy = !cost.pass ? "cost" : !wallClock.pass ? "wallclock" : null;
-  return { pass: cost.pass && wallClock.pass, refusedBy, cost, wallClock, census };
+  return { pass: cost.pass && wallClock.pass, refusedBy, cost, wallClock, census, lensFanout };
 }
 
 /** The customer-facing refusal record (SIZE_BOUNDARY terminal state — NOT a verdict; never BID/NO_BID/INELIGIBLE,
@@ -256,6 +276,7 @@ export function pipelineBoundaryRecord(r: PipelinePrescreenResult) {
     message: SIZE_BOUNDARY_MESSAGE,
     contact: "support@faraudit.com",
     refused_by: r.refusedBy,   // "cost" | "wallclock" — which term was binding
+    lens_fanout: r.lensFanout, // 1 = clean routing · PANEL_LENS_FANOUT = #525 whole-source worst case projected
     census: {
       doc_count: r.census.docCount,
       chars: r.census.machineReadableChars,

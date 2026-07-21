@@ -453,7 +453,10 @@ export async function executeAgenticPrimary(
       : censusPackage(docs.map((d) => ({ bytes: d.bytes.length, text: d.text })));
     // Gate against the SAME budget the engine enforces (watcher may pass a tighter one), ≥20% headroom (Brain #611).
     const effectiveBudgetMs = input.agenticBudgetMs ?? (Number(process.env.AGENTIC_V3_PRIMARY_BUDGET_MS) || 360_000);
-    const prescreen = pipelinePrescreen(census, { budgetMs: effectiveBudgetMs });
+    // #525 whole-source fallback (Brain #628-3): until the routing fix arms (AUDIT_ROUTING_CLEAN), the panel falls
+    // back to whole-source, so project the worst case (each lens reads the full source). Honest posture — the gate
+    // never claims a per-slice footprint the engine can't deliver while #525 lives.
+    const prescreen = pipelinePrescreen(census, { budgetMs: effectiveBudgetMs, wholeSourceFallback: !isEnvOn(process.env.AUDIT_ROUTING_CLEAN) });
     if (!prescreen.pass) {
       const record = pipelineBoundaryRecord(prescreen);
       console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: SIZE_BOUNDARY — refused_by=${prescreen.refusedBy} · census: ${census.docCount} docs / ${census.machineReadableChars} chars / ${census.scannedDocCount} scanned / ${(census.totalBytes / 1e6).toFixed(1)}MB → cost $${prescreen.cost.projectedUsd.toFixed(2)} vs gate $${prescreen.cost.gateUsd.toFixed(2)} · wall-clock ${prescreen.wallClock.projectedSeconds.toFixed(0)}s vs limit ${prescreen.wallClock.effectiveLimitSeconds.toFixed(0)}s (budget ${prescreen.wallClock.budgetSeconds}s, ≥${prescreen.wallClock.headroomPct}% headroom) → REFUSE before any lens fires (no charge)`);
