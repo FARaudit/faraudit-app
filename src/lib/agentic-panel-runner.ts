@@ -67,7 +67,23 @@ export interface PanelInstrumentation {
   outputTokens: number;
   cacheWrite: number;            // cache_creation_input_tokens (1.25×)
   cacheRead: number;             // cache_read_input_tokens (0.10×) — the shared-prefix HIT
+  costUsd: number;              // priced from the stage's model (card #612-(3)b cost gate)
 }
+// Per-1M-token USD pricing by model family (empirically reconciled to the E133 fire's $5.58 credit delta,
+// 2026-07-21). in / out / cacheWrite (1.25× in) / cacheRead (0.10× in). Card #612-(3)b — cost is now a
+// first-class pre-fire gate alongside wall-clock; the stopwatch must price every run so a large-package's spend
+// is VISIBLE (the E133 stall cost $5.58 = 2.2× the $2.50 gate, with the Opus verifier alone ~$2.60).
+const MODEL_PRICE_PER_MTOK: Record<string, { in: number; out: number; cw: number; cr: number }> = {
+  opus:   { in: 15, out: 75, cw: 18.75, cr: 1.5 },
+  sonnet: { in: 3,  out: 15, cw: 3.75,  cr: 0.3 },
+  haiku:  { in: 1,  out: 5,  cw: 1.25,  cr: 0.1 },
+};
+const _priceOf = (model: string) => model.includes("opus") ? MODEL_PRICE_PER_MTOK.opus : model.includes("haiku") ? MODEL_PRICE_PER_MTOK.haiku : MODEL_PRICE_PER_MTOK.sonnet;
+const _usageCostUsd = (u: StructuredUsage): number => {
+  const p = _priceOf(u.model || "");
+  return ((u.input_tokens || 0) * p.in + (u.output_tokens || 0) * p.out + (u.cache_write || 0) * p.cw + (u.cache_read || 0) * p.cr) / 1_000_000;
+};
+export const PANEL_COST_GATE_USD = Number(process.env.AUDIT_PANEL_COST_GATE_USD) || 2.5;  // CEO ruling 2026-07-21 — standing pre-fire cost ceiling
 const _panelStageOf = (label: string): string => {
   const l = label.replace(/\s*@\d+$/, "");                     // strip the retry "@<maxTokens>" suffix
   if (l.startsWith("panel:verifier")) return "verifier";
@@ -75,12 +91,12 @@ const _panelStageOf = (label: string): string => {
   if (l.startsWith("panel:")) return `lens:${l.slice("panel:".length).replace(/#\d+.*$/, "")}`;  // collapse chunk passes onto the lens
   return l || "unknown";
 };
-/** Fold the raw per-call usage into per-stage instrumentation rows (pure). */
+/** Fold the raw per-call usage into per-stage instrumentation rows (pure). Prices each row by its model. */
 export function summarizePanelUsage(usage: StructuredUsage[]): PanelInstrumentation[] {
   const byStage = new Map<string, PanelInstrumentation>();
   for (const u of usage) {
     const stage = _panelStageOf(u.label);
-    const row = byStage.get(stage) ?? { stage, calls: 0, wallMsSum: 0, wallMsMax: 0, inputTokens: 0, outputTokens: 0, cacheWrite: 0, cacheRead: 0 };
+    const row = byStage.get(stage) ?? { stage, calls: 0, wallMsSum: 0, wallMsMax: 0, inputTokens: 0, outputTokens: 0, cacheWrite: 0, cacheRead: 0, costUsd: 0 };
     row.calls += 1;
     row.wallMsSum += u.ms || 0;
     row.wallMsMax = Math.max(row.wallMsMax, u.ms || 0);
@@ -88,24 +104,26 @@ export function summarizePanelUsage(usage: StructuredUsage[]): PanelInstrumentat
     row.outputTokens += u.output_tokens || 0;
     row.cacheWrite += u.cache_write || 0;
     row.cacheRead += u.cache_read || 0;
+    row.costUsd += _usageCostUsd(u);
     byStage.set(stage, row);
   }
   return [...byStage.values()];
 }
-/** Render the stopwatch readout for the log (pure). `phaseAWallMs` = the MAX lens wall-clock (the parallel
- *  fan-out cost); the per-lens SUM is the cost the cache actually attacks. Cache-hit% = cache_read ÷ (fresh
- *  input + cache_write + cache_read) — the fraction of the lens prefix served from the shared cache. */
+/** Render the stopwatch readout for the log (pure). `producerWallMs` = end-to-end producer wall-clock. Reports
+ *  per-stage $ COST (card #612-(3)b) so the ≤$${PANEL_COST_GATE_USD} pre-fire gate is measured live, and flags
+ *  the run OVER-GATE when cost exceeds it. Cache-hit% = cache_read ÷ (fresh input + cache_write + cache_read). */
 export function formatPanelInstrumentation(rows: PanelInstrumentation[], producerWallMs: number): string {
   const lenses = rows.filter((r) => r.stage.startsWith("lens:"));
   const lensSum = lenses.reduce((a, r) => a + r.wallMsSum, 0);
   const lensMax = lenses.reduce((a, r) => Math.max(a, r.wallMsMax), 0);
-  const tot = rows.reduce((a, r) => ({ read: a.read + r.cacheRead, write: a.write + r.cacheWrite, input: a.input + r.inputTokens, out: a.out + r.outputTokens }), { read: 0, write: 0, input: 0, out: 0 });
+  const tot = rows.reduce((a, r) => ({ read: a.read + r.cacheRead, write: a.write + r.cacheWrite, input: a.input + r.inputTokens, out: a.out + r.outputTokens, cost: a.cost + r.costUsd }), { read: 0, write: 0, input: 0, out: 0, cost: 0 });
   const cacheable = tot.read + tot.write + tot.input;
   const hitPct = cacheable > 0 ? Math.round((tot.read / cacheable) * 100) : 0;
-  const line = (r: PanelInstrumentation) => `    ${r.stage.padEnd(34)} calls=${r.calls} wall(max/Σ)=${(r.wallMsMax / 1000).toFixed(1)}/${(r.wallMsSum / 1000).toFixed(1)}s in=${r.inputTokens} out=${r.outputTokens} cacheR=${r.cacheRead} cacheW=${r.cacheWrite}`;
+  const overGate = tot.cost > PANEL_COST_GATE_USD;
+  const line = (r: PanelInstrumentation) => `    ${r.stage.padEnd(34)} calls=${r.calls} wall(max/Σ)=${(r.wallMsMax / 1000).toFixed(1)}/${(r.wallMsSum / 1000).toFixed(1)}s $${r.costUsd.toFixed(3)} in=${r.inputTokens} out=${r.outputTokens} cacheR=${r.cacheRead} cacheW=${r.cacheWrite}`;
   return [
-    `[panel-timing] producer wall=${(producerWallMs / 1000).toFixed(1)}s · Phase-A lenses parallel-max=${(lensMax / 1000).toFixed(1)}s (serial-Σ=${(lensSum / 1000).toFixed(1)}s) · cache-hit=${hitPct}% (read ${tot.read} / cacheable ${cacheable} tok) · out=${tot.out} tok`,
-    ...rows.map(line),
+    `[panel-timing] producer wall=${(producerWallMs / 1000).toFixed(1)}s · $${tot.cost.toFixed(2)} ${overGate ? `⚠ OVER $${PANEL_COST_GATE_USD} GATE` : `(≤$${PANEL_COST_GATE_USD} ✓)`} · Phase-A parallel-max=${(lensMax / 1000).toFixed(1)}s (serial-Σ=${(lensSum / 1000).toFixed(1)}s) · cache-hit=${hitPct}% · out=${tot.out} tok`,
+    ...rows.sort((a, b) => b.costUsd - a.costUsd).map(line),
   ].join("\n");
 }
 

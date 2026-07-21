@@ -103,7 +103,8 @@ const run = () => runPanelJudge({
   assert(verifierRow?.calls === 2, "summarize: both verifier batch calls fold into ONE verifier stage");
   assert(rows.some((r) => r.stage === "gatekeeper"), "summarize: retry '@12000' suffix stripped ⇒ gatekeeper stage");
   const rendered = formatPanelInstrumentation(rows, 22000);
-  assert(rendered.includes("cache-hit=") && rendered.includes("Phase-A lenses parallel-max="), "format: renders cache-hit% + parallel-max wall-clock");
+  assert(rendered.includes("cache-hit=") && rendered.includes("Phase-A parallel-max="), "format: renders cache-hit% + parallel-max wall-clock");
+  assert(/\$\d/.test(rendered) && rows.every((r) => typeof r.costUsd === "number"), "format: renders per-stage $ cost (card #612-(3)b cost gate)");
 
   globalThis.fetch = realFetch;
   console.log(`\n${failures === 0 ? "✅ ALL GREEN" : `❌ ${failures} FAILURE(S)`}`);
