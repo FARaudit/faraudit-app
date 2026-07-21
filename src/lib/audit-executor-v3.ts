@@ -43,7 +43,7 @@ import { confirmResidualTokens } from "./ocr-accuracy-gate";
 import { makeVisionConfirmer, makeTableVisionConfirmer } from "./ocr-vision-confirm";
 import { detectRateTable, gateRateTable } from "./ocr-table-gate";
 import { clampToWord, reframeNoSetAsideFindings } from "./audit-decide";
-import { costPrescreen, sizeBoundaryRecord, SIZE_BOUNDARY_STATUS } from "./cost-prescreen";
+import { pipelinePrescreen, pipelineBoundaryRecord, censusPackage, SIZE_BOUNDARY_STATUS } from "./cost-prescreen";
 
 /** The agentic V3 engine is the SOLE engine. V1/V2 are DELETED (2026-06-28) — there is no
  *  fallback path in the code at all, and no env flag can switch engines. `executeAudit` calls
@@ -428,10 +428,27 @@ export async function executeAgenticPrimary(
   // None is this pass. While OFF this block is provably inert (3 independent finders confirmed byte-identity); the
   // risk is ONLY on arming.
   if (process.env.AUDIT_COST_PRESCREEN === "true" && manifestComplete && !constructionOOS) {
-    const prescreen = costPrescreen(fullSource.length);
+    // WHOLE-PIPELINE census (Build C, card #624-2). Scanned classification uses the AUTHORITATIVE ingest signal
+    // (`has_text` = word-shape AND full-page-text AND not-OCR-suspect) — NOT a re-classify of docs[].text, which is
+    // already OCR-recovered and would under-count scanned docs (defeating fail-safe). chars = the assembled text the
+    // panel actually reads; bytes/scanned/docCount = the ingested set whose fetch+ingest+OCR cost was already
+    // incurred pre-panel. Fallback (null ingestion = genuine single-doc upload): classify from docs bytes/word-shape.
+    const ingestedFiles = input.ingestion?.files.filter((f) => f.ingested) ?? [];
+    const census = ingestedFiles.length > 0
+      ? {
+          docCount: docs.length,
+          machineReadableChars: fullSource.length,
+          scannedDocCount: ingestedFiles.filter((f) => f.has_text !== true).length,
+          totalBytes: ingestedFiles.reduce((a, f) => a + (f.bytes ?? 0), 0),
+          imageBytes: ingestedFiles.filter((f) => f.has_text !== true).reduce((a, f) => a + (f.bytes ?? 0), 0),
+        }
+      : censusPackage(docs.map((d) => ({ bytes: d.bytes.length, text: d.text })));
+    // Gate against the SAME budget the engine enforces (watcher may pass a tighter one), ≥20% headroom (Brain #611).
+    const effectiveBudgetMs = input.agenticBudgetMs ?? (Number(process.env.AGENTIC_V3_PRIMARY_BUDGET_MS) || 360_000);
+    const prescreen = pipelinePrescreen(census, { budgetMs: effectiveBudgetMs });
     if (!prescreen.pass) {
-      const record = sizeBoundaryRecord(prescreen);
-      console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: SIZE_BOUNDARY — ${fullSource.length} machine-readable chars → projected $${prescreen.projectedUsd.toFixed(2)} > gate $${prescreen.gateUsd.toFixed(2)} (cap $${prescreen.capUsd.toFixed(2)}, margin ${prescreen.marginPct}%, ${prescreen.modelVersion}) → REFUSE before any lens fires (no charge)`);
+      const record = pipelineBoundaryRecord(prescreen);
+      console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: SIZE_BOUNDARY — refused_by=${prescreen.refusedBy} · census: ${census.docCount} docs / ${census.machineReadableChars} chars / ${census.scannedDocCount} scanned / ${(census.totalBytes / 1e6).toFixed(1)}MB → cost $${prescreen.cost.projectedUsd.toFixed(2)} vs gate $${prescreen.cost.gateUsd.toFixed(2)} · wall-clock ${prescreen.wallClock.projectedSeconds.toFixed(0)}s vs limit ${prescreen.wallClock.effectiveLimitSeconds.toFixed(0)}s (budget ${prescreen.wallClock.budgetSeconds}s, ≥${prescreen.wallClock.headroomPct}% headroom) → REFUSE before any lens fires (no charge)`);
       if (signal?.aborted) throw new Error("agentic engine aborted at size pre-screen (overall budget) — not writing a late row");
       const boundaryAt = new Date().toISOString();
       const boundaryUpdate = {
