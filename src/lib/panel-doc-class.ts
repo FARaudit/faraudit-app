@@ -86,8 +86,9 @@ const COMMERCIAL_ANCHORS_V2: Array<{ key: string; re: RegExp }> = [
   // §M: award-DECISION / LPTA-full-phrase language only — NOT bare "technically acceptable" (fires inside a PWS spec).
   { key: "M", re: /evaluation (?:criteria|factors?)|basis (?:for|of) award|section m\b|lowest[- ]priced?[, ]+technically acceptable|award (?:will|shall) be made/i },
   { key: "C", re: /statement of work|performance work statement|scope of work|description\/specifications|section c\b/i },
-  // §B: contract-line-item / CLIN language only — NOT bare "line item" (fires inside a drawing/spec paragraph).
-  { key: "B", re: /schedule of (?:items|supplies|prices)|supplies\/services|price schedule|section b\b|supplies or services and prices|contract line items?|\bclin\b/i },
+  // §B: HEADER-LIKE "Contract Line Item … Number/Schedule" phrase ONLY — NOT bare "CLIN" or "line item", which recur
+  //     mid-content (a PWS/spec referencing "CLIN 0001") and would fragment §C, per this file's anchor doctrine (L67).
+  { key: "B", re: /schedule of (?:items|supplies|prices)|supplies\/services|price schedule|section b\b|supplies or services and prices|contract line items?\s+(?:number|schedule)/i },
   { key: "I", re: /contract clauses|clauses incorporated (?:by reference)?|section i\b/i },
 ];
 
