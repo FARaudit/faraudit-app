@@ -22,8 +22,21 @@
    PRINT HOST: slides render in the mock's own `.scrollmode` (light DOM); @page +
    1-slide/page pagination live in REPORT_DECK_CSS. No presenter/editor runtime.
    ============================================================================= */
-import { esc, eligInfo, TONE_LABEL, eyebrowFor, scorecardTiles, type EligInfo } from "@/lib/v5-report/core";
+import { esc, eligInfo, TONE_LABEL, eyebrowFor, scorecardTiles, splitCaveatRationale, type EligInfo } from "@/lib/v5-report/core";
 import { reasoningSteps, REACHED_INTRO, splitMethod } from "@/lib/v5-report/render";
+
+// Bottom line — lede + ranked top-5 self-clearable caveats, remainder grouped (card #612-(3c)).
+// SHARED logic with the web + Executive Brief surfaces so the Gate Deck never dumps the wall.
+function bottomLineDeck(rationale: unknown): string {
+  const { lede, caveats } = splitCaveatRationale(rationale);
+  const top = caveats.slice(0, 5);
+  const rest = caveats.length - top.length;
+  return `<div class="bl-t">${esc(lede)}</div>` +
+    (top.length
+      ? `<ul class="bl-caveats">${top.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` +
+        (rest > 0 ? `<div class="bl-more">+${rest} more self-clearable item${rest === 1 ? "" : "s"} — see Findings</div>` : "")
+      : "");
+}
 import { REPORT_DECK_CSS, REPORT_DECK_SEAL_CSS } from "@/lib/v5-report/styles-deck";
 import { FONTS_CSS } from "@/lib/v5-report/fonts";
 import { buildV4Data } from "@/lib/v4-report/build-data";
@@ -164,7 +177,7 @@ function decisionSlide(d: V4Data): Slide {
           <div class="vd-vrow"><span class="vd-ico">${ICON[tone] || ICON.slate}</span><span class="vd-word">${esc(v.band)}</span></div>
           <div class="vd-chips">${chips.join("")}</div>
         </div>`}
-        <div class="vd-bl"><div class="bl-k">Bottom line</div><div class="bl-t">${esc(v.rationale || "")}</div></div>
+        <div class="vd-bl"><div class="bl-k">Bottom line</div>${bottomLineDeck(v.rationale)}</div>
         ${gateHTML ? `<div class="vd-facts">${gateHTML}</div>` : ""}
       </div>`,
   };

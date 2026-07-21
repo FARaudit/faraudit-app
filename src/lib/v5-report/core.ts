@@ -63,10 +63,89 @@ export function scorecardTiles(d: V4Data): ScorecardTile[] {
     // Coverage = read / total (never a bare %). Gate-2 ruling (Design, 2026-07-07): a
     // percentage is score-adjacent on a score-free artifact, and it contradicted the deck
     // cover console + provenance panel, which already speak "X / Y". read/total unifies all.
-    { k: "Coverage", v: (cov.read == null || cov.total == null) ? "—" : cov.read + " / " + cov.total, tone: cov.state === "COMPLETE" ? "go" : "slate", sub: "documents · " + cov.state.toLowerCase(), textv: false },
+    // Coverage sub is a one-line EXPLANATION, not a bare "· incomplete" (card #612-(3e)):
+    // "5 / 5 · incomplete" reads as a contradiction. Resolve WHY in one line — a partial read,
+    // or a full read with a section still to confirm (LBJ 653570ea: all 5 read, §L flagged).
+    { k: "Coverage", v: (cov.read == null || cov.total == null) ? "—" : cov.read + " / " + cov.total, tone: cov.state === "COMPLETE" ? "go" : "slate", sub: coverageSub(cov), textv: false },
     elig
-      ? { k: "Eligibility", v: elig.label, tone: elig.cls === "ok" ? "go" : elig.cls === "no" ? "stop" : "slate", sub: "set-aside / status", textv: true }
+      // Eligibility sub explains the tri-state chip instead of the static "set-aside / status":
+      // "Not determined" alone leaves the reader guessing whether it is a problem (card #612-(3e)).
+      ? { k: "Eligibility", v: elig.label, tone: elig.cls === "ok" ? "go" : elig.cls === "no" ? "stop" : "slate", sub: elig.cls === "ok" ? "eligible on the facts read" : elig.cls === "no" ? "a verified bar applies" : "confirm before you rely on it", textv: true }
       : { k: "Advisories", v: String(p2), tone: "slate", sub: "clause flow-downs", textv: false },
   ];
   return tiles;
+}
+
+// One-line coverage explanation for the scorecard tile (card #612-(3e)). Distinguishes a
+// genuine PARTIAL read (read < total) from a full read that left a section unconfirmed
+// (read == total but coverage.missing non-empty — the LBJ §L case) so "incomplete" never
+// looks like it contradicts a "5 / 5" count.
+function coverageSub(cov: V4Data["coverage"]): string {
+  if (cov.state === "COMPLETE") return "documents · complete";
+  const miss = (cov.missing || []).filter(Boolean);
+  if (cov.read != null && cov.total != null && cov.read < cov.total) return "partial read · confirm the unread set";
+  if (miss.length) return `all read · ${miss.length} section${miss.length === 1 ? "" : "s"} to confirm`;
+  return "read · completeness not certified";
+}
+
+// Split a self-clearable-package rationale into a LEDE + the enumerated caveat list
+// (card #612-(3c)). The engine inlines the entire self-clearable list after a "confirm
+// each before bidding:" intro — a ~50-item semicolon wall dumped verbatim into the bottom
+// line, redundant with the Findings section. This lets the renderer show the lede + a
+// ranked top-N (engine order = rank), with the remainder grouped ("+N more in Findings").
+// A normal single-sentence rationale (no list intro, or a trivial tail) returns unchanged
+// with an empty caveat list, so non-package poles are byte-identical.
+const CAVEAT_INTRO_RE = /(\bconfirm each before bidding:\s*)([\s\S]+)$/i;
+// A self-clearable item ALWAYS opens with a capital letter, a digit (clause number), or a
+// bracket. A fragment opening lowercase is a mid-clause CONTINUATION — the engine's semicolon
+// list carries clause-internal "; " (52.219-14 "…self-perform at least 50% of the work; it
+// will not pay…"), and splitting on "; " would orphan the "it will not pay…" half onto its own
+// bullet (Design flag, PR #266). Re-join continuations so every bullet is a whole clause.
+const CAVEAT_CONTINUATION_RE = /^[a-z]/;
+const CAVEAT_STOP = new Set(["a", "an", "the", "of", "for", "to", "with", "under", "and", "or", "in", "on", "at", "this", "that", "must", "be", "is", "are", "as", "by"]);
+
+// Signature for near-dup collapse = sorted CONTENT tokens of the LEADING clause (up to the first
+// . ; :). Two items whose leading clause carries the same substance modulo word-order/filler
+// (the reworded set-aside pair "…with a $34 million size standard" vs "…, size standard $34
+// million") collide and fold — so a restatement never spends a premium top-5 slot. Short leads
+// (<4 content tokens) return "" so distinct terse items are never over-collapsed.
+function caveatSignature(s: string): string {
+  const lead = (s.split(/[.;:]/)[0] || s).toLowerCase();
+  const toks = lead.replace(/[^a-z0-9]+/g, " ").split(/\s+/).filter((w) => w && !CAVEAT_STOP.has(w));
+  return toks.length < 4 ? "" : toks.sort().join(" ");
+}
+
+// Belt: a truncated tail must never render "(" without a matching ")".
+function balanceParens(s: string): string {
+  const opens = (s.match(/\(/g) || []).length, closes = (s.match(/\)/g) || []).length;
+  return opens > closes ? s + ")".repeat(opens - closes) : s;
+}
+
+export function splitCaveatRationale(rationale: unknown): { lede: string; caveats: string[] } {
+  const t = esc(rationale) === "" ? "" : String(rationale ?? "");
+  const m = t.match(CAVEAT_INTRO_RE);
+  if (!m) return { lede: t, caveats: [] };
+  const lede = t.slice(0, m.index! + m[1].length).trim();
+  // (1) split on the item separator, RE-JOINING continuation fragments so a clause with an
+  //     internal semicolon stays ONE whole bullet (never a lowercase-leading orphan).
+  const merged: string[] = [];
+  for (const raw of m[2].split(/\s*;\s*/)) {
+    const piece = raw.trim();
+    if (!piece) continue;
+    if (merged.length && CAVEAT_CONTINUATION_RE.test(piece)) merged[merged.length - 1] += "; " + piece;
+    else merged.push(piece);
+  }
+  // (2) de-dup on exact-normalized OR leading-clause signature (first-seen order = rank), then
+  //     (3) balance any dangling paren. Both defects live in the CEO-read top slots (Design flag).
+  const seen = new Set<string>();
+  const caveats: string[] = [];
+  for (const piece of merged) {
+    const k1 = piece.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const k2 = caveatSignature(piece);
+    if (seen.has(k1) || (k2 && seen.has(k2))) continue;
+    seen.add(k1); if (k2) seen.add(k2);
+    caveats.push(balanceParens(piece));
+  }
+  if (caveats.length < 2) return { lede: t, caveats: [] }; // not a real list → leave the sentence whole
+  return { lede, caveats };
 }

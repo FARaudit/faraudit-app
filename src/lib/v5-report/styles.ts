@@ -158,6 +158,13 @@ body{background:var(--desk); color:var(--ink); font-family:var(--font);
 .cmd-bl{border-left:3px solid var(--tone-c); padding:2px 0 2px 16px; margin-bottom:20px;}
 .cmd-bl-k{display:block; font-size:11px; text-transform:uppercase; letter-spacing:.12em; color:var(--ink-3); font-weight:600; margin-bottom:5px;}
 .cmd-bl-t{margin:0; font-size:16px; line-height:1.55; color:var(--ink); text-wrap:pretty; max-width:74ch;}
+/* Self-clearable caveat list — top-N ranked, remainder grouped (card #612-(3c)). Replaces
+   the ~50-item semicolon wall the rationale used to dump into the bottom line. */
+.cmd-bl-caveats{list-style:none; margin:11px 0 0; padding:0; display:grid; gap:6px;}
+.cmd-bl-caveats li{position:relative; padding-left:17px; font-size:13.5px; line-height:1.5; color:var(--ink-2, #3a4553); text-wrap:pretty; max-width:74ch;}
+.cmd-bl-caveats li::before{content:"›"; position:absolute; left:3px; top:-1px; color:var(--tone-c); font-weight:700;}
+.cmd-bl-more{margin:9px 0 0; font-size:12px; color:var(--ink-3); font-weight:600;}
+.cmd-bl-more a{color:inherit; text-decoration:none; border-bottom:1px solid var(--line, #d7dee6);}
 
 .cmd-drivers{}
 .cmd-drv-h{font-size:11px; text-transform:uppercase; letter-spacing:.11em; color:var(--ink-3); font-weight:600; margin-bottom:9px;}

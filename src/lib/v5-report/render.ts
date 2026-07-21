@@ -18,7 +18,7 @@
    Every interpolated field routes through esc() (stored-XSS safe).
    ============================================================================= */
 import type { V4Data, V4Verdict, V4Findings, V4Finding, V4Date, V4Temporal, V4SubmissionL, V4EvalM, V4Clins, V4Provenance, Tone } from "@/lib/v4-report/render";
-import { esc, TONE_LABEL, SEVLAB, eligInfo, eyebrowFor, plur, cap, scorecardTiles, type EligInfo } from "./core";
+import { esc, TONE_LABEL, SEVLAB, eligInfo, eyebrowFor, plur, cap, scorecardTiles, splitCaveatRationale, type EligInfo } from "./core";
 
 // AUDIT_V5_SEAL — "Decision Seal" masthead redesign (flag-gated; default-OFF = byte-identical).
 const V5_SEAL = process.env.AUDIT_V5_SEAL === "true";
@@ -131,6 +131,20 @@ function commandHeader(d: V4Data): string {
   const tilesHTML = scorecardTiles(d).map((t) =>
     `<div class="cmd-tile${t.textv ? " is-textv" : ""}" data-tone="${t.tone}"><div class="ct-v">${esc(t.v)}</div><div class="ct-k">${esc(t.k)}</div><div class="ct-sub">${esc(t.sub)}</div></div>`).join("");
 
+  // Bottom line — lede + ranked top-5 self-clearable caveats, remainder grouped (card #612-(3c)).
+  // Replaces the ~50-item semicolon wall the rationale dumped inline (redundant with Findings).
+  // A non-package rationale returns caveats=[] → the lede IS the whole sentence (byte-identical).
+  const CAVEAT_TOP_N = 5;
+  const { lede: blLede, caveats: blCaveats } = splitCaveatRationale(v.rationale);
+  const blTop = blCaveats.slice(0, CAVEAT_TOP_N);
+  const blRest = blCaveats.length - blTop.length;
+  const bottomLineBody =
+    `<p class="cmd-bl-t">${esc(blLede)}</p>` +
+    (blTop.length
+      ? `<ul class="cmd-bl-caveats">${blTop.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` +
+        (blRest > 0 ? `<p class="cmd-bl-more">+${blRest} more self-clearable item${blRest === 1 ? "" : "s"} — <a href="#findings">see Findings below</a></p>` : "")
+      : "");
+
   if (V5_SEAL) {
     // Record band — Agency (two-tier) · Offers due (two-tier) · Set-aside · NAICS.
     const agencyFact = facts.find((ft) => /agency/i.test(ft.k));
@@ -170,7 +184,7 @@ function commandHeader(d: V4Data): string {
           <div class="gv2-word">${esc(v.band)}</div>
           <div class="cmd-bl">
             <span class="cmd-bl-k">Bottom line</span>
-            <p class="cmd-bl-t">${esc(v.rationale)}</p>
+            ${bottomLineBody}
           </div>
         </div>
       </div>
@@ -202,7 +216,7 @@ function commandHeader(d: V4Data): string {
         <div class="cmd-detail">
           <div class="cmd-bl">
             <span class="cmd-bl-k">Bottom line</span>
-            <p class="cmd-bl-t">${esc(v.rationale)}</p>
+            ${bottomLineBody}
           </div>
           ${driverHTML}
         </div>
@@ -238,15 +252,45 @@ export function reasoningSteps(d: V4Data): ReasoningStep[] {
   });
   const coreOk = (cov.core || []).filter((c) => c.ok).map((c) => c.k);
 
-  // 01 — COVERAGE
+  // 01 — COVERAGE. The "partial read → sequence stops, no verdict issued" copy is
+  // TERMINAL and belongs ONLY to the genuine INCOMPLETE pole. A committal verdict
+  // reached over a flagged section (a sound verifier still produced BID / BID-WITH-
+  // CAUTION while §L was flagged for confirmation — LBJ 653570ea) must narrate the
+  // FULL chain: the coverage step is honest-but-non-terminal and the sequence
+  // continues to blocking → drivers → eligibility → verdict. Keying the terminal
+  // branch on cov.state alone told the reader "no verdict is issued" and then
+  // printed the BID-WITH-CAUTION verdict two steps later (card #612-(3a)).
+  const coverageWithheld = !complete && v.pole === "INCOMPLETE"; // genuine INCOMPLETE — terminal at coverage
+  const miss = cov.missing || [];
+  let coverageDetail: string;
+  if (complete) {
+    coverageDetail = `${cov.read} of ${cov.total} documents read in full${coreOk.length ? `; core sections present (${coreOk.join(" · ")})` : ""}. ${cov.read < cov.total ? "The unread documents contain no required section, so the read is sufficient for the decision to rest on it." : "No documents were left unread — the decision rests on the complete record."}`;
+  } else if (coverageWithheld) {
+    coverageDetail = `${cov.read} of ${cov.total} documents could be read. A partial read cannot certify what it did not see — the sequence stops here and no verdict is issued.`;
+  } else if (v.noVerdict) {
+    // NHR / OOS — coverage is stamped incomplete only because a no-verdict pole never
+    // shows COMPLETE; the read is NOT what halts the sequence, the next step is.
+    coverageDetail = `${cov.read} of ${cov.total} documents read. The read is not what halts the sequence here — see the next step.`;
+  } else {
+    // committal verdict reached despite a coverage flag. Two INDEPENDENT dimensions can
+    // each stamp INCOMPLETE — unread documents (read < total) and/or a section left
+    // unconfirmed (cov.missing) — so narrate whichever actually applies rather than
+    // asserting "flagged sections" that may not exist (matches coverageSub's tile copy).
+    const partialRead = cov.read != null && cov.total != null && cov.read < cov.total;
+    const clauses: string[] = [`${cov.read} of ${cov.total} documents read`];
+    if (partialRead) clauses.push(`the ${cov.total - cov.read} unread contain no required section relied on for this call`);
+    if (miss.length) clauses.push(`${miss.length === 1 ? "section" : "sections"} ${miss.join(" · ")} could not be fully confirmed from the posted set and ${miss.length === 1 ? "is" : "are"} flagged for your confirmation`);
+    const caveatTail = (partialRead || miss.length)
+      ? ` The decision below still rests on the record that was read — ${miss.length ? (miss.length === 1 ? "that flagged section is a caveat" : "the flagged sections are caveats") : "the unread set is a caveat"}, not a stop.`
+      : " The decision below rests on the record that was read.";
+    coverageDetail = clauses.join("; ") + "." + caveatTail;
+  }
   steps.push({
     tone: complete ? "go" : "slate", label: "Coverage read",
     outcome: complete ? "Sufficient" : "Incomplete",
-    detail: complete
-      ? `${cov.read} of ${cov.total} documents read in full${coreOk.length ? `; core sections present (${coreOk.join(" · ")})` : ""}. ${cov.read < cov.total ? "The unread documents contain no required section, so the read is sufficient for the decision to rest on it." : "No documents were left unread — the decision rests on the complete record."}`
-      : `${cov.read} of ${cov.total} documents could be read. A partial read cannot certify what it did not see — the sequence stops here and no verdict is issued.`,
+    detail: coverageDetail,
   });
-  if (!complete) { // INCOMPLETE — terminal at coverage
+  if (coverageWithheld) {
     steps.push(skip("Remaining checks", "Blocking conditions, findings and eligibility need a complete read; they were not run."));
     steps.push(verdictStep());
     return steps;

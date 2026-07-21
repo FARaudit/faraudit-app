@@ -145,6 +145,11 @@ b,strong{font-weight:700;}
 .gb-bl .bl-k{font-family:var(--mono); font-size:7.6pt; font-weight:600; letter-spacing:.14em;
   text-transform:uppercase; color:var(--accent-deep); margin-bottom:8px;}
 .gb-bl .bl-t{font-size:13pt; line-height:1.5; color:var(--ink); text-wrap:pretty; max-width:64ch; font-weight:500;}
+/* Ranked top-5 self-clearable caveats, remainder grouped (card #612-(3c)). */
+.gb-bl .bl-caveats{list-style:none; margin:9px 0 0; padding:0;}
+.gb-bl .bl-caveats li{position:relative; padding-left:15px; margin-top:5px; font-size:10.5pt; line-height:1.45; color:var(--ink-2, #3a4553); text-wrap:pretty; max-width:64ch;}
+.gb-bl .bl-caveats li::before{content:"›"; position:absolute; left:2px; color:var(--tone-c, #185FA5); font-weight:700;}
+.gb-bl .bl-more{margin:7px 0 0; font-size:9.5pt; color:var(--ink-3, #6b7887); font-weight:600;}
 
 /* identity grid */
 .gb-idgrid{margin-top:24px; display:grid; grid-template-columns:1fr 1fr; gap:0 34px; border-top:.75px solid var(--rule);}
