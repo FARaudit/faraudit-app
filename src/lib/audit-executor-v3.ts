@@ -404,8 +404,12 @@ export async function executeAgenticPrimary(
   // of the honest-fail guard (refuse before spend = refuse before fabrication). INCOMPLETE/OOS WINS if both would fire:
   // the gate only arms on a would-be-COMPLETE package (`manifestComplete && !constructionOOS`), so a genuinely partial
   // read still reads honest-INCOMPLETE and is never mislabeled "too big". Flag OFF ⇒ this block is a STRICT no-op ⇒
-  // byte-identical. The report-page / worker rendering of `size_boundary` is a DEFERRED Design seam (card #615.5) —
-  // arming is gated on that page + the cert-3 routing-integrity proof (fallback: none), neither of which is this pass.
+  // byte-identical. BINDING ARM-GATE (code-review a951c50, verified): NO surface renders `status=size_boundary`
+  // yet — report route, status route, worker recommendation, sync-route response, refetch, and the watcher email
+  // all currently mistreat it (a flag-ON run falls through to the "INCOMPLETE — payload could not be loaded, re-run"
+  // shell, NOT the refusal copy). So arming is HARD-gated on BOTH (a) the size_boundary render surface shipping
+  // (Design seam #615.5) AND (b) the cert-3 routing-integrity proof (fallback: none). Neither is this pass. While
+  // OFF this block is provably inert (3 independent finders confirmed byte-identity); the risk is ONLY on arming.
   if (process.env.AUDIT_COST_PRESCREEN === "true" && manifestComplete && !constructionOOS) {
     const prescreen = costPrescreen(fullSource.length);
     if (!prescreen.pass) {

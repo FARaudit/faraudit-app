@@ -141,7 +141,10 @@ export function tagClaimsBySection(
   for (const c of claims) {
     const lensKey = c.ref.split(":")[0] || "?";
     let tag = byLens.get(lensKey);
-    if (!tag) { tag = { lensKey, sections: lensAssignedSections(lensKey as PanelLensKey, documentClass), gates: 0, risks: 0, claimChars: 0 }; byLens.set(lensKey, tag); }
+    // Spread-copy the assigned-sections array — lensAssignedSections returns the module-level LENS_SECTIONS map
+    // entry BY REFERENCE; aliasing it into a mutable tag would let any future in-place edit corrupt the shared
+    // lens→section map process-wide. Defensive copy keeps this instrumentation truly read-only.
+    if (!tag) { tag = { lensKey, sections: [...lensAssignedSections(lensKey as PanelLensKey, documentClass)], gates: 0, risks: 0, claimChars: 0 }; byLens.set(lensKey, tag); }
     if (c.kind === "gate") tag.gates++; else tag.risks++;
     tag.claimChars += c.text.length;
   }
