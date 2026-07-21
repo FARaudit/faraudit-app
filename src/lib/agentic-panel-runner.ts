@@ -127,6 +127,34 @@ export function formatPanelInstrumentation(rows: PanelInstrumentation[], produce
   ].join("\n");
 }
 
+// CLAIM→SECTION/EXCERPT TAGGING (cards #614 Ch.3 / #615.3) — verdict-INERT stopwatch instrumentation. Tag every
+// verifier claim to its lens's assigned UCF sections (via the ref prefix `<lensKey>:…`) and measure per-lens claim
+// volume + total claim-text size, so the verifier-cost distribution BY SECTION computes free on every run. This is
+// the data the DEFERRED batching decision (#614 Ch.3, post-CERT-5) needs — surfaced now at $0, never inferable-only.
+// Pure → $0 gate-testable. Emitted only under AUDIT_PANEL_TIMING; affects no finding, claim, or verdict.
+export interface ClaimSectionTag { lensKey: string; sections: string[]; gates: number; risks: number; claimChars: number }
+export function tagClaimsBySection(
+  claims: Array<{ ref: string; kind: "gate" | "risk"; text: string }>,
+  documentClass?: "ucf" | "commercial",
+): ClaimSectionTag[] {
+  const byLens = new Map<string, ClaimSectionTag>();
+  for (const c of claims) {
+    const lensKey = c.ref.split(":")[0] || "?";
+    let tag = byLens.get(lensKey);
+    if (!tag) { tag = { lensKey, sections: lensAssignedSections(lensKey as PanelLensKey, documentClass), gates: 0, risks: 0, claimChars: 0 }; byLens.set(lensKey, tag); }
+    if (c.kind === "gate") tag.gates++; else tag.risks++;
+    tag.claimChars += c.text.length;
+  }
+  return [...byLens.values()];
+}
+export function formatClaimSectionTags(tags: ClaimSectionTag[]): string {
+  const tot = tags.reduce((a, t) => ({ g: a.g + t.gates, r: a.r + t.risks, ch: a.ch + t.claimChars }), { g: 0, r: 0, ch: 0 });
+  return [
+    `[panel-timing] claim→section distribution (verifier load) — ${tot.g + tot.r} claim(s) [${tot.g} gate · ${tot.r} risk] · ${tot.ch} claim-chars across ${tags.length} lens(es):`,
+    ...tags.sort((a, b) => b.claimChars - a.claimChars).map((t) => `    ${t.lensKey.padEnd(14)} §${t.sections.join(",§") || "—"}  gates=${t.gates} risks=${t.risks} claim-chars=${t.claimChars}`),
+  ].join("\n");
+}
+
 // tier → model id (env-overridable). Tier MIX (not all one tier) reduces same-family
 // correlation per the Apple "Nine Judges" finding; true cross-provider diversity is a
 // future option ([[reference_glm_5_2]]) once we're off a single-vendor stack.
@@ -530,6 +558,9 @@ export async function runPanelJudge(params: {
   if (absenceRefuted) console.log(`[panel] absence-grounding: ${absenceRefuted} claim(s) REFUTED — asserted absence of an element the package contains`);
   // Exclude both ungrounded AND absence-contradicted claims from the (paid) verifier batch — their state is already sealed.
   const groundedClaims = claims.filter((c) => c.grounded && stateByRef.get(c.ref)?.state !== "REFUTED");
+  // Claim→section/excerpt tagging (cards #614 Ch.3 / #615.3) — the verifier-load distribution BY SECTION over the
+  // claims the verifier will actually process. Verdict-inert; emitted only under the timing flag ⇒ no-op otherwise.
+  if (PANEL_TIMING_ON() && groundedClaims.length) console.log(formatClaimSectionTags(tagClaimsBySection(groundedClaims, params.documentClass)));
 
   let verifier: VerifierOutput | null = null;
   let verifierFailed = false;

@@ -20,20 +20,24 @@ ok(projectPanelCostUsd(500_000) < projectPanelCostUsd(995_368), "projection mono
 const e133 = projectPanelCostUsd(995_368);
 ok(e133 >= 5.0 && e133 <= 6.2, `E133 anchor projects ≈ the measured $5.58 (got $${e133.toFixed(2)})`);
 
-// ── REFUSE direction — E133-size (995k chars) exceeds the margin-adjusted cap ──
+// ── CANONICAL FORMULA (card #615.1) — CAP fixed ($2.50), gate = CAP × (1 − margin_n); ONE formula, ONE source ──
 const big = costPrescreen(995_368, { n: 1 });
-ok(!big.pass, `E133 995k chars REFUSES (projected $${big.projectedUsd.toFixed(2)} > cap $${big.capUsd.toFixed(2)})`);
-ok(big.capUsd === PANEL_COST_GATE_USD * 0.8, "n=1 cap = $2.50 × (1−20%) = $2.00");
+ok(big.capUsd === PANEL_COST_GATE_USD, "CAP is the fixed $2.50 ceiling (PANEL_COST_GATE_USD)");
+ok(big.gateUsd === big.capUsd * (1 - marginForN(1)), "gate_n = CAP × (1 − margin_n) — derived, not a stray constant");
+ok(big.gateUsd === PANEL_COST_GATE_USD * 0.8, "n=1 effective gate = $2.50 × (1−20%) = $2.00");
+
+// ── REFUSE direction — E133-size (995k chars) exceeds the effective gate ──
+ok(!big.pass, `E133 995k chars REFUSES (projected $${big.projectedUsd.toFixed(2)} > gate $${big.gateUsd.toFixed(2)} [cap $${big.capUsd.toFixed(2)}])`);
 ok(big.modelVersion === COST_PRESCREEN_MODEL_VERSION, "refusal carries the model version (re-checkable)");
 
-// ── PASS direction — 36C24426Q0675 pre-screen size (152,211 chars) is under the cap ──
+// ── PASS direction — 36C24426Q0675 pre-screen size (152,211 chars) is under the gate ──
 const small = costPrescreen(152_211, { n: 1 });
-ok(small.pass, `36C24426Q0675 152k chars PASSES (projected $${small.projectedUsd.toFixed(2)} ≤ cap $${small.capUsd.toFixed(2)})`);
+ok(small.pass, `36C24426Q0675 152k chars PASSES (projected $${small.projectedUsd.toFixed(2)} ≤ gate $${small.gateUsd.toFixed(2)})`);
 
-// ── boundary: find the n=1 break-even and confirm the gate sits there ──
+// ── boundary: find the n=1 break-even and confirm it sits on the effective gate (derived from the same formula) ──
 let lo = 0, hi = 995_368;
 for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (costPrescreen(mid, { n: 1 }).pass) lo = mid; else hi = mid; }
-ok(Math.abs(costPrescreen(lo, { n: 1 }).projectedUsd - big.capUsd) < 0.05, `break-even at ~${Math.round(lo/1000)}k chars (n=1, cap $${big.capUsd.toFixed(2)})`);
+ok(Math.abs(costPrescreen(lo, { n: 1 }).projectedUsd - big.gateUsd) < 0.05, `break-even at ~${Math.round(lo/1000)}k chars (n=1, gate $${big.gateUsd.toFixed(2)})`);
 console.log(`   → n=1 supported size ≈ ${Math.round(lo/1000)}k chars · n≥10 (margin 10%) ≈ ${Math.round((()=>{let a=0,b=1_500_000;for(let i=0;i<40;i++){const m=(a+b)/2;if(costPrescreen(m,{n:10}).pass)a=m;else b=m;}return a;})()/1000)}k chars — cap RISES as margin shrinks + slope recalibrates.`);
 
 // ── SIZE_BOUNDARY record — terminal, non-verdict, ratified copy ──
@@ -42,6 +46,7 @@ ok(rec.status === SIZE_BOUNDARY_STATUS && !["BID","NO_BID","INELIGIBLE","NEEDS_H
 ok(rec.message.includes("larger than FARaudit currently audits") && rec.message.includes("Send it to us and we'll audit it"), "refusal copy = Brain-ratified (CTA, no passive 'logged')");
 ok(rec.contact === "support@faraudit.com", "contact CTA present");
 ok(typeof rec.projectedUsd === "number" && typeof rec.chars === "number" && rec.modelVersion === COST_PRESCREEN_MODEL_VERSION, "refusal logs projected cost · chars · model version");
+ok(rec.capUsd === 2.5 && rec.gateUsd === 2.0, "refusal shows BOTH the fixed cap ($2.50) AND the effective gate it was refused against ($2.00) — card #615.1");
 
 console.log(`\n${fail === 0 ? "✅ COST-PRESCREEN DRY: ALL PASS" : `❌ ${fail} FAILURE(S)`}`);
 process.exit(fail === 0 ? 0 : 1);
