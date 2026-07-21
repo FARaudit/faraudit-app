@@ -238,15 +238,35 @@ export function reasoningSteps(d: V4Data): ReasoningStep[] {
   });
   const coreOk = (cov.core || []).filter((c) => c.ok).map((c) => c.k);
 
-  // 01 — COVERAGE
+  // 01 — COVERAGE. The "partial read → sequence stops, no verdict issued" copy is
+  // TERMINAL and belongs ONLY to the genuine INCOMPLETE pole. A committal verdict
+  // reached over a flagged section (a sound verifier still produced BID / BID-WITH-
+  // CAUTION while §L was flagged for confirmation — LBJ 653570ea) must narrate the
+  // FULL chain: the coverage step is honest-but-non-terminal and the sequence
+  // continues to blocking → drivers → eligibility → verdict. Keying the terminal
+  // branch on cov.state alone told the reader "no verdict is issued" and then
+  // printed the BID-WITH-CAUTION verdict two steps later (card #612-(3a)).
+  const coverageWithheld = !complete && v.pole === "INCOMPLETE"; // genuine INCOMPLETE — terminal at coverage
+  const miss = cov.missing || [];
+  let coverageDetail: string;
+  if (complete) {
+    coverageDetail = `${cov.read} of ${cov.total} documents read in full${coreOk.length ? `; core sections present (${coreOk.join(" · ")})` : ""}. ${cov.read < cov.total ? "The unread documents contain no required section, so the read is sufficient for the decision to rest on it." : "No documents were left unread — the decision rests on the complete record."}`;
+  } else if (coverageWithheld) {
+    coverageDetail = `${cov.read} of ${cov.total} documents could be read. A partial read cannot certify what it did not see — the sequence stops here and no verdict is issued.`;
+  } else if (v.noVerdict) {
+    // NHR / OOS — coverage is stamped incomplete only because a no-verdict pole never
+    // shows COMPLETE; the read is NOT what halts the sequence, the next step is.
+    coverageDetail = `${cov.read} of ${cov.total} documents read. The read is not what halts the sequence here — see the next step.`;
+  } else {
+    // committal verdict reached over a section flagged for confirmation
+    coverageDetail = `${cov.read} of ${cov.total} documents read${miss.length ? `; ${miss.length === 1 ? "section" : "sections"} ${miss.join(" · ")} could not be fully confirmed from the posted set and ${miss.length === 1 ? "is" : "are"} flagged for your confirmation` : ""}. The decision below still rests on the record that was read — ${miss.length === 1 ? "that section is a caveat" : "any flagged sections are caveats"}, not a stop.`;
+  }
   steps.push({
     tone: complete ? "go" : "slate", label: "Coverage read",
     outcome: complete ? "Sufficient" : "Incomplete",
-    detail: complete
-      ? `${cov.read} of ${cov.total} documents read in full${coreOk.length ? `; core sections present (${coreOk.join(" · ")})` : ""}. ${cov.read < cov.total ? "The unread documents contain no required section, so the read is sufficient for the decision to rest on it." : "No documents were left unread — the decision rests on the complete record."}`
-      : `${cov.read} of ${cov.total} documents could be read. A partial read cannot certify what it did not see — the sequence stops here and no verdict is issued.`,
+    detail: coverageDetail,
   });
-  if (!complete) { // INCOMPLETE — terminal at coverage
+  if (coverageWithheld) {
     steps.push(skip("Remaining checks", "Blocking conditions, findings and eligibility need a complete read; they were not run."));
     steps.push(verdictStep());
     return steps;
