@@ -287,6 +287,12 @@ export async function executeAgenticPrimary(
   // CONFIRMER, never a co-voter; disagreement fails toward NHR (confirmResidualTokens owns that). Flag OFF ⇒ no OCR ⇒
   // no ocr_residual ⇒ this block is inert (byte-identical). Runs BEFORE manifestComplete so the recovery propagates to
   // the verdict cap, the reconciliation banner, and bindingContentLossDocs uniformly.
+  // Cost-prescreen census (Build C, card #624-2): count docs that INCURRED OCR/vision NOW — i.e. has_text=false at
+  // INGEST, BEFORE the OCR-LAYER3 block below can flip a recovered doc to has_text=true. Using the post-LAYER3 count
+  // would under-count the OCR wall-clock actually spent (36C: 6 docs hit vision, 1 recovered → post-flip 5, but all 6
+  // cost the 3.0·doc OCR time this run). Snapshot here so the projection matches the card's calibration (scannedDocs
+  // = docs that went through OCR). Null when there's no ingestion meta (single-doc upload → census fallback classifies).
+  const preOcrScannedDocCount = input.ingestion?.files.filter((f) => f.ingested && f.has_text !== true).length ?? null;
   if ((isEnvOn(process.env.AUDIT_WORKER_OCR) || isEnvOn(process.env.AUDIT_OCR_TABLE_CONFIRM)) && input.ingestion) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     // Name → base64 map over every doc the executor holds bytes for (primary + attachments). Normalised so a
@@ -434,11 +440,13 @@ export async function executeAgenticPrimary(
     // panel actually reads; bytes/scanned/docCount = the ingested set whose fetch+ingest+OCR cost was already
     // incurred pre-panel. Fallback (null ingestion = genuine single-doc upload): classify from docs bytes/word-shape.
     const ingestedFiles = input.ingestion?.files.filter((f) => f.ingested) ?? [];
+    // scannedDocCount = the PRE-OCR-LAYER3 snapshot (docs that actually went through OCR/vision this run); imageBytes
+    // still sums CURRENT has_text!==true (net-of-recovery vision payload), a diagnostic that does not feed the gate.
     const census = ingestedFiles.length > 0
       ? {
           docCount: docs.length,
           machineReadableChars: fullSource.length,
-          scannedDocCount: ingestedFiles.filter((f) => f.has_text !== true).length,
+          scannedDocCount: preOcrScannedDocCount ?? ingestedFiles.filter((f) => f.has_text !== true).length,
           totalBytes: ingestedFiles.reduce((a, f) => a + (f.bytes ?? 0), 0),
           imageBytes: ingestedFiles.filter((f) => f.has_text !== true).reduce((a, f) => a + (f.bytes ?? 0), 0),
         }
