@@ -17,6 +17,8 @@ import { isNoticedescUrl, resolveSamDescription, type ResolvedDescription } from
 import { MAX_DOCS, type IngestionMeta } from "@/lib/sam-attachments";
 import { executeAgenticPrimary } from "@/lib/audit-executor-v3";
 import type { BidderProfile } from "@/lib/audit-findings";
+import { aggregate, type UsageCall } from "@/lib/audit-cost";
+import { recordAuditCost, decrementAuditQuota } from "@/lib/audit-billing";
 
 // T2-2 (engine line-audit 2026-07-07) — REMOVED three retired-engine phantoms:
 //   • AuditPersistError — a class that was caught (route.ts) + advertised in the
@@ -275,9 +277,30 @@ export async function executeAudit(
   // withBudget aborts the signal on breach → auditPackage lenses/skeptic cancel in-flight calls →
   // a clean terminal Error. Caller budget wins (the watcher passes a tighter one for its prologue).
   const agenticBudgetMs = input.agenticBudgetMs ?? (Number(process.env.AGENTIC_V3_PRIMARY_BUDGET_MS) || 270000);
-  return await withBudget(
-    (signal) => executeAgenticPrimary(supabase, auditId, input, solicitation, agency, signal),
-    agenticBudgetMs,
-    `agentic V3 primary overall budget (${agenticBudgetMs / 1000}s) exceeded — engine stalled`
-  );
+  // COGS-on-fail (Brain card #623-B) — capture spend if the run ABORTS (budget stall). usageSink collects every
+  // priced model call; on the happy path executeAgenticPrimary records cost itself and this catch never fires.
+  const usageSink: UsageCall[] = [];
+  try {
+    return await withBudget(
+      (signal) => executeAgenticPrimary(supabase, auditId, input, solicitation, agency, signal, usageSink),
+      agenticBudgetMs,
+      `agentic V3 primary overall budget (${agenticBudgetMs / 1000}s) exceeded — engine stalled`
+    );
+  } catch (err) {
+    // The run aborted before executeAgenticPrimary's own recordAuditCost, but real tokens were spent (in usageSink).
+    // Record the partial COGS as a no-charge ESTIMATED usage_events row so the stall's spend shows in the cost
+    // cockpit. Best-effort + fail-safe: NEVER mask the engine error, NEVER throw from here. decrementAuditQuota
+    // upserts the row (keyed by audit_id) so recordAuditCost's UPDATE has a row to write.
+    try {
+      if (usageSink.length) {
+        await decrementAuditQuota(supabase, auditId, { billable: false, honestFail: true, verdict: "FAILED-STALL (ESTIMATED)" });
+        const { perModel, totals } = aggregate(usageSink);
+        await recordAuditCost(supabase, auditId, { perModel, totals, source: "customer" });
+        console.warn(`[COST] ${auditId}: recorded ESTIMATED $${totals.usd.toFixed(4)} COGS on aborted run (${usageSink.length} calls) — Brain #623-B`);
+      }
+    } catch (costErr) {
+      console.warn(`[COST] ${auditId}: fail-path COGS record skipped (fail-safe): ${costErr instanceof Error ? costErr.message : String(costErr)}`);
+    }
+    throw err;
+  }
 }

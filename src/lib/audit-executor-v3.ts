@@ -150,6 +150,10 @@ export async function executeAgenticPrimary(
   solicitation: AuditExecutionInput["solicitation"],
   agency: string | null,
   signal?: AbortSignal,
+  // COGS-on-fail sink (Brain card #623-B): when the caller passes an array, every priced model call lands in it,
+  // so if the run ABORTS (budget stall) before the normal recordAuditCost, the caller can still record the real
+  // spend. Omitted ⇒ a fresh internal array ⇒ byte-identical to before (the complete path records as always).
+  usageSink?: UsageCall[],
 ): Promise<AuditExecutionResult> {
   await markStage(supabase, auditId, "extraction");
 
@@ -217,7 +221,7 @@ export async function executeAgenticPrimary(
   // assembleFullSourceBudgeted. Package fits under budget ⇒ whole read + ZERO paid map calls either way.
   // Per-run token tally (concurrency-safe — local to THIS audit). Declared here so the MAP calls that run
   // during assembly are priced into the SAME ledger as the auditPackage calls below.
-  const usageCalls: UsageCall[] = [];
+  const usageCalls: UsageCall[] = usageSink ?? [];
   // AUDIT_LOSSLESS_INGEST (2026-07-06, CEO leap) — DETERMINISTIC $0 replacement for the lossy map-reduce
   // compressor: an over-budget package is shrunk by keeping every BINDING line verbatim (+ context) and dropping
   // only noise, NEVER summarizing. Runs BEFORE the chunked branch and short-circuits it (no paid MAP calls).
@@ -304,8 +308,13 @@ export async function executeAgenticPrimary(
     for (const a of input.attachmentPdfs ?? []) addName(a.name, a.base64);
 
     // ── OCR-ACCURACY LAYER 3 residual confirm (flag AUDIT_WORKER_OCR) ──
+    // TIMING (Brain card #623-5(i)): this vision-confirm loop can eat MINUTES on a scanned-drawing package (one
+    // Opus/crossdoc vision call per residual-bearing doc) yet was previously unmeasured — d7de0285 stalled partly
+    // here. Per-doc + total wall now emit under AUDIT_TIMING_PREPANEL (pure logging ⇒ verdict-inert).
     if (isEnvOn(process.env.AUDIT_WORKER_OCR)) {
+      const _tOcr3 = Date.now();
       const residualDocs = input.ingestion.files.filter((f) => f.ingested && isBindingDoc(f) && f.has_text !== true && (f.ocr_residual?.length ?? 0) > 0);
+      let _ocr3Calls = 0;
       for (const f of residualDocs) {
         const b64 = b64ByName.get(normName(f.name)); // poisoned/ambiguous key → undefined → held content-loss (safe)
         if (!apiKey || !b64) {
@@ -313,15 +322,19 @@ export async function executeAgenticPrimary(
           continue;
         }
         const confirmer = makeVisionConfirmer({ base64: b64, docName: f.name, apiKey, model: modelFor("crossdoc"), signal, onUsage: (u) => usageCalls.push(u) });
+        const _tDoc = Date.now();
         const r = await confirmResidualTokens(f.ocr_residual ?? [], confirmer, { docName: f.name });
+        _ocr3Calls++;
+        const _docMs = Date.now() - _tDoc;
         if (r.confirmed) {
           f.has_text = true;
           delete f.ocr_suspect;
-          console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: OCR-LAYER3 — "${f.name}" RECOVERED (${r.detail}) → has_text=true`);
+          console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: OCR-LAYER3 — "${f.name}" RECOVERED (${r.detail}) → has_text=true${_timeOn ? ` · vision ${_docMs}ms` : ""}`);
         } else {
-          console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: OCR-LAYER3 — "${f.name}" held content-loss (${r.detail})`);
+          console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: OCR-LAYER3 — "${f.name}" held content-loss (${r.detail})${_timeOn ? ` · vision ${_docMs}ms` : ""}`);
         }
       }
+      if (_timeOn) console.log(`[timing] prepanel:ocr-layer3 ${Date.now() - _tOcr3}ms · ${_ocr3Calls}/${residualDocs.length} doc(s) vision-confirmed`);
     }
 
     // ── OCR TABLE-CONFIRM · arc-B (Card #477 ruling 1b, flag AUDIT_OCR_TABLE_CONFIRM, default OFF) ──
