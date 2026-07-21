@@ -469,8 +469,9 @@ async function buildInput(row: UserPendingRow): Promise<AuditExecutionInput> {
   let extractedFormat: "docx" | "xlsx" | "doc" | "txt" | null = null;
   let pdfSource: PdfSource = "sam_unavailable";
   let pdfUnavailableReason: string | null = null;
-  // FA-136 — multi-attachment plan outputs.
-  let attachmentPdfs: Array<{ name: string; base64: string; buffer: Buffer }> | null = null;
+  // FA-136 — multi-attachment plan outputs. `text` (Brain #624-1) carries the assembler's
+  // already-extracted text so buildAgenticDocs skips a second parse+OCR pass.
+  let attachmentPdfs: Array<{ name: string; base64: string; buffer: Buffer; text?: string }> | null = null;
   let primaryDocName: string | null = null;
   let ingestion: import("@/lib/sam-attachments").IngestionMeta | null = null;
 
@@ -501,6 +502,10 @@ async function buildInput(row: UserPendingRow): Promise<AuditExecutionInput> {
       pdfBuffer = assembled.primary.buffer;
       pdfSource = "uploaded";
       attachmentPdfs = assembled.attachments;
+      // Reuse the primary form's already-extracted text (Brain #624-1) so buildAgenticDocs
+      // does not parse+OCR the primary a second time. null when truncated/image-only ⇒
+      // re-extracted downstream exactly as before.
+      extractedText = assembled.primary.text ?? null;
       primaryDocName = assembled.primary.name;
       console.log(`[audit-worker] FA-178: upload set assembled · ${ingestion.files_ingested}/${ingestion.files_total} ingested · primary=${primaryDocName} · form_identified=${ingestion.form_identified}`);
     } else {
@@ -556,6 +561,8 @@ async function buildInput(row: UserPendingRow): Promise<AuditExecutionInput> {
       pdfBuffer = assembled.primary.buffer;
       pdfSource = "sam_fetched";
       attachmentPdfs = assembled.attachments;
+      // Reuse the primary form's already-extracted text (Brain #624-1) — see upload arm.
+      extractedText = assembled.primary.text ?? null;
       primaryDocName = assembled.primary.name;
       ingestion = assembled.ingestion;
       console.log(`[audit-worker] FA-136: document set assembled · ${assembled.ingestion.files_ingested}/${assembled.ingestion.files_total} ingested · form_identified=${assembled.ingestion.form_identified} · primary=${assembled.primary.name}`);

@@ -351,10 +351,16 @@ export interface IngestionMeta {
 }
 
 export interface AssembledDocumentSet {
-  /** The form (or first plan entry when no form identified), inline-ready. */
-  primary: { name: string; base64: string; buffer: Buffer } | null;
+  /** The form (or first plan entry when no form identified), inline-ready.
+   *  `text` is the extraction (pdf-parse / OCR) ALREADY produced by estimateDocTokens
+   *  during assembly — carried so buildAgenticDocs can reuse it instead of extracting
+   *  a SECOND time (the ~96s double-extraction / double-OCR waste, Brain #624-1). Only
+   *  present when the delivered buffer was NOT truncated (a truncated/re-wrapped buffer's
+   *  text differs from the full extraction, so it is re-extracted from the delivered bytes
+   *  to stay byte-identical to the flag-OFF path). Absent ⇒ caller extracts as before. */
+  primary: { name: string; base64: string; buffer: Buffer; text?: string } | null;
   /** Further ingested documents in plan order. */
-  attachments: Array<{ name: string; base64: string; buffer: Buffer }>;
+  attachments: Array<{ name: string; base64: string; buffer: Buffer; text?: string }>;
   ingestion: IngestionMeta;
 }
 
@@ -1142,7 +1148,7 @@ export async function assembleSamDocumentSet(
   const tokenKeptById = new Map(tokenKept.map((k) => [k.resourceId, k]));
   const tokenSkippedIds = new Set(tokenSkipped.map((s) => s.entry.resourceId));
   // Pass 3: build the ingested set + the loud per-file record.
-  const downloaded: Array<{ name: string; base64: string; buffer: Buffer; role: DocumentPlanEntry["role"] }> = [];
+  const downloaded: Array<{ name: string; base64: string; buffer: Buffer; role: DocumentPlanEntry["role"]; text?: string }> = [];
   // FA-INGEST4: cumulative base64 size of VISION-delivered (image-only) docs.
   // The count_tokens guard trims text, never vision blocks, so this is the only
   // bound on the 32MB-per-request inline payload. Text docs don't count.
@@ -1165,7 +1171,14 @@ export async function assembleSamDocumentSet(
       const tokenTruncated = kept.truncated && buf !== f.buffer;
       const wasTruncated = tokenTruncated || f.sourceTruncated; // S1 — OR the at-source xlsx head-truncation into the doc's truncated flag
       const displayName = wasTruncated ? `${f.entry.name} (truncated)` : f.entry.name;
-      downloaded.push({ name: displayName, base64, buffer: buf, role: f.entry.role });
+      // Carry the already-extracted text (Brain #624-1) so buildAgenticDocs reuses it and
+      // does NOT parse+OCR every doc a second time. ONLY when the buffer is the ORIGINAL
+      // (buf === f.buffer): a truncated/re-wrapped buffer no longer matches f.text, so leave
+      // text undefined → the caller re-extracts from the delivered bytes (byte-identical to
+      // the pre-fix path). f.text=="" (image-only, OCR yielded nothing) also carries through
+      // as undefined so the caller's vision/OCR retry path is unchanged.
+      const carryText = buf === f.buffer && f.text ? f.text : undefined;
+      downloaded.push({ name: displayName, base64, buffer: buf, role: f.entry.role, text: carryText });
       // partialPageText (mixed cover+scanned) forces has_text=false even when the
       // cover text alone would clear hasEngineText — the scanned body is content loss.
       files.push({ name: displayName, role: f.entry.role, bytes: buf.length, ingested: true, has_text: hasEngineText(f.text) && !f.partialPageText && !f.ocrSuspect, ...(f.ocrSuspect ? { ocr_suspect: true, ocr_residual: f.ocrResidual } : {}), ...(wasTruncated ? { reason: tokenTruncated ? `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget` : `spreadsheet head-truncated at the source (~${Math.round(MAX_XLSX_DOC_TOKENS / 1000)}k tokens) — full line-item file on SAM.gov`, truncated: true } : {}) });
@@ -1198,8 +1211,8 @@ export async function assembleSamDocumentSet(
     files: files.map((f) => ({ ...f, section_roles: f.role === "attachment" ? classifySectionRoles(f.name) : [] })),
   };
   return {
-    primary: primary ? { name: primary.name, base64: primary.base64, buffer: primary.buffer } : null,
-    attachments: attachments.map((a) => ({ name: a.name, base64: a.base64, buffer: a.buffer })),
+    primary: primary ? { name: primary.name, base64: primary.base64, buffer: primary.buffer, text: primary.text } : null,
+    attachments: attachments.map((a) => ({ name: a.name, base64: a.base64, buffer: a.buffer, text: a.text })),
     ingestion
   };
 }
@@ -1305,7 +1318,7 @@ export async function assembleUploadedDocumentSet(
   const tokenKeptById = new Map(tokenKept.map((k) => [k.resourceId, k]));
   const tokenSkippedIds = new Set(tokenSkipped.map((s) => s.entry.resourceId));
   // Pass 3: build the ingested set + the loud per-file record.
-  const ingested: Array<{ name: string; base64: string; buffer: Buffer; role: DocumentPlanEntry["role"] }> = [];
+  const ingested: Array<{ name: string; base64: string; buffer: Buffer; role: DocumentPlanEntry["role"]; text?: string }> = [];
   // FA-INGEST4: same inline VISION byte cap as the SAM arm (keep the assembled
   // request under the 32MB API limit; the count_tokens guard trims text, never
   // vision blocks). Text docs don't count; the form is exempt.
@@ -1326,7 +1339,9 @@ export async function assembleUploadedDocumentSet(
       const tokenTruncated = kept.truncated && buf !== c.buffer;
       const wasTruncated = tokenTruncated || c.sourceTruncated; // S1 — OR the at-source xlsx head-truncation into the doc's truncated flag
       const displayName = wasTruncated ? `${c.entry.name} (truncated)` : c.entry.name;
-      ingested.push({ name: displayName, base64, buffer: buf, role: c.entry.role });
+      // Carry already-extracted text for buildAgenticDocs reuse (Brain #624-1) — see SAM arm.
+      const carryText = buf === c.buffer && c.text ? c.text : undefined;
+      ingested.push({ name: displayName, base64, buffer: buf, role: c.entry.role, text: carryText });
       // partialPageText (mixed cover+scanned) forces has_text=false — see SAM arm.
       files.push({ name: displayName, role: c.entry.role, bytes: buf.length, ingested: true, has_text: hasEngineText(c.text) && !c.partialPageText && !c.ocrSuspect, ...(c.ocrSuspect ? { ocr_suspect: true, ocr_residual: c.ocrResidual } : {}), ...(wasTruncated ? { reason: tokenTruncated ? `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget` : `spreadsheet head-truncated at the source (~${Math.round(MAX_XLSX_DOC_TOKENS / 1000)}k tokens) — full line-item file on SAM.gov`, truncated: true } : {}) });
     } else if (tokenSkippedIds.has(c.entry.resourceId)) {
@@ -1356,8 +1371,8 @@ export async function assembleUploadedDocumentSet(
     files: files.map((f) => ({ ...f, section_roles: f.role === "attachment" ? classifySectionRoles(f.name) : [] })),
   };
   return {
-    primary: primary ? { name: primary.name, base64: primary.base64, buffer: primary.buffer } : null,
-    attachments: attachments.map((a) => ({ name: a.name, base64: a.base64, buffer: a.buffer })),
+    primary: primary ? { name: primary.name, base64: primary.base64, buffer: primary.buffer, text: primary.text } : null,
+    attachments: attachments.map((a) => ({ name: a.name, base64: a.base64, buffer: a.buffer, text: a.text })),
     ingestion
   };
 }

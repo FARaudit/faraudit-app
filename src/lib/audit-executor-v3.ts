@@ -43,7 +43,7 @@ import { confirmResidualTokens } from "./ocr-accuracy-gate";
 import { makeVisionConfirmer, makeTableVisionConfirmer } from "./ocr-vision-confirm";
 import { detectRateTable, gateRateTable } from "./ocr-table-gate";
 import { clampToWord, reframeNoSetAsideFindings } from "./audit-decide";
-import { costPrescreen, sizeBoundaryRecord, SIZE_BOUNDARY_STATUS } from "./cost-prescreen";
+import { pipelinePrescreen, pipelineBoundaryRecord, censusPackage, SIZE_BOUNDARY_STATUS } from "./cost-prescreen";
 
 /** The agentic V3 engine is the SOLE engine. V1/V2 are DELETED (2026-06-28) — there is no
  *  fallback path in the code at all, and no env flag can switch engines. `executeAudit` calls
@@ -150,6 +150,10 @@ export async function executeAgenticPrimary(
   solicitation: AuditExecutionInput["solicitation"],
   agency: string | null,
   signal?: AbortSignal,
+  // COGS-on-fail sink (Brain card #623-B): when the caller passes an array, every priced model call lands in it,
+  // so if the run ABORTS (budget stall) before the normal recordAuditCost, the caller can still record the real
+  // spend. Omitted ⇒ a fresh internal array ⇒ byte-identical to before (the complete path records as always).
+  usageSink?: UsageCall[],
 ): Promise<AuditExecutionResult> {
   await markStage(supabase, auditId, "extraction");
 
@@ -178,7 +182,7 @@ export async function executeAgenticPrimary(
     primaryName: input.primaryDocName ?? "primary solicitation",
     primaryBytes,
     primaryText: input.extractedText ?? null,
-    attachments: input.attachmentPdfs?.map((a) => ({ name: a.name, base64: a.base64 })) ?? null,
+    attachments: input.attachmentPdfs?.map((a) => ({ name: a.name, base64: a.base64, text: a.text ?? null })) ?? null,
     noticeBody,
   });
   if (_timeOn) console.log(`[timing] prepanel:ingest-buildDocs ${Date.now() - _tIngest}ms · ${docs.length} doc(s) · ${docs.reduce((n, d) => n + (d.text?.length || 0), 0)} chars extracted`);
@@ -217,7 +221,7 @@ export async function executeAgenticPrimary(
   // assembleFullSourceBudgeted. Package fits under budget ⇒ whole read + ZERO paid map calls either way.
   // Per-run token tally (concurrency-safe — local to THIS audit). Declared here so the MAP calls that run
   // during assembly are priced into the SAME ledger as the auditPackage calls below.
-  const usageCalls: UsageCall[] = [];
+  const usageCalls: UsageCall[] = usageSink ?? [];
   // AUDIT_LOSSLESS_INGEST (2026-07-06, CEO leap) — DETERMINISTIC $0 replacement for the lossy map-reduce
   // compressor: an over-budget package is shrunk by keeping every BINDING line verbatim (+ context) and dropping
   // only noise, NEVER summarizing. Runs BEFORE the chunked branch and short-circuits it (no paid MAP calls).
@@ -283,6 +287,12 @@ export async function executeAgenticPrimary(
   // CONFIRMER, never a co-voter; disagreement fails toward NHR (confirmResidualTokens owns that). Flag OFF ⇒ no OCR ⇒
   // no ocr_residual ⇒ this block is inert (byte-identical). Runs BEFORE manifestComplete so the recovery propagates to
   // the verdict cap, the reconciliation banner, and bindingContentLossDocs uniformly.
+  // Cost-prescreen census (Build C, card #624-2): count docs that INCURRED OCR/vision NOW — i.e. has_text=false at
+  // INGEST, BEFORE the OCR-LAYER3 block below can flip a recovered doc to has_text=true. Using the post-LAYER3 count
+  // would under-count the OCR wall-clock actually spent (36C: 6 docs hit vision, 1 recovered → post-flip 5, but all 6
+  // cost the 3.0·doc OCR time this run). Snapshot here so the projection matches the card's calibration (scannedDocs
+  // = docs that went through OCR). Null when there's no ingestion meta (single-doc upload → census fallback classifies).
+  const preOcrScannedDocCount = input.ingestion?.files.filter((f) => f.ingested && f.has_text !== true).length ?? null;
   if ((isEnvOn(process.env.AUDIT_WORKER_OCR) || isEnvOn(process.env.AUDIT_OCR_TABLE_CONFIRM)) && input.ingestion) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     // Name → base64 map over every doc the executor holds bytes for (primary + attachments). Normalised so a
@@ -304,8 +314,13 @@ export async function executeAgenticPrimary(
     for (const a of input.attachmentPdfs ?? []) addName(a.name, a.base64);
 
     // ── OCR-ACCURACY LAYER 3 residual confirm (flag AUDIT_WORKER_OCR) ──
+    // TIMING (Brain card #623-5(i)): this vision-confirm loop can eat MINUTES on a scanned-drawing package (one
+    // Opus/crossdoc vision call per residual-bearing doc) yet was previously unmeasured — d7de0285 stalled partly
+    // here. Per-doc + total wall now emit under AUDIT_TIMING_PREPANEL (pure logging ⇒ verdict-inert).
     if (isEnvOn(process.env.AUDIT_WORKER_OCR)) {
+      const _tOcr3 = Date.now();
       const residualDocs = input.ingestion.files.filter((f) => f.ingested && isBindingDoc(f) && f.has_text !== true && (f.ocr_residual?.length ?? 0) > 0);
+      let _ocr3Calls = 0;
       for (const f of residualDocs) {
         const b64 = b64ByName.get(normName(f.name)); // poisoned/ambiguous key → undefined → held content-loss (safe)
         if (!apiKey || !b64) {
@@ -313,15 +328,19 @@ export async function executeAgenticPrimary(
           continue;
         }
         const confirmer = makeVisionConfirmer({ base64: b64, docName: f.name, apiKey, model: modelFor("crossdoc"), signal, onUsage: (u) => usageCalls.push(u) });
+        const _tDoc = Date.now();
         const r = await confirmResidualTokens(f.ocr_residual ?? [], confirmer, { docName: f.name });
+        _ocr3Calls++;
+        const _docMs = Date.now() - _tDoc;
         if (r.confirmed) {
           f.has_text = true;
           delete f.ocr_suspect;
-          console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: OCR-LAYER3 — "${f.name}" RECOVERED (${r.detail}) → has_text=true`);
+          console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: OCR-LAYER3 — "${f.name}" RECOVERED (${r.detail}) → has_text=true${_timeOn ? ` · vision ${_docMs}ms` : ""}`);
         } else {
-          console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: OCR-LAYER3 — "${f.name}" held content-loss (${r.detail})`);
+          console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: OCR-LAYER3 — "${f.name}" held content-loss (${r.detail})${_timeOn ? ` · vision ${_docMs}ms` : ""}`);
         }
       }
+      if (_timeOn) console.log(`[timing] prepanel:ocr-layer3 ${Date.now() - _tOcr3}ms · ${_ocr3Calls}/${residualDocs.length} doc(s) vision-confirmed`);
     }
 
     // ── OCR TABLE-CONFIRM · arc-B (Card #477 ruling 1b, flag AUDIT_OCR_TABLE_CONFIRM, default OFF) ──
@@ -415,10 +434,29 @@ export async function executeAgenticPrimary(
   // None is this pass. While OFF this block is provably inert (3 independent finders confirmed byte-identity); the
   // risk is ONLY on arming.
   if (process.env.AUDIT_COST_PRESCREEN === "true" && manifestComplete && !constructionOOS) {
-    const prescreen = costPrescreen(fullSource.length);
+    // WHOLE-PIPELINE census (Build C, card #624-2). Scanned classification uses the AUTHORITATIVE ingest signal
+    // (`has_text` = word-shape AND full-page-text AND not-OCR-suspect) — NOT a re-classify of docs[].text, which is
+    // already OCR-recovered and would under-count scanned docs (defeating fail-safe). chars = the assembled text the
+    // panel actually reads; bytes/scanned/docCount = the ingested set whose fetch+ingest+OCR cost was already
+    // incurred pre-panel. Fallback (null ingestion = genuine single-doc upload): classify from docs bytes/word-shape.
+    const ingestedFiles = input.ingestion?.files.filter((f) => f.ingested) ?? [];
+    // scannedDocCount = the PRE-OCR-LAYER3 snapshot (docs that actually went through OCR/vision this run); imageBytes
+    // still sums CURRENT has_text!==true (net-of-recovery vision payload), a diagnostic that does not feed the gate.
+    const census = ingestedFiles.length > 0
+      ? {
+          docCount: docs.length,
+          machineReadableChars: fullSource.length,
+          scannedDocCount: preOcrScannedDocCount ?? ingestedFiles.filter((f) => f.has_text !== true).length,
+          totalBytes: ingestedFiles.reduce((a, f) => a + (f.bytes ?? 0), 0),
+          imageBytes: ingestedFiles.filter((f) => f.has_text !== true).reduce((a, f) => a + (f.bytes ?? 0), 0),
+        }
+      : censusPackage(docs.map((d) => ({ bytes: d.bytes.length, text: d.text })));
+    // Gate against the SAME budget the engine enforces (watcher may pass a tighter one), ≥20% headroom (Brain #611).
+    const effectiveBudgetMs = input.agenticBudgetMs ?? (Number(process.env.AGENTIC_V3_PRIMARY_BUDGET_MS) || 360_000);
+    const prescreen = pipelinePrescreen(census, { budgetMs: effectiveBudgetMs });
     if (!prescreen.pass) {
-      const record = sizeBoundaryRecord(prescreen);
-      console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: SIZE_BOUNDARY — ${fullSource.length} machine-readable chars → projected $${prescreen.projectedUsd.toFixed(2)} > gate $${prescreen.gateUsd.toFixed(2)} (cap $${prescreen.capUsd.toFixed(2)}, margin ${prescreen.marginPct}%, ${prescreen.modelVersion}) → REFUSE before any lens fires (no charge)`);
+      const record = pipelineBoundaryRecord(prescreen);
+      console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: SIZE_BOUNDARY — refused_by=${prescreen.refusedBy} · census: ${census.docCount} docs / ${census.machineReadableChars} chars / ${census.scannedDocCount} scanned / ${(census.totalBytes / 1e6).toFixed(1)}MB → cost $${prescreen.cost.projectedUsd.toFixed(2)} vs gate $${prescreen.cost.gateUsd.toFixed(2)} · wall-clock ${prescreen.wallClock.projectedSeconds.toFixed(0)}s vs limit ${prescreen.wallClock.effectiveLimitSeconds.toFixed(0)}s (budget ${prescreen.wallClock.budgetSeconds}s, ≥${prescreen.wallClock.headroomPct}% headroom) → REFUSE before any lens fires (no charge)`);
       if (signal?.aborted) throw new Error("agentic engine aborted at size pre-screen (overall budget) — not writing a late row");
       const boundaryAt = new Date().toISOString();
       const boundaryUpdate = {
