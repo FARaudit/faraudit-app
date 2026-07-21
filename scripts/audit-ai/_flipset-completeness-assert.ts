@@ -72,6 +72,11 @@ const ARMED_CERT_DRY_UNPROVEN: Record<string, string> = {
   // verdict and BANKED, never authoritative. ARMED on audit-worker for the LBJ 12318726Q0165 re-fire to capture the
   // Phase-1 shadow beside the live verdict (Phase-2 design evidence). Gold-set v1 16/16 + FALSE-BIDs=0. Atomic-arm.
   AUDIT_POSITIVE_VERDICT_POLE: "#600-2 (fc16d41, PR #254) — verdict-inert shadow; ARMED for LBJ re-fire; gold-set 16/16",
+  // #525 commercial routing fix (ff1ca18, PR #271) — RFQ §L/§B anchors + no-lens-starved predicate. ARMED THIS TURN
+  // for the N0016726Q1089 re-fire (Brain card #632, re-fire path 2b — this flag ONLY, nothing else rides). Cert
+  // _cert-525-routing-629.ts ALL PASS · gold-set 21/21 · adversarial (fable) clean · flag-OFF byte-identical.
+  // Live-proof owed at the CEO re-fire (= cert-3 seq-3 + arm-precondition a). AUDIT_COST_PRESCREEN stays OFF.
+  AUDIT_COMMERCIAL_ROUTING_V2: "#629 Option A (ff1ca18, PR #271) — commercial routing v2; ARMED for N0016726Q1089 re-fire; cert ALL PASS, gold-set 21/21",
 };
 
 // STANDING INVARIANT (Brain ruling #578-(2), card #467 lineage): ARMING AND REGISTRATION ARE ONE ATOMIC ACT. No flag is
