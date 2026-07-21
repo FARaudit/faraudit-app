@@ -137,7 +137,31 @@ function buildFindings(showStoppers: FindingLite[], all: FindingLite[]): V4Findi
     const v = mapFinding(f);
     (severityOf(f) === "P2" ? p2 : p1).push(v);
   }
-  return { p0, p1, p2, satisfied };
+  // Conservative report-layer near-dedup (card #612-(3b)): collapse findings whose ENTIRE
+  // requirement normalizes identically once articles/punctuation/case are neutralised — the
+  // same obligation restated with a trivial wording difference (e.g. "Provide a QCP within
+  // 10 days" vs "Provide QCP within 10 days"). Keyed on the FULL normalized requirement,
+  // NEVER fuzzy similarity, so genuinely distinct gates (RN vs LPN vs Psychologist licensure)
+  // keep separate rows. Verdict-inert — display only; the engine's cross-fleet deduper
+  // (AUDIT_CROSS_FLEET_DEDUP) is the source-side tool for cross-panel near-dups.
+  return { p0: dedupeNearFindings(p0), p1: dedupeNearFindings(p1), p2: dedupeNearFindings(p2), satisfied };
+}
+
+// FULL-requirement normalizer (NOT a similarity score): lowercase, drop leading/standalone
+// articles, punctuation → space, collapse whitespace. Two findings collide ONLY when the
+// entire requirement is the same sentence modulo articles/spacing — safe against over-collapse.
+const normReqKey = (r: string): string =>
+  s(r).toLowerCase().replace(/\b(?:a|an|the)\b/g, " ").replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+export function dedupeNearFindings(list: V4Finding[]): V4Finding[] {
+  const seen = new Set<string>();
+  const out: V4Finding[] = [];
+  for (const f of list) {
+    const k = normReqKey(f.req);
+    if (k && seen.has(k)) continue;   // exact-normalized restatement → collapse (keep first, which keeps its cite)
+    if (k) seen.add(k);
+    out.push(f);
+  }
+  return out;
 }
 
 // ── §L submission matrix (derived) ──
