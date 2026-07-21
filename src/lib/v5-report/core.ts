@@ -63,10 +63,27 @@ export function scorecardTiles(d: V4Data): ScorecardTile[] {
     // Coverage = read / total (never a bare %). Gate-2 ruling (Design, 2026-07-07): a
     // percentage is score-adjacent on a score-free artifact, and it contradicted the deck
     // cover console + provenance panel, which already speak "X / Y". read/total unifies all.
-    { k: "Coverage", v: (cov.read == null || cov.total == null) ? "—" : cov.read + " / " + cov.total, tone: cov.state === "COMPLETE" ? "go" : "slate", sub: "documents · " + cov.state.toLowerCase(), textv: false },
+    // Coverage sub is a one-line EXPLANATION, not a bare "· incomplete" (card #612-(3e)):
+    // "5 / 5 · incomplete" reads as a contradiction. Resolve WHY in one line — a partial read,
+    // or a full read with a section still to confirm (LBJ 653570ea: all 5 read, §L flagged).
+    { k: "Coverage", v: (cov.read == null || cov.total == null) ? "—" : cov.read + " / " + cov.total, tone: cov.state === "COMPLETE" ? "go" : "slate", sub: coverageSub(cov), textv: false },
     elig
-      ? { k: "Eligibility", v: elig.label, tone: elig.cls === "ok" ? "go" : elig.cls === "no" ? "stop" : "slate", sub: "set-aside / status", textv: true }
+      // Eligibility sub explains the tri-state chip instead of the static "set-aside / status":
+      // "Not determined" alone leaves the reader guessing whether it is a problem (card #612-(3e)).
+      ? { k: "Eligibility", v: elig.label, tone: elig.cls === "ok" ? "go" : elig.cls === "no" ? "stop" : "slate", sub: elig.cls === "ok" ? "eligible on the facts read" : elig.cls === "no" ? "a verified bar applies" : "confirm before you rely on it", textv: true }
       : { k: "Advisories", v: String(p2), tone: "slate", sub: "clause flow-downs", textv: false },
   ];
   return tiles;
+}
+
+// One-line coverage explanation for the scorecard tile (card #612-(3e)). Distinguishes a
+// genuine PARTIAL read (read < total) from a full read that left a section unconfirmed
+// (read == total but coverage.missing non-empty — the LBJ §L case) so "incomplete" never
+// looks like it contradicts a "5 / 5" count.
+function coverageSub(cov: V4Data["coverage"]): string {
+  if (cov.state === "COMPLETE") return "documents · complete";
+  const miss = (cov.missing || []).filter(Boolean);
+  if (cov.read != null && cov.total != null && cov.read < cov.total) return "partial read · confirm the unread set";
+  if (miss.length) return `all read · ${miss.length} section${miss.length === 1 ? "" : "s"} to confirm`;
+  return "read · completeness not certified";
 }
