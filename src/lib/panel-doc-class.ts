@@ -76,14 +76,34 @@ const COMMERCIAL_ANCHORS: Array<{ key: string; re: RegExp }> = [
   { key: "I", re: /contract clauses|clauses incorporated (?:by reference)?|section i\b/i },
 ];
 
+// COMMERCIAL_ANCHORS_V2 (#525 fix, Brain card #629 shape-(i)) — the base anchors MISS RFQ/SF-1449 packages that
+// embed the instructions/eval in the cover with NO distinct "Section L/M" or "Instructions to Offerors" block
+// (N0016726Q1089: §L never placed → whole-source fallback → all 5 lenses read full source → 5× cost/wall). These
+// add the POSITIVE-SHAPE RFQ markers those packages actually use (proposal-submission phrasing for §L, contract-
+// line-item phrasing for §B) — positive shape allowlist, never a bar-vocab blocklist. Base kept for back-compat.
+const COMMERCIAL_ANCHORS_V2: Array<{ key: string; re: RegExp }> = [
+  { key: "L", re: /instructions? to (?:offerors|quoters)|submission (?:instructions|requirements)|section l\b|proposal shall (?:contain|include|consist)|offerors?\s+shall\s+(?:submit|furnish|provide)|\bvolume\s+(?:[ivx]+|[1-9])\s*[:\-.]|(?:shall|must)\s+(?:provide|furnish|submit)[^.]{0,50}(?:as part of|with)\s+(?:its|the|your)?\s*(?:offer|quote|proposal)/i },
+  // §M: award-DECISION / LPTA-full-phrase language only — NOT bare "technically acceptable" (fires inside a PWS spec).
+  { key: "M", re: /evaluation (?:criteria|factors?)|basis (?:for|of) award|section m\b|lowest[- ]priced?[, ]+technically acceptable|award (?:will|shall) be made/i },
+  { key: "C", re: /statement of work|performance work statement|scope of work|description\/specifications|section c\b/i },
+  // §B: HEADER-LIKE "Contract Line Item … Number/Schedule" phrase ONLY — NOT bare "CLIN" or "line item", which recur
+  //     mid-content (a PWS/spec referencing "CLIN 0001") and would fragment §C, per this file's anchor doctrine (L67).
+  { key: "B", re: /schedule of (?:items|supplies|prices)|supplies\/services|price schedule|section b\b|supplies or services and prices|contract line items?\s+(?:number|schedule)/i },
+  { key: "I", re: /contract clauses|clauses incorporated (?:by reference)?|section i\b/i },
+];
+
 /** Route a commercial/non-UCF source into UCF-keyed section text by CONTENT SIGNAL (position-ordered anchor slicing),
  *  so the panel lenses still receive relevant text. Returns {sectionText, routed}. `routed` is true only when the
  *  core evaluation (M) AND submission (L) content were placed — what the lenses most need; otherwise the caller uses
  *  the whole-source single-bundle fallback. Pure. */
-export function routeCommercialSections(fullSource: string): { sectionText: Record<string, string>; routed: boolean } {
+export function routeCommercialSections(
+  fullSource: string,
+  opts?: { v2?: boolean }
+): { sectionText: Record<string, string>; routed: boolean; placedKeys: string[] } {
   const src = fullSource ?? "";
+  const anchors = opts?.v2 ? COMMERCIAL_ANCHORS_V2 : COMMERCIAL_ANCHORS;
   const hits: Array<{ pos: number; key: string }> = [];
-  for (const a of COMMERCIAL_ANCHORS) {
+  for (const a of anchors) {
     const re = new RegExp(a.re.source, "ig");
     let m: RegExpExecArray | null;
     while ((m = re.exec(src)) !== null) hits.push({ pos: m.index, key: a.key });
@@ -95,7 +115,10 @@ export function routeCommercialSections(fullSource: string): { sectionText: Reco
     if (slice.length < 20) continue;
     sectionText[hits[i].key] = sectionText[hits[i].key] ? `${sectionText[hits[i].key]}\n\n${slice}` : slice;
   }
-  return { sectionText, routed: !!(sectionText["L"] && sectionText["M"]) };
+  // `routed` (legacy predicate: §L AND §M placed) kept for back-compat; `placedKeys` lets the caller apply the
+  // stronger no-lens-starved predicate (#525 fix — route whenever every lens gets its owned content, fall back to
+  // whole-source ONLY when a lens would be starved, which is worse than whole-source per Brain #629).
+  return { sectionText, routed: !!(sectionText["L"] && sectionText["M"]), placedKeys: Object.keys(sectionText) };
 }
 
 /** The UCF lens keys populated by the whole-source single-bundle fallback (content routing failed). Every lens then
