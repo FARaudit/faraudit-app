@@ -41,25 +41,25 @@ const ANCHORS: Array<{ name: string; census: PackageCensus; claims: number; proj
 ];
 
 // ── A: formula reproduces the anchor projections (with ACTUAL claims) ────────────────────────────────────────────
-console.log("── A. Formula reproduces card #624-3.ii anchor projections (actual claims) ──");
+console.log("── A. Formula reproduces card #624-3.ii anchor projections (actual claims, CLEAN routing fanout=1) ──");
 for (const a of ANCHORS) {
-  const s = projectWallClockSeconds(a.census, a.claims);
+  const s = projectWallClockSeconds(a.census, { claimsOverride: a.claims });
   ok(`A ${a.name} → ${s.toFixed(0)}s (card ${a.projected}s)`, near(s, a.projected, 2), `Δ=${(s - a.projected).toFixed(1)}s`);
 }
 
 // ── B + C: RE-CERT gate verdicts (ESTIMATED claims, budget 360s @ 20% headroom → limit 288s) ────────────────────
 console.log("\n── B/C. RE-CERT gate verdicts (estimated claims · budget 360s · ≥20% headroom · limit 288s) ──");
 for (const a of ANCHORS) {
-  const p = pipelinePrescreen(a.census, { budgetMs: 360_000, headroom: 0.20 });
+  const p = pipelinePrescreen(a.census, { budgetMs: 360_000, headroom: 0.20, wholeSourceFallback: false });
   const gotVerdict = p.pass ? "PASS" : "REFUSE";
   ok(`B ${a.name} gate = ${gotVerdict} (expect ${a.verdict})`, gotVerdict === a.verdict,
     `cost $${p.cost.projectedUsd.toFixed(2)}≤$${p.cost.gateUsd.toFixed(2)}=${p.cost.pass} · wall ${p.wallClock.projectedSeconds.toFixed(0)}s≤${p.wallClock.effectiveLimitSeconds.toFixed(0)}s=${p.wallClock.pass}${p.refusedBy ? ` · refusedBy=${p.refusedBy}` : ""}`);
 }
 // C — 36C caught ONLY by wall-clock (cost passes); E133 caught by cost.
-const p36 = pipelinePrescreen(ANCHORS[1].census, { budgetMs: 360_000, headroom: 0.20 });
+const p36 = pipelinePrescreen(ANCHORS[1].census, { budgetMs: 360_000, headroom: 0.20, wholeSourceFallback: false });
 ok("C 36C passes the $ COST gate (char-only gate would NOT refuse it)", p36.cost.pass, `cost $${p36.cost.projectedUsd.toFixed(2)} ≤ $${p36.cost.gateUsd.toFixed(2)}`);
 ok("C 36C is refused specifically by WALL-CLOCK (the new byte/scanned term)", p36.refusedBy === "wallclock");
-const pE = pipelinePrescreen(ANCHORS[2].census, { budgetMs: 360_000, headroom: 0.20 });
+const pE = pipelinePrescreen(ANCHORS[2].census, { budgetMs: 360_000, headroom: 0.20, wholeSourceFallback: false });
 ok("C E133 fails the COST gate (1M chars → intrinsic $ over cap)", !pE.cost.pass, `cost $${pE.cost.projectedUsd.toFixed(2)} > $${pE.cost.gateUsd.toFixed(2)}`);
 
 // ── D: per-doc census classifier ────────────────────────────────────────────────────────────────────────────────
