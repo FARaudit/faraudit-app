@@ -73,10 +73,15 @@ const ARMED_CERT_DRY_UNPROVEN: Record<string, string> = {
   // Phase-1 shadow beside the live verdict (Phase-2 design evidence). Gold-set v1 16/16 + FALSE-BIDs=0. Atomic-arm.
   AUDIT_POSITIVE_VERDICT_POLE: "#600-2 (fc16d41, PR #254) — verdict-inert shadow; ARMED for LBJ re-fire; gold-set 16/16",
   // #525 commercial routing fix (ff1ca18, PR #271) — RFQ §L/§B anchors + no-lens-starved predicate. ARMED THIS TURN
-  // for the N0016726Q1089 re-fire (Brain card #632, re-fire path 2b — this flag ONLY, nothing else rides). Cert
-  // _cert-525-routing-629.ts ALL PASS · gold-set 21/21 · adversarial (fable) clean · flag-OFF byte-identical.
-  // Live-proof owed at the CEO re-fire (= cert-3 seq-3 + arm-precondition a). AUDIT_COST_PRESCREEN stays OFF.
-  AUDIT_COMMERCIAL_ROUTING_V2: "#629 Option A (ff1ca18, PR #271) — commercial routing v2; ARMED for N0016726Q1089 re-fire; cert ALL PASS, gold-set 21/21",
+  // DISARMED (Brain ruling cards #640/#641, 2026-07-21 — Rule 61 atomic, this flag alone → OFF on audit-worker).
+  // P0 (sweep card #640): `commercialRoutingSafe` certifies routing-safety against LENS_SECTIONS_COMMERCIAL, but with
+  // AUDIT_LENS_EMISSION_INTEGRITY OFF the reader serves the UCF map (LENS_SECTIONS) — the predicate validates a map the
+  // reader does NOT use → a false-safety cert on the verdict path (fail-OPEN: a commercial pkg w/o §I certifies "safe"
+  // then starves proposal_compliance [H,I] under fallback:none). Brain chose PULL over arm-INTEGRITY (arming an
+  // unverified flag to patch an undeclared dependency repeats the hole's origin). #525 whole-source economics return
+  // until the #271 Tier-V fix (predicate must evaluate the EFFECTIVE map lensAssignedSections serves under live flags);
+  // the #628-B fallback-multiplier is the operative pre-screen projection basis again. Container-verify the disarm.
+  AUDIT_COMMERCIAL_ROUTING_V2: "DISARMED 2026-07-21 (Brain #640 — P0 false-safety cert; PULL ruling). Was: #629 Option A (ff1ca18, PR #271). Re-arm ONLY after #271 fix grade A.",
 };
 
 // STANDING INVARIANT (Brain ruling #578-(2), card #467 lineage): ARMING AND REGISTRATION ARE ONE ATOMIC ACT. No flag is
