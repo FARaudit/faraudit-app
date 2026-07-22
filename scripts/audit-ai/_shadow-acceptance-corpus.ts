@@ -38,12 +38,17 @@ import { readFileSync, readdirSync } from "fs";
     { name: "SPMYM226 (real credential bar)", category: "non-self-clearable/NHR", expected: "NEEDS_HUMAN_REVIEW", inp: byId("SPMYM226") },
   ];
 
-  // ── CONSTRUCTED INELIGIBLE (real bar + adversarial CLOSED-WORLD profile; Rule 64: real findings/source, test profile) ──
+  // ── CERT EXHIBIT (Brain #642-(4)) — the CLOSED-WORLD HALF of the no-false-INELIGIBLE guarantee, cited + permanent.
+  // seq-4's open-world half proves "real set-aside → NEEDS_HUMAN_REVIEW (never false-INELIGIBLE)"; this exhibit proves
+  // the OTHER half: when the firm's status IS knowable (closed-world profile lacking the required program cert), the
+  // engine COMMITS to a literal INELIGIBLE — the two halves are one guarantee. Rule 64: real bar + real source (a
+  // FA303 run finding), adversarial CLOSED-WORLD test profile. Expected is STRICT INELIGIBLE (not the loose either-or):
+  // this is a behavior LOCK — if this ever returns NHR the closed-world half regressed and the gate MUST break.
   const base = JSON.parse(JSON.stringify(byId("5d0477e7"))); // FA303 run the shadow commits to BWC on 9 self-cert socioeconomic bars
   const barWithAttr = (base.findings as any[]).find((f) => f.kind === "eligibility_bar" && f.requiredAttribute);
   if (barWithAttr) {
     base.bidderProfile = { closedWorld: true, satisfiedAttributes: [], held: [], name: "TEST: small biz lacking the required program cert" };
-    specs.push({ name: `CONSTRUCTED INELIGIBLE (real bar '${String(barWithAttr.requiredAttribute).slice(0,24)}' + closed-world firm lacking it)`, category: "real-INELIGIBLE preserved", expected: ["INELIGIBLE", "NEEDS_HUMAN_REVIEW"], inp: base });
+    specs.push({ name: `CERT EXHIBIT #642-4 — closed-world set-aside COMMITS to INELIGIBLE (real bar '${String(barWithAttr.requiredAttribute).slice(0,24)}' + closed-world firm lacking it)`, category: "real-INELIGIBLE preserved", expected: "INELIGIBLE", inp: base });
   }
 
   // ── ADVERSARIAL FALSE-BID CORPUS (card #609-(8)) — the typing floor MUST NOT demote a real eligibility bar to a
