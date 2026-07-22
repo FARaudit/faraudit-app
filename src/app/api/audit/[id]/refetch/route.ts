@@ -167,7 +167,7 @@ export async function POST(
   // through to the legacy single-doc path below.
   let assembled: AssembledDocumentSet | null = null; // ROOT-1 — hoisted for the no-silent-degrade guard
   if (/^[a-f0-9]{32}$/i.test(solicitation.noticeId)) {
-    assembled = await assembleSamDocumentSet(solicitation.noticeId, solicitation.solicitationNumber).catch(() => null);
+    assembled = await assembleSamDocumentSet(solicitation.noticeId, solicitation.solicitationNumber, solicitation.resourceLinks).catch(() => null); // ROOT-2 #648: independent v2 expected-set for the EXISTS denominator
     if (assembled?.primary) {
       pdfBase64 = assembled.primary.base64;
       pdfBuffer = assembled.primary.buffer;

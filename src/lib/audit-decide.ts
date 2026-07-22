@@ -3147,6 +3147,14 @@ export function deriveShadowVerdict(inp: VerdictInputs, opts?: { naics?: string 
   // binding manifest was not fully read cannot green-light, even with a clean deciding set. Corpus-surfaced gap
   // (FA442726Q1068 8eab14c2 committed BID over manifestComplete=false). documentsComplete=false is already a HARD gate
   // above; this catches the computed manifestComplete=false case. → INCOMPLETE, an honest-fail, never a caution.
+  // ⚠ ROOT-2 (Brain #648) PHASE-2 DEPENDENCY: this shadow pole retired `documentsComplete` (contaminated by the OLD
+  // false-INCOMPLETE root) and caps ONLY on `manifestComplete`. ROOT-2's dropped-doc completeness truth (the EXISTS
+  // denominator, agenticManifestComplete via the v2 resourceLinks cross-check) flows into `documentsComplete`, NOT
+  // this `manifestComplete` input — so on the AUTHORITATIVE deriveVerdict pole it caps at 1b (:3255), but here it
+  // does NOT. That is safe TODAY (this pole is flag-OFF/report-only, never authoritative — AUDIT_POSITIVE_VERDICT_POLE).
+  // BEFORE any Phase-2 flip that makes this pole authoritative, the reconciliation truth MUST be re-threaded here
+  // (either read documentsComplete for the dropped-doc case, or AND opts.manifestComplete into the manifestComplete
+  // input at orchestrator:2757) or #648 reopens under the flip. Proven in the ROOT-2 gauntlet; residual in the design.
   const manifestIncomplete = (inp as unknown as { manifestComplete?: boolean }).manifestComplete === false;
   const scBars = selfClearablePackageBars(dispositions);
   if (manifestIncomplete) return mk("INCOMPLETE", `Deciding set clears but the binding manifest is incomplete — honest-fail, never a commit over an unread manifest`, { hardGate: "manifestComplete", vetoes: (scBars ?? []).map((f) => f.citation) });
