@@ -183,6 +183,11 @@ export interface IngestionFileMeta {
   // ATTACHMENT in the ingestion banner. Drives the .isec section tags + true
   // §C/§L/§M coverage chip (upgrades the banner from form-grain).
   section_roles?: string[];
+  // ROOT-2 (Brain #648) — a synthetic placeholder for a doc the v2 notice ADVERTISED (resourceLinks) but the v3
+  // RESOURCES manifest never enumerated (degraded retrieval). ingested:false, bytes:null. This is NEITHER a budget
+  // drop ("too large — prioritized") NOR a near-dup — it was never retrieved at all. Machine-checkable marker so
+  // render/caveat surfaces classify it honestly instead of reason-regex-guessing it into the wrong bucket.
+  not_retrieved?: boolean;
   // Lever-3 STEP-2 OCR-accuracy gate. Set ONLY on an OCR-recovered doc. `ocr_suspect` = layer-2 caught a
   // structurally-impossible misread OR a format-valid residual is still unconfirmed → the deterministic gate holds
   // has_text=false (fail-toward-NHR) until the executor's layer-3 vision confirms the residual. `ocr_residual` = the
@@ -1110,9 +1115,38 @@ export function applyTokenBudget<T extends { role: DocumentPlanEntry["role"]; to
   return { ingest, skipped };
 }
 
+/** ROOT-2 (Brain #648) — EXISTS-denominator shortfall. The v2 OPPORTUNITY `resourceLinks` is an INDEPENDENT
+ *  enumeration of the posted attachments (different SAM endpoint / failure-domain than the v3 RESOURCES manifest).
+ *  When the v3 manifest enumerated FEWER attachments than v2 advertised, known docs were never retrieved. Compares
+ *  RAW counts (both pre-dedup, symmetric) so the FILE-level near-dup reconciliation can NEVER fabricate a phantom
+ *  shortfall (the near-dup false-INCOMPLETE P0 the panel flagged). Returns one ingested:false placeholder per
+ *  unretrieved doc so files_total reflects what EXISTS. `resourceLinksLen` 0 (uploads, v2-lag watcher) ⇒ [] ⇒
+ *  byte-identical. Never REDUCES the total: v3-enumerated-more (resourceLinks < manifest) ⇒ [] (fail-safe, trust
+ *  the larger in-hand count). Pure — $0 gauntlet-testable. */
+export function existsShortfallEntries(manifestLen: number, resourceLinksLen: number): IngestionFileMeta[] {
+  const shortfall = Math.max(0, resourceLinksLen - manifestLen);
+  const out: IngestionFileMeta[] = [];
+  for (let i = 0; i < shortfall; i++) {
+    out.push({
+      name: `notice attachment ${manifestLen + i + 1} (not retrieved)`,
+      role: "attachment",
+      bytes: null,
+      ingested: false,
+      not_retrieved: true,
+      reason: `advertised on the SAM notice (${resourceLinksLen} resources) but absent from the resources manifest (${manifestLen} enumerated) — degraded retrieval; re-run`,
+    });
+  }
+  return out;
+}
+
 export async function assembleSamDocumentSet(
   noticeId: string,
-  solicitationNumber: string | null
+  solicitationNumber: string | null,
+  // ROOT-2 (Brain #648) — the v2 OPPORTUNITY record's resourceLinks: an INDEPENDENT enumeration of the posted
+  // attachments (different SAM endpoint / failure-domain than the v3 RESOURCES manifest fetched below). Threaded so
+  // the completeness denominator reflects what the notice ADVERTISES, not only what the v3 manifest happened to
+  // enumerate. Optional ⇒ callers that omit it (and the upload path, which has none) stay byte-identical.
+  resourceLinks?: string[]
 ): Promise<AssembledDocumentSet | null> {
   const manifest = await fetchAttachmentManifest(noticeId);
   if (!manifest) return null;
@@ -1226,10 +1260,21 @@ export async function assembleSamDocumentSet(
   // over-merges / kept-has-no-text stay ingested:false → honest INCOMPLETE. Runs here (after ingestion) so the
   // kept copy's has_text is known. Covered dupes are excluded from files_total (not distinct documents).
   const nearDupCount = reconcileNearDuplicates(files);
+  // skippedCount is the BUDGET/planning-skip denominator for the overflow message — computed BEFORE the ROOT-2
+  // degraded-retrieval placeholders below, so a manifest blip is never mislabeled as a budget overflow.
   const skippedCount = files.filter((f) => !f.ingested).length;
   const distinctTotal = plan.length - nearDupCount;
+  // ROOT-2 (Brain #648) — EXISTS denominator. When the v3 manifest enumerated FEWER attachments than the v2 notice
+  // advertised (resourceLinks), known docs were never retrieved (seq-4: v3 degraded to 1 entry, the route held 6
+  // v2 links, never cross-checked → a 3KB stub of a 180K package was ratified docs_complete=true). Each missing
+  // doc becomes an ingested:false placeholder → files_total reflects what EXISTS, files_ingested < files_total,
+  // and the existing agenticManifestComplete gate caps to INCOMPLETE. (Placeholders are appended AFTER skippedCount
+  // so a manifest blip is never mislabeled as a budget overflow; the overflow message keeps distinctTotal.)
+  const existsPlaceholders = existsShortfallEntries(manifest.length, resourceLinks?.length ?? 0);
+  files.push(...existsPlaceholders);
+  const existsTotal = distinctTotal + existsPlaceholders.length;
   const ingestion: IngestionMeta = {
-    files_total: distinctTotal,
+    files_total: existsTotal,
     files_ingested: ingestedCount,
     // RC5 Fix 1 — only honest if a SUBSTANTIVE form was identified. An
     // amendment-only / SF-30-cover primary (form claim is just the sol-number

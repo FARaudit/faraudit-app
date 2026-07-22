@@ -3466,8 +3466,12 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
       // analyst caution, naming the docs to verify, never the code mechanics.
       const skipped = Array.isArray(ing.files) ? ing.files.filter((f) => f.ingested === false) : [];
       const isBenign = (r?: string) => /near-duplicate|duplicate|superseded/i.test(r || "");
-      const realDrops = skipped.filter((f) => !isBenign(f.reason));
-      if (realDrops.length === 0 && !formless && !ing.portfolio_detected) {
+      // ROOT-2 (Brain #648) — never-retrieved docs (v2 advertised, v3 manifest degraded) are NOT "too large —
+      // prioritized" (they were never fetched at all) and NOT benign. Split them out so they get an honest
+      // "could not be retrieved — re-run" caveat instead of the false budget-prioritization copy below.
+      const notRetrieved = skipped.filter((f) => (f as { not_retrieved?: boolean }).not_retrieved === true);
+      const realDrops = skipped.filter((f) => !isBenign(f.reason) && (f as { not_retrieved?: boolean }).not_retrieved !== true);
+      if (realDrops.length === 0 && notRetrieved.length === 0 && !formless && !ing.portfolio_detected) {
         // All unique documents reviewed; only duplicate copies set aside → no warning (unless the
         // agentic MAP itself reported partial coverage — that still suppresses the verdict).
         return orAgentic({ ingestion_incomplete: false, ingestion_note: "" });
@@ -3478,6 +3482,11 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
       if (realDrops.length > 0) {
         const names = realDrops.map((f) => (f.name || "").trim()).filter(Boolean).slice(0, 4).join(", ");
         parts.push(`${realDrops.length} document${realDrops.length === 1 ? " was" : "s were"} too large to analyze in full — the core solicitation and key sections were prioritized${names ? `; review ${names} in the full solicitation before finalizing your bid` : ""}`);
+      }
+      if (notRetrieved.length > 0) {
+        // ROOT-2 — honest degraded-retrieval caveat: the notice advertises more documents than were retrieved; the
+        // audit is INCOMPLETE and should be re-run so the full posted set is analyzed. Never claims prioritization.
+        parts.push(`${notRetrieved.length} document${notRetrieved.length === 1 ? "" : "s"} posted to this notice could not be retrieved from SAM.gov — this audit does not reflect the full solicitation; re-run the audit to include ${notRetrieved.length === 1 ? "it" : "them"} before relying on the result`);
       }
       if (ing.portfolio_detected) parts.push("the primary file is a document portfolio whose embedded files were not expanded — review them in the full solicitation");
       if (parts.length === 0) return orAgentic({ ingestion_incomplete: false, ingestion_note: "" });
