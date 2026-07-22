@@ -124,8 +124,9 @@ async function buildWatcherAuditInput(
   // gets a REAL complete audit; without the manifest the engine would force
   // documents_complete=false on every multi-attachment notice. Manifest failure / no
   // primary falls through to the single-doc path below (honest-fail stays the degrade).
+  let assembled: AssembledDocumentSet | null = null; // ROOT-1 — hoisted so the guard can key on assembled===null
   if (/^[a-f0-9]{32}$/i.test(solicitation.noticeId)) {
-    const assembled: AssembledDocumentSet | null = await assembleSamDocumentSet(solicitation.noticeId, solicitation.solicitationNumber).catch(() => null);
+    assembled = await assembleSamDocumentSet(solicitation.noticeId, solicitation.solicitationNumber).catch(() => null);
     if (assembled?.primary) {
       pdfBase64 = assembled.primary.base64;
       pdfBuffer = assembled.primary.buffer;
@@ -141,7 +142,14 @@ async function buildWatcherAuditInput(
     }
   }
 
-  if (!pdfBase64 && !pdfFileId) {
+  if (!pdfBase64 && !pdfFileId && assembled === null && solicitation.resourceLinks.length > 1 && /^[a-f0-9]{32}$/i.test(solicitation.noticeId)) {
+    // NO-SILENT-DEGRADE (ROOT-1, Brain #648) — mirror of the front-door route guard. `assembled === null` = manifest
+    // UNAVAILABLE for a MULTI-DOC package (a readable-but-oversize set is assembled !== null → keeps its legacy
+    // read). A single-URL read of resourceLinks[0] would silently drop the other N-1 known docs and report
+    // docs_complete on 1. Route to honest-unavailable → INCOMPLETE, never a verdict on a partial read.
+    pdfUnavailableReason = `multi-doc manifest assembly failed (after retries) — ${solicitation.resourceLinks.length} resources expected; not degrading to a single-doc read (would drop ${solicitation.resourceLinks.length - 1})`;
+    console.warn(`[watcher] NO-SILENT-DEGRADE: notice=${solicitation.noticeId} resourceLinks=${solicitation.resourceLinks.length} · assembly null → INCOMPLETE (refused single-doc fallback)`);
+  } else if (!pdfBase64 && !pdfFileId) {
     try {
       const fetched = await fetchPdfFromSamUrl(solicitation.resourceLinks[0]);
       if (fetched.bytes > MAX_PDF_BYTES) {

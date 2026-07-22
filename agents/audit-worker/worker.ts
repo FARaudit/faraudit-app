@@ -573,7 +573,18 @@ async function buildInput(row: UserPendingRow): Promise<AuditExecutionInput> {
         ingestion = assembled.ingestion;
         console.warn(`[audit-worker] FA-136: manifest read but no ingestible primary (${assembled.ingestion.files_total} files) — legacy single-URL path with completeness flag`);
       }
-    const docUrl = row.pdf_url ?? solicitation.resourceLinks[0] ?? null;
+    // NO-SILENT-DEGRADE (ROOT-1, Brain #648/#649 — the PROD async path; the route guard is dead behind the
+    // 202 enqueue, this is where the seq-4 8ca6d7d4 degrade actually happened). assembled===null means the
+    // manifest was UNAVAILABLE (fetch exhausted after retries) — NOT "readable-but-oversize" (that keeps
+    // ingestion set above and its legacy read). For a MULTI-DOC package (resourceLinks>1) a single-URL read
+    // of resourceLinks[0] would silently drop the other N-1 KNOWN docs and let the engine verdict on 1/N →
+    // refuse it; route to honest-unavailable → INCOMPLETE, never a verdict on a partial read.
+    const manifestUnavailable = assembled === null && solicitation.resourceLinks.length > 1 && /^[a-f0-9]{32}$/i.test(row.notice_id);
+    if (manifestUnavailable) {
+      pdfUnavailableReason = `multi-doc manifest unavailable (after retries) — ${solicitation.resourceLinks.length} resources expected; refused single-doc degrade (would drop ${solicitation.resourceLinks.length - 1})`;
+      console.warn(`[audit-worker] NO-SILENT-DEGRADE: notice=${row.notice_id} resourceLinks=${solicitation.resourceLinks.length} · manifest unavailable → INCOMPLETE (refused single-doc fallback)`);
+    }
+    const docUrl = manifestUnavailable ? null : (row.pdf_url ?? solicitation.resourceLinks[0] ?? null);
     if (docUrl) {
       try {
         const fetched = await fetchPdfFromSamUrl(docUrl);
