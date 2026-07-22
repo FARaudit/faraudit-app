@@ -20,6 +20,7 @@ function check(condition: boolean, label: string): void {
 function meta(o: Partial<EmailMeta>): EmailMeta {
   return {
     threadId: "t1",
+    latestMessageId: "m1",
     senderEmail: "test@example.com",
     senderName: "Test",
     recipient: "jose@faraudit.com",

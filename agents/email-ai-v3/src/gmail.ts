@@ -42,11 +42,14 @@ export async function listLabels(): Promise<Map<string, string>> {
 // Thread + message helpers
 // ────────────────────────────────────────────────────────────
 
-export async function listUnreadThreads(maxResults = 50): Promise<string[]> {
+// #658: widened past unread-only. Fetch recent inbox (2-day window) so read-but-unhandled mail is
+// still classified once. The per-tick idempotency guard (index.ts) ensures prior-classified threads
+// are never re-acted on — so widening the window does not cause re-labeling or re-drafting.
+export async function listInboxThreads(maxResults = 50): Promise<string[]> {
   const gmail = getGmail();
   const res = await gmail.users.threads.list({
     userId: "me",
-    q: "is:unread in:inbox",
+    q: "in:inbox newer_than:2d",
     maxResults,
   });
   return (res.data.threads || []).map((t) => t.id!).filter(Boolean);
