@@ -334,7 +334,7 @@ export async function GET(req: NextRequest) {
   }
 
   // ━━ Step 3: fetch the posted document manifest (no downloads) ━━
-  const manifest = await fetchAttachmentManifest(noticeId);
+  const manifest = await fetchAttachmentManifest(noticeId, { maxAttempts: 1 }); // ROOT-1 #5: resolve maxDuration=30s → single attempt
   if (!manifest || manifest.length === 0) {
     // No attachment list on the opportunity (or SAM unreachable — the manifest
     // helper returns null in both cases). Honest: report the empty package

@@ -165,8 +165,9 @@ export async function POST(
   // reconcile, so it forces documents_complete=false on every SAM refetch and
   // export-gates an otherwise clean report. Manifest failure / no primary falls
   // through to the legacy single-doc path below.
+  let assembled: AssembledDocumentSet | null = null; // ROOT-1 — hoisted for the no-silent-degrade guard
   if (/^[a-f0-9]{32}$/i.test(solicitation.noticeId)) {
-    const assembled: AssembledDocumentSet | null = await assembleSamDocumentSet(solicitation.noticeId, solicitation.solicitationNumber).catch(() => null);
+    assembled = await assembleSamDocumentSet(solicitation.noticeId, solicitation.solicitationNumber).catch(() => null);
     if (assembled?.primary) {
       pdfBase64 = assembled.primary.base64;
       pdfBuffer = assembled.primary.buffer;
@@ -182,8 +183,14 @@ export async function POST(
     }
   }
 
+  // NO-SILENT-DEGRADE (ROOT-1, Brain #648/#649 finding #4) — assembled===null = manifest UNAVAILABLE for a
+  // MULTI-DOC package; refuse the single-URL degrade (would drop N-1 known docs) → honest-INCOMPLETE.
+  if (!pdfBase64 && !pdfFileId && assembled === null && solicitation.resourceLinks.length > 1 && /^[a-f0-9]{32}$/i.test(solicitation.noticeId)) {
+    pdfUnavailableReason = `multi-doc manifest unavailable (after retries) — ${solicitation.resourceLinks.length} resources expected; refused single-doc degrade`;
+    console.warn(`[refetch] NO-SILENT-DEGRADE: notice=${solicitation.noticeId} resourceLinks=${solicitation.resourceLinks.length} · manifest unavailable → INCOMPLETE`);
+  }
   // Fallback — single primary doc (mirrors the main route) when assembly yields no primary.
-  if (!pdfBase64 && !pdfFileId) {
+  else if (!pdfBase64 && !pdfFileId) {
     try {
       const fetched = await fetchPdfFromSamUrl(solicitation.resourceLinks[0]);
       if (fetched.bytes > MAX_PDF_BYTES) {

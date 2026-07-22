@@ -366,28 +366,58 @@ export interface AssembledDocumentSet {
 
 const norm = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-export async function fetchAttachmentManifest(noticeId: string): Promise<AttachmentManifestEntry[] | null> {
+// ROOT-1 (Brain #648) — bounded-backoff retry so a TRANSIENT manifest blip does not silently collapse a
+// multi-doc package to the single-URL fallback. A genuinely-empty manifest (valid response, 0 attachments)
+// is NOT a blip and is returned immediately (null) with no retry. Every fetch FAILURE (network throw or
+// non-2xx) emits a counted [manifest-blip] event (noticeId + attempt) so blip frequency is measurable and
+// the retry budget is data-driven, not guessed.
+const MANIFEST_MAX_ATTEMPTS = 3;
+const MANIFEST_BACKOFF_MS = [0, 300, 800]; // delay BEFORE attempt i (attempt 1 = no delay)
+
+export async function fetchAttachmentManifest(
+  noticeId: string,
+  opts?: { maxAttempts?: number }
+): Promise<AttachmentManifestEntry[] | null> {
   if (!SAM_API_KEY || !/^[a-f0-9]{32}$/i.test(noticeId)) return null;
-  try {
-    const res = await fetch(
-      `https://sam.gov/api/prod/opps/v3/opportunities/${noticeId}/resources?api_key=${SAM_API_KEY}`,
-      { headers: { accept: "application/hal+json" }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }
-    );
-    if (!res.ok) return null;
-    const j = (await res.json()) as { _embedded?: { opportunityAttachmentList?: Array<{ attachments?: Array<Record<string, unknown>> }> } };
-    const atts = j?._embedded?.opportunityAttachmentList?.[0]?.attachments;
-    if (!Array.isArray(atts) || atts.length === 0) return null;
-    return atts
-      .filter((a) => typeof a?.resourceId === "string" && typeof a?.name === "string")
-      .map((a) => ({
-        name: a.name as string,
-        sizeBytes: typeof a.size === "number" ? a.size : null,
-        resourceId: a.resourceId as string,
-        url: `https://sam.gov/api/prod/opps/v3/opportunities/resources/files/${a.resourceId}/download`
-      }));
-  } catch {
-    return null;
+  // ROOT-1 finding #5 — a caller under a tight wall-clock ceiling (resolve route: maxDuration=30s) passes
+  // maxAttempts=1 so the retry chain (≤3 × 30s timeout) can't blow its budget. Default 3 for the async paths.
+  const maxAttempts = Math.max(1, opts?.maxAttempts ?? MANIFEST_MAX_ATTEMPTS);
+  let lastFailure = "";
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    if (attempt > 1) await new Promise((r) => setTimeout(r, MANIFEST_BACKOFF_MS[attempt - 1] ?? 800));
+    try {
+      const res = await fetch(
+        `https://sam.gov/api/prod/opps/v3/opportunities/${noticeId}/resources?api_key=${SAM_API_KEY}`,
+        { headers: { accept: "application/hal+json" }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }
+      );
+      if (!res.ok) {
+        lastFailure = `http_${res.status}`;
+        console.warn(`[manifest-blip] notice=${noticeId} attempt=${attempt}/${maxAttempts} failure=http_${res.status}`);
+        continue; // transient → retry
+      }
+      const j = (await res.json()) as { _embedded?: { opportunityAttachmentList?: Array<{ attachments?: Array<Record<string, unknown>> }> } };
+      const atts = j?._embedded?.opportunityAttachmentList?.[0]?.attachments;
+      // Valid response with no attachments is a REAL answer (not a blip) — return immediately, never retry.
+      if (!Array.isArray(atts) || atts.length === 0) return null;
+      return atts
+        .filter((a) => typeof a?.resourceId === "string" && typeof a?.name === "string")
+        .map((a) => ({
+          name: a.name as string,
+          sizeBytes: typeof a.size === "number" ? a.size : null,
+          resourceId: a.resourceId as string,
+          url: `https://sam.gov/api/prod/opps/v3/opportunities/resources/files/${a.resourceId}/download`
+        }));
+    } catch (e) {
+      lastFailure = e instanceof Error ? e.message.slice(0, 60) : "throw";
+      console.warn(`[manifest-blip] notice=${noticeId} attempt=${attempt}/${maxAttempts} failure=${lastFailure}`);
+      continue; // network throw → retry
+    }
   }
+  // All attempts exhausted on FETCH FAILURE — a blip-class exhaustion. Distinct from "no attachments";
+  // the caller's no-silent-degrade guard keys on resourceLinks.length, not on the reason, so returning
+  // null here is safe: a multi-doc package (resourceLinks>1) will route to INCOMPLETE, not single-doc.
+  console.warn(`[manifest-blip] notice=${noticeId} EXHAUSTED ${maxAttempts} attempts · lastFailure=${lastFailure}`);
+  return null;
 }
 
 // FA-119 Phase 2 — work-statement-aware tiering. The governing work statement

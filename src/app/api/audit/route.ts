@@ -413,12 +413,16 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // ROOT-1 (Brain #648/#649) — `assembled` hoisted so the no-silent-degrade guard below can key on
+  // `assembled === null` (manifest UNAVAILABLE) vs a readable-but-no-primary set (oversize → keeps its legacy
+  // read). Fixes the over-fire that keyed on `!pdfBase64` alone.
+  let assembled: AssembledDocumentSet | null = null;
   if (!pdfBase64 && !pdfFileId && noticeId && solicitation.resourceLinks.length > 0) {
     // FA-136 — deterministic form-first multi-attachment assembly (mirrors
     // the worker arm). Manifest failure or no ingestible primary falls
     // through to the legacy single-URL path unchanged.
     if (/^[a-f0-9]{32}$/i.test(solicitation.noticeId)) {
-      const assembled: AssembledDocumentSet | null = await assembleSamDocumentSet(solicitation.noticeId, solicitation.solicitationNumber).catch(() => null);
+      assembled = await assembleSamDocumentSet(solicitation.noticeId, solicitation.solicitationNumber).catch(() => null);
       if (assembled?.primary) {
         pdfBase64 = assembled.primary.base64;
         pdfBuffer = assembled.primary.buffer;
@@ -434,7 +438,17 @@ export async function POST(req: NextRequest) {
       }
     }
   }
-  if (!pdfBase64 && !pdfFileId && noticeId && solicitation.resourceLinks.length > 0) {
+  if (!pdfBase64 && !pdfFileId && noticeId && assembled === null && solicitation.resourceLinks.length > 1 && /^[a-f0-9]{32}$/i.test(solicitation.noticeId)) {
+    // NO-SILENT-DEGRADE (ROOT-1, Brain #648) — `assembled === null` = manifest UNAVAILABLE (fetch exhausted) for a
+    // MULTI-DOC package (resourceLinks.length known > 1). (A readable-but-no-primary/oversize set is assembled !==
+    // null → this guard is skipped, preserving its legacy read — over-fire fix.) Falling through to the single-URL
+    // read below would
+    // silently ingest resourceLinks[0] alone, drop the other N-1 KNOWN docs, and report docs_complete on 1 — the
+    // exact seq-4 8ca6d7d4 defect. A degraded read of a known-multi-doc package is NOT a healthy single-doc audit:
+    // route to honest-unavailable so the engine returns INCOMPLETE, never a verdict on a partial read.
+    pdfUnavailableReason = `multi-doc manifest assembly failed (after retries) — ${solicitation.resourceLinks.length} resources expected; not degrading to a single-doc read (would drop ${solicitation.resourceLinks.length - 1})`;
+    console.warn(`[audit] NO-SILENT-DEGRADE: notice=${solicitation.noticeId} resourceLinks=${solicitation.resourceLinks.length} · assembly null → INCOMPLETE (refused single-doc fallback)`);
+  } else if (!pdfBase64 && !pdfFileId && noticeId && solicitation.resourceLinks.length > 0) {
     try {
       const fetched = await fetchPdfFromSamUrl(solicitation.resourceLinks[0]);
       if (fetched.bytes > MAX_PDF_BYTES) {
