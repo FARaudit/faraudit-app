@@ -3,6 +3,7 @@
 // tick into ONE "📌 needs attention" summary draft. Machine noise NEVER reaches this path — only the
 // digest_p0_block verb qualifies, and routine/automated notifications are explicitly not that verb.
 import type { ActionVerb } from "./action-extractor";
+import { isArchiveAllowlisted } from "./archive-allowlist";
 
 export interface NeedsAttentionItem {
   senderName: string;
@@ -16,6 +17,16 @@ export interface NeedsAttentionItem {
 /** The ONLY verb that flags a thread for CEO attention. Everything else (incl. machine noise) is silent. */
 export function isNeedsAttention(verb: ActionVerb): boolean {
   return verb === "digest_p0_block";
+}
+
+/**
+ * #662 (Brain ruled B — strict allowlist suppression): a thread produces needs-attention egress (draft
+ * or Telegram) ONLY when the verb qualifies AND the sender is NOT in ARCHIVE_ALLOWLIST. Allowlisted-domain
+ * threads (github/vercel/railway/supabase) NEVER egress, regardless of failure content — they are silent
+ * machine-noise senders by policy. Non-allowlisted failures (e.g. Stripe payment failed) still qualify.
+ */
+export function shouldEgress(verb: ActionVerb, senderEmail: string | null | undefined): boolean {
+  return isNeedsAttention(verb) && !isArchiveAllowlisted(senderEmail);
 }
 
 /**

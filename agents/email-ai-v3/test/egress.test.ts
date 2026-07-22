@@ -2,7 +2,7 @@
 // Matrix: p0 action → draft; machine-noise → zero egress; already-classified → skipped;
 // second tick same thread → no reprocess; new message on thread → reprocesses (can re-notify);
 // telegram gated cleanly when creds absent.
-import { isNeedsAttention, buildNeedsAttentionDraft, buildTelegramLine, type NeedsAttentionItem } from "../src/needs-attention";
+import { isNeedsAttention, shouldEgress, buildNeedsAttentionDraft, buildTelegramLine, type NeedsAttentionItem } from "../src/needs-attention";
 import { telegramConfigured } from "../src/telegram";
 import type { ActionVerb } from "../src/action-extractor";
 
@@ -15,6 +15,17 @@ function check(cond: boolean, label: string): void {
 check(isNeedsAttention("digest_p0_block") === true, "digest_p0_block → qualifies");
 const nonQualifying: ActionVerb[] = ["reply", "calendar", "notion_update", "digest_p0_unblock", "forward", "none"];
 for (const v of nonQualifying) check(isNeedsAttention(v) === false, `${v} → does NOT qualify (no egress)`);
+
+// ── 1b. #662 STRICT SUPPRESSION — allowlisted-domain threads NEVER egress, even on failure content ──
+//   allowlisted FAILURE (railway/vercel build/deploy failed) → archived, ZERO egress
+check(shouldEgress("digest_p0_block", "hello@notify.railway.app") === false, "railway FAILURE (allowlisted) → suppressed, no egress");
+check(shouldEgress("digest_p0_block", "notifications@vercel.com") === false, "vercel FAILURE (allowlisted) → suppressed, no egress");
+check(shouldEgress("digest_p0_block", "noreply@github.com") === false, "github (allowlisted) → suppressed");
+//   non-allowlisted failure (Stripe payment failed) → STILL qualifies
+check(shouldEgress("digest_p0_block", "failed-payments@stripe.com") === true, "Stripe FAILURE (non-allowlisted) → still egresses");
+check(shouldEgress("digest_p0_block", "registered-agent@example.com") === true, "human/vendor deadline (non-allowlisted) → egresses");
+//   non-qualifying verb never egresses regardless of sender
+check(shouldEgress("none", "failed-payments@stripe.com") === false, "non-qualifying verb → no egress");
 
 // ── 2. buildNeedsAttentionDraft: zero qualifying → NO draft; ≥1 → one draft w/ #660 subject ──
 check(buildNeedsAttentionDraft([], "2026-07-22 11:30 CT") === null, "0 qualifying → null (no draft)");

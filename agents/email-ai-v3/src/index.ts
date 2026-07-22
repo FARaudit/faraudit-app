@@ -18,7 +18,7 @@ import {
 import { shouldArchive } from "./archive-allowlist";
 import { alertFailure } from "./alerting";
 import {
-  isNeedsAttention,
+  shouldEgress,
   buildNeedsAttentionDraft,
   buildTelegramLine,
   type NeedsAttentionItem,
@@ -398,8 +398,9 @@ async function main(): Promise<void> {
       try {
         const action = await extractAction(meta, outcome.result);
         await persistAction(classificationId, meta.threadId, runId, action);
-        // #660: collect qualifying (digest_p0_block) for the single needs-attention egress after the loop.
-        if (isNeedsAttention(action.verb)) {
+        // #660 + #662: collect qualifying for egress — digest_p0_block AND sender NOT allowlisted
+        // (strict suppression: allowlisted-domain threads never draft/push, even on failure content).
+        if (shouldEgress(action.verb, meta.senderEmail)) {
           const cs = (action.cross_system || {}) as { blocker?: string; deadline?: string };
           qualifying.push({
             classificationId,
