@@ -5,7 +5,7 @@
 process.env.AUDIT_SELF_CLEARABLE_PACKAGE = "true";
 import { readFileSync, readdirSync } from "fs";
 (async () => {
-  const { deriveShadowVerdict, applyClauseKeyedTypingFloor } = await import("../../src/lib/audit-decide");
+  const { deriveShadowVerdict, deriveVerdict, applyClauseKeyedTypingFloor } = await import("../../src/lib/audit-decide");
   // card #609-(2)/(8): mirror production — the clause-keyed typing floor runs pre-deriveShadowVerdict when armed. The
   // corpus previously never exercised the floor (the #609-(8) corpus gap). Applied to every specimen's findings under
   // the same flag production reads, so the adversarial 8(a)/HUBZone/size specimens below actually pass through it.
@@ -15,7 +15,7 @@ import { readFileSync, readdirSync } from "fs";
   const byId = (frag: string) => { const f = all.find((x) => x.includes(frag)); if (!f) throw new Error(`no record for ${frag}`); return JSON.parse(readFileSync(`${dir}/${f}`, "utf8")).result.inputs; };
   const naicsOf = (inp: any) => { const m = (inp.source || "").match(/NAICS\s*(?:code)?[:\s#]*([0-9]{5,6})/i); return m ? m[1] : null; };
 
-  type Spec = { name: string; category: string; expected: string | string[]; inp: any; naics?: string | null };
+  type Spec = { name: string; category: string; expected: string | string[]; inp: any; naics?: string | null; authoritative?: boolean };
   const specs: Spec[] = [
     // ── BIDDABLE → COMMIT (committal on genuinely self-clearable packages) ──
     { name: "LBJ 40fd02ce", category: "biddable/self-clearable", expected: "BID_WITH_CAUTION", inp: byId("40fd02ce"), naics: "561320" },
@@ -65,10 +65,32 @@ import { readFileSync, readdirSync } from "fs";
     specs.push({ name: a.name, category: "adversarial-falseBID", expected: ["INELIGIBLE", "NEEDS_HUMAN_REVIEW"], inp: adv });
   }
 
+  // ── ROOT-2 (Brain #648) — EXISTS-denominator completeness, tested on the AUTHORITATIVE deriveVerdict pole
+  // (the field ROOT-2 sets, `documentsComplete`, is retired on the shadow pole — see the ⚠ Phase-2 dependency at
+  // audit-decide.ts:3150). A degraded package (v3 dropped docs → agenticManifestComplete false → documentsComplete
+  // false) MUST cap to INCOMPLETE, never a committal over a stub; a lean package that reads fully MUST NOT be
+  // false-INCOMPLETE. Base = a real biddable record's inputs; only the completeness flag is overridden (Rule 64). ──
+  {
+    // Coverage-clean base (real biddable findings/source, self-clearable → BWC) so `documentsComplete` is the SOLE
+    // deciding completeness axis — isolates exactly what ROOT-2 sets (the other completeness gates are cleared).
+    const b = JSON.parse(JSON.stringify(byId("df202699")));
+    const cleanBase: any = { ...b, coverageComplete: true };
+    delete cleanBase.coverageV2;
+    const stub = { ...cleanBase, documentsComplete: false };
+    specs.push({ name: "ROOT-2 stub-degraded (docs_complete=false) → INCOMPLETE", category: "root2-exists/incomplete", expected: "INCOMPLETE", inp: stub, authoritative: true });
+    const lean = { ...cleanBase, documentsComplete: true };
+    specs.push({ name: "ROOT-2 lean-complete (docs_complete=true) → not false-INCOMPLETE", category: "root2-exists/biddable", expected: ["BID", "BID_WITH_CAUTION"], inp: lean, authoritative: true });
+  }
+
   // ── run ──
   let pass = 0; const rows: any[] = [];
   for (const s of specs) {
-    let sv: any; try { sv = deriveShadowVerdict(flooredInp(s.inp), { naics: s.naics ?? naicsOf(s.inp) }); } catch (e) { sv = { verdict: "THREW", reason: String(e) }; }
+    let sv: any;
+    try {
+      sv = s.authoritative
+        ? deriveVerdict(flooredInp(s.inp))
+        : deriveShadowVerdict(flooredInp(s.inp), { naics: s.naics ?? naicsOf(s.inp) });
+    } catch (e) { sv = { verdict: "THREW", reason: String(e) }; }
     const exp = Array.isArray(s.expected) ? s.expected : [s.expected];
     const ok = exp.includes(sv.verdict);
     if (ok) pass++;

@@ -125,7 +125,7 @@ async function buildWatcherAuditInput(
   // documents_complete=false on every multi-attachment notice. Manifest failure / no
   // primary falls through to the single-doc path below (honest-fail stays the degrade).
   if (/^[a-f0-9]{32}$/i.test(solicitation.noticeId)) {
-    const assembled: AssembledDocumentSet | null = await assembleSamDocumentSet(solicitation.noticeId, solicitation.solicitationNumber).catch(() => null);
+    const assembled: AssembledDocumentSet | null = await assembleSamDocumentSet(solicitation.noticeId, solicitation.solicitationNumber, solicitation.resourceLinks).catch(() => null); // ROOT-2 #648: independent v2 expected-set for the EXISTS denominator
     if (assembled?.primary) {
       pdfBase64 = assembled.primary.base64;
       pdfBuffer = assembled.primary.buffer;

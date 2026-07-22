@@ -418,7 +418,7 @@ export async function POST(req: NextRequest) {
     // the worker arm). Manifest failure or no ingestible primary falls
     // through to the legacy single-URL path unchanged.
     if (/^[a-f0-9]{32}$/i.test(solicitation.noticeId)) {
-      const assembled: AssembledDocumentSet | null = await assembleSamDocumentSet(solicitation.noticeId, solicitation.solicitationNumber).catch(() => null);
+      const assembled: AssembledDocumentSet | null = await assembleSamDocumentSet(solicitation.noticeId, solicitation.solicitationNumber, solicitation.resourceLinks).catch(() => null); // ROOT-2 #648: independent v2 expected-set for the EXISTS denominator
       if (assembled?.primary) {
         pdfBase64 = assembled.primary.base64;
         pdfBuffer = assembled.primary.buffer;

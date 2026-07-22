@@ -941,6 +941,9 @@ function renderPriceAnchor(html: string, v: V2RenderInput): string {
 function deriveIndexedCategory(reason: string): string {
   const r = String(reason ?? "").trim();
   if (!r) return "";
+  // ROOT-2 (Brain #648) — a doc the notice advertised but the manifest never retrieved. Distinct from "beyond
+  // budget" (we chose not to deep-read) — we never got the file. Honest label, never implies custody.
+  if (/degraded retrieval|absent from the resources manifest/i.test(r)) return "Not retrieved — re-run";
   if (/near-duplicate|duplicate|superseded/i.test(r)) return "Duplicate / superseded";
   // Bare amendment / "SF-30" cover sheet → superseded amendments bucket.
   if (/\bsf[\s-]?30\b|amendment\s+cover|bare\s+amendment|^amendment\b/i.test(r)) return "Superseded amendments";
