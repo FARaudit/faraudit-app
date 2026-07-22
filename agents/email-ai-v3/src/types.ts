@@ -63,6 +63,7 @@ export interface ClassificationResult {
 
 export interface EmailMeta {
   threadId: string;
+  latestMessageId: string; // #660: id of the newest message — the fetch-widening idempotency key
   senderEmail: string;
   senderName: string;
   recipient: string;
@@ -79,6 +80,8 @@ export interface RunMetrics {
   classifiedDeterministic: number;
   classifiedLLM: number;
   draftsCreated: number;
+  needsAttention: number;           // #658: digest_p0_block threads flagged this tick
+  skippedAlreadyClassified: number; // #658: threads skipped by the idempotency guard (classify-once)
   errors: number;
   totalCostUSD: number;
   errorLog: Array<{

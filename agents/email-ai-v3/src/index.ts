@@ -7,15 +7,23 @@ import { loadBlacklist, isBlacklisted } from "./blacklist";
 import { getSupabase } from "./supabase";
 import {
   listLabels,
-  listUnreadThreads,
+  listInboxThreads,
   getThread,
   applyLabel,
   removeLabel,
   ensureLabel,
   archiveThread,
+  createDraft,
 } from "./gmail";
 import { shouldArchive } from "./archive-allowlist";
 import { alertFailure } from "./alerting";
+import {
+  isNeedsAttention,
+  buildNeedsAttentionDraft,
+  buildTelegramLine,
+  type NeedsAttentionItem,
+} from "./needs-attention";
+import { telegramConfigured, sendTelegram } from "./telegram";
 import { BLACKLIST_LABEL } from "./constants";
 import { classifyDeterministic } from "./deterministic";
 import { classifyLLM } from "./anthropic";
@@ -39,10 +47,6 @@ import {
   type RunMetrics,
 } from "./types";
 
-// Self-loop filter is now domain-based (per Phase 2 spec) — handles plus-addressing
-// and Bullrize/LexAnchor self-forwards. Per-email match used to be GMAIL_USER but
-// senders.self_identity_domains is the canonical source of truth.
-const SELF_DOMAINS = new Set(senders.self_identity_domains.map((d) => d.toLowerCase()));
 const KILL_SWITCH = process.env.EMAIL_AI_ENABLED === "true";
 
 // ────────────────────────────────────────────────────────────
@@ -72,6 +76,7 @@ function buildEmailMeta(thread: GmailThread): EmailMeta | null {
 
   return {
     threadId: thread.id,
+    latestMessageId: (last as GmailMessage).id || "",
     senderEmail,
     senderName,
     recipient: findHeader(headers, "To"),
@@ -131,6 +136,7 @@ async function persistClassification(
   const supabase = getSupabase();
   const { data, error } = await supabase.from("email_thread_classifications").insert({
     thread_id: meta.threadId,
+    latest_message_id: meta.latestMessageId, // #660: idempotency key for the widened fetch
     sender_email: meta.senderEmail,
     subject: meta.subject,
     bucket: result.urgency,
@@ -170,18 +176,8 @@ async function persistAction(
 }
 
 // ────────────────────────────────────────────────────────────
-// Outbound tracking stub (for WAITING auto-detect — Phase 2 SHIP wires)
-// For now, just no-op log. Phase 2 SHIP will write to outbound_tracking table.
-// ────────────────────────────────────────────────────────────
-
-function trackOutbound(meta: EmailMeta): void {
-  // TODO Phase 2 SHIP: persist {thread_id, recipient, sent_at} to outbound_tracking
-  // for downstream WAITING auto-detect (4hr threshold, 14d expiry)
-  console.log(`[email-ai-v3] outbound tracked (stub): ${meta.threadId} → ${extractEmail(meta.recipient)}`);
-}
-
-// ────────────────────────────────────────────────────────────
 // Per-thread processing: deterministic Stage 1 → LLM Stage 2
+// (#660: dead trackOutbound() stub removed — real outbound tracking lives in outbound-tracker.ts.)
 // ────────────────────────────────────────────────────────────
 
 interface ProcessOutcome {
@@ -194,13 +190,6 @@ async function processThread(
   meta: EmailMeta,
   labelMap: Map<string, string>,
 ): Promise<ProcessOutcome> {
-  // Self-domain filter (handles plus-addressing + Bullrize/LexAnchor self-forwards).
-  // Step A in deterministic.ts catches this too; this is the route for outbound tracking.
-  const senderDomain = extractDomain(meta.senderEmail);
-  if (SELF_DOMAINS.has(senderDomain)) {
-    trackOutbound(meta);
-  }
-
   // Stage 1: deterministic
   let result = classifyDeterministic(meta);
 
@@ -314,6 +303,8 @@ async function main(): Promise<void> {
     classifiedDeterministic: 0,
     classifiedLLM: 0,
     draftsCreated: 0,
+    needsAttention: 0,
+    skippedAlreadyClassified: 0,
     errors: 0,
     totalCostUSD: 0,
     errorLog: [],
@@ -321,8 +312,8 @@ async function main(): Promise<void> {
 
   let threadIds: string[] = [];
   try {
-    threadIds = await listUnreadThreads(50);
-    console.log(`[email-ai-v3] fetched ${threadIds.length} unread threads`);
+    threadIds = await listInboxThreads(50); // #660: in:inbox newer_than:2d (was unread-only)
+    console.log(`[email-ai-v3] fetched ${threadIds.length} inbox threads (newer_than:2d)`);
   } catch (e) {
     metrics.errors += 1;
     metrics.errorLog.push({
@@ -336,6 +327,27 @@ async function main(): Promise<void> {
     return;
   }
 
+  // #660 idempotency guard: pre-load the latest_message_ids already classified for this fetch set.
+  // A thread whose current latest message id is already recorded is skipped — classify each message
+  // state exactly once; a NEW message (new id) is not in the set, so it re-qualifies (and can re-notify).
+  const alreadyClassified = new Set<string>();
+  try {
+    const supabase = getSupabase();
+    for (let i = 0; i < threadIds.length; i += 100) {
+      const chunk = threadIds.slice(i, i + 100);
+      const { data } = await supabase
+        .from("email_thread_classifications")
+        .select("latest_message_id")
+        .in("thread_id", chunk);
+      for (const r of data || []) if (r.latest_message_id) alreadyClassified.add(r.latest_message_id as string);
+    }
+  } catch (e) {
+    console.warn(`[email-ai-v3] idempotency preload failed (will classify all): ${errorMessage(e)}`);
+  }
+
+  // #660 Tier 1/2: qualifying (digest_p0_block) items collected across the tick → single draft + per-item push.
+  const qualifying: Array<NeedsAttentionItem & { classificationId: string }> = [];
+
   for (const threadId of threadIds) {
     metrics.threadsProcessed += 1;
     let meta: EmailMeta | null = null;
@@ -344,6 +356,13 @@ async function main(): Promise<void> {
       const thread = await getThread(threadId);
       meta = buildEmailMeta(thread);
       if (!meta) continue;
+
+      // #660 idempotency: skip if this exact message state was already classified (no re-label, no re-act,
+      // no re-notify). A new message on the thread has a new id → not skipped → re-qualifies.
+      if (meta.latestMessageId && alreadyClassified.has(meta.latestMessageId)) {
+        metrics.skippedAlreadyClassified += 1;
+        continue;
+      }
 
       // Blacklist (legacy v3 hard filter). De-arm (#657) change 1: LABEL-ONLY, never trashed.
       // Apply "AI/Blacklisted" (create if missing) + remove INBOX + UNREAD. Nothing is deleted.
@@ -379,6 +398,19 @@ async function main(): Promise<void> {
       try {
         const action = await extractAction(meta, outcome.result);
         await persistAction(classificationId, meta.threadId, runId, action);
+        // #660: collect qualifying (digest_p0_block) for the single needs-attention egress after the loop.
+        if (isNeedsAttention(action.verb)) {
+          const cs = (action.cross_system || {}) as { blocker?: string; deadline?: string };
+          qualifying.push({
+            classificationId,
+            threadId: meta.threadId,
+            senderName: meta.senderName,
+            senderEmail: meta.senderEmail,
+            subject: meta.subject,
+            reason: cs.blocker || action.reason || "action-required",
+            deadline: cs.deadline,
+          });
+        }
       } catch (e) {
         metrics.errors += 1;
         metrics.errorLog.push({
@@ -400,6 +432,59 @@ async function main(): Promise<void> {
         ts: new Date().toISOString(),
       });
       console.error(`[email-ai-v3] thread ${meta?.threadId || threadId} failed: ${errorMessage(e)}`);
+    }
+  }
+
+  // ── #660 EGRESS: needs-attention (digest_p0_block) → ONE Gmail draft + per-item Telegram push ──
+  // Zero qualifying = zero egress. Machine-noise/allowlist senders never reach here (they don't get the verb).
+  metrics.needsAttention = qualifying.length;
+  let telegramSummary = "disabled";
+  if (qualifying.length > 0) {
+    const nowLabel =
+      new Date()
+        .toLocaleString("en-CA", {
+          timeZone: "America/Chicago",
+          year: "numeric", month: "2-digit", day: "2-digit",
+          hour: "2-digit", minute: "2-digit", hour12: false,
+        })
+        .replace(",", "") + " CT";
+
+    // Tier 1 — single Gmail draft-flag (zero new creds; reuses #657 createDraft).
+    try {
+      const draft = buildNeedsAttentionDraft(qualifying, nowLabel);
+      if (draft) {
+        await createDraft({ to: process.env.ALERT_EMAIL || "jose@faraudit.com", subject: draft.subject, body: draft.body });
+        metrics.draftsCreated += 1;
+        console.log(`[email-ai-v3] needs-attention draft created (${qualifying.length} item(s))`);
+      }
+    } catch (e) {
+      metrics.errors += 1;
+      console.error(`[email-ai-v3] needs-attention draft failed: ${errorMessage(e)}`);
+    }
+
+    // Tier 2 — env-gated Telegram push (one per qualifying action). Dormant + silent without creds.
+    if (telegramConfigured()) {
+      let tgSent = 0;
+      for (const it of qualifying) {
+        const res = await sendTelegram(buildTelegramLine(it, nowLabel));
+        if (res.ok) tgSent += 1;
+        else console.warn(`[email-ai-v3] telegram push failed thread=${it.threadId}: ${res.reason}`);
+      }
+      telegramSummary = `${tgSent}/${qualifying.length} sent`;
+      console.log(`[email-ai-v3] telegram: ${telegramSummary}`);
+    } else {
+      console.log(`[email-ai-v3] telegram disabled — ${qualifying.length} qualifying action(s) via draft-flag only`);
+    }
+
+    // #660 DEDUPE: stamp notified_at so a thread notifies once across both tiers (a new message re-qualifies).
+    try {
+      const supabase = getSupabase();
+      await supabase
+        .from("email_ai_actions")
+        .update({ notified_at: new Date().toISOString() })
+        .in("classification_id", qualifying.map((q) => q.classificationId));
+    } catch (e) {
+      console.warn(`[email-ai-v3] notified_at stamp failed: ${errorMessage(e)}`);
     }
   }
 
@@ -432,7 +517,7 @@ async function main(): Promise<void> {
 
   await finalizeRun(runId, metrics, status);
 
-  lastTickSummary = `status=${status} · processed=${metrics.threadsProcessed} · det=${metrics.classifiedDeterministic} · llm=${metrics.classifiedLLM} · drafts=${metrics.draftsCreated} · errors=${metrics.errors} · cost=$${metrics.totalCostUSD.toFixed(4)}`;
+  lastTickSummary = `status=${status} · fetched=${metrics.threadsProcessed} · skipped=${metrics.skippedAlreadyClassified} · det=${metrics.classifiedDeterministic} · llm=${metrics.classifiedLLM} · qualifying=${metrics.needsAttention} · drafts=${metrics.draftsCreated} · telegram=${telegramSummary} · errors=${metrics.errors} · cost=$${metrics.totalCostUSD.toFixed(4)}`;
   console.log(`[email-ai-v3] tick complete · ${lastTickSummary}`);
 }
 
