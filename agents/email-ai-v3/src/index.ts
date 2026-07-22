@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { initSentry } from "./sentry";
+import { initSentry, captureException } from "./sentry";
 initSentry("email-ai-v3");
 
 import { runMigrationCheck } from "./migration-check";
@@ -11,8 +11,12 @@ import {
   getThread,
   applyLabel,
   removeLabel,
-  moveToTrash,
+  ensureLabel,
+  archiveThread,
 } from "./gmail";
+import { shouldArchive } from "./archive-allowlist";
+import { alertFailure } from "./alerting";
+import { BLACKLIST_LABEL } from "./constants";
 import { classifyDeterministic } from "./deterministic";
 import { classifyLLM } from "./anthropic";
 import { tickOutbound, tickReplies, tickWaiting } from "./outbound-tracker";
@@ -230,19 +234,20 @@ async function processThread(
   const companyLabelId = labelMap.get(companyLabelName);
   if (companyLabelId) await applyLabel(meta.threadId, companyLabelId);
 
-  // Email-AI v4 Stage 1 (2026-05-15): Inbox-as-NOW-queue.
-  // ONLY NOW keeps INBOX. THIS_WEEK / WAITING / REFERENCE / ARCHIVE all strip INBOX —
-  // bucket label retained, threads remain findable via label search.
-  // Defensive: only strip for KNOWN non-NOW buckets. Unknown urgency values keep INBOX
-  // to surface classifier failures rather than silently hiding them.
-  const STRIP_INBOX_BUCKETS = ["THIS_WEEK", "WAITING", "REFERENCE", "ARCHIVE"];
-  if (STRIP_INBOX_BUCKETS.includes(result.urgency)) {
+  // De-arm (#657) change 2: ALLOWLIST-GATED ARCHIVING (supersedes the old bucket-strip). A thread
+  // leaves the inbox ONLY when its classification was deterministic AND its sender is in
+  // ARCHIVE_ALLOWLIST. Everything else — every LLM-fallback classification and every non-allowlisted
+  // sender — is labeled and RETAINED (INBOX + UNREAD kept; applyLabel no longer strips UNREAD).
+  if (shouldArchive(result.stage, meta.senderEmail)) {
     try {
       await removeLabel(meta.threadId, "INBOX");
-      console.log(`[email-ai-v3] inbox-removed thread=${meta.threadId} urgency=${result.urgency}`);
+      await removeLabel(meta.threadId, "UNREAD");
+      console.log(`[email-ai-v3] archived (deterministic+allowlist) thread=${meta.threadId} sender=${meta.senderEmail} urgency=${result.urgency}`);
     } catch (e) {
-      console.warn(`[email-ai-v3] inbox-remove failed thread=${meta.threadId}: ${errorMessage(e)}`);
+      console.warn(`[email-ai-v3] archive failed thread=${meta.threadId}: ${errorMessage(e)}`);
     }
+  } else {
+    console.log(`[email-ai-v3] retained-in-inbox thread=${meta.threadId} stage=${result.stage} sender=${meta.senderEmail}`);
   }
 
   // Phase 2 BUILD: drafts disabled. Phase 2 SHIP restores draft creation here.
@@ -340,10 +345,11 @@ async function main(): Promise<void> {
       meta = buildEmailMeta(thread);
       if (!meta) continue;
 
-      // Blacklist (legacy v3 hard filter — kept for backwards compat)
+      // Blacklist (legacy v3 hard filter). De-arm (#657) change 1: LABEL-ONLY, never trashed.
+      // Apply "AI/Blacklisted" (create if missing) + remove INBOX + UNREAD. Nothing is deleted.
       if (isBlacklisted(meta.senderEmail)) {
-        await moveToTrash(meta.threadId);
-        // Persist as ARCHIVE (not DELETE — DELETE is killed)
+        const blLabelId = await ensureLabel(BLACKLIST_LABEL);
+        await archiveThread(meta.threadId, [blLabelId]);
         await persistClassification(
           runId,
           meta,
@@ -352,7 +358,7 @@ async function main(): Promise<void> {
             domain: null,
             company: deriveCompanyFromRecipient(meta.recipient),
             confidence: 1.0,
-            reasoning: "hard blacklist match — auto-trashed",
+            reasoning: "hard blacklist match — labeled AI/Blacklisted, inbox+unread removed (never trashed)",
             bypassLLM: true,
             stage: "deterministic",
             rule_matched: "blacklist",
@@ -426,13 +432,18 @@ async function main(): Promise<void> {
 
   await finalizeRun(runId, metrics, status);
 
-  console.log(
-    `[email-ai-v3] tick complete · status=${status} · processed=${metrics.threadsProcessed} · det=${metrics.classifiedDeterministic} · llm=${metrics.classifiedLLM} · drafts=${metrics.draftsCreated} · errors=${metrics.errors} · cost=$${metrics.totalCostUSD.toFixed(4)}`
-  );
+  lastTickSummary = `status=${status} · processed=${metrics.threadsProcessed} · det=${metrics.classifiedDeterministic} · llm=${metrics.classifiedLLM} · drafts=${metrics.draftsCreated} · errors=${metrics.errors} · cost=$${metrics.totalCostUSD.toFixed(4)}`;
+  console.log(`[email-ai-v3] tick complete · ${lastTickSummary}`);
 }
 
-main().catch((e: Error) => {
+// De-arm (#657) change 3: failure alerting. Any uncaught error / Gmail auth failure → Sentry capture
+// (no-op without SENTRY_DSN) + a rate-limited (1/6h) Gmail DRAFT alert to the CEO. Never masks the exit code.
+let lastTickSummary = "tick did not reach completion (failed during setup or fetch — see error)";
+
+main().catch(async (e: Error) => {
   console.error(`[email-ai-v3] fatal: ${errorMessage(e)}`);
   console.error(e.stack);
+  captureException(e);
+  await alertFailure(e, lastTickSummary);
   process.exit(1);
 });
