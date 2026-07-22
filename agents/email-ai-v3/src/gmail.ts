@@ -66,12 +66,14 @@ export async function getThread(threadId: string): Promise<GmailThread> {
 // Mutations
 // ────────────────────────────────────────────────────────────
 
+// Apply a label WITHOUT touching read state — de-arm (#657): labeled-but-retained threads keep
+// INBOX + UNREAD. UNREAD is only removed on the explicit archive path (archiveThread).
 export async function applyLabel(threadId: string, addLabelId: string): Promise<void> {
   const gmail = getGmail();
   await gmail.users.threads.modify({
     userId: "me",
     id: threadId,
-    requestBody: { addLabelIds: [addLabelId], removeLabelIds: ["UNREAD"] },
+    requestBody: { addLabelIds: [addLabelId] },
   });
 }
 
@@ -84,9 +86,29 @@ export async function removeLabel(threadId: string, removeLabelId: string): Prom
   });
 }
 
-export async function moveToTrash(threadId: string): Promise<void> {
+// Resolve a label name → id, creating the label if it does not exist. Returns the id.
+export async function ensureLabel(name: string): Promise<string> {
   const gmail = getGmail();
-  await gmail.users.threads.trash({ userId: "me", id: threadId });
+  const existing = await listLabels();
+  const found = existing.get(name);
+  if (found) return found;
+  const res = await gmail.users.labels.create({
+    userId: "me",
+    requestBody: { name, labelListVisibility: "labelShow", messageListVisibility: "show" },
+  });
+  if (!res.data.id) throw new Error(`ensureLabel: create returned no id for '${name}'`);
+  return res.data.id;
+}
+
+// Archive = add label(s) + remove INBOX + remove UNREAD. This is the ONLY path that pulls a thread
+// out of the inbox. De-arm (#657): no code path can trash or delete mail — trashing is gone.
+export async function archiveThread(threadId: string, addLabelIds: string[]): Promise<void> {
+  const gmail = getGmail();
+  await gmail.users.threads.modify({
+    userId: "me",
+    id: threadId,
+    requestBody: { addLabelIds, removeLabelIds: ["INBOX", "UNREAD"] },
+  });
 }
 
 // ────────────────────────────────────────────────────────────
