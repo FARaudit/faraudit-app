@@ -85,7 +85,7 @@ const FORBIDDEN = ["AUDIT_VETO_NARROW_UNIVERSAL", "AUDIT_RETIRE_VERBATIM_VETO"] 
   const CONFIGS: Array<{ name: string; cfg: Record<string, string>; graded: boolean }> = [
     { name: "BASELINE  (live parity · arc flags OFF)", cfg: off(ALL_ARC), graded: false },
     { name: "ARMED-6   (the CEO's batch-arm)", cfg: { ...off(ALL_ARC), ...on(ARMED_SIX) }, graded: true },
-    { name: "+TEMPORAL (decision support ONLY — NOT on the arm card)", cfg: { ...off(ALL_ARC), ...on(ARMED_SIX), AUDIT_TEMPORAL_VERDICT: "true" }, graded: false },
+    { name: "+TEMPORAL (⛔ NON-EVIDENCE — see the banner printed with this block)", cfg: { ...off(ALL_ARC), ...on(ARMED_SIX), AUDIT_TEMPORAL_VERDICT: "true" }, graded: false },
   ];
 
   console.log("═".repeat(112));
@@ -122,6 +122,16 @@ const FORBIDDEN = ["AUDIT_VETO_NARROW_UNIVERSAL", "AUDIT_RETIRE_VERBATIM_VETO"] 
       if (escalToCommittal.length === 0 && threw.length === 0) console.log(`   ✅ R1 + R4 hold.`);
       console.log(`   R2/R3 — the ${deltas.length} delta(s) above are the PRE-REGISTERED expected set; any delta`);
       console.log(`           observed post-arm that is NOT in this list is a blocker, not a rounding error.`);
+    } else if (r.name.startsWith("+TEMPORAL")) {
+      // FORMAL EVIDENCE RULING — Brain, card #700, Jul 23 2026. Printed with the numbers, every run, so the
+      // table can never be quoted without it.
+      console.log(`   ⛔ NON-EVIDENCE FOR THE TEMPORAL QUESTION — IN BOTH DIRECTIONS.`);
+      console.log(`      A banked run-record CANNOT exercise a verdict-time live-SAM currency check: the gate asks`);
+      console.log(`      whether the solicitation is open NOW, and a frozen record has no NOW. This corpus is`);
+      console.log(`      STRUCTURALLY INCAPABLE of registering the gate's effect, so identical deltas here are`);
+      console.log(`      ABSENCE OF MEASUREMENT, not evidence of inertness (the L40 placebo shape).`);
+      console.log(`      Do NOT cite this block as grounds to leave AUDIT_TEMPORAL_VERDICT off, or to arm it.`);
+      console.log(`      The motivating record for arming it is #667, not this table. Charter: ceo/PACKAGE-2-LIVENESS-UNIT-CHARTER.md`);
     } else {
       console.log(`   (ungraded — reference configuration)`);
     }
