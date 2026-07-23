@@ -19,7 +19,33 @@ export const SITE_VISIT_CONCLUDED_RE = /\bsite[\s-]?(?:visit|tour|inspection)\b[
 // … eligible". It deliberately does NOT match a neutral "site visit was held and concluded" (the FA813726R0033 shape),
 // so a model-asserted "BARS AWARD" in a finding's REQUIREMENT can never confer bar-status without a grounded EXCERPT.
 // SHARED contract regex — tested against the verbatim EXCERPT (grounded source text), never the model requirement.
-export const SITE_VISIT_MANDATORY_ATTENDANCE_RE = /\bmandatory\b[^.\n]{0,40}\b(?:site[\s-]?visit|attend|walk|tour|conference|job[\s-]?walk)\b|\b(?:site[\s-]?visit|walk[\s-]?through|job[\s-]?walk|tour|attendance|conference)\b[^.\n]{0,40}\b(?:is|are|will\s+be|shall\s+be)\s+mandatory\b|\battendance\s+(?:is\s+)?(?:required|mandatory|compulsory|a\s+(?:prerequisite|precondition|condition))\b|\b(?:must|shall|are?\s+required\s+to)\s+attend\b|\bfailure\s+to\s+attend\b[^.\n]{0,70}\b(?:ineligibl|disqualif|not\s+be\s+considered|bar(?:s|red)|preclud|reject)|\bonly\s+(?:offerors?|firms?|contractors?|bidders?|those)\s+(?:who|that)\s+(?:attend|attended|participate)[^.\n]{0,70}\b(?:eligible|may\s+(?:bid|submit|propose)|be\s+considered|for\s+award)\b/i;
+// Branch set HARDENED by the item-B adversarial seat (card #703/#705): the original single-literal missed genuine
+// mandatory phrasings the seat surfaced as FALSE-DEMOTIONS (a real precondition demoted to a harmless attribute) —
+// "site visit is required", "attendance at the pre-proposal visit is a condition of eligibility", "offers from firms
+// that did not attend will not be evaluated / disqualified", "only those offerors that participated … permitted to
+// submit". The NEW branches (b2b/b3b/b5-widened/b6-widened) close those; the OPTIONAL/ENCOURAGED discrimination set
+// ("recommended but not required", "encouraged to attend", "attendance is optional", "registration is required to
+// obtain the drawings" [N6], "attendance at the optional site visit is not required" [N5]) stays UNMATCHED — the
+// tight no-`;`/`.` windows + the (?!not) guard on b3b prevent gap-swallow over-match. Verified match/no-match, 8 miss
+// + 7 must-not. Array-join form (sibling BOA_HOLDER_ONLY_EMIT_RE idiom) — tune the individual branches HERE, once.
+export const SITE_VISIT_MANDATORY_ATTENDANCE_RE = new RegExp([
+  // b1 — "mandatory" ADJ before an event noun ("mandatory site visit", "mandatory job walk")
+  "\\bmandatory\\b[^.\\n]{0,40}\\b(?:site[\\s-]?visit|attend|walk|tour|conference|job[\\s-]?walk)\\b",
+  // b2 — event noun … is/are/will-be/shall-be mandatory
+  "\\b(?:site[\\s-]?visit|walk[\\s-]?through|job[\\s-]?walk|tour|attendance|conference)\\b[^.\\n]{0,40}\\b(?:is|are|will\\s+be|shall\\s+be)\\s+mandatory\\b",
+  // b2b — event NOUN + "is/are required | a prerequisite/precondition/condition" (tight no-;/. window blocks N6)
+  "\\b(?:site[\\s-]?visit|site[\\s-]?inspection|pre[\\s-]?(?:proposal|bid)\\s+(?:conference|meeting)|job[\\s-]?walk|walk[\\s-]?through)\\b[^.\\n;]{0,15}\\b(?:is|are)\\s+(?:required|compulsory|a\\s+(?:prerequisite|precondition|condition))\\b",
+  // b3 — "attendance is required/mandatory/compulsory/a prerequisite…"
+  "\\battendance\\s+(?:is\\s+)?(?:required|mandatory|compulsory|a\\s+(?:prerequisite|precondition|condition))\\b",
+  // b3b — "attendance at/for/during <event NOUN> is <modal>" (gap sits BEFORE the noun; (?!not) blocks N5)
+  "\\battendance\\s+(?:at|for|during)\\s+[^.\\n;]{0,30}?\\b(?:site[\\s-]?visit|site[\\s-]?inspection|conference|meeting|walk[\\s-]?through|job[\\s-]?walk|tour)\\b\\s+(?:is\\s+)?(?!not\\b)(?:required|mandatory|compulsory|a\\s+(?:prerequisite|precondition|condition))\\b",
+  // b4 — "must/shall/are required to attend"
+  "\\b(?:must|shall|are?\\s+required\\s+to)\\s+attend\\b",
+  // b5 — failure/fail/did-not/non-attendance … ineligible|disqualified|not (considered|evaluated|eligible|accepted)|nonresponsive|barred|precluded|rejected
+  "\\b(?:failure\\s+to\\s+attend|fail(?:s|ed|ing)?\\s+to\\s+attend|(?:do|does|did|will|who|that)\\s+not\\s+attend|non-?attendance)\\b[^.\\n]{0,70}\\b(?:ineligibl|disqualif|not\\s+be\\s+(?:considered|evaluated|eligible|accepted)|will\\s+not\\s+be\\s+(?:considered|evaluated|accepted)|nonresponsive|non-?responsive|bar(?:s|red)|preclud|reject)",
+  // b6 — "only (those) offerors/firms who|that attended|participated … eligible|may bid/submit|permitted/allowed to bid|for award"
+  "\\bonly\\s+(?:those\\s+)?(?:offerors?|firms?|contractors?|bidders?)?\\s*(?:who|that)\\s+(?:attend|attended|participat(?:e|ed|ing))[^.\\n]{0,70}\\b(?:eligible|may\\s+(?:bid|submit|propose)|(?:permitted|allowed|eligible)\\s+to\\s+(?:bid|submit|propose|compete)|be\\s+(?:considered|permitted|allowed)|for\\s+award)\\b",
+].join("|"), "i");
 
 // A BOA/IDIQ/BPA/GWAC/MAS/FSS vehicle HOLDER-ONLY ordering restriction — an ITO/order issued against a multiple-
 // award vehicle is competable only by existing holders of that vehicle; a non-holder cannot bid at all. SHARED
