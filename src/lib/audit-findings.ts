@@ -254,4 +254,24 @@ export interface VerdictInputs {
   // (honest-fail), never a silent first-doc default. Computed in the orchestrator (flag-gated AUDIT_ATTACHMENT_COVERAGE);
   // absent/false ⇒ byte-identical.
   primaryIndeterminate?: boolean;
+  // ── VERDICT ARC (move 4, Brain card #668) — verdict-time TEMPORAL disposition inputs ──────────────────
+  // All optional; absent (or AUDIT_TEMPORAL_VERDICT off) ⇒ NO temporal reasoning runs ⇒ byte-identical. The
+  // orchestrator computes classifyTemporal(deadlines, today) → temporalSnapshot, fetchLiveSamStatus(...) → liveSam,
+  // and reconciles the ingested amendment set → ingestedAmendmentComplete; deriveVerdict then calls the PURE
+  // deriveTemporalDisposition(snapshot, live, amendmentComplete, today). PANEL NON-NEGOTIABLE: a snapshot date can
+  // NEVER drive NO_BID — CLOSED requires live-confirmed currency (liveSam); a missing doc may BE the extending
+  // amendment. CLOSED ⇒ NO_BID(closed, recompete-watch); INDETERMINATE ⇒ committal capped to INCOMPLETE; OPEN ⇒ no block.
+  temporalSnapshot?: import("./audit-temporal").TemporalSignal;   // classifyTemporal(deadlines, today) over the ingested package
+  liveSam?: import("./audit-temporal").LiveSamStatus | null;      // fetchLiveSamStatus(...) at verdict time — CLOSED requires this
+  ingestedAmendmentComplete?: boolean;                            // ingested amendment set ⊇ live-advertised inventory (default false = conservative)
+  today?: string;                                                 // injected ISO yyyy-mm-dd (the pure engine never calls new Date())
+  nowIso?: string | null;                                         // verdict-time INSTANT (full ISO w/ zone). ULTRA B2 F1 / RULING 4:
+                                                                  // the live-deadline gate compares INSTANTS ONLY — `today` is a UTC
+                                                                  // date and a date-vs-date compare arms a tz off-by-one FALSE-CLOSED.
+  // VERDICT ARC (move-4 hard-bar floor) — the SAM-metadata half of PANEL RULING 3's
+  // "detectSetAsideNotices(source) ∪ SAM setAside". GAUNTLET R1 BRK-10: this field did not exist, so the union's
+  // second half was STRUCTURALLY unreachable from deriveVerdict — an SF1449 package with no applicable clause-matrix
+  // row + a lens-miss + set-aside flags OFF produced a clean BID over a pool the offeror may not be in, which is
+  // exactly the false-BID class ruling 3 added the set-aside class to close. Absent ⇒ byte-identical.
+  samSetAside?: string | null;                                    // raw SAM set-aside code/label (canonicalized in audit-decide)
 }

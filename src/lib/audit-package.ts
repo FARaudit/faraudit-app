@@ -51,6 +51,7 @@ export interface AuditPackageInput {
   onUsage?: (u: UsageCall) => void;         // per-run token tally (concurrency-safe); the prod executor records cost from it
   panelFindings?: TypedFinding[];           // card #523 (P2a-wire) — the expert panel's VERIFIED typed facts, UNIONed into the rail (additive to lenses); absent ⇒ byte-identical
   panelFindingsPromise?: Promise<TypedFinding[] | undefined>;  // card #570 (AUDIT_PANEL_PARALLEL) — producer findings resolved AT the rail merge so the producer overlaps the expert-phase; union byte-identical to panelFindings
+  temporal?: import("./audit-temporal").TemporalVerdictBundle; // VERDICT ARC (move 4) — verdict-time temporal bundle; forwarded verbatim to runAgenticAudit → VerdictInputs. Absent ⇒ byte-identical.
 }
 
 // ── J-1/J-2 JUDGMENT-LAYER CALLER SEAMS (Brain card 246/247 prod-wire) ──────────────────────────────────
@@ -253,6 +254,7 @@ export async function auditPackage(input: AuditPackageInput): Promise<AuditResul
     formIdentified: input.formIdentified,   // Layer-2 (card 262) — corroborates whether the §L/§M-bearing primary was ingested
     panelFindings: input.panelFindings,     // card #523 (P2a-wire) — expert-panel VERIFIED facts unioned into the rail (undefined ⇒ byte-identical)
     panelFindingsPromise: input.panelFindingsPromise,  // card #570 — parallel-path producer promise (resolved at the rail merge); exactly one of the two is set
+    temporal: input.temporal,               // VERDICT ARC (move 4) — verbatim forward to the orchestrator → VerdictInputs (undefined ⇒ byte-identical)
 
     ...(judgment ? { judgmentReason: judgment.judgmentReason, judgmentEntail: judgment.judgmentEntail } : {}),
   });

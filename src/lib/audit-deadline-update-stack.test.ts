@@ -6,6 +6,7 @@
 // treat an "UPDATE NN – <date>" dateline as a due date, (c) report the reset ("new due date will be provided") with the
 // last stated date (08 Jul 2026, spelled-out) demoted. Flag OFF ⇒ status "none" (byte-identical: no caller acts).
 
+export {}; // force MODULE scope — env is set before the dynamic import in main(), so there's no top-level import stmt
 let failures = 0;
 const assert = (cond: boolean, msg: string) => { console.log(`${cond ? "✅" : "❌"} ${msg}`); if (!cond) failures++; };
 

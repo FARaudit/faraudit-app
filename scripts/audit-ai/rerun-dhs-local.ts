@@ -60,6 +60,7 @@ async function main() {
       typeOfSetAside: old.set_aside,
       postedDate: null,
       responseDeadLine: old.response_deadline,
+      active: null,
       description: "",
       resourceLinks: [],
     } as Solicitation;

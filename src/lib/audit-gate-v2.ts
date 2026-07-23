@@ -290,13 +290,36 @@ export function isLptaConsequenceNonBar(ob: string): boolean {
 /** Three-way importance of an ungrounded obligation (Brain card-301 #1). Ambiguous defaults to disqualifier.
  *  Exported for the allow-list regression suite (audit-gate-v2-allowlist.test.ts) — the offeror-rights / no-op-rep
  *  family (protest + debriefing + foreign-procurement-tax + document order-of-precedence) must never silently narrow. */
+// Brain step-4 ruling item 2 (card #682 named defect) — see the guard inside `importanceOf`. Default-OFF: this is a
+// verdict-path change, so the arm is a CEO click, never Code's. Read at CALL time so it toggles per-invocation.
+const boilerplateBarSignalGuardEnabled = () => process.env.AUDIT_BOILERPLATE_BAR_SIGNAL_GUARD === "true";
+// B4 (Brain ruling, cards #690/#691) — see the banner block in `gateV2Outcome`. Verdict-inert, reason-only.
+const bannerNoUnrankedBarClaimEnabled = () => process.env.AUDIT_BANNER_NO_UNRANKED_BAR_CLAIM === "true";
+
 export function importanceOf(ob: string): "disqualifier" | "boilerplate" | "ambiguous" {
   if (DISQUALIFIER_RE.test(ob)) {
     // OPTION 1 release (flag-gated + shape-allowlist guarded): a BARE LPTA eval-consequence sentence flows to
     // ambiguous → the proven bar-signal-negative demotion. Any embedded substantive word keeps it a disqualifier.
     if (!(lptaConsequenceReleaseEnabled() && isLptaConsequenceNonBar(ob))) return "disqualifier";
   }
-  if (BOILERPLATE_RE.test(ob)) return "boilerplate";
+  // ── NAMED DEFECT (Brain step-4 ruling item 2, promoted 2026-07-22; found by the red-team seat, card #682) ──
+  // FAIL-TOWARD-DISQUALIFIER VIOLATION, live on the shipped engine and INDEPENDENT of veto retirement: this branch
+  // returned "boilerplate" — a full release off the escalation path — even when the sentence carries an
+  // eligibility-BAR signal. Its sibling one line below has carried the `!BAR_SIGNAL_RE` guard all along, so the
+  // asymmetry was almost certainly an omission rather than a decision. Effect: a sentence matching BOTH a
+  // boilerplate shape and a bar shape (e.g. a "shall submit <credential> with the quotation" §L instruction naming
+  // a real credential) was released as boilerplate instead of routing to "ambiguous", where the ratified
+  // ambiguous+bar-signal-POSITIVE semantics escalate it. Ambiguity must fail TOWARD the disqualifier; this failed
+  // away from it.
+  // FIX (flag `AUDIT_BOILERPLATE_BAR_SIGNAL_GUARD`, default-OFF — verdict-path change, so arming is a CEO click):
+  // the boilerplate release now requires the same no-bar-signal condition the NOOP-REP family already requires.
+  // `hasBarSignal` (not raw BAR_SIGNAL_RE) is deliberate — it carries the #587b `bond paper` carve-out, so a §L
+  // "submitted on SF-1444 or bond paper" format instruction cannot be re-classified as a bar by this fix.
+  // DIRECTION: this ADDS escalation, so its risk is over-fire / crying-wolf, measured on the gold-set + corpus.
+  if (BOILERPLATE_RE.test(ob)) {
+    if (!(boilerplateBarSignalGuardEnabled() && hasBarSignal(ob))) return "boilerplate";
+    return "ambiguous";   // bar-signal-positive: hand to the ambiguous pole, which escalates when armed
+  }
   // OFFEROR-RIGHTS / NO-OP-REP family — allow-list OUT only when the sentence carries NO eligibility-bar signal.
   // (Preserves the prior protest/debrief behavior exactly: each member still gates on its own flag + RE + !BAR_SIGNAL.)
   if (!BAR_SIGNAL_RE.test(ob) && NOOP_REP_FAMILY.some((m) => m.enabled && m.re.test(ob))) return "boilerplate";
@@ -315,8 +338,45 @@ export function importanceOf(ob: string): "disqualifier" | "boilerplate" | "ambi
 // a real "bid bond"/"performance bond"/"payment bond" is untouched). Flag-OFF ⇒ byte-identical. Sibling of the Unit-5
 // digit-collision + Unit-4 preprint-marker cases (feedback_token_substring_collision_doctrine).
 const bondPaperNonBarEnabled = () => process.env.AUDIT_BOND_PAPER_NONBAR === "true";
+
+// ── REGISTER TOKENS (Brain step-4 envelope item 2, flag `AUDIT_BAR_SIGNAL_REGISTER_TOKENS`, default-OFF) ─────
+// Fire-side additions for the card-#680 registers, so the step-2 boilerplate guard has something to bite on:
+//   · the 4b ruling's discriminator — a CLEARANCE fragment (`FCL`, `DD Form 254`, `facility clearance`, a bare
+//     level paired with clearance vocabulary) that the existing tokens miss entirely;
+//   · the SUBMIT-PROOF class — a named credential furnished WITH the offer (FAA Part 145 / repair station /
+//     airworthiness certificate), which register R2 proved is invisible today (bucket = 0 in both flag states).
+//
+// ── NO-BLOCKLIST-DOCTRINE CHECK (required by the ruling; performed by ENUMERATING every consumer) ────────────
+// Every consumer of BAR_SIGNAL_RE / hasBarSignal uses it in the NEGATIVE form, as a guard that BLOCKS a release
+// or a demotion — verified by enumeration on 2026-07-22:
+//   :286 `if (hasBarSignal(ob)) return false`            — blocks a non-bar classification
+//   :318 `if (!(guard && hasBarSignal(ob))) return "boilerplate"` — a bar signal blocks the boilerplate release
+//   :323 `if (!BAR_SIGNAL_RE.test(ob) && NOOP_REP…)`     — blocks the NOOP-REP release
+//   :370 / :393 `return !hasBarSignal(stripped)`         — a surviving bar signal blocks the demotion
+//   :446 `if (ledgerBroadAmbiguous && !hasBarSignal(ob))` — a bar signal blocks the broad-ambiguous demotion
+// ⇒ ADDING a token can only block MORE releases/demotions ⇒ strictly MORE escalation ⇒ fail-toward-disqualifier.
+// This is FIRE-SIDE SIGNAL EXPANSION, never release/demotion logic, so it does not touch the no-blocklist
+// doctrine (which forbids a blocklist of bar vocabulary whose INCOMPLETENESS fails toward FIRE; here
+// incompleteness fails toward NO-fire, the safe direction).
+// KNOWN LIMITATION (documented, not silent): `:323` tests the raw `BAR_SIGNAL_RE`, not `hasBarSignal`, so the
+// NOOP-REP release does not see these tokens. Left deliberately unchanged — widening it is a behaviour change to
+// a ratified branch and is out of this item's scope.
+// DIRECTION OF RISK: this ADDS escalation ⇒ over-fire / crying-wolf is the danger, measured on the corpus.
+const registerTokensEnabled = () => process.env.AUDIT_BAR_SIGNAL_REGISTER_TOKENS === "true";
+const REGISTER_TOKENS_RE = new RegExp([
+  // 4b ruling — clearance-fragment discriminator
+  "\\bFCL\\b",
+  "\\bDD[\\s-]?(?:Form\\s*)?254\\b",
+  "\\bfacility\\s+(?:security\\s+)?clearance\\b",
+  "\\b(?:TOP\\s+SECRET|SECRET|CONFIDENTIAL)\\b[^.?!;]{0,40}\\bclearance\\b",
+  "\\bclearance\\b[^.?!;]{0,40}\\b(?:TOP\\s+SECRET|SECRET|CONFIDENTIAL)\\b",
+  // submit-proof class — a named credential furnished with the offer (register R2)
+  "\\bPart\\s*145\\b", "\\brepair\\s+station\\s+certificate\\b", "\\bairworthiness\\s+certificate\\b",
+].join("|"), "i");
+
 export function hasBarSignal(ob: string): boolean {
   if (bondPaperNonBarEnabled()) ob = ob.replace(/\bbond(?:ed)?[\s-]+paper\b/gi, " ");   // "bond paper" (paper stock) ≠ a surety bond
+  if (registerTokensEnabled() && REGISTER_TOKENS_RE.test(ob)) return true;
   return BAR_SIGNAL_RE.test(ob);
 }
 
@@ -845,14 +905,205 @@ export function gradeCoverageV2(attestations: SectionAttestation[], opts?: {
 
 export type GateV2Outcome = { cap: "INCOMPLETE" | "NEEDS_HUMAN_REVIEW" | null; reason: string };
 
+// ── VERDICT ARC step 4 (moves 1+2) — VERBATIM-VETO RETIREMENT, flag `AUDIT_RETIRE_VERBATIM_VETO` default-OFF ──
+// Move 2 as ratified: "retire the verbatim MATCH, keep the source-obligation ENUMERATION." This flag implements
+// exactly that halving, at the ONE place the match becomes an authority:
+//   · RETIRED — `disqualifierUncovered` stops being a verdict CAP. An obligation is no longer escalated to NHR
+//     merely because no finding quoted it with a ≥4-word verbatim n-gram. Non-grounding is not evidence of a bar.
+//   · KEPT — the enumeration itself. `gradeCoverageV2` still enumerates and classifies every obligation, the
+//     `CoverageV2` object still flows to every consumer as classifier INPUT and render signal, and the bucket is
+//     still reported (`softBudget.disqualifierUncovered`, run-record serialization) for measurement.
+//   · UNTOUCHED — `unreadable` → INCOMPLETE. That is the honest-fail on genuinely unread binding content, not the
+//     verbatim veto; retiring it would manufacture false committals over content nobody read.
+// The independent `noticeBodyBarUngrounded` NHR pole (audit-decide.ts:3377) is a SEPARATE authority and also
+// survives retirement untouched.
+// SAFETY POSTURE: this REMOVES a deterministic escalation, so its failure direction is toward FALSE-BID — the
+// cardinal sin, and the exact reason PANEL RULING 1 gates it on MEASURED false-BID = 0 (gold-set direct count AND
+// itemized flip-adjudication over the banked run-records; Brain step-4 ruling PART 1, 2026-07-22). Flag-OFF is
+// byte-identical: the branch below is entered exactly as before and the fall-through reason string is unchanged
+// (the ledger note appends ONLY when the flag is on AND the bucket is non-empty).
+const retireVerbatimVetoEnabled = () => process.env.AUDIT_RETIRE_VERBATIM_VETO === "true";
+
+// ── STEP-4 OPTION (C) · VETO NARROWING (Brain ruling 2026-07-23, card #693) ─────────────────────────────────
+// Flag `AUDIT_VETO_NARROW_UNIVERSAL`, default-OFF.
+//
+// ⛔⛔ **DO NOT ARM — END-GAUNTLET NON-GREEN (2026-07-23).** `ceo/GAUNTLET-ENDROUND-REDTEAM.md`, independently
+// re-executed in `scripts/audit-ai/_verify-gauntlet-p0.ts`: **6 adversarial sentences carrying GENUINE pre-award
+// bars are RELEASED by this predicate with `cap = null`** — a false-BID pathway, the cardinal sin. Confirmed
+// releases include a bid guarantee (FAR 28.101-4), SAM registration (FAR 52.204-7), a Top Secret facility
+// clearance, a DCAA-approved accounting system, and a GSA Schedule vehicle bar.
+//
+// ⛔ CLASS (a) IS UNSOUND **BY DESIGN**, not by regex gap. The charter claim below — that a responsibility
+// determination is "not a bar the bidder can fail to possess in advance" — is **LEGALLY FALSE**. FAR 9.104-2
+// (fetched 2026-07-23): special standards of responsibility "**shall be set forth in the solicitation** (and so
+// identified) and **shall apply to all offerors**" — objective pre-award criteria (years of experience,
+// licensing, bonding) that GAO reviews on protest precisely because a bidder CAN fail them. A single-clause
+// definitive-responsibility-criterion sentence is SHAPE-INDISTINGUISHABLE from the universal recital, so no
+// tightening of the clause detector can separate them (the #557 shape-collision pattern).
+//
+// Class (b) carries fixable vocabulary gaps (notably the "Schedule" token collision: an EVAL_FACTOR_RE
+// evaluation factor vs a GSA **Schedule** contract vehicle bar — the ratified token-collision doctrine).
+// BUT the measured target `SP3300-26-Q-0165` needs BOTH entries released to flip, so class (b) alone returns the
+// narrowing's measured effect to ZERO. **Option (C) as ruled cannot be delivered safely — carded to Brain.**
+// The code is retained flag-OFF and byte-identical so the measurement is reproducible; it is NOT a shippable unit.
+//
+// WHAT IT DOES: excludes from the veto's fire path the TWO UNIVERSAL classes measured on `SP3300-26-Q-0165` —
+// the only record on which the veto was the sole deciding authority, and on which its catch was a FALSE
+// POSITIVE both times:
+//   (a) FAR Part 9 **responsibility-determination** recitals — a Contracting-Officer-side determination made at
+//       award, present in essentially every solicitation. Not a bar the bidder can fail to possess in advance.
+//   (b) **Government evaluation-methodology** prose ("the Government will evaluate X to determine acceptability").
+//       The existing `isGovtEvalMethodologyNonBar` is TINA-scoped despite its name (it requires a cost-or-pricing-
+//       data token), so this general class was never covered.
+//
+// ⚠ DOCTRINE CHECK — WHY THE RATIFIED 3-STEP SHAPE COULD NOT BE USED, AND WHAT REPLACED IT.
+// The established shape for a demotion predicate is FRAME + SUBSTANCE + strip-then-require-no-surviving-bar-signal
+// (see isGovtEvalMethodologyNonBar / isConditionalTinaBoilerplate). Its safety rests entirely on `hasBarSignal`
+// catching anything real that survives the strip. **MEASURED, and it does not:**
+//     hasBarSignal("shall furnish a bid guarantee of 20 percent of the bid price")            → FALSE
+//     hasBarSignal("bid guarantee")                                                            → FALSE
+//     hasBarSignal("must be a small business manufacturer or obtain an SBA nonmanufacturer waiver") → FALSE
+// (The real FA8137 bid-guarantee obligation only registers because it contains the word "required".) A
+// strip-then-recheck guard therefore **released a genuine bid guarantee and a genuine nonmanufacturer-rule bar**
+// in the adversarial probe. On a RELEASE-side gate that is not an acceptable failure mode: the guard would be a
+// placebo (L40 — an INERT guard whose output equals its PASSING output).
+//
+// THE PIVOT (reconstruction-treadmill recognizer): stop reconstructing the strip, use a POSITIVE STRUCTURAL
+// INVARIANT. A sentence is released ONLY IF it is a **SINGLE operative clause whose subject IS the universal
+// recital**. Any compound sentence — a coordinating conjunction introducing a second duty, or any semicolon/colon
+// clause — is NEVER released, whatever vocabulary it carries. The property holds BY CONSTRUCTION and does not
+// depend on `hasBarSignal` seeing the co-resident bar: a bar riding along a responsibility recital always makes
+// the sentence compound, and compound sentences are excluded.
+//
+// FAILURE DIRECTION: incompleteness of the exclusion fails toward FIRE — an unrecognised boilerplate phrase
+// merely keeps today's over-fire, which is the safe direction for a veto. The dangerous direction (releasing a
+// genuine bar) is what the single-clause invariant closes.
+const vetoNarrowUniversalEnabled = () => process.env.AUDIT_VETO_NARROW_UNIVERSAL === "true";
+
+/** A SECOND operative duty riding the same sentence: a coordinating conjunction followed by a modal/copula duty,
+ *  or any semicolon/colon-introduced clause. POSITIVE detection of compoundness — never a bar-vocabulary list. */
+const SECOND_CLAUSE_RE = /\b(?:and|or)\s+(?:the\s+\w+\s+)?(?:shall|must|will|is|are)\b|[;:]/i;
+
+/** (a) A single-clause FAR Part 9 responsibility-determination recital. */
+const RESPONSIBILITY_RECITAL_RE = /\bdetermined?\s+to\s+be\s+responsible\b|\bdetermination\s+of\s+responsibility\b|\bresponsibility\s+determination\b/i;
+export function isResponsibilityDeterminationRecital(ob: string): boolean {
+  const t = ob.trim();
+  if (!RESPONSIBILITY_RECITAL_RE.test(t)) return false;
+  if (SECOND_CLAUSE_RE.test(t)) return false;                 // compound ⇒ never released
+  return !/\b(?:only\s+if|provided\s+that|unless|conditioned\s+upon)\b/i.test(t);  // a conditional gate is not a bare recital
+}
+
+/** (b) Single-clause government evaluation-methodology prose (the general class; the TINA-scoped predicate above
+ *  stays untouched and continues to own its own family). */
+const GOVT_EVAL_GENERAL_RE = /\bthe\s+government\s+(?:will|shall|may)\s+(?:evaluate|assess|consider)\b|\b(?:proposals?|quotes?|offers?|quotations?)\s+(?:will|shall)\s+be\s+evaluated\b/i;
+
+// ADVERSARIAL BREAK FOUND AND CLOSED (red-team pass, 2026-07-23). The frame + single-clause test alone RELEASED
+// "The Government will assess each quoter's CMMC Level 2 certification status to determine acceptability." —
+// a single-clause evaluation sentence that NAMES A GENUINE CREDENTIAL GATE, and CMMC L2 is one of the very
+// register shapes this narrowing exists to preserve. Releasing it would have been a false-BID pathway.
+//
+// FIX — POSITIVE ALLOWLIST OF THE SAFE CASE, per the standing no-blocklist doctrine: a sentence is evaluation
+// METHODOLOGY only when the thing being evaluated is a STANDARD EVALUATION FACTOR (FAR 15.304 — price/cost,
+// past performance, technical, management, schedule, quality, capability). Evaluating a CREDENTIAL, CLEARANCE,
+// CERTIFICATION or REGISTRATION is a GATE, never methodology, and is never released. An unrecognised eval
+// subject falls through to KEEP FIRING — the safe direction.
+const EVAL_FACTOR_RE = /\b(?:past\s+performance|price|cost|technical\s+(?:approach|capability|merit|factors?)|management\s+(?:approach|plan)|schedule|quality|delivery|small\s+business\s+participation|relevant\s+experience)\b/i;
+/** Naming any of these makes the sentence a GATE regardless of its frame — the eval subject is a possession. */
+const CREDENTIAL_SUBJECT_RE = /\b(?:cmmc|clearance|certification|certificate|accreditation|licens(?:e|ure)|registration|qualified\s+products?\s+list|qpl|facility\s+security|dd\s*form\s*254|iso\s*900\d|8\s?\(a\)|hubzone|sdvosb|wosb|edwosb)\b/i;
+
+export function isGovtEvalMethodologyGeneralNonBar(ob: string): boolean {
+  const t = ob.trim();
+  if (!GOVT_EVAL_GENERAL_RE.test(t)) return false;
+  if (SECOND_CLAUSE_RE.test(t)) return false;                 // compound ⇒ never released
+  if (CREDENTIAL_SUBJECT_RE.test(t)) return false;            // evaluating a possession = a gate, not methodology
+  if (!EVAL_FACTOR_RE.test(t)) return false;                  // POSITIVE allowlist: unrecognised subject ⇒ keep firing
+  // An evaluation sentence that also states a CONSEQUENCE of not qualifying is a gate, not methodology.
+  return !/\b(?:ineligible|unacceptable|will\s+not\s+be\s+considered|rejected|disqualified|only\s+if|must\s+possess|must\s+hold|must\s+be)\b/i.test(t);
+}
+
+/** The single predicate the veto consults. Flag-OFF ⇒ always false ⇒ byte-identical. */
+export function isNarrowedUniversalNonBar(ob: string): boolean {
+  if (!vetoNarrowUniversalEnabled()) return false;
+  return isResponsibilityDeterminationRecital(ob) || isGovtEvalMethodologyGeneralNonBar(ob);
+}
+
+// ── B3 · BANNER BAR RANKING (Brain ruling 2026-07-23) ───────────────────────────────────────────────────────
+const bannerBarRankingEnabled = () => process.env.AUDIT_BANNER_BAR_RANKING === "true";
+
+/** Normalize for the tier-1 correspondence test: lowercase, collapse whitespace, drop punctuation. Deliberately
+ *  NOT the grounding matcher — this decides DISPLAY ORDER only and can never change a cap, so a miss costs a
+ *  less-apt excerpt, never a wrong verdict. */
+const normForRank = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+
+/** Tier of one bucket entry. LOWER IS MORE SIGNIFICANT.
+ *   0 — corresponds to a TYPED `eligibility_bar` finding. The engine already decided this text is a bar, by its
+ *       own authority, so it outranks anything the sentence-level classifiers infer.
+ *   1 — `importanceOf` says disqualifier (positive classification).
+ *   2 — `hasBarSignal` (weaker, bar-shaped vocabulary present).
+ *   3 — none of the above; ordered by document position via the stable sort.
+ *  Ambiguity never promotes: an entry only leaves tier 3 on a POSITIVE signal, matching the module's
+ *  shape-allowlist doctrine (never a blocklist, never a demotion by absence). */
+function rankTierOf(entry: { obligation: string }, barTexts: string[]): number {
+  const ob = entry.obligation || "";
+  if (barTexts.length) {
+    const n = normForRank(ob);
+    // Correspondence is CONTAINMENT IN EITHER DIRECTION on normalized text, with a length floor so a short
+    // fragment cannot match half the document. This is intentionally conservative: a false negative just means
+    // the entry is ranked by its classifier tier instead, which is still better than raw document order.
+    if (n.length >= 24 && barTexts.some((b) => b.length >= 24 && (b.includes(n) || n.includes(b)))) return 0;
+  }
+  if (importanceOf(ob) === "disqualifier") return 1;
+  if (hasBarSignal(ob)) return 2;
+  return 3;
+}
+
+/** Returns the highest-ranked entry. PURE — never mutates the caller's array (the bucket flows on to other
+ *  consumers and to run-record serialization, so re-ordering it in place would be a silent substrate change). */
+function rankDisqualifiers<T extends { obligation: string }>(entries: T[], findings?: Array<{ kind?: string; requirement?: string; excerpt?: string }>): T {
+  const barTexts = (findings ?? [])
+    .filter((f) => f.kind === "eligibility_bar")
+    .flatMap((f) => [f.requirement, f.excerpt])
+    .filter((t): t is string => typeof t === "string" && t.length > 0)
+    .map(normForRank);
+  let best = entries[0], bestTier = rankTierOf(entries[0], barTexts);
+  for (let i = 1; i < entries.length && bestTier > 0; i++) {
+    const t = rankTierOf(entries[i], barTexts);
+    if (t < bestTier) { best = entries[i]; bestTier = t; }   // strict < ⇒ stable: ties keep document order
+  }
+  return best;
+}
+
 /** Map V2 coverage → a verdict CAP (or null = no cap, the committal verdict flows). This replaces the V1 blanket
  *  `!coverageComplete → INCOMPLETE`. Order matters: genuine unreadability first (legitimate INCOMPLETE), then a
  *  genuinely-uncovered disqualifier (escalate, never silent-BID), else no cap — the false-INCOMPLETE is gone. */
-export function gateV2Outcome(cov: CoverageV2): GateV2Outcome {
+export function gateV2Outcome(cov: CoverageV2, opts?: { findings?: Array<{ kind?: string; requirement?: string; excerpt?: string }> }): GateV2Outcome {
   if (cov.unreadable.length)
     return { cap: "INCOMPLETE", reason: `Could not fully read binding content: §${cov.unreadable.join(", §")} (unread/truncated at ingest) — the honest incomplete.` };
-  if (cov.disqualifierUncovered.length) {
-    const d = cov.disqualifierUncovered[0];
+  // step-4 retirement: flag-ON, an ungrounded-but-bar-shaped obligation no longer CAPS the verdict — it stays in
+  // the ledger as classifier input and falls through to the signal path below. Flag-OFF, the branch is entered
+  // exactly as before (byte-identical).
+  // OPTION (C) NARROWING — the two universal classes are excluded from the FIRE decision only. The entries are
+  // NOT dropped: `cov.disqualifierUncovered` is untouched and still flows to every consumer, the run-record and
+  // the ledger note below, exactly like the retirement flag's "retained as ledger input" posture. Flag-OFF the
+  // filter is the identity function ⇒ byte-identical.
+  const firing = vetoNarrowUniversalEnabled()
+    ? cov.disqualifierUncovered.filter((d) => !isNarrowedUniversalNonBar(d.obligation))
+    : cov.disqualifierUncovered;
+  if (firing.length && !retireVerbatimVetoEnabled()) {
+    // ── B3 (Brain ruling, 2026-07-23) — RANK the bucket so the banner quotes the MOST SIGNIFICANT obligation ──
+    // Flag `AUDIT_BANNER_BAR_RANKING`, default-OFF. CAP-INVARIANT / SELECTION-VARIANT / VERDICT-INERT: this only
+    // chooses WHICH entry is quoted. The cap, the bucket, its length, and every downstream consumer are untouched
+    // — `cov.disqualifierUncovered` itself is never mutated (the sort runs on a copy).
+    //
+    // WHY IT NEEDED B4 FIRST: the bucket is in DOCUMENT ORDER and unranked, so `[0]` was simply the first
+    // ungrounded obligation in the file. Ranking alone would still have emitted B4's false characterization on
+    // whatever it promoted; B4 made the sentence honest, B3 now makes it the RIGHT sentence. Measured motivating
+    // case `be69ce16`: a real bid guarantee sat unquoted in the bucket while a DEBRIEFING sentence was shown.
+    //
+    // PRECEDENCE (ratified): typed eligibility_bar → importanceOf=disqualifier → hasBarSignal → document order.
+    // The sort is STABLE, so document order is preserved WITHIN every tier — the last tier is not a tie-break
+    // rule so much as the guarantee that an unranked bucket comes out exactly as it went in.
+    const d = bannerBarRankingEnabled() ? rankDisqualifiers(firing, opts?.findings) : firing[0];
     // UNIT 2.2 — report the obligation at its TRUE location when the locator resolved one (the routed section
     // key is an approximation on commercial packages; dccce793's "§L" banner was a PWS key-personnel row).
     // Any adjacent scope context (e.g. a reference-only note) rides along so the reader sees what the human
@@ -876,6 +1127,25 @@ export function gateV2Outcome(cov: CoverageV2): GateV2Outcome {
       const cc = credentialConditionalRecital(d.obligation);
       if (cc) return { cap: "NEEDS_HUMAN_REVIEW", reason: `A credential-conditional requirement ${where} could not be grounded to a finding — it requires ${cc.credential}. Confirm your firm holds this before bidding — human verification needed: "${d.obligation.slice(0, 120)}".${ctxNote}` };
     }
+    // ── B4 (Brain ruling on cards #690/#691, 2026-07-23) — STOP CHARACTERIZING AN UNRANKED SENTENCE AS A BAR ──
+    // Flag `AUDIT_BANNER_NO_UNRANKED_BAR_CLAIM`, default-OFF. CAP-INVARIANT / REASON-VARIANT / VERDICT-INERT.
+    // THE DEFECT (contracts seat, verified by red-team): `disqualifierUncovered` is in DOCUMENT ORDER and is
+    // NOT RANKED, so `[0]` is simply the first ungrounded obligation in the file — yet the banner asserted it was
+    // "a potential disqualifying requirement". Measured on `be69ce16`: a real bid guarantee sat unquoted in the
+    // bucket while the customer was shown a DEBRIEFING sentence labelled as a potential disqualifier.
+    // WHY IT IS THE ARC'S ONE CUSTOMER-FACING EXPOSURE: this is not fabrication — the quoted text is verbatim —
+    // but it is a MISCHARACTERIZATION, and at protest standard it is worse than naming no bar at all: the bidder
+    // relies on it, is misdirected away from the real gate, and the product asserts something false about
+    // federal procurement law in a paid advisory.
+    // THE FIX IS PROSE-ONLY: say what is actually true — an obligation could not be grounded, there are N of
+    // them, and this excerpt is first in document order rather than the most significant. The cap, the bucket and
+    // every verdict are untouched. B3 (ranking) lands next; ranking WITHOUT this fix would still emit the false
+    // characterization, which is why the ruling ordered B4 first.
+    if (bannerNoUnrankedBarClaimEnabled()) {
+      const n = cov.disqualifierUncovered.length;
+      const more = n > 1 ? ` ${n} obligations in this package could not be grounded; this excerpt is the first in document order, not necessarily the most significant.` : "";
+      return { cap: "NEEDS_HUMAN_REVIEW", reason: `An obligation ${where} could not be grounded to a finding — human verification needed: "${d.obligation.slice(0, 120)}".${more}${ctxNote}` };
+    }
     return { cap: "NEEDS_HUMAN_REVIEW", reason: `A potential disqualifying requirement ${where} could not be grounded to a finding — human verification needed: "${d.obligation.slice(0, 120)}".${ctxNote}` };
   }
   const nonBar = cov.ungroundedNonBarSignal ?? [];
@@ -888,7 +1158,13 @@ export function gateV2Outcome(cov: CoverageV2): GateV2Outcome {
   const benignNote = benign.length
     ? ` ${benign.length} benign recital(s) verified present in source (benign_covered_recital).`
     : "";
+  // step-4 retirement ledger note — present ONLY when the flag is on AND the bucket is non-empty, so a flag-OFF
+  // reason string is byte-identical to the pre-step-4 shape (mirrors the `demoted` / `benignNote` pattern). The
+  // entries are NOT dropped: they remain in `cov.disqualifierUncovered` for every downstream consumer.
+  const retiredLedger = retireVerbatimVetoEnabled() && cov.disqualifierUncovered.length
+    ? ` ${cov.disqualifierUncovered.length} ungrounded bar-shaped obligation(s) retained as ledger input, no longer a verdict veto (retire_verbatim_veto).`
+    : "";
   return { cap: null, reason: (cov.ungroundedRead.length
     ? `Read complete; ${cov.ungroundedRead.length} section(s) have unquoted boilerplate obligations (coverage grade ${(cov.coverageGrade * 100).toFixed(0)}%) — a signal, not a veto.`
-    : `Coverage complete (grade ${(cov.coverageGrade * 100).toFixed(0)}%).`) + demoted + benignNote };
+    : `Coverage complete (grade ${(cov.coverageGrade * 100).toFixed(0)}%).`) + demoted + benignNote + retiredLedger };
 }

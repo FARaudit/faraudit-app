@@ -52,7 +52,7 @@ async function main(): Promise<void> {
       noticeId: `pdf-fa137-${label}`, solicitationNumber: "FA137-FIXTURE", title: `FA-137 ${label} fixture`,
       department: null, subTier: null, fullParentPathName: null,
       naicsCode: "561210", type: "Solicitation", typeOfSetAside: "SBA",
-      postedDate: "2026-06-12", responseDeadLine: "2026-07-15T17:00:00-05:00",
+      postedDate: "2026-06-12", responseDeadLine: "2026-07-15T17:00:00-05:00", active: null,
       description: "Synthetic FA-137 fixture: replace thirteen interior door assemblies at a federal facility, contractor furnishes all labor and materials, FFP, site visit required before quote submission. This text exists so the metadata arm has a real synopsis.",
       resourceLinks: []
     },

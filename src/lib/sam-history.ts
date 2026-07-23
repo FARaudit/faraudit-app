@@ -123,6 +123,24 @@ async function fetchVersionNaics(opportunityId: string): Promise<string | null> 
  * failure. Cost: 1 history call, plus one per-version call ONLY when the
  * notice has amendments (never-amended notices need no NAICS comparison).
  */
+/**
+ * VERDICT ARC (move 4) — the live amendment inventory a solicitation advertises,
+ * for the temporal completeness gate. Returns the count of NON-deleted, non-cancelled
+ * notice versions (1 = original only, never amended; 2 = original + 1 amendment, …),
+ * or `null` on any fetch/parse failure (Rule 64 — never a confident wrong count).
+ * Lean by design: ONE history call, no per-version NAICS fetches — the caller only
+ * needs "how many versions does SAM currently advertise" to reconcile against the
+ * ingested package. amendmentCount = max(0, versionCount - 1).
+ */
+export async function fetchNoticeVersionCount(noticeId: string): Promise<number | null> {
+  if (!SAM_API_KEY || !noticeId || /^pdf-/i.test(noticeId)) return null;
+  const j = await fetchHal(`${OPPS_V2}/${noticeId}/history?api_key=${SAM_API_KEY}`);
+  const history = Array.isArray(j?.history) ? (j!.history as Array<Record<string, unknown>>) : null;
+  if (!history) return null;
+  const live = history.filter((h) => h && typeof h.opportunityId === "string" && h.deleted !== "1" && h.cancelNotice !== "1");
+  return live.length; // 0 is a valid answer (all versions deleted/cancelled) — distinct from null (fetch failed)
+}
+
 export async function fetchNaicsAppealAnchor(noticeId: string): Promise<NaicsAppealAnchor> {
   if (!SAM_API_KEY || !noticeId || /^pdf-/i.test(noticeId)) return UNKNOWN_ANCHOR;
 

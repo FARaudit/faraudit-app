@@ -26,6 +26,8 @@ import { assembleFullSourceChunked, makeChunkMapCaller, wouldOverflow, type DocR
 import { callStructuredClaude } from "./anthropic-structured";
 import { modelFor } from "./model-registry";
 import { auditPackage } from "./audit-package";
+import { fetchLiveSamStatus } from "./sam"; // VERDICT ARC move 4 — verdict-time live-SAM currency (flag AUDIT_TEMPORAL_VERDICT)
+import { classifyTemporal, type LiveSamStatus, type TemporalVerdictBundle } from "./audit-temporal";
 import { AGENTIC_PANEL_ENABLED, runPanelJudge, type PanelResult } from "./agentic-panel-runner";
 import { buildPanelInputs } from "./panel-adapter";
 import { foldPanelReason } from "./panel-findings-bridge";
@@ -161,6 +163,21 @@ export async function executeAgenticPrimary(
   // completeness cap below AND for L1 notice-body ingest: only a SAM notice HAS a
   // government-published body; an upload's description field is not one.
   const isSamSol = !!solicitation?.noticeId && /^[a-f0-9]{32}$/i.test(solicitation.noticeId);
+
+  // ── VERDICT ARC (move 4, card #668) — kick off the verdict-time LIVE-SAM currency fetch NOW, concurrently with
+  //    ingest + panel, so its seconds of latency are fully HIDDEN behind the minutes of audit compute (it must never
+  //    become the stall source). Flag AUDIT_TEMPORAL_VERDICT default-OFF ⇒ liveSamPromise stays null ⇒ byte-identical.
+  //    Only real SAM notices (an upload has no live notice). The 12s budget wrapper resolves null on timeout/error →
+  //    the disposition falls to INDETERMINATE (→ INCOMPLETE), NEVER a guess, NEVER a false CLOSED (panel non-negotiable).
+  const temporalEnabled = process.env.AUDIT_TEMPORAL_VERDICT === "true";
+  const LIVE_SAM_BUDGET_MS = 12_000;
+  const liveSamPromise: Promise<LiveSamStatus | null> | null =
+    temporalEnabled && isSamSol && solicitation?.noticeId
+      ? Promise.race([
+          fetchLiveSamStatus(solicitation.noticeId, solicitation.solicitationNumber ?? null),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), LIVE_SAM_BUDGET_MS)),
+        ]).catch(() => null)
+      : null;
 
   // L1 (Brain card 264 Ruling 1) — the SAM notice body. audit-executor.ts (FA-148) resolves
   // the noticedesc URL into solicitation.description; a value that is STILL a noticedesc URL
@@ -551,8 +568,25 @@ export async function executeAgenticPrimary(
       panelResult = await runPanel();      // SERIAL (today's path — byte-identical)
     }
   }
+  // VERDICT ARC (move 4) — assemble the temporal bundle. liveSamPromise (kicked off at ingest start) is already
+  // resolved here, so this await adds ~0 wall-clock. `today` is injected at THIS I/O boundary (the pure engine never
+  // calls new Date()). Reconciliation is CONSERVATIVE per the panel: CLOSED may fire only over a complete manifest AND
+  // a live inventory advertising ZERO amendments beyond the original — so no unread (supremacy) amendment can exist.
+  // Any advertised amendment or unknown count ⇒ ingestedAmendmentComplete=false ⇒ INDETERMINATE, never a false CLOSED.
+  // (Version-postedDate-aware reconciliation that safely admits amended-but-current packages is the documented follow-up.)
+  let temporal: TemporalVerdictBundle | undefined;
+  if (liveSamPromise) {
+    const liveSam = await liveSamPromise;
+    const nowInstant = new Date().toISOString();          // FULL ISO instant — the ONLY thing the deadline gate compares (F1)
+    const today = nowInstant.slice(0, 10);                 // UTC date; retained for classifyTemporal's date-domain signal only
+    const snapshot = classifyTemporal([{ date: solicitation?.responseDeadLine ?? null, label: "RESPONSE DATE" }], today);
+    const ingestedAmendmentComplete = (manifestComplete && !constructionOOS) && liveSam?.amendmentCount === 0;
+    temporal = { snapshot, liveSam, ingestedAmendmentComplete, today, nowIso: nowInstant };
+    console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: temporal live-SAM fetched=${liveSam?.fetched ?? false} active=${liveSam?.active ?? "?"} amendments=${liveSam?.amendmentCount ?? "?"} ingestComplete=${ingestedAmendmentComplete}`);
+  }
   const _tPackage = Date.now();
   const res = await auditPackage({
+    temporal,
     fullSource, bidderProfile, signal, manifestComplete: manifestComplete && !constructionOOS, constructionManifest, groundingSource,
     // card #523 (P2a-wire) — VERIFIED panel facts unioned into the rail (undefined when flag OFF ⇒ byte-identical).
     // card #570 — serial passes the resolved array; parallel passes the PRODUCER PROMISE (resolved at the rail merge so
@@ -668,6 +702,13 @@ export async function executeAgenticPrimary(
       const heldReg = (payload.documents as { ocr_held?: Array<{ name: string; residuals: number; reason: string }> }).ocr_held;
       if (heldReg) for (const h of ocrHeld) heldReg.push(h);
     }
+  }
+  // P0-6 (Brain card #666 — retrieved-vs-analyzed conflation) — `read` counts bytes RETRIEVED; a scanned/image or
+  // ocr-held binding doc is retrieved-but-not-analyzed, so the surface would read "8/8" over un-analyzed content. Emit an
+  // honest ANALYZED count (docs that yielded machine-readable text the engine consumed) alongside `read`. Additive: the
+  // verdict, completeness, `read`/`posted`/`missing` are all UNCHANGED — this only adds a truthful display figure.
+  if (ing && payload.documents) {
+    payload.documents.analyzed = (ing.files ?? []).filter((f) => f.ingested && f.has_text !== false).length;
   }
   // C-1 (Brain C.e) — ONE completeness computation. `manifestComplete` (agenticManifestComplete: truncation +
   // reconciliation + binding-content-loss, line 145) is the SINGLE truth: it was threaded into deriveVerdict

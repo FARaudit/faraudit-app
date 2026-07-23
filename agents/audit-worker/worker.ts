@@ -675,6 +675,7 @@ function synthesizeFromRow(row: UserPendingRow): Solicitation {
     typeOfSetAside: row.set_aside,
     postedDate: null,
     responseDeadLine: row.response_deadline,
+    active: null, // degraded/re-fetch path — live SAM currency unknown (temporal gate → INDETERMINATE)
     description: row.pdf_filename
       ? `(PDF upload: ${row.pdf_filename} — Claude reads attached document directly.)`
       : "",

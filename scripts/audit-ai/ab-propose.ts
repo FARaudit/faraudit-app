@@ -85,7 +85,7 @@ async function main() {
     solicitation = {
       noticeId: row.notice_id, solicitationNumber: row.solicitation_number, title: row.title || "Untitled",
       department: null, subTier: null, fullParentPathName: null, naicsCode: row.naics_code, type: null,
-      typeOfSetAside: row.set_aside, postedDate: null, responseDeadLine: row.response_deadline,
+      typeOfSetAside: row.set_aside, postedDate: null, responseDeadLine: row.response_deadline, active: null,
       description: "", resourceLinks: [],
     } as Solicitation;
   }

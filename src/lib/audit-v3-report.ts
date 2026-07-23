@@ -51,6 +51,10 @@ export interface V3ReportPayload {
   reason: string;
   // STEP 10 (gate-framing) data-contract additions — both optional / absent today, so flag-OFF is byte-identical.
   verdictSub?: string;       // optional verdict-band one-liner override; falls back to the presentation default.
+  // VERDICT ARC (move 4/5) — set ONLY on a live-confirmed CLOSED solicitation (verdict NO_BID). Lets the report render
+  // the distinct "closed — recompete watch" state instead of generic no-bid copy. ABSENT unless the producer set it
+  // (AUDIT_TEMPORAL_VERDICT off ⇒ decision.temporalClosed undefined ⇒ field omitted ⇒ render byte-identical).
+  temporalClosed?: boolean;
   profileVerified?: boolean; // true ONLY when a firm profile was affirmatively verified. Green "satisfied" renders only then; default is neutral slate (doctrine #1/#6). INELIGIBLE requires this true.
   showStoppers: FindingLite[];
   findings: FindingLite[];
@@ -65,7 +69,12 @@ export interface V3ReportPayload {
   documents?: {
     reconciled: boolean;
     posted: number;
-    read: number;
+    read: number;                 // RETRIEVED (bytes ingested) — NOT the same as analyzed
+    // P0-6 (retrieved-vs-analyzed conflation, card #666) — RETRIEVED counts bytes that arrived; ANALYZED counts docs that
+    // yielded machine-readable text the engine actually consumed. A scanned/image binding doc is retrieved-but-not-analyzed,
+    // so `read` alone reads "8/8" over un-analyzed content. `analyzed` (≤ read) makes the surface honest. Additive/optional
+    // ⇒ absent on legacy rows (renderer falls back to `read`), byte-identical for consumers that don't read it.
+    analyzed?: number;
     complete: boolean;
     missing: Array<{ name: string; reason?: string }>;
     // OCR-HELD REGISTER (Brain card #471 ruling A, flag AUDIT_OCR_HELD_REGISTER) — docs whose OCR recovered text but
@@ -123,6 +132,9 @@ export function buildV3Payload(
     showStoppers: decision.showStoppers.map(lite),
     findings: rawFindings.map(lite),
     coverage: { required: coverage.required, covered: coverage.covered, missing: coverage.missing, coreMissing: coverage.coreMissing ?? [] },
+    // spread-conditional: the key is OMITTED (not set to false/undefined) unless the decision actually carries it,
+    // so a flag-OFF payload is byte-identical to the pre-arc payload.
+    ...(decision.temporalClosed === true ? { temporalClosed: true } : {}),
     generatedAt,
   };
 }
@@ -172,6 +184,19 @@ export function gateFramingPres(v: string): VerdictPres {
     case "OUT_OF_SCOPE":       return { word: "OUT OF SCOPE",       cls: "v-slate",   kind: "unresolved", eyebrow: "Outside scope · no charge", sub: "This package is outside what FARaudit assesses; no gate was evaluated, and nothing was charged." };
     default:                   return { word: v,                    cls: "v-slate",   kind: "unresolved", eyebrow: "Gate undetermined",         sub: "" };
   }
+}
+
+// VERDICT ARC — a temporally CLOSED solicitation is NOT an "unwinnable requirement". The generic NO_BID copy
+// ("Do not bid — an unwinnable requirement is present" / "a condition no offeror can clear") is actively WRONG here:
+// nothing about the requirement forecloses award, the response window simply shut. Misreporting that costs the
+// customer the real signal, which is a RECOMPETE WATCH. Per the gateFramingPres invariant, word/cls/kind are the
+// colour moat and are left EXACTLY as verdictPres returned them — only eyebrow + sub reframe.
+export function temporalClosedPres(base: VerdictPres): VerdictPres {
+  return {
+    ...base,
+    eyebrow: "Solicitation closed · recompete watch",
+    sub: "The response window has closed — this is not a judgement on the requirement. Track the recompete: the incumbent's award and period of performance set the next opportunity.",
+  };
 }
 
 export function verdictPres(v: string, gateFraming: boolean = gateFramingEnabled()): VerdictPres {
@@ -344,7 +369,9 @@ export function renderV3Report(payload: V3ReportPayload, meta: V3ReportMeta): st
   // affirmatively-verified profile degrades to the honest NEEDS_HUMAN_REVIEW band (deriveVerdict already never
   // emits INELIGIBLE under a null profile — card 163 — so this is a defensive renderer guard, not a behavior change).
   const effectiveVerdict = (gf && payload.verdict === "INELIGIBLE" && payload.profileVerified !== true) ? "NEEDS_HUMAN_REVIEW" : payload.verdict;
-  const V = verdictPres(effectiveVerdict, gf);
+  const Vbase = verdictPres(effectiveVerdict, gf);
+  // Absent temporalClosed (the only state with the flag off) ⇒ identity ⇒ byte-identical render.
+  const V = (payload.temporalClosed === true && effectiveVerdict === "NO_BID") ? temporalClosedPres(Vbase) : Vbase;
   const isUn = V.kind === "unresolved";
   const noCharge = gf ? (effectiveVerdict === "INCOMPLETE" || effectiveVerdict === "OUT_OF_SCOPE") : (effectiveVerdict === "INCOMPLETE");
   const eyebrowIco = isUn

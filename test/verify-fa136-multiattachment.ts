@@ -79,7 +79,7 @@ async function main(): Promise<void> {
       solicitation: {
         noticeId: NOTICE_1232, solicitationNumber: "1232SA26R0020", title: "Tornado Repairs USHRL",
         department: null, subTier: null, fullParentPathName: null, naicsCode: null, type: "Solicitation", typeOfSetAside: null,
-        postedDate: null, responseDeadLine: null, description: "", resourceLinks: []
+        postedDate: null, responseDeadLine: null, active: null, description: "", resourceLinks: []
       },
       agency: "USDA ARS",
       pdfBuffer: assembled!.primary!.buffer,
