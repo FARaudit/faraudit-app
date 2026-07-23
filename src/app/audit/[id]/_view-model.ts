@@ -395,6 +395,8 @@ export interface AuditViewModel {
   // 2026-06-04: when no document was retrieved, surface SAM-metadata tiles
   // instead of a fabricated fit score.
   prelim_has_deadline: boolean;     // false → renderer omits Tile A entirely
+  deadline_reset_tbd: boolean;      // ITEM D (card #707) — the offer-due date was RESET to TBD by a later amendment; the tile shows the reset caveat, never the superseded passed date. Flag AUDIT_DEADLINE_RESET_RENDER.
+  deadline_reset_note: string;      // ITEM D — the engine-authored reset caveat (notice_body_deadline.note); empty when not reset.
   set_aside_eligibility: string;    // empty → renderer hides the .mhv-note line
   // Classifier output (PRELIMINARY-READ ADAPTIVE MODES, HANDOFF Jun 4):
   //   "fetch"  → doc exists on SAM but our retrieval failed (re-fetchable)
@@ -3031,6 +3033,16 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   // date (17 Feb) and reported a live solicitation (SAM Aug-27) CLOSED — a
   // customer-fatal false negative on a winnable opportunity. SAM is correct
   // here; a doc parse can never be allowed to close a sol SAM says is open.
+  // ITEM D (repair-unit, card #707, flag AUDIT_DEADLINE_RESET_RENDER, default-OFF) — a notice-body UPDATE stack that
+  // RESET the offer-due date to TBD (audit-deadline-extract → notice_body_deadline.status === "reset_tbd") makes the
+  // persisted response_deadline a SUPERSEDED PAST date; rendering it as the live deadline is false (FA813726R0033:
+  // response_deadline 2026-07-18 already passed, but UPDATE 03 reset it to TBD). When reset, the tile shows a reset
+  // caveat and the passed date + countdown + expired banner are suppressed. Flag-OFF ⇒ every field is byte-identical.
+  const nbd = (compJson.notice_body_deadline ?? null) as { status?: string; note?: string; lastStated?: { date?: string; label?: string } } | null;
+  const deadlineResetTbd = process.env.AUDIT_DEADLINE_RESET_RENDER === "true" && nbd?.status === "reset_tbd";
+  const deadlineResetBy = (/(UPDATE\s*\d+)/i.exec(nbd?.note ?? "") ?? [])[1] ?? "the latest amendment";
+  const deadlineResetLabel = `Deadline reset — TBD per ${deadlineResetBy}`;
+  const deadlineResetNote = deadlineResetTbd ? (nbd?.note ?? deadlineResetLabel) : "";
   const samResponseDeadline = parseDate(audit.response_deadline);
   const sourceOfferDue = parseSourceOfferDue(compJson.deadlines);
   const responseDeadline = samResponseDeadline ?? sourceOfferDue;
@@ -3038,8 +3050,9 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   // open/closed derives from the SAME controlling deadline that drives the
   // masthead, the §03 timeline, and the §L operative deadline — one date, in
   // lockstep across all three. False-open is the safe failure mode.
+  // reset_tbd (item D) ⇒ NOT expired — the passed date is SUPERSEDED, not a live deadline that lapsed.
   const is_expired: boolean =
-    responseDeadline != null && daysBetween(now, responseDeadline) < 0;
+    !deadlineResetTbd && responseDeadline != null && daysBetween(now, responseDeadline) < 0;
   // (FA-108 score_locked is declared earlier near verdictMode — needs to be in
   // scope by the time `score` is computed.)
   const qaDeadlineDate = parseDate(audit.qa_deadline) ?? parseDate(compJson.qa_deadline);
@@ -3624,7 +3637,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
       if (rec === "DECLINE") return "NO-BID";
       return "CAUTION";
     })(),
-    days_to_deadline: canonicalDaysToDeadline,
+    days_to_deadline: deadlineResetTbd ? null : canonicalDaysToDeadline,
     // Cycle-1 canonical gate card — composed from canonicalGates (VM-detected),
     // not compJson.verdict.gates. Byte-stable across extraction-variant runs.
     // P1 gate-tally fix (2026-06-21): the card prose + count MUST use the SAME gate
@@ -3660,15 +3673,18 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     qa_days_num: qaDays != null ? String(Math.max(0, qaDays)) : "",
     // #329 facet B: preserve the stated TIME cutoff. When SAM is the controlling source, format from the RAW ISO
     // (keeps 16:30 + offset); when the doc-parsed offer-due wins, fmtDeadlineFull falls back to date-only on the Date.
-    response_deadline: fmtDeadlineFull(samResponseDeadline ? audit.response_deadline : null, responseDeadline),
-    response_days: fmtKdCountdown(responseDays),
-    response_days_num: responseDays != null ? String(Math.max(0, responseDays)) : "",
-    response_deadline_short: fmtDueShort(responseDeadline),
+    response_deadline: deadlineResetTbd ? deadlineResetLabel : fmtDeadlineFull(samResponseDeadline ? audit.response_deadline : null, responseDeadline),
+    response_days: deadlineResetTbd ? "" : fmtKdCountdown(responseDays),
+    response_days_num: deadlineResetTbd ? "" : (responseDays != null ? String(Math.max(0, responseDays)) : ""),
+    response_deadline_short: deadlineResetTbd ? "" : fmtDueShort(responseDeadline),
     // Card-360 item 3 (Brain / Card-330 permanent ruling): the prelim deadline tile shows the ABSOLUTE DATE as
     // primary — never an "N days" countdown that goes stale on a saved export — with time+offset as the two-tier
     // secondary line. Split off the fmtDeadlineFull "date · time (offset)" string.
-    prelim_deadline_date: fmtDeadlineFull(samResponseDeadline ? audit.response_deadline : null, responseDeadline).split(" · ")[0],
-    prelim_deadline_time: fmtDeadlineFull(samResponseDeadline ? audit.response_deadline : null, responseDeadline).split(" · ").slice(1).join(" · "),
+    // ITEM D: reset_tbd ⇒ the tile primary is the reset caveat (never the superseded passed date), no time line.
+    prelim_deadline_date: deadlineResetTbd ? deadlineResetLabel : fmtDeadlineFull(samResponseDeadline ? audit.response_deadline : null, responseDeadline).split(" · ")[0],
+    prelim_deadline_time: deadlineResetTbd ? "" : fmtDeadlineFull(samResponseDeadline ? audit.response_deadline : null, responseDeadline).split(" · ").slice(1).join(" · "),
+    deadline_reset_tbd: deadlineResetTbd,
+    deadline_reset_note: deadlineResetNote,
     award_date: awardDateDate ? fmtDayMonYear(awardDateDate) : "",
     award_quarter: awardQuarterStr,
     urgent_field: urgentField,
