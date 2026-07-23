@@ -292,6 +292,7 @@ export async function POST(req: NextRequest) {
       typeOfSetAside: null,
       postedDate: null,
       responseDeadLine: null,
+      active: null, // upload path — no live SAM notice (temporal gate → INDETERMINATE)
       description: uploadAssembled
         ? `(Document upload: ${uploadAssembled.ingestion.files_ingested} of ${uploadAssembled.ingestion.files_total} file(s) ingested; primary "${safeName}" — Claude reads the attached documents directly.)`
         : `(PDF upload: ${safeName}${pdfBuffer ? `, ${(pdfBuffer.length / 1024).toFixed(0)} KB` : ""} — Claude reads attached document directly.)`,

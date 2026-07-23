@@ -142,6 +142,11 @@ export interface OrchestratorInput {
   // AFTER the expert-phase has already run. The merged union is byte-identical to the serial `panelFindings` array
   // (same set, same merge point, same dedup order) — only wall-clock differs. Exactly one of the two is ever set.
   panelFindingsPromise?: Promise<TypedFinding[] | undefined>;
+  // VERDICT ARC (move 4, card #668) — the verdict-time temporal bundle the executor computed at the I/O boundary
+  // (classifyTemporal snapshot + fetchLiveSamStatus + amendment reconciliation + injected today). Threaded verbatim
+  // into VerdictInputs so the PURE deriveTemporalDisposition runs inside deriveVerdict. Absent (flag-OFF executor) ⇒
+  // no temporal fields on inputs ⇒ byte-identical. The orchestrator does NO temporal I/O — it only forwards.
+  temporal?: import("./audit-temporal").TemporalVerdictBundle;
 }
 
 export interface AuditResult {
@@ -820,15 +825,38 @@ export function isBareSizeStandardSentence(sentence: string): boolean {
 }
 
 // ── Card #516 (Brain CLASS ruling, flag AUDIT_SELF_DETERMINABLE_ELIG_CLASS default-OFF) ─────────────────────────────
-// GENERALIZES the §509 size-standard demotion to the FULL BIDDER-SELF-DETERMINABLE eligibility class. The CERT-10 seq-1
+// GENERALIZES the §509 size-standard demotion to the FULL BIDDER-STATUS-KNOWABLE eligibility class. The CERT-10 seq-1
 // FA303026Q0020 run cycled benign notice-body layers — size standard → WOSB set-aside → SAM registration → a bare
-// "eligible" fragment — each a legal SELF-CERT the firm executes itself, none a firm-only third-party bar, yet each in
+// "eligible" fragment — each a status the firm resolves itself, none a firm-only third-party bar, yet each in
 // turn forced a false NHR. Rule the CLASS once instead of chasing one sentence per paid run.
-//   R1 DEMOTE→self-cert caveat: socioeconomic set-aside/program the firm self-certifies or is SBA-certified under
+//
+// ⚠ NAMING RULING (Brain, 2026-07-23 · seam record 01 · `ceo/SEAM-01-INSTRUMENT-REBUILD.md`). R1 was originally
+// described as the "SELF-CERT" class, and that name CONFLATED TWO DIFFERENT THINGS — a blur that hid a live
+// false-BID on an 8(a) set-aside (70B01C 999e909b) until the instrument rebuild exposed it:
+//   · self-CERTIFIABLE      — the firm EXECUTES the certification itself (WOSB, size standard, SAM, reps & certs)
+//   · self-DETERMINABLE     — a THIRD PARTY grants the status, but the firm KNOWS its own standing with certainty
+//                             and cannot be mistaken about it (8(a), HUBZone, SDVOSB — SBA/VA-granted)
+// The old name implied the first, while the membership list already contained the second ("…self-certifies OR is
+// SBA-certified under…"). Anyone reading the name would conclude 8(a) had been mis-filed; anyone reading the list
+// would conclude it was deliberate. Both readings were available, which is what made it a blur rather than a bug.
+//
+// THE DISCRIMINATOR IS **BIDDER-KNOWABILITY**, NOT CERTIFICATION MECHANICS. NHR is justified only where human
+// review can ADD INFORMATION. A firm's own 8(a)/HUBZone/SDVOSB standing is known to it with certainty, so
+// abstaining adds nothing and manufactures the NHR-on-common-set-asides product failure. Fail-toward-disqualifier
+// governs ambiguity about whether a bar EXISTS — here the bar is CERTAIN and bidder-resolvable, which is the
+// ratified clears-as-declared shape (set-aside backstop `requiredAttribute` + #575).
+// The class is therefore named **BIDDER-STATUS-KNOWABLE**. Behaviour is UNCHANGED by this ruling — it renames and
+// documents an existing membership so the blur cannot recur; R2 is untouched.
+//   R1 DEMOTE→named-gate caveat (BIDDER-STATUS-KNOWABLE): socioeconomic set-aside/program the firm self-certifies
+//      OR is SBA/VA-certified under and knows its own standing in
 //      (WOSB/EDWOSB/HUBZone/SDVOSB/veteran-/women-/service-disabled-owned/8(a)/small-business set-aside) · SAM
 //      registration (FAR 52.204-7, self-executed) · reps & certs (FAR 52.212-3, offeror-completed) · size standard.
-//   R2 RESERVE floor-NHR for genuinely THIRD-PARTY-gated bars: security/facility clearance · mandatory (unconcluded)
+//      The emitted caveat MUST NAME the specific gate (e.g. "SBA-certified 8(a) participant per FAR 52.219-18"),
+//      never a generic "confirm eligibility" — pinned by `requireNamedGate` in `_shadow-acceptance-corpus.ts`.
+//   R2 RESERVE floor-NHR for bars that are NOT bidder-knowable — a third party must investigate, adjudicate, or
+//      grant, so the firm genuinely cannot answer: security/facility clearance · mandatory (unconcluded)
 //      site visit · vehicle/BOA holder-only · ITAR/export · QPL/facility certification. These stay firm_cannot_move.
+//      TEST FOR MEMBERSHIP: ask "can the bidder answer this today with certainty?" — not "who issues the paper?"
 //   R3 the floor never RE-escalates a sentence already resolved as structured RECORD METADATA (`set_aside`) — the
 //      platform header already displays it; re-flagging it "needs human review" is doubly incoherent.
 //   R4 ALLOWLIST-OF-SHAPE only (the closed, statutory set of self-cert substances) — NEVER a bar-vocabulary blocklist
@@ -1325,13 +1353,16 @@ export function emitSizeStandardCaveats(fullSource: string, findings: TypedFindi
 }
 
 /** Card #516 (Brain CLASS ruling, flag AUDIT_SELF_DETERMINABLE_ELIG_CLASS default-OFF) — the generalization of
- *  emitSizeStandardCaveats to the FULL bidder-self-determinable class. For every ungrounded ELIGIBILITY_BAR_RE hit
- *  whose enclosing sentence is bidder-self-determinable (isBidderSelfDeterminableSentence), surface a class-appropriate
- *  self-cert CAVEAT (controllability bidder_controls ⇒ never a show-stopper, never downgrades the verdict) so the fact
- *  rides a committal as a reps-&-certs reminder instead of the floor mis-typing it as a firm-only bar → false NHR.
- *  Third-party bars (clearance / site-visit / ITAR / QPL) are NOT self-determinable → skipped here and left to the bar
- *  path. Dedups against decision-bearing findings that already own the span. Flag-OFF ⇒ never called (gated at the call
- *  site) ⇒ byte-identical (Rule 61). */
+ *  emitSizeStandardCaveats to the FULL **BIDDER-STATUS-KNOWABLE** class (see the naming ruling at the R1/R2 block
+ *  above: the discriminator is whether the BIDDER CAN ANSWER TODAY WITH CERTAINTY, not who issues the paper — so
+ *  third-party-GRANTED but firm-KNOWN statuses like 8(a)/HUBZone/SDVOSB belong here alongside genuinely
+ *  self-certified WOSB/size/SAM). For every ungrounded ELIGIBILITY_BAR_RE hit whose enclosing sentence is
+ *  bidder-status-knowable (isBidderSelfDeterminableSentence), surface a class-appropriate **named-gate** CAVEAT
+ *  (controllability bidder_controls ⇒ never a show-stopper, never downgrades the verdict) so the fact rides a
+ *  committal as a reps-&-certs reminder instead of the floor mis-typing it as a firm-only bar → false NHR.
+ *  Bars the bidder CANNOT answer (clearance / site-visit / ITAR / QPL — a third party must investigate, adjudicate
+ *  or grant) are R2 → skipped here and left to the bar path. Dedups against decision-bearing findings that already
+ *  own the span. Flag-OFF ⇒ never called (gated at the call site) ⇒ byte-identical (Rule 61). */
 export function emitSelfDeterminableCaveats(fullSource: string, findings: TypedFinding[], noticeBodyText?: string | null, declaredSetAside?: string | null): TypedFinding[] {
   const noticeText = (noticeBodyText && noticeBodyText.trim())
     ? noticeBodyText
@@ -2754,7 +2785,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // flag-ON) is surfaced as a BID_WITH_CAUTION-floor caveat before deriveVerdict. Flag-OFF ⇒ caveatRecital absent ⇒
   // emitter is a no-op ⇒ byte-identical.
   if (coverageV2?.caveatRecital?.length) findings = emitPerformanceUpkeepCaveats(findings, coverageV2.caveatRecital);
-  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(process.env.AUDIT_SITEVISIT_SEVERITY_FLOOR === "true" ? { siteVisitSeverityFloor: true } : {}), ...(coverageV2 ? { coverageV2 } : {}) };
+  const inputs: VerdictInputs = { findings, bidderProfile, samSetAside: opts.setAside ?? null, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(process.env.AUDIT_SITEVISIT_SEVERITY_FLOOR === "true" ? { siteVisitSeverityFloor: true } : {}), ...(coverageV2 ? { coverageV2 } : {}), ...(opts.temporal ? { temporalSnapshot: opts.temporal.snapshot, liveSam: opts.temporal.liveSam, ingestedAmendmentComplete: opts.temporal.ingestedAmendmentComplete, today: opts.temporal.today, nowIso: opts.temporal.nowIso ?? null } : {}) };
   // Phase-1 SHADOW (cards #596/#597) — compute the positive-shape pole BESIDE the real verdict and bank it. VERDICT-INERT:
   // the shadow is never routed on; the live deriveVerdict below is untouched. Gated on AUDIT_POSITIVE_VERDICT_POLE (default-
   // OFF ⇒ never computed ⇒ byte-identical) AND banking on (the diagnostics carrier). naics is the SAM fact (Rule 64).

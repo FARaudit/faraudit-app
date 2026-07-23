@@ -1,4 +1,5 @@
 @AGENTS.md
+@ceo/CLAUDE.md
 
 ## SESSION UPDATE — May 2 2026
 

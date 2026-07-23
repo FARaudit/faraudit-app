@@ -21,7 +21,7 @@ async function main(): Promise<void> {
       solicitation: {
         noticeId: "pdf-fa137-clean", solicitationNumber: "SPRRA126Q0034", title: "FA-137 clean-run telemetry fixture",
         department: null, subTier: null, fullParentPathName: null, naicsCode: null, type: null, typeOfSetAside: null,
-        postedDate: null, responseDeadLine: null, description: "(FA-137 clean-run fixture)", resourceLinks: []
+        postedDate: null, responseDeadLine: null, active: null, description: "(FA-137 clean-run fixture)", resourceLinks: []
       },
       agency: null, pdfBuffer: null, pdfBase64: pdf.toString("base64"), pdfFileId: null,
       imageBase64: null, imageMediaType: null, extractedText: null, extractedFormat: null,

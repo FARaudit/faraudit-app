@@ -69,7 +69,7 @@ async function main(): Promise<void> {
         title: "FA-132 upload-arm fixture",
         department: null, subTier: null, fullParentPathName: null,
         naicsCode: null, type: null, typeOfSetAside: null,
-        postedDate: null, responseDeadLine: null,
+        postedDate: null, responseDeadLine: null, active: null,
         description: "(PDF upload: fa132-fixture.pdf — Claude reads attached document directly.)",
         resourceLinks: []
       },

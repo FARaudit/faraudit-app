@@ -3,7 +3,23 @@
 // The Audit-AI cron can't import from src/lib/ at runtime (Railway Root
 // Directory = agents/audit-ai/ means src/ isn't in the container).
 
+import type { LiveSamStatus } from "./audit-temporal";
+import { fetchNoticeVersionCount } from "./sam-history";
+
 const SAM_API_KEY = process.env.SAM_API_KEY;
+
+// Normalize SAM's `active` field ("Yes"/"No" string, sometimes a boolean) to a
+// tristate. Anything unrecognized → null (unknown), never a false open/closed —
+// the temporal gate treats null as "cannot certify" and falls to INDETERMINATE.
+export function parseSamActive(raw: unknown): boolean | null {
+  if (typeof raw === "boolean") return raw;
+  if (typeof raw === "string") {
+    const t = raw.trim().toLowerCase();
+    if (t === "yes" || t === "true" || t === "active") return true;
+    if (t === "no" || t === "false" || t === "inactive" || t === "archived") return false;
+  }
+  return null;
+}
 
 export interface Solicitation {
   noticeId: string;
@@ -22,6 +38,11 @@ export interface Solicitation {
   typeOfSetAside: string | null;
   postedDate: string | null;
   responseDeadLine: string | null;
+  // SAM v2 returns `active` as "Yes"/"No" (occasionally a boolean) — the live
+  // open/closed fact for a notice: "No" = archived/inactive. Captured here so the
+  // Verdict Arc temporal gate can confirm currency at verdict time (a snapshot
+  // date can never prove no extending amendment exists). null = SAM omitted it.
+  active: boolean | null;
   description: string;
   // SAM v2 returns resourceLinks for opportunities that have an attached PDF
   // (Solicitation, Combined Synopsis/Solicitation). Captured here so the
@@ -107,6 +128,7 @@ function mapOpportunity(o: Record<string, unknown>): Solicitation {
     typeOfSetAside: (o.typeOfSetAside as string | undefined) ?? null,
     postedDate: (o.postedDate as string | undefined) ?? null,
     responseDeadLine: (o.responseDeadLine as string | undefined) ?? null,
+    active: parseSamActive(o.active),
     description: ((o.description as string | undefined) || "").slice(0, 4000),
     resourceLinks: Array.isArray(o.resourceLinks) ? (o.resourceLinks as string[]) : []
   };
@@ -157,4 +179,45 @@ export async function fetchSolicitationByNoticeId(
     if (viaNoticeId) return viaNoticeId;
   }
   return null;
+}
+
+// ── VERDICT ARC (move 4) — VERDICT-TIME LIVE-SAM STATUS ──────────────────────────────────
+// The panel (card #668) mandate: CLOSED is a LIVE-SAM fact, never a snapshot-date inference.
+// A missing document IS often the extending amendment, so a snapshot deadline can be silently
+// fatal (false-CLOSED). This re-queries SAM at verdict time, family-keyed (notice → sol# →
+// hyphen-stripped fallback, inherited from fetchSolicitationByNoticeId), to answer three
+// questions the temporal gate needs: is the notice still ACTIVE, what is the CURRENT
+// (post-amendment) response deadline, and how many versions does SAM advertise (so the caller
+// can reconcile the ingested amendment set for completeness).
+//
+// FAIL-SAFE BY CONSTRUCTION: a fetch miss/timeout → { fetched:false } → the disposition falls
+// to INDETERMINATE (→ INCOMPLETE/escalate), NEVER CLOSED and NEVER BID. amendmentCount is null
+// when history could not be fetched (distinct from 1 = original-only), so an unknown inventory
+// never masquerades as "complete". Runs the two SAM calls in parallel to bound verdict latency.
+export async function fetchLiveSamStatus(
+  noticeId: string,
+  solicitationNumber?: string | null,
+): Promise<LiveSamStatus> {
+  if (!SAM_API_KEY || !noticeId) return { fetched: false, active: null };
+
+  const [sol, versionCount] = await Promise.all([
+    // Family-keyed currency: the latest version SAM serves carries the live `active` flag and
+    // the current (post-amendment) responseDeadLine. If the ingested noticeId is stale, fall
+    // back to the solicitation number so a re-issued/amended family record is still found.
+    (async () => {
+      const byNotice = await fetchSolicitationByNoticeId(noticeId);
+      if (byNotice) return byNotice;
+      const sn = sanitizeSolicitationNumber(solicitationNumber);
+      return sn && sn !== noticeId ? fetchSolicitationByNoticeId(sn) : null;
+    })(),
+    fetchNoticeVersionCount(noticeId),
+  ]);
+
+  if (!sol) return { fetched: false, active: null };
+  return {
+    fetched: true,
+    active: sol.active,
+    responseDeadline: sol.responseDeadLine ?? null,
+    amendmentCount: versionCount === null ? null : Math.max(0, versionCount - 1),
+  };
 }
