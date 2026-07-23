@@ -17,7 +17,8 @@ import { NMR_CAUTION } from "./audit-keyfact-detector"; // the canonical NMR req
 import { deriveTemporalDisposition, type TemporalDisposition } from "./audit-temporal"; // VERDICT ARC move 4 (flag AUDIT_TEMPORAL_VERDICT default-OFF)
 import { deriveSetAsideBackstop, type SetAsideBackstopDisposition } from "./audit-setaside-backstop"; // VERDICT ARC move-4, part B (flag AUDIT_SETASIDE_BACKSTOP default-OFF, SHADOW-ONLY; part A retired — card #677)
 import { GATE_V2_ENABLED, gateV2Outcome, hasLongLeadCredential, hasPreAwardPossession } from "./audit-gate-v2";
-import { SITE_VISIT_RE, SITE_VISIT_CONCLUDED_RE, BOA_IDIQ_HOLDER_BAR_RE } from "./audit-site-visit-patterns";
+import { SITE_VISIT_RE, SITE_VISIT_CONCLUDED_RE, SITE_VISIT_MANDATORY_ATTENDANCE_RE, BOA_IDIQ_HOLDER_BAR_RE } from "./audit-site-visit-patterns";
+import { reconcileScopeOpacity } from "./audit-scope-reconciliation";
 import { demoteMmEvidenceFactor, hasGroundedLeadTimeBasis } from "./mm-evidence-factor"; // card #538 (flag AUDIT_MM_EVIDENCE_FACTOR_DEMOTION)
 import { classifyGateShape } from "./panel-findings-bridge"; // ratified positive who-can-win shape classifier — the Unit-1 perf-obligation gate's keep-the-bar veto (Gauntlet R1: no bar-vocab blocklist). Type-only elsewhere ⇒ no import cycle.
 
@@ -2639,6 +2640,8 @@ export function disposeFinding(f: TypedFinding): Disposition {
 // post-decision floor cannot tell those poles apart (all return showStoppers=[] before the verifier/conflict
 // checks) -> the promotion lives in the branch that OWNS the pole. The customer render frames an NHR-pole
 // show-stopper as a CONDITIONAL bar (Brain/Design ruling card 432), never committal "blocks award" copy.
+// Item B (card #703) flag — a concluded site visit needs GROUNDED mandatory-attendance to confer bar-status.
+const siteVisitMandatoryGroundedEnabled = () => process.env.AUDIT_SITEVISIT_MANDATORY_GROUNDED === "true";
 // OVER-FIRE GUARDS (isSiteVisitOrEligBar): disposition===disqualifying (a benign site-visit-ENCOURAGED gate is
 // bidder_controls -> excluded) · NOT curableInWindow===true (curable = a gate to clear, branch-5b parity) · NOT
 // firmStatus==="satisfies" (the firm PROVES it holds the bar). Flag-OFF ⇒ the branch passes [] as before
@@ -2659,6 +2662,15 @@ function isSiteVisitOrEligBar(f: DecidedFinding, profile: BidderProfile | null, 
   // findings (concluded only in the source) stay NOT-promoted — routed to human review, never a false "go attend" P0.
   const findingCarriesConcludedFrame = SITE_VISIT_CONCLUDED_RE.test(f.requirement ?? "") || SITE_VISIT_CONCLUDED_RE.test(f.excerpt ?? "");
   if (isSiteVisit && source && SITE_VISIT_CONCLUDED_RE.test(source) && !findingCarriesConcludedFrame) return false;
+  // ── ITEM B (card #703, flag AUDIT_SITEVISIT_MANDATORY_GROUNDED, default-OFF) — a CONCLUDED/past site visit is an
+  // ATTRIBUTE, not a disqualifying bar, UNLESS mandatory-attendance-as-precondition is grounded in the finding's own
+  // verbatim EXCERPT (not merely asserted in the model-generated requirement). FA813726R0033: excerpt grounds only
+  // "site visit was held and concluded on may 28" while the requirement claimed "BARS AWARD unless attendance
+  // confirmed" — the bar-status was inferred, not grounded. Demoting (return false) drops it from the P0 show-stopper
+  // band to the P2 advisory band (attribute/caveat) — never a customer-facing disqualifying bar on ungrounded
+  // mandatoriness. Scoped to the concluded-frame path (the live defect); flag-OFF ⇒ this block is skipped, byte-identical.
+  if (siteVisitMandatoryGroundedEnabled() && isSiteVisit && findingCarriesConcludedFrame
+      && !SITE_VISIT_MANDATORY_ATTENDANCE_RE.test(f.excerpt ?? "")) return false;
   if (f.kind === "eligibility_bar") return true;
   return isSiteVisit; // CONTENT only — NOT citation (keying P0 off a referenced doc NAME over-fires; ultracode re-review #2 P2)
 }
@@ -2784,6 +2796,20 @@ export function namedEligibilityReason(stoppers: DecidedFinding[]): string | nul
 // disqualifiers, floored P0, framed CONDITIONAL by the render — card 432), so a non-elig disqualifier is never promoted.
 // Flag-OFF ⇒ passes [] exactly as today (byte-identical, Rule 61).
 const coverageNhrStopperFillEnabled = () => process.env.AUDIT_COVERAGE_NHR_STOPPER_FILL === "true";
+
+// ── ITEM A (card #703 repair · flag AUDIT_NHR_HEADLINE_SHOWSTOPPER_FIRST, default-OFF) — HEADLINE SELECTION ONLY ──
+// The first live customer run (FA813726R0033) headlined the NHR with an ungrounded §L reps-&-certs recital (the
+// disqualifierUncovered content, hijacked by an OCR garble) while the DECISIVE grounded gate — BOA-holders-only —
+// sat unreferenced in showStoppers[]. Brain repair-unit item A: when the coverage-NHR cap fires AND a grounded
+// eligibility/site-visit show-stopper exists, LEAD the reason with the top grounded bar (namedEligibilityReason —
+// the same machinery the notice-body pole uses, card #477 ruling 3) and DEMOTE the uncovered-obligation reason to a
+// secondary coverage note. THE CAP AND POLE ARE UNCHANGED (still NEEDS_HUMAN_REVIEW); deriveVerdict remains sole
+// authority; the persisted showStoppers[] slot is governed by the FILL flag exactly as before. Flag-OFF ⇒ the reason
+// is v2.reason verbatim and the persisted slot is unchanged ⇒ byte-identical (Rule 61).
+// ⚠ ARM SEQUENCING (item-A seat, P3): do NOT arm this flag before repair-unit ITEM B lands. Until B, a concluded
+// site visit can still carry a disqualifying disposition (an over-claim), and item A would faithfully lead the
+// headline with that over-claimed bar. Arm A only WITH or AFTER B, so the bar A promotes is a real disqualifier.
+const nhrHeadlineShowStopperFirstEnabled = () => process.env.AUDIT_NHR_HEADLINE_SHOWSTOPPER_FIRST === "true";
 
 /** Against a disqualifying (bidder_cannot_move) bar, the firm's status is one of three — and that, not the
  *  bar's mere presence, decides the outcome (the standing facts-vs-analysis / no-blind-INELIGIBLE doctrine):
@@ -3227,7 +3253,14 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   // escalate; R3 source-contradiction ("preferred/not required") demotes. Flag OFF ⇒ inp.findings passes through
   // untouched ⇒ every branch below is byte-identical.
   const mmDemote = process.env.AUDIT_MM_EVIDENCE_FACTOR_DEMOTION === "true";
-  const decidedFindings = mmDemote ? inp.findings.map((f) => demoteMmEvidenceFactor(f, inp.source)) : inp.findings;
+  const mmDemoted = mmDemote ? inp.findings.map((f) => demoteMmEvidenceFactor(f, inp.source)) : inp.findings;
+  // ── FINDING-#46 SCOPE-OPACITY RECONCILIATION (repair item C · Brain #703/#707 · flag AUDIT_SCOPE_OPACITY_RECONCILE,
+  //    default-OFF). A P0 "scope opacity / no SOW-spec-drawings visible" gate finding is demoted to a P2 attribute
+  //    when the finding set proves a SOW/spec/drawings attachment WAS read (the FA813726 ATT10 contradiction) — it is
+  //    materially false to surface a "cannot price, missing scope" P0 gate over a package whose SOW was ingested.
+  //    Scoped to the absence-claim SHAPE + gate-band + scope-doc-read gate; flag-OFF (or no scope doc read) ⇒
+  //    byte-identical. SET-LEVEL: needs the whole findings set to prove the attachment was read.
+  const decidedFindings = reconcileScopeOpacity(mmDemoted, inp.source, process.env.AUDIT_SCOPE_OPACITY_RECONCILE === "true");
   const dispositions: DecidedFinding[] = decidedFindings.map((f) => ({ ...f, disposition: disposeFinding(f) }));
   // (b/c) UNVERIFIED ELIGIBILITY GATES — a PROFILE-DEPENDENT eligibility gate (kind eligibility_bar carrying a
   //     specific requiredAttribute credential to check) the profile does not PROVE the firm satisfies. On a
@@ -3378,8 +3411,21 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
     // SEAM FILL (card #472) — on the coverage-NHR cap ONLY (never INCOMPLETE: unreadable ⇒ findings untrustworthy), lift
     // any grounded site-visit/eligibility bar in dispositions[] into the persisted showStoppers[] slot so it renders in
     // the show-stopper band, not the P2 advisories. Same filter/flag family as the notice-body pole. OFF ⇒ [] (identical).
-    if (v2.cap === "NEEDS_HUMAN_REVIEW") return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), v2.reason, dispositions,
-      coverageNhrStopperFillEnabled() ? siteVisitEligStoppers(dispositions, inp.bidderProfile, inp.source) : []);
+    if (v2.cap === "NEEDS_HUMAN_REVIEW") {
+      // Stoppers are computed when EITHER flag needs them (headline lead or persisted fill), from the SAME filter.
+      const covStoppers = (coverageNhrStopperFillEnabled() || nhrHeadlineShowStopperFirstEnabled())
+        ? siteVisitEligStoppers(dispositions, inp.bidderProfile, inp.source) : [];
+      // ITEM A — headline selection only (see doctrine above). Lead with the grounded bar; demote v2.reason.
+      // P1 SELF-ENFORCEMENT (item-A adversarial seat, B6-confirmed): do NOT trust the upstream filter to have
+      // grounded the stopper — filter to grounded !== false HERE so the headline can never lead with an ungrounded
+      // bar even if a future caller widens siteVisitEligStoppers. Defense-in-depth; the arc's zero-fabrication class.
+      const groundedStoppers = covStoppers.filter((s) => (s as { grounded?: boolean }).grounded !== false);
+      const lead = nhrHeadlineShowStopperFirstEnabled() ? namedEligibilityReason(groundedStoppers) : null;
+      const reason = lead ? `${lead} A secondary coverage note: ${v2.reason}` : v2.reason;
+      // Persisted slot governed by the FILL flag ALONE — the headline flag never changes what is persisted (byte-identity).
+      const persisted = coverageNhrStopperFillEnabled() ? covStoppers : [];
+      return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), reason, dispositions, persisted);
+    }
     // cap === null ⇒ no coverage veto; the documentsComplete gate (1b) below still applies (genuine unreadability).
   } else if (!inp.coverageComplete) {
     return mk("INCOMPLETE", honestFailEligible(), "Coverage not complete — not all binding content was read and grounded." + (inp.coverageGap ? ` Gap: ${inp.coverageGap}.` : ""), dispositions, []);
