@@ -17,7 +17,7 @@ import { NMR_CAUTION } from "./audit-keyfact-detector"; // the canonical NMR req
 import { deriveTemporalDisposition, type TemporalDisposition } from "./audit-temporal"; // VERDICT ARC move 4 (flag AUDIT_TEMPORAL_VERDICT default-OFF)
 import { deriveSetAsideBackstop, type SetAsideBackstopDisposition } from "./audit-setaside-backstop"; // VERDICT ARC move-4, part B (flag AUDIT_SETASIDE_BACKSTOP default-OFF, SHADOW-ONLY; part A retired — card #677)
 import { GATE_V2_ENABLED, gateV2Outcome, hasLongLeadCredential, hasPreAwardPossession } from "./audit-gate-v2";
-import { SITE_VISIT_RE, SITE_VISIT_CONCLUDED_RE, BOA_IDIQ_HOLDER_BAR_RE } from "./audit-site-visit-patterns";
+import { SITE_VISIT_RE, SITE_VISIT_CONCLUDED_RE, SITE_VISIT_MANDATORY_ATTENDANCE_RE, BOA_IDIQ_HOLDER_BAR_RE } from "./audit-site-visit-patterns";
 import { demoteMmEvidenceFactor, hasGroundedLeadTimeBasis } from "./mm-evidence-factor"; // card #538 (flag AUDIT_MM_EVIDENCE_FACTOR_DEMOTION)
 import { classifyGateShape } from "./panel-findings-bridge"; // ratified positive who-can-win shape classifier — the Unit-1 perf-obligation gate's keep-the-bar veto (Gauntlet R1: no bar-vocab blocklist). Type-only elsewhere ⇒ no import cycle.
 
@@ -2639,6 +2639,8 @@ export function disposeFinding(f: TypedFinding): Disposition {
 // post-decision floor cannot tell those poles apart (all return showStoppers=[] before the verifier/conflict
 // checks) -> the promotion lives in the branch that OWNS the pole. The customer render frames an NHR-pole
 // show-stopper as a CONDITIONAL bar (Brain/Design ruling card 432), never committal "blocks award" copy.
+// Item B (card #703) flag — a concluded site visit needs GROUNDED mandatory-attendance to confer bar-status.
+const siteVisitMandatoryGroundedEnabled = () => process.env.AUDIT_SITEVISIT_MANDATORY_GROUNDED === "true";
 // OVER-FIRE GUARDS (isSiteVisitOrEligBar): disposition===disqualifying (a benign site-visit-ENCOURAGED gate is
 // bidder_controls -> excluded) · NOT curableInWindow===true (curable = a gate to clear, branch-5b parity) · NOT
 // firmStatus==="satisfies" (the firm PROVES it holds the bar). Flag-OFF ⇒ the branch passes [] as before
@@ -2659,6 +2661,15 @@ function isSiteVisitOrEligBar(f: DecidedFinding, profile: BidderProfile | null, 
   // findings (concluded only in the source) stay NOT-promoted — routed to human review, never a false "go attend" P0.
   const findingCarriesConcludedFrame = SITE_VISIT_CONCLUDED_RE.test(f.requirement ?? "") || SITE_VISIT_CONCLUDED_RE.test(f.excerpt ?? "");
   if (isSiteVisit && source && SITE_VISIT_CONCLUDED_RE.test(source) && !findingCarriesConcludedFrame) return false;
+  // ── ITEM B (card #703, flag AUDIT_SITEVISIT_MANDATORY_GROUNDED, default-OFF) — a CONCLUDED/past site visit is an
+  // ATTRIBUTE, not a disqualifying bar, UNLESS mandatory-attendance-as-precondition is grounded in the finding's own
+  // verbatim EXCERPT (not merely asserted in the model-generated requirement). FA813726R0033: excerpt grounds only
+  // "site visit was held and concluded on may 28" while the requirement claimed "BARS AWARD unless attendance
+  // confirmed" — the bar-status was inferred, not grounded. Demoting (return false) drops it from the P0 show-stopper
+  // band to the P2 advisory band (attribute/caveat) — never a customer-facing disqualifying bar on ungrounded
+  // mandatoriness. Scoped to the concluded-frame path (the live defect); flag-OFF ⇒ this block is skipped, byte-identical.
+  if (siteVisitMandatoryGroundedEnabled() && isSiteVisit && findingCarriesConcludedFrame
+      && !SITE_VISIT_MANDATORY_ATTENDANCE_RE.test(f.excerpt ?? "")) return false;
   if (f.kind === "eligibility_bar") return true;
   return isSiteVisit; // CONTENT only — NOT citation (keying P0 off a referenced doc NAME over-fires; ultracode re-review #2 P2)
 }

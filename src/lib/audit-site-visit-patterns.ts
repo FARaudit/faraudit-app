@@ -12,6 +12,15 @@ export const SITE_VISIT_RE = /\bsite[\s-]?(?:visit|tour|inspection)\b|\bjob[\s-]
 // the emitter frames against it and the guard recognizes it. Any tuning happens HERE, once.
 export const SITE_VISIT_CONCLUDED_RE = /\bsite[\s-]?(?:visit|tour|inspection)\b[^.\n]{0,80}\b(?:was\s+held|has\s+been\s+held|(?:was|is|has\s+been)\s+(?:concluded|closed|conducted)|already\s+(?:past|held|occurred|concluded)|(?:is|are)\s+now\s+(?:closed|concluded|past))\b|\b(?:held\s+and\s+(?:concluded|closed)|now\s+closed|has\s+concluded)\b[^.\n]{0,60}\bsite[\s-]?(?:visit|tour)\b/i;
 
+// MANDATORY-ATTENDANCE-PRECONDITION language (repair-unit item B, card #703). A concluded/past site visit is an
+// ATTRIBUTE, not a disqualifying bar, UNLESS the source itself grounds that attendance is a PRECONDITION of award /
+// eligibility. This regex matches only that grounding — "mandatory site visit", "attendance is required/mandatory/a
+// prerequisite", "must/shall attend", "failure to attend → ineligible/bars/disqualified", "only firms that attended
+// … eligible". It deliberately does NOT match a neutral "site visit was held and concluded" (the FA813726R0033 shape),
+// so a model-asserted "BARS AWARD" in a finding's REQUIREMENT can never confer bar-status without a grounded EXCERPT.
+// SHARED contract regex — tested against the verbatim EXCERPT (grounded source text), never the model requirement.
+export const SITE_VISIT_MANDATORY_ATTENDANCE_RE = /\bmandatory\b[^.\n]{0,40}\b(?:site[\s-]?visit|attend|walk|tour|conference|job[\s-]?walk)\b|\b(?:site[\s-]?visit|walk[\s-]?through|job[\s-]?walk|tour|attendance|conference)\b[^.\n]{0,40}\b(?:is|are|will\s+be|shall\s+be)\s+mandatory\b|\battendance\s+(?:is\s+)?(?:required|mandatory|compulsory|a\s+(?:prerequisite|precondition|condition))\b|\b(?:must|shall|are?\s+required\s+to)\s+attend\b|\bfailure\s+to\s+attend\b[^.\n]{0,70}\b(?:ineligibl|disqualif|not\s+be\s+considered|bar(?:s|red)|preclud|reject)|\bonly\s+(?:offerors?|firms?|contractors?|bidders?|those)\s+(?:who|that)\s+(?:attend|attended|participate)[^.\n]{0,70}\b(?:eligible|may\s+(?:bid|submit|propose)|be\s+considered|for\s+award)\b/i;
+
 // A BOA/IDIQ/BPA/GWAC/MAS/FSS vehicle HOLDER-ONLY ordering restriction — an ITO/order issued against a multiple-
 // award vehicle is competable only by existing holders of that vehicle; a non-holder cannot bid at all. SHARED
 // contract regex (card #459/#461 B2): the notice-body EMITTER (audit-orchestrator) surfaces the bar when no lens
