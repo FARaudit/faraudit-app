@@ -18,6 +18,7 @@ import { deriveTemporalDisposition, type TemporalDisposition } from "./audit-tem
 import { deriveSetAsideBackstop, type SetAsideBackstopDisposition } from "./audit-setaside-backstop"; // VERDICT ARC move-4, part B (flag AUDIT_SETASIDE_BACKSTOP default-OFF, SHADOW-ONLY; part A retired — card #677)
 import { GATE_V2_ENABLED, gateV2Outcome, hasLongLeadCredential, hasPreAwardPossession } from "./audit-gate-v2";
 import { SITE_VISIT_RE, SITE_VISIT_CONCLUDED_RE, SITE_VISIT_MANDATORY_ATTENDANCE_RE, BOA_IDIQ_HOLDER_BAR_RE } from "./audit-site-visit-patterns";
+import { reconcileScopeOpacity } from "./audit-scope-reconciliation";
 import { demoteMmEvidenceFactor, hasGroundedLeadTimeBasis } from "./mm-evidence-factor"; // card #538 (flag AUDIT_MM_EVIDENCE_FACTOR_DEMOTION)
 import { classifyGateShape } from "./panel-findings-bridge"; // ratified positive who-can-win shape classifier — the Unit-1 perf-obligation gate's keep-the-bar veto (Gauntlet R1: no bar-vocab blocklist). Type-only elsewhere ⇒ no import cycle.
 
@@ -3252,7 +3253,14 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   // escalate; R3 source-contradiction ("preferred/not required") demotes. Flag OFF ⇒ inp.findings passes through
   // untouched ⇒ every branch below is byte-identical.
   const mmDemote = process.env.AUDIT_MM_EVIDENCE_FACTOR_DEMOTION === "true";
-  const decidedFindings = mmDemote ? inp.findings.map((f) => demoteMmEvidenceFactor(f, inp.source)) : inp.findings;
+  const mmDemoted = mmDemote ? inp.findings.map((f) => demoteMmEvidenceFactor(f, inp.source)) : inp.findings;
+  // ── FINDING-#46 SCOPE-OPACITY RECONCILIATION (repair item C · Brain #703/#707 · flag AUDIT_SCOPE_OPACITY_RECONCILE,
+  //    default-OFF). A P0 "scope opacity / no SOW-spec-drawings visible" gate finding is demoted to a P2 attribute
+  //    when the finding set proves a SOW/spec/drawings attachment WAS read (the FA813726 ATT10 contradiction) — it is
+  //    materially false to surface a "cannot price, missing scope" P0 gate over a package whose SOW was ingested.
+  //    Scoped to the absence-claim SHAPE + gate-band + scope-doc-read gate; flag-OFF (or no scope doc read) ⇒
+  //    byte-identical. SET-LEVEL: needs the whole findings set to prove the attachment was read.
+  const decidedFindings = reconcileScopeOpacity(mmDemoted, inp.source, process.env.AUDIT_SCOPE_OPACITY_RECONCILE === "true");
   const dispositions: DecidedFinding[] = decidedFindings.map((f) => ({ ...f, disposition: disposeFinding(f) }));
   // (b/c) UNVERIFIED ELIGIBILITY GATES — a PROFILE-DEPENDENT eligibility gate (kind eligibility_bar carrying a
   //     specific requiredAttribute credential to check) the profile does not PROVE the firm satisfies. On a

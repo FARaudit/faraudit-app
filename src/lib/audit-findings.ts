@@ -146,6 +146,7 @@ export interface TypedFinding {
   // excludes demoted findings on this marker (their kind/requiredAttribute survive the demote, so without it a
   // demoted factor still clamps eligible=null). Verdict routing still reads controllability/cautionFloor/curableInWindow.
   mmEvidenceFactor?: boolean;
+  scopeReconciledDemoted?: boolean; // Repair item C (Brain #703/#707, flag AUDIT_SCOPE_OPACITY_RECONCILE) — set when a "scope opacity / no SOW/spec/drawings visible" P0 gate finding was demoted to a P2 attribute/caveat because the document set proved a SOW/spec/drawings attachment WAS read (the ATT10 contradiction). Provenance/telemetry only; deriveVerdict reads severity, not this marker.
   // TEMPORAL SHARED-ARO / SEQUENTIAL-GATE NARROWING (Brain card 140, Step 7) — set on the FAT precondition
   // finding when the Step-2 universal-impossibility (no_one_can_move → NO_BID) was DECLINED under the Option-B
   // four-prong gate and the finding was floored to a KO-clarify caution instead (cautionFloor) — i.e. a temporal
