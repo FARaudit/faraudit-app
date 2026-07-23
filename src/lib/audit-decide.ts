@@ -2785,6 +2785,20 @@ export function namedEligibilityReason(stoppers: DecidedFinding[]): string | nul
 // Flag-OFF ⇒ passes [] exactly as today (byte-identical, Rule 61).
 const coverageNhrStopperFillEnabled = () => process.env.AUDIT_COVERAGE_NHR_STOPPER_FILL === "true";
 
+// ── ITEM A (card #703 repair · flag AUDIT_NHR_HEADLINE_SHOWSTOPPER_FIRST, default-OFF) — HEADLINE SELECTION ONLY ──
+// The first live customer run (FA813726R0033) headlined the NHR with an ungrounded §L reps-&-certs recital (the
+// disqualifierUncovered content, hijacked by an OCR garble) while the DECISIVE grounded gate — BOA-holders-only —
+// sat unreferenced in showStoppers[]. Brain repair-unit item A: when the coverage-NHR cap fires AND a grounded
+// eligibility/site-visit show-stopper exists, LEAD the reason with the top grounded bar (namedEligibilityReason —
+// the same machinery the notice-body pole uses, card #477 ruling 3) and DEMOTE the uncovered-obligation reason to a
+// secondary coverage note. THE CAP AND POLE ARE UNCHANGED (still NEEDS_HUMAN_REVIEW); deriveVerdict remains sole
+// authority; the persisted showStoppers[] slot is governed by the FILL flag exactly as before. Flag-OFF ⇒ the reason
+// is v2.reason verbatim and the persisted slot is unchanged ⇒ byte-identical (Rule 61).
+// ⚠ ARM SEQUENCING (item-A seat, P3): do NOT arm this flag before repair-unit ITEM B lands. Until B, a concluded
+// site visit can still carry a disqualifying disposition (an over-claim), and item A would faithfully lead the
+// headline with that over-claimed bar. Arm A only WITH or AFTER B, so the bar A promotes is a real disqualifier.
+const nhrHeadlineShowStopperFirstEnabled = () => process.env.AUDIT_NHR_HEADLINE_SHOWSTOPPER_FIRST === "true";
+
 /** Against a disqualifying (bidder_cannot_move) bar, the firm's status is one of three — and that, not the
  *  bar's mere presence, decides the outcome (the standing facts-vs-analysis / no-blind-INELIGIBLE doctrine):
  *    "satisfies" — profile PROVES the firm holds the required qualification → the bar is cleared (a fact).
@@ -3378,8 +3392,21 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
     // SEAM FILL (card #472) — on the coverage-NHR cap ONLY (never INCOMPLETE: unreadable ⇒ findings untrustworthy), lift
     // any grounded site-visit/eligibility bar in dispositions[] into the persisted showStoppers[] slot so it renders in
     // the show-stopper band, not the P2 advisories. Same filter/flag family as the notice-body pole. OFF ⇒ [] (identical).
-    if (v2.cap === "NEEDS_HUMAN_REVIEW") return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), v2.reason, dispositions,
-      coverageNhrStopperFillEnabled() ? siteVisitEligStoppers(dispositions, inp.bidderProfile, inp.source) : []);
+    if (v2.cap === "NEEDS_HUMAN_REVIEW") {
+      // Stoppers are computed when EITHER flag needs them (headline lead or persisted fill), from the SAME filter.
+      const covStoppers = (coverageNhrStopperFillEnabled() || nhrHeadlineShowStopperFirstEnabled())
+        ? siteVisitEligStoppers(dispositions, inp.bidderProfile, inp.source) : [];
+      // ITEM A — headline selection only (see doctrine above). Lead with the grounded bar; demote v2.reason.
+      // P1 SELF-ENFORCEMENT (item-A adversarial seat, B6-confirmed): do NOT trust the upstream filter to have
+      // grounded the stopper — filter to grounded !== false HERE so the headline can never lead with an ungrounded
+      // bar even if a future caller widens siteVisitEligStoppers. Defense-in-depth; the arc's zero-fabrication class.
+      const groundedStoppers = covStoppers.filter((s) => (s as { grounded?: boolean }).grounded !== false);
+      const lead = nhrHeadlineShowStopperFirstEnabled() ? namedEligibilityReason(groundedStoppers) : null;
+      const reason = lead ? `${lead} A secondary coverage note: ${v2.reason}` : v2.reason;
+      // Persisted slot governed by the FILL flag ALONE — the headline flag never changes what is persisted (byte-identity).
+      const persisted = coverageNhrStopperFillEnabled() ? covStoppers : [];
+      return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), reason, dispositions, persisted);
+    }
     // cap === null ⇒ no coverage veto; the documentsComplete gate (1b) below still applies (genuine unreadability).
   } else if (!inp.coverageComplete) {
     return mk("INCOMPLETE", honestFailEligible(), "Coverage not complete — not all binding content was read and grounded." + (inp.coverageGap ? ` Gap: ${inp.coverageGap}.` : ""), dispositions, []);
