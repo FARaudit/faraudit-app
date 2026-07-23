@@ -815,6 +815,20 @@ export async function executeAgenticPrimary(
   }
   if (persistErr) throw new Error(`agentic persist failed after 3 attempts: ${persistErr}`);
 
+  // card #704 (routed item F, Option A) — persist the FULL ASSEMBLED SOURCE (the re-groundable blob) as a SEPARATE,
+  // best-effort write AFTER the verdict row is durably in. GUARD (Brain #4): a blob-write failure (size cap /
+  // transient) must NEVER discard a finished, paid audit or re-spend the engine — it logs loudly and is a flagged
+  // infra defect, never a customer-facing error and never on the verdict path. Without this, a completed audit is
+  // permanently un-re-groundable once the SAM notice 404s on archive (2ababbc3 was the founding gap). `raw_pdf_text`
+  // is an EXISTING nullable column — no migration. NOTE (item F #5): the blob must NOT ride `select("*")` on the hot
+  // path — readers select explicit columns; a list view that needs it uses a scoped select.
+  try {
+    const { error: srcErr } = await supabase.from("audits").update({ raw_pdf_text: fullSource }).eq("id", auditId);
+    if (srcErr) console.warn(`[AGENTIC-V3-PRIMARY] raw_pdf_text persist failed for ${auditId} (verdict is SAFE — source not re-groundable): ${srcErr.message}`);
+  } catch (e) {
+    console.warn(`[AGENTIC-V3-PRIMARY] raw_pdf_text persist threw for ${auditId} (verdict is SAFE): ${String(e)}`);
+  }
+
   // RUN-RECORD BANK (AUDIT_BANK_RUN_RECORD, default-OFF) — the engine-rebuild cheap-proof multiplier. Banks a
   // COMPLETE replayable RunRecord (real findings + inputs + coverage + fullSource) to durable storage so a fix
   // can be graded on real data for $0 (scripts/audit-ai/pull-run-records.ts → replay → gold-corpus-score.ts).

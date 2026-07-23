@@ -1510,13 +1510,19 @@ export function amendmentSupersessionUnresolved(fullSource: string): boolean {
 }
 /** Per-finding document PROVENANCE (which assembled doc a finding's excerpt is grounded in) — persisted so a
  *  reviewer can see which document (primary vs a specific attachment/amendment) each finding came from. */
-export function findingProvenance(fullSource: string, findings: TypedFinding[]): Array<{ id: string; doc: string }> {
+// card #704 (routed item F, Option A with the C-ready shape) — provenance now carries the VERBATIM excerpt per
+// finding, not just {id, doc}, so a finding can be re-grounded post-hoc without the (often 404'd) live source.
+// The excerpt is written verbatim (never fabricated) and only when the finding actually carries one — the loop
+// already skips excerpt-less findings, so an absent excerpt is simply not an entry (never a null-fabrication).
+// SECURITY: excerpt is source-/model-derived text (attacker-influenceable, like `doc`). Inert today (no renderer
+// reads finding_provenance); ANY future UI surfacing it MUST route through escapeHtml (stored-XSS), like `doc`.
+export function findingProvenance(fullSource: string, findings: TypedFinding[]): Array<{ id: string; doc: string; excerpt: string }> {
   const regions = docRegions(fullSource).map((r) => ({ name: r.name, n: norm(r.text) }));
-  const out: Array<{ id: string; doc: string }> = [];
+  const out: Array<{ id: string; doc: string; excerpt: string }> = [];
   for (const f of findings) {
     if (!f.id || !f.excerpt) continue;
     const ex = norm(f.excerpt);
-    out.push({ id: f.id, doc: regions.find((r) => r.n.includes(ex))?.name ?? "(ungrounded)" });
+    out.push({ id: f.id, doc: regions.find((r) => r.n.includes(ex))?.name ?? "(ungrounded)", excerpt: f.excerpt });
   }
   return out;
 }
