@@ -4,6 +4,13 @@
 // buried CMMC/clearance, at-award possession, untyped bar, non-curable, no_one_can_move, unsound verifier, flag-OFF.
 import { deriveVerdict } from "./audit-decide";
 import type { TypedFinding, VerdictInputs } from "./audit-findings";
+// SELF-ARM (card #697): the standard runner (`_gauntlet-replay.sh` → bare `npx tsx <file>`) passes NO env.
+// Without this line the POSITIVE arm silently measures the flag-OFF legacy path and reports a false RED —
+// the same value (`BID`) that the flag-OFF arm below asserts is CORRECT. Sibling suites self-arm identically
+// (audit-decide-incomplete-precedence.test.ts:9, audit-decide-temporal.test.ts:53); the flag is read at CALL
+// time (proved by the flag-OFF arm's mid-run delete), so placement after the imports is behaviour-equivalent.
+// Live worker carries AUDIT_SELF_CLEARABLE_PACKAGE=true, so this is the production configuration.
+process.env.AUDIT_SELF_CLEARABLE_PACKAGE = "true";
 let fail = 0; const ok = (c: boolean, m: string) => { console.log(`${c ? "✅" : "❌"} ${m}`); if (!c) fail++; };
 
 const bar = (o: Partial<TypedFinding>): TypedFinding => ({
