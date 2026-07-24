@@ -300,12 +300,12 @@ export function fmtDeadline(raw: string): string {
   return `${dateStr} · ${hh}:${mi} (${offLabel})`;
 }
 
-function buildDates(responseDeadline: string, cj: Record<string, unknown>): V4Date[] {
+function buildDates(responseDeadline: string, cj: Record<string, unknown>, amended?: AmendedDue): V4Date[] {
   // Card #479 — the §06 Key Dates "Offers due" row carries the SAME reset/reconcile caveat as the masthead (offerDueFact),
   // so a reader scanning Key Dates alone isn't misled that a reset-TBD date is firm. Under the base flags this is the bare
   // date exactly as before (offerDueFact returns {value, sub:undefined}) → byte-identical.
   if (!responseDeadline) return [];
-  const od = offerDueFact(responseDeadline, cj);
+  const od = offerDueFact(responseDeadline, cj, amended);
   return [{ label: "Offers due", value: od.value, kind: "gate", ...(od.sub ? { sub: od.sub } : {}) }];
 }
 
@@ -351,13 +351,56 @@ function deadlineConflictNote(responseDeadline: string, cj: Record<string, unkno
 // value + sub-note, NEVER open/closed (that stays SAM-authoritative, computed elsewhere). Flag OFF ⇒ the exact prior
 // behavior (SAM value + verify caveat), byte-identical (Rule 61).
 const DEADLINE_RECONCILE_ENABLED = process.env.AUDIT_DEADLINE_RECONCILE === "true";
-export function offerDueFact(responseDeadline: string, cj: Record<string, unknown>): { value: string; sub?: string } {
+
+// Vehicle F3 · masthead deadline reconcile (flag AUDIT_MASTHEAD_DEADLINE_RECONCILE, default-OFF) — DOMAIN RULING
+// (Brain, card #736): the offer-due date hierarchy is (a) an executed SF-30 amendment in the package = AUTHORITATIVE;
+// (b) SAM `response_deadline` metadata = fallback ONLY when no in-package amendment touches the date; (c) notice-body
+// UPDATEs = annotations, never the rendered date. NEVER render a date absent from every artifact. The engine does NOT
+// extract the SF-30 amended date into any structured field (cj.deadlines empty; notice_body_deadline reset_tbd/date=null
+// — card #735), so the amended date lives ONLY in raw_pdf_text. This parses the executed SF-30 "SUMMARY OF CHANGES →
+// Response Due Date <from> <to>" and returns the amended (To) date. Conservative: fires ONLY inside SF-30/amendment
+// context AND only on an unambiguous From→To pair; anything else → null (SAM stays authoritative). SAM-floor is applied
+// by the caller (override only when strictly later than SAM). Pure; raw_pdf_text scan is a cheap targeted regex.
+// PER-CALL (not a module const) so the flag is honoured at render time, not frozen at import — matches severityHonestEnabled.
+const mastheadDeadlineReconcileEnabled = (): boolean => process.env.AUDIT_MASTHEAD_DEADLINE_RECONCILE === "true";
+const MONTH_IX_V4: Record<string, number> = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+function ddMonYyyyToIso(d: string): string | null {
+  const m = d.match(/(\d{1,2})\s+([A-Za-z]{3})[a-z]*\s+(\d{4})/);
+  if (!m) return null;
+  const mo = MONTH_IX_V4[m[2].toLowerCase()];
+  if (mo === undefined) return null;
+  return `${m[3]}-${String(mo + 1).padStart(2, "0")}-${String(Number(m[1])).padStart(2, "0")}`;
+}
+export function extractAmendmentDueDate(rawText: string): { iso: string; display: string } | null {
+  if (!rawText) return null;
+  if (!/summary of changes|amendment of solicitation/i.test(rawText)) return null; // SF-30 context required
+  // "Response Due Date <FROM date> <TO date>" — a From→To change table; the SECOND (To) date is the amended value.
+  const m = rawText.match(/Response Due Date\s+(\d{1,2}\s+[A-Za-z]{3,}\s+\d{4})\s+(\d{1,2}\s+[A-Za-z]{3,}\s+\d{4})/i);
+  if (!m) return null;
+  const iso = ddMonYyyyToIso(m[2]);
+  if (!iso) return null;
+  return { iso, display: fmtDeadline(iso) };
+}
+
+type AmendedDue = { iso: string; display: string } | null;
+export function offerDueFact(responseDeadline: string, cj: Record<string, unknown>, amended?: AmendedDue): { value: string; sub?: string } {
   const prior = { value: fmtDeadline(responseDeadline), sub: deadlineConflictNote(responseDeadline, cj) ?? undefined };
   // Card #477 ruling 2 — the notice-body UPDATE-stack state (flag AUDIT_DEADLINE_UPDATE_STACK; present only when on)
   // TAKES PRECEDENCE: it read the newest UPDATE and knows whether the due date was RESET, so it surfaces the TRUE state
   // instead of the stale-metadata reconcile that harvested an UPDATE-header/RFI-filename date ("document states 24 Jun").
   // SAM stays the masthead FLOOR; this only powers the caveat. Absent (flag OFF) ⇒ falls through unchanged (byte-identical).
   const nb = cj.notice_body_deadline as { status?: string; date?: string | null; lastStated?: { date: string } | null; note?: string } | undefined;
+  // (a) executed SF-30 amendment = AUTHORITATIVE (SAM-floor already applied by the caller). Render the amended date
+  // with provenance; when a later notice UPDATE signals the date was reset again, append a pending-revision caveat.
+  // This supersedes both the reset_tbd fallback and the cj.deadlines reconcile — an in-package executed amendment
+  // touches the date, so SAM metadata is no longer the fallback (DOMAIN RULING b). Flag gate is on `amended` being set.
+  if (mastheadDeadlineReconcileEnabled() && amended) {
+    const pending = nb?.status === "reset_tbd";
+    return {
+      value: amended.display,
+      sub: `Per the executed amendment (SF-30) — current offer-due date.${pending ? " A later notice indicates a further revision may be pending; verify against the latest amendment." : ""}`,
+    };
+  }
   if (nb && nb.status === "reset_tbd") {
     return { value: fmtDeadline(responseDeadline), sub: `⚠ ${nb.note || "Offer-due date reset by the latest amendment — a new date will be provided; verify against the latest amendment."}` };
   }
@@ -487,6 +530,12 @@ export function buildV4Data(audit: Record<string, unknown>): V4Data {
   const naics = s(audit.naics_code);
   const setAside = s(audit.set_aside);
   const responseDeadline = s(audit.response_deadline);
+  // Vehicle F3 · masthead deadline reconcile (flag AUDIT_MASTHEAD_DEADLINE_RECONCILE) — extract the executed SF-30
+  // amended offer-due date from raw_pdf_text ONCE, SAM-floor guarded (override only when strictly LATER than SAM, or
+  // SAM absent — an earlier doc date is a stale original and never wins). null ⇒ SAM stays authoritative (byte-identical).
+  const amendedRaw = mastheadDeadlineReconcileEnabled() ? extractAmendmentDueDate(s(audit.raw_pdf_text)) : null;
+  const samMsForAmend = Date.parse(responseDeadline);
+  const amended: AmendedDue = amendedRaw && (Number.isNaN(samMsForAmend) || Date.parse(amendedRaw.iso) > samMsForAmend) ? amendedRaw : null;
   const pole = s(p.verdict) as Pole;
   // authoritative completeness = the top-level compliance_json.documents_complete (C-group truth-source,
   // sibling of v3 — same field shouldGateExport reads), so the report state matches the export gate.
@@ -521,7 +570,7 @@ export function buildV4Data(audit: Record<string, unknown>): V4Data {
   }
   // #329: label is "Offers due" (this is the RESPONSE deadline, not a delivery date — the old "Delivery" mislabel
   // was a customer-facing error) and the value is formatted to preserve the wall-clock cutoff + offset.
-  if (responseDeadline) { const od = offerDueFact(responseDeadline, cj); facts.push({ k: "Offers due", v: od.value, sub: od.sub }); }
+  if (responseDeadline) { const od = offerDueFact(responseDeadline, cj, amended); facts.push({ k: "Offers due", v: od.value, sub: od.sub }); }
   const docType = deriveDocType(s(audit.notice_type), pole);
 
   // ── verdict ──
@@ -574,7 +623,7 @@ export function buildV4Data(audit: Record<string, unknown>): V4Data {
     submissionL: buildSubmissionL(all),
     evalM: buildEvalM(all),
     clins: buildClins(all),
-    dates: buildDates(responseDeadline, cj),
+    dates: buildDates(responseDeadline, cj, amended),
     provenance,
   } as V4Data;
 }

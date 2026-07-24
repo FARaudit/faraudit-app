@@ -154,6 +154,8 @@ body{background:var(--desk); color:var(--ink); font-family:var(--font);
 .cmd-clock-ic svg{width:100%; height:100%; display:block;}
 .cmd-clock-k{font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-3); font-weight:600;}
 .cmd-clock-v{font-size:12.5px; color:var(--ink); font-weight:500; letter-spacing:-.01em; white-space:nowrap;}
+/* Deadline reset/reconcile caveat under the clock (flag AUDIT_V5_DEADLINE_CAVEAT). od.sub already leads with "⚠". */
+.cmd-clock-caveat{margin-top:7px; font-size:11.5px; line-height:1.45; color:var(--ink-2); max-width:56ch; padding-left:11px; border-left:2px solid var(--tone-c); text-wrap:pretty;}
 
 .cmd-bl{border-left:3px solid var(--tone-c); padding:2px 0 2px 16px; margin-bottom:20px;}
 .cmd-bl-k{display:block; font-size:11px; text-transform:uppercase; letter-spacing:.12em; color:var(--ink-3); font-weight:600; margin-bottom:5px;}
