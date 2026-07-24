@@ -96,6 +96,16 @@ export function agenticManifestComplete(
  *  is UNKNOWN, never "present" — an ingested binding doc whose text status we cannot confirm is a content loss
  *  (`!== true`), not silently complete. This can flip a legacy record (written before the field) to INCOMPLETE on
  *  replay — the ruled, SAFE direction (unknown ⇒ cannot certify complete), never a false COMPLETE. */
+// ── Vehicle A–E item A — deterministic doc-ROLE × eligibility-gate classifier (Brain R4 conservative-default clause).
+// A doc is affirmatively NON-dispositive to a bidder-eligibility gate ONLY if its NAME is a pricing/technical/admin
+// artifact that cannot alter WHO MAY BID: wage determination, drawings, design narrative, submittal register,
+// sign-in sheet, photos. Everything else — amendment/SF30, base solicitation, RFI/Q&A, reps-certs, specs (may carry
+// QPL/brand-name qualification), or an UNKNOWN role — defaults ADVERSE (dispositive → blocks A). Model-free; pinned.
+const ELIG_NONDISPOSITIVE_ROLE_RE = /wage determination|davis[\s-]?bacon\b|design narrative|submittal register|sign[\s-]?in\b|\bdrawings?\b|\bphotos?\b/i;
+export function eligibilityNonDispositiveByRole(name: string): boolean {
+  return ELIG_NONDISPOSITIVE_ROLE_RE.test(name || "");
+}
+
 export function bindingContentLossDocs(ingestion: IngestionMeta): IngestionFileMeta[] {
   // A binding doc is a CONTENT LOSS when its text is absent/unknown (has_text !== true) OR when it was
   // mid-document truncated to fit the per-doc token budget (C-4 — the unread tail may carry a bar).
@@ -584,10 +594,21 @@ export async function executeAgenticPrimary(
     temporal = { snapshot, liveSam, ingestedAmendmentComplete, today, nowIso: nowInstant };
     console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: temporal live-SAM fetched=${liveSam?.fetched ?? false} active=${liveSam?.active ?? "?"} amendments=${liveSam?.amendmentCount ?? "?"} ingestComplete=${ingestedAmendmentComplete}`);
   }
+  // Vehicle A–E item A (flag AUDIT_VERDICT_POLE_PRECEDENCE, default-OFF) — the narrowed dispositive-completeness
+  // precondition. Incomplete set = dropped/over-budget + content-loss + binding content-loss (the last captures an
+  // OCR-held doc like a Wage Determination). A grounded eligibility bar may outrank INCOMPLETE ONLY if EVERY
+  // incomplete doc is affirmatively non-dispositive to a WHO-MAY-BID gate (conservative-adverse default). Flag-OFF ⇒
+  // undefined ⇒ A never fires ⇒ byte-identical.
+  const dispositiveCompletenessForEligibility = process.env.AUDIT_VERDICT_POLE_PRECEDENCE === "true"
+    ? (input.ingestion != null
+        ? [...assembled.droppedDocs, ...assembled.contentLossDocs, ...bindingContentLossDocs(input.ingestion).map((f) => f.name)]
+            .every((n) => eligibilityNonDispositiveByRole(n))
+        : false) // no ingestion manifest ⇒ cannot affirm completeness ⇒ conservative-adverse (A does not fire)
+    : undefined;
   const _tPackage = Date.now();
   const res = await auditPackage({
     temporal,
-    fullSource, bidderProfile, signal, manifestComplete: manifestComplete && !constructionOOS, constructionManifest, groundingSource,
+    fullSource, bidderProfile, signal, manifestComplete: manifestComplete && !constructionOOS, dispositiveCompletenessForEligibility, constructionManifest, groundingSource,
     // card #523 (P2a-wire) — VERIFIED panel facts unioned into the rail (undefined when flag OFF ⇒ byte-identical).
     // card #570 — serial passes the resolved array; parallel passes the PRODUCER PROMISE (resolved at the rail merge so
     // the producer overlaps the expert-phase). Exactly one is set; the merged union is byte-identical either way.

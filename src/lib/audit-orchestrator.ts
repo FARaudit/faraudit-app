@@ -98,6 +98,10 @@ export interface OrchestratorInput {
   // heuristic. false → caps a no-bar BID/CAUTION to INCOMPLETE (asymmetry). Default/absent
   // = true (no external constraint → rely on the heuristic alone, unchanged behavior).
   manifestComplete?: boolean;
+  // Vehicle A–E item A (flag AUDIT_VERDICT_POLE_PRECEDENCE) — narrowed dispositive-completeness precondition
+  // (computed in the executor from the incomplete-doc set via a deterministic role classifier). Forwarded verbatim
+  // to VerdictInputs. Absent ⇒ A never fires ⇒ byte-identical.
+  dispositiveCompletenessForEligibility?: boolean;
   // Step 4a (plumb-only) — SAM-resolved scalar FACTS carried into the gate-pipeline scope so a
   // future deterministic gate (Step 4: Nonmanufacturer Rule) can read them WITHOUT regexing source
   // (Rule 64: fact, never AI-derived). Absent → null (honest silence; uploads have no SAM NAICS).
@@ -2817,7 +2821,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // flag-ON) is surfaced as a BID_WITH_CAUTION-floor caveat before deriveVerdict. Flag-OFF ⇒ caveatRecital absent ⇒
   // emitter is a no-op ⇒ byte-identical.
   if (coverageV2?.caveatRecital?.length) findings = emitPerformanceUpkeepCaveats(findings, coverageV2.caveatRecital);
-  const inputs: VerdictInputs = { findings, bidderProfile, samSetAside: opts.setAside ?? null, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(process.env.AUDIT_SITEVISIT_SEVERITY_FLOOR === "true" ? { siteVisitSeverityFloor: true } : {}), ...(coverageV2 ? { coverageV2 } : {}), ...(opts.temporal ? { temporalSnapshot: opts.temporal.snapshot, liveSam: opts.temporal.liveSam, ingestedAmendmentComplete: opts.temporal.ingestedAmendmentComplete, today: opts.temporal.today, nowIso: opts.temporal.nowIso ?? null } : {}) };
+  const inputs: VerdictInputs = { findings, bidderProfile, samSetAside: opts.setAside ?? null, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(opts.dispositiveCompletenessForEligibility !== undefined ? { dispositiveCompletenessForEligibility: opts.dispositiveCompletenessForEligibility } : {}), ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(process.env.AUDIT_SITEVISIT_SEVERITY_FLOOR === "true" ? { siteVisitSeverityFloor: true } : {}), ...(coverageV2 ? { coverageV2 } : {}), ...(opts.temporal ? { temporalSnapshot: opts.temporal.snapshot, liveSam: opts.temporal.liveSam, ingestedAmendmentComplete: opts.temporal.ingestedAmendmentComplete, today: opts.temporal.today, nowIso: opts.temporal.nowIso ?? null } : {}) };
   // Phase-1 SHADOW (cards #596/#597) — compute the positive-shape pole BESIDE the real verdict and bank it. VERDICT-INERT:
   // the shadow is never routed on; the live deriveVerdict below is untouched. Gated on AUDIT_POSITIVE_VERDICT_POLE (default-
   // OFF ⇒ never computed ⇒ byte-identical) AND banking on (the diagnostics carrier). naics is the SAM fact (Rule 64).
