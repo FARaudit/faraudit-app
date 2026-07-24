@@ -489,7 +489,21 @@ export function buildV4Data(audit: Record<string, unknown>): V4Data {
   const facts: V4Fact[] = [];
   if (agency) facts.push({ k: "Agency", v: agency });
   if (naics) facts.push({ k: "NAICS", v: naics, mono: true });
-  if (setAside) facts.push({ k: "Set-aside", v: setAside });
+  // Vehicle F2 · F-3 (flag AUDIT_SETASIDE_HEADER_RECONCILE, default-OFF) — the header must not ASSERT a set-aside the
+  // body denies. Raw SAM `set_aside` is sometimes an agency/metadata label ("SBA") with no operative clause. When the
+  // engine's own body finding says no operative set-aside exists (52.219-6 absent) AND no set_aside_type is typed, the
+  // header DERIVES from that finding instead of parroting the metadata. Flag-OFF: raw value (byte-identical).
+  if (setAside) {
+    const setAsideType = s(audit.set_aside_type);
+    const bodyDeniesSetAside = process.env.AUDIT_SETASIDE_HEADER_RECONCILE === "true"
+      && !setAsideType
+      && (p.findings || []).some((f) => /no\s+socioeconomic\s+set.?aside|52\.219-6\s+(is\s+)?absent/i.test(`${s(f.requirement)} ${s(f.excerpt)}`));
+    if (bodyDeniesSetAside) {
+      facts.push({ k: "Set-aside", v: "None confirmed", sub: `SAM coding "${setAside}" present; no operative set-aside clause (52.219-6 absent) — confirm` });
+    } else {
+      facts.push({ k: "Set-aside", v: setAside });
+    }
+  }
   // #329: label is "Offers due" (this is the RESPONSE deadline, not a delivery date — the old "Delivery" mislabel
   // was a customer-facing error) and the value is formatted to preserve the wall-clock cutoff + offset.
   if (responseDeadline) { const od = offerDueFact(responseDeadline, cj); facts.push({ k: "Offers due", v: od.value, sub: od.sub }); }
