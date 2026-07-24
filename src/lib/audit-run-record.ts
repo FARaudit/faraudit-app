@@ -71,6 +71,11 @@ export interface RunRecord {
     reason: string;
     inputs: VerdictInputs;                       // deriveVerdict(inputs) reproduces verdict — integrity check
     findings: TypedFinding[];                    // full grounded finding set (the replay's grounding corpus)
+    // Vehicle F2 · I6 — capture the Decision's verdict metadata so the post-run battery reads REAL values instead of
+    // NOT-MEASURED (the vehicle-F battery found result.noVerdictCause / result.showStoppers absent). Additive +
+    // optional ⇒ pre-existing records still load; the report render never reads the run-record, so byte-identity holds.
+    noVerdictCause?: string;                     // the enumerated no-verdict cause (eligibility/conflict/coverage/…)
+    showStoppers?: unknown[];                    // decided show-stoppers WITH disposition (the two-tier eligibility bars)
     coverage: AuditResult["coverage"];           // required/covered/missing/attestations/coreMissing as run
     conflict: boolean;
     sectionsRead: string[];
@@ -108,6 +113,12 @@ export function buildRunRecord(args: BuildRunRecordArgs): RunRecord {
       reason: args.result.decision.reason,
       inputs: args.result.inputs,
       findings: args.result.findings,
+      // Vehicle F2 · I6 — verdict metadata for the battery (see interface note). Spread-conditional so a committal
+      // pole (no noVerdictCause) omits the key; showStoppers always captured (empty array on a clean BID).
+      ...((args.result.decision as { noVerdictCause?: string }).noVerdictCause
+        ? { noVerdictCause: (args.result.decision as { noVerdictCause?: string }).noVerdictCause }
+        : {}),
+      showStoppers: (args.result.decision as { showStoppers?: unknown[] }).showStoppers ?? [],
       coverage: args.result.coverage,
       conflict: args.result.conflict,
       sectionsRead: args.result.sectionsRead,

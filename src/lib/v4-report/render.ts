@@ -31,7 +31,7 @@ export interface V4Coverage {
 }
 export interface V4Temporal { gateDays: number | null; windowDays: number | null; gateExceedsWindow: boolean; }
 export interface V4Finding { req: string; cite: string; excerpt?: string; curability?: string; temporal?: V4Temporal; driver?: boolean; }
-export interface V4Findings { p0: V4Finding[]; p1: V4Finding[]; p2: V4Finding[]; satisfied?: { req: string; cite: string }[]; }
+export interface V4Findings { p0: V4Finding[]; p1: V4Finding[]; p2: V4Finding[]; unrated?: V4Finding[]; satisfied?: { req: string; cite: string }[]; }
 export interface V4Grounded<T> { grounded: boolean; } // { grounded:false } sentinel or the full derived shape
 export interface V4SubmissionL { grounded: true; lead?: string; rows: { vol: string; req: string; condition: string; cite: string }[]; }
 export interface V4EvalM { grounded: true; basis: string; factors: { name: string; basis: string; cite: string }[]; }
@@ -113,11 +113,23 @@ function verdict(v: V4Verdict, meta: { auditId?: string; auditDate?: string; cov
   const m = meta || {};
   const cov = m.coverage || ({} as V4Coverage);
   const pct = cov.total ? Math.round((cov.read / cov.total) * 100) : null;
+  // Vehicle F2 · F-5 (flag AUDIT_COVERAGE_DISPLAY_COHERENT, default-OFF) — the masthead "%" is the READ axis
+  // (docs-read / docs-total); the coverage CARD renders the GROUNDED axis (cov.state). When those disagree, the
+  // masthead showed "100%" directly above a card reading "INCOMPLETE". Flag-ON: when state ≠ COMPLETE the masthead
+  // shows the STATE (grounded axis), coherent with the card — never a read-100% that contradicts an incomplete grounding.
+  const coherent = process.env.AUDIT_COVERAGE_DISPLAY_COHERENT === "true";
+  const covIncomplete = coherent && cov.state != null && cov.state !== "COMPLETE";
+  const covVal = covIncomplete
+    ? esc(cov.state === "INCOMPLETE" ? "Incomplete" : String(cov.state))
+    : (pct == null ? "—" : pct + "%");
+  const covSub = covIncomplete
+    ? (cov.total ? " · " + cov.read + "/" + cov.total + " read" : "")
+    : (cov.total ? " · " + cov.read + "/" + cov.total + " docs" : "");
   const readout = `
           <aside class="vd-readout mono" aria-hidden="true">
             <div class="vdr-row"><span class="vdr-k">Assessment</span><span class="vdr-v">${esc(m.auditId || "—")}</span></div>
             <div class="vdr-row"><span class="vdr-k">Evaluated</span><span class="vdr-v">${esc(m.auditDate || "—")}</span></div>
-            <div class="vdr-row"><span class="vdr-k">Coverage</span><span class="vdr-v">${pct == null ? "—" : pct + "%"}<span class="vdr-sub">${cov.total ? " · " + cov.read + "/" + cov.total + " docs" : ""}</span></span></div>
+            <div class="vdr-row"><span class="vdr-k">Coverage</span><span class="vdr-v">${covVal}<span class="vdr-sub">${covSub}</span></span></div>
           </aside>`;
   return `
     <section class="sec vd-sec" id="verdict" data-sec data-tone="${esc(v.tone)}"${v.noVerdict ? ' data-noverdict="1"' : ""}>
@@ -166,14 +178,21 @@ function temporal(t?: V4Temporal): string {
       <span class="ft-verdict">${exceeds ? "gate exceeds the window" : "gate falls within the window"}</span>
     </div>`;
 }
-const SEVLAB: Record<string, string> = { p0: "Stop", p1: "Critical", p2: "Advisory" };
+// Vehicle F2 · F-2 (flag AUDIT_SEVERITY_HONEST, default-OFF). Flag-OFF: legacy labels (byte-identical). Flag-ON:
+// the p1 tier reads "Gate" not "Critical" — a clearable gate is not a show-stopper; "Critical" belongs only to the
+// p0 blocker registry (this aligns v4 with v5-report/core.ts SEVLAB, which already says "Gate"). "unrated" =
+// UNRATED (the honest UNCOMPUTED-DEFAULT rendering — never promoted upward). Evaluated PER-CALL (not a module const)
+// so the flag is honoured at render time, not frozen at import.
+const sevLab = (): Record<string, string> => process.env.AUDIT_SEVERITY_HONEST === "true"
+  ? { p0: "Stop", p1: "Gate", p2: "Advisory", unrated: "Unrated" }
+  : { p0: "Stop", p1: "Critical", p2: "Advisory" };
 function findingRow(f: V4Finding, sev: string, open: boolean): string {
   return `
     <article class="find" data-sev="${sev}"${open ? ' data-open="1"' : ""}>
       <button class="find-top" type="button" aria-expanded="${open ? "true" : "false"}">
         <span class="find-num" aria-hidden="true"></span>
         <span class="find-dot" aria-hidden="true"></span>
-        <span class="find-sevtag" aria-hidden="true"><b>${sev.toUpperCase()}</b><i>${SEVLAB[sev] || ""}</i></span>
+        <span class="find-sevtag" aria-hidden="true"><b>${sev.toUpperCase()}</b><i>${sevLab()[sev] || ""}</i></span>
         <span class="find-req">${esc(f.req)}</span>
         <span class="find-side"><span class="find-cite mono">${esc(f.cite)}</span>
           <span class="find-chev" aria-hidden="true">${I.chev}</span></span>
@@ -199,6 +218,9 @@ function findings(fd: V4Findings, complete: boolean): string {
     findingGroup(fd.p0, "p0", "Show-stoppers", complete, true),
     findingGroup(fd.p1, "p1", "Gates", complete, false),
     findingGroup(fd.p2, "p2", "Advisories", complete, false),
+    // Vehicle F2 · F-2 — the UNRATED tier renders ONLY when the engine left severity uncomputed AND the disposition
+    // did not rank it. Honest by construction: it is never merged into a gate/advisory. Absent (flag-OFF) ⇒ omitted.
+    (fd.unrated && fd.unrated.length) ? findingGroup(fd.unrated, "unrated", "Unrated · severity not computed", complete, false) : "",
   ].filter(Boolean).join("");
   const sat = (fd.satisfied && fd.satisfied.length)
     ? `<div class="fgroup fg-ok"><div class="fg-h"><span class="fg-mk"></span>Satisfied · grounded facts<span class="fg-cnt mono">${fd.satisfied.length}</span></div>
