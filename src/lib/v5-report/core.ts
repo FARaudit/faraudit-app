@@ -57,8 +57,14 @@ export function scorecardTiles(d: V4Data): ScorecardTile[] {
   const p0 = (f.p0 || []).length, p1 = (f.p1 || []).length, p2 = (f.p2 || []).length;
   const nv = !!v.noVerdict;
   const elig = eligInfo(v);
+  // Vehicle F · D3 (flag AUDIT_NHR_NARRATIVE_TRUE_CAUSE) — on an ELIGIBILITY-cause NHR the gate(s) ARE determined (the
+  // engine named a grounded eligibility bar), so Show-stoppers/Eligibility surface the conditional gate instead of the
+  // blanket "Not determined". Flag-OFF / other causes ⇒ eligGate false ⇒ exact legacy tiles ⇒ byte-identical.
+  const eligGate = process.env.AUDIT_NHR_NARRATIVE_TRUE_CAUSE === "true" && (v as { noVerdictCause?: string }).noVerdictCause === "eligibility" && p0 > 0;
   const tiles: ScorecardTile[] = [
-    { k: "Show-stoppers", v: nv ? "Not determined" : (p0 ? String(p0) : "None"), tone: nv ? "slate" : (p0 ? "stop" : "go"), sub: nv ? "not determined" : (p0 ? "block award" : "no blockers found"), textv: nv },
+    eligGate
+      ? { k: "Show-stoppers", v: String(p0), tone: "caution", sub: "eligibility gate — confirm your firm's status", textv: false }
+      : { k: "Show-stoppers", v: nv ? "Not determined" : (p0 ? String(p0) : "None"), tone: nv ? "slate" : (p0 ? "stop" : "go"), sub: nv ? "not determined" : (p0 ? "block award" : "no blockers found"), textv: nv },
     { k: "Gates to clear", v: nv ? "Not determined" : String(p1), tone: nv ? "slate" : (p1 ? "caution" : "go"), sub: nv ? "not determined" : "before you submit", textv: nv },
     // Coverage = read / total (never a bare %). Gate-2 ruling (Design, 2026-07-07): a
     // percentage is score-adjacent on a score-free artifact, and it contradicted the deck

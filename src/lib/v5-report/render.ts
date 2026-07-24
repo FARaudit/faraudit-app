@@ -236,6 +236,20 @@ export interface ReasoningStep {
   skip?: boolean; verdict?: boolean; cites?: string[]; findings?: V4Finding[];
 }
 
+// Vehicle F · D2 — true-cause NHR narrative (flag AUDIT_NHR_NARRATIVE_TRUE_CAUSE). Each enumerated cause renders its
+// OWN true sequence; conflict language lives ONLY under `conflict`. Returns null for an absent/unrecognized cause so
+// the caller emits the FAIL-LOUD neutral string + a defect signal — never a fabricated cause.
+function nhrCauseNarrative(cause?: string): { label: string; outcome: string; detail: string } | null {
+  switch (cause) {
+    case "conflict": return { label: "Findings reconciled", outcome: "Cannot be reconciled", detail: "Two grounded findings conflict and the engine will not adjudicate between them. A human must resolve the conflict first, so the sequence stops and no verdict is issued." };
+    case "eligibility": return { label: "Eligibility gate", outcome: "Human confirmation required", detail: "A bidder-eligibility gate stated in the solicitation governs award, and the engine cannot confirm your firm's status from the posted record — so the sequence stops for human confirmation rather than guess. The gate(s) are named below." };
+    case "coverage": return { label: "Coverage reconciled", outcome: "Not fully grounded", detail: "Referenced binding material could not be fully read or grounded, so a verdict cannot be certified over the partial record. The gap is named below; no verdict is issued." };
+    case "primary_indeterminate": return { label: "Base solicitation", outcome: "Not identified", detail: "No uploaded document carries a solicitation form or contract structure, so the engine cannot confirm which document is the solicitation. Human review is required before any verdict." };
+    case "verification": return { label: "Verification", outcome: "Not sound", detail: "The findings did not pass adversarial verification, or no decision-bearing finding survived, so the engine will not rest a verdict on an untrustworthy set. Human review is required." };
+    default: return null;
+  }
+}
+
 export function reasoningSteps(d: V4Data): ReasoningStep[] {
   const v = d.verdict, cov = d.coverage, f = d.findings;
   const complete = cov.state === "COMPLETE";
@@ -307,15 +321,38 @@ export function reasoningSteps(d: V4Data): ReasoningStep[] {
   // 02 — complete + no-verdict poles (NHR reconcile / OUT_OF_SCOPE scope) — terminal here
   if (v.noVerdict) {
     const oos = v.pole === "OUT_OF_SCOPE";
-    steps.push({
-      tone: "slate", label: oos ? "Scope checked" : "Findings reconciled",
-      outcome: oos ? "Outside scope" : "Cannot be reconciled",
-      detail: oos
-        ? "The notice solicits no offer and confers no basis for award, so a bid decision does not apply. The sequence stops and no verdict is issued."
-        : "Two grounded findings conflict and the engine will not adjudicate between them. A human must resolve the conflict first, so the sequence stops and no verdict is issued.",
-      cites: oos ? [] : drivers.slice(0, 2).map((x) => x.cite),
-    });
-    steps.push(skip("Eligibility & verdict", "These need the checks above to resolve; they were not run."));
+    // Vehicle F · D2 (flag AUDIT_NHR_NARRATIVE_TRUE_CAUSE, default-OFF) — derive the walkthrough from the engine's
+    // ENUMERATED cause instead of asserting "findings conflict" on every NHR (21/22 were fabricated). conflict language
+    // renders IFF cause==="conflict"; an absent/unknown cause renders a NEUTRAL TRUE string + a defect signal (fail-loud).
+    // Flag-OFF (or OOS) ⇒ the exact legacy strings ⇒ byte-identical.
+    const trueCause = process.env.AUDIT_NHR_NARRATIVE_TRUE_CAUSE === "true" && !oos;
+    if (!trueCause) {
+      steps.push({
+        tone: "slate", label: oos ? "Scope checked" : "Findings reconciled",
+        outcome: oos ? "Outside scope" : "Cannot be reconciled",
+        detail: oos
+          ? "The notice solicits no offer and confers no basis for award, so a bid decision does not apply. The sequence stops and no verdict is issued."
+          : "Two grounded findings conflict and the engine will not adjudicate between them. A human must resolve the conflict first, so the sequence stops and no verdict is issued.",
+        cites: oos ? [] : drivers.slice(0, 2).map((x) => x.cite),
+      });
+      steps.push(skip("Eligibility & verdict", "These need the checks above to resolve; they were not run."));
+      steps.push(verdictStep());
+      return steps;
+    }
+    const narr = nhrCauseNarrative(v.noVerdictCause);
+    if (!narr) { try { console.error(`[D2 fail-loud] NHR rendered with unrecognized/absent noVerdictCause=${String(v.noVerdictCause)} — neutral string emitted, not a fabricated cause`); } catch { /* logging must never affect render */ } }
+    const cause = narr ?? { label: "Sequence halted", outcome: "No verdict recorded", detail: "The sequence stopped before a verdict; the cause was not recorded in this report. Treat this audit as needing human review — this is a reporting gap, not a decision about the solicitation." };
+    steps.push({ tone: "slate", label: cause.label, outcome: cause.outcome, detail: cause.detail, cites: drivers.slice(0, 2).map((x) => x.cite) });
+    // D3 — on an ELIGIBILITY-cause NHR the gate(s) ARE determined: surface the tier-1/tier-2 conditional instead of a bare skip.
+    if (v.noVerdictCause === "eligibility" && drivers.length) {
+      steps.push({
+        tone: "caution", label: "Eligibility", outcome: "Confirm your firm's status",
+        detail: "Tier 1 — if your firm does not clear the gate(s) named above, it is INELIGIBLE and this is a no-bid; the read is otherwise complete for that determination. Tier 2 — if your firm clears them, the record supports proceeding, subject to any pricing/coverage caveats noted. Confirm status before committing bid cost.",
+        findings: drivers,
+      });
+    } else {
+      steps.push(skip("Eligibility & verdict", "The cause above halts the sequence before an eligibility or verdict determination."));
+    }
     steps.push(verdictStep());
     return steps;
   }

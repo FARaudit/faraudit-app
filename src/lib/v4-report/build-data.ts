@@ -451,6 +451,9 @@ export function buildV4Data(audit: Record<string, unknown>): V4Data {
     noCharge: NO_VERDICT_POLES.has(pole) && !(NHR_NOCHARGE_SUPPRESS && pole === "NEEDS_HUMAN_REVIEW"),
     eligible: p.eligible ?? null,          // tri-state; render suppresses the chip on OUT_OF_SCOPE (explicit pole rule)
     rationale: sanitizeProse(p.reason),    // verbatim in substance; strips only leaked machine artifacts (#612-3d)
+    // Vehicle F · D2 — thread the engine's enumerated no-verdict cause (absent on pre-D2 records ⇒ renderer fail-loud
+    // neutral string, never a fabricated conflict). Omitted-when-absent keeps pre-D2 V4Data byte-identical.
+    ...(p.noVerdictCause ? { noVerdictCause: p.noVerdictCause } : {}),
   };
 
   // union showStoppers + findings for the §L/§M/CLIN derivations (kind/citation-based,

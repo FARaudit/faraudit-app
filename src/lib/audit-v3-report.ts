@@ -18,7 +18,7 @@
 // authored. No improvising beyond the design (per design-ownership rule).
 
 import { disposeFinding } from "./audit-decide";
-import type { Decision } from "./audit-decide";
+import type { Decision, NoVerdictCause } from "./audit-decide";
 
 /** Compact, persistable finding — the unit the report renders. `disposition` is
  *  the derived bucket (show-stopper / gate / met) so the renderer needs no
@@ -55,6 +55,7 @@ export interface V3ReportPayload {
   // the distinct "closed — recompete watch" state instead of generic no-bid copy. ABSENT unless the producer set it
   // (AUDIT_TEMPORAL_VERDICT off ⇒ decision.temporalClosed undefined ⇒ field omitted ⇒ render byte-identical).
   temporalClosed?: boolean;
+  noVerdictCause?: NoVerdictCause;   // Vehicle F · D2 — enumerated cause of a no-verdict pole (renderer derives the true sequence)
   profileVerified?: boolean; // true ONLY when a firm profile was affirmatively verified. Green "satisfied" renders only then; default is neutral slate (doctrine #1/#6). INELIGIBLE requires this true.
   showStoppers: FindingLite[];
   findings: FindingLite[];
@@ -135,6 +136,9 @@ export function buildV3Payload(
     // spread-conditional: the key is OMITTED (not set to false/undefined) unless the decision actually carries it,
     // so a flag-OFF payload is byte-identical to the pre-arc payload.
     ...(decision.temporalClosed === true ? { temporalClosed: true } : {}),
+    // Vehicle F · D2 — persist the enumerated no-verdict cause so the renderer derives the true sequence (never
+    // fabricates one). Spread-conditional: omitted unless the decision carries it ⇒ pre-D2 payload byte-identical.
+    ...(decision.noVerdictCause ? { noVerdictCause: decision.noVerdictCause } : {}),
     generatedAt,
   };
 }
