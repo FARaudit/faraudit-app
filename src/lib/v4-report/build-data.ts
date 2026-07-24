@@ -100,12 +100,23 @@ function mapFinding(f: FindingLite): V4Finding {
   return out;
 }
 
-// severity bucket: explicit severity wins; else infer from disposition
+// Vehicle F2 · F-2 (flag AUDIT_SEVERITY_HONEST, default-OFF) — the UNCOMPUTED-DEFAULT class (L42): an absent
+// severity must NEVER default UPWARD. When ON, a finding with no severity AND a disposition that does not
+// authoritatively rank it renders as UNRATED + emits a defect signal — it is never silently promoted to a gate.
+const severityHonestEnabled = (): boolean => process.env.AUDIT_SEVERITY_HONEST === "true";
+
+// severity bucket: explicit severity wins; else infer from the AUTHORITATIVE disposition
 // (disqualifying→P0, gate_to_clear→P1). "met"→satisfied, "dropped"→excluded.
-function severityOf(f: FindingLite): "P0" | "P1" | "P2" {
+// Flag-OFF: a non-ranking disposition with no severity falls to P2 (legacy, byte-identical).
+// Flag-ON: it becomes "unrated" (honest) with a signal — never P1/P0 by convenience.
+function severityOf(f: FindingLite): "P0" | "P1" | "P2" | "unrated" {
   if (f.severity) return f.severity;
   if (f.disposition === "disqualifying") return "P0";
   if (f.disposition === "gate_to_clear") return "P1";
+  if (severityHonestEnabled()) {
+    console.error(`[severity] UNRATED finding (no severity · disposition=${f.disposition ?? "none"}): ${s(f.requirement).slice(0, 60)}`);
+    return "unrated";
+  }
   return "P2";
 }
 
@@ -118,7 +129,7 @@ function severityOf(f: FindingLite): "P0" | "P1" | "P2" {
 // is NOT a blocker (the engine severity classifier over-tags P0 — see ENGINE-DEFECT
 // -LEDGER) and renders as a gate/advisory by severity, with no award-blocking copy.
 function buildFindings(showStoppers: FindingLite[], all: FindingLite[]): V4Findings {
-  const p0: V4Finding[] = [], p1: V4Finding[] = [], p2: V4Finding[] = [];
+  const p0: V4Finding[] = [], p1: V4Finding[] = [], p2: V4Finding[] = [], unrated: V4Finding[] = [];
   const satisfied: { req: string; cite: string }[] = [];
   const key = (f: FindingLite): string => `${s(f.requirement)}|${s(f.citation)}`;
   const seen = new Set<string>();
@@ -140,7 +151,10 @@ function buildFindings(showStoppers: FindingLite[], all: FindingLite[]): V4Findi
     if (f.disposition === "dropped") continue;
     if (f.disposition === "met") { satisfied.push({ req: s(f.requirement), cite: s(f.citation) }); continue; }
     const v = mapFinding(f);
-    (severityOf(f) === "P2" ? p2 : p1).push(v);
+    const sev = severityOf(f);
+    if (sev === "unrated") unrated.push(v);        // flag-ON only — never promoted to a gate
+    else if (sev === "P2") p2.push(v);
+    else p1.push(v);
   }
   // Conservative report-layer near-dedup (card #612-(3b)): collapse findings whose ENTIRE
   // requirement normalizes identically once articles/punctuation/case are neutralised — the
@@ -149,7 +163,42 @@ function buildFindings(showStoppers: FindingLite[], all: FindingLite[]): V4Findi
   // NEVER fuzzy similarity, so genuinely distinct gates (RN vs LPN vs Psychologist licensure)
   // keep separate rows. Verdict-inert — display only; the engine's cross-fleet deduper
   // (AUDIT_CROSS_FLEET_DEDUP) is the source-side tool for cross-panel near-dups.
-  return { p0: dedupeNearFindings(p0), p1: dedupeNearFindings(p1), p2: dedupeNearFindings(p2), satisfied };
+  // Flag-ON (F-2): a second, excerpt-grounded near-dedup collapses findings that rest on the IDENTICAL source
+  // excerpt but were restated with different requirement wording / citation punctuation (the 6× "submit only one
+  // proposal" family — same grounded text, six paraphrases). Keyed on the FULL normalized excerpt, never a prefix
+  // or similarity score, so genuinely distinct gates (different source text) never collapse. Flag-OFF: byte-identical.
+  const ded = (list: V4Finding[]): V4Finding[] =>
+    severityHonestEnabled() ? dedupeByExcerpt(dedupeNearFindings(list)) : dedupeNearFindings(list);
+  const out: V4Findings = { p0: ded(p0), p1: ded(p1), p2: ded(p2), satisfied };
+  if (severityHonestEnabled() && unrated.length) out.unrated = dedupeByExcerpt(dedupeNearFindings(unrated));
+  return out;
+}
+
+// FULL-excerpt near-dedup (F-2). Two findings resting on the IDENTICAL normalized source excerpt are the same
+// obligation restated — collapse them, merging distinct citations (same contract as dedupeNearFindings). Findings
+// with an empty excerpt are never a dedup key (each kept). NOT a similarity score — exact normalized-excerpt match.
+// Excerpt-HEAD key (first 120 normalized chars) — not the full string: the same obligation is sometimes captured
+// with more/less trailing context (e.g. the one-proposal rule persisted at 156 vs 329 chars). 120 chars of identical
+// normalized source text is specific enough that two genuinely distinct obligations never collide.
+const excerptHeadKey = (e: string): string => normReqKey(e).slice(0, 120);
+export function dedupeByExcerpt(list: V4Finding[]): V4Finding[] {
+  const byKey = new Map<string, V4Finding>();
+  const out: V4Finding[] = [];
+  for (const f of list) {
+    const k = f.excerpt ? excerptHeadKey(f.excerpt) : "";
+    if (!k) { out.push(f); continue; }
+    const survivor = byKey.get(k);
+    if (survivor) {
+      const cites = survivor.cite.split(/\s*·\s*/).filter(Boolean);
+      const add = s(f.cite).trim();
+      if (add && !cites.some((c) => c.toLowerCase() === add.toLowerCase())) survivor.cite = [...cites, add].join(" · ");
+      continue;
+    }
+    const copy: V4Finding = { ...f };
+    byKey.set(k, copy);
+    out.push(copy);
+  }
+  return out;
 }
 
 // FULL-requirement normalizer (NOT a similarity score): lowercase, drop leading/standalone
@@ -180,9 +229,19 @@ export function dedupeNearFindings(list: V4Finding[]): V4Finding[] {
   return out;
 }
 
+// Flag-ON (F-2): collapse §L rows resting on the IDENTICAL normalized excerpt (the same one-proposal / amendment-ack
+// obligation restated across paraphrases). Keeps the first, drops the rest. Empty-excerpt rows never dedup. Flag-OFF:
+// byte-identical (the raw filtered set is returned unchanged).
+function dedupeLiteByExcerpt(list: FindingLite[]): FindingLite[] {
+  if (!severityHonestEnabled()) return list;
+  const seen = new Set<string>(); const out: FindingLite[] = [];
+  for (const f of list) { const k = f.excerpt ? excerptHeadKey(f.excerpt) : ""; if (k && seen.has(k)) continue; if (k) seen.add(k); out.push(f); }
+  return out;
+}
+
 // ── §L submission matrix (derived) ──
 function buildSubmissionL(all: FindingLite[]): V4SubmissionL | { grounded: false } {
-  const set = all.filter((f) => f.disposition !== "dropped" && (f.kind === "submission_instruction" || RE_L.test(s(f.citation))));
+  const set = dedupeLiteByExcerpt(all.filter((f) => f.disposition !== "dropped" && (f.kind === "submission_instruction" || RE_L.test(s(f.citation)))));
   if (!set.length) return { grounded: false };
   const rows = set
     .slice()
