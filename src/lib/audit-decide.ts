@@ -254,6 +254,33 @@ const BONDING_CLAUSE_RE = /\b52\.228-(?:1|15|16)\b|bid guarantee|performance and
 /** Re-type a ROUTINE federal clause the proposer over-typed as a bar → bidder_controls (Guard 2). Pure →
  *  gate-tested. Two arms: Availability-of-Funds no_one_can_move → bidder_controls; bonding bidder_cannot_move →
  *  bidder_controls. NEVER touches a verified universal defect. Flag-gated; OFF (default) ⇒ unchanged. */
+// ── Vehicle A–E item D (flag AUDIT_CYBER_RFI_RECONCILE, default-OFF) — cyber RFI reconciliation ────────────────────
+// OVER-CLAIM CLASS (L40-D5, own independent seat). The engine over-stated cyber on FA813726 e63bd1e7: it typed
+// 252.204-7012 as a P1 gate with an 800-171 subcontractor flow-down, while the package's RFI responses stated verbatim
+// "this project does not contain CUI" and CMMC/SPRS/NIST-800-171 for subs "is no longer a requirement." This guard
+// reconciles the two: ONLY when BOTH the CUI-absence AND the cyber-withdrawal are grounded in source (conservative —
+// both signals required, never a blanket cyber suppression), it DEMOTES the over-claimed cyber obligation to an
+// informational, bidder-controllable caveat (never suppresses a genuinely-required cyber gate). Keep-the-bar exclusion:
+// a finding co-stating any structural-impossibility token is untouched. Flag-OFF ⇒ byte-identical.
+const CYBER_CLAUSE_RE = /\b252\.204-70(?:12|08|17|18)\b|\bCMMC\b|\bSPRS\b|\bNIST\s+SP\s+800-171\b|\b800-171\b|covered defense information/i;
+const RFI_CYBER_WITHDRAWN_RE = /(?:CMMC|SPRS|NIST\s+SP\s+800-171|800-171)[^.]{0,180}(?:no longer (?:a )?requirement|is no longer required|not (?:a )?requirement)|(?:there is )?no longer (?:a )?requirement/i;
+const NO_CUI_FCI_RE = /does not contain CUI|(?:FCI|FCU)(?:\s*and\/or\s*CUI)?[^.]{0,80}not included in any documentation|\bno CUI\b/i;
+export function applyCyberRfiReconciliation(findings: TypedFinding[], source: string | undefined, opts?: { enabled?: boolean }): TypedFinding[] {
+  if (!opts?.enabled) return findings;                      // default-off ⇒ byte-identical
+  const src = source ?? "";
+  // BOTH grounded signals required — the CO withdrew the cyber sub-requirement AND stated no CUI/FCI. Either alone
+  // (e.g. a live 7012 with real CDI) must NOT demote — that would be the false-BID direction on a real cyber gate.
+  if (!(RFI_CYBER_WITHDRAWN_RE.test(src) && NO_CUI_FCI_RE.test(src))) return findings;
+  return findings.map((f) => {
+    if (f.universalDefect || f.verifiedBy) return f;         // a verified impossibility is never downgraded
+    const hay = `${f.citation ?? ""} ${f.requirement ?? ""} ${f.excerpt ?? ""}`;
+    if (!CYBER_CLAUSE_RE.test(hay)) return f;                // not a cyber finding → untouched
+    if (STRUCTURAL_BAR_RE_114.test(hay)) return f;           // keep-the-bar: co-stated genuine bar → never demote
+    return { ...f, controllability: "bidder_controls", curableInWindow: true, cyberRfiReconciled: true,
+      citation: `${f.citation ?? ""} · [cyber reconciliation (item D): the CO's RFI responses in this package state no CUI/FCI and that CMMC/SPRS/NIST 800-171 for subcontractors is no longer a requirement — this DFARS cyber clause is informational for THIS order, not an award gate]` };
+  });
+}
+
 export function applyRoutineClauseOvertypeGuard(findings: TypedFinding[], opts?: { enabled?: boolean }): TypedFinding[] {
   if (!opts?.enabled) return findings; // default-off ⇒ byte-for-byte unchanged
   return findings.map((f) => {
