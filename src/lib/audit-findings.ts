@@ -97,6 +97,11 @@ export interface TypedFinding {
   // bidder_cannot_move → bidder_controls (the bidder OBTAINS the bond — a do-the-work gate, never a profile bar).
   // Marker only; deriveVerdict reads controllability, not this field.
   routineClauseGuard?: boolean;
+  // Vehicle A–E item D (flag AUDIT_CYBER_RFI_RECONCILE) — set when the cyber-RFI reconciliation guard demoted an
+  // over-claimed DFARS cyber obligation (7012/7008/7017/7018/CMMC/SPRS/800-171) to informational because the package's
+  // RFI responses grounded a CO withdrawal (no CUI/FCI + "no longer a requirement"). Marker only; deriveVerdict reads
+  // controllability, not this field.
+  cyberRfiReconciled?: boolean;
   // AWARD-BASIS OVER-TYPE GUARD (Brain card 108) — set when the deterministic guard either (a) re-typed an
   // award-basis / evaluation-methodology / source-selection finding mis-typed no_one_can_move → bidder_controls
   // (the award basis is never a universal bar — a false NO_BID), or (b) marked a SPECIFIC socioeconomic
@@ -202,6 +207,13 @@ export interface VerdictInputs {
   // (an unread binding doc could carry OR waive a bar — you cannot certify any verdict on a partial read).
   // Default undefined ⇒ no cap (unchanged), so callers that don't supply it stay byte-identical.
   documentsComplete?: boolean;
+  // Vehicle A–E · item A (flag AUDIT_VERDICT_POLE_PRECEDENCE) — the NARROWED dispositive-completeness precondition
+  // (Brain R4 ruling + conservative-default clause). TRUE iff no unfetched doc AND no content-loss on any doc that
+  // could bear on the PROMOTED eligibility gate (deterministic doc-ROLE × gate-CLASS classifier in the orchestrator;
+  // defaults ADVERSE — unknown role ⇒ dispositive ⇒ false). When TRUE, a grounded operative-language eligibility
+  // disqualifier OUTRANKS the documentsComplete INCOMPLETE cap (a non-dispositive OCR/pricing hold like a Wage
+  // Determination must not suppress a read eligibility bar). Default undefined ⇒ A never fires ⇒ byte-identical.
+  dispositiveCompletenessForEligibility?: boolean;
   // B3 (Brain card 421 Fork-3) — an UNGROUNDED hard bidder-eligibility / disqualifier bar in the SAM notice body
   // (mandatory site visit / set-aside / clearance) that the attachment-scoped coverage floor never saw. Its OWN gate
   // (not the coverageComplete veto) so it SURVIVES the GATE_V2 remap — a coverageV2 'no-cap' must not wave a real

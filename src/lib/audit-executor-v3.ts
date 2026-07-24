@@ -96,6 +96,23 @@ export function agenticManifestComplete(
  *  is UNKNOWN, never "present" — an ingested binding doc whose text status we cannot confirm is a content loss
  *  (`!== true`), not silently complete. This can flip a legacy record (written before the field) to INCOMPLETE on
  *  replay — the ruled, SAFE direction (unknown ⇒ cannot certify complete), never a false COMPLETE. */
+// ── Vehicle A–E item A — deterministic doc-ROLE × eligibility-gate classifier (Brain R4 conservative-default clause).
+// A doc is affirmatively NON-dispositive to a bidder-eligibility gate ONLY if its NAME is a pricing/technical/admin
+// artifact that cannot alter WHO MAY BID: wage determination, drawings, design narrative, submittal register,
+// sign-in sheet, photos. Everything else — amendment/SF30, base solicitation, RFI/Q&A, reps-certs, specs (may carry
+// QPL/brand-name qualification), or an UNKNOWN role — defaults ADVERSE (dispositive → blocks A). Model-free; pinned.
+const ELIG_NONDISPOSITIVE_ROLE_RE = /wage determination|davis[\s-]?bacon\b|design narrative|submittal register|sign[\s-]?in\b|\bdrawings?\b|\bphotos?\b/i;
+// P2 FIX (adversarial seat #2, 2026-07-24) — a COMBINED doc that also carries specs/SOW/QPL/brand-name/amendment can
+// bear a WHO-MAY-BID qualification (e.g. "Drawings & Specifications.pdf" matched \bdrawings?\b yet holds a QPL/brand-
+// name bar). Such names default ADVERSE (dispositive → block A), so item A never claims "no more documents needed" on
+// an unread doc that could gate eligibility. Pure name-role artifacts (Wage Determination, standalone Drawings) unaffected.
+const ELIG_DISPOSITIVE_OVERRIDE_RE = /spec(?:ification)?s?\b|\bSOW\b|statement of work|\bPWS\b|\bQPL\b|\bQML\b|brand[\s-]?name|\bamendment\b|\bSF[\s-]?30\b/i;
+export function eligibilityNonDispositiveByRole(name: string): boolean {
+  const n = name || "";
+  if (ELIG_DISPOSITIVE_OVERRIDE_RE.test(n)) return false;   // combined/eligibility-bearing role → adverse-default
+  return ELIG_NONDISPOSITIVE_ROLE_RE.test(n);
+}
+
 export function bindingContentLossDocs(ingestion: IngestionMeta): IngestionFileMeta[] {
   // A binding doc is a CONTENT LOSS when its text is absent/unknown (has_text !== true) OR when it was
   // mid-document truncated to fit the per-doc token budget (C-4 — the unread tail may carry a bar).
@@ -584,10 +601,21 @@ export async function executeAgenticPrimary(
     temporal = { snapshot, liveSam, ingestedAmendmentComplete, today, nowIso: nowInstant };
     console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: temporal live-SAM fetched=${liveSam?.fetched ?? false} active=${liveSam?.active ?? "?"} amendments=${liveSam?.amendmentCount ?? "?"} ingestComplete=${ingestedAmendmentComplete}`);
   }
+  // Vehicle A–E item A (flag AUDIT_VERDICT_POLE_PRECEDENCE, default-OFF) — the narrowed dispositive-completeness
+  // precondition. Incomplete set = dropped/over-budget + content-loss + binding content-loss (the last captures an
+  // OCR-held doc like a Wage Determination). A grounded eligibility bar may outrank INCOMPLETE ONLY if EVERY
+  // incomplete doc is affirmatively non-dispositive to a WHO-MAY-BID gate (conservative-adverse default). Flag-OFF ⇒
+  // undefined ⇒ A never fires ⇒ byte-identical.
+  const dispositiveCompletenessForEligibility = process.env.AUDIT_VERDICT_POLE_PRECEDENCE === "true"
+    ? (input.ingestion != null
+        ? [...assembled.droppedDocs, ...assembled.contentLossDocs, ...bindingContentLossDocs(input.ingestion).map((f) => f.name)]
+            .every((n) => eligibilityNonDispositiveByRole(n))
+        : false) // no ingestion manifest ⇒ cannot affirm completeness ⇒ conservative-adverse (A does not fire)
+    : undefined;
   const _tPackage = Date.now();
   const res = await auditPackage({
     temporal,
-    fullSource, bidderProfile, signal, manifestComplete: manifestComplete && !constructionOOS, constructionManifest, groundingSource,
+    fullSource, bidderProfile, signal, manifestComplete: manifestComplete && !constructionOOS, dispositiveCompletenessForEligibility, constructionManifest, groundingSource,
     // card #523 (P2a-wire) — VERIFIED panel facts unioned into the rail (undefined when flag OFF ⇒ byte-identical).
     // card #570 — serial passes the resolved array; parallel passes the PRODUCER PROMISE (resolved at the rail merge so
     // the producer overlaps the expert-phase). Exactly one is set; the merged union is byte-identical either way.

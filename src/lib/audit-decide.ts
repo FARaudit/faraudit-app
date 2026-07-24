@@ -254,6 +254,40 @@ const BONDING_CLAUSE_RE = /\b52\.228-(?:1|15|16)\b|bid guarantee|performance and
 /** Re-type a ROUTINE federal clause the proposer over-typed as a bar → bidder_controls (Guard 2). Pure →
  *  gate-tested. Two arms: Availability-of-Funds no_one_can_move → bidder_controls; bonding bidder_cannot_move →
  *  bidder_controls. NEVER touches a verified universal defect. Flag-gated; OFF (default) ⇒ unchanged. */
+// ── Vehicle A–E item D (flag AUDIT_CYBER_RFI_RECONCILE, default-OFF) — cyber RFI reconciliation ────────────────────
+// OVER-CLAIM CLASS (L40-D5, own independent seat). The engine over-stated cyber on FA813726 e63bd1e7: it typed
+// 252.204-7012 as a P1 gate with an 800-171 subcontractor flow-down, while the package's RFI responses stated verbatim
+// "this project does not contain CUI" and CMMC/SPRS/NIST-800-171 for subs "is no longer a requirement." This guard
+// reconciles the two: ONLY when BOTH the CUI-absence AND the cyber-withdrawal are grounded in source (conservative —
+// both signals required, never a blanket cyber suppression), it DEMOTES the over-claimed cyber obligation to an
+// informational, bidder-controllable caveat (never suppresses a genuinely-required cyber gate). Keep-the-bar exclusion:
+// a finding co-stating any structural-impossibility token is untouched. Flag-OFF ⇒ byte-identical.
+const CYBER_CLAUSE_RE = /\b252\.204-70(?:12|08|17|18)\b|\bCMMC\b|\bSPRS\b|\bNIST\s+SP\s+800-171\b|\b800-171\b|covered defense information/i;
+// P0 FIX (adversarial seat, 2026-07-24) — the withdrawal MUST be cyber-anchored: a cyber token within 180 non-period
+// chars BEFORE the "no longer required" phrase (same clause, no sentence break). The prior decoupled tail
+// `|(?:there is )?no longer (?:a )?requirement` matched ANY "no longer a requirement" (e.g. a site-visit withdrawal),
+// which — paired with a CUI-handling "no CUI" false-match below — demoted a GENUINE 7012 CDI bar (false-BID). Removed.
+const RFI_CYBER_WITHDRAWN_RE = /(?:CMMC|SPRS|NIST\s+SP\s+800-171|800-171|252\.204-70(?:12|08|17|18))[^.]{0,180}(?:no longer (?:a )?requirement|is no longer required|not (?:a )?requirement)/i;
+// P0 FIX — require a genuine CUI/FCI ABSENCE assertion. The prior bare `\bno CUI\b` matched CUI-HANDLING instructions
+// that PRESUME CUI exists (e.g. "No CUI shall be stored on systems that are not 800-171 compliant"). Now the "no CUI"
+// arm must be followed by an absence verb (is/are/shall be present|involved|included|generated|…), never "stored/handled".
+const NO_CUI_FCI_RE = /does not contain CUI|contains? no CUI\b|\bno CUI\s+(?:is|are|will be|shall be|to be)?\s*(?:present|involved|included|generated|created|applicable|expected|required|anticipated)\b|(?:FCI|FCU)(?:\s*and\/or\s*CUI)?[^.]{0,80}not included in any documentation/i;
+export function applyCyberRfiReconciliation(findings: TypedFinding[], source: string | undefined, opts?: { enabled?: boolean }): TypedFinding[] {
+  if (!opts?.enabled) return findings;                      // default-off ⇒ byte-identical
+  const src = source ?? "";
+  // BOTH grounded signals required — the CO withdrew the cyber sub-requirement AND stated no CUI/FCI. Either alone
+  // (e.g. a live 7012 with real CDI) must NOT demote — that would be the false-BID direction on a real cyber gate.
+  if (!(RFI_CYBER_WITHDRAWN_RE.test(src) && NO_CUI_FCI_RE.test(src))) return findings;
+  return findings.map((f) => {
+    if (f.universalDefect || f.verifiedBy) return f;         // a verified impossibility is never downgraded
+    const hay = `${f.citation ?? ""} ${f.requirement ?? ""} ${f.excerpt ?? ""}`;
+    if (!CYBER_CLAUSE_RE.test(hay)) return f;                // not a cyber finding → untouched
+    if (STRUCTURAL_BAR_RE_114.test(hay)) return f;           // keep-the-bar: co-stated genuine bar → never demote
+    return { ...f, controllability: "bidder_controls", curableInWindow: true, cyberRfiReconciled: true,
+      citation: `${f.citation ?? ""} · [cyber reconciliation (item D): the CO's RFI responses in this package state no CUI/FCI and that CMMC/SPRS/NIST 800-171 for subcontractors is no longer a requirement — this DFARS cyber clause is informational for THIS order, not an award gate]` };
+  });
+}
+
 export function applyRoutineClauseOvertypeGuard(findings: TypedFinding[], opts?: { enabled?: boolean }): TypedFinding[] {
   if (!opts?.enabled) return findings; // default-off ⇒ byte-for-byte unchanged
   return findings.map((f) => {
@@ -3093,6 +3127,18 @@ export function applyClauseKeyedTypingFloor(findings: TypedFinding[], o: { enabl
 // CMMC/clearance/QPL bar, an at-award possession frame, or an untyped bar. Flag-OFF ⇒ never called ⇒ byte-identical.
 const selfClearablePackageEnabled = () => process.env.AUDIT_SELF_CLEARABLE_PACKAGE === "true";
 const incompletePrecedenceEnabled = () => process.env.AUDIT_INCOMPLETE_PRECEDENCE === "true"; // Brain #664 — documentsComplete=false not subordinate to coverage-pole NHR
+// ── Vehicle A–E · item A + E (flag AUDIT_VERDICT_POLE_PRECEDENCE, default-OFF) ─────────────────────────────────────
+const verdictPolePrecedenceEnabled = () => process.env.AUDIT_VERDICT_POLE_PRECEDENCE === "true";
+// item E (design-panel R1, hard dependency of A's site-visit fire) — the promoted finding's excerpt must carry
+// OPERATIVE eligibility-limiting language, NOT a bare recital ("site visit held and concluded" alone is NOT
+// dispositive — the concluded-site-visit trap). Deterministic SHAPE test; model-free. Matches the operative
+// attendance-as-eligibility phrasing and the vehicle-holder restriction idiom (the two grounded gates on e63bd1e7).
+const OPERATIVE_ELIG_LANGUAGE_RE = /\beligible to (?:propose|bid|offer|submit|compete)\b|\bto be (?:considered )?eligible\b|\b(?:must|shall|are required to) attend\b[^.]{0,80}\beligib/i;
+const HOLDER_RESTRICTION_RE = /\bholders?\s+only\b|\bonly\s+(?:available|open)\s+(?:to|for)\b[^.]{0,60}\bholders?\b|\bonly available to current\b[^.]{0,40}\bholders?\b/i;
+export function hasOperativeEligibilityLanguage(excerpt: string): boolean {
+  const s = excerpt || "";
+  return OPERATIVE_ELIG_LANGUAGE_RE.test(s) || HOLDER_RESTRICTION_RE.test(s);
+}
 function selfClearablePackageBars(dispositions: DecidedFinding[]): DecidedFinding[] | null {
   const live = dispositions.filter((f) => f.disposition !== "dropped");
   const hayOf = (f: DecidedFinding) => `${f.requirement ?? ""} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""}`;
@@ -3374,6 +3420,31 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //    default. Computed + flag-gated (AUDIT_ATTACHMENT_COVERAGE) in the orchestrator; absent/false ⇒ byte-identical.
   if (inp.primaryIndeterminate)
     return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "Could not confidently identify the base solicitation among the uploaded documents (no document carries a solicitation form or contract structure) — human review required to confirm which document is the solicitation before an audit can be relied on.", dispositions, []);
+
+  // 0-A. VERDICT-POLE PRECEDENCE (Vehicle A–E, flag AUDIT_VERDICT_POLE_PRECEDENCE default-OFF). A grounded,
+  //   OPERATIVE-language DISQUALIFYING eligibility bar on a FULLY-READ document OUTRANKS the documentsComplete
+  //   INCOMPLETE cap WHEN the narrowed dispositive-completeness precondition holds (no unfetched/content-lost doc that
+  //   could bear on the promoted eligibility gate — Brain R4 + conservative-adverse classifier in the orchestrator).
+  //   A non-dispositive OCR/pricing hold (e.g. a Wage Determination rate table) is NOT allowed to bury a read
+  //   eligibility bar. Sits ABOVE 1-PRE/1b (the INCOMPLETE cap) and BELOW the proven-read show-stopper block (pole is
+  //   the conditional-NHR eligibility headline, not a hard NO_BID — the engine cannot know the firm's holder/attendee
+  //   status without a profile; #575 collapses it to decisive). E-predicate (hasOperativeEligibilityLanguage) is a HARD
+  //   gate so a bare "held and concluded" site-visit recital never promotes. Flag-OFF / precondition unset ⇒ skipped ⇒
+  //   byte-identical.
+  // P2 FIX (adversarial seat #3, 2026-07-24) — item A's ONLY job is to override the documentsComplete=false INCOMPLETE
+  //   cap; gate on `documentsComplete === false` so it never preempts the definitive show-stopper/INELIGIBLE path on a
+  //   FULLY-READ package (where the incomplete-doc set is empty ⇒ precondition is vacuously true). Cert cases all set
+  //   documentsComplete:false ⇒ still green; the e63bd1e7 target (WD OCR-hold ⇒ documentsComplete=false) still fires.
+  if (verdictPolePrecedenceEnabled() && inp.dispositiveCompletenessForEligibility === true && inp.documentsComplete === false) {
+    const eligStoppers = siteVisitEligStoppers(dispositions, inp.bidderProfile, inp.source)
+      .filter((s) => (s as { grounded?: boolean }).grounded !== false && hasOperativeEligibilityLanguage(s.excerpt ?? ""));
+    if (eligStoppers.length > 0) {
+      const named = namedEligibilityReason(eligStoppers);
+      const reason = (named ?? "A bidder-eligibility bar stated in the solicitation gates award")
+        + " — your firm is INELIGIBLE unless it clears each gate (confirm your firm's status); the read is otherwise complete for this eligibility decision, so no additional documents are needed to reach it. Based on the notice as posted — any pending amendment may alter these gates.";
+      return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), reason, dispositions, eligStoppers);
+    }
+  }
 
   // 1-PRE. INCOMPLETE PRECEDENCE (Brain #664, flag AUDIT_INCOMPLETE_PRECEDENCE default-OFF). A posted binding DOCUMENT
   //   that could not be confirmed read in full (documentsComplete=false) is a COMPLETENESS failure that must NOT be

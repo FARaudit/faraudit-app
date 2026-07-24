@@ -22,7 +22,7 @@ import { NOTICE_BODY_DOC_NAME } from "./agentic-executor";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
 import { SITE_VISIT_CONCLUDED_RE, BOA_HOLDER_ONLY_EMIT_RE } from "./audit-site-visit-patterns";
-import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyNmrNaicsDormancy, applyCheckboxStateFidelity, applyPerfObligationInsuranceTyping, applyClauseKeyedTypingFloor, applyStructuralAssertionFidelity, applyQuantityAmbiguityFidelity, applyFindingDedup, applyCrossFleetDedup, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, applyInquiryDeadlineBenignGuard, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, emitPerformanceUpkeepCaveats, deriveShadowVerdict, EngineInvariantError, type Decision, type ShadowVerdict } from "./audit-decide";
+import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyCyberRfiReconciliation, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyNmrNaicsDormancy, applyCheckboxStateFidelity, applyPerfObligationInsuranceTyping, applyClauseKeyedTypingFloor, applyStructuralAssertionFidelity, applyQuantityAmbiguityFidelity, applyFindingDedup, applyCrossFleetDedup, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, applyInquiryDeadlineBenignGuard, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, emitPerformanceUpkeepCaveats, deriveShadowVerdict, EngineInvariantError, type Decision, type ShadowVerdict } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
 import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type ReasonCaller, type EntailmentCaller, type JudgmentCost, zeroCost } from "./audit-judgment-layer";
 import { highSignalSweep, boilerplateTrapSweep } from "./audit-grounding-sweep";
@@ -98,6 +98,10 @@ export interface OrchestratorInput {
   // heuristic. false → caps a no-bar BID/CAUTION to INCOMPLETE (asymmetry). Default/absent
   // = true (no external constraint → rely on the heuristic alone, unchanged behavior).
   manifestComplete?: boolean;
+  // Vehicle A–E item A (flag AUDIT_VERDICT_POLE_PRECEDENCE) — narrowed dispositive-completeness precondition
+  // (computed in the executor from the incomplete-doc set via a deterministic role classifier). Forwarded verbatim
+  // to VerdictInputs. Absent ⇒ A never fires ⇒ byte-identical.
+  dispositiveCompletenessForEligibility?: boolean;
   // Step 4a (plumb-only) — SAM-resolved scalar FACTS carried into the gate-pipeline scope so a
   // future deterministic gate (Step 4: Nonmanufacturer Rule) can read them WITHOUT regexing source
   // (Rule 64: fact, never AI-derived). Absent → null (honest silence; uploads have no SAM NAICS).
@@ -663,6 +667,32 @@ export function docRegions(fullSource: string): Array<{ name: string; text: stri
   if (regions.length === 0) return [{ name: "(primary solicitation)", text: fullSource ?? "", isPrimary: true }];
   const primaryIdx = ATTACHMENT_COVERAGE_ENABLED ? resolvePrimary(regions).index : 0;
   return regions.map((r, i) => ({ ...r, isPrimary: i === primaryIdx }));
+}
+
+// ── Vehicle A–E · item B (flag AUDIT_COVERAGE_COUNTER_SPLIT, default-OFF) — READ vs GROUNDED are distinct axes. ──────
+// A region that is the GROUNDED SOURCE of a decision-bearing finding is, by definition, read AND grounded, and must
+// NEVER appear in the "not confirmed read/grounded" gap list. Pin: FA813726 e63bd1e7 — two `disqualifying` findings
+// quote the SAM Notice Body verbatim while the gap list named it "not confirmed read/grounded" (the contradiction the
+// Gate-4 panel + red-team confirmed). REGION-GRANULAR per design-panel R5: keyed to the region a decision-bearing
+// grounded finding's excerpt is actually IN. Pure; model-free. Flag-OFF ⇒ never called ⇒ byte-identical.
+const coverageCounterSplitEnabled = (): boolean => process.env.AUDIT_COVERAGE_COUNTER_SPLIT === "true";
+export function groundedSourceRegionNames(fullSource: string, findings: TypedFinding[]): Set<string> {
+  const nameKey = (s: string): string => (s || "").replace(/\s+/g, " ").trim().toLowerCase();
+  const decisionBearing = findings.filter((f) => f.grounded === true && !!f.excerpt && disposeFinding(f) !== "dropped");
+  const regions = docRegions(fullSource).map((r) => ({ name: r.name, text: norm(r.text) }));
+  const out = new Set<string>();
+  // P2 FIX (adversarial seat #4, 2026-07-24) — attribute each grounded excerpt to its UNIQUE source region. A short or
+  //   boilerplate excerpt ("shall comply with all applicable regulations", a bare FAR cite) can substring a genuinely-
+  //   UNCOVERED region and wrongly strip it from the gap list, hiding an unread doc. Guard both directions: require a
+  //   substantive excerpt (≥24 norm chars) AND a UNIQUE containing region (hits===1). Ambiguous (0 or >1) ⇒ strip
+  //   nothing ⇒ the gap disclosure is KEPT (conservative — never hide a real gap; at worst leaves a grounded region listed).
+  for (const f of decisionBearing) {
+    const ex = norm(f.excerpt || "");
+    if (ex.length < 24) continue;
+    const hits = regions.filter((r) => r.text.includes(ex));
+    if (hits.length === 1) out.add(nameKey(hits[0].name));
+  }
+  return out;
 }
 
 export function documentsCovered(
@@ -2581,6 +2611,11 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      universal defect. Reduces false honest-fail NHR on routine construction clauses. Flag off ⇒ unchanged.
   findings = applyRoutineClauseOvertypeGuard(findings, { enabled: process.env.AUDIT_ROUTINE_CLAUSE_GUARD === "true" });
 
+  // Vehicle A–E item D (flag AUDIT_CYBER_RFI_RECONCILE, default-OFF) — demote an over-claimed DFARS cyber obligation
+  // to informational ONLY when the package's RFI responses ground a CO withdrawal (no CUI/FCI + "no longer a
+  // requirement"). Over-claim class (own independent seat). Flag-OFF ⇒ byte-identical.
+  findings = applyCyberRfiReconciliation(findings, ctx.fullSource, { enabled: process.env.AUDIT_CYBER_RFI_RECONCILE === "true" });
+
   // P4.4-ter — ELIGIBILITY-AUTHORITY ALLOW-LIST (Brain card 329), default-OFF (=== "true"). Kills the fabricated
   //      trade-agreement / end-product-origin / publicizing DISQUALIFIER class (live root, audit a80a9a13): a lens
   //      that types a "not subject to WTO GPA/FTA, per FAR 5.101" statement as a hard bidder show-stopper inflates
@@ -2707,8 +2742,15 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // Flag OFF ⇒ coverageV2 absent ⇒ deriveVerdict runs the exact V1 line (byte-identical). Proven: scripts/audit-ai/prove-gate-v2*.ts.
   // Brain card #320 — NAME the gap so an INCOMPLETE tells the customer WHICH doc/section blocked a verdict
   // (deterministic signals only; never affects the verdict, only enriches the honest-fail reason).
+  // Vehicle A–E · item B: strip any region that is the grounded source of a decision-bearing finding from the gap
+  // list (invariant: gapList ∩ groundedSourceRegions === ∅). Flag-OFF ⇒ groundedSrc null ⇒ uncoveredForGap ===
+  // docCoverage.uncovered ⇒ byte-identical.
+  const groundedSrcRegions = coverageCounterSplitEnabled() ? groundedSourceRegionNames(ctx.fullSource, findings) : null;
+  const uncoveredForGap = groundedSrcRegions
+    ? (docCoverage.uncovered ?? []).filter((n) => !groundedSrcRegions.has((n || "").replace(/\s+/g, " ").trim().toLowerCase()))
+    : docCoverage.uncovered;
   const coverageGap = [
-    docCoverage.uncovered?.length ? `document(s) not confirmed read/grounded: ${docCoverage.uncovered.join(", ")}` : "",
+    uncoveredForGap?.length ? `document(s) not confirmed read/grounded: ${uncoveredForGap.join(", ")}` : "",
     missing.length ? `binding section(s) not located: ${missing.join(", ")}` : "",
     coreMissing.length ? `required section(s) absent: ${coreMissing.join(", ")}` : "",
   ].filter(Boolean).join("; ") || undefined;
@@ -2791,7 +2833,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // flag-ON) is surfaced as a BID_WITH_CAUTION-floor caveat before deriveVerdict. Flag-OFF ⇒ caveatRecital absent ⇒
   // emitter is a no-op ⇒ byte-identical.
   if (coverageV2?.caveatRecital?.length) findings = emitPerformanceUpkeepCaveats(findings, coverageV2.caveatRecital);
-  const inputs: VerdictInputs = { findings, bidderProfile, samSetAside: opts.setAside ?? null, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(process.env.AUDIT_SITEVISIT_SEVERITY_FLOOR === "true" ? { siteVisitSeverityFloor: true } : {}), ...(coverageV2 ? { coverageV2 } : {}), ...(opts.temporal ? { temporalSnapshot: opts.temporal.snapshot, liveSam: opts.temporal.liveSam, ingestedAmendmentComplete: opts.temporal.ingestedAmendmentComplete, today: opts.temporal.today, nowIso: opts.temporal.nowIso ?? null } : {}) };
+  const inputs: VerdictInputs = { findings, bidderProfile, samSetAside: opts.setAside ?? null, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(opts.dispositiveCompletenessForEligibility !== undefined ? { dispositiveCompletenessForEligibility: opts.dispositiveCompletenessForEligibility } : {}), ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(process.env.AUDIT_SITEVISIT_SEVERITY_FLOOR === "true" ? { siteVisitSeverityFloor: true } : {}), ...(coverageV2 ? { coverageV2 } : {}), ...(opts.temporal ? { temporalSnapshot: opts.temporal.snapshot, liveSam: opts.temporal.liveSam, ingestedAmendmentComplete: opts.temporal.ingestedAmendmentComplete, today: opts.temporal.today, nowIso: opts.temporal.nowIso ?? null } : {}) };
   // Phase-1 SHADOW (cards #596/#597) — compute the positive-shape pole BESIDE the real verdict and bank it. VERDICT-INERT:
   // the shadow is never routed on; the live deriveVerdict below is untouched. Gated on AUDIT_POSITIVE_VERDICT_POLE (default-
   // OFF ⇒ never computed ⇒ byte-identical) AND banking on (the diagnostics carrier). naics is the SAM fact (Rule 64).

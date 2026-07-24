@@ -38,6 +38,7 @@ export interface AuditPackageInput {
   maxTurns?: number;                        // per-expert react-loop bound (default 8)
   signal?: AbortSignal;                     // overall wall-clock budget — cancels in-flight paid calls on breach (no-op if absent)
   manifestComplete?: boolean;               // N8 — external "every posted doc ingested" signal; false caps a no-bar verdict to INCOMPLETE
+  dispositiveCompletenessForEligibility?: boolean; // Vehicle A–E item A — narrowed R4 precondition; forwarded verbatim to runAgenticAudit → VerdictInputs. Absent ⇒ byte-identical.
   naics?: string | null;                    // Step 4a (plumb-only) — SAM-resolved NAICS fact, forwarded to the gate pipeline; null when absent
   setAside?: string | null;                 // Step 4a (plumb-only) — SAM-resolved set-aside fact, forwarded to the gate pipeline; null when absent
   noticeType?: string | null;               // Layer-2 (card 262) — SAM notice type; scopes the §L/§M INCOMPLETE requirement to solicitation-type buys
@@ -248,6 +249,7 @@ export async function auditPackage(input: AuditPackageInput): Promise<AuditResul
     maxTurns: input.maxTurns,
     signal: input.signal,
     manifestComplete: input.manifestComplete,
+    dispositiveCompletenessForEligibility: input.dispositiveCompletenessForEligibility,
     naics: input.naics ?? null,             // Step 4a — forward the fact; no consumer yet (verdict unchanged)
     setAside: input.setAside ?? null,
     noticeType: input.noticeType ?? null,   // Layer-2 (card 262) — scopes the §L/§M requirement to solicitation-type buys
@@ -325,6 +327,7 @@ export async function runJudgmentFirstAudit(input: AuditPackageInput): Promise<J
     bidderProfile: input.bidderProfile ?? null,
     signal: input.signal,
     manifestComplete: input.manifestComplete,
+    dispositiveCompletenessForEligibility: input.dispositiveCompletenessForEligibility,
     naics: input.naics ?? null,
     setAside: input.setAside ?? null,
     noticeType: input.noticeType ?? null,
