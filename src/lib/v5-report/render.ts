@@ -103,6 +103,14 @@ function commandHeader(d: V4Data): string {
 
   const od = offersDue(d);
   const dl = od && V5_SEAL ? splitDeadline(od.value) : null;
+  // Vehicle F3 · masthead deadline reconcile (flag AUDIT_MASTHEAD_DEADLINE_RECONCILE, default-OFF) — the build layer
+  // (offerDueFact) sets the offer-due VALUE to the executed SF-30 amended date + a provenance/pending sub (od.sub), but
+  // the v5 command-header clock rendered ONLY the value and DROPPED od.sub — so the amendment provenance + reset caveat
+  // never reached the served surface (card #735/#736, FA813726R0033: masthead showed the orphan SAM "18 Jul 2026" with no
+  // caveat while SF-30 Mod 0001 amended it to 31 Jul; UPDATE 03 signals a further revision). Flag-ON: render od.sub under
+  // the clock. Flag-OFF: byte-identical (no caveat node). Data-present-only (never fabricated).
+  const deadlineCaveat = (process.env.AUDIT_MASTHEAD_DEADLINE_RECONCILE === "true" && od && od.sub)
+    ? `<div class="cmd-clock-caveat">${esc(od.sub)}</div>` : "";
   const clockHTML = !od ? "" : V5_SEAL ? `
       <div class="cmd-clock" title="Solicitation closing — grounded fact read from source; not a schedulability judgment">
         <span class="cmd-clock-ic">${I.clock}</span>
@@ -111,12 +119,12 @@ function commandHeader(d: V4Data): string {
           <span class="cmd-clock-v mono">${esc(dl!.date)}</span>
           ${dl!.time ? `<span class="cmd-clock-time mono">${esc(dl!.time)}</span>` : ""}
         </span>
-      </div>` : `
+      </div>${deadlineCaveat}` : `
       <div class="cmd-clock" title="Solicitation closing — grounded fact, not a schedulability judgment">
         <span class="cmd-clock-ic">${I.clock}</span>
         <span class="cmd-clock-k">${esc(od.label)}</span>
         <span class="cmd-clock-v mono">${esc(od.value)}</span>
-      </div>`;
+      </div>${deadlineCaveat}`;
 
   let drivers = ([] as V4Finding[]).concat(f.p0 || [], f.p1 || []).filter((x) => x.driver === true);
   if (!drivers.length) drivers = ((f.p0 && f.p0.length ? f.p0 : (f.p1 || [])) as V4Finding[]).slice(0, 2);
