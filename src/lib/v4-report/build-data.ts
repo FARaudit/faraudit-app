@@ -133,6 +133,11 @@ function buildFindings(showStoppers: FindingLite[], all: FindingLite[]): V4Findi
   const satisfied: { req: string; cite: string }[] = [];
   const key = (f: FindingLite): string => `${s(f.requirement)}|${s(f.citation)}`;
   const seen = new Set<string>();
+  // Vehicle F2 · F-2 cross-tier — the excerpt-heads already rendered as show-stoppers. Flag-ON: a gate/advisory that
+  // rests on the SAME source excerpt as a show-stopper is the SAME bar restated one tier down (the anchor eligibility
+  // bar was rendering as both "Stop" AND "Gate"); it is dropped from the lower tier so each bar appears once, and the
+  // show-stoppers stay unmistakable. Flag-OFF: never populated ⇒ byte-identical.
+  const p0Heads = new Set<string>();
 
   // Tier 0 — the blocker registry, verbatim (any severity, deduped, met→satisfied).
   for (const f of showStoppers) {
@@ -141,6 +146,7 @@ function buildFindings(showStoppers: FindingLite[], all: FindingLite[]): V4Findi
     seen.add(k);
     if (f.disposition === "dropped") continue;
     if (f.disposition === "met") { satisfied.push({ req: s(f.requirement), cite: s(f.citation) }); continue; }
+    if (severityHonestEnabled() && f.excerpt) p0Heads.add(excerptHeadKey(f.excerpt));
     p0.push(mapFinding(f));
   }
   // Everything else — gates (P0-non-blocker + P1) / advisories (P2). No block-award language.
@@ -148,6 +154,8 @@ function buildFindings(showStoppers: FindingLite[], all: FindingLite[]): V4Findi
     const k = key(f);
     if (seen.has(k)) continue; // already rendered as a show-stopper (or a dup)
     seen.add(k);
+    // Flag-ON cross-tier: same bar as a show-stopper (identical excerpt-head) → do not also render it as a gate.
+    if (severityHonestEnabled() && f.excerpt && p0Heads.has(excerptHeadKey(f.excerpt))) continue;
     if (f.disposition === "dropped") continue;
     if (f.disposition === "met") { satisfied.push({ req: s(f.requirement), cite: s(f.citation) }); continue; }
     const v = mapFinding(f);

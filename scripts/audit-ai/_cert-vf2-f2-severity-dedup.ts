@@ -36,6 +36,11 @@ console.log(`[flag-ON ] Critical=${onCritical} Gate=${onGate} Stop=${onStop} one
 ok(onCritical === 0, "flag-ON: ZERO gates labeled 'Critical' (no upward default)");
 ok(onGate > 0, "flag-ON: gates read 'Gate'");
 ok(onStop === 2, "flag-ON: exactly 2 show-stoppers survive ('Stop' — the two eligibility bars, unmistakable)");
+// cross-tier: the BOA-only bar must render ONCE (as a show-stopper), not also as a gate
+const boaRows = (html: string) => (html.match(/ONLY AVAILABLE TO CURRENT BOA HOLDERS/gi) || []).length;
+console.log(`[cross-tier] BOA excerpt rows: flag-OFF=${boaRows(off)} flag-ON=${boaRows(on)}`);
+ok(boaRows(on) === 1, `flag-ON: the anchor BOA bar renders ONCE (not Stop+Gate) — got ${boaRows(on)}`);
+ok(boaRows(off) >= 2, "flag-OFF: BOA bar rendered at two tiers (the legacy blemish)");
 // One occurrence per SURFACE (findings wall + §L compliance matrix), down from 7 — the wall + matrix each show
 // the obligation once (that is honest, not duplication; the two surfaces are distinct views).
 ok(onOneProp === 2 && onOneProp < offOneProp, `flag-ON: one-proposal collapses to 1-per-surface (got ${onOneProp}, was ${offOneProp})`);
