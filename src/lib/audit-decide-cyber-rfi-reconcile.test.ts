@@ -55,5 +55,20 @@ console.log("\n── 5 · FLAG ON + BOTH signals but a NON-cyber finding ⇒ un
   assert(out[0].controllability === "bidder_controls" && !out[0].cyberRfiReconciled, "non-cyber finding never reconciled");
 }
 
+// P0 REGRESSION LOCK (adversarial seat, 2026-07-24) — the two-signal guard must NOT fire on a DECOUPLED withdrawal
+// (a routine "X is no longer a requirement" unrelated to cyber) + a CUI-HANDLING "no CUI" phrase (which presumes CUI).
+// A genuine 252.204-7012 CDI bar (no "CMMC" token ⇒ unprotected by STRUCTURAL_BAR_RE_114) must stay a gate. False-BID.
+const genuine7012 = (): TypedFinding => ({
+  requirement: "Offeror must have implemented NIST SP 800-171 and hold a current SPRS score at time of award; offerors unable to demonstrate safeguarding of covered defense information are ineligible.",
+  citation: "DFARS 252.204-7012", excerpt: "this effort involves covered defense information; 800-171 implementation is required.",
+  kind: "eligibility_bar", controllability: "bidder_cannot_move", grounded: true, lens: "cyber_cmmc", curableInWindow: false,
+});
+const ADV_DECOUPLED = "The pre-proposal site visit is no longer a requirement. No CUI shall be stored on contractor information systems that are not 800-171 compliant. This effort involves covered defense information.";
+console.log("\n── 6 · FLAG ON + DECOUPLED withdrawal + CUI-HANDLING 'no CUI' (false signals) ⇒ genuine 7012 NOT demoted ──");
+{
+  const out = applyCyberRfiReconciliation([genuine7012()], ADV_DECOUPLED, { enabled: true });
+  assert(out[0].controllability === "bidder_cannot_move" && !out[0].cyberRfiReconciled, "adversarial decoupled signals ⇒ genuine CDI bar kept as a gate (no false-BID)");
+}
+
 console.log(failures === 0 ? "\n✅ ALL GREEN — vehicle D cyber RFI reconciliation" : `\n❌ ${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);

@@ -679,11 +679,18 @@ const coverageCounterSplitEnabled = (): boolean => process.env.AUDIT_COVERAGE_CO
 export function groundedSourceRegionNames(fullSource: string, findings: TypedFinding[]): Set<string> {
   const nameKey = (s: string): string => (s || "").replace(/\s+/g, " ").trim().toLowerCase();
   const decisionBearing = findings.filter((f) => f.grounded === true && !!f.excerpt && disposeFinding(f) !== "dropped");
+  const regions = docRegions(fullSource).map((r) => ({ name: r.name, text: norm(r.text) }));
   const out = new Set<string>();
-  for (const r of docRegions(fullSource)) {
-    const nRegion = norm(r.text);
-    if (decisionBearing.some((f) => { const ex = norm(f.excerpt || ""); return ex.length > 0 && nRegion.includes(ex); }))
-      out.add(nameKey(r.name));
+  // P2 FIX (adversarial seat #4, 2026-07-24) — attribute each grounded excerpt to its UNIQUE source region. A short or
+  //   boilerplate excerpt ("shall comply with all applicable regulations", a bare FAR cite) can substring a genuinely-
+  //   UNCOVERED region and wrongly strip it from the gap list, hiding an unread doc. Guard both directions: require a
+  //   substantive excerpt (≥24 norm chars) AND a UNIQUE containing region (hits===1). Ambiguous (0 or >1) ⇒ strip
+  //   nothing ⇒ the gap disclosure is KEPT (conservative — never hide a real gap; at worst leaves a grounded region listed).
+  for (const f of decisionBearing) {
+    const ex = norm(f.excerpt || "");
+    if (ex.length < 24) continue;
+    const hits = regions.filter((r) => r.text.includes(ex));
+    if (hits.length === 1) out.add(nameKey(hits[0].name));
   }
   return out;
 }

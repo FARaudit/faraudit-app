@@ -102,8 +102,15 @@ export function agenticManifestComplete(
 // sign-in sheet, photos. Everything else — amendment/SF30, base solicitation, RFI/Q&A, reps-certs, specs (may carry
 // QPL/brand-name qualification), or an UNKNOWN role — defaults ADVERSE (dispositive → blocks A). Model-free; pinned.
 const ELIG_NONDISPOSITIVE_ROLE_RE = /wage determination|davis[\s-]?bacon\b|design narrative|submittal register|sign[\s-]?in\b|\bdrawings?\b|\bphotos?\b/i;
+// P2 FIX (adversarial seat #2, 2026-07-24) — a COMBINED doc that also carries specs/SOW/QPL/brand-name/amendment can
+// bear a WHO-MAY-BID qualification (e.g. "Drawings & Specifications.pdf" matched \bdrawings?\b yet holds a QPL/brand-
+// name bar). Such names default ADVERSE (dispositive → block A), so item A never claims "no more documents needed" on
+// an unread doc that could gate eligibility. Pure name-role artifacts (Wage Determination, standalone Drawings) unaffected.
+const ELIG_DISPOSITIVE_OVERRIDE_RE = /spec(?:ification)?s?\b|\bSOW\b|statement of work|\bPWS\b|\bQPL\b|\bQML\b|brand[\s-]?name|\bamendment\b|\bSF[\s-]?30\b/i;
 export function eligibilityNonDispositiveByRole(name: string): boolean {
-  return ELIG_NONDISPOSITIVE_ROLE_RE.test(name || "");
+  const n = name || "";
+  if (ELIG_DISPOSITIVE_OVERRIDE_RE.test(n)) return false;   // combined/eligibility-bearing role → adverse-default
+  return ELIG_NONDISPOSITIVE_ROLE_RE.test(n);
 }
 
 export function bindingContentLossDocs(ingestion: IngestionMeta): IngestionFileMeta[] {

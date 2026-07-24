@@ -68,6 +68,13 @@ async function main() {
     assert(d.verdict === "INCOMPLETE", `precondition undefined ⇒ A inert ⇒ INCOMPLETE (got ${d.verdict})`);
   }
 
+  console.log("\n── 6 · FLAG ON + precondition TRUE but documentsComplete=TRUE (fully read) ⇒ A does NOT preempt (fix #3) ──");
+  {
+    process.env.AUDIT_VERDICT_POLE_PRECEDENCE = "true";
+    const d = deriveVerdict(mk([boaBar()], { dispositiveCompletenessForEligibility: true, documentsComplete: true }));
+    assert(!/no additional documents are needed/i.test(d.reason), `documentsComplete=true ⇒ item A step-0-A does not fire its reason (got: ${d.reason.slice(0, 70)}…)`);
+  }
+
   console.log(failures === 0 ? "\n✅ ALL GREEN — vehicle A verdict-pole precedence" : `\n❌ ${failures} FAILURE(S)`);
   process.exit(failures === 0 ? 0 : 1);
 }

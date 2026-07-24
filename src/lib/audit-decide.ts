@@ -263,8 +263,15 @@ const BONDING_CLAUSE_RE = /\b52\.228-(?:1|15|16)\b|bid guarantee|performance and
 // informational, bidder-controllable caveat (never suppresses a genuinely-required cyber gate). Keep-the-bar exclusion:
 // a finding co-stating any structural-impossibility token is untouched. Flag-OFF ⇒ byte-identical.
 const CYBER_CLAUSE_RE = /\b252\.204-70(?:12|08|17|18)\b|\bCMMC\b|\bSPRS\b|\bNIST\s+SP\s+800-171\b|\b800-171\b|covered defense information/i;
-const RFI_CYBER_WITHDRAWN_RE = /(?:CMMC|SPRS|NIST\s+SP\s+800-171|800-171)[^.]{0,180}(?:no longer (?:a )?requirement|is no longer required|not (?:a )?requirement)|(?:there is )?no longer (?:a )?requirement/i;
-const NO_CUI_FCI_RE = /does not contain CUI|(?:FCI|FCU)(?:\s*and\/or\s*CUI)?[^.]{0,80}not included in any documentation|\bno CUI\b/i;
+// P0 FIX (adversarial seat, 2026-07-24) — the withdrawal MUST be cyber-anchored: a cyber token within 180 non-period
+// chars BEFORE the "no longer required" phrase (same clause, no sentence break). The prior decoupled tail
+// `|(?:there is )?no longer (?:a )?requirement` matched ANY "no longer a requirement" (e.g. a site-visit withdrawal),
+// which — paired with a CUI-handling "no CUI" false-match below — demoted a GENUINE 7012 CDI bar (false-BID). Removed.
+const RFI_CYBER_WITHDRAWN_RE = /(?:CMMC|SPRS|NIST\s+SP\s+800-171|800-171|252\.204-70(?:12|08|17|18))[^.]{0,180}(?:no longer (?:a )?requirement|is no longer required|not (?:a )?requirement)/i;
+// P0 FIX — require a genuine CUI/FCI ABSENCE assertion. The prior bare `\bno CUI\b` matched CUI-HANDLING instructions
+// that PRESUME CUI exists (e.g. "No CUI shall be stored on systems that are not 800-171 compliant"). Now the "no CUI"
+// arm must be followed by an absence verb (is/are/shall be present|involved|included|generated|…), never "stored/handled".
+const NO_CUI_FCI_RE = /does not contain CUI|contains? no CUI\b|\bno CUI\s+(?:is|are|will be|shall be|to be)?\s*(?:present|involved|included|generated|created|applicable|expected|required|anticipated)\b|(?:FCI|FCU)(?:\s*and\/or\s*CUI)?[^.]{0,80}not included in any documentation/i;
 export function applyCyberRfiReconciliation(findings: TypedFinding[], source: string | undefined, opts?: { enabled?: boolean }): TypedFinding[] {
   if (!opts?.enabled) return findings;                      // default-off ⇒ byte-identical
   const src = source ?? "";
@@ -3424,7 +3431,11 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //   status without a profile; #575 collapses it to decisive). E-predicate (hasOperativeEligibilityLanguage) is a HARD
   //   gate so a bare "held and concluded" site-visit recital never promotes. Flag-OFF / precondition unset ⇒ skipped ⇒
   //   byte-identical.
-  if (verdictPolePrecedenceEnabled() && inp.dispositiveCompletenessForEligibility === true) {
+  // P2 FIX (adversarial seat #3, 2026-07-24) — item A's ONLY job is to override the documentsComplete=false INCOMPLETE
+  //   cap; gate on `documentsComplete === false` so it never preempts the definitive show-stopper/INELIGIBLE path on a
+  //   FULLY-READ package (where the incomplete-doc set is empty ⇒ precondition is vacuously true). Cert cases all set
+  //   documentsComplete:false ⇒ still green; the e63bd1e7 target (WD OCR-hold ⇒ documentsComplete=false) still fires.
+  if (verdictPolePrecedenceEnabled() && inp.dispositiveCompletenessForEligibility === true && inp.documentsComplete === false) {
     const eligStoppers = siteVisitEligStoppers(dispositions, inp.bidderProfile, inp.source)
       .filter((s) => (s as { grounded?: boolean }).grounded !== false && hasOperativeEligibilityLanguage(s.excerpt ?? ""));
     if (eligStoppers.length > 0) {
