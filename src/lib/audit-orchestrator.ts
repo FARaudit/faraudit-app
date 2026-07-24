@@ -665,6 +665,25 @@ export function docRegions(fullSource: string): Array<{ name: string; text: stri
   return regions.map((r, i) => ({ ...r, isPrimary: i === primaryIdx }));
 }
 
+// ── Vehicle A–E · item B (flag AUDIT_COVERAGE_COUNTER_SPLIT, default-OFF) — READ vs GROUNDED are distinct axes. ──────
+// A region that is the GROUNDED SOURCE of a decision-bearing finding is, by definition, read AND grounded, and must
+// NEVER appear in the "not confirmed read/grounded" gap list. Pin: FA813726 e63bd1e7 — two `disqualifying` findings
+// quote the SAM Notice Body verbatim while the gap list named it "not confirmed read/grounded" (the contradiction the
+// Gate-4 panel + red-team confirmed). REGION-GRANULAR per design-panel R5: keyed to the region a decision-bearing
+// grounded finding's excerpt is actually IN. Pure; model-free. Flag-OFF ⇒ never called ⇒ byte-identical.
+const coverageCounterSplitEnabled = (): boolean => process.env.AUDIT_COVERAGE_COUNTER_SPLIT === "true";
+export function groundedSourceRegionNames(fullSource: string, findings: TypedFinding[]): Set<string> {
+  const nameKey = (s: string): string => (s || "").replace(/\s+/g, " ").trim().toLowerCase();
+  const decisionBearing = findings.filter((f) => f.grounded === true && !!f.excerpt && disposeFinding(f) !== "dropped");
+  const out = new Set<string>();
+  for (const r of docRegions(fullSource)) {
+    const nRegion = norm(r.text);
+    if (decisionBearing.some((f) => { const ex = norm(f.excerpt || ""); return ex.length > 0 && nRegion.includes(ex); }))
+      out.add(nameKey(r.name));
+  }
+  return out;
+}
+
 export function documentsCovered(
   fullSource: string,
   findings: TypedFinding[],
@@ -2707,8 +2726,15 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // Flag OFF ⇒ coverageV2 absent ⇒ deriveVerdict runs the exact V1 line (byte-identical). Proven: scripts/audit-ai/prove-gate-v2*.ts.
   // Brain card #320 — NAME the gap so an INCOMPLETE tells the customer WHICH doc/section blocked a verdict
   // (deterministic signals only; never affects the verdict, only enriches the honest-fail reason).
+  // Vehicle A–E · item B: strip any region that is the grounded source of a decision-bearing finding from the gap
+  // list (invariant: gapList ∩ groundedSourceRegions === ∅). Flag-OFF ⇒ groundedSrc null ⇒ uncoveredForGap ===
+  // docCoverage.uncovered ⇒ byte-identical.
+  const groundedSrcRegions = coverageCounterSplitEnabled() ? groundedSourceRegionNames(ctx.fullSource, findings) : null;
+  const uncoveredForGap = groundedSrcRegions
+    ? (docCoverage.uncovered ?? []).filter((n) => !groundedSrcRegions.has((n || "").replace(/\s+/g, " ").trim().toLowerCase()))
+    : docCoverage.uncovered;
   const coverageGap = [
-    docCoverage.uncovered?.length ? `document(s) not confirmed read/grounded: ${docCoverage.uncovered.join(", ")}` : "",
+    uncoveredForGap?.length ? `document(s) not confirmed read/grounded: ${uncoveredForGap.join(", ")}` : "",
     missing.length ? `binding section(s) not located: ${missing.join(", ")}` : "",
     coreMissing.length ? `required section(s) absent: ${coreMissing.join(", ")}` : "",
   ].filter(Boolean).join("; ") || undefined;
