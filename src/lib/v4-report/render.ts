@@ -113,11 +113,23 @@ function verdict(v: V4Verdict, meta: { auditId?: string; auditDate?: string; cov
   const m = meta || {};
   const cov = m.coverage || ({} as V4Coverage);
   const pct = cov.total ? Math.round((cov.read / cov.total) * 100) : null;
+  // Vehicle F2 · F-5 (flag AUDIT_COVERAGE_DISPLAY_COHERENT, default-OFF) — the masthead "%" is the READ axis
+  // (docs-read / docs-total); the coverage CARD renders the GROUNDED axis (cov.state). When those disagree, the
+  // masthead showed "100%" directly above a card reading "INCOMPLETE". Flag-ON: when state ≠ COMPLETE the masthead
+  // shows the STATE (grounded axis), coherent with the card — never a read-100% that contradicts an incomplete grounding.
+  const coherent = process.env.AUDIT_COVERAGE_DISPLAY_COHERENT === "true";
+  const covIncomplete = coherent && cov.state != null && cov.state !== "COMPLETE";
+  const covVal = covIncomplete
+    ? esc(cov.state === "INCOMPLETE" ? "Incomplete" : String(cov.state))
+    : (pct == null ? "—" : pct + "%");
+  const covSub = covIncomplete
+    ? (cov.total ? " · " + cov.read + "/" + cov.total + " read" : "")
+    : (cov.total ? " · " + cov.read + "/" + cov.total + " docs" : "");
   const readout = `
           <aside class="vd-readout mono" aria-hidden="true">
             <div class="vdr-row"><span class="vdr-k">Assessment</span><span class="vdr-v">${esc(m.auditId || "—")}</span></div>
             <div class="vdr-row"><span class="vdr-k">Evaluated</span><span class="vdr-v">${esc(m.auditDate || "—")}</span></div>
-            <div class="vdr-row"><span class="vdr-k">Coverage</span><span class="vdr-v">${pct == null ? "—" : pct + "%"}<span class="vdr-sub">${cov.total ? " · " + cov.read + "/" + cov.total + " docs" : ""}</span></span></div>
+            <div class="vdr-row"><span class="vdr-k">Coverage</span><span class="vdr-v">${covVal}<span class="vdr-sub">${covSub}</span></span></div>
           </aside>`;
   return `
     <section class="sec vd-sec" id="verdict" data-sec data-tone="${esc(v.tone)}"${v.noVerdict ? ' data-noverdict="1"' : ""}>

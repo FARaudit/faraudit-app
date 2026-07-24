@@ -488,6 +488,13 @@ export function buildV4Data(audit: Record<string, unknown>): V4Data {
   // ── masthead — audit-row columns only (Brain #5), never compliance_json ──
   const facts: V4Fact[] = [];
   if (agency) facts.push({ k: "Agency", v: agency });
+  // Vehicle F2 · F-4 (flag AUDIT_MASTHEAD_OFFICE_LEAF, default-OFF) — surface the issuing-office leaf (e.g. AFSC/PZIOC,
+  // the org that authored §I) when the engine captured it. COMPUTE-OR-ABSENT: rendered ONLY when office_leaf is
+  // populated; when the column is empty it is silently absent (never a fabricated leaf). Flag-OFF: byte-identical.
+  if (process.env.AUDIT_MASTHEAD_OFFICE_LEAF === "true") {
+    const leaf = s(audit.office_leaf);
+    if (leaf) facts.push({ k: "Issuing office", v: leaf });
+  }
   if (naics) facts.push({ k: "NAICS", v: naics, mono: true });
   // Vehicle F2 · F-3 (flag AUDIT_SETASIDE_HEADER_RECONCILE, default-OFF) — the header must not ASSERT a set-aside the
   // body denies. Raw SAM `set_aside` is sometimes an agency/metadata label ("SBA") with no operative clause. When the
