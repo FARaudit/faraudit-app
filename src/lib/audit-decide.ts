@@ -26,8 +26,16 @@ export type Verdict = "BID" | "BID_WITH_CAUTION" | "NO_BID" | "INELIGIBLE" | "NE
 export type Disposition = "met" | "gate_to_clear" | "disqualifying" | "dropped";
 
 export interface DecidedFinding extends TypedFinding { disposition: Disposition; }
+// Vehicle F · D2 (fabrication-adjacent, fail-loud) — the EXHAUSTIVE enumerated cause of a no-verdict (NHR) pole,
+// stamped at the deriveVerdict return site so the render never has to reverse-engineer (or fabricate) it. Every real
+// NHR return site maps to exactly ONE value (coverage-proof cert enforces this). ONLY the expert-conflict site emits
+// "conflict". A render must render conflict language iff cause==="conflict"; an absent/unknown cause renders a NEUTRAL
+// TRUE string + a defect signal, never a fallback that asserts a cause. Verdict-inert (new field; existing consumers
+// read verdict/reason/etc.) ⇒ flag-OFF byte-identical.
+export type NoVerdictCause = "conflict" | "eligibility" | "coverage" | "primary_indeterminate" | "verification";
 export interface Decision {
   verdict: Verdict;
+  noVerdictCause?: NoVerdictCause;   // set on NHR returns only; absent on committal poles
   eligible: boolean | null;  // null = "not determined" (honest-fail under AUDIT_ELIGIBLE_TRISTATE) — never false on an undetermined verdict (doctrine #6)
   reason: string;
   dispositions: DecidedFinding[];      // every finding with its derived disposition
@@ -3034,8 +3042,8 @@ export function validateUniversalDefectProducerConfig(env: NodeJS.ProcessEnv = p
 // LOCKS the invariant the moment a universal-defect detector is wired without the tristate.
 validateUniversalDefectProducerConfig();
 
-const mk = (verdict: Verdict, eligible: boolean | null, reason: string, dispositions: DecidedFinding[], showStoppers: DecidedFinding[]): Decision =>
-  ({ verdict, eligible, reason, dispositions, showStoppers });
+const mk = (verdict: Verdict, eligible: boolean | null, reason: string, dispositions: DecidedFinding[], showStoppers: DecidedFinding[], noVerdictCause?: NoVerdictCause): Decision =>
+  ({ verdict, eligible, reason, dispositions, showStoppers, ...(noVerdictCause ? { noVerdictCause } : {}) });
 
 // Doctrine #6 (Brain card 125) — an honest-fail verdict (INCOMPLETE / verifier-unsound NHR) must NOT assert
 // eligible:false; "false" is an affirmative ineligibility claim and is itself false when the truth is
@@ -3424,7 +3432,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //    is a manifest/readability failure and DOMINATES → NEEDS_HUMAN_REVIEW (honest-fail), never a silent first-doc
   //    default. Computed + flag-gated (AUDIT_ATTACHMENT_COVERAGE) in the orchestrator; absent/false ⇒ byte-identical.
   if (inp.primaryIndeterminate)
-    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "Could not confidently identify the base solicitation among the uploaded documents (no document carries a solicitation form or contract structure) — human review required to confirm which document is the solicitation before an audit can be relied on.", dispositions, []);
+    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "Could not confidently identify the base solicitation among the uploaded documents (no document carries a solicitation form or contract structure) — human review required to confirm which document is the solicitation before an audit can be relied on.", dispositions, [], "primary_indeterminate");
 
   // 0-A. VERDICT-POLE PRECEDENCE (Vehicle A–E, flag AUDIT_VERDICT_POLE_PRECEDENCE default-OFF). A grounded,
   //   OPERATIVE-language DISQUALIFYING eligibility bar on a FULLY-READ document OUTRANKS the documentsComplete
@@ -3447,7 +3455,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
       const named = namedEligibilityReason(eligStoppers);
       const reason = (named ?? "A bidder-eligibility bar stated in the solicitation gates award")
         + " — your firm is INELIGIBLE unless it clears each gate (confirm your firm's status); the read is otherwise complete for this eligibility decision, so no additional documents are needed to reach it. Based on the notice as posted — any pending amendment may alter these gates.";
-      return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), reason, dispositions, eligStoppers);
+      return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), reason, dispositions, eligStoppers, "eligibility");
     }
   }
 
@@ -3500,7 +3508,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
       const reason = lead ? `${lead} A secondary coverage note: ${v2.reason}` : v2.reason;
       // Persisted slot governed by the FILL flag ALONE — the headline flag never changes what is persisted (byte-identity).
       const persisted = coverageNhrStopperFillEnabled() ? covStoppers : [];
-      return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), reason, dispositions, persisted);
+      return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), reason, dispositions, persisted, "coverage");
     }
     // cap === null ⇒ no coverage veto; the documentsComplete gate (1b) below still applies (genuine unreadability).
   } else if (!inp.coverageComplete) {
@@ -3520,7 +3528,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
     // Card #477 ruling 3 — name the grounded bars in the reason-line (flag-gated); null ⇒ keep the generic string.
     const named = reasonLineNamedEnabled() ? namedEligibilityReason(noticeStoppers) : null;
     return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), named ?? "A bidder-eligibility bar stated in the solicitation notice (e.g. a mandatory site visit, set-aside, or required clearance/registration) could not be confirmed as analyzed — human review required to confirm eligibility before the verdict can be relied on.", dispositions,
-      noticeStoppers);
+      noticeStoppers, "eligibility");
   }
 
   // 1b. DOCUMENT completeness (C-1, Brain C.e) — the SINGLE reconciliation truth. A posted binding document the
@@ -3536,7 +3544,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //     never committal. Uses nhrEligible() (an undetermined verdict never asserts eligible=false — Gate-2 finding #4).
   //     Absent/empty unreadEvidence ⇒ byte-identical (no effect). Candidate A has NO verdict authority; this routes it.
   if (inp.unreadEvidence && inp.unreadEvidence.length)
-    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), `Unread/missing referenced material observed — human verification needed: ${clampToWord(inp.unreadEvidence.map((u) => u.note).join("; "), 220)}`, dispositions, []);
+    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), `Unread/missing referenced material observed — human verification needed: ${clampToWord(inp.unreadEvidence.map((u) => u.note).join("; "), 220)}`, dispositions, [], "coverage");
 
   // 1d. SET-ASIDE CONFLICT (Brain #332) — SAM (system of record) and the document name DIFFERENT set-aside programs.
   //     This changes WHO is eligible (an ineligible firm could bid, or an eligible firm could walk — zero-contract-
@@ -3547,11 +3555,11 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //     LEADS the reason — a hard-coded "SAM names a different program" lead is incoherent for a doc-internal conflict
   //     where SAM records no single program (pre-live review #334). SAM/document values follow as supporting detail.
   if (inp.setAsideConflict)
-    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), `Set-aside conflict — the eligible pool is ambiguous and must be confirmed with the Contracting Officer before relying on eligibility. ${inp.setAsideConflict.note} (SAM: ${inp.setAsideConflict.sam}; document: ${inp.setAsideConflict.doc}.)`, dispositions, []);
+    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), `Set-aside conflict — the eligible pool is ambiguous and must be confirmed with the Contracting Officer before relying on eligibility. ${inp.setAsideConflict.note} (SAM: ${inp.setAsideConflict.sam}; document: ${inp.setAsideConflict.doc}.)`, dispositions, [], "eligibility");
 
   // 2. Verification soundness — if adversarial verification did not succeed, the findings aren't trustworthy.
   if (!inp.verifierSound)
-    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "Adversarial verification did not succeed — findings not trustworthy enough to decide.", dispositions, []);
+    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "Adversarial verification did not succeed — findings not trustworthy enough to decide.", dispositions, [], "verification");
 
   // 2b. VERIFIED-FLOOR (Brain card 224 fork 1) — coverage is complete and verification reported sound, yet ZERO
   //     findings survive to decide over (none raised, or every one overturned). A committal verdict CANNOT rest
@@ -3564,7 +3572,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   // it would sail past a `length === 0` test and fall through to a clean default BID. A materially-empty verified set
   // (no non-`dropped` survivor) → NEEDS_HUMAN_REVIEW, never a default BID. (`every` on [] is true → literal-empty covered.)
   if (dispositions.every((f) => f.disposition === "dropped"))
-    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "No decision-bearing findings survived over complete coverage (empty or all-boilerplate verified set) — a clean BID cannot rest on a materially-empty set. Human review required.", dispositions, []);
+    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "No decision-bearing findings survived over complete coverage (empty or all-boilerplate verified set) — a clean BID cannot rest on a materially-empty set. Human review required.", dispositions, [], "verification");
 
   // 3. Show-stoppers — BRAIN CARD 226 FORK 2: DEFAULT-DENY NO_BID (positive-allow, not negative-deny). A committal
   //    NO_BID is reachable ONLY on a POSITIVE match to the UNIVERSAL_DEFECT allowlist (the solicitation is
@@ -3595,7 +3603,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   if (unverifiedUniversalDefect.length) {
     const breach = `FORK-5 invariant breach (card 240): ${unverifiedUniversalDefect.length} finding(s) marked universalDefect WITHOUT verification evidence — a committal NO_BID may not rest on an unverified mark (no verifiedBy binding the defect to the cited excerpt, Rule 64). Fail-safe → NEEDS_HUMAN_REVIEW: ${unverifiedUniversalDefect.map((s) => s.requirement).join("; ")}`;
     logInvariantBreach(breach);
-    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), breach, dispositions, unverifiedUniversalDefect);
+    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), breach, dispositions, unverifiedUniversalDefect, "verification");
   }
   // CARD 275 RULING 4b (Brain) — SUPPRESS judgment-sourced committal NO_BID → NHR until the four-walls re-enable
   // (RULING 4a). Today a universalDefect is proven on a SINGLE J-2 entailment over a ±1KB window — one wall, not
@@ -3608,7 +3616,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   if (universalDefect.length && process.env.AUDIT_FOURWALLS_NOBID !== "true") {
     const msg = `card 275 R4b: ${universalDefect.length} verified universalDefect(s) SUPPRESSED to NHR pending four-walls re-enable (single-verifier entailment is not four-walls): ${universalDefect.map((s) => s.requirement).join("; ")}`;
     try { console.log(`[card275-r4b] ${msg}`); } catch { /* logging must never affect the verdict */ } // a normal suppression, NOT an invariant breach
-    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), msg, dispositions, universalDefect);
+    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), msg, dispositions, universalDefect, "verification");
   }
   // RULING A — a firmStatus-PROVEN who-can-win failure is INELIGIBLE by construction: normalize its kind to
   // eligibility_bar at the determination point so the show-stopper is coherent (eligible:false WITH an
@@ -3629,7 +3637,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
     // WAIVE or moot the bar → zero-contract-loss. Downgrade to NHR carrying the CONDITIONAL bar.
     if (inp.manifestComplete === false)
       return mk("NEEDS_HUMAN_REVIEW", nhrEligible(),
-        `CONDITIONAL bar(s) on an INCOMPLETE read — a manifest-named document went unfetched and could waive or moot the following; confirm against the full package before treating as disqualifying: ${showStoppers.map((s) => s.requirement).join("; ")}`, dispositions, showStoppers);
+        `CONDITIONAL bar(s) on an INCOMPLETE read — a manifest-named document went unfetched and could waive or moot the following; confirm against the full package before treating as disqualifying: ${showStoppers.map((s) => s.requirement).join("; ")}`, dispositions, showStoppers, "eligibility");
     // POSITIVE eligibility determination (Ruling B) — proven-pass→true, proven-fail→false, else null; NEVER default true.
     const positiveEligible = (): boolean | null => {
       const gates = disqualifying.filter((f) => !!f.requiredAttribute);
@@ -3655,11 +3663,11 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   const unmarkedUniversalClaim = disqualifying.filter((f) => !isUniversalDefect(f) && f.controllability === "no_one_can_move" && firmStatus(f, inp.bidderProfile, inp.source) !== "fails");
   if (unmarkedUniversalClaim.length)
     return mk("NEEDS_HUMAN_REVIEW", nhrEligible(),
-      `Finding(s) claim a universal impossibility (no_one_can_move) but are not a positively-classified universal defect, and the firm does not provably fail them — human review to classify or clear: ${unmarkedUniversalClaim.map((s) => s.requirement).join("; ")}`, dispositions, unmarkedUniversalClaim);
+      `Finding(s) claim a universal impossibility (no_one_can_move) but are not a positively-classified universal defect, and the firm does not provably fail them — human review to classify or clear: ${unmarkedUniversalClaim.map((s) => s.requirement).join("; ")}`, dispositions, unmarkedUniversalClaim, "verification");
 
   // 4. Unresolved material conflict between experts the loop could not reconcile.
   if (inp.conflict)
-    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), "Unresolved material conflict between experts.", dispositions, []);
+    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), "Unresolved material conflict between experts.", dispositions, [], "conflict");
 
   // 4b. SELF-CLEARABLE PACKAGE (card #590 Modified-B, flag AUDIT_SELF_CLEARABLE_PACKAGE, default-OFF). VERIFIER-SOVEREIGN
   //     — only reached with verifierSound=true (step 2) + coverage/documents complete + no show-stopper/universal defect
@@ -3690,7 +3698,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   const untyped = unknownBars.filter((f) => !f.requiredAttribute || f.curableInWindow === undefined);
   if (untyped.length)
     return mk("NEEDS_HUMAN_REVIEW", nhrEligible(),
-      `Disqualifying bar(s) missing required typing (requiredAttribute / curableInWindow) — fail closed to human review, never a silent caution: ${names(untyped)}`, dispositions, untyped);
+      `Disqualifying bar(s) missing required typing (requiredAttribute / curableInWindow) — fail closed to human review, never a silent caution: ${names(untyped)}`, dispositions, untyped, "eligibility");
 
   // 5b. NON-CURABLE structural bar (curableInWindow === false) under unknown status. Top-line verdict is
   //     NEEDS_HUMAN_REVIEW (the determining fact — does the firm already hold it — is absent, so the engine
@@ -3715,7 +3723,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
     const lead = mechanic ? "Non-curable bar(s)" : "Structural bar(s) the firm may be unable to satisfy within the response window";
     const cure = mechanic ? " — it cannot be cured in the window" : "";
     const barLine = `${lead}${mechanic}. CONDITIONAL NO-BID: if your firm does not ALREADY hold the following and cannot obtain it before the deadline, this is a NO-BID${cure}: ${names(nonCurable)}`;
-    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), barLine, dispositions, nonCurable);
+    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), barLine, dispositions, nonCurable, "eligibility");
   }
 
   // 5b-NMR. FORK-7 (Brain card 242 item 4) — NMR unknown/unrecognized status. NOT a lead-time bar: a nonmanufacturer
@@ -3725,7 +3733,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   const nmrUnknown = unknownBars.filter((f) => f.nmrGuard === true && f.curableInWindow === false);
   if (nmrUnknown.length)
     return mk("NEEDS_HUMAN_REVIEW", nhrEligible(),
-      `Manufacturer/nonmanufacturer status not determined; if nonmanufacturer, Nonmanufacturer Rule compliance is typically achievable by supplying a small U.S. manufacturer's product — confirm status in profile: ${names(nmrUnknown)}`, dispositions, nmrUnknown);
+      `Manufacturer/nonmanufacturer status not determined; if nonmanufacturer, Nonmanufacturer Rule compliance is typically achievable by supplying a small U.S. manufacturer's product — confirm status in profile: ${names(nmrUnknown)}`, dispositions, nmrUnknown, "eligibility");
 
   // ASYMMETRY CAP (Brain card-58): a "no-bar" verdict (CAUTION/BID) is valid only if the read was COMPLETE.
   // If a manifest-named attachment went unfetched, a clean verdict is the §C content-loss failure with a clean
