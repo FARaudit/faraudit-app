@@ -266,7 +266,15 @@ export function reasoningSteps(d: V4Data): ReasoningStep[] {
   if (complete) {
     coverageDetail = `${cov.read} of ${cov.total} documents read in full${coreOk.length ? `; core sections present (${coreOk.join(" · ")})` : ""}. ${cov.read < cov.total ? "The unread documents contain no required section, so the read is sufficient for the decision to rest on it." : "No documents were left unread — the decision rests on the complete record."}`;
   } else if (coverageWithheld) {
-    coverageDetail = `${cov.read} of ${cov.total} documents could be read. A partial read cannot certify what it did not see — the sequence stops here and no verdict is issued.`;
+    // Vehicle A–E · item C (flag AUDIT_COVERAGE_COUNTER_SPLIT, default-OFF) — state the TRUE read-vs-grounded shape.
+    // The legacy copy asserted "partial read cannot certify what it did not see" even when read===total (FA813726
+    // e63bd1e7: "9 of 9 documents could be read. A partial read cannot certify…" — internally contradictory: 9/9 is
+    // NOT a partial read). When everything posted was read, the sequence stops on GROUNDING/certification, not on an
+    // unread doc — say so. Flag-OFF ⇒ the exact legacy string ⇒ byte-identical.
+    const allRead = cov.read != null && cov.total != null && cov.read >= cov.total;
+    coverageDetail = (process.env.AUDIT_COVERAGE_COUNTER_SPLIT === "true" && allRead)
+      ? `All ${cov.total} documents were read; the sequence stops because not all binding content could be grounded/confirmed — no verdict is issued on an unconfirmed read.`
+      : `${cov.read} of ${cov.total} documents could be read. A partial read cannot certify what it did not see — the sequence stops here and no verdict is issued.`;
   } else if (v.noVerdict) {
     // NHR / OOS — coverage is stamped incomplete only because a no-verdict pole never
     // shows COMPLETE; the read is NOT what halts the sequence, the next step is.
