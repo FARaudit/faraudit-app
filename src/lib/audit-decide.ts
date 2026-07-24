@@ -263,11 +263,16 @@ const BONDING_CLAUSE_RE = /\b52\.228-(?:1|15|16)\b|bid guarantee|performance and
 // informational, bidder-controllable caveat (never suppresses a genuinely-required cyber gate). Keep-the-bar exclusion:
 // a finding co-stating any structural-impossibility token is untouched. Flag-OFF ⇒ byte-identical.
 const CYBER_CLAUSE_RE = /\b252\.204-70(?:12|08|17|18)\b|\bCMMC\b|\bSPRS\b|\bNIST\s+SP\s+800-171\b|\b800-171\b|covered defense information/i;
-// P0 FIX (adversarial seat, 2026-07-24) — the withdrawal MUST be cyber-anchored: a cyber token within 180 non-period
-// chars BEFORE the "no longer required" phrase (same clause, no sentence break). The prior decoupled tail
-// `|(?:there is )?no longer (?:a )?requirement` matched ANY "no longer a requirement" (e.g. a site-visit withdrawal),
-// which — paired with a CUI-handling "no CUI" false-match below — demoted a GENUINE 7012 CDI bar (false-BID). Removed.
-const RFI_CYBER_WITHDRAWN_RE = /(?:CMMC|SPRS|NIST\s+SP\s+800-171|800-171|252\.204-70(?:12|08|17|18))[^.]{0,180}(?:no longer (?:a )?requirement|is no longer required|not (?:a )?requirement)/i;
+// P0 FIX (adversarial seat, 2026-07-24) — the withdrawal MUST be cyber-anchored: a cyber token BEFORE the "no longer
+// required" phrase. The prior decoupled tail `|(?:there is )?no longer (?:a )?requirement` matched ANY "no longer a
+// requirement" (e.g. a site-visit withdrawal), which — paired with a CUI-handling "no CUI" false-match below — demoted
+// a GENUINE 7012 CDI bar (false-BID). Removed. D5 FIX (live e63bd1e7 re-fire, 2026-07-24, L40-D4 fixture doctrine):
+// the window was `[^.]{0,180}` (same sentence, no period) — but the REAL RFI Q&A format puts the cyber requirement in
+// the QUESTION and the withdrawal in the "PZ Response:" ANSWER, split by a period, so item D under-fired on its own
+// target. Widen to a bounded cross-sentence window `[\s\S]{0,240}?`; the cyber-token-BEFORE-withdrawal ordering + the
+// genuine-absence NO_CUI_FCI guard below still hold the false-BID line (the P0 adversarial repro stays SAFE — its
+// "no longer a requirement" precedes any cyber token, and "no CUI shall be stored" fails genuine-absence).
+const RFI_CYBER_WITHDRAWN_RE = /(?:CMMC|SPRS|NIST\s+SP\s+800-171|800-171|252\.204-70(?:12|08|17|18))[\s\S]{0,240}?(?:no longer (?:a )?requirement|is no longer required|not (?:a )?requirement)/i;
 // P0 FIX — require a genuine CUI/FCI ABSENCE assertion. The prior bare `\bno CUI\b` matched CUI-HANDLING instructions
 // that PRESUME CUI exists (e.g. "No CUI shall be stored on systems that are not 800-171 compliant"). Now the "no CUI"
 // arm must be followed by an absence verb (is/are/shall be present|involved|included|generated|…), never "stored/handled".

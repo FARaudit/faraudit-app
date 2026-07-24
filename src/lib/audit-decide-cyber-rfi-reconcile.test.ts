@@ -18,8 +18,11 @@ const nonCyber = (): TypedFinding => ({
   requirement: "Offeror must furnish a 20% bid guarantee.", citation: "§ L 4.3", excerpt: "A bid guarantee of 20% is required.",
   kind: "pricing", controllability: "bidder_controls", grounded: true, lens: "pricing_analyst", curableInWindow: true,
 });
-// e63bd1e7 RFI responses (verbatim-shaped): CUI-absence + cyber-withdrawal.
-const RFI_SRC = "Per the OPSEC Memo this project does not contain CUI. FCI and/or CUI are not included in any documentation as a part of the subject project. Subcontractors required to independently satisfy applicable CMMC, SPRS, and/or NIST SP 800-171 requirements — PZ Response: This is no longer a requirement.";
+// e63bd1e7 RFI responses — FAITHFUL Q&A shape from this record's persisted raw_pdf_text (L40-D4 fixture doctrine, D5
+// fix 2026-07-24): the cyber requirement is in the QUESTION and the withdrawal in the "PZ Response:" ANSWER, split by
+// a PERIOD (the prior fixture used an em-dash with no period, hiding the sentence boundary that made item D under-fire
+// on the real source under the tight `[^.]` window). This captured shape is the regression pin for the widened anchor.
+const RFI_SRC = "Per the OPSEC Memo this project does not contain CUI. FCI and/or CUI are not included in any documentation as a part of the subject project. 54. Please confirm whether subcontractors must implement applicable CMMC, SPRS, and/or NIST SP 800-171 requirements in order to participate in proposal preparation or contract performance under this acquisition. PZ Response: This is no longer a requirement.";
 const SRC_WITHDRAWN_ONLY = "Subcontractors to satisfy CMMC/SPRS requirements — PZ Response: This is no longer a requirement."; // no no-CUI statement
 const SRC_LIVE_CYBER = "Contractor shall comply with DFARS 252.204-7012 safeguarding of covered defense information and 72-hour cyber incident reporting."; // real CDI, no withdrawal
 
