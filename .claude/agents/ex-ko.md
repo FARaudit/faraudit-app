@@ -1,6 +1,6 @@
 ---
 name: ex-ko
-model: opus  # Brain card 520 addendum — pin panel/red-team to opus-4-8 explicitly (was inherited)
+model: opus
 description: Use on every audit to check facts-vs-SAM, UCF mechanics, and verdict-ladder soundness. Ex-Contracting-Officer lens (warranted 1102, ran source selections) — facts fidelity vs SAM, Uniform Contract Format mechanics (§A-M), open-vs-closed, contract type, evaluation scheme, KO-grade risk realism, verdict-ladder soundness. Core panel — always runs.
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 memory: project
