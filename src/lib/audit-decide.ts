@@ -3093,6 +3093,18 @@ export function applyClauseKeyedTypingFloor(findings: TypedFinding[], o: { enabl
 // CMMC/clearance/QPL bar, an at-award possession frame, or an untyped bar. Flag-OFF ⇒ never called ⇒ byte-identical.
 const selfClearablePackageEnabled = () => process.env.AUDIT_SELF_CLEARABLE_PACKAGE === "true";
 const incompletePrecedenceEnabled = () => process.env.AUDIT_INCOMPLETE_PRECEDENCE === "true"; // Brain #664 — documentsComplete=false not subordinate to coverage-pole NHR
+// ── Vehicle A–E · item A + E (flag AUDIT_VERDICT_POLE_PRECEDENCE, default-OFF) ─────────────────────────────────────
+const verdictPolePrecedenceEnabled = () => process.env.AUDIT_VERDICT_POLE_PRECEDENCE === "true";
+// item E (design-panel R1, hard dependency of A's site-visit fire) — the promoted finding's excerpt must carry
+// OPERATIVE eligibility-limiting language, NOT a bare recital ("site visit held and concluded" alone is NOT
+// dispositive — the concluded-site-visit trap). Deterministic SHAPE test; model-free. Matches the operative
+// attendance-as-eligibility phrasing and the vehicle-holder restriction idiom (the two grounded gates on e63bd1e7).
+const OPERATIVE_ELIG_LANGUAGE_RE = /\beligible to (?:propose|bid|offer|submit|compete)\b|\bto be (?:considered )?eligible\b|\b(?:must|shall|are required to) attend\b[^.]{0,80}\beligib/i;
+const HOLDER_RESTRICTION_RE = /\bholders?\s+only\b|\bonly\s+(?:available|open)\s+(?:to|for)\b[^.]{0,60}\bholders?\b|\bonly available to current\b[^.]{0,40}\bholders?\b/i;
+export function hasOperativeEligibilityLanguage(excerpt: string): boolean {
+  const s = excerpt || "";
+  return OPERATIVE_ELIG_LANGUAGE_RE.test(s) || HOLDER_RESTRICTION_RE.test(s);
+}
 function selfClearablePackageBars(dispositions: DecidedFinding[]): DecidedFinding[] | null {
   const live = dispositions.filter((f) => f.disposition !== "dropped");
   const hayOf = (f: DecidedFinding) => `${f.requirement ?? ""} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""}`;
@@ -3374,6 +3386,27 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //    default. Computed + flag-gated (AUDIT_ATTACHMENT_COVERAGE) in the orchestrator; absent/false ⇒ byte-identical.
   if (inp.primaryIndeterminate)
     return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "Could not confidently identify the base solicitation among the uploaded documents (no document carries a solicitation form or contract structure) — human review required to confirm which document is the solicitation before an audit can be relied on.", dispositions, []);
+
+  // 0-A. VERDICT-POLE PRECEDENCE (Vehicle A–E, flag AUDIT_VERDICT_POLE_PRECEDENCE default-OFF). A grounded,
+  //   OPERATIVE-language DISQUALIFYING eligibility bar on a FULLY-READ document OUTRANKS the documentsComplete
+  //   INCOMPLETE cap WHEN the narrowed dispositive-completeness precondition holds (no unfetched/content-lost doc that
+  //   could bear on the promoted eligibility gate — Brain R4 + conservative-adverse classifier in the orchestrator).
+  //   A non-dispositive OCR/pricing hold (e.g. a Wage Determination rate table) is NOT allowed to bury a read
+  //   eligibility bar. Sits ABOVE 1-PRE/1b (the INCOMPLETE cap) and BELOW the proven-read show-stopper block (pole is
+  //   the conditional-NHR eligibility headline, not a hard NO_BID — the engine cannot know the firm's holder/attendee
+  //   status without a profile; #575 collapses it to decisive). E-predicate (hasOperativeEligibilityLanguage) is a HARD
+  //   gate so a bare "held and concluded" site-visit recital never promotes. Flag-OFF / precondition unset ⇒ skipped ⇒
+  //   byte-identical.
+  if (verdictPolePrecedenceEnabled() && inp.dispositiveCompletenessForEligibility === true) {
+    const eligStoppers = siteVisitEligStoppers(dispositions, inp.bidderProfile, inp.source)
+      .filter((s) => (s as { grounded?: boolean }).grounded !== false && hasOperativeEligibilityLanguage(s.excerpt ?? ""));
+    if (eligStoppers.length > 0) {
+      const named = namedEligibilityReason(eligStoppers);
+      const reason = (named ?? "A bidder-eligibility bar stated in the solicitation gates award")
+        + " — your firm is INELIGIBLE unless it clears each gate (confirm your firm's status); the read is otherwise complete for this eligibility decision, so no additional documents are needed to reach it. Based on the notice as posted — any pending amendment may alter these gates.";
+      return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), reason, dispositions, eligStoppers);
+    }
+  }
 
   // 1-PRE. INCOMPLETE PRECEDENCE (Brain #664, flag AUDIT_INCOMPLETE_PRECEDENCE default-OFF). A posted binding DOCUMENT
   //   that could not be confirmed read in full (documentsComplete=false) is a COMPLETENESS failure that must NOT be
