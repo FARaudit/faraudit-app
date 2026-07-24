@@ -16,9 +16,14 @@ export type Pole =
 
 export interface V4Fact { k: string; v: string; sub?: string; mono?: boolean; extracted?: boolean; }
 export interface V4Masthead { docType: string; solicitation: string; title: string; facts: V4Fact[]; }
+// Vehicle F · D2 — enumerated cause of a no-verdict pole, threaded from the engine Decision (single source:
+// audit-decide.NoVerdictCause; inlined here to keep the display-contract type free of engine coupling). The renderer
+// derives the true reasoning sequence from this; an absent/unknown cause renders a NEUTRAL TRUE string + defect signal.
+export type NoVerdictCause = "conflict" | "eligibility" | "coverage" | "primary_indeterminate" | "verification";
 export interface V4Verdict {
   pole: Pole; band: string; tone: Tone; noVerdict?: boolean; noCharge?: boolean;
   eligible?: boolean | null; rationale: string;
+  noVerdictCause?: NoVerdictCause;
 }
 export interface V4Coverage {
   state: "COMPLETE" | "INCOMPLETE"; lead: string; read: number; indexed: number; total: number;

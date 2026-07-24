@@ -21,7 +21,7 @@ import { looksMojibake } from "./pdf-ocr";
 import { NOTICE_BODY_DOC_NAME } from "./agentic-executor";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
-import { SITE_VISIT_CONCLUDED_RE, BOA_HOLDER_ONLY_EMIT_RE } from "./audit-site-visit-patterns";
+import { SITE_VISIT_CONCLUDED_RE, BOA_HOLDER_ONLY_EMIT_RE, SITE_VISIT_MANDATORY_ATTENDANCE_RE } from "./audit-site-visit-patterns";
 import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyCyberRfiReconciliation, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyNmrNaicsDormancy, applyCheckboxStateFidelity, applyPerfObligationInsuranceTyping, applyClauseKeyedTypingFloor, applyStructuralAssertionFidelity, applyQuantityAmbiguityFidelity, applyFindingDedup, applyCrossFleetDedup, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, applyInquiryDeadlineBenignGuard, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, emitPerformanceUpkeepCaveats, deriveShadowVerdict, EngineInvariantError, type Decision, type ShadowVerdict } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
 import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type ReasonCaller, type EntailmentCaller, type JudgmentCost, zeroCost } from "./audit-judgment-layer";
@@ -1278,6 +1278,19 @@ export function emitNoticeBodyEligBarFindings(fullSource: string, findings: Type
       outExcerpt = fromWindow
         ? nNotice.slice(Math.min(ss, cs), Math.max(se, ce)).trim().slice(0, 600)
         : concludedSentence.slice(0, 600);
+      // Vehicle F · D1 (flag AUDIT_ELIG_OPERATIVE_EXCERPT, default-OFF) — item E (hasOperativeEligibilityLanguage) keys
+      // off the EXCERPT; a bare "held and concluded" recital fails it, so item A leaves the gate unnamed (e63bd1e7 tier-1
+      // was 1 of 2). When the notice ALSO carries the OPERATIVE attendance-eligibility sentence ("must attend … to be
+      // considered eligible to propose"), prepend it to the grounded excerpt (still verbatim in the notice) so E passes
+      // and the gate is named. Flag-OFF ⇒ outExcerpt unchanged ⇒ byte-identical.
+      if (process.env.AUDIT_ELIG_OPERATIVE_EXCERPT === "true") {
+        const opM = new RegExp(SITE_VISIT_MANDATORY_ATTENDANCE_RE.source, "i").exec(nNotice);
+        if (opM && opM.index != null) {
+          const [os, oe] = sentenceSpan(opM.index);
+          const opSentence = nNotice.slice(os, oe).trim();
+          if (opSentence && !outExcerpt.includes(opSentence)) outExcerpt = `${opSentence} ${outExcerpt}`.slice(0, 600);
+        }
+      }
       // The requirement ALWAYS carries a CONCLUDED_RE-matchable frame ("site visit … was held/concluded"), with or
       // without a parseable date — the guard keys promotion off this frame, so it must match even when eventDate="".
       requirement = `Mandatory site visit stated in the SAM notice body was held/concluded${eventDate ? ` ${eventDate}` : " (date not stated in the notice)"}; attendance is non-retroactive — this BARS AWARD unless the firm's attendance at the concluded site visit is confirmed (conditional-concluded, not a live gate): "${concludedSentence.slice(0, 200)}"`;
