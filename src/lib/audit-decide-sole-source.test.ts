@@ -88,5 +88,20 @@ CARVE("set-aside pool", "Sole source to Boeing Company noted. This is a 100% tot
   assert(!/sole-source award to/i.test(on.reason), "test 5: the proven bar won — reason is NOT the sole-source pole");
 }
 
+// ── 6. TRUE T1 SHAPE — documentsComplete=true + manifestComplete=false (coreMissing=["M"], the grounding stop
+//   that produced the live INCOMPLETE at decide.ts:3803). The sole-source step sits ABOVE that committal cap, so
+//   the lock PREEMPTS it → NHR-conditional. Proves ④ does NOT depend on ② (card #745) for T1 to show the pole. ──
+{
+  const inp = base(T1_SOURCE);
+  inp.documentsComplete = true;        // all 8 docs read (matches persisted a7727dfc documents_complete=true)
+  inp.manifestComplete = false;        // coreMissing=["M"] → the grounding stop that capped the live run to INCOMPLETE
+  const on = withFlag(true, () => deriveVerdict(inp));
+  assert(on.verdict === "NEEDS_HUMAN_REVIEW", `true-T1-shape: lock PREEMPTS the manifestIncomplete INCOMPLETE cap → NHR (got ${on.verdict})`);
+  assert(/Raytheon/.test(on.reason), "true-T1-shape: reason names Raytheon (not the 'unfetched' INCOMPLETE)");
+  // and flag-OFF the SAME input reproduces the original INCOMPLETE (byte-identical prior behavior)
+  const off = withFlag(false, () => deriveVerdict(inp));
+  assert(off.verdict === "INCOMPLETE", `true-T1-shape flag-OFF: original INCOMPLETE preserved (got ${off.verdict})`);
+}
+
 console.log(failures ? `\n❌ ${failures} FAILURE(S)` : "\n✅ ALL PASS");
 if (failures) process.exit(1);
