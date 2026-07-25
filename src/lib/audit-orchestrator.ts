@@ -15,6 +15,7 @@
 import { runAgenticExpert, isGrounded, type CallModel, type ExpertSpec } from "./audit-expert";
 import { readSection, sectionFullText, procurementPart, requiresProposalSections, materializeSections, parseDocRegions, resolvePrimary, ATTACHMENT_COVERAGE_ENABLED, type AuditToolContext } from "./audit-tools";
 import { constructionRequired, constructionCoreMissing, constructionCoverage } from "./audit-construction-manifest";
+import { detectSoleSourceLock } from "./audit-sole-source-lock";
 import { runSectionFinder, type SectionFinderCall } from "./audit-section-finder";
 import { isBindingDoc, hasEngineText } from "./sam-attachments";
 import { looksMojibake } from "./pdf-ocr";
@@ -2846,7 +2847,10 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // flag-ON) is surfaced as a BID_WITH_CAUTION-floor caveat before deriveVerdict. Flag-OFF ⇒ caveatRecital absent ⇒
   // emitter is a no-op ⇒ byte-identical.
   if (coverageV2?.caveatRecital?.length) findings = emitPerformanceUpkeepCaveats(findings, coverageV2.caveatRecital);
-  const inputs: VerdictInputs = { findings, bidderProfile, samSetAside: opts.setAside ?? null, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(opts.dispositiveCompletenessForEligibility !== undefined ? { dispositiveCompletenessForEligibility: opts.dispositiveCompletenessForEligibility } : {}), ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(process.env.AUDIT_SITEVISIT_SEVERITY_FLOOR === "true" ? { siteVisitSeverityFloor: true } : {}), ...(coverageV2 ? { coverageV2 } : {}), ...(opts.temporal ? { temporalSnapshot: opts.temporal.snapshot, liveSam: opts.temporal.liveSam, ingestedAmendmentComplete: opts.temporal.ingestedAmendmentComplete, today: opts.temporal.today, nowIso: opts.temporal.nowIso ?? null } : {}) };
+  // ④ SOLE-SOURCE LOCK (card #746, flag AUDIT_SOLE_SOURCE_LOCK default-OFF) — DETECT the named-vendor lock over the
+  // assembled source; deriveVerdict runs the over-fire carve-out pre-gate + routing. Flag-OFF ⇒ null ⇒ byte-identical.
+  const soleSourceLock = process.env.AUDIT_SOLE_SOURCE_LOCK === "true" ? detectSoleSourceLock(ctx.fullSource) : null;
+  const inputs: VerdictInputs = { findings, bidderProfile, samSetAside: opts.setAside ?? null, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(opts.dispositiveCompletenessForEligibility !== undefined ? { dispositiveCompletenessForEligibility: opts.dispositiveCompletenessForEligibility } : {}), ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(process.env.AUDIT_SITEVISIT_SEVERITY_FLOOR === "true" ? { siteVisitSeverityFloor: true } : {}), ...(coverageV2 ? { coverageV2 } : {}), ...(soleSourceLock ? { soleSourceLock } : {}), ...(opts.temporal ? { temporalSnapshot: opts.temporal.snapshot, liveSam: opts.temporal.liveSam, ingestedAmendmentComplete: opts.temporal.ingestedAmendmentComplete, today: opts.temporal.today, nowIso: opts.temporal.nowIso ?? null } : {}) };
   // Phase-1 SHADOW (cards #596/#597) — compute the positive-shape pole BESIDE the real verdict and bank it. VERDICT-INERT:
   // the shadow is never routed on; the live deriveVerdict below is untouched. Gated on AUDIT_POSITIVE_VERDICT_POLE (default-
   // OFF ⇒ never computed ⇒ byte-identical) AND banking on (the diagnostics carrier). naics is the SAM fact (Rule 64).

@@ -13,6 +13,7 @@
 
 import { createHash } from "node:crypto"; // Fork-5 (card 240): deterministic sha256 for the verified-defect excerpt binding (server-side, same as agentic-ingest/model-runs). Pure — no network, no randomness.
 import type { VerdictInputs, TypedFinding, BidderProfile, Controllability, RequirementKind } from "./audit-findings";
+import { soleSourceCarveOut } from "./audit-sole-source-lock";
 import { NMR_CAUTION } from "./audit-keyfact-detector"; // the canonical NMR requirement text — the positive-shape allowlist for the dormancy gate (Gauntlet Unit 2 R3)
 import { deriveTemporalDisposition, type TemporalDisposition } from "./audit-temporal"; // VERDICT ARC move 4 (flag AUDIT_TEMPORAL_VERDICT default-OFF)
 import { deriveSetAsideBackstop, type SetAsideBackstopDisposition } from "./audit-setaside-backstop"; // VERDICT ARC move-4, part B (flag AUDIT_SETASIDE_BACKSTOP default-OFF, SHADOW-ONLY; part A retired — card #677)
@@ -2857,6 +2858,7 @@ const coverageNhrStopperFillEnabled = () => process.env.AUDIT_COVERAGE_NHR_STOPP
 // site visit can still carry a disqualifying disposition (an over-claim), and item A would faithfully lead the
 // headline with that over-claimed bar. Arm A only WITH or AFTER B, so the bar A promotes is a real disqualifier.
 const nhrHeadlineShowStopperFirstEnabled = () => process.env.AUDIT_NHR_HEADLINE_SHOWSTOPPER_FIRST === "true";
+const soleSourceLockEnabled = () => process.env.AUDIT_SOLE_SOURCE_LOCK === "true";
 
 /** Against a disqualifying (bidder_cannot_move) bar, the firm's status is one of three — and that, not the
  *  bar's mere presence, decides the outcome (the standing facts-vs-analysis / no-blind-INELIGIBLE doctrine):
@@ -3656,6 +3658,52 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
     return enforceVerdictWordInvariant(mk("INELIGIBLE", false,
       `Ineligible — the firm's profile does not satisfy the required attribute(s): ${provenFails.map((s) => s.requiredAttribute ?? s.requirement).join("; ")}`, dispositions, showStoppers));
   }
+  // ── ④ SOLE-SOURCE LOCK → NHR-CONDITIONAL (Brain card #746, flag AUDIT_SOLE_SOURCE_LOCK default-OFF) ──────────
+  //   A named-vendor sole-source lock (detectSoleSourceLock over the source, threaded as inp.soleSourceLock) that
+  //   SURVIVES the over-fire carve-out pre-gate routes to a lock-dominant NEEDS_HUMAN_REVIEW naming the vendor.
+  //   RULING (Tier-V design panel, card #746): NOT NO_BID — a sole source is MEETABLE by the named vendor, so it is a
+  //   "who-can-win" bar, not a UNIVERSAL defect (NO_BID is doctrinally unreachable here — card 226 Fork-2). NOT
+  //   INELIGIBLE — that must PROVE firm≠vendor, but BidderProfile carries NO firm-identity operand, so "≠ vendor" is
+  //   unevaluable → it would collapse to "any named vendor → kill" (the over-fire). Honest pole: "sole source to
+  //   <vendor>; if your firm is not <vendor>, no-bid — confirm", carrying a subcontractor-teaming disposition.
+  //   PLACEMENT: BELOW the proven show-stopper block AND below the hoisted documentsComplete=false / CLOSED /
+  //   primaryIndeterminate returns (a real INELIGIBLE/NO_BID/universal-defect, an unread POSTED document, or a
+  //   live-confirmed-closed sol all return ABOVE and still win). It sits ABOVE the committal-exit caps —
+  //   manifestComplete=false (the coreMissing grounding stop, decide.ts ~3803) and temporalIndeterminate (~3792) —
+  //   which it PREEMPTS by design: a title-grounded lock must surface as the NHR headline, not hide behind an
+  //   incomplete-read/currency cap (this is what moves the live T1 run off its INCOMPLETE). Preempting is SAFE
+  //   because the lock already routes to the SAME zero-contract-loss NHR-conditional pole those caps would (never a
+  //   hard NO_BID), and its reason carries the "based on the notice as posted — any pending amendment may alter
+  //   this" caveat. Net: it CAPS the committal path (would-be BID/BWC → NHR-conditional). The CARVE-OUT pre-gate
+  //   (soleSourceCarveOut) is the real defense — or-equal · FAR 5.207 intent-synopsis · descriptive-incumbent ·
+  //   set-aside-firm-qualifies · firm-is-vendor → biddable → fall through (no false NHR). Flag-OFF / no lock ⇒
+  //   skipped ⇒ byte-identical.
+  if (soleSourceLockEnabled() && inp.soleSourceLock) {
+    const lock = inp.soleSourceLock;
+    const carve = soleSourceCarveOut(lock, inp.source, { samSetAside: inp.samSetAside ?? null });
+    if (carve) {
+      try { console.log(`[decide] sole-source lock on ${lock.vendor} CARVED OUT (${carve.kind}) — biddable, no NHR: ${carve.reason}`); } catch { /* logging never affects the verdict */ }
+    } else {
+      const stopperTF: TypedFinding = {
+        requirement: `Sole-source award to ${lock.vendor}`,
+        citation: lock.jaSignal ? "FAR 6.302" : "Sole-source notice (SAM)",
+        excerpt: lock.excerpt,
+        kind: "eligibility_bar",
+        controllability: "bidder_cannot_move",
+        curableInWindow: false,
+        grounded: true,
+        lens: "sole-source-lock#746",
+        severity: "P0",
+      };
+      const stopper: DecidedFinding = { ...stopperTF, disposition: disposeFinding(stopperTF) };
+      const reason = `This is a sole-source award to ${lock.vendor}. If your firm is not ${lock.vendor} `
+        + `(or an authorized distributor at fixed transfer pricing), this is a no-bid — confirm your firm's status before pursuing. `
+        + `Best play for a small sub: pursue as a subcontractor to ${lock.vendor} and set a recompete alert for this requirement. `
+        + `Based on the notice as posted — any pending amendment may alter this.`;
+      return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), reason, dispositions, [stopper], "eligibility");
+    }
+  }
+
   // FORK-2 DEFENSE-IN-DEPTH (adversarial review) — an UNMARKED no_one_can_move finding CLAIMS universal
   // impossibility but is NOT a positively-classified universal defect. It must NEVER silently clear to BID via
   // firmStatus="satisfies" or curableInWindow:true (the retired `universal` bucket was immune to that mis-type).

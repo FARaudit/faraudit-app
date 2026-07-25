@@ -287,4 +287,11 @@ export interface VerdictInputs {
   // row + a lens-miss + set-aside flags OFF produced a clean BID over a pool the offeror may not be in, which is
   // exactly the false-BID class ruling 3 added the set-aside class to close. Absent ⇒ byte-identical.
   samSetAside?: string | null;                                    // raw SAM set-aside code/label (canonicalized in audit-decide)
+  // ④ SOLE-SOURCE LOCK (Brain card #746, flag AUDIT_SOLE_SOURCE_LOCK default-OFF) — the deterministic
+  // detected named-vendor sole-source lock (detectSoleSourceLock over ctx.fullSource). deriveVerdict runs the
+  // over-fire CARVE-OUT pre-gate (soleSourceCarveOut) against it and, if nothing carves it out, routes to a
+  // lock-dominant NHR-CONDITIONAL pole naming the vendor (NOT NO_BID — a sole source is meetable by the named
+  // vendor, not a UNIVERSAL defect; NOT INELIGIBLE — the profile carries no firm-identity operand to prove
+  // firm≠vendor). Absent (flag-OFF orchestrator) ⇒ the sole-source step is skipped ⇒ byte-identical.
+  soleSourceLock?: import("./audit-sole-source-lock").SoleSourceLock;
 }
