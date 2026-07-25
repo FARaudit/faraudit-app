@@ -63,7 +63,7 @@ const CARVE = (title: string, source: string) => {
 };
 CARVE("or-equal", "Sole source to Acme Systems. Brand name or equal; an approved equal meeting the salient characteristics will be accepted.");
 CARVE("intent synopsis 5207", "Notice of intent to sole source to Northrop Grumman Systems under FAR 5.207; interested capable sources may submit a capability statement the Government will consider.");
-CARVE("set-aside pool", "Sole source to Boeing Company noted. This is a 100% total small business set-aside under FAR 52.219-6.");
+CARVE("incidental set-aside (J&A, no directed vendor)", "Justification and approval: the only known source is Acme Systems Inc. This is a 100% total small business set-aside under FAR 52.219-6.");
 
 // ── 4. PRECEDENCE — a real INCOMPLETE WINS over the lock (unread doc could waive it). ─────────────────────
 {

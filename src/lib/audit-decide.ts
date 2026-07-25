@@ -3666,9 +3666,15 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //   INELIGIBLE — that must PROVE firm≠vendor, but BidderProfile carries NO firm-identity operand, so "≠ vendor" is
   //   unevaluable → it would collapse to "any named vendor → kill" (the over-fire). Honest pole: "sole source to
   //   <vendor>; if your firm is not <vendor>, no-bid — confirm", carrying a subcontractor-teaming disposition.
-  //   PLACEMENT: BELOW the proven show-stopper block (a real INELIGIBLE/NO_BID/universal-defect wins) and BELOW the
-  //   INCOMPLETE/CLOSED/temporal caps, which already returned above (an unread binding doc could waive the lock →
-  //   those still win); it CAPS the committal path (would-be BID/BWC → NHR-conditional). The CARVE-OUT pre-gate
+  //   PLACEMENT: BELOW the proven show-stopper block AND below the hoisted documentsComplete=false / CLOSED /
+  //   primaryIndeterminate returns (a real INELIGIBLE/NO_BID/universal-defect, an unread POSTED document, or a
+  //   live-confirmed-closed sol all return ABOVE and still win). It sits ABOVE the committal-exit caps —
+  //   manifestComplete=false (the coreMissing grounding stop, decide.ts ~3803) and temporalIndeterminate (~3792) —
+  //   which it PREEMPTS by design: a title-grounded lock must surface as the NHR headline, not hide behind an
+  //   incomplete-read/currency cap (this is what moves the live T1 run off its INCOMPLETE). Preempting is SAFE
+  //   because the lock already routes to the SAME zero-contract-loss NHR-conditional pole those caps would (never a
+  //   hard NO_BID), and its reason carries the "based on the notice as posted — any pending amendment may alter
+  //   this" caveat. Net: it CAPS the committal path (would-be BID/BWC → NHR-conditional). The CARVE-OUT pre-gate
   //   (soleSourceCarveOut) is the real defense — or-equal · FAR 5.207 intent-synopsis · descriptive-incumbent ·
   //   set-aside-firm-qualifies · firm-is-vendor → biddable → fall through (no false NHR). Flag-OFF / no lock ⇒
   //   skipped ⇒ byte-identical.
