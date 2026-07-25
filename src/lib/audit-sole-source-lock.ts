@@ -68,14 +68,17 @@ const COMPANY_SUFFIX = "(?:Inc|LLC|L\\.L\\.C|Corp|Corporation|Ltd|Co|Company|Ind
 const COMPANY_SUFFIX_RE = new RegExp(`\\b${COMPANY_SUFFIX}\\b`, "i");
 
 // "sole source ... to <VendorName>" — the primary signal (notice title/masthead + prose).
-// The LITERAL "sole source"/"to" parts are case-INSENSITIVE (inline (?i:...) groups) so an
-// ALL-CAPS DoD/DLA masthead ("SOLE SOURCE TO RAYTHEON") matches; the vendor capture stays
-// UPPERCASE-anchored ([A-Z], no /i) so a proper-noun head is required (a /i flag would let
-// [A-Z] match "to be determined" → a false vendor). Multi-token continuation uses [ \t]+
-// (NOT \s+) so the name never crosses a newline into the next sentence; no "." in the token
-// class so a sentence period is not absorbed ("Acme Systems. Brand..." → "Acme Systems").
+// The LITERAL "sole source"/"to" parts are made case-INSENSITIVE with EXPLICIT per-letter
+// character classes ([Ss][Oo]…) — NOT inline (?i:…) flag groups, which parse under tsx/tsc
+// but are REJECTED by the Next.js/webpack production build (ES2025 pattern-modifiers are not
+// supported in that pipeline → "Invalid group" at module load, breaking the build even
+// flag-OFF). This keeps ALL-CAPS DoD/DLA mastheads ("SOLE SOURCE TO RAYTHEON") matching while
+// the vendor capture stays UPPERCASE-anchored ([A-Z], no /i flag) so a proper-noun head is
+// required (a /i flag would let [A-Z] match "to be determined" → a false vendor). Multi-token
+// continuation uses [ \t]+ (NOT \s+) so the name never crosses a newline into the next
+// sentence; no "." in the token class so a sentence period is not absorbed.
 const SOLE_SOURCE_TO_RE =
-  /\b(?i:sole[-\s]?source)\b[^.\n]{0,25}?\b(?i:to)[ \t]+([A-Z][A-Za-z0-9&'’\-]*(?:[ \t]+(?:[A-Z][A-Za-z0-9&'’\-]*|and|of|&|de|la)){0,4})/g;
+  /\b[Ss][Oo][Ll][Ee][-\s]?[Ss][Oo][Uu][Rr][Cc][Ee]\b[^.\n]{0,25}?\b[Tt][Oo][ \t]+([A-Z][A-Za-z0-9&'’\-]*(?:[ \t]+(?:[A-Z][A-Za-z0-9&'’\-]*|and|of|&|de|la)){0,4})/g;
 
 // Classic J&A / FAR 6.302 / only-known-source structural signal (the OTHER trigger).
 const JA_SIGNAL_RE =
