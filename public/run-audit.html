@@ -343,6 +343,14 @@ details[open]>summary .chev{transform:rotate(180deg)}
 .rac.is-proceed{--v:#1f8a5b;--vt:#e7f4ed;--vl:#bfe3cf;--vi:#15623f}
 .rac.is-caution{--v:#c2861a;--vt:#fbf1dc;--vl:#ecd5a3;--vi:#8a5d11}
 .rac.is-nobid{--v:#c0352b;--vt:#fbeae8;--vl:#eec4bf;--vi:#9a261d}
+/* F2-LIVE (ARC #747) — the non-committal poles. Graphite bodies: red asserts a decline the engine did not
+   issue, amber asserts a caution it did not issue. Tokens taken from Design card #663 R2 so the parked row
+   rebuild inherits the same register rather than re-deciding it. */
+.rac.is-review{--v:#64748b;--vt:#f1f5f9;--vl:#dbe2ea;--vi:#475569}
+.rac.is-review::before{background:#c2861a}                      /* graphite body, one warm rail — referred, not judged */
+.rac.is-incomplete{--v:#64748b;--vt:#fafcfe;--vl:#cbd5e1;--vi:#475569}
+.rac.is-incomplete::before{background:none;border-left:3px dashed #94a3b8;width:0}  /* dashed = unfinished, not merely referred */
+.rac.is-unresolved{--v:#64748b;--vt:#f1f5f9;--vl:#dbe2ea;--vi:#475569}
 .rac-badge{width:54px;height:54px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;line-height:1;background:var(--v)}
 .rac-score{font-family:"IBM Plex Mono",monospace;font-size:22px;font-weight:700}
 .rac-of{font-family:"IBM Plex Mono",monospace;font-size:8px;font-weight:600;opacity:.85;margin-top:3px}
@@ -1228,16 +1236,55 @@ var __fdPartialNoticeId=null;
     if(days===0)return{cls:'due',txt:'Due today'};
     return{cls:'closed',txt:'Closed'};
   }
-  function verdictOf(a){var ev=String(a.exec_verdict||'').toUpperCase().replace(/[\s_]+/g,'-');
-    if(ev==='NO-BID'||ev==='NOBID')return{cls:'is-nobid',label:'NO-BID'};if(ev==='CAUTION')return{cls:'is-caution',label:'CAUTION'};if(ev==='PROCEED'||ev==='GO'||ev==='BID')return{cls:'is-proceed',label:'PROCEED'};
-    var rec=String(a.recommendation||'').toUpperCase();if(rec==='DECLINE')return{cls:'is-nobid',label:'NO-BID'};if(rec==='PROCEED')return{cls:'is-proceed',label:'PROCEED'};if(rec.indexOf('CAUTION')!==-1)return{cls:'is-caution',label:'CAUTION'};
-    var s=(typeof a.score==='number')?a.score:(typeof a.compliance_score==='number')?a.compliance_score:null;if(s!=null){if(s>=70)return{cls:'is-proceed',label:'PROCEED'};if(s<40)return{cls:'is-nobid',label:'NO-BID'};}return{cls:'is-caution',label:'CAUTION'};}
+  // ── VERDICT POLE → ROW (F2-LIVE, ARC #747) ───────────────────────────────────────────────────────
+  // The engine issues SIX poles (audit-decide.ts: BID | BID_WITH_CAUTION | NO_BID | INELIGIBLE |
+  // NEEDS_HUMAN_REVIEW | INCOMPLETE). This list used to map THREE and end on a terminal
+  // `return {label:'CAUTION'}`, so INELIGIBLE / NEEDS_HUMAN_REVIEW / INCOMPLETE were all painted — and
+  // LABELLED — "CAUTION": the surface asserting a decision the engine never issued. Measured before the
+  // fix: 54 of 101 recent audits carried a pole the map could not represent, and every one rendered
+  // CAUTION. That is the dominant case, not an edge case.
+  //
+  // Rules (Design card #663 R2, and the ARC #747 class rule):
+  //  · v3_verdict is the AUTHORITATIVE pole and is read FIRST. The legacy vocabularies are consulted only
+  //    for rows that predate it (v3_verdict absent), never as an override.
+  //  · Red is reserved for COMMITTAL declines. NEEDS_HUMAN_REVIEW / INCOMPLETE never take verdict-red —
+  //    red would assert a decline the engine did not issue.
+  //  · NOTHING falls back to a sibling value or to the most convenient label. An unresolvable row renders
+  //    an honest "UNRESOLVED" in the neutral register — never amber, never a guess.
+  //  · The retired score-band guess (>=70 PROCEED / <40 NO-BID) is DELETED. A score is not a verdict.
+  var POLE_ROW = {
+    BID:                { cls: 'is-proceed',    label: 'BID' },
+    BID_WITH_CAUTION:   { cls: 'is-caution',    label: 'BID · CAUTION' },
+    NO_BID:             { cls: 'is-nobid',      label: 'NO-BID' },
+    INELIGIBLE:         { cls: 'is-nobid',      label: 'INELIGIBLE' },   // shares the decline register, distinct word (CEO ruling, Q2)
+    NEEDS_HUMAN_REVIEW: { cls: 'is-review',     label: 'NEEDS REVIEW' }, // graphite body, amber rail — no verdict
+    INCOMPLETE:         { cls: 'is-incomplete', label: 'INCOMPLETE' },   // graphite, dashed rail — unfinished, not merely referred
+    OUT_OF_SCOPE:       { cls: 'is-unresolved', label: 'OUT OF SCOPE' }
+  };
+  function verdictOf(a){
+    var pole=String(a.v3_verdict||'').toUpperCase().replace(/[\s-]+/g,'_');
+    if(POLE_ROW[pole])return POLE_ROW[pole];
+    // Legacy rows only (no v3 pole recorded). These vocabularies ARE engine-computed for their era, so
+    // mapping them is faithful; guessing past them is not.
+    if(pole)return{cls:'is-unresolved',label:'UNRESOLVED'};  // a pole we do not recognise — say so, never inherit amber
+    var ev=String(a.exec_verdict||'').toUpperCase().replace(/[\s_]+/g,'-');
+    if(ev==='NO-BID'||ev==='NOBID')return{cls:'is-nobid',label:'NO-BID'};
+    if(ev==='CAUTION')return{cls:'is-caution',label:'CAUTION'};
+    if(ev==='PROCEED'||ev==='GO'||ev==='BID')return{cls:'is-proceed',label:'BID'};
+    var rec=String(a.recommendation||'').toUpperCase();
+    if(rec==='DECLINE')return{cls:'is-nobid',label:'NO-BID'};
+    if(rec==='PROCEED')return{cls:'is-proceed',label:'BID'};
+    if(rec.indexOf('CAUTION')!==-1)return{cls:'is-caution',label:'BID · CAUTION'};
+    return{cls:'is-unresolved',label:'UNRESOLVED'};
+  }
   function insightOf(a){var s='';if(a.insight)s=String(a.insight).trim();if(!s){var w=String(a.exec_what||'').trim();if(w){var p=w.split(' — ');if(p.length>1)s=p.slice(1).join(' — ').trim();}}if(!s){s=String(a.exec_factors||'').split(',')[0].trim().replace(/\s*\([^)]*\)\s*$/,'').trim();}if(!s)return '';s=s.charAt(0).toUpperCase()+s.slice(1);return s.length>90?s.slice(0,89).replace(/\s+$/,'')+'…':s;}
   function cell(a){var v=verdictOf(a);var sol=String(a.solicitation_number||a.notice_id||a.title||'').trim();var slug=a.id?String(a.id):encodeURIComponent(sol.toLowerCase());
     var score=(typeof a.score==='number')?a.score:(typeof a.compliance_score==='number')?a.compliance_score:null;
     var office=String(a.office_display||a.agency||'').trim();var when=a.ago||ago(a.completed_at||a.created_at);
     var title=String(a.title||'').trim();if(title.toLowerCase()==='untitled solicitation')title='';var titleLine=(title&&title.toUpperCase()!==sol.toUpperCase())?title.slice(0,80):sol;
-    var ins=insightOf(a)||v.label;
+    // F2-LIVE: the reason line must NEVER fall back to the pole word — that printed the same invented
+    // verdict twice in one row and dressed a label up as an engine-derived insight (Design calls it F6).
+    var ins=insightOf(a);
     var badge=(score!=null)?'<span class="rac-score">'+escapeHtml(String(score))+'</span><span class="rac-of">/ 100</span>':'<span class="rac-score">—</span>';
     var dl=dueIn(a,v.label);
     return '<a class="rac '+v.cls+'" href="/audit/'+slug+'"><div class="rac-badge">'+badge+'</div><div class="rac-main"><div class="rac-title">'+escapeHtml(titleLine)+'</div><div class="rac-sub">'+(office?'<span class="rac-office">'+escapeHtml(office)+'</span>':'')+'<span class="rac-insight"><span class="rac-spark"></span>'+escapeHtml(ins)+'</span></div></div><div class="rac-dl"><span class="lbl">Due in</span><span class="val '+dl.cls+'">'+escapeHtml(dl.txt)+'</span></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>'+escapeHtml(v.label)+'</span><span class="rac-ago">'+escapeHtml(when)+'</span><span class="rac-chev">→</span></div></a>';}
