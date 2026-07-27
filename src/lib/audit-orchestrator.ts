@@ -131,6 +131,21 @@ export interface OrchestratorInput {
   // Fires ONLY on required sections the deterministic pass did not locate; a verified locate augments ctx.sections
   // BEFORE the experts run so both the analysis AND the completeness proof see the located §L/§M.
   sectionFinder?: SectionFinderCall;
+  // CITATION-FIDELITY CORPUS (review round 4, finding #1) — the text a printed regulation citation is checked
+  // AGAINST, supplied explicitly instead of read off ctx. It exists because `ctx.groundingSource` is NOT set on
+  // the production path: `auditPackage` receives `input.groundingSource` and then builds its ctx without it
+  // (audit-package.ts:198), while `runJudgmentFirstAudit` does forward it (:294). So the gate was reading
+  // `ctx.groundingSource ?? ctx.fullSource` and ALWAYS landing on fullSource, while the executor's fold gate a
+  // layer up used the real pre-compression text — two gates, two corpora, and a comment in the executor
+  // asserting they matched. Under AUDIT_LOSSLESS_INGEST (live=true) an over-budget package's fullSource is a
+  // binding-filtered SUBSET, so a citation genuinely in the solicitation could be withheld from the customer
+  // report: the module's own stated worst failure.
+  //
+  // DELIBERATELY NOT FIXED BY PUTTING groundingSource BACK ON ctx. That would also redirect `isGrounded`
+  // (audit-expert.ts:36) and the E1 head-re-grounding pass, changing what counts as grounded on the VERDICT
+  // path — a TIER V change that does not belong in a display-only citation gate. The narrow seam keeps this
+  // fix inside the display layer; the ctx-level gap is filed as its own unit.
+  citationSource?: string;
   // JUDGMENT-FIRST SEAM (Brain cards 276/279) — opt-in. When the holistic proposer supplies pre-found findings,
   // the orchestrator SKIPS the paid expert lenses (P1) and runs the FULL deterministic rail (P1.5→P5: sweep,
   // temporal, dedup, verify, completeness, every re-typing guard, deriveVerdict) over this seed instead. The seed
@@ -2930,7 +2945,11 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // report and the one that carries the verdict, rendering the citation the gate just refused everywhere
   // else. `decision.dispositions` is deliberately NOT gated: it is not persisted or rendered, and it is the
   // record of what the engine decided on — the analysis side of the same display/analysis split.
-  const citeSource = ctx.groundingSource ?? ctx.fullSource;
+  // See `citationSource` on the opts interface: ctx.groundingSource is undefined on the production path, so
+  // the old `ctx.groundingSource ?? ctx.fullSource` silently judged against the possibly-filtered digest while
+  // the executor's fold gate judged against the complete text. The explicit option is what makes the two
+  // agree; the ctx fallbacks stay as the last resort for callers that do set them (runJudgmentFirstAudit).
+  const citeSource = opts.citationSource ?? ctx.groundingSource ?? ctx.fullSource;
   const citeGate = gateFindingCitations(findings, citeSource);
   const stopperGate = gateFindingCitations(decision.showStoppers, citeSource);
   // THE HEADLINE, which the first cut of this gate missed entirely. `decision.reason` is composed by
@@ -2942,7 +2961,20 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   const reasonGate = citationFidelityEnabled()
     ? gateCitationsInText(decision.reason ?? "", citeSource, "reason")
     : { text: decision.reason ?? "", withheld: [] as typeof citeGate.withheld };
-  const withheldAll = [...citeGate.withheld, ...stopperGate.withheld, ...reasonGate.withheld];
+  // DISTINCT WITHHOLDINGS, not one per surface (review round 4, finding #4). `decision.showStoppers` are
+  // COPIES of the finding objects — `dispositions` is `deciding.map(f => ({...f, disposition}))` and
+  // show-stoppers are filtered from those — so gating `findings` and `showStoppers` rewrites the SAME rejected
+  // token twice, three times when it also reaches `decision.reason`. The ledger is meant to be a record of
+  // what was refused, so a token appears once; the console count was overstating withholdings by the number
+  // of surfaces the finding happened to reach.
+  const seenWithheld = new Set<string>();
+  const withheldAll = [...citeGate.withheld, ...stopperGate.withheld, ...reasonGate.withheld]
+    .filter((w) => {
+      const k = `${w.corpus}|${w.number}|${w.raw}|${w.field ?? ""}`;
+      if (seenWithheld.has(k)) return false;
+      seenWithheld.add(k);
+      return true;
+    });
   if (withheldAll.length) {
     console.warn(`[orchestrator] citation-fidelity: withheld ${withheldAll.length} unresolvable citation(s) across ${citeGate.touched} finding(s) + ${stopperGate.touched} show-stopper(s) — ` +
       withheldAll.map((w) => `${w.raw} (${w.field})`).join("; "));

@@ -53,7 +53,14 @@ export const CORPUS_GRAMMAR: Record<string, RegExp> = {
   FAR:    /^(?:52\.\d{3}-\d{1,3}|(?:[1-9]|[1-4]\d|5[0-3])\.\d{1,4}(?:-\d{1,4})?)$/,
   DFARS:  /^(?:252\.\d{3}-7\d{3}|2(?:0[1-9]|[1-4]\d|5[0-3])\.\d{1,4}(?:-\d{1,4})?)$/,
   AFFARS: /^(?:5352\.\d{3}-\d{4}|53\d{2}\.\d{1,4}(?:-\d{1,4})?)$/,
-  DLAD:   /^(?:5452\.\d{3}-\d{4}|54\d{2}\.\d{1,4}(?:-\d{1,4})?)$/,
+  // DLAD CLAUSES ARE 52.2xx-9xxx, not 5452.xxx-xxxx (review round 4, finding #6). The 5452 prefix is the
+  // DLAD *part* numbering; the CLAUSES DLA actually puts in a solicitation are numbered in the 52.2xx series
+  // with a 9xxx suffix — DLAD 52.211-9000 is a real, common packaging clause. Without this alternative the
+  // gate withheld it with "not a valid DLAD designation" (verified by execution) unless the bare number
+  // happened to appear verbatim in the ingested text. Same class as the FAR 53.301-1442 / DFARS 253.303-1449
+  // miss closed in round 3 — an over-strict grammar in a FAIL-CLOSED gate deleting a true citation — and DLA
+  // is a high-volume source in this corpus, so the exposure is not theoretical.
+  DLAD:   /^(?:52\.2\d{2}-9\d{3}|5452\.\d{3}-\d{4}|54\d{2}\.\d{1,4}(?:-\d{1,4})?)$/,
   VAAR:   /^(?:852\.\d{3}-\d{1,3}|8\d{2}\.\d{1,4}(?:-\d{1,4})?)$/,
   CFR:    /^\d{1,4}\.\d{1,4}(?:-\d{1,3})?$/,
 };
@@ -70,8 +77,27 @@ const CORPUS_WORD = "(?:FAR|DFARS|DFAR|AFFARS|VAAR|DLAD|C\\.?F\\.?R\\.?|U\\.?S\\
 // Dotted forms longest-first so 252.204-7012 is never truncated to 252.204; then the DASH-ONLY form, which
 // is the shape the founding defect took and which an earlier revision of the census could not see at all.
 const NUMBER = "\\d{1,4}\\.\\d{1,4}-\\d{1,4}|\\d{1,4}\\.\\d{1,4}|\\d{2,4}-\\d{1,3}";
-// The connector words are OPTIONAL and consumed into the match so the replacement span stays contiguous.
-const TOKEN_RE = new RegExp(`(${CORPUS_WORD})(\\s+(?:part|subpart|section|clause|table|§)?\\s*)(${NUMBER})(?![-.]?\\d)`, "gi");
+// ONE connector list, used by BOTH the extractor and the source-pairing check (review round 4, finding #3).
+// They must not drift: the extractor decides what gets JUDGED and the pairing check decides what the source
+// is taken to have SAID, so a word missing from either half is a hole. "provision" and "paragraph" were
+// missing from both — and "provision" is the standard FAR/DFARS word for a §L/§K solicitation provision, so
+// this was not a rare shape. Verified by execution before the fix: `extractRegulationTokens("per DFARS
+// provision 215-2")` returned ZERO tokens, meaning the founding defect's exact shape shipped completely
+// ungated whenever the connector happened to be "provision"; and with the SOURCE writing "DFARS provision
+// 252.215-7009", `corporaPairedInSource` returned the empty set, so a report attributing that number to the
+// wrong corpus was judged already-quoted instead of withheld — the body-swap this gate exists to catch.
+// Each initial is spelled both cases because the pattern as a whole is case-SENSITIVE (see below); connectors
+// are ordinary words and legitimately appear capitalized mid-sentence.
+const CONNECTOR = "(?:[Pp]art|[Ss]ubpart|[Ss]ection|[Cc]lause|[Pp]rovision|[Pp]aragraph|[Tt]able|§)";
+// CASE-SENSITIVE ON THE CORPUS WORD — deliberately, and it is the whole fix for finding #2. The pattern ran
+// case-insensitively, so the ENGLISH WORD "far" matched the FAR corpus: "so far 0.5 percent" was rewritten to
+// `so [citation withheld — "0.5" is not a valid FAR designation…] percent`, verified by execution. A word
+// boundary does NOT close this (the "far" in "so far" has boundaries on both sides); requiring the corpus
+// word in caps does, because every corpus here is an acronym that is written in caps in both model output and
+// solicitation text, while the collision is a lowercase English word. The most exposed surface was the
+// executor's newly-gated fold of the model-authored panel rationale, which is free prose, not a citation
+// field. Connectors stay case-insensitive — they are ordinary words and appear capitalized mid-sentence.
+const TOKEN_RE = new RegExp(`(${CORPUS_WORD})(\\s+${CONNECTOR}?\\s*)(${NUMBER})(?![-.]?\\d)`, "g");
 
 export interface RegulationToken {
   /** canonical corpus key ("DFARS"), not the raw spelling */
@@ -133,7 +159,10 @@ export function corporaPairedInSource(num: string, source: string): Set<string> 
   const out = new Set<string>();
   if (!num || !source) return out;
   const esc = num.replace(/[.\-]/g, "\\$&");
-  const re = new RegExp(`(${CORPUS_WORD})[\\s,]*(?:part|subpart|section|clause|table|§)?\\s*${esc}(?![-.]?\\d)`, "gi");
+  // Same connector list and same case discipline as the extractor — see CONNECTOR / TOKEN_RE. Case-sensitive
+  // matters MORE on this side: a false pairing manufactured from the English word "far" would EXONERATE a
+  // fabricated citation, which is the failure direction this gate must never take.
+  const re = new RegExp(`(${CORPUS_WORD})[\\s,]*${CONNECTOR}?\\s*${esc}(?![-.]?\\d)`, "g");
   for (const m of source.matchAll(re)) {
     const key = m[1].replace(/\./g, "").toUpperCase();
     out.add(CORPUS_ALIAS[key] ?? key);
