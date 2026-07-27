@@ -29,85 +29,23 @@ interface NewsArticle {
   aiInsight: string;
 }
 
-const MOCK_ARTICLES: NewsArticle[] = [
-  {
-    title: "Pentagon raises small business award threshold to $50M for FY2026 set-asides",
-    description:
-      "The Department of Defense announced sweeping changes to its small business contracting framework this week, raising the maximum set-aside award threshold from $25M to $50M for NAICS 336413, 332710, and 332721. The shift is expected to accelerate prime contract flow to small-business manufacturers.",
-    url: "https://www.defensenews.com/",
-    urlToImage: null,
-    source: { name: "Defense News" },
-    publishedAt: "2026-05-26T09:00:00Z",
-    aiInsight:
-      "Threshold raise to $50M opens NAICS 336413 prime-contract flow — review your past performance for SB set-aside eligibility.",
-  },
-  {
-    title: "F-35 sustainment IDIQ: AFLCMC issues $500M sources sought to small business primes",
-    description:
-      "The Air Force Life Cycle Management Center has opened a sources-sought window for the next F-35 mission systems ground support equipment IDIQ — a $500M ceiling vehicle with explicit small-business prime openness.",
-    url: "https://breakingdefense.com/",
-    urlToImage: null,
-    source: { name: "Breaking Defense" },
-    publishedAt: "2026-05-24T13:00:00Z",
-    aiInsight:
-      "Sources Sought window is open. RFI response by Friday could shape Section M evaluation criteria.",
-  },
-  {
-    title: "CMMC Phase 2 implementation timeline: DoD confirms Q4 2026 full enforcement",
-    description:
-      "Defense Department officials confirmed that CMMC 2.0 Level 2 certification will be a hard requirement on all FCI/CUI-handling contracts starting Q4 2026, with conditional waivers limited to 90 days.",
-    url: "https://www.janes.com/",
-    urlToImage: null,
-    source: { name: "Janes" },
-    publishedAt: "2026-05-23T11:00:00Z",
-    aiInsight:
-      "Your CMMC L2 cert expires Aug 2026 — renew before Q4 2026 enforcement to avoid contract gaps.",
-  },
-  {
-    title: "Army TACOM machined components IDIQ awarded to small business primes",
-    description:
-      "TACOM's $145M precision machined components IDIQ went to three small business primes this week — a notable shift from the legacy single-prime model dominated by General Dynamics Land Systems.",
-    url: "https://www.defensenews.com/land/",
-    urlToImage: null,
-    source: { name: "Defense News" },
-    publishedAt: "2026-05-22T15:30:00Z",
-    aiInsight:
-      "Set-aside shift to small-business primes signals opportunity for NAICS 332710 manufacturers — track this prime cohort.",
-  },
-  {
-    title: "DLA Aviation spare parts shortage: ramp-up plan for FY27 includes 40% small-business goal",
-    description:
-      "Persistent NSN-level spare parts shortages are pushing DLA Aviation to accelerate its supplier diversification, with an internal target of 40% small business obligations on aircraft parts contracts by FY2027.",
-    url: "https://breakingdefense.com/",
-    urlToImage: null,
-    source: { name: "Breaking Defense" },
-    publishedAt: "2026-05-21T10:15:00Z",
-    aiInsight:
-      "40% small-business obligation goal by FY2027 — accelerate DLA CAGE-code registration if you're targeting 336413.",
-  },
-  {
-    title: "NAVAIR depot maintenance budget rises 14% for FY2026 — boost for aircraft parts primes",
-    description:
-      "NAVAIR's depot-level maintenance budget jumps to $4.8B for FY2026, with explicit allocations toward T-38, F/A-18 sustainment, and H-60 powertrain analytics — all expected to spawn 336413-coded recompetes.",
-    url: "https://www.janes.com/",
-    urlToImage: null,
-    source: { name: "Janes" },
-    publishedAt: "2026-05-20T08:45:00Z",
-    aiInsight:
-      "T-38 / F/A-18 / H-60 sustainment line items spawn 336413 recompetes — monitor SAM.gov for pre-sol activity.",
-  },
-  {
-    title: "Pentagon FY2026 small business goal exceeds 27% target — first time in a decade",
-    description:
-      "DoD exceeded its 23% small business prime contracting goal for the first time since 2016, hitting 27.2% of total obligations — driven largely by manufacturing-NAICS set-asides under the new threshold framework.",
-    url: "https://www.defensenews.com/",
-    urlToImage: null,
-    source: { name: "Defense News" },
-    publishedAt: "2026-05-19T14:20:00Z",
-    aiInsight:
-      "Highest SB obligation share in a decade — federal-wide tailwind for NAICS 336413/332710/332721 small-business primes.",
-  },
-];
+// MOCK_ARTICLES DELETED 2026-07-27 — ARC #747.
+//
+// This route carried seven hand-written "articles" and served them whenever NEWS_API_KEY was unset or the
+// upstream fetch threw. They were not placeholders: they had headlines, bodies, publication dates, and were
+// ATTRIBUTED TO REAL OUTLETS (Defense News, Breaking Defense, Janes) with links to those outlets' homepages.
+// Two carried invented regulatory claims — a small-business set-aside threshold "raised from $25M to $50M"
+// and a CMMC Level 2 hard-enforcement date "confirmed" by DoD officials. A reader had no way to tell them
+// from reporting.
+//
+// Verified before removal: production currently returns LIVE articles, so this was NOT firing in prod — it
+// is a fail-open, not an active leak. That distinction matters and the review that surfaced it overstated
+// the liveness. But a fallback that fabricates attributed journalism the moment a key lapses is the same
+// class as every other defect in this arc: a surface answering when it knows nothing.
+//
+// The failure path now returns an EMPTY list plus the reason. /defense-news already initialises its article
+// list to empty and fills only on success, so an empty feed renders as an absence rather than an error.
+
 
 const LIVE_INSIGHT =
   "Monitor this development — may affect active solicitations in your NAICS codes.";
@@ -115,8 +53,9 @@ const LIVE_INSIGHT =
 const CACHE_HEADER = "s-maxage=900, stale-while-revalidate=600";
 
 function fallback(reason: string) {
+  // Fail CLOSED: no articles, and say why. Never invent journalism.
   return NextResponse.json(
-    { articles: MOCK_ARTICLES, source: "mock", reason },
+    { articles: [] as NewsArticle[], source: "unavailable", reason },
     { headers: { "cache-control": CACHE_HEADER } }
   );
 }

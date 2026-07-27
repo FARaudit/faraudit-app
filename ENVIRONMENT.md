@@ -20,9 +20,15 @@ articles with `urlToImage` for the magazine-style grid.
 - Railway production env vars (if running the Next server outside Vercel)
 - Local `.env.local` for `npm run dev`
 
-**Behavior if missing**: The `/api/news-feed` route falls back to 7
-curated mock articles. The Defense News page still renders, with the
-"Live · NewsAPI" pill replaced by "Mock". No errors.
+**Behavior if missing**: The `/api/news-feed` route returns an EMPTY article
+list plus a `reason`, and the Defense News page renders with no articles. It
+does NOT invent content.
+
+Until 2026-07-27 it fell back to 7 hand-written "articles" attributed to real
+outlets (Defense News, Breaking Defense, Janes), two of which carried invented
+regulatory claims. Those were deleted under ARC #747: a fallback that fabricates
+attributed journalism the moment a key lapses is the same class as a report
+asserting a fact it never computed.
 
 **Cost guardrails**: Route caches for 15 minutes at the edge
 (`s-maxage=900`). Free tier (~100 req/day) is sufficient for the
@@ -33,7 +39,7 @@ becomes a high-traffic page.
 `/api/defense-news` route (RSS + Claude insights, used by `/home`).
 The two news routes coexist:
 - `/api/defense-news` — RSS + Claude + Supabase cache (auth-gated, /home)
-- `/api/news-feed` — NewsAPI.org + mock fallback (public, /defense-news)
+- `/api/news-feed` — NewsAPI.org, fails CLOSED to an empty list (public, /defense-news)
 
 ---
 
