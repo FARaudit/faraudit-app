@@ -78,5 +78,24 @@ const F = (req: string, cite: string, excerpt = SPAN) => ({ req, cite, excerpt }
   assert(src[0].req === "First obligation", "source finding object is not mutated by the merge");
 }
 
+// ── PRE-MERGED INCOMING REQUIREMENTS (red-team, round on PR #293) ────────────────────────────────────
+// The arriving requirement may ALREADY carry several obligations joined by the same " · ": the engine's
+// applyFindingDedup uses that separator, and 7 of 2,060 banked requirements arrive pre-merged. Treating the
+// incoming string as one opaque unit broke both the cap and the dedup. Both reproduced by execution first.
+{
+  const out = dedupeByExcerpt([F("A \u00b7 B", "\u00a71"), F("C \u00b7 D", "\u00a72")]);
+  const facets = out[0].req.split(" \u00b7 ").filter(Boolean);
+  assert(facets.length === 3, "a pre-merged incoming requirement cannot push a row past the cap",
+    `got ${facets.length}: ${out[0].req}`);
+}
+{
+  const out = dedupeByExcerpt([F("A \u00b7 B", "\u00a71"), F("B \u00b7 C", "\u00a72")]);
+  const facets = out[0].req.split(" \u00b7 ").filter(Boolean);
+  const dupes = facets.filter((x, i) => facets.indexOf(x) !== i);
+  assert(dupes.length === 0, "an obligation already on the row is not printed a second time",
+    `duplicated: ${dupes.join(", ")} in ${out[0].req}`);
+  assert(facets.length === 3, "and the genuinely new facet is still added", out[0].req);
+}
+
 console.log(failures === 0 ? "\nPASS — merged rows keep every obligation\n" : `\nFAIL — ${failures}\n`);
 process.exit(failures === 0 ? 0 : 1);
