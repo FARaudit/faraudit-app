@@ -15,6 +15,7 @@
 import { runAgenticExpert, isGrounded, type CallModel, type ExpertSpec } from "./audit-expert";
 import { readSection, sectionFullText, procurementPart, requiresProposalSections, materializeSections, parseDocRegions, resolvePrimary, ATTACHMENT_COVERAGE_ENABLED, type AuditToolContext } from "./audit-tools";
 import { constructionRequired, constructionCoreMissing, constructionCoverage } from "./audit-construction-manifest";
+import { recomputeGrounding } from "./audit-grounding-recompute";
 import { detectSoleSourceLock } from "./audit-sole-source-lock";
 import { runSectionFinder, type SectionFinderCall } from "./audit-section-finder";
 import { isBindingDoc, hasEngineText } from "./sam-attachments";
@@ -2850,6 +2851,24 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // ④ SOLE-SOURCE LOCK (card #746, flag AUDIT_SOLE_SOURCE_LOCK default-OFF) — DETECT the named-vendor lock over the
   // assembled source; deriveVerdict runs the over-fire carve-out pre-gate + routing. Flag-OFF ⇒ null ⇒ byte-identical.
   const soleSourceLock = process.env.AUDIT_SOLE_SOURCE_LOCK === "true" ? detectSoleSourceLock(ctx.fullSource) : null;
+  // ── GROUNDING RECOMPUTE (ARC #747 · CEO option A, flag AUDIT_GROUNDING_RECOMPUTE default-OFF) ─────────
+  // `grounded` is documented as a deterministic check that the excerpt is present in the source. It is not:
+  // it is a hardcoded `true` at 22 emitter sites, and the only real verifier had ONE production caller (the
+  // model path). So every deterministic emitter declared itself grounded, and one of them synthesized the
+  // excerpt it was declaring. Recompute it HERE, once, where the full source is in hand — a computed fact
+  // instead of 22 promises, and one a future emitter cannot bypass by adding a 23rd declaration.
+  // Flag-OFF: measured and logged, nothing mutated ⇒ byte-identical.
+  {
+    const gr = recomputeGrounding(findings, ctx.fullSource, { enabled: process.env.AUDIT_GROUNDING_RECOMPUTE === "true" });
+    findings = gr.findings;
+    if (gr.stats.demoted > 0 || gr.stats.promoted > 0) {
+      try {
+        console.log(`[grounding] declared=${gr.stats.declaredTrue} computed=${gr.stats.computedTrue} ` +
+          `DEMOTED=${gr.stats.demoted} promoted=${gr.stats.promoted} noExcerpt=${gr.stats.noExcerpt} ` +
+          `applied=${process.env.AUDIT_GROUNDING_RECOMPUTE === "true"} byLens=${JSON.stringify(gr.stats.demotedLenses)}`);
+      } catch { /* logging never affects the verdict */ }
+    }
+  }
   const inputs: VerdictInputs = { findings, bidderProfile, samSetAside: opts.setAside ?? null, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(opts.dispositiveCompletenessForEligibility !== undefined ? { dispositiveCompletenessForEligibility: opts.dispositiveCompletenessForEligibility } : {}), ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(process.env.AUDIT_SITEVISIT_SEVERITY_FLOOR === "true" ? { siteVisitSeverityFloor: true } : {}), ...(coverageV2 ? { coverageV2 } : {}), ...(soleSourceLock ? { soleSourceLock } : {}), ...(opts.temporal ? { temporalSnapshot: opts.temporal.snapshot, liveSam: opts.temporal.liveSam, ingestedAmendmentComplete: opts.temporal.ingestedAmendmentComplete, today: opts.temporal.today, nowIso: opts.temporal.nowIso ?? null } : {}) };
   // Phase-1 SHADOW (cards #596/#597) — compute the positive-shape pole BESIDE the real verdict and bank it. VERDICT-INERT:
   // the shadow is never routed on; the live deriveVerdict below is untouched. Gated on AUDIT_POSITIVE_VERDICT_POLE (default-
