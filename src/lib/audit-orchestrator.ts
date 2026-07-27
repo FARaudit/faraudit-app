@@ -655,7 +655,12 @@ function groundedBy(obligation: string, findings: TypedFinding[], sec: string, s
     const sectionOk = fSec === sec
       || (fSec === null && (f.citation || "").trim().length > 0 && !!sectionNText && !!ex && sectionNText.includes(ex));
     if (!sectionOk) continue;
-    if (passesSubstantiveBar(obligation, vToks, f.excerpt || "")) ids.push(f.id);
+    // ANALYZED span, not the displayed one. `passesSubstantiveBar` tokenises the excerpt and asks whether it
+    // COVERS the obligation's tokens, so widening only ever adds tokens and can only make an obligation
+    // easier to claim — the dangerous direction. Its sibling at the legacy path above was converted in the
+    // first E1 pass and this one was missed: two lines apart, the same finding was answering "did the
+    // analysis examine this?" with two different spans.
+    if (passesSubstantiveBar(obligation, vToks, analyzedExcerptOf(f) || "")) ids.push(f.id);
   }
   return [...new Set(ids)];
 }
@@ -1575,7 +1580,10 @@ export function findingProvenance(fullSource: string, findings: TypedFinding[]):
   const out: Array<{ id: string; doc: string; excerpt: string }> = [];
   for (const f of findings) {
     if (!f.id || !f.excerpt) continue;
-    const ex = norm(f.excerpt);
+    // Attribution asks which DOCUMENT the analysis read, so it matches on the analyzed span. The displayed
+    // excerpt is re-grounded against `groundingSource`, which on a compressed-digest run is not the text
+    // these regions are built from — matching it here returns "(ungrounded)" for a finding that is grounded.
+    const ex = norm(analyzedExcerptOf(f));
     out.push({ id: f.id, doc: regions.find((r) => r.n.includes(ex))?.name ?? "(ungrounded)", excerpt: f.excerpt });
   }
   return out;
@@ -1953,13 +1961,23 @@ export function completenessOf(ctx: AuditToolContext, required: string[], findin
     // Which documents carry a GROUNDED finding — an element is analyzed if a finding lands in the doc that carries it
     // (findingProvenance maps each finding's excerpt to its assembled-doc region; "(ungrounded)" excluded).
     const analyzedDocs = new Set(findingProvenance(ctx.fullSource, findings).map((p) => p.doc).filter((d) => d && d !== "(ungrounded)"));
-    const cov = constructionCoverage(ctx.constructionManifest, ctx.fullSource, findings.map((f) => f.excerpt || ""), analyzedDocs);
+    // THE HAYSTACK DIRECTION — the one place widening can manufacture coverage rather than lose it.
+    // constructionCoverage does `nExcerpts.some((ex) => ex.includes(nAnchor))` (audit-construction-manifest.ts:227):
+    // the excerpt is the HAYSTACK and the manifest element's anchor is the needle. Everywhere else in this
+    // file the excerpt is the needle, where a longer span can only be harder to match. Here a head widened
+    // backward across an extractor wrap that carries a NEIGHBOURING element's anchor — a Davis-Bacon WD
+    // header, a CSI code — marks that element ANALYZED, and the part-36 completeness proof returns COMPLETE
+    // for an element no finding examined.
+    const cov = constructionCoverage(ctx.constructionManifest, ctx.fullSource, findings.map((f) => analyzedExcerptOf(f) || ""), analyzedDocs);
     for (const e of ctx.constructionManifest.elements) {
       if (!e.present) continue;
       const covered = cov.covered.includes(e.key);
       const dropped = cov.droppedByCompressor.includes(e.key);
       // Provenance backstop (adversarial review): a covered element cites the findings whose excerpt carries its anchor.
-      const cited = covered && e.anchor ? findings.filter((f) => f.id && nrm(f.excerpt || "").includes(nrm(e.anchor!))).map((f) => f.id!) : [];
+      // Same haystack direction as the line above, and worse in consequence: this one CITES the finding's id
+      // as the provenance backstop, so a swallowed neighbouring anchor does not just certify the element —
+      // it names a finding as the proof for text that finding never analyzed.
+      const cited = covered && e.anchor ? findings.filter((f) => f.id && nrm(analyzedExcerptOf(f) || "").includes(nrm(e.anchor!))).map((f) => f.id!) : [];
       attestations.push({
         section: e.key,
         status: covered ? "covered_direct" : "obligations_ungrounded",
@@ -1984,7 +2002,11 @@ export function completenessOf(ctx: AuditToolContext, required: string[], findin
     // S7 (Brain card 274) — a section is covered_direct ONLY by a finding CITED TO THAT SAME SECTION whose excerpt is
     // in the section text. Without the findingSection guard, a §B-cited finding whose sentence coincidentally appears
     // in §H/§M text falsely certified §H/§M covered → false-COMPLETE. Same guard the covered_attested path uses (groundedBy).
-    const direct = findings.filter((f) => f.excerpt && findingSection(f) === sec && nText.includes(norm(f.excerpt)));
+    // Needle direction (safe — a longer span can only fail to match), but still the wrong question: this asks
+    // whether the ANALYSIS covered the section. The head pass grounds against `groundingSource`, while
+    // `nText` comes from ctx.sections/fullSource; on a compressed-digest run the widened span is verbatim in
+    // the former and absent from the latter, so covered_direct is LOST and the run goes false INCOMPLETE.
+    const direct = findings.filter((f) => f.excerpt && findingSection(f) === sec && nText.includes(norm(analyzedExcerptOf(f))));
     // PHASE 4 (Brain, flag AUDIT_COVERED_DIRECT_BAR_FLOOR) — COVERED_DIRECT HARD-BAR FLOOR. Before the covered_direct
     // blanket short-circuit (below) OR the read_no_obligation valve can certify a non-per-obligation binding section
     // ({B,C,D,E,F,H}) covered, refuse if the section carries an UNGROUNDED (non-self-cert-demotable) eligibility bar

@@ -30,6 +30,12 @@ export interface FindingLite {
   requirement: string;
   citation: string;
   excerpt?: string;
+  // ARC #747 · E1 — the span the ANALYSIS examined, when head re-grounding widened `excerpt` for the reader.
+  // Carried because the render layer keys DEDUP IDENTITY off the excerpt head, and identity is an analysis
+  // question: without this the payload cannot distinguish "same obligation" from "same quote after widening",
+  // and a collision drops a real obligation from the report. OMITTED when absent ⇒ no backfill, flag-OFF
+  // payload byte-identical.
+  excerptPreReground?: string;
   note?: string;              // Step 10 (gate-framing) — short plain-language note under the requirement (Design contract). Absent today ⇒ flag-OFF byte-identical.
   disposition: "disqualifying" | "gate_to_clear" | "met" | "dropped";
   // Carried through for Tier-2 (persist-only today — NOT rendered by the memo):
@@ -148,6 +154,7 @@ type RawLiteInput = {
   kind?: string; controllability?: string;
   severity?: "P0" | "P1" | "P2"; requiredAttribute?: string; curableInWindow?: boolean;
   temporalEvidence?: { gateDays: number | null; windowDays: number | null; gateExceedsWindow: boolean };
+  excerptPreReground?: string;   // ARC #747 E1 — set only when head re-grounding widened `excerpt`
 };
 const lite = (f: RawLiteInput): FindingLite => ({
   requirement: f.requirement,
@@ -162,6 +169,7 @@ const lite = (f: RawLiteInput): FindingLite => ({
   ...(f.requiredAttribute != null ? { requiredAttribute: f.requiredAttribute } : {}),
   ...(f.curableInWindow != null ? { curableInWindow: f.curableInWindow } : {}),
   ...(f.temporalEvidence != null ? { temporalEvidence: f.temporalEvidence } : {}), // card 243: carry the parsed temporal arithmetic when present; omit otherwise (no backfill)
+  ...(f.excerptPreReground != null ? { excerptPreReground: f.excerptPreReground } : {}), // ARC #747 E1: analyzed span for dedup identity; omitted when the head pass did not widen this excerpt
 });
 
 // ── verdict → presentation contract (the moat lives here; ported from Design) ──

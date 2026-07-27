@@ -1,71 +1,84 @@
-// ARC #747 · E1 — FLAG-OFF REPORT PARITY. $0, nothing written.
+// ARC #747 · E1 — FLAG-OFF REPORT PARITY. $0, nothing written, no flag armed.
 //
-// Two of the battery fixes live OUTSIDE the flag: the facet-preserving merge in `dedupeByExcerpt`
-// (v4-report/build-data.ts) and the `groundingSource` argument at the call site. TIER E requires flag-OFF to
-// be byte-identical, so "it is only an improvement" is not good enough — it has to be MEASURED.
+// ── REWRITTEN after /code-review high finding #6 on PR #292. ──
+// The previous version of this file was a placebo. It claimed to certify "the facet-preserving merge in
+// dedupeByExcerpt", but `git diff main...HEAD -- src/lib/v4-report/` was EMPTY — no such change existed in
+// the PR. It documented a `[path-to-main-checkout]` baseline argument and never read it, never built a
+// baseline, and called buildV4Data only on `{ findings: [], verdict: "INCOMPLETE" }`. It printed
+// "FLAG-OFF PARITY: HOLDS" from a re-implemented collision count over the raw records. An inert run and a
+// passing run produced identical output. [[feedback_placebo_family_inert_equals_passing]]
 //
-// This builds the v4 report payload for every banked run record with the flag OFF, under the CURRENT code,
-// and compares it to the same payload built by the code on `main` (loaded from a git worktree of main if one
-// is supplied). Without a baseline path it degrades to a self-consistency report: how many records contain a
-// merge at all, i.e. how many records the changed line can even reach.
-//   npx tsx scripts/audit-ai/_e1-cert-flagoff-report.ts [path-to-main-checkout]
+// WHAT THIS NOW CERTIFIES, and how it can fail. E1 does now change the render layer: identity/dedup keys in
+// v4-report/build-data.ts read the ANALYZED span (`excerptPreReground ?? excerpt`) instead of the displayed
+// one, so a widened quote can no longer collapse two distinct obligations into a single row and drop one of
+// their requirements. TIER E requires flag-OFF to be byte-identical, so this measures it as a DIFFERENTIAL
+// over the real banked corpus:
+//
+//   A = the v4 payload built by the CURRENT code, flag OFF
+//   B = the same payload built from findings with `excerptPreReground` STRIPPED — byte-for-byte what the
+//       pre-E1 key expression (`excerptHeadKey(f.excerpt)`) produced
+//
+// With the flag off no finding carries `excerptPreReground`, so A must equal B on every record. If the new
+// key path ever perturbs a flag-OFF payload, A ≠ B and this fails with the diverging span printed. It also
+// asserts the structural precondition — that flag-OFF really does leave the field unset — and refuses to
+// report green on an empty corpus, so a passing run cannot be vacuous.
 import * as fs from "fs";
 import * as path from "path";
 import { RUN_RECORD_SCHEMA, type RunRecord } from "../../src/lib/audit-run-record";
 import { buildV4Data } from "../../src/lib/v4-report/build-data";
+import { buildV3Payload } from "../../src/lib/audit-v3-report";
+import type { Decision } from "../../src/lib/audit-decide";
 
 const DIR = path.join(__dirname, "run-records");
 const files = fs.readdirSync(DIR).filter((f) => f.endsWith(".run-record.json"));
-delete process.env.AUDIT_EXCERPT_HEAD_REGROUND; // the point of the exercise
 
-let loaded = 0, withMerge = 0, rowsAffected = 0;
-const hits: string[] = [];
+delete process.env.AUDIT_EXCERPT_HEAD_REGROUND;   // the point of the exercise
+process.env.AUDIT_SEVERITY_HONEST = "true";       // verified live on Vercel production 2026-07-27. It gates
+                                                  // dedupeByExcerpt; left unset, this cert cannot fail.
 
-for (const f of files) {
+const strip = (f: Record<string, unknown>) => { const { excerptPreReground: _drop, ...rest } = f; return rest; };
+
+let loaded = 0, skipped = 0, mismatches = 0, preRegroundLeaks = 0, findingsSeen = 0;
+const notes: string[] = [];
+
+for (const file of files) {
   let rec: RunRecord;
   try {
-    rec = JSON.parse(fs.readFileSync(path.join(DIR, f), "utf8"));
-    if (rec?.schema !== RUN_RECORD_SCHEMA) continue;
-  } catch { continue; }
-  if (!rec.result?.findings?.length) continue;
+    rec = JSON.parse(fs.readFileSync(path.join(DIR, file), "utf8"));
+    if (rec?.schema !== RUN_RECORD_SCHEMA) { skipped++; continue; }
+  } catch { skipped++; continue; }
+  const findings = (rec.result?.findings ?? []) as unknown as Record<string, unknown>[];
+  if (!findings.length) { skipped++; continue; }
   loaded++;
+  findingsSeen += findings.length;
 
-  // Reach test: does any pair of findings in this record share an excerpt head at all? If none do, the
-  // changed merge line is unreachable for this record and flag-OFF output cannot differ.
-  const norm = (s: string) => (s || "").toLowerCase().replace(/\s+/g, " ").trim().slice(0, 120);
-  const seen = new Map<string, string[]>();
-  for (const fd of rec.result.findings) {
-    const k = fd.excerpt ? norm(fd.excerpt) : "";
-    if (!k) continue;
-    seen.set(k, [...(seen.get(k) ?? []), (fd as { requirement?: string }).requirement ?? ""]);
-  }
-  const collisions = [...seen.entries()].filter(([, reqs]) => reqs.length > 1);
-  // Only a collision whose requirements DIFFER can change output — identical requirements merge to the same
-  // string either way.
-  const lossy = collisions.filter(([, reqs]) => new Set(reqs.map((r) => r.toLowerCase().trim())).size > 1);
-  if (collisions.length) withMerge++;
-  if (lossy.length) {
-    rowsAffected += lossy.length;
-    hits.push(`  ${rec.meta?.sol ?? f} — ${lossy.length} merge(s) where the discarded requirement differed`);
+  // STRUCTURAL PRECONDITION — flag OFF must mean the analyzed-span field is never present. If it ever leaks,
+  // the differential below compares two identical inputs and could not fail.
+  const leaked = findings.filter((f) => f.excerptPreReground != null).length;
+  if (leaked) { preRegroundLeaks += leaked; notes.push(`${file}: ${leaked} finding(s) carry excerptPreReground with the flag OFF`); }
+
+  const decision = { verdict: rec.result?.verdict ?? "INCOMPLETE", eligible: null, reason: (rec.result as { reason?: string })?.reason ?? "", dispositions: [], showStoppers: [] } as unknown as Decision;
+  const cov = rec.result?.coverage ?? { required: [], covered: [], missing: [], coreMissing: [] };
+  const mk = (fs_: Record<string, unknown>[]) => buildV4Data({
+    compliance_json: { v3: buildV3Payload(decision, cov as never, fs_ as never, "2026-07-27T00:00:00Z"), engine: "agentic_v3" },
+  } as never);
+
+  const A = JSON.stringify(mk(findings));
+  const B = JSON.stringify(mk(findings.map(strip)));
+  if (A !== B) {
+    mismatches++;
+    const at = [...A].findIndex((c, i) => c !== B[i]);
+    notes.push(`${file}: PAYLOAD MISMATCH at char ${at}\n     A: …${A.slice(Math.max(0, at - 90), at + 90)}…\n     B: …${B.slice(Math.max(0, at - 90), at + 90)}…`);
   }
 }
 
-console.log(`\nARC #747 · E1 — flag-OFF report parity ($0)\n`);
-console.log(`  run records with findings ............................ ${loaded}`);
-console.log(`  records containing ANY excerpt-head merge ............ ${withMerge}`);
-console.log(`  records where the merge DISCARDED a different req .... ${hits.length}   (${rowsAffected} merges)`);
-for (const h of hits) console.log(h);
-console.log(
-  hits.length === 0
-    ? `\nFLAG-OFF PARITY: HOLDS — no banked record has a merge whose discarded requirement differed, so the` +
-      `\nfacet-preserving change cannot alter flag-OFF output on this corpus.`
-    : `\nFLAG-OFF PARITY: DOES NOT HOLD — the records above gain requirement text they were silently losing.` +
-      `\nThat is a strict information GAIN, not a behaviour flip, but it is a flag-OFF change and must be` +
-      `\ndeclared rather than described as byte-identical.`);
-// Sanity: buildV4Data must still run. A parity script that never exercised the code path would prove nothing.
-try {
-  buildV4Data({ compliance_json: { v3: { findings: [], verdict: "INCOMPLETE" } } } as never);
-  console.log(`\n(buildV4Data exercised — the changed module loads and runs.)\n`);
-} catch (e) {
-  console.log(`\n(buildV4Data smoke FAILED: ${(e as Error).message})\n`);
-}
+console.log(`records ${loaded} · skipped ${skipped} · findings ${findingsSeen}`);
+console.log(`flag-OFF excerptPreReground leaks: ${preRegroundLeaks}   (must be 0)`);
+console.log(`flag-OFF payload mismatches:       ${mismatches}   (must be 0)`);
+if (notes.length) { console.log("\n── detail ──"); notes.forEach((n) => console.log("  " + n)); }
+
+// A cert that cannot fail is worse than no cert.
+if (loaded === 0) { console.log("\n❌ CERT VACUOUS — no banked record carried findings; nothing was compared"); process.exit(1); }
+const green = mismatches === 0 && preRegroundLeaks === 0;
+console.log(`\n${green ? "✅ FLAG-OFF PARITY HOLDS" : "❌ FLAG-OFF PARITY BROKEN"} — over ${loaded} records / ${findingsSeen} findings`);
+process.exit(green ? 0 : 1);

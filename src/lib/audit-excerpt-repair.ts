@@ -207,12 +207,38 @@ function wrapRegionStart(source: string, lineStart: number, anchor: number): num
     const prev = lineAt(source, regionStart - 1);
     if (!prev.text.trim()) break;                                   // blank line ⇒ paragraph break
     if (isTabularLine(prev.text)) break;                            // never walk into a table or a clause row
+    if (!isProseLine(prev.text)) break;                             // heading, not a wrapped sentence — see below
     const masked = maskGuards(prev.text).replace(/[\s"')\]]+$/, "");
     if (/[.!?;:]$/.test(masked)) break;                             // previous line finished its clause
     if (anchor - prev.start > MAX_HEAD_EXTEND) break;               // too far back to still be one clause
     regionStart = prev.start;
   }
   return regionStart;
+}
+
+/** A line the walk may cross must itself be PROSE. This is the module's existing prose-ness discriminator
+ *  (`headCarriesSomething`) applied at the right granularity — per line crossed, not once to the assembled
+ *  head.
+ *
+ *  That granularity bug is what `/code-review high` found on PR #292, and it was a real false green: an
+ *  ALL-CAPS section heading is >40 chars (so `isTabularLine` passes it), carries no regulation number
+ *  (so `isClauseRowLine` passes it), has no `Label:` prefix, and ends on no terminator — so the walk climbed
+ *  straight through it. The assembled head then contained the LOWER wrap line's lowercase prose, satisfying
+ *  `headCarriesSomething`, while the harm came from the UPPER line. Reproduced:
+ *
+ *    "SECTION K - REPRESENTATIONS AND CERTIFICATIONS, TOTAL SMALL BUSINESS SET-ASIDE"
+ *    + a questions-deadline excerpt two lines below → isPositiveSetAside false → TRUE.
+ *
+ *  Sentences wrap; headings do not. A wrapped continuation always carries running-prose lowercase, so the
+ *  test is a case-distribution shape, not a vocabulary list — no heading words are enumerated.
+ *
+ *  KNOWN RESIDUAL, stated rather than implied: a TITLE-CASE heading ("Section K - Representations and
+ *  Certifications") does carry lowercase words and is still crossable. It is not closed by this rule and
+ *  there is a failing probe for it in the suite. The honest reason it ships anyway: every heading shape
+ *  observed in the real corpus is upper-case, and inventing a title-case rule with no record behind it is
+ *  how the last three shape rules each turned out to be one shape short. */
+function isProseLine(line: string): boolean {
+  return /(?:^|[^A-Za-z])[a-z]{3,}(?:[^A-Za-z]|$)/.test(line.trim());
 }
 
 /** Offset within `head` where the excerpt's own clause begins: just past the last unguarded terminator, or
@@ -292,7 +318,11 @@ function locateHeadClip(source: string, excerpt: string): { clauseStartOrig: num
 
   const sameLineHead = source.slice(anchorLine.start, startOrig);
   if (sameLineHead.trim()) {
-    if (HEAD_ENDS_TERMINATED.test(sameLineHead)) return null;   // prior sentence/clause finished → clean start
+    // MASKED, like every other terminator test in this module. Unmasked, a head ending "…delivered to the
+    // U.S. " or "…see Fig. " reads as a finished sentence and the repair refuses — a false NEGATIVE that
+    // silently shrinks the class this pass exists to catch, and it skewed the 8.3% prevalence figure the
+    // corpus DRY reported. `maskGuards` is length-preserving, so offsets are unaffected.
+    if (HEAD_ENDS_TERMINATED.test(maskGuards(sameLineHead))) return null;   // prior sentence/clause finished → clean start
     if (HEAD_ENDS_ENUMERATOR.test(sameLineHead)) return null;   // "1. " / "(a) " / "• " introducing it → clean
   }
   // A clause-incorporation row opens its own record; the line above it is the previous row's tail.
@@ -360,6 +390,16 @@ export function repairClippedExcerpts(findings: TypedFinding[], source: string):
   if (!source) return res;
   for (const f of findings) {
     if (REPAIR_EXCLUDED_LENSES.has(f.lens)) continue;       // deterministic lenses emit verbatim → out of scope
+    // An already-VERIFIED excerpt is never rewritten — the head pass has guarded this since it shipped, and
+    // its twin did not. J-2 stamps `verifiedBy.excerptHash` at P2; this pass runs at P2.6, AFTER it; and
+    // audit-decide.ts:3001 requires `v.excerptHash === excerptHash(f.excerpt)` before a verified universal
+    // defect may reach NO_BID. Silently improving the quote desyncs that hash and drops a real verified
+    // defect to NEEDS_HUMAN_REVIEW. Pre-existing, but E1 identified the hazard and fixed only one of the two
+    // passes that can trigger it, which is how a known bug survives a review that names it.
+    if ((f as { verifiedBy?: unknown }).verifiedBy) {
+      res.skipped.push({ id: f.id, lens: f.lens, reason: "already verified (J-2 excerptHash) — left as emitted" });
+      continue;
+    }
     if (!isTruncatedExcerpt(f.excerpt)) continue;           // only touch what the gate flags as truncated
     const span = findRepairSpan(source, f.excerpt);
     if (!span) {

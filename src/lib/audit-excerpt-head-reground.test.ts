@@ -8,6 +8,7 @@
 // excerpts from the same record that have preceding text on their line and must NOT be touched.
 export {};
 import { isHeadClippedExcerpt, findHeadRepairSpan, repairHeadClippedExcerpts } from "./audit-excerpt-repair";
+import { isPositiveSetAside } from "./audit-decide";
 import type { TypedFinding } from "./audit-findings";
 
 let failures = 0;
@@ -207,6 +208,41 @@ process.env.AUDIT_EXCERPT_HEAD_REGROUND = "true";
   const second = repairHeadClippedExcerpts(findings, SRC_C1);
   check("flag ON · idempotent (second pass is a no-op)", second.repaired === 0 && findings[0].excerpt === once);
 }
+// ── REGRESSION · /code-review high finding #1 on PR #292 (the FOURTH row shape) ─────────────────────────
+// An ALL-CAPS section heading slips every earlier rule: >40 chars so isTabularLine passes it, no regulation
+// number so isClauseRowLine passes it, no `Label:` prefix, and no terminator. The walk climbed through it and
+// isPositiveSetAside flipped false→true on a questions-deadline finding — the same cross-row harm the battery
+// claimed to have closed, one shape over. The fix is per-line prose-ness in the walk, not a fifth shape rule.
+{
+  const SRC_HEADING =
+    "SECTION K - REPRESENTATIONS AND CERTIFICATIONS, TOTAL SMALL BUSINESS SET-ASIDE\n" +
+    "The Offeror shall submit all questions in writing no later than five\n" +
+    "business days prior to the closing date and time of this solicitation\n";
+  const EX_DEADLINE = "business days prior to the closing date and time of this solicitation";
+  const span = findHeadRepairSpan(SRC_HEADING, EX_DEADLINE);
+  check("an ALL-CAPS heading STOPS the backward walk", !!span && !/SECTION K/.test(span), JSON.stringify(span));
+  check("…while the legitimate prose wrap below it is still followed", !!span && /The Offeror shall submit/.test(span));
+
+  const base = { requirement: "Questions must be submitted in writing no later than five business days prior to closing.", citation: "Section L", kind: "submission_mechanic", controllability: "bidder_controls", grounded: true, lens: "proposal_manager" } as unknown as TypedFinding;
+  check("and isPositiveSetAside does not flip",
+    isPositiveSetAside({ ...base, excerpt: EX_DEADLINE } as TypedFinding) === false &&
+    isPositiveSetAside({ ...base, excerpt: span ?? EX_DEADLINE } as TypedFinding) === false);
+}
+// ── KNOWN GAP, recorded rather than implied ─────────────────────────────────────────────────────────────
+// A TITLE-CASE heading carries lowercase words, so the prose-ness rule does not stop it. This asserts the
+// CURRENT (crossable) behaviour on purpose: writing it as a passing expectation would claim a closure we do
+// not have, and leaving it out would hide a shape we know about. When someone closes it, this flips loudly.
+{
+  const SRC_TITLE =
+    "Section K - Representations and Certifications, Total Small Business Set-Aside\n" +
+    "The Offeror shall submit all questions in writing no later than five\n" +
+    "business days prior to the closing date and time of this solicitation\n";
+  const span = findHeadRepairSpan(SRC_TITLE, "business days prior to the closing date and time of this solicitation");
+  const stillCrosses = !!span && /Section K/.test(span);
+  check("KNOWN GAP · a title-case heading is still crossed (documented, not fixed)", stillCrosses,
+    stillCrosses ? "" : "the gap appears CLOSED — update audit-excerpt-repair.ts:isProseLine's residual note and this test");
+}
+
 delete process.env.AUDIT_EXCERPT_HEAD_REGROUND;
 
 console.log(failures === 0 ? "\nPASS — head-side re-grounding\n" : `\nFAIL — ${failures}\n`);
