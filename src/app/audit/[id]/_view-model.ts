@@ -1457,7 +1457,26 @@ const VM_SPRS_CLAUSE_RE = /252\.204-7019|252\.204-7020|252\.204-7012/;
 const VM_JCP_RE        = /\bJCP\b|JCP[-\s]?(?:certified|cert|certification)|Joint\s+Certification\s+Program|DD\s*Form\s*2345|militarily\s+critical\s+technical\s+data|noncommercial\s+technical\s+data|252\.227-7025/i;
 const VM_FAA145_RE     = /FAA\s*Part\s*145|14\s*CFR\s*145|FAA[-\s]?approved\s+repair\s+station|repair\s+station\s+rating/i;
 const VM_TEST_JIG_RE   = /test\s*jig|specialized\s+test\s+equipment|government[-\s]furnished\s+test|special\s+test\s+equipment/i;
-const VM_AFTO_RE       = /\bAFTO\b|Air\s*Force\s*Technical\s*Order|TO\s+\d+[A-Z]?\d*-[\d-]+/i;
+// ARC #747 — NARROWED 2026-07-27. The prior pattern was
+//   /\bAFTO\b|Air\s*Force\s*Technical\s*Order|TO\s+\d+[A-Z]?\d*-[\d-]+/i
+// and its third alternative had no case constraint and no shape constraint on the designator, so the English
+// preposition "to" followed by any number range matched. Reproduced by execution before changing anything:
+//   "Deliver within 30 to 45-60 days after receipt of order."   → FIRED
+//   "CLIN 0002 quantities apply to 100-200 units."              → FIRED
+//   "Ship to 700-1200 lbs pallets."                             → FIRED
+// Each produced a gate telling the customer that access to controlled Air Force technical data was required
+// and could not be cured in the response window — off a delivery range. This is the live copy; the identical
+// dead copy in audit-engine.ts was deleted under ruling R4.
+//
+// Split into two tests because the constraint differs by alternative:
+//   · AFTO / "Air Force Technical Order" stay case-INSENSITIVE — they are unambiguous however they are cased.
+//   · The bare "TO <designator>" form is case-SENSITIVE (a Technical Order citation is written uppercase) AND
+//     must look like a TO designator: a leading numeric group carrying a LETTER (TO 1F-16C-2-70JG-00-1) or at
+//     least three hyphen-separated numeric groups (TO 00-20-1). A two-group range like "45-60" no longer
+//     qualifies, which is the shape — not the vocabulary — that separates a citation from a quantity.
+const VM_AFTO_NAMED_RE = /\bAFTO\b|Air\s*Force\s*Technical\s*Order/i;
+const VM_AFTO_TONUM_RE = /\bT\.?O\.?\s+\d+[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+|\bT\.?O\.?\s+\d+-\d+-\d+/;
+const VM_AFTO_RE       = { test: (s: string) => VM_AFTO_NAMED_RE.test(s) || VM_AFTO_TONUM_RE.test(s) };
 
 // FA-146 provenance taxonomy (2026-06-12, CEO ruling): the gate corpus is
 // EXTRACTION-provenance fields only — clause arrays, required certifications,
@@ -1556,7 +1575,14 @@ function detectGatesCanonical(
       gate_label: "Air Force Technical Order access required",
       status: "UNKNOWN",
       cure_possible_in_window: false,
-      verification_action: "Confirm AFTO access via existing TO library agreement OR teaming arrangement with a holding contractor."
+      // ARC #747 — the prior text named "an existing TO library agreement OR teaming arrangement with a
+      // holding contractor" as the cure. No such instrument governs controlled technical data, and the record
+      // never established one; it is the same fabricated-mechanism class as the sole-source distributor line.
+      // Replaced with a question, which asserts nothing about this acquisition and therefore needs no
+      // grounding. Naming the correct mechanism is deliberately NOT done here: that is an assertion about a
+      // regulatory entitlement and is subject to ruling R3 (the replacement text takes no exemption from the
+      // rule it creates), so it belongs in V2 with primary-source verification, not in a detector patch.
+      verification_action: "Confirm with the contracting officer how access to the referenced technical data will be provided, before quoting."
     });
   }
   return gates;
