@@ -493,33 +493,94 @@ tr.hidden{display:none}
 </div>
 
 <script>
-const AUDITS = [
-  {id:'N00024-26-R-2207', title:'SPY-6 Radar Sustainment Engineering — Phase IV CDRL', date:'2m ago', age:0.03, type:'RFP', score:94, rec:'Proceed', status:'complete'},
-  {id:'FA8730-26-Q-0114', title:'F-35 Mission Systems — Software Test Harness Refactor', date:'38m ago', age:0.6, type:'RFQ', score:88, rec:'Proceed', status:'complete'},
-  {id:'W912DY-26-R-0089', title:'USACE Huntsville — Cyber Resilience Assessment', date:'3h ago', age:3, type:'Combined Synopsis', score:81, rec:'Proceed', status:'complete'},
-  {id:'SP4701-26-Q-0942', title:'DLA Aviation — Predictive Maintenance Analytics, H-60', date:'5h ago', age:5, type:'Sources Sought', score:76, rec:'Caution', status:'complete'},
-  {id:'HQ0034-26-R-2058', title:'DARPA — Resilient Tactical Edge Compute, Phase 2 SBIR', date:'Yesterday', age:24, type:'Pre-solicitation', score:71, rec:'Caution', status:'complete'},
-  {id:'FA2517-26-R-0033', title:'Space Force — Ground Station Software Modernization, GPS III', date:'Yesterday', age:26, type:'RFP', score:65, rec:'Caution', status:'complete'},
-  {id:'W56KGY-26-R-0014', title:'CECOM — Tactical Network Sustainment Support, APG', date:'2d ago', age:48, type:'Combined Synopsis', score:58, rec:'Caution', status:'complete'},
-  {id:'N40192-26-Q-1188', title:'NAVFAC Pacific — Energetics Storage Inspection, Guam', date:'2d ago', age:50, type:'RFQ', score:52, rec:'Decline', status:'complete'},
-  {id:'W912DR-26-R-0117', title:'USACE Baltimore — Cantonment Area Construction Mgmt', date:'3d ago', age:72, type:'IFB', score:48, rec:'Decline', status:'complete'},
-  {id:'N00178-26-R-3071', title:'NSWC Indian Head — Energetics Material Handling, Bldg. 4042', date:'4d ago', age:96, type:'RFP', score:42, rec:'Decline', status:'complete'},
-  {id:'HC1028-26-R-1015', title:'DISA — Cloud Migration Services, JWCC Task Order', date:'5d ago', age:120, type:'Modification', score:38, rec:'Decline', status:'complete'},
-  {id:'M67854-26-Q-2244', title:'MARSC Albany — Tactical Vehicle Maintenance Support', date:'6d ago', age:144, type:'RFQ', score:null, rec:null, status:'pending'},
-  {id:'W519TC-26-R-0066', title:'NETCOM — Enterprise Network Services Sustainment', date:'6d ago', age:146, type:'RFP', score:null, rec:null, status:'pending'},
-  {id:'N00164-26-Q-0788', title:'NSWC Crane — Energetic Materials R&D Support', date:'1w ago', age:168, type:'Sources Sought', score:null, rec:null, status:'pending'},
-  {id:'HQ0808-26-R-0001', title:'DTRA — Strategic Threat Reduction Modeling Support', date:'1w ago', age:172, type:'Pre-solicitation', score:null, rec:null, status:'failed'}
-];
+// ── LIVE AUDIT LEDGER (ARC #747, 2026-07-27) ──────────────────────────────────────────────────────────
+// This page previously shipped a hardcoded array of FIFTEEN FICTIONAL audits — SPY-6, F-35, a DLA/H-60 buy —
+// and served them to every signed-in customer. It never asked the server for anything. The filter bar above
+// was decorative: seven <select>s and a Clear button with no listener on any of them, and the row count read
+// "of 15" because 15 was typed into the page. Verified live on the authed surface before this change.
+//
+// The list is now the customer's own audits from /api/audits (user-scoped server-side). There is no mock
+// fallback anywhere below: if the request fails the table says so. A fallback here would recreate the exact
+// defect — a page that looks populated when it knows nothing.
+let AUDITS = [];
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+
+// SIX-POLE VOCABULARY — same mapping the audit list uses (public/run-audit.html), kept in step deliberately.
+// The engine issues six poles; this filter previously offered three (Proceed/Caution/Decline), so half the
+// outcomes were unrepresentable AND the control implied they did not exist. Nothing falls back to a sibling
+// pole: an unrecognised value renders UNRESOLVED rather than borrowing a neighbour's word.
+const POLE_REC = {
+  BID: 'Bid', BID_WITH_CAUTION: 'Bid · caution', NO_BID: 'No-bid', INELIGIBLE: 'Ineligible',
+  NEEDS_HUMAN_REVIEW: 'Needs review', INCOMPLETE: 'Incomplete', OUT_OF_SCOPE: 'Out of scope'
+};
+function recOf(a){
+  const pole = String(a.v3_verdict||'').toUpperCase().replace(/[\s-]+/g,'_');
+  if (POLE_REC[pole]) return POLE_REC[pole];
+  if (pole) return 'Unresolved';
+  // Legacy rows with no v3 pole: read what WAS recorded for their era. Faithful; guessing past it is not.
+  const ev = String(a.exec_verdict||'').toUpperCase().replace(/[\s_]+/g,'-');
+  if (ev==='NO-BID'||ev==='NOBID') return 'No-bid';
+  if (ev==='CAUTION') return 'Bid · caution';
+  if (ev==='PROCEED'||ev==='GO'||ev==='BID') return 'Bid';
+  const r = String(a.recommendation||'').toUpperCase();
+  if (r==='DECLINE') return 'No-bid';
+  if (r==='PROCEED') return 'Bid';
+  if (r.indexOf('CAUTION')!==-1) return 'Bid · caution';
+  return null;   // absent, not guessed — renders as an em dash
+}
+function agoOf(iso){
+  if(!iso) return {label:'—', hours:1e9};
+  const h=(Date.now()-new Date(iso).getTime())/36e5;
+  if(h<1) return {label:Math.max(1,Math.round(h*60))+'m ago', hours:h};
+  if(h<24) return {label:Math.round(h)+'h ago', hours:h};
+  const d=Math.round(h/24);
+  return {label:(d<7?d+'d ago':Math.round(d/7)+'w ago'), hours:h};
+}
+function mapRow(a){
+  const t=agoOf(a.completed_at||a.created_at);
+  return {
+    id: String(a.solicitation_number||a.notice_id||a.id||'').trim() || String(a.id||''),
+    slug: String(a.id||''),
+    title: String(a.title||'').trim() || '—',
+    agency: String(a.office_display||a.agency||'').trim() || '—',
+    date: t.label, age: t.hours,
+    type: String(a.document_type||'').trim() || '—',
+    naics: String(a.naics_code||'').trim(),
+    setAside: String(a.set_aside||'').trim(),
+    score: (typeof a.compliance_score==='number') ? a.compliance_score : null,
+    rec: recOf(a),
+    status: String(a.status||'').trim() || 'complete'
+  };
+}
 
 function scoreTone(s){ if(s==null) return 's-none'; if(s>=80) return 's-hi'; if(s>=65) return 's-md'; if(s>=40) return 's-lo'; return 's-no'; }
-function recClass(r){ return r? r.toLowerCase() : 'none'; }
+function recClass(r){
+  // Six poles → the three existing tone classes. Committal decisions keep their register; the non-committal
+  // poles (needs review / incomplete / unresolved) deliberately take NEITHER green nor red, because painting
+  // them would assert a decision the engine did not issue.
+  if(!r) return 'none';
+  if(r==='Bid') return 'proceed';
+  if(r==='Bid · caution') return 'caution';
+  if(r==='No-bid'||r==='Ineligible') return 'decline';
+  return 'none';
+}
 
 let curFilter='all', sortKey='score', sortDir=-1;
 
 function rowMatches(a){
-  if(curFilter==='all') return true;
-  if(curFilter==='open') return a.status!=='complete';
-  return a.rec===curFilter;
+  if(!(curFilter==='all' || (curFilter==='open' ? a.status!=='complete' : a.rec===curFilter))) return false;
+  // Filter bar (previously inert markup — seven selects with no listener on any of them).
+  const g=(id)=>{ const el=document.getElementById(id); return el? el.value : 'all'; };
+  const eq=(v,val)=> v==='all' || String(val||'')===v;
+  if(!eq(g('fRec'), a.rec)) return false;
+  if(!eq(g('fStatus'), a.status)) return false;
+  if(!eq(g('fAgency'), a.agency)) return false;
+  if(!eq(g('fType'), a.type)) return false;
+  if(!eq(g('fNaics'), a.naics)) return false;
+  if(!eq(g('fSetAside'), a.setAside)) return false;
+  const t=g('fTime');
+  if(t!=='all'){ const max=parseFloat(t); if(isFinite(max) && a.age>max) return false; }
+  return true;
 }
 
 function render(){
@@ -539,23 +600,24 @@ function render(){
       ? `<span class="score s-none">—</span>`
       : `<div class="score-cell"><span class="score-meter"><i class="si ${tone}" style="width:${a.score}%"></i></span><span class="score ${tone}">${a.score}</span></div>`;
     const recCell = a.rec
-      ? `<span class="rec ${recClass(a.rec)}">${a.rec}</span>`
+      ? `<span class="rec ${recClass(a.rec)}">${esc(a.rec)}</span>`
       : `<span class="rec none">—</span>`;
-    const slug=a.id.toLowerCase();
+    const slug=a.slug||'';
     return `<tr data-rec="${a.rec||''}" class="${show?'':'hidden'}">
-      <td class="cell-id">${a.id}</td>
-      <td class="cell-title" title="${a.title}">${a.title}</td>
-      <td class="cell-agency">—</td>
-      <td><span class="doctype">${a.type}</span></td>
+      <td class="cell-id">${esc(a.id)}</td>
+      <td class="cell-title" title="${esc(a.title)}">${esc(a.title)}</td>
+      <td class="cell-agency">${esc(a.agency)}</td>
+      <td><span class="doctype">${esc(a.type)}</span></td>
       <td class="cell-due">—</td>
-      <td class="cell-date">${a.date}</td>
+      <td class="cell-date">${esc(a.date)}</td>
       <td class="right">${a.score==null?scoreCell:scoreCell}</td>
       <td>${recCell}</td>
-      <td><span class="status ${a.status}">${a.status}</span></td>
+      <td><span class="status ${esc(a.status)}">${esc(a.status)}</span></td>
       <td class="right"><a class="view-link" href="/audit/${slug}">View<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></td>
     </tr>`;
   }).join('');
-  document.getElementById('visCount').textContent = vis+' of 15';
+  // Was hardcoded "of 15" — the mock's row count, printed regardless of what was on screen.
+  document.getElementById('visCount').textContent = vis+' of '+AUDITS.length;
 }
 
 /* filters */
@@ -577,7 +639,56 @@ document.querySelectorAll('th.sortable').forEach(th=>{
   });
 });
 
-render();
+/* filter bar — these <select>s previously had no listener at all */
+['fTime','fAgency','fType','fRec','fStatus','fNaics','fSetAside'].forEach(function(id){
+  var el=document.getElementById(id); if(el) el.addEventListener('change', render);
+});
+var clr=document.getElementById('paClear');
+if(clr) clr.addEventListener('click', function(){
+  ['fTime','fAgency','fType','fRec','fStatus','fNaics','fSetAside'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.value='all';
+  });
+  render();
+});
+
+/* Populate the value-driven slicers from the customer's OWN rows — never a fixed list, which would imply
+   options they do not have and hide ones they do. */
+function fillSlicer(id, values){
+  var el=document.getElementById(id); if(!el) return;
+  var keep=el.value;
+  var uniq=[...new Set(values.filter(Boolean))].sort();
+  el.innerHTML = el.options[0].outerHTML + uniq.map(function(v){
+    return '<option value="'+esc(v)+'">'+esc(v)+'</option>';
+  }).join('');
+  el.value = uniq.indexOf(keep)>=0 ? keep : 'all';
+}
+
+function setLedgerMessage(msg){
+  var body=document.getElementById('ledgerBody');
+  if(body) body.innerHTML='<tr><td colspan="10" class="cell-title" style="padding:22px 12px;color:var(--mute)">'+esc(msg)+'</td></tr>';
+  var c=document.getElementById('visCount'); if(c) c.textContent='';
+}
+
+/* LIVE LOAD. No mock fallback: if this fails the page says so rather than showing a populated ledger it
+   cannot vouch for. A fallback here would recreate the defect this change exists to remove. */
+setLedgerMessage('Loading your audits…');
+fetch('/api/audits?limit=200',{headers:{accept:'application/json'}})
+  .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+  .then(function(d){
+    AUDITS = (d && Array.isArray(d.audits) ? d.audits : []).map(mapRow);
+    if(!AUDITS.length){ setLedgerMessage('No audits yet — run one from Run Audit and it will appear here.'); return; }
+    fillSlicer('fAgency', AUDITS.map(function(a){return a.agency;}).filter(function(v){return v!=='—';}));
+    fillSlicer('fType',   AUDITS.map(function(a){return a.type;}).filter(function(v){return v!=='—';}));
+    fillSlicer('fNaics',  AUDITS.map(function(a){return a.naics;}));
+    fillSlicer('fSetAside',AUDITS.map(function(a){return a.setAside;}));
+    fillSlicer('fRec',    AUDITS.map(function(a){return a.rec;}));
+    fillSlicer('fStatus', AUDITS.map(function(a){return a.status;}));
+    render();
+  })
+  .catch(function(err){
+    setLedgerMessage('Could not load your audits ('+(err&&err.message||'error')+'). Reload to try again.');
+  });
+
 </script>
 
 <script src="dashboard-live.js"></script>

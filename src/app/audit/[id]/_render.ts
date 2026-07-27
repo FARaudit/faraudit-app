@@ -2267,6 +2267,60 @@ function renderGatePearl(html: string, pearl: string | null): string {
   return removeElementByOpenRe(html, /<div class="g-pearl"[^>]*>/, "div");
 }
 
+// ── UNBOUND-SLOT SWEEP (ARC #747, 2026-07-27) — the fail-CLOSED replacement for demoLeakGuard ──────────
+//
+// THE DEFECT. `_template.html` ships as a design mock with a complete fictional acquisition baked into its
+// 232 `data-field` slots — an H-60 DLA buy, solicitation SP4701-26-Q-0942, "$14.2M" award value, dates,
+// agency, set-aside. It is SERVED: route.ts branches to v4/v5 only for engine === "agentic_v3"; every other
+// row falls through to this template. So any slot the view-model fails to bind renders ANOTHER FIRM'S
+// INVENTED DATA to the customer, styled identically to their own.
+//
+// WHY THE EXISTING GUARD IS NOT ENOUGH. demoLeakGuard (below) is a four-phrase denylist and, by its own
+// comment, "never throws — failure mode is console.warn only". Both halves are wrong for this job: a
+// denylist can only catch leaks somebody already enumerated (it does not list "$14.2M", nor the incumbent
+// expiry narrative), and a guard whose failure state permits the output is a placebo guard. It also cannot
+// grow safely — its own comment records that the obvious markers ("H-60", "Rivera", "procurexinc") were
+// removed because they collide with legitimate engine output. That is a dead end by construction.
+//
+// THE SHAPE INSTEAD OF THE STRING. Do not ask "does this look like demo text?" — ask "was this slot ever
+// written?". A slot whose rendered content is byte-identical to the pristine template's content for the same
+// key was never bound. That test needs no vocabulary, cannot be evaded by editing the mock, and covers slots
+// nobody has thought of yet.
+//
+// FAILURE DIRECTION. Unbound ⇒ render the absence (an em dash), never the mock's value. A slot whose default
+// is ALREADY an honest empty marker (no alphanumerics — "&mdash;", "·") is left alone; it is not lying.
+export function stripUnboundSlots(html: string, pristine: string): { html: string; stripped: string[] } {
+  const stripped: string[] = [];
+  let out = html;
+  const keys = new Set<string>();
+  for (const m of pristine.matchAll(/\bdata-field="([^"]+)"/g)) keys.add(m[1]);
+  for (const key of keys) {
+    const p = findDataField(pristine, key);
+    if (!p) continue;
+    const pristineInner = pristine.slice(p.contentStart, p.contentEnd);
+    // A default with no alphanumerics is an honest "no value" marker, not fabricated data.
+    // Entities must be removed FIRST: "&mdash;" is punctuation to a reader but contains the letters
+    // "mdash", so a naive alphanumeric test classified an honest em-dash default as fabricated data and
+    // stripped it. Caught by the test, not by inspection.
+    const pristineText = pristineInner.replace(/&[a-z]+;|&#\d+;/gi, "");
+    if (!/[a-z0-9]/i.test(pristineText)) continue;
+    let scan = 0;
+    while (true) {
+      const hit = findDataField(out, key, scan);
+      if (!hit) break;
+      const renderedInner = out.slice(hit.contentStart, hit.contentEnd);
+      if (renderedInner === pristineInner) {
+        out = out.slice(0, hit.contentStart) + "&mdash;" + out.slice(hit.contentEnd);
+        stripped.push(key);
+        scan = hit.contentStart + 7;
+      } else {
+        scan = hit.contentEnd;
+      }
+    }
+  }
+  return { html: out, stripped };
+}
+
 // FA-112: demo-leak guard. Last render step. Scans for known template demo
 // markers and blanks the enclosing data-field element (or nearest block element)
 // if any survive. Never throws — failure mode is console.warn only so render
@@ -3228,9 +3282,16 @@ export function renderAuditReportComplete(
   // §08 empty-guard — after the closed-mode passes so it sees the post-
   // removeKoEmailCard shape (the trigger case). Mirrors the template IIFE.
   html = stripEmptyKoSection(html);
-  // FA-112: final-stage demo-leak guard. Catches any template demo content
-  // (SP4701 / Rivera / H-60 / procurexinc / Predictive Maintenance Analytics)
-  // that survived all prior render passes. Warn-only on failure to resolve
-  // — never throws.
-  return demoLeakGuard(html);
+  // ARC #747 — fail-CLOSED unbound-slot sweep. Runs BEFORE demoLeakGuard because it is the general
+  // mechanism: any data-field slot still byte-identical to the mock was never bound, and renders as an
+  // absence rather than as the mock's fictional acquisition. demoLeakGuard is kept behind it as a belt for
+  // demo content that lives OUTSIDE a data-field slot, which the sweep cannot see — but it is no longer the
+  // primary defence, and its four-phrase denylist is no longer load-bearing.
+  const swept = stripUnboundSlots(html, template);
+  if (swept.stripped.length > 0) {
+    try {
+      console.warn(`[render] ${swept.stripped.length} unbound data-field slot(s) rendered as absent: ${[...new Set(swept.stripped)].join(", ")}`);
+    } catch { /* logging never affects render output */ }
+  }
+  return demoLeakGuard(swept.html);
 }

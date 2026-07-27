@@ -170,7 +170,23 @@ export function detectSoleSourceLock(source: string | null | undefined): SoleSou
   // under-fire (normal verdict), never a fabricated NHR.
   if (!jaSignal && proseSignals.length === 0 && !hasCompanySuffix(vendor)) return null;
 
-  if (!excerpt) excerpt = proseSignals[0] ?? `sole source to ${vendor}`;
+  // ARC #747 · CEO option A — the SYNTHESIZED-EXCERPT FALLBACK IS DELETED.
+  //
+  // This line read:  if (!excerpt) excerpt = proseSignals[0] ?? `sole source to ${vendor}`;
+  //
+  // The second half composed a span out of the vendor's name when no real one was found, and the caller
+  // (audit-decide.ts) passes that field straight through as `excerpt` alongside a hardcoded `grounded: true`.
+  // So a manufactured quotation reached the customer marked as verbatim source. That is the exact defect
+  // this arc exists to close, sitting inside the arc's own most recent shipped unit — and it silently
+  // satisfies any "derived sentences must carry a grounded excerpt" rule, which is why the V2 design built
+  // on top of it graded F.
+  //
+  // Now: no real span ⇒ NO LOCK. The failure direction is deliberate and matches the module's own doctrine
+  // above — a missed lock is a SAFE under-fire (the run yields a normal verdict), whereas a fabricated
+  // excerpt is a customer-facing fabrication with a quotation under it. Falling back to `proseSignals[0]` is
+  // retained because that IS a real span lifted from the source; only the invented string is gone.
+  if (!excerpt) excerpt = proseSignals[0] ?? "";
+  if (!excerpt) return null;
   return { vendor, titleSignal, jaSignal, proseSignals, excerpt };
 }
 

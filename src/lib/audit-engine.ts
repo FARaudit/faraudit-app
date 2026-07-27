@@ -2218,7 +2218,7 @@ export function cleanObjectivePhrase(rawObjective: string): string {
 const JCP_RE = /\bJCP\b|JCP[-\s]?(?:certified|cert|certification)|Joint\s+Certification\s+Program|DD\s*Form\s*2345|militarily\s+critical\s+technical\s+data|noncommercial\s+technical\s+data|252\.227-7025/i;
 const FAA145_RE = /FAA\s*Part\s*145|14\s*CFR\s*145|FAA[-\s]?approved\s+repair\s+station|repair\s+station\s+rating/i;
 const TEST_JIG_RE = /test\s*jig|specialized\s+test\s+equipment|government[-\s]furnished\s+test|special\s+test\s+equipment/i;
-const AFTO_RE = /\bAFTO\b|Air\s*Force\s*Technical\s*Order|TO\s+\d+[A-Z]?\d*-[\d-]+/i;
+// AFTO_RE deleted with detectAftoGate (R4) — its only consumer. See the note at the former gate site.
 // Brain ruling Item 1: SPRS detection broadened to include 252.204-7019 (the
 // Notice of NIST SP 800-171 DoD Assessment Requirements clause — where SPRS
 // is most often cited in DLA solicitations) and the literal "SPRS" mention
@@ -2543,16 +2543,21 @@ export function detectTestJigGate(docText: string): DecisionGate | null {
   };
 }
 
-export function detectAftoGate(docText: string): DecisionGate | null {
-  if (!AFTO_RE.test(docText)) return null;
-  return {
-    gate_id: "AFTO_ACCESS",
-    gate_label: "Air Force Technical Order access required",
-    status: "UNKNOWN",
-    cure_possible_in_window: false,
-    verification_action: "Confirm AFTO access via existing TO library agreement OR teaming arrangement with a holding contractor."
-  };
-}
+// detectAftoGate DELETED 2026-07-27 — ARC #747 Brain ruling R4 ("the dead engine detector is deleted, not
+// parked"). It had no callers anywhere in src/, agents/ or scripts/, so it changed no verdict — but it was
+// wrong in two ways and an uncalled wrong function is a landmine for whoever wires it up.
+//
+//   1. Its pattern `TO\s+\d+[A-Z]?\d*-[\d-]+` has no word boundary before "TO", so it fired on ordinary
+//      prose: "Deliver within 30 to 45-60 days", "quantities apply to 100-200 units", "Ship to 700-1200 lbs
+//      pallets" all matched and concluded the solicitation required access to controlled Air Force technical
+//      data. Reproduced by execution before deletion, not assumed.
+//   2. Its remedy text named a "TO library agreement OR teaming arrangement" as the cure. No such instrument
+//      governs controlled technical data — access runs through the Joint Certification Program via DD Form
+//      2345, which this same file already emits correctly ~30 lines above at the JCP gate. The two gates gave
+//      incompatible instructions for the same class of data.
+//
+// A LIVE duplicate of both faults still exists in the older report path (`_view-model.ts`, VM_AFTO_RE) and is
+// tracked separately — deleting this copy does NOT fix that one.
 
 export function aggregateGateRecommendation(gates: DecisionGate[]): "PROCEED_WITH_CAUTION" | "DECLINE" {
   if (gates.length === 0) return "PROCEED_WITH_CAUTION";
