@@ -125,6 +125,30 @@ check("list · a clause row is not glued to the previous row's date",
 check("list · a bare effective date is not a clause head",
   findHeadRepairSpan(SRC_CLAUSE_LIST, "52.240-90 Security Prohibitions and Exclusions Representation.") === null);
 
+// CLAUSE TABLE — wide, punctuated, tab-separated rows. Every earlier rule reads these as prose; walking up
+// through them prepended an unrelated clause and flipped `isPositiveSetAside` false→true on four findings.
+const SRC_CLAUSE_TABLE =
+  "FAR Clause \t52.217-9 \tOption to Extend the Term of the Contract \tMar 2000 \tYes\n" +
+  "FAR Clause \t52.219-6 \tNotice of Total Small Business Set-Aside \tFeb 2026 \tYes\n" +
+  "FAR Clause \t52.219-33 \tNonmanufacturer Rule \tYes\n";
+check("clause table · a quote never absorbs the row above it",
+  findHeadRepairSpan(SRC_CLAUSE_TABLE, "52.219-33 \tNonmanufacturer Rule \tYes") === null,
+  `got: ${findHeadRepairSpan(SRC_CLAUSE_TABLE, "52.219-33 \tNonmanufacturer Rule \tYes")}`);
+check("clause table · and the set-aside row is never glued on",
+  !/Total Small Business Set-Aside/.test(findHeadRepairSpan(SRC_CLAUSE_TABLE, "Nonmanufacturer Rule \tYes") ?? ""));
+
+// NOTICE METADATA HEADER — `Label: value` records. No terminators, lowercase words present, so it also reads
+// as one wrapped sentence. Walking up from the Posted/Deadline line put a set-aside label on a DEADLINE
+// finding. Real shape from SP3300-26-Q-0165.
+const SRC_META =
+  "Title: DDSP Office Chairs - SP3300-26-Q-0165\n" +
+  "NAICS: 337214  PSC: 7110\n" +
+  "Set-aside (metadata label): Women-Owned Small Business  code=WOSB\n" +
+  "Posted: 2026-06-24  Deadline: 2026-06-29T17:30:00-04:00\n";
+check("metadata · a deadline record never absorbs the set-aside record",
+  findHeadRepairSpan(SRC_META, "Posted: 2026-06-24  Deadline: 2026-06-29T17:30:00-04:00") === null,
+  `got: ${findHeadRepairSpan(SRC_META, "Posted: 2026-06-24  Deadline: 2026-06-29T17:30:00-04:00")}`);
+
 // A paragraph break stops the backward walk — a wrap is a continuation, a blank line is a new thought.
 const SRC_PARA = "The Government intends to award without discussions\n\nOfferors shall submit a complete proposal package by the stated time.\n";
 check("refuses · never walks backward across a blank line",
@@ -164,6 +188,16 @@ process.env.AUDIT_EXCERPT_HEAD_REGROUND = "true";
   const findings = [mk(C1_CLIPPED, "procedural_coverage")];
   const res = repairHeadClippedExcerpts(findings, SRC_C1);
   check("flag ON · deterministic lens excluded", res.repaired === 0 && findings[0].excerpt === C1_CLIPPED);
+}
+{
+  // An already-verified finding is never rewritten: J-2 stamps verifiedBy.excerptHash BEFORE this pass, and
+  // audit-decide requires that hash to still match before a verified universal defect may reach NO_BID.
+  // Silently improving the quote would desync the hash and drop the finding to NEEDS_HUMAN_REVIEW.
+  const verified = mk(C1_CLIPPED, "cost_price");
+  (verified as unknown as { verifiedBy: unknown }).verifiedBy = { excerptHash: "abc123", verifier: "j2" };
+  const res = repairHeadClippedExcerpts([verified], SRC_C1);
+  check("flag ON · an already-verified excerpt is left untouched", res.repaired === 0 && verified.excerpt === C1_CLIPPED);
+  check("flag ON · and the skip is recorded, not silent", res.skipped.some((x) => /already verified/.test(x.reason)));
 }
 {
   // Idempotence: running the pass twice must not walk the span further backward each time.

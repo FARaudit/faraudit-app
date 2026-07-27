@@ -160,9 +160,35 @@ const LEADING_ENUMERATOR = /^\s*(?:[-•*—]|\(?\d{1,2}[.)]|\(?[a-zA-Z][.)])\s+
 const TABULAR_MAX_LEN = 40;
 function isTabularLine(line: string): boolean {
   const t = line.trim();
+  if (isClauseRowLine(t)) return true;  // a wide, punctuated table row — see below
   if (!t || t.length > TABULAR_MAX_LEN) return false;
   return !/[.!?;:]/.test(t);            // short AND carrying no clause punctuation ⇒ a column fragment
 }
+
+// The OTHER table, and the one that gets through a short-line test: a clause-incorporation row —
+//   "FAR Clause \t52.219-6 \tNotice of Total Small Business Set-Aside \tFeb 2026 \tYes"
+// It is wide, it is full of periods, and it reads as prose to every rule above. Walking backward through
+// these prepends UNRELATED CLAUSES to a finding's quote, and the downstream cost is not cosmetic: an
+// integration probe caught `isPositiveSetAside` (audit-decide.ts:598) flipping false→true on four findings
+// because the row above a Nonmanufacturer-Rule quote announced a total small-business set-aside. Verbatim
+// text, wrong clause, and it lands on the set-aside axis.
+// Shape: a regulation number plus column separators (a tab, or a run of two or more spaces).
+function isClauseRowLine(line: string): boolean {
+  const t = line.trim();
+  if (!t) return false;
+  if (LABEL_RECORD_LINE.test(t)) return true;
+  return /\b\d{2,3}\.\d{3}(?:-\d+)?\b/.test(t) && /(?:\t| {2,})/.test(t);
+}
+
+// The THIRD row shape, found by re-measuring after the clause-row fix: the notice metadata header, a block of
+// `Label: value` records —
+//   "Set-aside (metadata label): Women-Owned Small Business  code=WOSB"
+//   "Posted: 2026-06-24  Deadline: 2026-06-29T17:30:00-04:00"
+// Each line is a separate record, none ends on a terminator, and they carry lowercase words, so every earlier
+// rule reads them as one wrapped sentence. Walking up from the Posted/Deadline line prepended the set-aside
+// label to a DEADLINE finding, and `isPositiveSetAside` flipped on it — the same cross-row harm as the clause
+// table, one block over. A label-colon prefix is the shape; the value that follows belongs to that label alone.
+const LABEL_RECORD_LINE = /^[A-Z][A-Za-z0-9 ()./-]{0,30}:\s/;
 
 /** The physical line containing `pos`. */
 function lineAt(source: string, pos: number): { start: number; end: number; text: string } {
@@ -180,7 +206,7 @@ function wrapRegionStart(source: string, lineStart: number, anchor: number): num
   while (regionStart > 0) {
     const prev = lineAt(source, regionStart - 1);
     if (!prev.text.trim()) break;                                   // blank line ⇒ paragraph break
-    if (isTabularLine(prev.text)) break;                            // never walk into a table
+    if (isTabularLine(prev.text)) break;                            // never walk into a table or a clause row
     const masked = maskGuards(prev.text).replace(/[\s"')\]]+$/, "");
     if (/[.!?;:]$/.test(masked)) break;                             // previous line finished its clause
     if (anchor - prev.start > MAX_HEAD_EXTEND) break;               // too far back to still be one clause
@@ -358,6 +384,12 @@ export function repairHeadClippedExcerpts(findings: TypedFinding[], source: stri
   for (const f of findings) {
     if (REPAIR_EXCLUDED_LENSES.has(f.lens)) continue;
     if (!f.excerpt || !f.excerpt.trim()) continue;
+    // ALREADY VERIFIED ⇒ leave it alone. The J-2 cross-examination runs at P2, before this pass, and stamps
+    // `verifiedBy.excerptHash` over the excerpt as it stood. `audit-decide.ts` requires that hash to still
+    // match before a verified universal defect may reach NO_BID — so silently rewriting a verified excerpt
+    // desyncs the hash and drops the finding to NEEDS_HUMAN_REVIEW. A better quote is not worth losing a
+    // committal verdict; the honest move is to not touch what has already been attested.
+    if (f.verifiedBy) { res.skipped.push({ id: f.id, lens: f.lens, reason: "already verified (excerptHash stamped) — not rewritten" }); continue; }
     if (!isHeadClippedExcerpt(source, f.excerpt)) continue;
     const span = findHeadRepairSpan(source, f.excerpt);
     if (!span) {

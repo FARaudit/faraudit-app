@@ -2465,9 +2465,14 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //         Gate 4 on SPRRA2-26-R-0034 found three, and the head-side shape is the more dangerous of the two
   //         because a cropped head reads as corroboration: an excerpt starting "15-2, Instructions…" appeared
   //         to support a gate citing "DFARS 215-2" while its own line said "FAR 15.408, Table 15-2".
-  //         Runs after the tail pass so a doubly-clipped excerpt is repaired at both ends, and before
-  //         completeness so the restored (longer, still verbatim) span feeds covered_direct.
-  const headRepair = repairHeadClippedExcerpts(findings, ctx.fullSource);
+  //         Runs after the tail pass so a doubly-clipped excerpt is repaired at both ends.
+  //         PLACEMENT, stated correctly: an earlier draft of this comment claimed the position "lets the
+  //         restored span feed covered_direct." That was backwards — covered_direct uses the excerpt as the
+  //         NEEDLE (`nText.includes(norm(f.excerpt))`), so a longer excerpt can only be harder to match, never
+  //         easier. Measured across 40 banked run records: zero coverage and zero verdict deltas either way.
+  //         The position is neutral for coverage; it is here because the tail pass belongs first.
+  //         Grounded against `groundingSource` when it differs from fullSource, matching `isGrounded`.
+  const headRepair = repairHeadClippedExcerpts(findings, ctx.groundingSource ?? ctx.fullSource);
   if (headRepair.repaired || headRepair.unrepairable) {
     console.log(`[orchestrator] excerpt-head-reground: restored ${headRepair.repaired} clipped head(s)${headRepair.unrepairable ? `, ${headRepair.unrepairable} left as emitted` : ""}` +
       (headRepair.changes.length ? ` — ${headRepair.changes.map((c) => c.id ?? c.lens).join(", ")}` : ""));
