@@ -131,7 +131,10 @@
     width:1100px;height:620px;pointer-events:none;z-index:0;
     background:radial-gradient(ellipse at 50% 0%, rgba(55,138,221,0.16), rgba(55,138,221,0) 62%);
   }
-  .hero-grid{position:relative;z-index:1;display:grid;grid-template-columns:1.05fr 0.95fr;gap:56px;align-items:center}
+  /* SINGLE-COLUMN HERO (CEO 2026-07-27). The right-hand KPI panel is gone: every element in it asserted
+     something the page had no source for, and an empty box or a placeholder would be worse than neither.
+     The copy column now runs full width; the lede keeps its own max-width so the measure stays readable. */
+  .hero-grid{position:relative;z-index:1;display:block}
   .hero h1{
     font-size:56px;font-weight:800;line-height:1.08;letter-spacing:-.04em;color:var(--ink);
     margin:24px 0 22px;text-wrap:balance;
@@ -143,22 +146,7 @@
   .hero-cta .seehow:hover{color:var(--ink)}
   .hero-cta .seehow .arrow{color:var(--accent)}
 
-  /* navy KPI hero panel — verbatim from command center .kpi.navy */
-  .kpi-navy{
-    position:relative;overflow:hidden;border-radius:16px;color:#fff;padding:22px 24px 20px;
-    background:linear-gradient(135deg,#0A1628 0%,#16294a 55%,#1e3a8a 100%);
-    box-shadow:var(--shadow-lg);border:1px solid rgba(255,255,255,0.06);
-  }
-  .kpi-navy::after{
-    content:"";position:absolute;inset:auto -40px -70px auto;width:240px;height:240px;border-radius:50%;
-    background:radial-gradient(circle,rgba(255,255,255,.12),rgba(255,255,255,0) 70%);pointer-events:none;
-  }
-  .kpi-navy .kpi-top{display:flex;align-items:center;gap:10px;margin-bottom:14px}
-  .kpi-navy .label{display:flex;align-items:center;gap:9px;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.8)}
-  .kpi-navy .label .ico{width:20px;height:20px;border-radius:6px;background:rgba(255,255,255,.14);display:grid;place-items:center}
-  /* The KPI panel's badge / counter / sparkline / activity-strip rules were removed with the markup they
-     styled (CEO 2026-07-27) — including the keyframes behind the badge's pulse, which is what made a static
-     label read as a status signal. .kpi-top and .label survive; nothing else here had markup left to style. */
+  /* The navy KPI hero panel and all of its rules were removed 2026-07-27 (CEO ruling) — see the hero. */
 
   /* ───────── section scaffolding ───────── */
   section.band{padding:96px 0;position:relative}
@@ -337,25 +325,6 @@
         </div>
       </div>
 
-      <!-- navy KPI hero panel -->
-      <div class="reveal kpi-navy">
-        <div class="kpi-top">
-          <div class="label"><span class="ico">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M21 7v5h-5"/></svg>
-          </span>Solicitations</div>
-        </div>
-        <!-- REMOVED 2026-07-27 (CEO ruling): the KPI panel's status badge, its headline count and unit, the
-             personalisation sentence beneath it, the sparkline that charted that count, and the three-row
-             activity strip with its elapsed-time labels and office codes.
-             None of it had a data source anywhere in this file — this file makes zero network calls — so every
-             one of those elements asserted something the page could not support, to a logged-out visitor who
-             had supplied nothing. The personalisation sentence was the worst of them: it claimed a match
-             against a visitor's own industry and product codes, plus a day-over-day delta, with no visitor
-             input and no yesterday. The office codes in the activity strip are real, which is precisely why a
-             defense BD reader would have tried to look them up.
-             Deleted rather than commented out. Deliberately NOT replaced: a real number here needs a real
-             source, and inventing a substitute claim is the thing being fixed. -->
-      </div>
     </div>
   </div>
 </section>
@@ -396,12 +365,22 @@
             <div><div class="tt">Hexavalent chromium</div><div class="td">DFARS 252.223-7008 — standard aerospace primers <b>disqualify.</b></div></div>
           </div>
         </div>
+        <!-- The count-and-duration pair that stood here was removed with the caption metrics below (Brain
+             ruling 2026-07-27). It was the same unverifiable claim in a second element, and fixing only the
+             caption would have left the figure the eye actually lands on. The checkmark row stays, stating
+             what the card can support: these findings were caught, each cited to its clause. -->
         <div class="caught">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-          All three caught
-          <span class="mono-time">4 min</span>
+          Each finding cited to its clause
         </div>
-        <div class="panel-caption">Live Air Force RFQ — two P0 traps and one disqualifying DFARS clause caught in four minutes.</div>
+        <!-- The metrics in this caption came DOWN rather than being corrected (Brain ruling 2026-07-27). The
+             only runs behind them were produced by a RETIRED engine (legacy payload shape, superseded models),
+             so the figures cannot be verified against the current product at all — and the recorded numbers did
+             not match the claim either: 3 P0 entries, not two, at 1.9–2.0 minutes, not four. The currency word was also a
+             time-dependent claim about a solicitation that has long since closed. The findings the card SHOWS
+             stay — they are illustrated in the rows above and cite their own clauses; it is the count, the
+             duration and the currency claim that had nothing standing behind them. -->
+        <div class="panel-caption">Air Force RFQ — CLIN quantity ambiguity and an FOB designation conflict, each cited to the clause it came from.</div>
       </div>
     </div>
   </div>
