@@ -23,6 +23,7 @@ import { looksMojibake } from "./pdf-ocr";
 import { NOTICE_BODY_DOC_NAME } from "./agentic-executor";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
+import { gateFindingCitations } from "./audit-citation-fidelity";
 import { SITE_VISIT_CONCLUDED_RE, BOA_HOLDER_ONLY_EMIT_RE, SITE_VISIT_MANDATORY_ATTENDANCE_RE } from "./audit-site-visit-patterns";
 import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyCyberRfiReconciliation, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyNmrNaicsDormancy, applyCheckboxStateFidelity, applyPerfObligationInsuranceTyping, applyClauseKeyedTypingFloor, applyStructuralAssertionFidelity, applyQuantityAmbiguityFidelity, applyFindingDedup, applyCrossFleetDedup, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, applyInquiryDeadlineBenignGuard, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, emitPerformanceUpkeepCaveats, deriveShadowVerdict, EngineInvariantError, type Decision, type ShadowVerdict } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
@@ -2901,5 +2902,36 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     throw e;
   }
 
-  return { decision, inputs, findings, coverage: { required, covered, missing, attestations, coreMissing }, perLens, conflict, sectionsRead: [...sectionsRead], trace, ...(verifierDrops.length ? { verifierDrops } : {}), ...(judgmentLayerEnabled() && (opts.judgmentReason || opts.judgmentEntail) ? { judgmentCost } : {}), ...(_bankDiag ? { diagnostics: _bankDiag } : {}) };
+  // ARC #747 · E2 — CITATION FIDELITY. Deliberately applied AFTER deriveVerdict, and deliberately only to the
+  // RETURNED findings, never to `inputs`.
+  //
+  // This is the E1 lesson applied at a different layer. A withheld citation is an answer to the DISPLAY
+  // question — what may we print at this customer? It must not become an answer to the ANALYSIS question —
+  // what did the engine examine, and what did it decide on. `f.citation` is read by roughly forty detectors in
+  // audit-decide (eligibility-authority allow-listing, clause-keyed typing, set-aside routing); rewriting it
+  // before the verdict would let a citation-hygiene pass move a bid/no-bid call, which is not a trade this
+  // gate is entitled to make. So `inputs` keeps the findings the decision was actually made on — a replay of
+  // the banked record re-derives the identical verdict — while the customer-facing set carries the
+  // withholding. [[feedback_display_span_vs_analyzed_span]]
+  //
+  // Flag-OFF returns the same array reference, so byte-identity is structural rather than re-proved.
+  //
+  // BOTH PERSISTED SETS ARE GATED, and that is not belt-and-braces. `buildV3Payload`
+  // (audit-executor-v3.ts:668) persists `res.findings` AND `res.decision.showStoppers` — two independent
+  // arrays. Gating only `findings` would have left the show-stopper block, the most prominent section of the
+  // report and the one that carries the verdict, rendering the citation the gate just refused everywhere
+  // else. `decision.dispositions` is deliberately NOT gated: it is not persisted or rendered, and it is the
+  // record of what the engine decided on — the analysis side of the same display/analysis split.
+  const citeSource = ctx.groundingSource ?? ctx.fullSource;
+  const citeGate = gateFindingCitations(findings, citeSource);
+  const stopperGate = gateFindingCitations(decision.showStoppers, citeSource);
+  const withheldAll = [...citeGate.withheld, ...stopperGate.withheld];
+  if (withheldAll.length) {
+    console.warn(`[orchestrator] citation-fidelity: withheld ${withheldAll.length} unresolvable citation(s) across ${citeGate.touched} finding(s) + ${stopperGate.touched} show-stopper(s) — ` +
+      withheldAll.map((w) => `${w.raw} (${w.field})`).join("; "));
+  }
+  // Same-reference when nothing was withheld ⇒ flag-OFF and clean-record runs return the identical object.
+  const decisionOut = stopperGate.touched ? { ...decision, showStoppers: stopperGate.findings } : decision;
+
+  return { decision: decisionOut, inputs, findings: citeGate.findings, coverage: { required, covered, missing, attestations, coreMissing }, perLens, conflict, sectionsRead: [...sectionsRead], trace, ...(withheldAll.length ? { citationsWithheld: withheldAll } : {}), ...(verifierDrops.length ? { verifierDrops } : {}), ...(judgmentLayerEnabled() && (opts.judgmentReason || opts.judgmentEntail) ? { judgmentCost } : {}), ...(_bankDiag ? { diagnostics: _bankDiag } : {}) };
 }
