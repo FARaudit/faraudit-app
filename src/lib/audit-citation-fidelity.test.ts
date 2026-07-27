@@ -10,7 +10,7 @@
 export {};
 import {
   extractRegulationTokens, judgeToken, numberPresentInSource, looksLikePartRange,
-  corporaPairedInSource, gateCitationsInText, gateFindingCitations, CORPUS_GRAMMAR,
+  corporaPairedInSource, gateCitationsInText, gateFindingCitations, CORPUS_GRAMMAR, stripWithholdMarkers,
 } from "./audit-citation-fidelity";
 
 let failures = 0;
@@ -165,6 +165,41 @@ console.log("\n── flag discipline and safety ──");
   const two = gateCitationsInText("first DFARS 215-2 then DFARS 52.215-22 done", SOURCE).text;
   check("multiple withholdings in one string all land, and none corrupts another's offsets",
     two.startsWith("first [citation withheld") && two.endsWith("done") && (two.match(/\[citation withheld/g) ?? []).length === 2);
+}
+
+console.log("\n── REGRESSIONS · /code-review high on PR #294 ──");
+{
+  // F1 — the guard after the number was `(?![.\\d-])`, which rejected a trailing SENTENCE PERIOD as well as a
+  // digit continuation. So the founding defect was invisible whenever it ended a sentence, and every fixture
+  // in this file happened to put the citation mid-sentence. The guard now rejects only `[-.]?digit`.
+  for (const s of ['Proposal must include documentation per DFARS 215-2.', 'Comply with DFARS 252.204-7012.', 'See FAR 52.219-6.']) {
+    check(`F1 · a citation ending a sentence is still extracted — ${JSON.stringify(s.slice(-24))}`,
+      extractRegulationTokens(s).length === 1, JSON.stringify(extractRegulationTokens(s)));
+  }
+  check("F1 · and the founding defect is withheld when it ends a sentence",
+    gateCitationsInText("Proposal must include documentation per DFARS 215-2.", SOURCE).withheld.length === 1);
+  // …while the collision guard it existed for still holds.
+  check("F1 · 215-2 is still NOT matched inside 52.215-22", numberPresentInSource("215-2", SOURCE) === false);
+  check("F1 · a clause number is still not truncated to its section",
+    extractRegulationTokens("DFARS 252.204-7012")[0].number === "252.204-7012");
+}
+{
+  // F4 — `findingSection` scans a citation for a bare UCF letter; the marker's own prose ends "withhel*d*",
+  // so a gated citation reported section "D" where the ungated one reported none, drifting replay coverage.
+  const sec = (c: string) => c.match(/§?\s*(?:section\s+)?([A-M])\b/i)?.[1];
+  const only = '[citation withheld — "215-2" is not a valid DFARS designation]';
+  check("F4 · the raw marker DOES trip the bare-letter section scan (the defect is real)", sec(only) === "d");
+  check("F4 · stripping it leaves no section", sec(stripWithholdMarkers(only)) === undefined);
+  check("F4 · a real section letter still survives stripping",
+    sec(stripWithholdMarkers(`Section I (FAR Clauses) ${only}`)) === "I");
+}
+{
+  // F2 — decision.reason is rendered VERBATIM as the report's "Bottom line". Gating findings and
+  // show-stoppers while leaving it alone let the headline print the very citation withheld below it.
+  const reason = 'Proposal must include Cost/Price Supporting Documentation per DFARS 215-2 — confirm before bid.';
+  const g = gateCitationsInText(reason, SOURCE, "reason");
+  check("F2 · the headline sentence is gated too", g.withheld.length === 1 && !g.text.includes("DFARS 215-2"));
+  check("F2 · and its surrounding prose survives", g.text.includes("confirm before bid."));
 }
 
 console.log(`\n${failures === 0 ? "✅ ALL GREEN" : `❌ ${failures} FAILURE(S)`}`);

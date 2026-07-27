@@ -60,7 +60,7 @@ const CORPUS_WORD = "(?:FAR|DFARS|DFAR|AFFARS|VAAR|DLAD|C\\.?F\\.?R\\.?|U\\.?S\\
 // is the shape the founding defect took and which an earlier revision of the census could not see at all.
 const NUMBER = "\\d{1,4}\\.\\d{1,4}-\\d{1,4}|\\d{1,4}\\.\\d{1,4}|\\d{2,4}-\\d{1,3}";
 // The connector words are OPTIONAL and consumed into the match so the replacement span stays contiguous.
-const TOKEN_RE = new RegExp(`(${CORPUS_WORD})(\\s+(?:part|subpart|section|clause|table|§)?\\s*)(${NUMBER})(?![.\\d-])`, "gi");
+const TOKEN_RE = new RegExp(`(${CORPUS_WORD})(\\s+(?:part|subpart|section|clause|table|§)?\\s*)(${NUMBER})(?![-.]?\\d)`, "gi");
 
 export interface RegulationToken {
   /** canonical corpus key ("DFARS"), not the raw spelling */
@@ -102,7 +102,7 @@ export function extractRegulationTokens(text: string): RegulationToken[] {
 export function numberPresentInSource(num: string, source: string): boolean {
   if (!num || !source) return false;
   const esc = num.replace(/[.\-]/g, "\\$&");
-  return new RegExp(`(?<![.\\d-])${esc}(?![.\\d-])`).test(source);
+  return new RegExp(`(?<![-.\\d])${esc}(?![-.]?\\d)`).test(source);
 }
 
 /** An ascending numeric range, not a section number: "13 CFR 121-128" is parts 121 THROUGH 128, legitimate
@@ -122,7 +122,7 @@ export function corporaPairedInSource(num: string, source: string): Set<string> 
   const out = new Set<string>();
   if (!num || !source) return out;
   const esc = num.replace(/[.\-]/g, "\\$&");
-  const re = new RegExp(`(${CORPUS_WORD})[\\s,]*(?:part|subpart|section|clause|table|§)?\\s*${esc}(?![.\\d-])`, "gi");
+  const re = new RegExp(`(${CORPUS_WORD})[\\s,]*(?:part|subpart|section|clause|table|§)?\\s*${esc}(?![-.]?\\d)`, "gi");
   for (const m of source.matchAll(re)) {
     const key = m[1].replace(/\./g, "").toUpperCase();
     out.add(CORPUS_ALIAS[key] ?? key);
@@ -175,6 +175,16 @@ export function judgeToken(tok: RegulationToken, source: string): TokenVerdict {
 export function withholdMarker(tok: RegulationToken, v: Extract<TokenVerdict, { state: "withheld" }>): string {
   const alt = v.alsoValidFor.length ? `; the number is a valid ${v.alsoValidFor.join("/")} form` : "";
   return `[citation withheld — ${v.reason}${alt}]`;
+}
+
+/** Engine-authored withholding markers, for callers that PARSE a citation structurally rather than display
+ *  it. `findingSection` scans a citation for a bare UCF letter with `/([A-M])\b/i`; the marker's own prose
+ *  ("…withhel**d** —") matches, so a gated citation would report section "D" where the original reported
+ *  none, and replay coverage would drift from the live run. One exported definition so no caller re-invents
+ *  it. (Review finding #4 on PR #294.) */
+const WITHHOLD_MARKER_RE = /\[citation withheld[^\]]*\]/g;
+export function stripWithholdMarkers(text: string): string {
+  return (text ?? "").replace(WITHHOLD_MARKER_RE, " ").replace(/\s{2,}/g, " ").trim();
 }
 
 export interface CitationGateResult {

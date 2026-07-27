@@ -23,7 +23,7 @@ import { looksMojibake } from "./pdf-ocr";
 import { NOTICE_BODY_DOC_NAME } from "./agentic-executor";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
-import { gateFindingCitations } from "./audit-citation-fidelity";
+import { gateFindingCitations, gateCitationsInText, stripWithholdMarkers, citationFidelityEnabled } from "./audit-citation-fidelity";
 import { SITE_VISIT_CONCLUDED_RE, BOA_HOLDER_ONLY_EMIT_RE, SITE_VISIT_MANDATORY_ATTENDANCE_RE } from "./audit-site-visit-patterns";
 import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyCyberRfiReconciliation, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyNmrNaicsDormancy, applyCheckboxStateFidelity, applyPerfObligationInsuranceTyping, applyClauseKeyedTypingFloor, applyStructuralAssertionFidelity, applyQuantityAmbiguityFidelity, applyFindingDedup, applyCrossFleetDedup, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, applyInquiryDeadlineBenignGuard, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, emitPerformanceUpkeepCaveats, deriveShadowVerdict, EngineInvariantError, type Decision, type ShadowVerdict } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
@@ -167,6 +167,11 @@ export interface AuditResult {
   trace: Record<string, { converged: boolean; turns: number; sectionsRead: string[]; tools: Array<{ turn: number; tools: Array<{ name: string; input: Record<string, unknown> }> }> }>; // per-lens
   verifierDrops?: CorrectedDrop[];                                                        // card 274 RULING 1 — skeptic drops (empty-corrected + overturned), telemetry-visible; absent when none
   judgmentCost?: JudgmentCost;                                                            // J-1/J-2 per-audit token/call ledger (card 246 acceptance h); absent when the layer is off
+  /** ARC #747 · E2 — every regulation citation the fidelity gate refused to print, with the reason. Declared
+   *  because it was previously RETURNED but absent from this interface, so no consumer could read it and
+   *  nothing persisted it: the withholding ledger existed only as a console.warn, which is not a record.
+   *  Absent when nothing was withheld ⇒ flag-OFF shape unchanged. (Review finding #5 on PR #294.) */
+  citationsWithheld?: Array<{ raw: string; corpus: string; number: string; reason: string; field?: string }>;
   diagnostics?: RunDiagnostics;                                                           // card #582 CAPTURE-ONLY — verdict-inert bank instrumentation (pre-dedup snapshot + stage counts); present only when AUDIT_BANK_RUN_RECORD is on; NEVER read by deriveVerdict
 }
 
@@ -380,7 +385,10 @@ function isFar52121Boilerplate(ob: string): boolean {
 /** The UCF section a finding is CITED to (from its citation, e.g. "§C" / "Section C" / "C - ..."). null when the
  *  citation names a clause number or is unparseable — such a finding cannot ground a section-scoped obligation. */
 function findingSection(f: TypedFinding): string | null {
-  const c = (f.citation || "").trim();
+  // STRIP the engine's own withholding marker before scanning. Its prose ends in "withhel*d*", and the bare
+  // UCF-letter scan below matches that `d` — so a gated citation reported section "D" where the ungated one
+  // reported none, drifting replay coverage away from the live run. (Review finding #4 on PR #294.)
+  const c = stripWithholdMarkers(f.citation || "").trim();
   // A commercial clause number IS its UCF section — 52.212-1 ≡ §L (instructions), 52.212-2 ≡ §M (evaluation),
   // 52.212-4/-5 ≡ §I (clauses), 52.204-8 / 52.212-3 ≡ §K (reps/certs). Map them so a finding that cites the clause
   // number instead of the §-letter still grounds its own section (else §M/§I/§K attested-coverage would false-drop
@@ -2925,13 +2933,24 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   const citeSource = ctx.groundingSource ?? ctx.fullSource;
   const citeGate = gateFindingCitations(findings, citeSource);
   const stopperGate = gateFindingCitations(decision.showStoppers, citeSource);
-  const withheldAll = [...citeGate.withheld, ...stopperGate.withheld];
+  // THE HEADLINE, which the first cut of this gate missed entirely. `decision.reason` is composed by
+  // deriveVerdict from `showStoppers[].requirement`, persisted as `v3.reason`, and rendered VERBATIM as the
+  // report's "Bottom line" (build-data.ts:600 → render.ts:146, render-deck, render-pdf) plus
+  // compliance_summary and bid_recommendation. Gating findings and show-stoppers while leaving it alone
+  // meant the report could print "[citation withheld …]" in the show-stopper block and "DFARS 215-2" in the
+  // sentence directly above it — the exact leak this gate claimed to close. (Review finding #2 on PR #294.)
+  const reasonGate = citationFidelityEnabled()
+    ? gateCitationsInText(decision.reason ?? "", citeSource, "reason")
+    : { text: decision.reason ?? "", withheld: [] as typeof citeGate.withheld };
+  const withheldAll = [...citeGate.withheld, ...stopperGate.withheld, ...reasonGate.withheld];
   if (withheldAll.length) {
     console.warn(`[orchestrator] citation-fidelity: withheld ${withheldAll.length} unresolvable citation(s) across ${citeGate.touched} finding(s) + ${stopperGate.touched} show-stopper(s) — ` +
       withheldAll.map((w) => `${w.raw} (${w.field})`).join("; "));
   }
   // Same-reference when nothing was withheld ⇒ flag-OFF and clean-record runs return the identical object.
-  const decisionOut = stopperGate.touched ? { ...decision, showStoppers: stopperGate.findings } : decision;
+  const decisionOut = (stopperGate.touched || reasonGate.withheld.length)
+    ? { ...decision, ...(stopperGate.touched ? { showStoppers: stopperGate.findings } : {}), ...(reasonGate.withheld.length ? { reason: reasonGate.text } : {}) }
+    : decision;
 
   return { decision: decisionOut, inputs, findings: citeGate.findings, coverage: { required, covered, missing, attestations, coreMissing }, perLens, conflict, sectionsRead: [...sectionsRead], trace, ...(withheldAll.length ? { citationsWithheld: withheldAll } : {}), ...(verifierDrops.length ? { verifierDrops } : {}), ...(judgmentLayerEnabled() && (opts.judgmentReason || opts.judgmentEntail) ? { judgmentCost } : {}), ...(_bankDiag ? { diagnostics: _bankDiag } : {}) };
 }

@@ -58,6 +58,19 @@ const toText = (html: string) => html
   const textBefore = toText(htmlBefore);
 
   // ── B: the row as the executor would persist it with the gate ON ──
+  // SOURCE SHAPE — production gates against `ctx.groundingSource ?? ctx.fullSource`, and `raw_pdf_text` is
+  // persisted as fullSource, which on a chunked-ingest run is the COMPRESSED digest. Presence only ever
+  // exonerates in this gate, so a smaller text can only make it withhold MORE — the proof was running on a
+  // strictly more aggressive input than production and its byte-identity/no-op claims were not measured on
+  // the production shape. Stated rather than silently accepted: this record is a single-doc, non-chunked
+  // ingest, so here fullSource IS the whole binding text and the two coincide. On a chunked record they do
+  // not, and this harness cannot see groundingSource because it is not persisted. (Review finding #6 on
+  // PR #294.)
+  const chunked = !!cj.source_truncated || (cj.read_modes && JSON.stringify(cj.read_modes).includes("chunk"));
+  console.log(`source shape: raw_pdf_text=${src.length}B · chunked/truncated=${!!chunked} · ` +
+    (chunked ? "⚠ groundingSource would differ in production — this proof is NOT production-shaped for this row"
+             : "fullSource == groundingSource for this row, so the gate sees what production sees"));
+
   const gFind = gateFindingCitations(cj.v3?.findings ?? [], src, { enabled: true });
   const gStop = gateFindingCitations(cj.v3?.showStoppers ?? [], src, { enabled: true });
   const rowAfter = { ...row, compliance_json: { ...cj, v3: { ...cj.v3, findings: gFind.findings, showStoppers: gStop.findings } } };

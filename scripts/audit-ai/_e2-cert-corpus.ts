@@ -43,10 +43,19 @@ for (const f of files) {
   const after = JSON.parse(JSON.stringify(rec)) as RunRecord;
   (after.result as any).findings = on.findings;
   try {
+    // PROPERTIES THAT EXIST. The first version of this cert compared `.verdict` and `.coverage` — neither is
+    // on ReplayResult, so both sides were `undefined`, the counters could never increment, and "CERT GREEN"
+    // was unconditional. I quoted that green in a commit message and a PR body. `tsc` does not catch it
+    // because tsconfig EXCLUDES scripts/**/_*.ts. The real fields are replayVerdict / missing / coreMissing.
+    // (Review finding #3 on PR #294.) [[feedback_certs_must_be_proven_falsifiable]]
     const rb = replayRunRecord(before);
     const ra = replayRunRecord(after);
-    if (JSON.stringify(rb.verdict) !== JSON.stringify(ra.verdict)) { verdictDeltas++; notes.push(`${f}: VERDICT DELTA ${JSON.stringify(rb.verdict)} → ${JSON.stringify(ra.verdict)}`); }
-    if (JSON.stringify(rb.coverage) !== JSON.stringify(ra.coverage)) { coverageDeltas++; notes.push(`${f}: COVERAGE DELTA`); }
+    const set = (xs: string[]) => [...xs].sort().join(",");
+    if (rb.replayVerdict !== ra.replayVerdict) { verdictDeltas++; notes.push(`${f}: VERDICT DELTA ${rb.replayVerdict} → ${ra.replayVerdict}`); }
+    if (set(rb.missing) !== set(ra.missing) || set(rb.coreMissing) !== set(ra.coreMissing)) {
+      coverageDeltas++;
+      notes.push(`${f}: COVERAGE DELTA missing [${set(rb.missing)}] → [${set(ra.missing)}] · coreMissing [${set(rb.coreMissing)}] → [${set(ra.coreMissing)}]`);
+    }
   } catch (e) {
     notes.push(`${f}: replay threw — ${(e as Error).message.slice(0, 120)}`);
   }
@@ -57,6 +66,11 @@ console.log(`records with a withheld citation: ${touched} · citations withheld:
 console.log(`FLAG-OFF non-identical array returns: ${byteDiffs}   (must be 0)`);
 console.log(`verdict deltas: ${verdictDeltas}   coverage deltas: ${coverageDeltas}   (both must be 0)`);
 if (notes.length) { console.log("\n── detail ──"); notes.forEach((n) => console.log("  " + n)); }
+// A cert that never exercised its own subject is not evidence. The founding record is NOT in the banked
+// corpus, so `withheldTotal` is legitimately 0 here — say so out loud rather than letting a reassuring zero
+// read as coverage. (The live-corpus census is what exercises the withholding path.)
+if (withheldTotal === 0) console.log("NOTE: 0 citations withheld across the banked corpus — the founding record (d0664ba2) is NOT banked, so this cert measures NON-INTERFERENCE only, not detection. Detection is covered by _e2-citation-census-live.ts.");
+if (loaded === 0) { console.log("\n\u274c CERT VACUOUS — no banked record carried findings"); process.exit(1); }
 const green = byteDiffs === 0 && verdictDeltas === 0 && coverageDeltas === 0;
 console.log(`\n${green ? "✅ CERT GREEN" : "❌ CERT RED"}`);
 process.exit(green ? 0 : 1);
