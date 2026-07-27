@@ -2370,7 +2370,22 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     // verbatim in source has grounded set false and is DROPPED here (fail-safe — a hallucinated/paraphrased excerpt
     // never survives, Rule 64 / I3). This is the load-bearing re-grounding the proposer's grounded:false depends on.
     const reground = opts.seedFindings.map((f) => ({ ...f, grounded: isGrounded(ctx, f) })).filter((f) => f.grounded);
-    reground.forEach((f, j) => { f.id = f.id ?? `judgment#${j}`; });
+    // ID UNIQUENESS ON THE SEED PATH (review round 4, finding #2). This used to be `f.id ?? judgment#${j}` with
+    // `j` the index AFTER the grounded filter — the one numbering the dupe-id fix did not convert. A seed is a
+    // prior run's `result.findings`, which MIXES id-carrying rows with id-less ones: the notice-body eligibility
+    // and size-standard caveat emitters push findings with no `id` at all. Drop three judgment rows in
+    // re-grounding and the id-less rows slide onto indices a surviving `judgment#N` already holds — the exact
+    // duplicate `applyHeadRepairsTo` matches on, which writes one finding's quote onto ANOTHER's requirement.
+    // A seed banked before the dupe-id fix can also carry duplicates of its own, so uniqueness is enforced
+    // across the whole set rather than only over the id-less rows: first claim wins, every later collision is
+    // re-issued through the same helper the lens paths use.
+    const claimed: TypedFinding[] = [];
+    const reissue: TypedFinding[] = [];
+    const seenSeedIds = new Set<string>();
+    for (const f of reground) {
+      if (f.id && !seenSeedIds.has(f.id)) { seenSeedIds.add(f.id); claimed.push(f); } else reissue.push(f);
+    }
+    assignUniqueFindingIds(reissue, "judgment", claimed);
     findings = reground;
     perLens["judgment"] = reground.length;
     // The proposer read the WHOLE assembled source → every present section counts as read for completeness (a

@@ -19,7 +19,13 @@ import fs from "fs";
 // only the EXCERPT (a verbatim source span). A truncated `requirement` is a model SYNTHESIS with no source
 // span to re-ground to — it is (correctly) NOT auto-repaired: STEP-1 retry prevents it at generation time,
 // and a stored one honestly fails the gate for human review rather than being model-completed (Rule 64).
-import { isTruncatedExcerpt } from "@/lib/audit-excerpt-repair";
+// analyzedExcerptOf — SCORE THE ANALYZED SPAN, NOT THE DISPLAY SPAN (review round 4, finding #4). The head
+// re-grounding pass widens an excerpt for the reader and stamps the pre-widening span; grounding is a question
+// about what the engine ANALYZED. It also grounds against `groundingSource ?? fullSource`, and this gate only
+// has `fullSource` — on a compressed-digest run (card 291) a widened head can pull in text the compressor
+// removed, so scoring the widened span would report a correctly-grounded finding as possible fabrication on
+// the arc's own acceptance instrument.
+import { isTruncatedExcerpt, analyzedExcerptOf } from "@/lib/audit-excerpt-repair";
 
 const norm = (s: string) => (s || "").toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, " ").replace(/[^a-z0-9 '"$%./-]/g, "").trim();
 
@@ -55,7 +61,7 @@ export function verifyRunQuality(rec: any, opts?: { min?: number }): RunQualityR
   const min = opts?.min ?? 0.72;
   const source: string = rec.input?.fullSource ?? "";
   const findings: any[] = rec.result?.findings ?? [];
-  const rows = findings.map((f) => ({ id: f.id, lens: f.lens, kind: f.kind, ratio: coverageRatio(f.excerpt || "", source), ok: false }));
+  const rows = findings.map((f) => ({ id: f.id, lens: f.lens, kind: f.kind, ratio: coverageRatio(analyzedExcerptOf(f), source), ok: false }));
   rows.forEach((r) => (r.ok = r.ratio >= min));
   const truncated = findings
     .filter((f) => isTruncated(f.excerpt) || isTruncated(f.requirement))

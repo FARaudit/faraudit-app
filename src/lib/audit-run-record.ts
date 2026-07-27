@@ -81,7 +81,14 @@ export interface RunRecordInput {
   noticeType?: string | null;                   // SAM notice type — scopes the §L/§M requirement (Layer-2, card 262)
   formIdentified?: boolean;                     // whether a substantive primary form was recognized — corroborates body-absent
   documentsComplete?: boolean | null;           // the run's documentsComplete signal (distinct from manifestComplete)
-  noticeBodyText?: string;                      // raw SAM notice body — the delimiter-independent eligibility floor reads it
+  // BANKED, NOT YET CONSUMED BY REPLAY — say so rather than imply otherwise (review round 4, finding #1). The
+  // only readers of `ctx.noticeBodyText` are the eligibility floor and the three caveat emitters, and all four
+  // live inside `runAgenticAudit`; `replayRunRecord` runs the deterministic stages only, none of which touch it.
+  // It is banked anyway because a compressed-digest run does NOT keep the notice body recoverable from
+  // `fullSource` (the emitters' `docRegions` fallback finds nothing there), so dropping it would foreclose ever
+  // replaying the floor. Cost is real — a second copy of the notice body — and it is the reason `groundingSource`
+  // above is deliberately NOT banked; revisit if a compressed-digest run is never replayed.
+  noticeBodyText?: string;                      // raw SAM notice body — what the live-run eligibility floor reads
 }
 
 export interface RunRecord {
@@ -125,7 +132,13 @@ export interface BuildRunRecordArgs {
 /** Capture a complete, replayable record from a finished paid run. Pure — computes the deterministic
  *  format/manifest snapshot off the source and copies the run's grounded outputs verbatim. */
 export function buildRunRecord(args: BuildRunRecordArgs): RunRecord {
-  const ctx: AuditToolContext = { fullSource: args.input.fullSource, sections: args.input.sections };
+  // CAPTURE SCOPES THE WAY REPLAY DOES (review round 4, finding #3). `format.coreMissing` is a snapshot taken
+  // at capture; when replay learned to scope §L/§M by notice type, capture kept the fail-safe "solicitation-type
+  // buy" default — so a Sources Sought record recorded coreMissing ["C","L","M"] while its own replay computed
+  // []. Same inputs, same function, two answers, baked into every new record. Both sides now read the banked
+  // scoping inputs, so the snapshot agrees with the replay it is supposed to be a baseline for.
+  const ctx: AuditToolContext = { fullSource: args.input.fullSource, sections: args.input.sections,
+    ...(args.input.noticeBodyText ? { noticeBodyText: args.input.noticeBodyText } : {}) };
   return {
     schema: RUN_RECORD_SCHEMA,
     meta: args.meta,
@@ -134,7 +147,11 @@ export function buildRunRecord(args: BuildRunRecordArgs): RunRecord {
       formatDetected: detectFormat(ctx),
       procurementPart: procurementPart(ctx),
       manifest: buildManifest(ctx),
-      coreMissing: coreMissingFor(ctx, { commercialHonestFail: args.commercialHonestFail }),
+      coreMissing: coreMissingFor(ctx, {
+        commercialHonestFail: args.commercialHonestFail,
+        ...(args.input.noticeType !== undefined ? { requiresLM: requiresProposalSections(args.input.noticeType) } : {}),
+        ...(args.input.formIdentified !== undefined ? { formIdentified: args.input.formIdentified } : {}),
+      }),
     },
     result: {
       verdict: args.result.decision.verdict,
@@ -187,8 +204,9 @@ export interface ReplayResult {
  *  persisted inputs. `drift` lists any place the record's recorded values disagree with a fresh deterministic
  *  recompute (stale record / changed engine). Options mirror the run-env flags so the replay is faithful. */
 export function replayRunRecord(rec: RunRecord, opts?: { sectionMDepth?: boolean; commercialHonestFail?: boolean }): ReplayResult {
-  // The notice body rides ctx exactly as it does in the live run — the delimiter-independent eligibility floor
-  // reads it from there, so a replay without it is scanning a smaller document than the run did.
+  // The notice body rides ctx as it does in the live run. NOTE it changes nothing here today: no deterministic
+  // stage below reads it (see the field's note on RunRecordInput). It is placed on ctx so that wiring the
+  // eligibility floor into replay is a one-line change rather than a re-capture of the whole corpus.
   const ctx: AuditToolContext = { fullSource: rec.input.fullSource, sections: rec.input.sections,
     ...(rec.input.noticeBodyText ? { noticeBodyText: rec.input.noticeBodyText } : {}) };
   const findings: TypedFinding[] = rec.result.findings;
