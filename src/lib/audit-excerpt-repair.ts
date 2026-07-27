@@ -444,11 +444,16 @@ export function repairClippedExcerpts(findings: TypedFinding[], source: string):
     // NOT flag-gated, so adding an unconditional skip changed LIVE behaviour with verdict reach: a verified
     // finding whose excerpt was clipped by a max_tokens stop would keep the clipped excerpt and ship it. TIER
     // E requires flag-OFF byte-identity, so the new behaviour rides E1's flag with everything else.
+    //
+    // ORDER MATTERS (review round 3, finding #4). The truncation test comes FIRST. A verified finding whose
+    // excerpt was never clipped is not a skip — this pass had nothing to do with it either way — and counting
+    // it as one overstates the skip telemetry an operator reads while arming E1, in a log line whose whole job
+    // is to say how much the flag changed. Only a repair this guard actually PREVENTED is reported.
+    if (!isTruncatedExcerpt(f.excerpt)) continue;           // only touch what the gate flags as truncated
     if (headRegroundEnabled() && (f as { verifiedBy?: unknown }).verifiedBy) {
       res.skipped.push({ id: f.id, lens: f.lens, reason: "already verified (J-2 excerptHash) — left as emitted" });
       continue;
     }
-    if (!isTruncatedExcerpt(f.excerpt)) continue;           // only touch what the gate flags as truncated
     const span = findRepairSpan(source, f.excerpt);
     if (!span) {
       res.unrepairable++;
@@ -530,6 +535,38 @@ export function repairHeadClippedExcerpts(findings: TypedFinding[], source: stri
     res.repaired++;
   }
   return res;
+}
+
+/** Apply an already-computed head repair to a SECOND set of objects holding the same findings.
+ *
+ *  Why this exists (review round 3, finding #2). `deriveVerdict` copies every finding it decides on —
+ *  `dispositions` is `deciding.map(f => ({...f, disposition}))` and `showStoppers` is a subset of those — and
+ *  those copies are taken BEFORE this pass runs, because the pass is deliberately post-verdict. The v3 payload
+ *  then persists the show-stopper band from `decision.showStoppers`, NOT from `findings`. So without this,
+ *  a restored head reaches every part of the report EXCEPT the show-stopper tile — which is exactly where the
+ *  founding clipped excerpt ("15-2, Instructions…") renders. The fix must reach both persisted sets, the same
+ *  way the citation gate had to.
+ *
+ *  Display-layer only, and provably so: it runs after the verdict is derived, it copies a span this module has
+ *  already accepted for the same finding, and it carries `excerptPreReground` across so `analyzedExcerptOf`
+ *  still answers with what the model actually emitted. It never widens anything the classifier guard refused. */
+export function applyHeadRepairsTo(
+  targets: Array<{ id?: string; lens?: string; excerpt?: string; excerptPreReground?: string }> | undefined,
+  changes: ExcerptRepairResult["changes"],
+): number {
+  if (!targets?.length || !changes.length) return 0;
+  let applied = 0;
+  for (const t of targets) {
+    // Match on id when the finding carries one; fall back to lens + the exact pre-repair excerpt, which is
+    // what identified the row in the copy. Never match on excerpt alone — two lenses can quote one line.
+    const c = changes.find((ch) =>
+      (ch.id && t.id) ? ch.id === t.id : (ch.lens === t.lens && ch.before === t.excerpt));
+    if (!c || t.excerpt === c.after) continue;
+    if (t.excerptPreReground === undefined) t.excerptPreReground = t.excerpt;
+    t.excerpt = c.after;
+    applied++;
+  }
+  return applied;
 }
 
 /** The span the ANALYSIS rested on — the model's own excerpt, before any widening for readability. Every

@@ -22,7 +22,7 @@ import { isBindingDoc, hasEngineText } from "./sam-attachments";
 import { looksMojibake } from "./pdf-ocr";
 import { NOTICE_BODY_DOC_NAME } from "./agentic-executor";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
-import { repairClippedExcerpts, repairHeadClippedExcerpts, analyzedExcerptOf } from "./audit-excerpt-repair";
+import { repairClippedExcerpts, repairHeadClippedExcerpts, applyHeadRepairsTo, analyzedExcerptOf } from "./audit-excerpt-repair";
 // ATTRIBUTION USES THE ANALYZED SPAN, NOT THE DISPLAYED ONE (ARC #747 · E1). Every "does this finding cover
 // that text?" computation below — grounding attribution, region coverage, the eligibility floors, the caveat
 // emitters — asks whether the ANALYSIS examined a passage. Head re-grounding widens an excerpt backward so a
@@ -2888,7 +2888,10 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // coverage-stage replay. Rides the AUDIT_BANK_RUN_RECORD flag: when banking is off the snapshot is never taken and
   // `_bankDiag` stays undefined ⇒ AuditResult.diagnostics absent ⇒ byte-identical. Never read by deriveVerdict.
   const _bankInstrOn = process.env.AUDIT_BANK_RUN_RECORD === "true";
-  const _preDedupFindings = _bankInstrOn ? findings.slice() : null;
+  // Per-finding copies, not `.slice()` (review round 3, finding #1). A shallow array copy holds the SAME
+  // objects, so the post-verdict head pass would rewrite the excerpts inside this "pre-processing" snapshot
+  // too — a diagnostic whose entire value is showing the findings as they stood at this stage.
+  const _preDedupFindings = _bankInstrOn ? findings.map((f) => ({ ...f })) : null;
   findings = applyFindingDedup(findings, { enabled: process.env.AUDIT_FINDING_DEDUP === "true" });
   // CROSS-FLEET DEADLINE-DEDUP (Phase 3 Unit 6 follow-on) — collapses the no-clause cross-fleet inflation the clause gate
   // can't reach: plain rows restating one dated deadline across the two paraphrasing panels. Runs right after the clause
@@ -2924,7 +2927,15 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
       } catch { /* logging never affects the verdict */ }
     }
   }
-  const inputs: VerdictInputs = { findings, bidderProfile, samSetAside: opts.setAside ?? null, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(opts.dispositiveCompletenessForEligibility !== undefined ? { dispositiveCompletenessForEligibility: opts.dispositiveCompletenessForEligibility } : {}), ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(process.env.AUDIT_SITEVISIT_SEVERITY_FLOOR === "true" ? { siteVisitSeverityFloor: true } : {}), ...(coverageV2 ? { coverageV2 } : {}), ...(soleSourceLock ? { soleSourceLock } : {}), ...(opts.temporal ? { temporalSnapshot: opts.temporal.snapshot, liveSam: opts.temporal.liveSam, ingestedAmendmentComplete: opts.temporal.ingestedAmendmentComplete, today: opts.temporal.today, nowIso: opts.temporal.nowIso ?? null } : {}) };
+  // SNAPSHOT, not the live array (review round 3, finding #1). `inputs` is what the verdict was derived from,
+  // and `audit-run-record.ts` both PERSISTS it and REPLAYS `deriveVerdict(rec.result.inputs)` off it. The
+  // post-verdict head pass below mutates findings IN PLACE, so sharing the objects would let a span widened
+  // for the reader travel into the banked record and be re-decided on replay — `isInquiryDeadlineBenign` flips
+  // and a BID re-derives as NHR. Placement after `deriveVerdict` protects the live verdict; only a copy
+  // protects the recorded one. Shallow per-finding copies: the fields decide reads are all primitives, and
+  // nothing downstream compares finding identity across the two arrays (checked). Values are identical at this
+  // point, so a flag-OFF run banks byte-identical JSON.
+  const inputs: VerdictInputs = { findings: findings.map((f) => ({ ...f })), bidderProfile, samSetAside: opts.setAside ?? null, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(opts.dispositiveCompletenessForEligibility !== undefined ? { dispositiveCompletenessForEligibility: opts.dispositiveCompletenessForEligibility } : {}), ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(process.env.AUDIT_SITEVISIT_SEVERITY_FLOOR === "true" ? { siteVisitSeverityFloor: true } : {}), ...(coverageV2 ? { coverageV2 } : {}), ...(soleSourceLock ? { soleSourceLock } : {}), ...(opts.temporal ? { temporalSnapshot: opts.temporal.snapshot, liveSam: opts.temporal.liveSam, ingestedAmendmentComplete: opts.temporal.ingestedAmendmentComplete, today: opts.temporal.today, nowIso: opts.temporal.nowIso ?? null } : {}) };
   // Phase-1 SHADOW (cards #596/#597) — compute the positive-shape pole BESIDE the real verdict and bank it. VERDICT-INERT:
   // the shadow is never routed on; the live deriveVerdict below is untouched. Gated on AUDIT_POSITIVE_VERDICT_POLE (default-
   // OFF ⇒ never computed ⇒ byte-identical) AND banking on (the diagnostics carrier). naics is the SAM fact (Rule 64).
@@ -2975,8 +2986,23 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   const headRepair = repairHeadClippedExcerpts(findings, ctx.groundingSource ?? ctx.fullSource, {
     rejectIfClassificationMoves: (before, after) => classificationSignature(before) !== classificationSignature(after),
   });
+  // REACH BOTH PERSISTED SETS (review round 3, finding #2). `deriveVerdict` decides on COPIES — `dispositions`
+  // is `deciding.map(f => ({...f, disposition}))` and `showStoppers` is a subset of those — and it took them
+  // before this pass ran, because this pass is deliberately post-verdict. `audit-v3-report.ts` then persists
+  // the show-stopper band from `decision.showStoppers`, not from `findings`. So the restored head reached the
+  // whole report EXCEPT the one tile the founding clipped excerpt renders in. Post-verdict and display-only:
+  // the span was already accepted for this finding above, `excerptPreReground` travels with it, and a widening
+  // the classifier guard refused was never in `changes` to begin with.
+  const stopperRepairs = applyHeadRepairsTo(
+    (decision as { showStoppers?: Array<{ id?: string; lens?: string; excerpt?: string; excerptPreReground?: string }> }).showStoppers,
+    headRepair.changes);
+  const dispositionRepairs = applyHeadRepairsTo(
+    (decision as { dispositions?: Array<{ id?: string; lens?: string; excerpt?: string; excerptPreReground?: string }> }).dispositions,
+    headRepair.changes);
   if (headRepair.repaired || headRepair.unrepairable || headRepair.skipped.length) {
     console.log(`[orchestrator] excerpt-head-reground: restored ${headRepair.repaired} clipped head(s)` +
+      `${stopperRepairs ? `, ${stopperRepairs} propagated to show-stopper(s)` : ""}` +
+      `${dispositionRepairs ? `, ${dispositionRepairs} to disposition(s)` : ""}` +
       `${headRepair.unrepairable ? `, ${headRepair.unrepairable} left as emitted` : ""}` +
       `${headRepair.skipped.length ? `, ${headRepair.skipped.length} skipped (${[...new Set(headRepair.skipped.map((s) => s.reason))].join(" · ")})` : ""}` +
       (headRepair.changes.length ? ` — ${headRepair.changes.map((c) => c.id ?? c.lens).join(", ")}` : ""));
