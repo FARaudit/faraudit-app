@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 // ━━ Content Security Policy ━━
 // Tailwind v4 generates dynamic styles at runtime — 'unsafe-inline' style is required.
@@ -126,6 +127,27 @@ const nextConfig: NextConfig = {
       // /home instead of their real destinations). /settings was already a
       // real route.
     ];
+  },
+  // ━━ PIN `sharp` TO THE ROOT COPY — makes the LOCAL build gate match Vercel ━━
+  // `npm run build` failed on a clean main locally while Vercel built green, so there was no local gate
+  // that matched the deploy gate and a build-breaking change was only catchable after push.
+  //
+  // Cause: the Railway worker has its own install at agents/audit-ai/node_modules (gitignored, so it exists
+  // on a developer box and NEVER on Vercel). The app reaches the worker's PDF helper —
+  // src/app/api/audit/route.ts → src/lib/sam-pdf.ts → agents/audit-ai/pdf.ts — and from there Node resolves
+  // `sharp` to the NESTED copy. Next's automatic opt-out for `sharp` (it is on the built-in
+  // serverExternalPackages list, which our array concats onto rather than replaces) matches the root
+  // node_modules copy, so the nested one gets BUNDLED instead — and a bundled sharp cannot load its native
+  // binary. Page-data collection then died with "Could not load the sharp module using the darwin-arm64
+  // runtime" on every route that reaches pdf.ts. Proven by moving the nested tree aside: build went green,
+  // restored: build failed again.
+  //
+  // On Vercel this alias is a NO-OP — the nested tree is not installed there, so `sharp` already resolves to
+  // exactly this path. It only removes the local divergence. Deleting the worker's install would also fix
+  // the build, but the worker legitimately owns it (and `ws` is worker-only, absent at root).
+  webpack: (config: { resolve: { alias: Record<string, string> } }) => {
+    config.resolve.alias = { ...config.resolve.alias, sharp: path.resolve(__dirname, "node_modules/sharp") };
+    return config;
   }
 };
 
