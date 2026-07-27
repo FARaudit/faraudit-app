@@ -39,9 +39,22 @@ export interface RunRecordMeta {
  *  curated `flags` subset recorded only ~5 keys, so 13 class-B flags were unrecoverable — card #578/#580 finding). */
 export function captureAuditFlagEnv(env: Record<string, string | undefined>): Record<string, string> {
   const out: Record<string, string> = {};
+  const malformed: string[] = [];
   for (const k of Object.keys(env).filter((k) => k.startsWith("AUDIT_")).sort()) {
     const v = env[k];
-    if (typeof v === "string") out[k] = v;
+    if (typeof v !== "string") continue;
+    out[k] = v;
+    // A key containing whitespace is a SETTING MISTAKE, not a flag: several banked records carry a single
+    // variable literally named "AUDIT_A AUDIT_B AUDIT_C …" = "true", which means those ~30 flags were never
+    // set at all in that run. Capture stays faithful — the record must show what actually ran, mistake
+    // included — but the mistake is announced instead of banked as if it were a flag state. Silent capture is
+    // how a run whose flags differed from production got replayed as evidence ABOUT production.
+    if (/\s/.test(k.trim())) malformed.push(k);
+  }
+  if (malformed.length) {
+    const hidden = malformed.reduce((n, k) => n + k.trim().split(/\s+/).filter((t) => t.startsWith("AUDIT_")).length, 0);
+    console.warn(`[run-record] MALFORMED flag env: ${malformed.length} variable name(s) contain whitespace, hiding ~${hidden} flag(s) that are therefore UNSET in this run — ` +
+      malformed.map((k) => `"${k.slice(0, 60)}${k.length > 60 ? "…" : ""}"`).join(" · "));
   }
   return out;
 }
