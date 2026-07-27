@@ -189,6 +189,10 @@ function buildFindings(showStoppers: FindingLite[], all: FindingLite[]): V4Findi
 // with more/less trailing context (e.g. the one-proposal rule persisted at 156 vs 329 chars). 120 chars of identical
 // normalized source text is specific enough that two genuinely distinct obligations never collide.
 const excerptHeadKey = (e: string): string => normReqKey(e).slice(0, 120);
+// A merged row keeps at most this many distinct obligations. Beyond it the row stops being readable, and a
+// span attracting four different obligations is a signal the dedup key is too coarse for that source — worth
+// knowing rather than papering over, so the overflow is logged.
+const MAX_MERGED_REQS = 3;
 export function dedupeByExcerpt(list: V4Finding[]): V4Finding[] {
   const byKey = new Map<string, V4Finding>();
   const out: V4Finding[] = [];
@@ -200,6 +204,18 @@ export function dedupeByExcerpt(list: V4Finding[]): V4Finding[] {
       const cites = survivor.cite.split(/\s*·\s*/).filter(Boolean);
       const add = s(f.cite).trim();
       if (add && !cites.some((c) => c.toLowerCase() === add.toLowerCase())) survivor.cite = [...cites, add].join(" · ");
+      // …and the REQUIREMENT too. Citations were merged here from the start; requirements were dropped, so a
+      // finding whose obligation differed left the report entirely — the reader saw one row and had no way to
+      // know a second obligation had been folded into it. Two lenses quoting the same §L schedule span, one
+      // stating the page limit and one the submission portal, shipped as the page limit alone. The engine's
+      // applyFindingDedup (audit-decide.ts) has always preserved every facet with " · "; this is the report
+      // layer catching up to it. Capped, because a row is a row and not a paragraph.
+      const reqs = s(survivor.req).split(/\s*·\s*/).map((r) => r.trim()).filter(Boolean);
+      const addReq = s(f.req).trim();
+      if (addReq && !reqs.some((r) => r.toLowerCase() === addReq.toLowerCase())) {
+        if (reqs.length < MAX_MERGED_REQS) survivor.req = [...reqs, addReq].join(" · ");
+        else console.error(`[report-dedup] dropped a 4th obligation on one excerpt key — dedup key may be too coarse here: ${addReq.slice(0, 80)}`);
+      }
       continue;
     }
     const copy: V4Finding = { ...f };
