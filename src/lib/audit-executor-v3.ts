@@ -882,6 +882,13 @@ export async function executeAgenticPrimary(
         naics: solicitation?.naicsCode ?? null,
         setAside: solicitation?.typeOfSetAside ?? null,
         manifestComplete: manifestComplete && !constructionOOS,
+        // The coverage-determining inputs. These are the SAME values handed to auditPackage above; banking
+        // them is what lets a $0 replay reproduce this run's coverage instead of re-deriving a stricter one
+        // from fullSource alone. noticeType + formIdentified scope whether §L/§M are required at all, so a
+        // replay without them grades sections missing that this run never required.
+        noticeType: solicitation?.type ?? null,
+        formIdentified: input.ingestion?.form_identified,
+        ...(noticeBody?.text ? { noticeBodyText: noticeBody.text } : {}),
       },
       billing: { honestFail, billable: billable(honestFail) },
       commercialHonestFail: process.env.AUDIT_PROCUREMENT_TYPE_SECTIONS === "true",

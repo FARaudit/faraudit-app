@@ -16,7 +16,7 @@
 
 import type { AuditResult, RunDiagnostics } from "./audit-orchestrator";
 import { buildManifest, completenessOf, coreMissingFor, locateObligationContext } from "./audit-orchestrator";
-import { detectFormat, procurementPart, type AuditToolContext } from "./audit-tools";
+import { detectFormat, procurementPart, requiresProposalSections, type AuditToolContext } from "./audit-tools";
 import { deriveVerdict, applyFindingDedup, applyCrossFleetDedup } from "./audit-decide";
 import { gradeCoverageV2, verifyRecitalInSource, type CoverageV2 } from "./audit-gate-v2";
 import type { TypedFinding, VerdictInputs, BidderProfile } from "./audit-findings";
@@ -66,6 +66,22 @@ export interface RunRecordInput {
   naics: string | null;
   setAside: string | null;
   manifestComplete: boolean | null;             // the external N8 signal the run used (null = not supplied)
+  // ── COVERAGE-DETERMINING INPUTS (added 2026-07-27; ALL OPTIONAL so every existing record still loads) ──
+  // Without these a replay cannot reproduce the run's coverage, and the gap is not subtle: a banked run graded
+  // `missing: ["L"]` and reached BID_WITH_CAUTION, while replaying the same record from the same source graded
+  // C/L/M absent and capped at INCOMPLETE. `noticeType` + `formIdentified` are the reason — Layer-2 (card 262)
+  // uses them to SCOPE whether §L/§M are required at all, so omitting them silently changes what "complete"
+  // means. The consequence was not academic: no banked record can be replayed to a committal verdict, which is
+  // why all 46 carry an EMPTY show-stopper band and the report's most consequential region has no $0 evidence
+  // behind it at all.
+  //
+  // Deliberately NOT banked: `groundingSource`. It is byte-identical to `fullSource` in all 39 records that
+  // carry both, so persisting it again would double the largest field to store a copy. Replay defaults it to
+  // fullSource, which is exactly what the orchestrator does when it is absent.
+  noticeType?: string | null;                   // SAM notice type — scopes the §L/§M requirement (Layer-2, card 262)
+  formIdentified?: boolean;                     // whether a substantive primary form was recognized — corroborates body-absent
+  documentsComplete?: boolean | null;           // the run's documentsComplete signal (distinct from manifestComplete)
+  noticeBodyText?: string;                      // raw SAM notice body — the delimiter-independent eligibility floor reads it
 }
 
 export interface RunRecord {
@@ -171,14 +187,26 @@ export interface ReplayResult {
  *  persisted inputs. `drift` lists any place the record's recorded values disagree with a fresh deterministic
  *  recompute (stale record / changed engine). Options mirror the run-env flags so the replay is faithful. */
 export function replayRunRecord(rec: RunRecord, opts?: { sectionMDepth?: boolean; commercialHonestFail?: boolean }): ReplayResult {
-  const ctx: AuditToolContext = { fullSource: rec.input.fullSource, sections: rec.input.sections };
+  // The notice body rides ctx exactly as it does in the live run — the delimiter-independent eligibility floor
+  // reads it from there, so a replay without it is scanning a smaller document than the run did.
+  const ctx: AuditToolContext = { fullSource: rec.input.fullSource, sections: rec.input.sections,
+    ...(rec.input.noticeBodyText ? { noticeBodyText: rec.input.noticeBodyText } : {}) };
   const findings: TypedFinding[] = rec.result.findings;
   const sectionsRead = new Set(rec.result.sectionsRead);
 
   const formatDetected = detectFormat(ctx);
   const part = procurementPart(ctx);
   const required = buildManifest(ctx);
-  const coreMissing = coreMissingFor(ctx, { commercialHonestFail: opts?.commercialHonestFail });
+  // SCOPE THE §L/§M REQUIREMENT THE WAY THE RUN DID. `coreMissingFor` has always accepted requiresLM /
+  // formIdentified; replay never supplied them, so it fell back to the fail-safe "solicitation-type buy"
+  // default and could grade sections missing that the run never required. Records banked before these fields
+  // existed have `noticeType === undefined`, and `requiresProposalSections(undefined)` returns the same
+  // fail-safe default — so old records replay byte-identically and only NEW records gain the fidelity.
+  const coreMissing = coreMissingFor(ctx, {
+    commercialHonestFail: opts?.commercialHonestFail,
+    ...(rec.input.noticeType !== undefined ? { requiresLM: requiresProposalSections(rec.input.noticeType) } : {}),
+    ...(rec.input.formIdentified !== undefined ? { formIdentified: rec.input.formIdentified } : {}),
+  });
   const { covered, missing, attestations } = completenessOf(ctx, required, findings, sectionsRead, { sectionMDepth: opts?.sectionMDepth });
 
   const sections: SectionReplay[] = attestations.map((a) => ({
