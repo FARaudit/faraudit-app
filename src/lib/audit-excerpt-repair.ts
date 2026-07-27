@@ -138,18 +138,93 @@ function maskGuards(text: string): string {
 // a finished sentence/clause, or a list enumerator ("1." / "(a)" / "•" / "—") introducing the excerpt.
 const HEAD_ENDS_TERMINATED = /[.!?;:]["')\]]*\s*$/;
 const HEAD_ENDS_ENUMERATOR = /(?:^|[\s(])(?:[-•*—]|\(?\d{1,2}[.)]|\(?[a-zA-Z][.)])\s*$/;
+// A leading enumerator on the first line of a clause ("f. In accordance with…") is a label, not part of it.
+const LEADING_ENUMERATOR = /^\s*(?:[-•*—]|\(?\d{1,2}[.)]|\(?[a-zA-Z][.)])\s+/;
 
-/** Offset within `head` where the excerpt's own clause begins: just past the last unguarded terminator, or 0
- *  (the line start) when the head contains none. */
+// ── LINE SHAPE: prose, or a fragment of an extracted table? ─────────────────────────────────────────
+// The physical line is NOT a unit of meaning in pdftotext output, and it fails in opposite directions:
+//
+//   TABLE  the spreadsheet attachment on the gate-4 record extracts as one column-fragment per line —
+//          "FY26" (4 chars) · "Min FY26" (8) · "BEQ FY27" (8) · … The logical cell is FY-first
+//          ("FY26 Min", "FY26 BEQ"), so the newline lands INSIDE a cell. Prepending the fragment that
+//          happens to precede the match glues one cell's qualifier to a different cell's year — it turns
+//          visibly-broken wreckage a reader discounts into plausible structure a reader might rely on.
+//          Every character is still verbatim and the result is still WRONG. So: refuse outright.
+//   PROSE  the extractor wraps a running sentence at ~80 chars. Line 184 of the same record ends
+//          "…FAR clause 52.215-22, Limitation on Pass-Through" and line 185 opens "Charges, if Raytheon
+//          intends…". Stopping at the physical line restores "Charges," — a dangling fragment, WORSE
+//          than the excerpt it replaced — while the citation it exists to recover sits one line up.
+//
+// So the boundary is the CLAUSE across the extractor's wraps, and a table is refused before we start.
+// A wrap is recognised by shape: the previous line is prose-length and does not end on a terminator.
+const TABULAR_MAX_LEN = 40;
+function isTabularLine(line: string): boolean {
+  const t = line.trim();
+  if (!t || t.length > TABULAR_MAX_LEN) return false;
+  return !/[.!?;:]/.test(t);            // short AND carrying no clause punctuation ⇒ a column fragment
+}
+
+/** The physical line containing `pos`. */
+function lineAt(source: string, pos: number): { start: number; end: number; text: string } {
+  const start = source.lastIndexOf("\n", pos - 1) + 1;
+  const nl = source.indexOf("\n", pos);
+  const end = nl < 0 ? source.length : nl;
+  return { start, end, text: source.slice(start, end) };
+}
+
+/** Walk backward from `lineStart` over extractor WRAPS — previous lines that are prose and do not end on a
+ *  terminator — and return where that continuous run begins. Stops at a blank line (paragraph break), at a
+ *  tabular fragment, at a terminated line, and at MAX_HEAD_EXTEND. */
+function wrapRegionStart(source: string, lineStart: number, anchor: number): number {
+  let regionStart = lineStart;
+  while (regionStart > 0) {
+    const prev = lineAt(source, regionStart - 1);
+    if (!prev.text.trim()) break;                                   // blank line ⇒ paragraph break
+    if (isTabularLine(prev.text)) break;                            // never walk into a table
+    const masked = maskGuards(prev.text).replace(/[\s"')\]]+$/, "");
+    if (/[.!?;:]$/.test(masked)) break;                             // previous line finished its clause
+    if (anchor - prev.start > MAX_HEAD_EXTEND) break;               // too far back to still be one clause
+    regionStart = prev.start;
+  }
+  return regionStart;
+}
+
+/** Offset within `head` where the excerpt's own clause begins: just past the last unguarded terminator, or
+ *  past a leading enumerator label, or 0. */
 function clauseStartInHead(head: string): number {
   const masked = maskGuards(head);
   let last = -1;
   for (const m of masked.matchAll(/[.!?;:](?=\s)/g)) last = m.index! + 1;
-  if (last < 0) return 0;
+  if (last < 0) {
+    const lead = LEADING_ENUMERATOR.exec(head);
+    return lead ? lead[0].length : 0;
+  }
   let i = last;
   while (i < head.length && /[\s"')\]]/.test(head[i])) i++; // step over the whitespace/quotes after it
   return i;
 }
+
+/** A restored head must be PROSE — a piece of the sentence the excerpt was cut out of.
+ *
+ *  This is what separates a wrap from a row. In a clause-incorporation list, pdftotext wraps each row so the
+ *  TAIL of one row ("(Deviation 2026-O0038) Feb 2026", "Dec 2022") lands on the line above the next row's
+ *  clause number — structurally identical to a wrapped sentence, but prepending it glues one clause's
+ *  effective date onto a different clause. Same wrong-neighbour association as the table case, in list form.
+ *
+ *  The discriminating shape is prose-ness, not vocabulary: a fragment of a running sentence carries at least
+ *  one lowercase word. Row tails are identifiers, dates and parentheticals — capitals, digits, punctuation.
+ *  It also disposes of bare row numbers ("01") and stray column labels. Cost of the rule, stated: a
+ *  legitimately capitalised head like "Effective August 13, 2020," is refused too. That is the safe
+ *  direction — an excerpt left clean beats an excerpt with the wrong fragment bolted on. */
+const MIN_RESTORED_HEAD = 4;
+function headCarriesSomething(head: string): boolean {
+  const t = head.trim();
+  return t.length >= MIN_RESTORED_HEAD && /(?:^|[^A-Za-z])[a-z]{3,}(?:[^A-Za-z]|$)/.test(t);
+}
+
+// An excerpt opening on a regulation-citation number AT A LINE START is the start of a record row (a §I/§K
+// clause-incorporation entry), not a crop of a sentence. Whatever precedes it belongs to the row above.
+const EXCERPT_OPENS_A_ROW = /^\(?\d{2,3}\.\d{3}(?:-\d+)?\b/;
 
 /** Where an excerpt sits in the source, under the SAME canonicalization the repair passes use (curly quotes
  *  and whitespace runs normalized). Exported so measurement code never re-implements the match — a second
@@ -184,15 +259,26 @@ function locateHeadClip(source: string, excerpt: string): { clauseStartOrig: num
   if (norm.indexOf(c, at + 1) >= 0) return null;         // ambiguous → refuse (never mislocate)
   const startOrig = map[at];
   const endOrig = map[at + c.length - 1] + 1;
-  const lineStart = source.lastIndexOf("\n", startOrig - 1) + 1;
-  const head = source.slice(lineStart, startOrig);
-  if (!head.trim()) return null;                         // excerpt starts the line → nothing was dropped
-  if (HEAD_ENDS_TERMINATED.test(head)) return null;      // prior sentence/clause finished → clean start
-  if (HEAD_ENDS_ENUMERATOR.test(head)) return null;      // "1. " / "(a) " / "• " introducing it → clean start
-  const rel = clauseStartInHead(head);
-  const clauseStartOrig = lineStart + rel;
+
+  const anchorLine = lineAt(source, startOrig);
+  // TABLE ⇒ refuse. A column fragment is not a clause, and prepending one mis-associates the figure.
+  if (isTabularLine(anchorLine.text)) return null;
+
+  const sameLineHead = source.slice(anchorLine.start, startOrig);
+  if (sameLineHead.trim()) {
+    if (HEAD_ENDS_TERMINATED.test(sameLineHead)) return null;   // prior sentence/clause finished → clean start
+    if (HEAD_ENDS_ENUMERATOR.test(sameLineHead)) return null;   // "1. " / "(a) " / "• " introducing it → clean
+  }
+  // A clause-incorporation row opens its own record; the line above it is the previous row's tail.
+  if (!sameLineHead.trim() && EXCERPT_OPENS_A_ROW.test(ex)) return null;
+  // The excerpt may begin at a line start and still be mid-clause — the extractor wrapped the sentence.
+  const regionStart = wrapRegionStart(source, anchorLine.start, startOrig);
+  const head = source.slice(regionStart, startOrig);
+  if (!head.trim()) return null;                         // genuinely at a clause start → nothing was dropped
+  const clauseStartOrig = regionStart + clauseStartInHead(head);
   if (clauseStartOrig >= startOrig) return null;          // nothing left to prepend after trimming
   if (startOrig - clauseStartOrig > MAX_HEAD_EXTEND) return null; // too far back to still be one clause
+  if (!headCarriesSomething(source.slice(clauseStartOrig, startOrig))) return null; // adds nothing usable
   return { clauseStartOrig, endOrig };
 }
 

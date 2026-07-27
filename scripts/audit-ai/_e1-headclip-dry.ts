@@ -20,7 +20,7 @@ dotenv.config({ path: ".env.local", quiet: true });
     .order("created_at", { ascending: false }).limit(200);
   if (error) { console.error(error.message); process.exit(1); }
 
-  let audits = 0, excerpts = 0, notInSource = 0, ambiguous = 0, clipped = 0, repaired = 0, unrepairable = 0;
+  let audits = 0, excerpts = 0, notInSource = 0, ambiguous = 0, clipped = 0, repaired = 0, unrepairable = 0, sweepCited = 0;
   const samples: any[] = [];
 
   for (const row of (data ?? []) as any[]) {
@@ -41,6 +41,10 @@ dotenv.config({ path: ".env.local", quiet: true });
       const span = findHeadRepairSpan(source, ex);
       if (!span) { unrepairable++; continue; }
       repaired++;
+      // The persisted findings carry no `lens`, so production's REPAIR_EXCLUDED_LENSES cannot be applied
+      // here. Deterministic-sweep findings do, however, stamp their citation — an approximation, labelled as
+      // one, so the headline number is not quoted as the production yield.
+      if (/grounding sweep|deterministic sweep/i.test(String(f.citation ?? ""))) sweepCited++;
       if (samples.length < 12) {
         const restored = span.slice(0, Math.max(0, span.length - ex.trim().length));
         samples.push({ audit: row.id.slice(0, 8), sol: row.solicitation_number, cite: f.citation,
@@ -55,6 +59,9 @@ dotenv.config({ path: ".env.local", quiet: true });
   console.log(`  HEAD-CLIPPED (begins mid-clause) ....... ${clipped}   (${excerpts ? ((clipped / excerpts) * 100).toFixed(1) : "0"}% of excerpts)`);
   console.log(`    ├─ would be re-grounded .............. ${repaired}`);
   console.log(`    └─ left as emitted (refused) ......... ${unrepairable}`);
+  console.log(`\n  of the re-grounded: ${sweepCited} carry a deterministic-sweep citation and would be SKIPPED in production`);
+  console.log(`  (REPAIR_EXCLUDED_LENSES is keyed on \`lens\`, which persisted findings do not carry — so the`);
+  console.log(`   figure above is an UPPER BOUND on the production yield, approximately ${repaired - sweepCited} of ${excerpts}.)`);
   console.log(`\n── what the customer was not shown (restored head → the excerpt they saw) ──`);
   for (const s of samples) {
     console.log(`\n  ${s.audit} · ${s.sol}\n     cite    : ${s.cite}`);
