@@ -29,8 +29,7 @@ const PUBLIC_PATHS = new Set([
   "/privacy",
   "/access",
   "/landing.html",
-  "/access.html",
-  "/signin.html"
+  "/access.html"
 ]);
 const PUBLIC_PREFIX = ["/auth/"];
 
