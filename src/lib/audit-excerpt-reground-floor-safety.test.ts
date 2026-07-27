@@ -44,17 +44,24 @@ const CLIPPED = "questions shall be submitted in writing no later than five busi
     noticeBodyEligibilityUngrounded(NOTICE, [f], NOTICE) === true);
 }
 
-// THE ATTACK — repair widens the excerpt across the wrap, and the widened span covers the bar.
+// THE ATTACK — a widened span that covers the bar.
+//
+// CONSTRUCTED DIRECTLY, not produced by the repair pass, and that changed on 2026-07-27. The pass now refuses
+// to walk across a line carrying its own obligation (`carriesOwnObligation`, added for `/code-review high`
+// finding #2), so it will no longer build this input at all. That is the upstream fix working — but the
+// floor's own invariant still has to hold for ANY widened excerpt that reaches it, however it arose: a future
+// caller, a different pass, or a relaxation of that rule. Binding this test to whether the current pass can
+// still construct the attack would make the floor's proof evaporate the moment something upstream got safer,
+// which is the opposite of what a safety test is for.
 {
-  const f = mk(CLIPPED);
-  process.env.AUDIT_EXCERPT_HEAD_REGROUND = "true";
-  const res = repairHeadClippedExcerpts([f], NOTICE);
-  delete process.env.AUDIT_EXCERPT_HEAD_REGROUND;
+  const WIDENED = NOTICE.slice(NOTICE.indexOf("Offerors must possess"), NOTICE.indexOf(CLIPPED) + CLIPPED.length);
+  const f = mk(WIDENED);
+  f.excerptPreReground = CLIPPED;   // exactly what the pass stamps when it widens
 
-  check("attack · the repair does widen this excerpt (else the test is inert)", res.repaired === 1,
-    `repaired=${res.repaired} excerpt=${f.excerpt.slice(0, 60)}`);
-  check("attack · and the widened span really does reach the clearance bar",
+  check("attack · the constructed span really does reach the clearance bar",
     /Top Secret facility clearance/.test(f.excerpt), `got: ${f.excerpt.slice(0, 90)}`);
+  check("attack · and it is verbatim in the notice (a real widening, not an invented string)",
+    NOTICE.includes(f.excerpt.trim()), f.excerpt.slice(0, 90));
   check("FLOOR HOLDS · the bar is still ungrounded and still fires",
     noticeBodyEligibilityUngrounded(NOTICE, [f], NOTICE) === true,
     "a quote widened for readability silenced an eligibility floor");

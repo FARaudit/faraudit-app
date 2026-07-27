@@ -33,7 +33,7 @@ import { repairClippedExcerpts, repairHeadClippedExcerpts, analyzedExcerptOf } f
 // `analyzedExcerptOf` returns the model's own excerpt when a repair widened it, and the excerpt itself
 // otherwise — so with the flag off, or on a finding no pass touched, every one of these is unchanged.
 import { SITE_VISIT_CONCLUDED_RE, BOA_HOLDER_ONLY_EMIT_RE, SITE_VISIT_MANDATORY_ATTENDANCE_RE } from "./audit-site-visit-patterns";
-import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyCyberRfiReconciliation, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyNmrNaicsDormancy, applyCheckboxStateFidelity, applyPerfObligationInsuranceTyping, applyClauseKeyedTypingFloor, applyStructuralAssertionFidelity, applyQuantityAmbiguityFidelity, applyFindingDedup, applyCrossFleetDedup, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, applyInquiryDeadlineBenignGuard, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, emitPerformanceUpkeepCaveats, deriveShadowVerdict, EngineInvariantError, type Decision, type ShadowVerdict } from "./audit-decide";
+import { isPositiveSetAside, isInquiryDeadlineBenign, hasOperativeEligibilityLanguage, ELIGIBILITY_AUTHORITY_RE, deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyCyberRfiReconciliation, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyNmrNaicsDormancy, applyCheckboxStateFidelity, applyPerfObligationInsuranceTyping, applyClauseKeyedTypingFloor, applyStructuralAssertionFidelity, applyQuantityAmbiguityFidelity, applyFindingDedup, applyCrossFleetDedup, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, applyInquiryDeadlineBenignGuard, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, emitPerformanceUpkeepCaveats, deriveShadowVerdict, EngineInvariantError, type Decision, type ShadowVerdict } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
 import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type ReasonCaller, type EntailmentCaller, type JudgmentCost, zeroCost } from "./audit-judgment-layer";
 import { highSignalSweep, boilerplateTrapSweep } from "./audit-grounding-sweep";
@@ -2491,23 +2491,29 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
       (repair.changes.length ? ` — ${repair.changes.map((c) => c.id ?? c.lens).join(", ")}` : ""));
   }
 
-  // P2.6b — HEAD-SIDE RE-GROUNDING (ARC #747 · E1, flag AUDIT_EXCERPT_HEAD_REGROUND, default OFF). The pass
-  //         above extends an excerpt clipped at its END; this one extends an excerpt that BEGAN mid-clause.
-  //         Gate 4 on SPRRA2-26-R-0034 found three, and the head-side shape is the more dangerous of the two
-  //         because a cropped head reads as corroboration: an excerpt starting "15-2, Instructions…" appeared
-  //         to support a gate citing "DFARS 215-2" while its own line said "FAR 15.408, Table 15-2".
-  //         Runs after the tail pass so a doubly-clipped excerpt is repaired at both ends.
-  //         PLACEMENT, stated correctly: an earlier draft of this comment claimed the position "lets the
-  //         restored span feed covered_direct." That was backwards — covered_direct uses the excerpt as the
-  //         NEEDLE (`nText.includes(norm(f.excerpt))`), so a longer excerpt can only be harder to match, never
-  //         easier. Measured across 40 banked run records: zero coverage and zero verdict deltas either way.
-  //         The position is neutral for coverage; it is here because the tail pass belongs first.
-  //         Grounded against `groundingSource` when it differs from fullSource, matching `isGrounded`.
-  const headRepair = repairHeadClippedExcerpts(findings, ctx.groundingSource ?? ctx.fullSource);
-  if (headRepair.repaired || headRepair.unrepairable) {
-    console.log(`[orchestrator] excerpt-head-reground: restored ${headRepair.repaired} clipped head(s)${headRepair.unrepairable ? `, ${headRepair.unrepairable} left as emitted` : ""}` +
-      (headRepair.changes.length ? ` — ${headRepair.changes.map((c) => c.id ?? c.lens).join(", ")}` : ""));
-  }
+  // HEAD-SIDE RE-GROUNDING WAS HERE (P2.6b) AND HAS MOVED — see the post-verdict block near the return.
+  //
+  // WHY IT MOVED (2026-07-27, `/code-review high` on PR #292, finding #1). At this position the widened
+  // `f.excerpt` flowed into every classifier in audit-decide (~28 sites building `hay`/`blob` strings from
+  // `f.excerpt`, lines 183-3455). The review reproduced a live flip with this PR's own fixture:
+  // `isInquiryDeadlineBenign` returns true before widening and false after, so the finding stays
+  // `no_one_can_move` and deriveVerdict escalates it — a BID becomes NHR/NO_BID on the strength of text the
+  // analysis never examined.
+  //
+  // The first fix I reached for was to sweep all 28 sites with `analyzedExcerptOf`. That is the enumeration
+  // pattern this arc keeps losing to: four row shapes each needed their own rule, and each was one shape
+  // short. Twenty-eight call sites would be twenty-eight chances to miss one, and the next lens added to
+  // audit-decide would reopen it silently.
+  //
+  // Widening a quote is a DISPLAY improvement. Running it after the verdict makes it STRUCTURALLY incapable
+  // of reaching a classifier — no decide-layer site needs to change, and none can regress. The prior
+  // placement was defended as "neutral for coverage, measured 0 deltas over 40 records"; that was true of the
+  // banked corpus and false of the mechanism, which is exactly the kind of reassurance a corpus can give and
+  // a structure cannot take away. [[feedback_display_span_vs_analyzed_span]]
+  //
+  // Nothing is lost by the move: coverage uses the excerpt as a NEEDLE, so the shorter (original) span can
+  // only match more easily, and the customer-facing purpose — restoring the dropped citation head for the
+  // reader — is served identically after the decision.
 
   // P4 — completeness (B-corrected): every binding section READ + obligation-coverage (direct or attested
   //      with cited finding IDs); experts must have converged. Attestations carried for trace adjudication.
@@ -2950,5 +2956,51 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     throw e;
   }
 
+  // ── HEAD-SIDE RE-GROUNDING (ARC #747 · E1, flag AUDIT_EXCERPT_HEAD_REGROUND, default OFF) ──────────────
+  // Moved here from P2.6b. The verdict is already derived and `inputs` already holds the findings it was
+  // derived from, so nothing this pass does can reach a classifier. See the note at the old site for why
+  // structure beat sweeping 28 call sites.
+  //
+  // CLASSIFIER-INVARIANCE GUARD. Placement protects the VERDICT; it does not protect the READER. Review
+  // finding #2 showed a widened quote for a questions-deadline finding reading
+  // "Offerors must possess a Top Secret facility clearance at time of proposal submission questions shall be
+  // submitted…" — verbatim, and corroborating an obligation it does not belong to. Finding #3 showed a
+  // title-case heading crossing the walk and flipping `isPositiveSetAside`. No refusal rule catches either,
+  // because the extractor emitted no terminator between the clauses.
+  //
+  // So the guard is not another shape rule: a widening that CHANGES WHAT THE SPAN WOULD BE CLASSIFIED AS is
+  // not a repair, it is a rewrite, and it is refused. That is a semantic test on the outcome rather than a
+  // guess about the layout, so it closes the shapes we have not thought of too — including the title-case
+  // heading this branch had recorded as a KNOWN GAP.
+  const headRepair = repairHeadClippedExcerpts(findings, ctx.groundingSource ?? ctx.fullSource, {
+    rejectIfClassificationMoves: (before, after) => classificationSignature(before) !== classificationSignature(after),
+  });
+  if (headRepair.repaired || headRepair.unrepairable || headRepair.skipped.length) {
+    console.log(`[orchestrator] excerpt-head-reground: restored ${headRepair.repaired} clipped head(s)` +
+      `${headRepair.unrepairable ? `, ${headRepair.unrepairable} left as emitted` : ""}` +
+      `${headRepair.skipped.length ? `, ${headRepair.skipped.length} skipped (${[...new Set(headRepair.skipped.map((s) => s.reason))].join(" · ")})` : ""}` +
+      (headRepair.changes.length ? ` — ${headRepair.changes.map((c) => c.id ?? c.lens).join(", ")}` : ""));
+  }
+
   return { decision, inputs, findings, coverage: { required, covered, missing, attestations, coreMissing }, perLens, conflict, sectionsRead: [...sectionsRead], trace, ...(verifierDrops.length ? { verifierDrops } : {}), ...(judgmentLayerEnabled() && (opts.judgmentReason || opts.judgmentEntail) ? { judgmentCost } : {}), ...(_bankDiag ? { diagnostics: _bankDiag } : {}) };
+}
+
+/** Every decide-layer reading of a finding that could move on a widened excerpt, collapsed to one string.
+ *  If this differs before and after a repair, the repair changed what the engine would conclude — so the
+ *  repair is refused and the customer keeps the excerpt the model emitted.
+ *
+ *  These are the classifiers the review reproduced flips on, plus their nearest siblings on the same axes
+ *  (set-aside, structural bar, eligibility authority, benign-inquiry, site-visit). It is deliberately a
+ *  SIGNATURE rather than a list of guards to re-run: adding a classifier here is cheap, and a classifier
+ *  that is missing can only make the guard less willing to refuse — never more willing to accept a rewrite
+ *  it should have caught, because refusal is the safe direction. */
+function classificationSignature(f: TypedFinding): string {
+  return [
+    isPositiveSetAside(f),
+    isInquiryDeadlineBenign(f),
+    hasOperativeEligibilityLanguage(f.excerpt ?? ""),
+    ELIGIBILITY_AUTHORITY_RE.test(`${f.citation ?? ""} ${f.requirement ?? ""} ${f.excerpt ?? ""}`),
+    SITE_VISIT_CONCLUDED_RE.test(f.excerpt ?? ""),
+    SITE_VISIT_MANDATORY_ATTENDANCE_RE.test(f.excerpt ?? ""),
+  ].join("|");
 }

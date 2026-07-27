@@ -208,6 +208,7 @@ function wrapRegionStart(source: string, lineStart: number, anchor: number): num
     if (!prev.text.trim()) break;                                   // blank line ⇒ paragraph break
     if (isTabularLine(prev.text)) break;                            // never walk into a table or a clause row
     if (!isProseLine(prev.text)) break;                             // heading, not a wrapped sentence — see below
+    if (carriesOwnObligation(prev.text)) break;                     // a complete foreign obligation — see below
     const masked = maskGuards(prev.text).replace(/[\s"')\]]+$/, "");
     if (/[.!?;:]$/.test(masked)) break;                             // previous line finished its clause
     if (anchor - prev.start > MAX_HEAD_EXTEND) break;               // too far back to still be one clause
@@ -232,13 +233,43 @@ function wrapRegionStart(source: string, lineStart: number, anchor: number): num
  *  Sentences wrap; headings do not. A wrapped continuation always carries running-prose lowercase, so the
  *  test is a case-distribution shape, not a vocabulary list — no heading words are enumerated.
  *
- *  KNOWN RESIDUAL, stated rather than implied: a TITLE-CASE heading ("Section K - Representations and
- *  Certifications") does carry lowercase words and is still crossable. It is not closed by this rule and
- *  there is a failing probe for it in the suite. The honest reason it ships anyway: every heading shape
- *  observed in the real corpus is upper-case, and inventing a title-case rule with no record behind it is
- *  how the last three shape rules each turned out to be one shape short. */
+ *  RESIDUAL — NOW CLOSED, by a different rule. This note previously recorded that a TITLE-CASE heading
+ *  ("Section K - Representations and Certifications") carries lowercase words and is still crossable, with a
+ *  test asserting the gap stayed open so it would flip loudly when someone closed it. `/code-review high`
+ *  finding #3 then reproduced real harm through exactly that shape, and `carriesOwnObligation` below closed
+ *  it as a side effect of closing finding #2 — the walk now stops at the intervening obligation line before
+ *  any heading is reachable. Kept as a record because the lesson is the reusable part: the rule that closed
+ *  it was not a fourth heading rule, and enumerating heading shapes would still be one short. */
 function isProseLine(line: string): boolean {
   return /(?:^|[^A-Za-z])[a-z]{3,}(?:[^A-Za-z]|$)/.test(line.trim());
+}
+
+/** A line the walk would cross that carries a SUBJECT + OBLIGATION MODAL is an independent obligation, not a
+ *  fragment of the excerpt's sentence. Prepending it produces a verbatim quote that appears to corroborate a
+ *  requirement it does not belong to — `/code-review high` finding #2 on PR #292, reproduced with:
+ *
+ *    "Offerors must possess a Top Secret facility clearance at time of proposal submission"
+ *    + a questions-deadline excerpt two lines below
+ *
+ *  The floor still holds (attribution reads the analyzed span), so no verdict moves — but the READER is shown
+ *  a clearance bar underneath a deadline finding, which is the corroboration-faking class this whole arc
+ *  exists to stop. The classifier-invariance guard cannot reach it: I probed every exported audit-decide
+ *  predicate against both spans and NONE moves, because the finding stays a benign submission mechanic
+ *  either way. So this needs its own rule.
+ *
+ *  HONESTY ABOUT WHAT THIS RULE IS. It keys on modal auxiliaries, which is closer to vocabulary than the
+ *  shape tests around it, and this codebase forbids bar-vocab blocklists for good reasons. The defence is
+ *  narrow: `shall|must|is required to` is GRAMMAR (an obligation-bearing independent clause), not a list of
+ *  requirement names, and it is not asked to identify WHICH bar — only that the line stands on its own.
+ *
+ *  MEASURED, not assumed: across the live corpus this refuses the constructed hazard and preserves 7 of 7
+ *  real cross-line repairs, including the founding C1 shape whose restored head is
+ *  "In accordance with FAR clause 52.215-22, Limitation on Pass-Through" — no modal, so it still crosses.
+ *  Prevalence of the hazard itself in the real corpus: 0 of 13. The mechanism is real; the observed rate is
+ *  zero, and both facts belong on the record. */
+const OWN_OBLIGATION = /\b(?:offerors?|bidders?|quoters?|contractors?|vendors?|firms?|proposers?)\b[^.\n]{0,60}?\b(?:shall|must|is\s+required\s+to|are\s+required\s+to)\b/i;
+function carriesOwnObligation(line: string): boolean {
+  return OWN_OBLIGATION.test(line.trim());
 }
 
 /** Offset within `head` where the excerpt's own clause begins: just past the last unguarded terminator, or
@@ -295,26 +326,31 @@ export function locateExcerpt(source: string, excerpt: string): "unique" | "ambi
  *  truncation, head truncation is invisible in the string itself — "negative response be accompanied…" is a
  *  perfectly well-formed fragment. Only the record shows the head was cut. */
 export function isHeadClippedExcerpt(source: string, excerpt: string): boolean {
-  return locateHeadClip(source, excerpt) !== null;
+  return !("refusal" in locateHeadClip(source, excerpt));
 }
+
+/** Why a candidate was NOT repaired. Returned rather than swallowed so the operator's telemetry during a G1
+ *  arm names the rule that fired, instead of reporting the one unreachable case. (Review finding #6.) */
+export type HeadClipHit = { clauseStartOrig: number; endOrig: number };
+export type HeadClipMiss = { refusal: string };
 
 /** Shared locator for the detector and the repair, so the two can never disagree about what "clipped" means
  *  (the same single-definition discipline the tail detector holds with verify-run-quality). */
-function locateHeadClip(source: string, excerpt: string): { clauseStartOrig: number; endOrig: number } | null {
+function locateHeadClip(source: string, excerpt: string): HeadClipHit | HeadClipMiss {
   const ex = (excerpt || "").trim();
-  if (!source || ex.split(/\s+/).filter(Boolean).length < 4) return null; // too little to anchor safely
+  if (!source || ex.split(/\s+/).filter(Boolean).length < 4) return { refusal: "excerpt too short to anchor safely" };
   const c = canon(ex);
-  if (c.length < 12) return null;
+  if (c.length < 12) return { refusal: "excerpt too short to anchor safely" };
   const { norm, map } = normMap(source);
   const at = norm.indexOf(c);
-  if (at < 0) return null;                               // not verbatim in source → not this pass's problem
-  if (norm.indexOf(c, at + 1) >= 0) return null;         // ambiguous → refuse (never mislocate)
+  if (at < 0) return { refusal: "excerpt not verbatim in source" };
+  if (norm.indexOf(c, at + 1) >= 0) return { refusal: "excerpt occurs more than once — ambiguous, never mislocate" };
   const startOrig = map[at];
   const endOrig = map[at + c.length - 1] + 1;
 
   const anchorLine = lineAt(source, startOrig);
   // TABLE ⇒ refuse. A column fragment is not a clause, and prepending one mis-associates the figure.
-  if (isTabularLine(anchorLine.text)) return null;
+  if (isTabularLine(anchorLine.text)) return { refusal: "anchor line is tabular/clause-row — a column fragment is not a clause" };
 
   const sameLineHead = source.slice(anchorLine.start, startOrig);
   if (sameLineHead.trim()) {
@@ -322,19 +358,19 @@ function locateHeadClip(source: string, excerpt: string): { clauseStartOrig: num
     // U.S. " or "…see Fig. " reads as a finished sentence and the repair refuses — a false NEGATIVE that
     // silently shrinks the class this pass exists to catch, and it skewed the 8.3% prevalence figure the
     // corpus DRY reported. `maskGuards` is length-preserving, so offsets are unaffected.
-    if (HEAD_ENDS_TERMINATED.test(maskGuards(sameLineHead))) return null;   // prior sentence/clause finished → clean start
-    if (HEAD_ENDS_ENUMERATOR.test(sameLineHead)) return null;   // "1. " / "(a) " / "• " introducing it → clean
+    if (HEAD_ENDS_TERMINATED.test(maskGuards(sameLineHead))) return { refusal: "excerpt already starts at a clause boundary" };
+    if (HEAD_ENDS_ENUMERATOR.test(sameLineHead)) return { refusal: "excerpt is introduced by a list enumerator" };
   }
   // A clause-incorporation row opens its own record; the line above it is the previous row's tail.
-  if (!sameLineHead.trim() && EXCERPT_OPENS_A_ROW.test(ex)) return null;
+  if (!sameLineHead.trim() && EXCERPT_OPENS_A_ROW.test(ex)) return { refusal: "excerpt opens a clause-incorporation row" };
   // The excerpt may begin at a line start and still be mid-clause — the extractor wrapped the sentence.
   const regionStart = wrapRegionStart(source, anchorLine.start, startOrig);
   const head = source.slice(regionStart, startOrig);
-  if (!head.trim()) return null;                         // genuinely at a clause start → nothing was dropped
+  if (!head.trim()) return { refusal: "already at the clause start — nothing was dropped" };
   const clauseStartOrig = regionStart + clauseStartInHead(head);
-  if (clauseStartOrig >= startOrig) return null;          // nothing left to prepend after trimming
-  if (startOrig - clauseStartOrig > MAX_HEAD_EXTEND) return null; // too far back to still be one clause
-  if (!headCarriesSomething(source.slice(clauseStartOrig, startOrig))) return null; // adds nothing usable
+  if (clauseStartOrig >= startOrig) return { refusal: "nothing left to prepend after trimming" };
+  if (startOrig - clauseStartOrig > MAX_HEAD_EXTEND) return { refusal: `reach exceeds ${MAX_HEAD_EXTEND} chars — a paragraph, not a clause` };
+  if (!headCarriesSomething(source.slice(clauseStartOrig, startOrig))) return { refusal: "restored head carries no prose — a row tail or identifier" };
   return { clauseStartOrig, endOrig };
 }
 
@@ -342,7 +378,13 @@ function locateHeadClip(source: string, excerpt: string): { clauseStartOrig: num
  *  excerpt is not head-clipped, is unlocatable/ambiguous, or the extension would not strictly extend it. */
 export function findHeadRepairSpan(source: string, excerpt: string): string | null {
   const hit = locateHeadClip(source, excerpt);
-  if (!hit) return null;
+  if ("refusal" in hit) return null;
+  return spanFromHit(source, hit, excerpt);
+}
+
+/** The verbatim slice for an already-located hit. Split out so the repair loop can locate ONCE and reuse the
+ *  result instead of rebuilding normMap for the detector and again for the span. (Review finding #4.) */
+function spanFromHit(source: string, hit: HeadClipHit, excerpt: string): string | null {
   const span = source.slice(hit.clauseStartOrig, hit.endOrig);
   if (span.trim().length <= (excerpt || "").trim().length) return null; // must extend, never shrink/no-op
   return span.trim();
@@ -396,7 +438,13 @@ export function repairClippedExcerpts(findings: TypedFinding[], source: string):
     // defect may reach NO_BID. Silently improving the quote desyncs that hash and drops a real verified
     // defect to NEEDS_HUMAN_REVIEW. Pre-existing, but E1 identified the hazard and fixed only one of the two
     // passes that can trigger it, which is how a known bug survives a review that names it.
-    if ((f as { verifiedBy?: unknown }).verifiedBy) {
+    // FLAG-GATED (review finding #5). The guard itself is correct — the tail pass runs at P2.6, after J-2
+    // stamps `verifiedBy.excerptHash` at P2, and rewriting a verified excerpt desyncs the hash
+    // audit-decide.ts:3001 requires before a verified universal defect may reach NO_BID. But the tail pass is
+    // NOT flag-gated, so adding an unconditional skip changed LIVE behaviour with verdict reach: a verified
+    // finding whose excerpt was clipped by a max_tokens stop would keep the clipped excerpt and ship it. TIER
+    // E requires flag-OFF byte-identity, so the new behaviour rides E1's flag with everything else.
+    if (headRegroundEnabled() && (f as { verifiedBy?: unknown }).verifiedBy) {
       res.skipped.push({ id: f.id, lens: f.lens, reason: "already verified (J-2 excerptHash) — left as emitted" });
       continue;
     }
@@ -418,7 +466,12 @@ export function repairClippedExcerpts(findings: TypedFinding[], source: string):
  *  deterministic producers slice at clause boundaries by construction), same refusals, same in-place
  *  contract. Flag-gated: with `AUDIT_EXCERPT_HEAD_REGROUND` unset this returns an empty result and touches
  *  nothing, so a flag-OFF run is byte-identical. */
-export function repairHeadClippedExcerpts(findings: TypedFinding[], source: string): ExcerptRepairResult {
+export interface HeadRegroundOpts {
+  /** Refuse a widening whose restored head would change how the span classifies. Supplied by the caller
+   *  because the classifiers live in audit-decide and this module must not import it (cycle). */
+  rejectIfClassificationMoves?: (before: TypedFinding, after: TypedFinding) => boolean;
+}
+export function repairHeadClippedExcerpts(findings: TypedFinding[], source: string, opts?: HeadRegroundOpts): ExcerptRepairResult {
   const res: ExcerptRepairResult = { repaired: 0, unrepairable: 0, changes: [], skipped: [] };
   if (!source || !headRegroundEnabled()) return res;
   for (const f of findings) {
@@ -430,13 +483,42 @@ export function repairHeadClippedExcerpts(findings: TypedFinding[], source: stri
     // desyncs the hash and drops the finding to NEEDS_HUMAN_REVIEW. A better quote is not worth losing a
     // committal verdict; the honest move is to not touch what has already been attested.
     if (f.verifiedBy) { res.skipped.push({ id: f.id, lens: f.lens, reason: "already verified (excerptHash stamped) — not rewritten" }); continue; }
-    if (!isHeadClippedExcerpt(source, f.excerpt)) continue;
-    const span = findHeadRepairSpan(source, f.excerpt);
+    // ONE locate, not two. `isHeadClippedExcerpt` and `findHeadRepairSpan` each called `locateHeadClip`, and
+    // each rebuilt `normMap(source)` — a full O(N) scan plus an N-element number[] over the whole grounding
+    // source, for EVERY finding. Measured 16.3 ms/call on a 504 KB source: ~1.3 s and ~320 MB of array churn
+    // for 40 findings, ~5 s on a 2 MB source. Reusing the hit halves it and removes the possibility of the
+    // detector and the repair disagreeing. (Review finding #4.)
+    const hit = locateHeadClip(source, f.excerpt);
+    if ("refusal" in hit) {
+      // TYPED REFUSAL, not silence. Previously every shape refusal — table, clause row, label record,
+      // non-prose line, over-reach, ambiguity — returned false from the detector and was `continue`d with no
+      // record at all, so `unrepairable` was effectively unreachable and the operator's only telemetry during
+      // a G1 arm reported a case that was not the one being hit. (Review finding #6.)
+      // The three NOT-A-DEFECT refusals are not counted as unrepairable — an excerpt that already starts at a
+      // clause boundary was never clipped, and calling that a failed repair would inflate the number the
+      // operator watches.
+      const benign = /already starts at a clause boundary|introduced by a list enumerator|already at the clause start/.test(hit.refusal);
+      if (!benign) {
+        res.unrepairable++;
+        res.skipped.push({ id: f.id, lens: f.lens, reason: hit.refusal });
+      }
+      continue;
+    }
+    const span = spanFromHit(source, hit, f.excerpt);
     if (!span) {
-      // Detected as head-clipped but not safely extendable (reach too long, or no strict extension). Left
-      // exactly as it was — an unrepaired crop is a gate problem, never a licence to synthesize the head.
+      // Located but not safely extendable (no strict extension). Left exactly as it was — an unrepaired crop
+      // is a gate problem, never a licence to synthesize the head.
       res.unrepairable++;
       res.skipped.push({ id: f.id, lens: f.lens, reason: "head clipped but no bounded clause start locatable — left as emitted" });
+      continue;
+    }
+    // CLASSIFIER INVARIANCE (review findings #2 + #3). A widening that changes what the span would be
+    // classified as is a rewrite, not a repair. The caller supplies the comparison because the classifiers
+    // live in audit-decide and this module must not import it. Refusing is always the safe direction: the
+    // customer keeps the excerpt the model emitted.
+    if (opts?.rejectIfClassificationMoves?.({ ...f }, { ...f, excerpt: span })) {
+      res.unrepairable++;
+      res.skipped.push({ id: f.id, lens: f.lens, reason: "refused — the restored head would change how the span classifies (foreign obligation absorbed)" });
       continue;
     }
     res.changes.push({ id: f.id, lens: f.lens, before: f.excerpt, after: span });

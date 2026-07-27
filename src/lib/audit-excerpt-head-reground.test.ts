@@ -208,39 +208,35 @@ process.env.AUDIT_EXCERPT_HEAD_REGROUND = "true";
   const second = repairHeadClippedExcerpts(findings, SRC_C1);
   check("flag ON · idempotent (second pass is a no-op)", second.repaired === 0 && findings[0].excerpt === once);
 }
-// ── REGRESSION · /code-review high finding #1 on PR #292 (the FOURTH row shape) ─────────────────────────
-// An ALL-CAPS section heading slips every earlier rule: >40 chars so isTabularLine passes it, no regulation
-// number so isClauseRowLine passes it, no `Label:` prefix, and no terminator. The walk climbed through it and
-// isPositiveSetAside flipped false→true on a questions-deadline finding — the same cross-row harm the battery
-// claimed to have closed, one shape over. The fix is per-line prose-ness in the walk, not a fifth shape rule.
+// ── REGRESSION · /code-review high findings #1 and #3 on PR #292 ────────────────────────────────────────
+// #1 was an ALL-CAPS section heading crossed by the walk, flipping isPositiveSetAside on a questions-deadline
+// finding. #3 was the same harm via a TITLE-CASE heading, which the first fix left open and this suite
+// recorded as a KNOWN GAP with a test asserting the gap STAYED open, so it would flip loudly when closed.
+//
+// IT FLIPPED. The own-obligation rule (finding #2's fix) stops the walk at the intervening
+// "The Offeror shall submit…" line before either heading is reachable, so both fixtures are now refused for
+// the same reason and neither heading can be absorbed. This block asserts the closure the gap test was built
+// to detect — writing it to fail on success is the reason I found out rather than assumed.
 {
-  const SRC_HEADING =
-    "SECTION K - REPRESENTATIONS AND CERTIFICATIONS, TOTAL SMALL BUSINESS SET-ASIDE\n" +
-    "The Offeror shall submit all questions in writing no later than five\n" +
-    "business days prior to the closing date and time of this solicitation\n";
   const EX_DEADLINE = "business days prior to the closing date and time of this solicitation";
-  const span = findHeadRepairSpan(SRC_HEADING, EX_DEADLINE);
-  check("an ALL-CAPS heading STOPS the backward walk", !!span && !/SECTION K/.test(span), JSON.stringify(span));
-  check("…while the legitimate prose wrap below it is still followed", !!span && /The Offeror shall submit/.test(span));
+  const heading = (h: string) => h + "\n" +
+    "The Offeror shall submit all questions in writing no later than five\n" + EX_DEADLINE + "\n";
 
-  const base = { requirement: "Questions must be submitted in writing no later than five business days prior to closing.", citation: "Section L", kind: "submission_mechanic", controllability: "bidder_controls", grounded: true, lens: "proposal_manager" } as unknown as TypedFinding;
-  check("and isPositiveSetAside does not flip",
-    isPositiveSetAside({ ...base, excerpt: EX_DEADLINE } as TypedFinding) === false &&
-    isPositiveSetAside({ ...base, excerpt: span ?? EX_DEADLINE } as TypedFinding) === false);
-}
-// ── KNOWN GAP, recorded rather than implied ─────────────────────────────────────────────────────────────
-// A TITLE-CASE heading carries lowercase words, so the prose-ness rule does not stop it. This asserts the
-// CURRENT (crossable) behaviour on purpose: writing it as a passing expectation would claim a closure we do
-// not have, and leaving it out would hide a shape we know about. When someone closes it, this flips loudly.
-{
-  const SRC_TITLE =
-    "Section K - Representations and Certifications, Total Small Business Set-Aside\n" +
-    "The Offeror shall submit all questions in writing no later than five\n" +
-    "business days prior to the closing date and time of this solicitation\n";
-  const span = findHeadRepairSpan(SRC_TITLE, "business days prior to the closing date and time of this solicitation");
-  const stillCrosses = !!span && /Section K/.test(span);
-  check("KNOWN GAP · a title-case heading is still crossed (documented, not fixed)", stillCrosses,
-    stillCrosses ? "" : "the gap appears CLOSED — update audit-excerpt-repair.ts:isProseLine's residual note and this test");
+  for (const [label, h] of [
+    ["ALL-CAPS", "SECTION K - REPRESENTATIONS AND CERTIFICATIONS, TOTAL SMALL BUSINESS SET-ASIDE"],
+    ["title-case", "Section K - Representations and Certifications, Total Small Business Set-Aside"],
+  ] as Array<[string, string]>) {
+    const SRC = heading(h);
+    const span = findHeadRepairSpan(SRC, EX_DEADLINE);
+    check(`${label} heading · the walk never reaches it`, span === null || !/Set-?Aside/i.test(span), JSON.stringify(span));
+
+    const f = mk(EX_DEADLINE, "proposal_manager");
+    const res = repairHeadClippedExcerpts([f], SRC);
+    check(`${label} heading · the excerpt is left as the model emitted it`, f.excerpt === EX_DEADLINE, f.excerpt);
+    check(`${label} heading · isPositiveSetAside does not flip`,
+      isPositiveSetAside({ ...f, requirement: "Questions must be submitted five business days prior to closing." } as TypedFinding) === false);
+    check(`${label} heading · nothing is counted as repaired`, res.repaired === 0);
+  }
 }
 
 delete process.env.AUDIT_EXCERPT_HEAD_REGROUND;
