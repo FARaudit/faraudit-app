@@ -89,6 +89,123 @@ function boundaryEnd(window: string): number {
   return nl >= 0 ? nl : -1;
 }
 
+// ── HEAD-SIDE RE-GROUNDING (ARC #747 · E1) ──────────────────────────────────────────────────────────
+// Everything above this line is TAIL-side: `isTruncatedExcerpt` tests exclusively how a string ENDS, and
+// `findRepairSpan` extends forward. Gate 4 on d0664ba2 (SPRRA2-26-R-0034) found the opposite failure —
+// excerpts that start too LATE — and it is the more dangerous shape, because a cropped head does not look
+// broken. It looks like corroboration:
+//
+//   C1  excerpt begins "15-2, Instructions…"          source line reads "…in accordance with FAR 15.408, Table 15-2, …"
+//       The dropped head IS THE CITATION. The gate above the excerpt claimed "DFARS 215-2", and the crop
+//       made the excerpt appear to support it. [[feedback_excerpt_start_truncation_fakes_corroboration]]
+//   S2  excerpt begins "FY27 BEQ FY28 Min…"           the table row's own head columns start at FY26
+//       The report then derived the span "FY27–FY30" FROM THE CROP; the record says FY2026–FY2030.
+//   S7  excerpt begins "negative response be…"        the clause head reads "…in writing within five (5)
+//       business days. It is requested that a negative response…" — the 5-business-day mechanic, the most
+//       actionable near-term obligation in the record, was cropped out of existence.
+//
+// THE DISCRIMINATOR IS A SHAPE, NOT A WORD LIST. It does not ask what the excerpt starts with; it asks
+// whether the text IMMEDIATELY PRECEDING the located span, on the same physical line, ends at a natural
+// boundary. Text that stops mid-clause before the excerpt means the excerpt began mid-clause. Measured on
+// the real record: 7 of 9 excerpts had preceding text on the line, 4 of them ended cleanly (a finished
+// sentence, or a list enumerator) and are left untouched; the 3 that did not are exactly C1, S2 and S7.
+//
+// The repair mirrors the forward pass and inherits its refusals: unique verbatim anchor or nothing, never
+// model-completed, never shrinks, and it extends BACKWARD only to the start of the clause on the same line —
+// never across a newline, never past MAX_HEAD_EXTEND. When it cannot repair, the excerpt is left exactly as
+// it was and the run-quality gate fails as it does today. Nothing is loosened.
+//
+// NOT IN THIS PASS (E1 items 3-4, deliberately separate): the no-derivation-from-window rule (a citation,
+// figure or fiscal span asserted in requirement/reason must be re-derived from the full source line) and
+// row-label alignment for tabular source. Re-grounding the span is the precondition for both — this is that
+// precondition, not the whole of E1.
+export const EXCERPT_HEAD_REGROUND_FLAG = "AUDIT_EXCERPT_HEAD_REGROUND";
+export function headRegroundEnabled(): boolean {
+  return process.env[EXCERPT_HEAD_REGROUND_FLAG] === "true";
+}
+
+const MAX_HEAD_EXTEND = 400; // chars; a backward reach longer than this is not a clause, it is a paragraph
+
+/** Mask guarded periods (decimal · email/URL · abbreviation) length-preservingly so offsets stay aligned. */
+function maskGuards(text: string): string {
+  let m = text.replace(PROCEDURAL_SENTENCE_GUARDS.decimal, (_x, a, b) => `${a}${GUARD}${b}`);
+  m = m.replace(PROCEDURAL_SENTENCE_GUARDS.emailUrl, (t) => t.replace(/\./g, GUARD));
+  m = m.replace(PROCEDURAL_SENTENCE_GUARDS.abbrev, (t) => t.replace(/\./g, GUARD));
+  return m;
+}
+
+// A head that ENDS on one of these is a clean start point for the excerpt, so there is nothing to repair:
+// a finished sentence/clause, or a list enumerator ("1." / "(a)" / "•" / "—") introducing the excerpt.
+const HEAD_ENDS_TERMINATED = /[.!?;:]["')\]]*\s*$/;
+const HEAD_ENDS_ENUMERATOR = /(?:^|[\s(])(?:[-•*—]|\(?\d{1,2}[.)]|\(?[a-zA-Z][.)])\s*$/;
+
+/** Offset within `head` where the excerpt's own clause begins: just past the last unguarded terminator, or 0
+ *  (the line start) when the head contains none. */
+function clauseStartInHead(head: string): number {
+  const masked = maskGuards(head);
+  let last = -1;
+  for (const m of masked.matchAll(/[.!?;:](?=\s)/g)) last = m.index! + 1;
+  if (last < 0) return 0;
+  let i = last;
+  while (i < head.length && /[\s"')\]]/.test(head[i])) i++; // step over the whitespace/quotes after it
+  return i;
+}
+
+/** Where an excerpt sits in the source, under the SAME canonicalization the repair passes use (curly quotes
+ *  and whitespace runs normalized). Exported so measurement code never re-implements the match — a second
+ *  definition of "is this in the source" is how a strict-`includes` scan reports 205 absent excerpts on a
+ *  corpus where 344 of 350 are really there. */
+export function locateExcerpt(source: string, excerpt: string): "unique" | "ambiguous" | "absent" {
+  const c = canon(excerpt || "");
+  if (!source || !c) return "absent";
+  const { norm } = normMap(source);
+  const at = norm.indexOf(c);
+  if (at < 0) return "absent";
+  return norm.indexOf(c, at + 1) >= 0 ? "ambiguous" : "unique";
+}
+
+/** True when `excerpt`, as located in `source`, begins mid-clause. Source-relative by necessity: unlike tail
+ *  truncation, head truncation is invisible in the string itself — "negative response be accompanied…" is a
+ *  perfectly well-formed fragment. Only the record shows the head was cut. */
+export function isHeadClippedExcerpt(source: string, excerpt: string): boolean {
+  return locateHeadClip(source, excerpt) !== null;
+}
+
+/** Shared locator for the detector and the repair, so the two can never disagree about what "clipped" means
+ *  (the same single-definition discipline the tail detector holds with verify-run-quality). */
+function locateHeadClip(source: string, excerpt: string): { clauseStartOrig: number; endOrig: number } | null {
+  const ex = (excerpt || "").trim();
+  if (!source || ex.split(/\s+/).filter(Boolean).length < 4) return null; // too little to anchor safely
+  const c = canon(ex);
+  if (c.length < 12) return null;
+  const { norm, map } = normMap(source);
+  const at = norm.indexOf(c);
+  if (at < 0) return null;                               // not verbatim in source → not this pass's problem
+  if (norm.indexOf(c, at + 1) >= 0) return null;         // ambiguous → refuse (never mislocate)
+  const startOrig = map[at];
+  const endOrig = map[at + c.length - 1] + 1;
+  const lineStart = source.lastIndexOf("\n", startOrig - 1) + 1;
+  const head = source.slice(lineStart, startOrig);
+  if (!head.trim()) return null;                         // excerpt starts the line → nothing was dropped
+  if (HEAD_ENDS_TERMINATED.test(head)) return null;      // prior sentence/clause finished → clean start
+  if (HEAD_ENDS_ENUMERATOR.test(head)) return null;      // "1. " / "(a) " / "• " introducing it → clean start
+  const rel = clauseStartInHead(head);
+  const clauseStartOrig = lineStart + rel;
+  if (clauseStartOrig >= startOrig) return null;          // nothing left to prepend after trimming
+  if (startOrig - clauseStartOrig > MAX_HEAD_EXTEND) return null; // too far back to still be one clause
+  return { clauseStartOrig, endOrig };
+}
+
+/** The verbatim source span for a head-clipped excerpt, extended BACKWARD to its clause start. Null when the
+ *  excerpt is not head-clipped, is unlocatable/ambiguous, or the extension would not strictly extend it. */
+export function findHeadRepairSpan(source: string, excerpt: string): string | null {
+  const hit = locateHeadClip(source, excerpt);
+  if (!hit) return null;
+  const span = source.slice(hit.clauseStartOrig, hit.endOrig);
+  if (span.trim().length <= (excerpt || "").trim().length) return null; // must extend, never shrink/no-op
+  return span.trim();
+}
+
 export interface ExcerptRepairResult {
   repaired: number;
   unrepairable: number;
@@ -140,6 +257,32 @@ export function repairClippedExcerpts(findings: TypedFinding[], source: string):
     }
     res.changes.push({ id: f.id, lens: f.lens, before: f.excerpt, after: span });
     f.excerpt = span;                                        // verbatim source span → grounded + un-truncated
+    res.repaired++;
+  }
+  return res;
+}
+
+/** Head-side twin of `repairClippedExcerpts` (ARC #747 · E1). Same scope rule (model expert lenses only —
+ *  deterministic producers slice at clause boundaries by construction), same refusals, same in-place
+ *  contract. Flag-gated: with `AUDIT_EXCERPT_HEAD_REGROUND` unset this returns an empty result and touches
+ *  nothing, so a flag-OFF run is byte-identical. */
+export function repairHeadClippedExcerpts(findings: TypedFinding[], source: string): ExcerptRepairResult {
+  const res: ExcerptRepairResult = { repaired: 0, unrepairable: 0, changes: [], skipped: [] };
+  if (!source || !headRegroundEnabled()) return res;
+  for (const f of findings) {
+    if (REPAIR_EXCLUDED_LENSES.has(f.lens)) continue;
+    if (!f.excerpt || !f.excerpt.trim()) continue;
+    if (!isHeadClippedExcerpt(source, f.excerpt)) continue;
+    const span = findHeadRepairSpan(source, f.excerpt);
+    if (!span) {
+      // Detected as head-clipped but not safely extendable (reach too long, or no strict extension). Left
+      // exactly as it was — an unrepaired crop is a gate problem, never a licence to synthesize the head.
+      res.unrepairable++;
+      res.skipped.push({ id: f.id, lens: f.lens, reason: "head clipped but no bounded clause start locatable — left as emitted" });
+      continue;
+    }
+    res.changes.push({ id: f.id, lens: f.lens, before: f.excerpt, after: span });
+    f.excerpt = span;
     res.repaired++;
   }
   return res;

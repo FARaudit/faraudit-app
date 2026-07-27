@@ -22,7 +22,7 @@ import { isBindingDoc, hasEngineText } from "./sam-attachments";
 import { looksMojibake } from "./pdf-ocr";
 import { NOTICE_BODY_DOC_NAME } from "./agentic-executor";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
-import { repairClippedExcerpts } from "./audit-excerpt-repair";
+import { repairClippedExcerpts, repairHeadClippedExcerpts } from "./audit-excerpt-repair";
 import { SITE_VISIT_CONCLUDED_RE, BOA_HOLDER_ONLY_EMIT_RE, SITE_VISIT_MANDATORY_ATTENDANCE_RE } from "./audit-site-visit-patterns";
 import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyCyberRfiReconciliation, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyNmrNaicsDormancy, applyCheckboxStateFidelity, applyPerfObligationInsuranceTyping, applyClauseKeyedTypingFloor, applyStructuralAssertionFidelity, applyQuantityAmbiguityFidelity, applyFindingDedup, applyCrossFleetDedup, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, applyInquiryDeadlineBenignGuard, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, emitPerformanceUpkeepCaveats, deriveShadowVerdict, EngineInvariantError, type Decision, type ShadowVerdict } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
@@ -2458,6 +2458,19 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   if (repair.repaired || repair.unrepairable) {
     console.log(`[orchestrator] excerpt-repair: re-grounded ${repair.repaired} clipped excerpt(s)${repair.unrepairable ? `, ${repair.unrepairable} unrepairable (left clipped)` : ""}` +
       (repair.changes.length ? ` — ${repair.changes.map((c) => c.id ?? c.lens).join(", ")}` : ""));
+  }
+
+  // P2.6b — HEAD-SIDE RE-GROUNDING (ARC #747 · E1, flag AUDIT_EXCERPT_HEAD_REGROUND, default OFF). The pass
+  //         above extends an excerpt clipped at its END; this one extends an excerpt that BEGAN mid-clause.
+  //         Gate 4 on SPRRA2-26-R-0034 found three, and the head-side shape is the more dangerous of the two
+  //         because a cropped head reads as corroboration: an excerpt starting "15-2, Instructions…" appeared
+  //         to support a gate citing "DFARS 215-2" while its own line said "FAR 15.408, Table 15-2".
+  //         Runs after the tail pass so a doubly-clipped excerpt is repaired at both ends, and before
+  //         completeness so the restored (longer, still verbatim) span feeds covered_direct.
+  const headRepair = repairHeadClippedExcerpts(findings, ctx.fullSource);
+  if (headRepair.repaired || headRepair.unrepairable) {
+    console.log(`[orchestrator] excerpt-head-reground: restored ${headRepair.repaired} clipped head(s)${headRepair.unrepairable ? `, ${headRepair.unrepairable} left as emitted` : ""}` +
+      (headRepair.changes.length ? ` — ${headRepair.changes.map((c) => c.id ?? c.lens).join(", ")}` : ""));
   }
 
   // P4 — completeness (B-corrected): every binding section READ + obligation-coverage (direct or attested
