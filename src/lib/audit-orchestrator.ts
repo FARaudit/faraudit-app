@@ -194,6 +194,29 @@ export interface RunDiagnostics {
  *  part36 the carrier is the SEALED construction binding-content manifest (present elements = the §A–M analog),
  *  computed at ingest over FULL doc text. The :574 completeness FORMULA is untouched — only WHICH set populates
  *  `required` changes. Flag-off / no manifest ⇒ procurementPart never returns part36 ⇒ byte-identical UCF path. */
+/** Number `prefix#N` ids WITHOUT ever re-issuing one the set already holds.
+ *
+ *  Every emitter here used to number from zero unconditionally, which is correct only while nothing upstream
+ *  already carries that emitter's ids. The judgment-first / replay shape breaks exactly that assumption: the
+ *  seed IS a previous run's persisted findings, so a record holding keyfact_detector#0 came back with TWO
+ *  findings answering to #0 — the Nonmanufacturer Rule and a delivery schedule. Duplicate ids are not cosmetic:
+ *  anything that pairs findings by id (repair propagation, dedup bookkeeping, replay drift, every differential
+ *  harness) can silently act on the wrong row, and a widened quote landing on the wrong requirement is the
+ *  fabrication shape this arc exists to close.
+ *
+ *  Live ladder runs are unaffected — nothing is ever taken, so the numbering is identical to before. This
+ *  diverges only where it would otherwise have produced a duplicate. Census: scripts/audit-ai/_dupe-id-census.ts. */
+function assignUniqueFindingIds(rows: TypedFinding[], prefix: string, existing: TypedFinding[]): void {
+  const taken = new Set(existing.map((f) => f.id).filter(Boolean) as string[]);
+  let n = 0;
+  for (const f of rows) {
+    let id = `${prefix}#${n++}`;
+    while (taken.has(id)) id = `${prefix}#${n++}`;
+    f.id = id;
+    taken.add(id);
+  }
+}
+
 export function buildManifest(ctx: AuditToolContext): string[] {
   if (procurementPart(ctx) === "part36-construction" && ctx.constructionManifest) return constructionRequired(ctx.constructionManifest);
   return BINDING_SECTIONS.filter((k) => readSection(ctx, k).present);
@@ -2360,7 +2383,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     const runs = await Promise.all(experts.map((spec) => runAgenticExpert(spec, ctx, { callModel, maxTurns, signal })));
     console.log(`[timing] expert-phase ${Date.now() - _tExp}ms · turns/lens ${experts.map((s, i) => `${s.key}:${runs[i].turns}`).join(" ")} · docsRead=${runs.reduce((n, r) => n + r.docsRead.length, 0)}`);
     experts.forEach((spec, i) => {
-      runs[i].findings.forEach((f, j) => { f.id = `${spec.key}#${j}`; });
+      assignUniqueFindingIds(runs[i].findings, spec.key, findings);
       perLens[spec.key] = runs[i].findings.length; findings.push(...runs[i].findings);
       runs[i].sectionsRead.forEach((s) => sectionsRead.add(s));
       runs[i].docsRead.forEach((d) => docsRead.add(d));
@@ -2397,7 +2420,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //         Set AUDIT_GROUNDING_SWEEP="false" to disable.
   if (process.env.AUDIT_GROUNDING_SWEEP !== "false") {
     const swept = highSignalSweep(ctx.fullSource);
-    swept.forEach((f, j) => { f.id = `deterministic_sweep#${j}`; });
+    assignUniqueFindingIds(swept, "deterministic_sweep", findings);
     if (swept.length) { perLens["deterministic_sweep"] = swept.length; findings.push(...swept); }
   }
 
@@ -2409,7 +2432,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   const boilerplateAttestOn = process.env.AUDIT_BOILERPLATE_ATTEST === "true";
   if (boilerplateAttestOn) {
     const traps = boilerplateTrapSweep(ctx.fullSource);
-    traps.forEach((f, j) => { f.id = `boilerplate_trap#${j}`; });
+    assignUniqueFindingIds(traps, "boilerplate_trap", findings);
     if (traps.length) { perLens["boilerplate_trap_sweep"] = traps.length; findings.push(...traps); }
   }
 
@@ -2467,7 +2490,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //         never an eligibility gate (invisible to the 206-A guarantee). part12-commercial gate is inside the pass.
   if (process.env.AUDIT_PROCEDURAL_COVERAGE_LENS === "true") {
     const proc = await proceduralCoveragePass(ctx, { extract: opts.proceduralExtract });
-    proc.forEach((f, j) => { f.id = `procedural_coverage#${j}`; });
+    assignUniqueFindingIds(proc, "procedural_coverage", findings);
     if (proc.length) {
       perLens["procedural_coverage"] = proc.length;
       findings.push(...proc);
@@ -2658,14 +2681,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     //
     // Live runs are unaffected — the lenses emit no keyfact ids, so nothing is ever taken and the numbering is
     // identical to before. It only diverges where it would otherwise have produced a duplicate.
-    const takenIds = new Set(findings.slice(0, before).map((f) => f.id).filter(Boolean));
-    let kfN = 0;
-    for (let k = before; k < findings.length; k++) {
-      let id = `keyfact_detector#${kfN++}`;
-      while (takenIds.has(id)) id = `keyfact_detector#${kfN++}`;
-      findings[k].id = id;
-      takenIds.add(id);
-    }
+    assignUniqueFindingIds(findings.slice(before), "keyfact_detector", findings.slice(0, before));
     if (findings.length > before) perLens["keyfact_detector"] = findings.length - before;
   }
 
