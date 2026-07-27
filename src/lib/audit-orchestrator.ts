@@ -2952,5 +2952,16 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     ? { ...decision, ...(stopperGate.touched ? { showStoppers: stopperGate.findings } : {}), ...(reasonGate.withheld.length ? { reason: reasonGate.text } : {}) }
     : decision;
 
-  return { decision: decisionOut, inputs, findings: citeGate.findings, coverage: { required, covered, missing, attestations, coreMissing }, perLens, conflict, sectionsRead: [...sectionsRead], trace, ...(withheldAll.length ? { citationsWithheld: withheldAll } : {}), ...(verifierDrops.length ? { verifierDrops } : {}), ...(judgmentLayerEnabled() && (opts.judgmentReason || opts.judgmentEntail) ? { judgmentCost } : {}), ...(_bankDiag ? { diagnostics: _bankDiag } : {}) };
+  // REBIND, don't only return (review round 3, finding #3). This gate produces COPIES for every touched row
+  // and, until now, handed them straight to the `return` while `findings` and `decision` still pointed at the
+  // originals. Any pass appended after this block — E1's head re-grounding on the sibling branch is exactly
+  // that, and both branches add their block immediately before this same return — would then mutate objects
+  // that never ship, and its work would vanish for precisely the rows this gate touched. Nothing here depends
+  // on merge order once the locals and the returned graph are the same objects; the gate reads `citation` and
+  // `requirement`, E1 writes `excerpt`, so the two are on disjoint fields in either order. Untouched runs
+  // rebind to the identical references, so flag-OFF stays a same-reference passthrough.
+  findings = citeGate.findings;
+  decision = decisionOut;
+
+  return { decision, inputs, findings, coverage: { required, covered, missing, attestations, coreMissing }, perLens, conflict, sectionsRead: [...sectionsRead], trace, ...(withheldAll.length ? { citationsWithheld: withheldAll } : {}), ...(verifierDrops.length ? { verifierDrops } : {}), ...(judgmentLayerEnabled() && (opts.judgmentReason || opts.judgmentEntail) ? { judgmentCost } : {}), ...(_bankDiag ? { diagnostics: _bankDiag } : {}) };
 }
