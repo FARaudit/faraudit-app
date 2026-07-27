@@ -400,8 +400,18 @@ export function repairHeadClippedExcerpts(findings: TypedFinding[], source: stri
       continue;
     }
     res.changes.push({ id: f.id, lens: f.lens, before: f.excerpt, after: span });
+    // Keep what the model actually emitted. Everything that asks "was this analyzed?" — the eligibility floors
+    // above all — must answer from the ORIGINAL span, or a quote widened for the reader silently credits the
+    // finding with source it never looked at. Set once: a second pass must not overwrite the true original.
+    if (f.excerptPreReground === undefined) f.excerptPreReground = f.excerpt;
     f.excerpt = span;
     res.repaired++;
   }
   return res;
+}
+
+/** The span the ANALYSIS rested on — the model's own excerpt, before any widening for readability. Every
+ *  coverage/attribution question uses this; only the reader sees the widened span. */
+export function analyzedExcerptOf(f: Pick<TypedFinding, "excerpt" | "excerptPreReground">): string {
+  return f.excerptPreReground ?? f.excerpt ?? "";
 }

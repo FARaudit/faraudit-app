@@ -38,6 +38,12 @@ export interface TypedFinding {
   requirement: string;        // the obligation, plain language
   citation: string;           // FAR/DFARS/section reference — must be literally in source (fabrication-gated, Rule 64)
   excerpt: string;            // VERBATIM source span proving it exists (the grounding)
+  // The excerpt AS THE MODEL EMITTED IT, set only when a repair pass later widened the span (ARC #747 · E1).
+  // Two different questions are asked of an excerpt and they need different answers: what the reader should SEE
+  // (the widened, still-verbatim span) and what the analysis actually EXAMINED (the original span). The
+  // eligibility floors decide "was this bar analyzed?" by span overlap, so they must ask the second question —
+  // otherwise widening a quote for readability silently marks an unexamined bar as covered.
+  excerptPreReground?: string;
   kind: RequirementKind;
   controllability: Controllability;
   grounded: boolean;          // excerpt verified present in the source (deterministic grounding check)

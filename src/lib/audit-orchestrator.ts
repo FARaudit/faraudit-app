@@ -22,7 +22,16 @@ import { isBindingDoc, hasEngineText } from "./sam-attachments";
 import { looksMojibake } from "./pdf-ocr";
 import { NOTICE_BODY_DOC_NAME } from "./agentic-executor";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
-import { repairClippedExcerpts, repairHeadClippedExcerpts } from "./audit-excerpt-repair";
+import { repairClippedExcerpts, repairHeadClippedExcerpts, analyzedExcerptOf } from "./audit-excerpt-repair";
+// ATTRIBUTION USES THE ANALYZED SPAN, NOT THE DISPLAYED ONE (ARC #747 · E1). Every "does this finding cover
+// that text?" computation below — grounding attribution, region coverage, the eligibility floors, the caveat
+// emitters — asks whether the ANALYSIS examined a passage. Head re-grounding widens an excerpt backward so a
+// customer sees the whole clause; if that widened span answered these questions it would silently credit the
+// finding with source it never looked at, and an eligibility bar sitting one line above a quote would read as
+// already-covered. An adversarial probe demonstrated exactly that: a questions-deadline finding, widened,
+// swallowing a Top Secret facility-clearance bar and retiring the floor that should have fired.
+// `analyzedExcerptOf` returns the model's own excerpt when a repair widened it, and the excerpt itself
+// otherwise — so with the flag off, or on a finding no pass touched, every one of these is unchanged.
 import { SITE_VISIT_CONCLUDED_RE, BOA_HOLDER_ONLY_EMIT_RE, SITE_VISIT_MANDATORY_ATTENDANCE_RE } from "./audit-site-visit-patterns";
 import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyCyberRfiReconciliation, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyNmrNaicsDormancy, applyCheckboxStateFidelity, applyPerfObligationInsuranceTyping, applyClauseKeyedTypingFloor, applyStructuralAssertionFidelity, applyQuantityAmbiguityFidelity, applyFindingDedup, applyCrossFleetDedup, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, applyInquiryDeadlineBenignGuard, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, emitPerformanceUpkeepCaveats, deriveShadowVerdict, EngineInvariantError, type Decision, type ShadowVerdict } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
@@ -637,7 +646,7 @@ function groundedBy(obligation: string, findings: TypedFinding[], sec: string, s
   const ids: string[] = [];
   for (const f of findings) {
     if (!f.id) continue;
-    const ex = norm(f.excerpt || "");
+    const ex = norm(analyzedExcerptOf(f) || "");
     const fSec = findingSection(f);
     // Legacy path — UNCHANGED any flag state: same-letter citation + exact 4-gram.
     if (fSec === sec && grams.some((g) => ex.includes(g))) { ids.push(f.id); continue; }
@@ -689,7 +698,7 @@ export function groundedSourceRegionNames(fullSource: string, findings: TypedFin
   //   substantive excerpt (≥24 norm chars) AND a UNIQUE containing region (hits===1). Ambiguous (0 or >1) ⇒ strip
   //   nothing ⇒ the gap disclosure is KEPT (conservative — never hide a real gap; at worst leaves a grounded region listed).
   for (const f of decisionBearing) {
-    const ex = norm(f.excerpt || "");
+    const ex = norm(analyzedExcerptOf(f) || "");
     if (ex.length < 24) continue;
     const hits = regions.filter((r) => r.text.includes(ex));
     if (hits.length === 1) out.add(nameKey(hits[0].name));
@@ -756,7 +765,7 @@ export function documentsCovered(
     // finding the engine would actually act on can lift the INCOMPLETE veto. Flag-gated on crossAttGate ⇒ flag-OFF
     // byte-identical (a `dropped` finding still counted before).
     if (findings.some((f) => {
-      const ex = norm(f.excerpt || "");
+      const ex = norm(analyzedExcerptOf(f) || "");
       if (!(ex.length > 0 && nRegion.includes(ex) && !primaryNorm.includes(ex))) return false;
       if (crossAttGate && disposeFinding(f) === "dropped") return false;   // #372 B — boilerplate/dropped finding is not decision-bearing → credits no coverage
       if (crossAttGate && otherAttNorms.some((o) => o.name !== r.name && o.t.includes(ex))) return false; // excerpt shared with ANOTHER attachment → doesn't prove THIS one analyzed
@@ -1128,7 +1137,7 @@ export function noticeBodyEligibilityUngrounded(fullSource: string, findings: Ty
   const covering: Array<[number, number]> = [];
   for (const f of findings) {
     if (disposeFinding(f) === "dropped") continue;
-    const ex = norm(f.excerpt || "");
+    const ex = norm(analyzedExcerptOf(f) || "");
     if (!ex) continue;
     const s = nNotice.indexOf(ex);
     if (s >= 0) covering.push([s, s + ex.length]);
@@ -1192,7 +1201,7 @@ export function emitNoticeBodyEligBarFindings(fullSource: string, findings: Type
   const covering: Array<[number, number]> = [];
   for (const f of findings) {
     if (disposeFinding(f) === "dropped") continue;
-    const ex = norm(f.excerpt || "");
+    const ex = norm(analyzedExcerptOf(f) || "");
     if (!ex) continue;
     const s = nNotice.indexOf(ex);
     if (s >= 0) covering.push([s, s + ex.length]);
@@ -1363,7 +1372,7 @@ export function emitSizeStandardCaveats(fullSource: string, findings: TypedFindi
   const covering: Array<[number, number]> = [];
   for (const f of findings) {
     if (disposeFinding(f) === "dropped") continue;
-    const ex = norm(f.excerpt || "");
+    const ex = norm(analyzedExcerptOf(f) || "");
     if (!ex) continue;
     const s = nNotice.indexOf(ex);
     if (s >= 0) covering.push([s, s + ex.length]);
@@ -1417,7 +1426,7 @@ export function emitSelfDeterminableCaveats(fullSource: string, findings: TypedF
   const covering: Array<[number, number]> = [];
   for (const f of findings) {
     if (disposeFinding(f) === "dropped") continue;
-    const ex = norm(f.excerpt || "");
+    const ex = norm(analyzedExcerptOf(f) || "");
     if (!ex) continue;
     const s = nNotice.indexOf(ex);
     if (s >= 0) covering.push([s, s + ex.length]);
@@ -1515,7 +1524,7 @@ export function constructionDocumentsCovered(ctx: AuditToolContext, findings: Ty
     // an excerpt shared with ANOTHER attachment (a flow-down phrase in both) must NOT certify THIS doc as analyzed
     // → false COMPLETE; exclude it (mirrors documentsCovered line ~397).
     if (!findings.some((f) => {
-      const ex = norm(f.excerpt || "");
+      const ex = norm(analyzedExcerptOf(f) || "");
       if (!(ex.length > 0 && nRegion.includes(ex) && !primaryNorm.includes(ex))) return false;
       if (otherAttNorms.some((o) => o.name !== r.name && o.t.includes(ex))) return false;   // shared with ANOTHER attachment → doesn't prove THIS one analyzed
       return true;
@@ -1879,7 +1888,7 @@ function sectionUngroundedEligBars(text: string, findings: TypedFinding[], decla
   const covering: Array<[number, number]> = [];
   for (const f of findings) {
     if (disposeFinding(f) === "dropped") continue;
-    const ex = norm(f.excerpt || "");
+    const ex = norm(analyzedExcerptOf(f) || "");
     if (!ex) continue;
     const s = nText.indexOf(ex);
     if (s >= 0) covering.push([s, s + ex.length]);
