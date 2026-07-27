@@ -167,7 +167,10 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;ali
    same glance that reads the rows. */
 .feed-illustrative{font-size:11px;font-weight:600;font-family:var(--serif);color:rgba(245,240,232,.82);letter-spacing:.01em;}
 .feed-illustrative em{font-style:normal;color:var(--gold);font-weight:700;}
-.feed-counters{display:grid;grid-template-columns:repeat(6,1fr);gap:0;border-bottom:1px solid rgba(201,168,76,.08);width:100%;}
+/* 4, not 6 — matched to the counters that actually exist. Two were removed with the fabricated
+   live numbers and two more were the "0 competitors / 0 rivals" claims; the grid kept declaring six
+   and rendered a third of the strip blank. Counters are never invented to fill this row. */
+.feed-counters{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-bottom:1px solid rgba(201,168,76,.08);width:100%;}
 .fc{padding:11px 0 11px 20px;border-right:1px solid rgba(201,168,76,.07);display:flex;flex-direction:column;gap:3px;min-width:0;}
 .fc:last-child{border-right:none;}
 .fc-n{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--gold2);line-height:1;letter-spacing:-.01em;white-space:nowrap;}
@@ -235,8 +238,6 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;ali
 .closing-cta:hover{background:var(--gold2);box-shadow:0 10px 32px rgba(201,168,76,.3);transform:translateY(-1px);}
 .closing-pricing{display:flex;flex-direction:column;align-items:flex-end;gap:5px;}
 .closing-price{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--gold);opacity:.75;letter-spacing:.06em;}
-.closing-slots{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:9px;color:rgba(245,240,232,.35);letter-spacing:.08em;}
-.slots-dot{width:5px;height:5px;border-radius:50%;background:#EF4444;animation:ldot 2s ease-in-out infinite;}
 .closing-period{font-family:var(--mono);font-size:8px;color:rgba(245,240,232,.2);letter-spacing:.06em;}
 
 /* Footer */
@@ -342,11 +343,6 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;ali
           <span class="ps-tag">IFB</span>
           <span class="ps-tag">Any page count</span>
         </div>
-        <div class="ps-detail">
-          <div class="ps-bullet"><span class="ps-dot">·</span>Any federal solicitation PDF — any agency, any format</div>
-          <div class="ps-bullet"><span class="ps-dot">·</span>Large IDIQs handled — no token truncation</div>
-          <div class="ps-bullet"><span class="ps-dot">·</span>Base period + all options ingested in full</div>
-        </div>
       </div>
 
       <div class="process-connector">
@@ -370,7 +366,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;ali
             <line x1="11" y1="22.5" x2="18" y2="22.5" stroke="#C9A84C" stroke-width=".8" stroke-opacity=".3"/>
           </svg>
         </div>
-        <div class="ps-title">Three-Call Audit Engine</div>
+        <div class="ps-title">Audit Engine</div>
         <div class="ps-tags">
           <span class="ps-tag">FAR</span>
           <span class="ps-tag">DFARS</span>
@@ -379,7 +375,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;ali
           <span class="ps-tag">CLIN Structure</span>
         </div>
         <div class="ps-detail">
-          Three sequential intelligence calls — no single-pass truncation, no black box. Every clause checked against current regulations. Every finding cited.
+          Every finding cited.
         </div>
       </div>
 
@@ -405,7 +401,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;ali
           <span class="ps-tag">Required Actions</span>
         </div>
         <div class="ps-detail">
-          <div class="ps-bullet"><span class="ps-dot">·</span>15-page branded report — P0 / P1 / P2 risks ranked</div>
+          <div class="ps-bullet"><span class="ps-dot">·</span>Branded report — P0 / P1 / P2 risks ranked</div>
           <div class="ps-bullet"><span class="ps-dot">·</span>Contracting Officer clarification email drafted</div>
           <div class="ps-bullet"><span class="ps-dot">·</span>Every finding cited to the exact FAR/DFARS clause</div>
         </div>
@@ -470,7 +466,6 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;ali
       <a href="mailto:jose@faraudit.com?subject=FARaudit%20Access%20Request" class="closing-cta">Request Access <span style="font-size:14px">→</span></a>
       <div class="closing-pricing">
         <div class="closing-price">$1,250 / month</div>
-        <div class="closing-slots"><div class="slots-dot"></div>5 design partner slots remaining</div>
         <div class="closing-period">First 90 days · Direct founder access · Input into roadmap</div>
       </div>
     </div>
