@@ -80,7 +80,12 @@ export interface RunRecordInput {
   // fullSource, which is exactly what the orchestrator does when it is absent.
   noticeType?: string | null;                   // SAM notice type — scopes the §L/§M requirement (Layer-2, card 262)
   formIdentified?: boolean;                     // whether a substantive primary form was recognized — corroborates body-absent
-  documentsComplete?: boolean | null;           // the run's documentsComplete signal (distinct from manifestComplete)
+  // `documentsComplete` was declared here alongside the three fields above and then never written by the
+  // banker and never read by the replay — a dead field on the one interface whose entire purpose is replay
+  // fidelity, which reads to the next person as "the record carries this signal" (review round 5, finding #5).
+  // REMOVED rather than wired, because the record already carries it: `result.inputs` is the full
+  // VerdictInputs, and `documentsComplete` lives there (audit-findings.ts:215) as the value deriveVerdict
+  // actually used. A second copy on the input side could only ever disagree with it.
   // BANKED, NOT YET CONSUMED BY REPLAY — say so rather than imply otherwise (review round 4, finding #1). The
   // only readers of `ctx.noticeBodyText` are the eligibility floor and the three caveat emitters, and all four
   // live inside `runAgenticAudit`; `replayRunRecord` runs the deterministic stages only, none of which touch it.

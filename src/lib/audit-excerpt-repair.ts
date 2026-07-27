@@ -336,12 +336,17 @@ export type HeadClipMiss = { refusal: string };
 
 /** Shared locator for the detector and the repair, so the two can never disagree about what "clipped" means
  *  (the same single-definition discipline the tail detector holds with verify-run-quality). */
-function locateHeadClip(source: string, excerpt: string): HeadClipHit | HeadClipMiss {
+function locateHeadClip(source: string, excerpt: string, precomputed?: { norm: string; map: number[] }): HeadClipHit | HeadClipMiss {
   const ex = (excerpt || "").trim();
   if (!source || ex.split(/\s+/).filter(Boolean).length < 4) return { refusal: "excerpt too short to anchor safely" };
   const c = canon(ex);
   if (c.length < 12) return { refusal: "excerpt too short to anchor safely" };
-  const { norm, map } = normMap(source);
+  // `normMap` is a PURE function of `source` and identical for every finding in a run, so the caller that
+  // loops may hand it in once (review round 5, finding #3). Measured on this branch BEFORE the hoist: 40
+  // findings against a 1.89 MB source cost 3,276 ms in this function alone — and that measurement repaired
+  // NOTHING, which is the point: the whole-source scan plus an N-element number[] is paid per finding whether
+  // or not a repair follows. Absent ⇒ computed here, so the two non-looping callers are unchanged.
+  const { norm, map } = precomputed ?? normMap(source);
   const at = norm.indexOf(c);
   if (at < 0) return { refusal: "excerpt not verbatim in source" };
   if (norm.indexOf(c, at + 1) >= 0) return { refusal: "excerpt occurs more than once — ambiguous, never mislocate" };
@@ -461,6 +466,15 @@ export function repairClippedExcerpts(findings: TypedFinding[], source: string):
       continue;
     }
     res.changes.push({ id: f.id, lens: f.lens, before: f.excerpt, after: span });
+    // RECORD THE ANALYZED SPAN HERE TOO (review round 5, finding #4). This tail pass also widens an excerpt,
+    // and it runs PRE-verdict (orchestrator P2.6, deliberately before completenessOf) — so it is the pass that
+    // can actually reach the coverage proof. Without this stamp `analyzedExcerptOf` returns the WIDENED span
+    // for a tail-repaired finding, which makes the guard at completenessOf ("the haystack direction — the one
+    // place widening can manufacture coverage") a no-op for exactly the findings that can trip it: a clipped
+    // excerpt forward-extended past a neighbouring manifest anchor would mark that element covered and name
+    // the finding as proof for text it never analyzed. The mitigation was pointed at the head pass, which is
+    // structurally post-verdict and cannot reach the proof at all.
+    if (f.excerptPreReground === undefined) f.excerptPreReground = f.excerpt;
     f.excerpt = span;                                        // verbatim source span → grounded + un-truncated
     res.repaired++;
   }
@@ -479,6 +493,8 @@ export interface HeadRegroundOpts {
 export function repairHeadClippedExcerpts(findings: TypedFinding[], source: string, opts?: HeadRegroundOpts): ExcerptRepairResult {
   const res: ExcerptRepairResult = { repaired: 0, unrepairable: 0, changes: [], skipped: [] };
   if (!source || !headRegroundEnabled()) return res;
+  // ONE normalized index for the whole run, built AFTER the flag guard so the OFF path still pays nothing.
+  const nm = normMap(source);
   for (const f of findings) {
     if (REPAIR_EXCLUDED_LENSES.has(f.lens)) continue;
     if (!f.excerpt || !f.excerpt.trim()) continue;
@@ -493,7 +509,7 @@ export function repairHeadClippedExcerpts(findings: TypedFinding[], source: stri
     // source, for EVERY finding. Measured 16.3 ms/call on a 504 KB source: ~1.3 s and ~320 MB of array churn
     // for 40 findings, ~5 s on a 2 MB source. Reusing the hit halves it and removes the possibility of the
     // detector and the repair disagreeing. (Review finding #4.)
-    const hit = locateHeadClip(source, f.excerpt);
+    const hit = locateHeadClip(source, f.excerpt, nm);
     if ("refusal" in hit) {
       // TYPED REFUSAL, not silence. Previously every shape refusal — table, clause row, label record,
       // non-prose line, over-reach, ambiguity — returned false from the detector and was `continue`d with no

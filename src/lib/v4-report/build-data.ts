@@ -571,7 +571,16 @@ export function buildV4Data(audit: Record<string, unknown>): V4Data {
     const setAsideType = s(audit.set_aside_type);
     const bodyDeniesSetAside = process.env.AUDIT_SETASIDE_HEADER_RECONCILE === "true"
       && !setAsideType
-      && (p.findings || []).some((f) => /no\s+socioeconomic\s+set.?aside|52\.219-6\s+(is\s+)?absent/i.test(`${s(f.requirement)} ${s(f.excerpt)}`));
+      // THE ANALYZED SPAN, not the displayed one (review round 5, finding #1). This predicate asks what the
+      // ENGINE FOUND — "did the body deny the set-aside?" — and then overrides a SAM-sourced masthead fact with
+      // the answer. Its three siblings in this file were converted; this one was missed, and it is the one with
+      // the largest blast radius. Reproduced against the real pass: where the source wraps as "…no socioeconomic
+      // set-aside\napplies; offerors shall submit unit prices…", a pricing finding quoting from "applies;" gets
+      // its head restored — legitimately, the classification guard sees no change — and the widened DISPLAY span
+      // now contains "no socioeconomic set-aside" while the span the analysis actually examined does not. The
+      // masthead would flip to "None confirmed" on the strength of text no lens ever read. [[L45]]
+      && (p.findings || []).some((f) => /no\s+socioeconomic\s+set.?aside|52\.219-6\s+(is\s+)?absent/i.test(
+        `${s(f.requirement)} ${s((f as { excerptPreReground?: string }).excerptPreReground ?? f.excerpt)}`));
     if (bodyDeniesSetAside) {
       facts.push({ k: "Set-aside", v: "None confirmed", sub: `SAM coding "${setAside}" present; no operative set-aside clause (52.219-6 absent) — confirm` });
     } else {
