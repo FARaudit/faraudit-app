@@ -160,9 +160,13 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;ali
 .feed-timestamp em{color:rgba(201,168,76,.6);font-style:normal;font-weight:700;}
 .feed-col-headers{display:grid;grid-template-columns:72px 1fr 260px 85px 58px 58px 78px 66px;gap:0 14px;align-items:center;padding:5px 20px;border-bottom:1px solid rgba(201,168,76,.07);background:rgba(201,168,76,.025);}
 .fch{font-family:var(--mono);font-size:7px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(245,240,232,.28);}
-.feed-live{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:8px;font-weight:700;color:rgba(74,222,128,.88);letter-spacing:.1em;}
-.live-dot{width:6px;height:6px;border-radius:50%;background:#4ADE80;animation:ldot 2s ease-in-out infinite;}
-@keyframes ldot{0%,100%{opacity:.8;box-shadow:0 0 0 0 rgba(74,222,128,.5)}50%{opacity:1;box-shadow:0 0 0 5px rgba(74,222,128,0)}}
+/* The pulsing green status dot, its badge and its keyframes are deliberately gone (CEO 2026-07-27). They
+   asserted a currency the page never had: every call this feed made was blocked by our own CSP before it
+   left the browser, so the panel has only ever shown the hardcoded sample below. The label that replaces
+   them is set at ROW weight, not fine print — an illustrative panel has to read as illustrative at the
+   same glance that reads the rows. */
+.feed-illustrative{font-size:11px;font-weight:600;font-family:var(--serif);color:rgba(245,240,232,.82);letter-spacing:.01em;}
+.feed-illustrative em{font-style:normal;color:var(--gold);font-weight:700;}
 .feed-counters{display:grid;grid-template-columns:repeat(6,1fr);gap:0;border-bottom:1px solid rgba(201,168,76,.08);width:100%;}
 .fc{padding:11px 0 11px 20px;border-right:1px solid rgba(201,168,76,.07);display:flex;flex-direction:column;gap:3px;min-width:0;}
 .fc:last-child{border-right:none;}
@@ -414,22 +418,19 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;ali
 
   <!-- SECTION 3 — INTELLIGENCE FEED -->
   <section class="section-process reveal" id="intelligence" style="padding-top:96px;padding-bottom:0;padding-left:56px;padding-right:56px;">
-    <div class="section-label">Live Intelligence</div>
+    <div class="section-label">What the Engine Reads</div>
     <div class="feed-panel">
       <div class="feed-hdr">
         <div class="feed-hdr-left">
           <div class="feed-hdr-label">Intelligence Feed</div>
           <div class="feed-hdr-div"></div>
-          <div class="feed-hdr-sub">Live · SAM.gov · Updated just now</div>
+          <div class="feed-illustrative"><em>Illustrative examples</em> — not live data</div>
         </div>
         <div class="feed-hdr-right">
-          <div class="feed-timestamp">Updated <em id="tsAgo">just now</em></div>
-          <div class="feed-live"><div class="live-dot"></div>LIVE</div>
+          <div class="feed-illustrative">Representative of the work, not a feed</div>
         </div>
       </div>
       <div class="feed-counters">
-        <div class="fc"><div class="fc-n" id="cSol">847</div><div class="fc-l">Active</div></div>
-        <div class="fc"><div class="fc-n" id="cP0">23</div><div class="fc-l">P0 Today</div></div>
         <div class="fc"><div class="fc-n" style="color:#4ADE80;font-size:18px;">0</div><div class="fc-l">Clause audit<br>competitors</div></div>
         <div class="fc"><div class="fc-n" style="color:#4ADE80;font-size:18px;">0</div><div class="fc-l">DFARS trap<br>rivals</div></div>
         <div class="fc"><div class="fc-n">60–90d</div><div class="fc-l">Upstream</div></div>
@@ -449,8 +450,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;ali
         <div class="feed-track" id="feedTrack"></div>
       </div>
       <div class="feed-ftr">
-        <span class="ftr-note">Live · SAM.gov · Updated just now</span>
-        <span class="ftr-count" id="ftrCount">847 solicitations active</span>
+        <span class="ftr-note feed-illustrative"><em>Illustrative examples</em> — not live data</span>
       </div>
     </div>
   </section>
@@ -492,15 +492,11 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;ali
 
 <script>
 // ══════════════════════════════════════
-// FARAUDIT INTELLIGENCE FEED — LIVE API
-// SAM.gov + USASpending.gov Integration
+// FARAUDIT INTELLIGENCE FEED — ILLUSTRATIVE
+// Static sample rows. No external data source.
 // ══════════════════════════════════════
 
-const SAM_API_KEY = 'CAQFhM7qTQGvCe5NCHxh1qDcFUCsnwQarM3mNrOk'; // Replace with your api.sam.gov key
-const NAICS_CODES = ['336413','332710','332721','334511','541330','336412','332999','541519','336415'];
 
-// USASpending agency spend data (no key required)
-const AGENCY_SPEND = {};
 
 // Sample data — used as fallback and while live data loads
 const SAMPLE_DATA = [
@@ -522,111 +518,11 @@ const SAMPLE_DATA = [
   {n:'336413',t:'F-16 Block 70 Hydraulic Actuator Brackets',a:'Air Force Materiel Command (AFMC)',v:'$521K',days:62,ty:'RFQ',sa:'sb',sal:'SB',b:'b0',bl:'1 P0'},
 ];
 
-// ── SAM.GOV LIVE FETCH ──
-async function fetchSAMLive() {
-  const today = new Date();
-  const future = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000);
-  const fmt = d => d.toISOString().split('T')[0];
 
-  const results = [];
-
-  for(const naics of NAICS_CODES.slice(0,3)) { // Rate limit: 3 NAICS on load
-    try {
-      const url = `https://api.sam.gov/opportunities/v2/search?api_key=${SAM_API_KEY}&naicsCode=${naics}&postedFrom=${fmt(today)}&postedTo=${fmt(future)}&limit=5&offset=0&ptype=o,p,k,r`;
-      const res = await fetch(url);
-      if(!res.ok) continue;
-      const data = await res.json();
-
-      if(data.opportunitiesData) {
-        for(const opp of data.opportunitiesData) {
-          const daysLeft = opp.responseDeadLine ?
-            Math.ceil((new Date(opp.responseDeadLine) - today) / 86400000) : 30;
-
-          // Map set-aside
-          const saMap = {
-            'Total Small Business':'sb','SBA':'sb',
-            'Service-Disabled Veteran-Owned Small Business':'sdvosb',
-            'Women-Owned Small Business':'wosb','8A':'a8',
-            'Unrestricted':'unrest',''  :'unrest'
-          };
-          const saCode = opp.typeOfSetAsideDescription || '';
-          const sa = saMap[saCode] || 'unrest';
-          const salMap = {sb:'SB',sdvosb:'SDVOSB',wosb:'WOSB',a8:'8(a)',unrest:'UNREST'};
-
-          // Risk classification based on DFARS keywords
-          const title = opp.title || '';
-          const hasDFARS = /CMMC|cyber|telecom|hexavalent|chromium|Xinjiang|ITAR/i.test(title);
-          const isComplex = /IDIQ|BPA|GWAC|multiple award/i.test(title);
-          const b = hasDFARS ? 'b0' : isComplex ? 'b1' : 'bw';
-          const bl = hasDFARS ? '1 P0' : isComplex ? '1 P1' : 'Watch';
-
-          // Format value
-          let v = 'UNDISCL';
-          if(opp.award && opp.award.amount) {
-            const amt = parseFloat(opp.award.amount);
-            v = amt >= 1000000 ? `$${(amt/1000000).toFixed(1)}M` : `$${Math.round(amt/1000)}K`;
-          }
-
-          results.push({
-            n: naics,
-            t: title.length > 55 ? title.substring(0,52) + '...' : title,
-            a: (opp.organizationName || 'DoD').substring(0,42),
-            v, days: Math.max(1, daysLeft),
-            ty: opp.solicitationType === 'PRESOL' ? 'Pre-Sol' :
-                opp.solicitationType === 'COMBINE' ? 'RFQ' :
-                opp.solicitationType === 'AWARD' ? 'Award' : 'RFP',
-            sa, sal: salMap[sa], b, bl,
-            live: true
-          });
-        }
-      }
-    } catch(e) { /* Fall through to sample data */ }
-  }
-  return results;
-}
-
-// ── USASPENDING AGENCY INTEL ──
-async function fetchAgencySpend() {
-  try {
-    const res = await fetch('https://api.usaspending.gov/api/v2/agency/list/?sort=obligations&order=desc&limit=10', {
-      method: 'GET', headers: {'Content-Type':'application/json'}
-    });
-    if(!res.ok) return null;
-    const data = await res.json();
-    return data.results;
-  } catch(e) { return null; }
-}
-
-// ── COUNTER STATS FROM USASPENDING ──
-async function fetchLiveStats() {
-  try {
-    // Get current FY contract count for defense NAICS
-    const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_award/', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        filters: {
-          naics_codes: NAICS_CODES,
-          award_type_codes: ['A','B','C','D'],
-          time_period: [{start_date:'2026-01-01', end_date:'2026-12-31'}]
-        },
-        fields: ['Award ID'],
-        sort: 'Award ID',
-        order: 'desc',
-        limit: 1,
-        page: 1
-      })
-    });
-    if(!res.ok) return null;
-    const data = await res.json();
-    return data.page_metadata ? data.page_metadata.total : null;
-  } catch(e) { return null; }
-}
 
 // ── BUILD FEED ROWS ──
 const track = document.getElementById('feedTrack');
 let currentData = SAMPLE_DATA;
-let liveMode = false;
 
 function buildRow(r) {
   const d = document.createElement('div');
@@ -634,10 +530,9 @@ function buildRow(r) {
   d.className = 'feed-row ' + riskClass;
   const daysCls = r.days <= 7 ? 'urgent' : r.days <= 21 ? 'soon' : 'ok';
   const daysLbl = r.days + 'd';
-  const liveBadge = r.live ? '<span style="font-family:var(--mono);font-size:6px;color:#4ADE80;opacity:.6;margin-left:4px">●LIVE</span>' : '';
   d.innerHTML = `
     <span class="feed-naics">${r.n}</span>
-    <div class="feed-main"><div class="feed-title">${r.t}${liveBadge}</div></div>
+    <div class="feed-main"><div class="feed-title">${r.t}</div></div>
     <span class="feed-agency">${r.a}</span>
     <span class="feed-value">${r.v}</span>
     <span class="feed-days ${daysCls}">${daysLbl}</span>
@@ -664,54 +559,7 @@ function populateFeed(data) {
 // Init with sample data immediately
 populateFeed(SAMPLE_DATA);
 
-// Then attempt live SAM.gov fetch
-(async () => {
-  const liveResults = await fetchSAMLive();
-  if(liveResults && liveResults.length >= 4) {
-    // Merge live + sample data, live rows first
-    const merged = [...liveResults, ...SAMPLE_DATA].slice(0,20);
-    populateFeed(merged);
-    liveMode = true;
 
-    // Update header to show truly live
-    const subEl = document.querySelector('.feed-hdr-sub');
-    if(subEl) subEl.textContent = `${liveResults.length} live from SAM.gov · ${SAMPLE_DATA.length} sample`;
-
-    // Update active counter with real data
-    document.getElementById('cSol').textContent = liveResults.length + 847;
-  }
-
-  // Fetch USASpending stats
-  fetchAgencySpend();
-})();
-
-// ── LIVE COUNTERS ──
-let sol = 847, p0 = 23;
-const elSol = document.getElementById('cSol');
-const elP0 = document.getElementById('cP0');
-const elFtr = document.getElementById('ftrCount');
-
-(function tick(){
-  if(Math.random()>.45) sol++;
-  if(Math.random()>.78) p0++;
-  if(elSol) elSol.textContent = sol;
-  if(elP0) elP0.textContent = p0;
-  if(elFtr) elFtr.textContent = sol + ' solicitations active';
-  setTimeout(tick, 1800 + Math.random()*3600);
-})();
-
-// ── TIMESTAMP ──
-let tsSeconds = 0;
-function updateTimestamp(){
-  const el = document.getElementById('tsAgo');
-  if(!el) return;
-  tsSeconds++;
-  if(tsSeconds < 60) el.textContent = tsSeconds + 's ago';
-  else if(tsSeconds < 120) el.textContent = '1m ago';
-  else el.textContent = Math.floor(tsSeconds/60) + 'm ago';
-  if(tsSeconds >= 90){ tsSeconds = 0; el.textContent = 'just now'; }
-}
-setInterval(updateTimestamp, 1000);
 
 // ── SCROLL REVEAL ──
 const observer = new IntersectionObserver(entries => {
