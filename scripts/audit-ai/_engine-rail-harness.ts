@@ -108,15 +108,20 @@ const WITHHELD = /\[citation withheld/;
 
     // ── E1 · excerpts widened, and did the widening reach the SHOW-STOPPER band? ──
     const offF = off.findings ?? [], onF = on.findings ?? [];
-    const byId = new Map(offF.map((f: any) => [f.id ?? `${f.lens}|${f.citation}`, f]));
-    const widened = onF.filter((f: any) => {
-      const o = byId.get(f.id ?? `${f.lens}|${f.citation}`);
+    // KEY ON POSITION + IDENTITY, never on id alone. Finding ids are NOT guaranteed unique — the keyfact
+    // emitter re-issued `keyfact_detector#0` on replayed records, and an id-keyed Map silently kept the last
+    // one, so this harness reported a "widened excerpt" that was really two unrelated findings compared to
+    // each other. The engine bug is fixed; the harness must not be able to resurrect the illusion.
+    const key = (f: any, i: number) => `${i}|${f.lens}|${f.id ?? ""}|${f.requirement ?? ""}`;
+    const byId = new Map(offF.map((f: any, i: number) => [key(f, i), f]));
+    const widened = onF.filter((f: any, i: number) => {
+      const o = byId.get(key(f, i));
       return o && typeof f.excerpt === "string" && f.excerpt !== o.excerpt;
     });
     const offS = off.decision?.showStoppers ?? [], onS = on.decision?.showStoppers ?? [];
-    const byIdS = new Map(offS.map((f: any) => [f.id ?? `${f.lens}|${f.citation}`, f]));
-    const stopperWidened = onS.filter((f: any) => {
-      const o = byIdS.get(f.id ?? `${f.lens}|${f.citation}`);
+    const byIdS = new Map(offS.map((f: any, i: number) => [key(f, i), f]));
+    const stopperWidened = onS.filter((f: any, i: number) => {
+      const o = byIdS.get(key(f, i));
       return o && typeof f.excerpt === "string" && f.excerpt !== o.excerpt;
     });
 
@@ -140,7 +145,7 @@ const WITHHELD = /\[citation withheld/;
 
     if (VERBOSE) {
       for (const f of widened.slice(0, 3)) {
-        const o = byId.get(f.id ?? `${f.lens}|${f.citation}`);
+        const o = byId.get(key(f, onF.indexOf(f)));
         console.log(`      was: "${clip(o.excerpt)}"\n      now: "${clip(f.excerpt)}"`);
       }
       for (const w of (on.citationsWithheld ?? []).slice(0, 3)) console.log(`      withheld: ${w.raw} (${w.field})`);

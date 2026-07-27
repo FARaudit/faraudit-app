@@ -559,8 +559,16 @@ export function applyHeadRepairsTo(
   for (const t of targets) {
     // Match on id when the finding carries one; fall back to lens + the exact pre-repair excerpt, which is
     // what identified the row in the copy. Never match on excerpt alone — two lenses can quote one line.
+    //
+    // THE PRE-REPAIR EXCERPT IS REQUIRED EVEN ON AN ID MATCH, because ids are not guaranteed unique: the
+    // keyfact emitter numbered from zero unconditionally and could re-issue an id the set already held (fixed
+    // in audit-orchestrator, but this must not depend on that fix holding, here or in any future emitter).
+    // An id-only match under a duplicate would write one finding's widened quote onto a DIFFERENT finding —
+    // a verbatim excerpt attached to a requirement it does not belong to, which is the fabrication shape this
+    // arc exists to close. Requiring `before` costs nothing: every target copy is taken pre-repair, so its
+    // excerpt is the change's `before` by construction, and a mismatch means it is not the same row.
     const c = changes.find((ch) =>
-      (ch.id && t.id) ? ch.id === t.id : (ch.lens === t.lens && ch.before === t.excerpt));
+      ch.before === t.excerpt && ((ch.id && t.id) ? ch.id === t.id : ch.lens === t.lens));
     if (!c || t.excerpt === c.after) continue;
     if (t.excerptPreReground === undefined) t.excerptPreReground = t.excerpt;
     t.excerpt = c.after;

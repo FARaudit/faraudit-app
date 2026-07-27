@@ -147,5 +147,21 @@ process.env.AUDIT_EXCERPT_HEAD_REGROUND = "true";
     "showStoppers never receives the restored head — the founding excerpt renders clipped in its own tile");
 }
 
+// ── #5 · DUPLICATE IDS MUST NOT MISROUTE A QUOTE ─────────────────────────────────────────────────────
+// Found by RUNNING the rail: the keyfact emitter numbered from zero unconditionally, so a replayed record
+// whose seed already carried keyfact ids came back with two findings answering to `keyfact_detector#0`.
+// The emitter is fixed, but propagation must not depend on that: an id-only match under a duplicate would
+// write one finding's widened quote onto another finding's requirement.
+{
+  const dupA = { id: "keyfact_detector#0", lens: "keyfact_detector", excerpt: "\u2612 52.219-33 Nonmanufacturer Rule (Nov 2025)" };
+  const dupB = { id: "keyfact_detector#0", lens: "keyfact_detector", excerpt: "Scope & Performance Period: see the PWS" };
+  const applied = applyHeadRepairsTo([dupA, dupB], [
+    { id: "keyfact_detector#0", lens: "keyfact_detector", before: dupA.excerpt, after: "WIDENED NMR SPAN" },
+  ]);
+  check("#5 only the finding whose pre-repair excerpt matches receives the repair",
+    applied === 1 && dupA.excerpt === "WIDENED NMR SPAN" && dupB.excerpt === "Scope & Performance Period: see the PWS",
+    `applied=${applied}\n     A=${dupA.excerpt}\n     B=${dupB.excerpt}`);
+}
+
 console.log(failures === 0 ? "\nALL GREEN" : `\n${failures} FAILURE(S)`);
 if (failures) process.exit(1);

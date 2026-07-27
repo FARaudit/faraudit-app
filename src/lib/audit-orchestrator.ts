@@ -2649,7 +2649,23 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   {
     const before = findings.length;
     findings = applyKeyfactDetector(findings, ctx.fullSource, { enabled: process.env.AUDIT_KEYFACT_DETECTOR === "true", procurementPart: procurementPart(ctx) });
-    for (let k = before; k < findings.length; k++) { findings[k].id = `keyfact_detector#${k - before}`; }
+    // COLLISION-FREE IDS. This numbered from zero unconditionally, so it re-issued an id the set was already
+    // using whenever the incoming findings already carried keyfact ids — which is exactly the judgment-first /
+    // replay shape, where the seed is a previous run's persisted findings. A banked record carrying
+    // keyfact_detector#0 and #1 came back with TWO findings answering to #0, one of them the Nonmanufacturer
+    // Rule and the other a delivery schedule. Found by running the rail, not by reading it: the duplicate made
+    // an id-keyed differential harness silently compare unrelated findings.
+    //
+    // Live runs are unaffected — the lenses emit no keyfact ids, so nothing is ever taken and the numbering is
+    // identical to before. It only diverges where it would otherwise have produced a duplicate.
+    const takenIds = new Set(findings.slice(0, before).map((f) => f.id).filter(Boolean));
+    let kfN = 0;
+    for (let k = before; k < findings.length; k++) {
+      let id = `keyfact_detector#${kfN++}`;
+      while (takenIds.has(id)) id = `keyfact_detector#${kfN++}`;
+      findings[k].id = id;
+      takenIds.add(id);
+    }
     if (findings.length > before) perLens["keyfact_detector"] = findings.length - before;
   }
 
