@@ -38,12 +38,23 @@ export function citationFidelityEnabled(): boolean {
 //   DLAD   48 CFR ch.54 · 54XX.YYY · clauses 5452.XXX-YYYY
 //   VAAR   48 CFR ch.8  · 8XX.YYY  · clauses 852.XXX-YY
 //   CFR/USC — the title lives OUTSIDE the token ("13 CFR 121.406"), so any part/section shape is admissible
+//
+// FORM-PRESCRIPTION SECTIONS (review round 3, finding #5). The dash suffix on the NON-CLAUSE alternative was
+// capped at two digits, which is the shape of a paragraph split (6.302-1, 9.504-2) but not of the part-53/253
+// sections that PRESCRIBE the standard forms — and those carry the form number itself: FAR 53.301-1442 is the
+// section for SF 1442, which is on essentially every construction solicitation, and DFARS 253.303-1449 for
+// SF 1449. Both were withheld as "not a valid designation," and the presence exoneration could not save them
+// because a solicitation names the FORM ("Standard Form 1442"), not the prescribing section. That is this
+// module's own stated failure — an over-strict grammar in a fail-closed gate deleting a true citation —
+// arriving in the corpus the gate was written for. Widened to four digits, which admits the real shape
+// without touching the founding catch: "215-2" carries no dot, so the non-clause alternative never applies
+// to it and it is still withheld. Regression: audit-citation-fidelity-forms.test.ts.
 export const CORPUS_GRAMMAR: Record<string, RegExp> = {
-  FAR:    /^(?:52\.\d{3}-\d{1,3}|(?:[1-9]|[1-4]\d|5[0-3])\.\d{1,4}(?:-\d{1,2})?)$/,
-  DFARS:  /^(?:252\.\d{3}-7\d{3}|2(?:0[1-9]|[1-4]\d|5[0-3])\.\d{1,4}(?:-\d{1,2})?)$/,
-  AFFARS: /^(?:5352\.\d{3}-\d{4}|53\d{2}\.\d{1,4}(?:-\d{1,2})?)$/,
-  DLAD:   /^(?:5452\.\d{3}-\d{4}|54\d{2}\.\d{1,4}(?:-\d{1,2})?)$/,
-  VAAR:   /^(?:852\.\d{3}-\d{1,3}|8\d{2}\.\d{1,4}(?:-\d{1,2})?)$/,
+  FAR:    /^(?:52\.\d{3}-\d{1,3}|(?:[1-9]|[1-4]\d|5[0-3])\.\d{1,4}(?:-\d{1,4})?)$/,
+  DFARS:  /^(?:252\.\d{3}-7\d{3}|2(?:0[1-9]|[1-4]\d|5[0-3])\.\d{1,4}(?:-\d{1,4})?)$/,
+  AFFARS: /^(?:5352\.\d{3}-\d{4}|53\d{2}\.\d{1,4}(?:-\d{1,4})?)$/,
+  DLAD:   /^(?:5452\.\d{3}-\d{4}|54\d{2}\.\d{1,4}(?:-\d{1,4})?)$/,
+  VAAR:   /^(?:852\.\d{3}-\d{1,3}|8\d{2}\.\d{1,4}(?:-\d{1,4})?)$/,
   CFR:    /^\d{1,4}\.\d{1,4}(?:-\d{1,3})?$/,
 };
 // SCOPE LIMIT, stated rather than implied. The extractor recognizes DOTTED and DASHED designations only, so

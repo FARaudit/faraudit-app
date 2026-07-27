@@ -31,6 +31,7 @@ import { classifyTemporal, type LiveSamStatus, type TemporalVerdictBundle } from
 import { AGENTIC_PANEL_ENABLED, runPanelJudge, type PanelResult } from "./agentic-panel-runner";
 import { buildPanelInputs } from "./panel-adapter";
 import { foldPanelReason } from "./panel-findings-bridge";
+import { gateCitationsInText, citationFidelityEnabled } from "./audit-citation-fidelity";
 import { buildV3Payload } from "./audit-v3-report";
 import { detectAmendments, findingProvenance } from "./audit-orchestrator";
 import { sweepConstructionManifest } from "./audit-construction-manifest";
@@ -663,7 +664,23 @@ export async function executeAgenticPrimary(
   }
   if (panelResult) panelResult.judgment = panelJudgment;
   if (panelResult?.typedFindings.length && panelJudgment?.rationale && COMMITTAL_JUDGE_VERDICT.has(panelJudgment.verdict)) {
-    res.decision = { ...res.decision, reason: foldPanelReason(res.decision.reason, panelJudgment.rationale) };
+    // RE-GATE (review round 3, finding #6). The orchestrator gates `decision.reason` and returns — and then
+    // this line reopens the very field it gated, appending up to 400 chars of MODEL-AUTHORED judge rationale
+    // that no gate has seen. `buildV3Payload` on the next line persists it as the report's "Bottom line". A
+    // rationale reading "…must comply with DFARS 215-2" would print verbatim directly above a show-stopper
+    // block reading "[citation withheld …]" — the same leak PR #294 exists to close, one merge point later.
+    // Gate the fold's OUTPUT rather than its input: the fold can splice sentences together, so the composed
+    // string is what the reader actually gets and therefore what has to be judged. Same source expression the
+    // orchestrator used (`groundingSource ?? fullSource`), so a citation is judged identically either side.
+    const folded = foldPanelReason(res.decision.reason, panelJudgment.rationale);
+    const foldGate = citationFidelityEnabled()
+      ? gateCitationsInText(folded, groundingSource ?? fullSource, "reason")
+      : { text: folded, withheld: [] as Array<{ raw: string; field?: string }> };
+    if (foldGate.withheld.length) {
+      console.warn(`[executor] citation-fidelity: withheld ${foldGate.withheld.length} unresolvable citation(s) from the folded panel rationale — ` +
+        foldGate.withheld.map((w) => w.raw).join("; "));
+    }
+    res.decision = { ...res.decision, reason: foldGate.text };
   }
   const payload = buildV3Payload(res.decision, res.coverage, res.findings, generatedAt);
 
