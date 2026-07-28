@@ -9,7 +9,7 @@
 // The model call is INJECTED (CallModel) so the loop is unit-testable with a stub ($0); the default impl
 // wraps the Anthropic SDK tool-use call. Running the real loop is PAID and gated.
 
-import { AUDIT_TOOLS, auditToolsFor, listBindingDocuments, runAuditTool, findInSource, ATTACHMENT_COVERAGE_ENABLED, type AuditToolContext } from "./audit-tools";
+import { AUDIT_TOOLS, auditToolsFor, listBindingDocuments, runAuditTool, findInSource, normalizeForSearch, phrasePresentInNormalized, ATTACHMENT_COVERAGE_ENABLED, type AuditToolContext } from "./audit-tools";
 import type { TypedFinding, RequirementKind, Controllability } from "./audit-findings";
 
 /** What the expert emits per requirement (pre-grounding) — facts, no verdict. */
@@ -118,13 +118,26 @@ export async function runAgenticExpert(
       // not fall back — so content appended to fullSource after the grounding corpus was taken (the arc-B
       // VISION-CONFIRMED WAGE RATES block, audit-executor-v3.ts:412) is unreachable to it. Counting the two
       // apart is the whole point; a bare `dropped` cannot answer the question it appears to answer.
-      // Costs one substring search per DROPPED finding only — nothing on the healthy path.
+      //
+      // COST DISCIPLINE — this sits in the PAID parallel expert phase, whose budget two live runs have already
+      // breached (see :72-73), so it must not add unbounded blocking CPU:
+      //   • when the corpora do NOT diverge, isGrounded already evaluated the byte-identical fullSource search
+      //     and returned false, so this counter is PROVABLY always 0 — skip it entirely rather than pay for a
+      //     constant. `divergent` is computed once, outside the loop.
+      //   • when they DO diverge, normalize fullSource ONCE (lazily, only if something is actually dropped)
+      //     instead of calling findInSource per finding, which would rebuild an offset map the size of the
+      //     source every time for an index this never reads.
       let droppedInReadSource = 0;
+      const divergent = !!ctx.groundingSource && ctx.groundingSource !== ctx.fullSource;
+      let normedFull: string | null = null;
       const findings: TypedFinding[] = [];
       for (const f of out.findings) {
         if (!isGrounded(ctx, f)) {                        // deterministic backstop — ungrounded never survives
           dropped++;
-          if (f.excerpt && f.excerpt.trim().length >= 4 && findInSource({ fullSource: ctx.fullSource }, f.excerpt).hits.length > 0) droppedInReadSource++;
+          if (divergent && f.excerpt && f.excerpt.trim().length >= 4) {
+            normedFull ??= normalizeForSearch(ctx.fullSource);
+            if (phrasePresentInNormalized(normedFull, f.excerpt)) droppedInReadSource++;
+          }
           continue;
         }
         findings.push({ requirement: f.requirement, citation: f.citation, excerpt: f.excerpt, kind: f.kind, controllability: f.controllability, grounded: true, lens: spec.key, requiredAttribute: f.requiredAttribute, curableInWindow: f.curableInWindow, severity: f.severity });

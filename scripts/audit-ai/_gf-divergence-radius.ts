@@ -68,7 +68,22 @@ console.log(`✓ probe is live — both directions detectable\n`);
 // ── STEP 2 · THE CORPUS ─────────────────────────────────────────────────────────────────────────────
 if (!fs.existsSync(CACHE)) { console.error(`no record cache at ${CACHE}`); process.exit(1); }
 
-let files = 0, withGrounding = 0, differing = 0, identical = 0, noGroundingField = 0;
+// ── TWO POPULATION FILTERS THAT MUST RUN BEFORE ANY NUMBER IS BELIEVED ──────────────────────────────
+//
+// (1) RECONSTRUCTED RECORDS. bankRunRecord (audit-executor-v3.ts:879) does not bank groundingSource at all.
+//     Every value in this cache was written afterwards by _groundfixture-backfill.ts as a LITERAL COPY of
+//     fullSource, and each such record carries meta.backfill = {field:"input.groundingSource", ...}. A copy can
+//     never differ from its original, so these records cannot express the divergence at any rate — including a
+//     rate of 100%. Counting them as "identical" would report a structural impossibility as a measured clean.
+//     They are segregated, and if NOTHING is left the probe refuses rather than printing six zeros.
+//
+// (2) SURVIVORSHIP — DIVERGENCE B IS NOT MEASURABLE HERE AT ALL. rec.result.findings holds the findings that
+//     SURVIVED the backstop. A class-B finding is by definition one isGrounded rejected, so it was deleted
+//     before banking and cannot appear in this array. B would therefore read 0 over any banked corpus however
+//     often it fires, which is a false clean of the worst kind — a zero that looks measured. It is reported as
+//     n/a, never as a count. The only sound measurement of B is the run-time droppedInReadSource counter
+//     (audit-expert.ts) or a replay that re-proposes the dropped candidates.
+let files = 0, withGrounding = 0, differing = 0, identical = 0, noGroundingField = 0, reconstructed = 0;
 let tot = 0, aCount = 0, bCount = 0, agree = 0, noExcerpt = 0, provUngrounded = 0;
 const rows: Array<{ id: string; sol: string; a: number; b: number; tot: number; prov: number; gLen: number; fLen: number }> = [];
 
@@ -82,6 +97,7 @@ for (const file of fs.readdirSync(CACHE).filter((f) => f.endsWith(".json"))) {
   if (!fullSource || !Array.isArray(findings)) continue;
 
   if (typeof groundingSource !== "string" || !groundingSource) { noGroundingField++; continue; }
+  if (rec?.meta?.backfill?.field === "input.groundingSource") { reconstructed++; continue; }  // a copy of fullSource — cannot diverge
   withGrounding++;
   if (groundingSource === fullSource) { identical++; continue; }   // isGrounded falls through to fullSource — no divergence possible
   differing++;
@@ -103,15 +119,28 @@ for (const file of fs.readdirSync(CACHE).filter((f) => f.endsWith(".json"))) {
 
 console.log(`RECORDS`);
 console.log(`  cache files ....................... ${files}`);
+console.log(`  RECONSTRUCTED (meta.backfill) ..... ${reconstructed}   ← groundingSource is a COPY of fullSource; cannot diverge at ANY rate`);
 console.log(`  no groundingSource banked ......... ${noGroundingField}   (isGrounded falls back to fullSource — divergence impossible)`);
-console.log(`  groundingSource banked ............ ${withGrounding}`);
+console.log(`  MEASURABLE (run-time value) ....... ${withGrounding}`);
 console.log(`    ├─ identical to fullSource ...... ${identical}   (fall-through — no divergence)`);
 console.log(`    └─ DIFFERS from fullSource ...... ${differing}   ← isGrounded takes the groundingSource branch here`);
+
+if (withGrounding === 0) {
+  console.error(`\n✗ NO MEASURABLE POPULATION — every cached record either lacks groundingSource or carries a backfilled copy of fullSource.`);
+  console.error(`  There is no number to report. A zero here would mean "the corpus cannot express this", NOT "the divergence does not happen".`);
+  console.error(`  Fix upstream: bank the real groundingSource at audit-executor-v3.ts:879, then re-pull records.\n`);
+  process.exit(1);
+}
+
 console.log(`\nFINDINGS across the ${differing} diverging record(s)`);
 console.log(`  findings with a usable excerpt .... ${tot - noExcerpt}`);
 console.log(`  both predicates agree ............. ${agree}`);
-console.log(`  ── DIVERGENCE A (grounding-only) ... ${aCount}   grounded:true the digest cannot show`);
-console.log(`  ── DIVERGENCE B (fullSource-only) .. ${bCount}   verbatim in what the model read, REJECTED by isGrounded`);
+console.log(`  ── DIVERGENCE A (grounding-only) ... ${aCount}   grounded:true the digest cannot show — MEASURABLE (these findings survived)`);
+console.log(`  ── DIVERGENCE B (fullSource-only) .. n/a  NOT MEASURABLE over banked findings: a class-B finding is one`);
+console.log(`                                           isGrounded rejected, so it was deleted BEFORE banking and can`);
+console.log(`                                           never appear in result.findings. Observed here: ${bCount} (expected 0`);
+console.log(`                                           by construction — a zero proves nothing). Use the run-time`);
+console.log(`                                           droppedInReadSource counter instead.`);
 console.log(`  no excerpt ........................ ${noExcerpt}`);
 console.log(`  findingProvenance "(ungrounded)" .. ${provUngrounded}`);
 

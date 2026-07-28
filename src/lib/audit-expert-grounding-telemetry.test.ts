@@ -15,17 +15,31 @@
 // KNOWS to be false and requires a recorded failure. A test file that cannot register a failure certifies
 // nothing, and this arc has shipped inert checks before.
 import { runAgenticExpert, type CallModel, type RawFinding } from "./audit-expert";
-import type { AuditToolContext } from "./audit-tools";
+import { findInSource, normalizeForSearch, phrasePresentInNormalized, type AuditToolContext } from "./audit-tools";
 
 let failures = 0;
-const assert = (cond: boolean, msg: string) => { console.log(`${cond ? "✅" : "❌"} ${msg}`); if (!cond) failures++; };
+// `sink` captures output instead of printing it. This exists for the self-check below: the repo's green gate
+// (scripts/audit-ai/card214-greens.sh:20-24) decides PASS/FAIL by grepping each test's stdout for the failure
+// glyph, so a self-check that PRINTS a deliberate failure would mark this file — and the whole gate — RED on
+// every passing run, training the operator to ignore a gate that is crying wolf. Capture it instead.
+let sink: string[] | null = null;
+const assert = (cond: boolean, msg: string) => {
+  const line = `${cond ? "✅" : "❌"} ${msg}`;
+  if (sink) sink.push(line); else console.log(line);
+  if (!cond) failures++;
+};
 
-// ── FALSIFICATION SELF-CHECK ────────────────────────────────────────────────────────────────────────
+// ── FALSIFICATION SELF-CHECK — the REAL asserter, output captured ───────────────────────────────────
 console.log("— harness self-check —");
-assert(false, "(expected ❌) a deliberately false claim must register as a failure");
-if (failures !== 1) { console.error("\n❌ HARNESS INERT — the asserter did not record a known-false claim. No result below is trustworthy.\n"); process.exit(1); }
+sink = [];
+assert(false, "a deliberately false claim");
+const captured = sink; sink = null;
+if (failures !== 1 || captured.length !== 1 || !captured[0].startsWith("❌")) {
+  console.error(`\nHARNESS INERT — the asserter did not both record and render a known-false claim (failures=${failures}, rendered=${JSON.stringify(captured)}). No result below is trustworthy.\n`);
+  process.exit(1);
+}
 failures = 0;
-console.log("✅ harness registers failures — the gate can fail\n");
+console.log("✅ harness registers AND renders failures — the gate can fail\n");
 
 // ── FIXTURE · the production two-corpus shape ───────────────────────────────────────────────────────
 const DOC_TEXT = "SECTION L - INSTRUCTIONS TO OFFERORS\nQuotations shall be submitted electronically not later than 2:00 PM Central Time.\n";
@@ -48,6 +62,16 @@ const run = async (excerpts: string[], groundingSource?: string) => {
 };
 
 (async () => {
+  // CASE 0 — the fast presence test must answer EXACTLY as findInSource, or the counter measures something
+  // subtly different from the gate it is reporting on. Asserted, not assumed: the counter uses
+  // normalizeForSearch + phrasePresentInNormalized to avoid rebuilding findInSource's offset map per finding.
+  const normed = normalizeForSearch(FULL);
+  for (const phrase of [IN_READ_SOURCE_ONLY, IN_BOTH, IN_NEITHER, "  QUOTATIONS   SHALL be submitted ", "ab", ""]) {
+    const viaFind = findInSource({ fullSource: FULL }, phrase).hits.length > 0;
+    const viaFast = phrasePresentInNormalized(normed, phrase);
+    assert(viaFind === viaFast, `presence agrees with findInSource for ${JSON.stringify(phrase.slice(0, 40))} (${viaFind})`);
+  }
+
   // CASE 1 — the divergence class. Excerpt is in what the lens READ but not in the grounding corpus.
   const c1 = await run([IN_READ_SOURCE_ONLY], GROUNDING);
   assert(c1.findings.length === 0, "divergence: the finding is dropped");
