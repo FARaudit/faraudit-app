@@ -160,10 +160,17 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;ali
 .feed-timestamp em{color:rgba(201,168,76,.6);font-style:normal;font-weight:700;}
 .feed-col-headers{display:grid;grid-template-columns:72px 1fr 260px 85px 58px 58px 78px 66px;gap:0 14px;align-items:center;padding:5px 20px;border-bottom:1px solid rgba(201,168,76,.07);background:rgba(201,168,76,.025);}
 .fch{font-family:var(--mono);font-size:7px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(245,240,232,.28);}
-.feed-live{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:8px;font-weight:700;color:rgba(74,222,128,.88);letter-spacing:.1em;}
-.live-dot{width:6px;height:6px;border-radius:50%;background:#4ADE80;animation:ldot 2s ease-in-out infinite;}
-@keyframes ldot{0%,100%{opacity:.8;box-shadow:0 0 0 0 rgba(74,222,128,.5)}50%{opacity:1;box-shadow:0 0 0 5px rgba(74,222,128,0)}}
-.feed-counters{display:grid;grid-template-columns:repeat(6,1fr);gap:0;border-bottom:1px solid rgba(201,168,76,.08);width:100%;}
+/* The pulsing green status dot, its badge and its keyframes are deliberately gone (CEO 2026-07-27). They
+   asserted a currency the page never had: every call this feed made was blocked by our own CSP before it
+   left the browser, so the panel has only ever shown the hardcoded sample below. The label that replaces
+   them is set at ROW weight, not fine print — an illustrative panel has to read as illustrative at the
+   same glance that reads the rows. */
+.feed-illustrative{font-size:11px;font-weight:600;font-family:var(--serif);color:rgba(245,240,232,.82);letter-spacing:.01em;}
+.feed-illustrative em{font-style:normal;color:var(--gold);font-weight:700;}
+/* 4, not 6 — matched to the counters that actually exist. Two were removed with the fabricated
+   live numbers and two more were the "0 competitors / 0 rivals" claims; the grid kept declaring six
+   and rendered a third of the strip blank. Counters are never invented to fill this row. */
+.feed-counters{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-bottom:1px solid rgba(201,168,76,.08);width:100%;}
 .fc{padding:11px 0 11px 20px;border-right:1px solid rgba(201,168,76,.07);display:flex;flex-direction:column;gap:3px;min-width:0;}
 .fc:last-child{border-right:none;}
 .fc-n{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--gold2);line-height:1;letter-spacing:-.01em;white-space:nowrap;}
@@ -231,8 +238,6 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;ali
 .closing-cta:hover{background:var(--gold2);box-shadow:0 10px 32px rgba(201,168,76,.3);transform:translateY(-1px);}
 .closing-pricing{display:flex;flex-direction:column;align-items:flex-end;gap:5px;}
 .closing-price{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--gold);opacity:.75;letter-spacing:.06em;}
-.closing-slots{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:9px;color:rgba(245,240,232,.35);letter-spacing:.08em;}
-.slots-dot{width:5px;height:5px;border-radius:50%;background:#EF4444;animation:ldot 2s ease-in-out infinite;}
 .closing-period{font-family:var(--mono);font-size:8px;color:rgba(245,240,232,.2);letter-spacing:.06em;}
 
 /* Footer */
@@ -287,12 +292,12 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;ali
   <div class="eyebrow">Federal Contract Intelligence</div>
 
   <h1 class="headline">
-    The only platform that reads the solicitation
+    The platform that reads the solicitation
     <em>the way a Contracting Officer wrote it.</em>
   </h1>
 
-  <div class="dismiss">GovWin sells you data. &nbsp;·&nbsp; GovTribe shows you opportunities. &nbsp;·&nbsp; EZGovOpps tracks your pipeline.</div>
-  <div class="verdict">None of them read a single clause.</div>
+  <div class="dismiss">Read clause by clause. &nbsp;·&nbsp; Quoted, not summarized. &nbsp;·&nbsp; Traceable to the source document.</div>
+  <div class="verdict">Every finding cites the clause it came from.</div>
 
   <div class="cta-row">
     <a href="mailto:jose@faraudit.com?subject=FARaudit%20Access%20Request" class="btn-primary">Request Access <span style="font-size:14px">→</span></a>
@@ -336,12 +341,6 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;ali
           <span class="ps-tag">RFP</span>
           <span class="ps-tag">IDIQ</span>
           <span class="ps-tag">IFB</span>
-          <span class="ps-tag">Any page count</span>
-        </div>
-        <div class="ps-detail">
-          <div class="ps-bullet"><span class="ps-dot">·</span>Any federal solicitation PDF — any agency, any format</div>
-          <div class="ps-bullet"><span class="ps-dot">·</span>Large IDIQs handled — no token truncation</div>
-          <div class="ps-bullet"><span class="ps-dot">·</span>Base period + all options ingested in full</div>
         </div>
       </div>
 
@@ -366,7 +365,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;ali
             <line x1="11" y1="22.5" x2="18" y2="22.5" stroke="#C9A84C" stroke-width=".8" stroke-opacity=".3"/>
           </svg>
         </div>
-        <div class="ps-title">Three-Call Audit Engine</div>
+        <div class="ps-title">Audit Engine</div>
         <div class="ps-tags">
           <span class="ps-tag">FAR</span>
           <span class="ps-tag">DFARS</span>
@@ -375,7 +374,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;ali
           <span class="ps-tag">CLIN Structure</span>
         </div>
         <div class="ps-detail">
-          Three sequential intelligence calls — no single-pass truncation, no black box. Every clause checked against current regulations. Every finding cited.
+          Every finding cited.
         </div>
       </div>
 
@@ -401,7 +400,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;ali
           <span class="ps-tag">Required Actions</span>
         </div>
         <div class="ps-detail">
-          <div class="ps-bullet"><span class="ps-dot">·</span>15-page branded report — P0 / P1 / P2 risks ranked</div>
+          <div class="ps-bullet"><span class="ps-dot">·</span>Branded report — P0 / P1 / P2 risks ranked</div>
           <div class="ps-bullet"><span class="ps-dot">·</span>Contracting Officer clarification email drafted</div>
           <div class="ps-bullet"><span class="ps-dot">·</span>Every finding cited to the exact FAR/DFARS clause</div>
         </div>
@@ -414,24 +413,21 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;ali
 
   <!-- SECTION 3 — INTELLIGENCE FEED -->
   <section class="section-process reveal" id="intelligence" style="padding-top:96px;padding-bottom:0;padding-left:56px;padding-right:56px;">
-    <div class="section-label">Live Intelligence</div>
+    <div class="section-label">What the Engine Reads</div>
     <div class="feed-panel">
       <div class="feed-hdr">
         <div class="feed-hdr-left">
           <div class="feed-hdr-label">Intelligence Feed</div>
           <div class="feed-hdr-div"></div>
-          <div class="feed-hdr-sub">Live · SAM.gov · Updated just now</div>
+          <div class="feed-illustrative"><em>Illustrative examples</em> — not live data</div>
         </div>
         <div class="feed-hdr-right">
-          <div class="feed-timestamp">Updated <em id="tsAgo">just now</em></div>
-          <div class="feed-live"><div class="live-dot"></div>LIVE</div>
+          <div class="feed-illustrative">Representative of the work, not a feed</div>
         </div>
       </div>
       <div class="feed-counters">
-        <div class="fc"><div class="fc-n" id="cSol">847</div><div class="fc-l">Active</div></div>
-        <div class="fc"><div class="fc-n" id="cP0">23</div><div class="fc-l">P0 Today</div></div>
-        <div class="fc"><div class="fc-n" style="color:#4ADE80;font-size:18px;">0</div><div class="fc-l">Clause audit<br>competitors</div></div>
-        <div class="fc"><div class="fc-n" style="color:#4ADE80;font-size:18px;">0</div><div class="fc-l">DFARS trap<br>rivals</div></div>
+        <div class="fc"><div class="fc-n">§A–M</div><div class="fc-l">Uniform Contract<br>Format</div></div>
+        <div class="fc"><div class="fc-n">FAR·DFARS</div><div class="fc-l">Clause set<br>checked</div></div>
         <div class="fc"><div class="fc-n">60–90d</div><div class="fc-l">Upstream</div></div>
         <div class="fc"><div class="fc-n">Stage 01</div><div class="fc-l">Engagement</div></div>
       </div>
@@ -449,8 +445,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;ali
         <div class="feed-track" id="feedTrack"></div>
       </div>
       <div class="feed-ftr">
-        <span class="ftr-note">Live · SAM.gov · Updated just now</span>
-        <span class="ftr-count" id="ftrCount">847 solicitations active</span>
+        <span class="ftr-note feed-illustrative"><em>Illustrative examples</em> — not live data</span>
       </div>
     </div>
   </section>
@@ -470,7 +465,6 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;ali
       <a href="mailto:jose@faraudit.com?subject=FARaudit%20Access%20Request" class="closing-cta">Request Access <span style="font-size:14px">→</span></a>
       <div class="closing-pricing">
         <div class="closing-price">$1,250 / month</div>
-        <div class="closing-slots"><div class="slots-dot"></div>5 design partner slots remaining</div>
         <div class="closing-period">First 90 days · Direct founder access · Input into roadmap</div>
       </div>
     </div>
@@ -492,15 +486,11 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;ali
 
 <script>
 // ══════════════════════════════════════
-// FARAUDIT INTELLIGENCE FEED — LIVE API
-// SAM.gov + USASpending.gov Integration
+// FARAUDIT INTELLIGENCE FEED — ILLUSTRATIVE
+// Static sample rows. No external data source.
 // ══════════════════════════════════════
 
-const SAM_API_KEY = 'CAQFhM7qTQGvCe5NCHxh1qDcFUCsnwQarM3mNrOk'; // Replace with your api.sam.gov key
-const NAICS_CODES = ['336413','332710','332721','334511','541330','336412','332999','541519','336415'];
 
-// USASpending agency spend data (no key required)
-const AGENCY_SPEND = {};
 
 // Sample data — used as fallback and while live data loads
 const SAMPLE_DATA = [
@@ -511,122 +501,22 @@ const SAMPLE_DATA = [
   {n:'332721',t:'Titanium Fastener Sets MIL-SPEC-AN960',a:'Defense Logistics Agency (DLA)',v:'$94K',days:18,ty:'RFQ',sa:'sb',sal:'SB',b:'b1',bl:'2 P1'},
   {n:'541330',t:'Structural Analysis Support — F-35B Variant',a:'Naval Air Systems Command (NAVAIR)',v:'$4.8M',days:34,ty:'RFP',sa:'unrest',sal:'UNREST',b:'bw',bl:'Watch'},
   {n:'336413',t:'F-22 Raptor Canopy Frame Components',a:'AF Life Cycle Mgmt Center (AFLCMC)',v:'$620K',days:8,ty:'FFP',sa:'sb',sal:'SB',b:'b0',bl:'2 P0'},
-  {n:'332710',t:'Bell 407 Engine Mount Brackets',a:'Army Aviation Tech Directorate (AATD)',v:'$156K',days:26,ty:'FFP',sa:'sdvosb',sal:'SDVOSB',b:'b1',bl:'1 P1'},
+  {n:'332710',t:'Light Utility Helicopter Engine Mount Brackets',a:'Army Aviation Tech Directorate (AATD)',v:'$156K',days:26,ty:'FFP',sa:'sdvosb',sal:'SDVOSB',b:'b1',bl:'1 P1'},
   {n:'334511',t:'Radar Array Housing · Low Observable Coating',a:'DARPA',v:'$14.2M',days:4,ty:'RFP',sa:'unrest',sal:'UNREST',b:'b0',bl:'3 P0'},
   {n:'336413',t:'F-35A Ground Support Equipment Set · IDIQ',a:'F-35 Joint Program Office (JPO)',v:'$8.4M',days:42,ty:'IDIQ',sa:'sb',sal:'SB',b:'b1',bl:'2 P1'},
-  {n:'332721',t:'High-Temp Alloy Fasteners · ITAR Controlled',a:'SpaceX Government (SpaceX Gov)',v:'UNDISCL',days:55,ty:'RFQ',sa:'unrest',sal:'UNREST',b:'bw',bl:'Watch'},
-  {n:'332710',t:'Sikorsky UH-60 Transmission Housing CNC',a:'Army Contracting Command (ACC)',v:'$278K',days:31,ty:'FFP',sa:'wosb',sal:'WOSB',b:'b1',bl:'1 P1'},
+  {n:'332721',t:'High-Temp Alloy Fasteners · ITAR Controlled',a:'Space Systems Command (SSC)',v:'UNDISCL',days:55,ty:'RFQ',sa:'unrest',sal:'UNREST',b:'bw',bl:'Watch'},
+  {n:'332710',t:'UH-60 Transmission Housing CNC',a:'Army Contracting Command (ACC)',v:'$278K',days:31,ty:'FFP',sa:'wosb',sal:'WOSB',b:'b1',bl:'1 P1'},
   {n:'336413',t:'C-130J Hercules Wing Rib Machining · FFP',a:'AF Life Cycle Mgmt Center (AFLCMC)',v:'$445K',days:7,ty:'RFQ',sa:'sb',sal:'SB',b:'b0',bl:'2 P0'},
   {n:'334511',t:'EW System Interface Housings · ITAR Export',a:'Air Force Research Laboratory (AFRL)',v:'$1.9M',days:48,ty:'RFP',sa:'unrest',sal:'UNREST',b:'bw',bl:'Watch'},
   {n:'332710',t:'AH-64 Apache Gearbox Housing Precision CNC',a:'Corpus Christi Army Depot (CCAD)',v:'$203K',days:12,ty:'FFP',sa:'a8',sal:'8(a)',b:'b1',bl:'2 P1'},
   {n:'336413',t:'F-16 Block 70 Hydraulic Actuator Brackets',a:'Air Force Materiel Command (AFMC)',v:'$521K',days:62,ty:'RFQ',sa:'sb',sal:'SB',b:'b0',bl:'1 P0'},
 ];
 
-// ── SAM.GOV LIVE FETCH ──
-async function fetchSAMLive() {
-  const today = new Date();
-  const future = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000);
-  const fmt = d => d.toISOString().split('T')[0];
 
-  const results = [];
-
-  for(const naics of NAICS_CODES.slice(0,3)) { // Rate limit: 3 NAICS on load
-    try {
-      const url = `https://api.sam.gov/opportunities/v2/search?api_key=${SAM_API_KEY}&naicsCode=${naics}&postedFrom=${fmt(today)}&postedTo=${fmt(future)}&limit=5&offset=0&ptype=o,p,k,r`;
-      const res = await fetch(url);
-      if(!res.ok) continue;
-      const data = await res.json();
-
-      if(data.opportunitiesData) {
-        for(const opp of data.opportunitiesData) {
-          const daysLeft = opp.responseDeadLine ?
-            Math.ceil((new Date(opp.responseDeadLine) - today) / 86400000) : 30;
-
-          // Map set-aside
-          const saMap = {
-            'Total Small Business':'sb','SBA':'sb',
-            'Service-Disabled Veteran-Owned Small Business':'sdvosb',
-            'Women-Owned Small Business':'wosb','8A':'a8',
-            'Unrestricted':'unrest',''  :'unrest'
-          };
-          const saCode = opp.typeOfSetAsideDescription || '';
-          const sa = saMap[saCode] || 'unrest';
-          const salMap = {sb:'SB',sdvosb:'SDVOSB',wosb:'WOSB',a8:'8(a)',unrest:'UNREST'};
-
-          // Risk classification based on DFARS keywords
-          const title = opp.title || '';
-          const hasDFARS = /CMMC|cyber|telecom|hexavalent|chromium|Xinjiang|ITAR/i.test(title);
-          const isComplex = /IDIQ|BPA|GWAC|multiple award/i.test(title);
-          const b = hasDFARS ? 'b0' : isComplex ? 'b1' : 'bw';
-          const bl = hasDFARS ? '1 P0' : isComplex ? '1 P1' : 'Watch';
-
-          // Format value
-          let v = 'UNDISCL';
-          if(opp.award && opp.award.amount) {
-            const amt = parseFloat(opp.award.amount);
-            v = amt >= 1000000 ? `$${(amt/1000000).toFixed(1)}M` : `$${Math.round(amt/1000)}K`;
-          }
-
-          results.push({
-            n: naics,
-            t: title.length > 55 ? title.substring(0,52) + '...' : title,
-            a: (opp.organizationName || 'DoD').substring(0,42),
-            v, days: Math.max(1, daysLeft),
-            ty: opp.solicitationType === 'PRESOL' ? 'Pre-Sol' :
-                opp.solicitationType === 'COMBINE' ? 'RFQ' :
-                opp.solicitationType === 'AWARD' ? 'Award' : 'RFP',
-            sa, sal: salMap[sa], b, bl,
-            live: true
-          });
-        }
-      }
-    } catch(e) { /* Fall through to sample data */ }
-  }
-  return results;
-}
-
-// ── USASPENDING AGENCY INTEL ──
-async function fetchAgencySpend() {
-  try {
-    const res = await fetch('https://api.usaspending.gov/api/v2/agency/list/?sort=obligations&order=desc&limit=10', {
-      method: 'GET', headers: {'Content-Type':'application/json'}
-    });
-    if(!res.ok) return null;
-    const data = await res.json();
-    return data.results;
-  } catch(e) { return null; }
-}
-
-// ── COUNTER STATS FROM USASPENDING ──
-async function fetchLiveStats() {
-  try {
-    // Get current FY contract count for defense NAICS
-    const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_award/', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        filters: {
-          naics_codes: NAICS_CODES,
-          award_type_codes: ['A','B','C','D'],
-          time_period: [{start_date:'2026-01-01', end_date:'2026-12-31'}]
-        },
-        fields: ['Award ID'],
-        sort: 'Award ID',
-        order: 'desc',
-        limit: 1,
-        page: 1
-      })
-    });
-    if(!res.ok) return null;
-    const data = await res.json();
-    return data.page_metadata ? data.page_metadata.total : null;
-  } catch(e) { return null; }
-}
 
 // ── BUILD FEED ROWS ──
 const track = document.getElementById('feedTrack');
 let currentData = SAMPLE_DATA;
-let liveMode = false;
 
 function buildRow(r) {
   const d = document.createElement('div');
@@ -634,10 +524,9 @@ function buildRow(r) {
   d.className = 'feed-row ' + riskClass;
   const daysCls = r.days <= 7 ? 'urgent' : r.days <= 21 ? 'soon' : 'ok';
   const daysLbl = r.days + 'd';
-  const liveBadge = r.live ? '<span style="font-family:var(--mono);font-size:6px;color:#4ADE80;opacity:.6;margin-left:4px">●LIVE</span>' : '';
   d.innerHTML = `
     <span class="feed-naics">${r.n}</span>
-    <div class="feed-main"><div class="feed-title">${r.t}${liveBadge}</div></div>
+    <div class="feed-main"><div class="feed-title">${r.t}</div></div>
     <span class="feed-agency">${r.a}</span>
     <span class="feed-value">${r.v}</span>
     <span class="feed-days ${daysCls}">${daysLbl}</span>
@@ -664,54 +553,7 @@ function populateFeed(data) {
 // Init with sample data immediately
 populateFeed(SAMPLE_DATA);
 
-// Then attempt live SAM.gov fetch
-(async () => {
-  const liveResults = await fetchSAMLive();
-  if(liveResults && liveResults.length >= 4) {
-    // Merge live + sample data, live rows first
-    const merged = [...liveResults, ...SAMPLE_DATA].slice(0,20);
-    populateFeed(merged);
-    liveMode = true;
 
-    // Update header to show truly live
-    const subEl = document.querySelector('.feed-hdr-sub');
-    if(subEl) subEl.textContent = `${liveResults.length} live from SAM.gov · ${SAMPLE_DATA.length} sample`;
-
-    // Update active counter with real data
-    document.getElementById('cSol').textContent = liveResults.length + 847;
-  }
-
-  // Fetch USASpending stats
-  fetchAgencySpend();
-})();
-
-// ── LIVE COUNTERS ──
-let sol = 847, p0 = 23;
-const elSol = document.getElementById('cSol');
-const elP0 = document.getElementById('cP0');
-const elFtr = document.getElementById('ftrCount');
-
-(function tick(){
-  if(Math.random()>.45) sol++;
-  if(Math.random()>.78) p0++;
-  if(elSol) elSol.textContent = sol;
-  if(elP0) elP0.textContent = p0;
-  if(elFtr) elFtr.textContent = sol + ' solicitations active';
-  setTimeout(tick, 1800 + Math.random()*3600);
-})();
-
-// ── TIMESTAMP ──
-let tsSeconds = 0;
-function updateTimestamp(){
-  const el = document.getElementById('tsAgo');
-  if(!el) return;
-  tsSeconds++;
-  if(tsSeconds < 60) el.textContent = tsSeconds + 's ago';
-  else if(tsSeconds < 120) el.textContent = '1m ago';
-  else el.textContent = Math.floor(tsSeconds/60) + 'm ago';
-  if(tsSeconds >= 90){ tsSeconds = 0; el.textContent = 'just now'; }
-}
-setInterval(updateTimestamp, 1000);
 
 // ── SCROLL REVEAL ──
 const observer = new IntersectionObserver(entries => {
