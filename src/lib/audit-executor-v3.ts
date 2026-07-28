@@ -31,6 +31,7 @@ import { classifyTemporal, type LiveSamStatus, type TemporalVerdictBundle } from
 import { AGENTIC_PANEL_ENABLED, runPanelJudge, type PanelResult } from "./agentic-panel-runner";
 import { buildPanelInputs } from "./panel-adapter";
 import { foldPanelReason } from "./panel-findings-bridge";
+import { gateCitationsInText, citationFidelityEnabled } from "./audit-citation-fidelity";
 import { buildV3Payload } from "./audit-v3-report";
 import { detectAmendments, findingProvenance } from "./audit-orchestrator";
 import { sweepConstructionManifest } from "./audit-construction-manifest";
@@ -663,7 +664,30 @@ export async function executeAgenticPrimary(
   }
   if (panelResult) panelResult.judgment = panelJudgment;
   if (panelResult?.typedFindings.length && panelJudgment?.rationale && COMMITTAL_JUDGE_VERDICT.has(panelJudgment.verdict)) {
-    res.decision = { ...res.decision, reason: foldPanelReason(res.decision.reason, panelJudgment.rationale) };
+    // RE-GATE (review round 3, finding #6). The orchestrator gates `decision.reason` and returns — and then
+    // this line reopens the very field it gated, appending up to 400 chars of MODEL-AUTHORED judge rationale
+    // that no gate has seen. `buildV3Payload` on the next line persists it as the report's "Bottom line". A
+    // rationale reading "…must comply with DFARS 215-2" would print verbatim directly above a show-stopper
+    // block reading "[citation withheld …]" — the same leak PR #294 exists to close, one merge point later.
+    // Gate the fold's OUTPUT rather than its input: the fold can splice sentences together, so the composed
+    // string is what the reader actually gets and therefore what has to be judged. The orchestrator is now
+    // handed this SAME corpus explicitly (`citationSource`, review round 4 finding #1) — it used to read
+    // `ctx.groundingSource`, which auditPackage never sets, so the two gates were judging against different
+    // text while this comment claimed they matched.
+    const folded = foldPanelReason(res.decision.reason, panelJudgment.rationale);
+    const foldGate = citationFidelityEnabled()
+      ? gateCitationsInText(folded, groundingSource ?? fullSource, "reason")
+      : { text: folded, withheld: [] as ReturnType<typeof gateCitationsInText>["withheld"] };
+    if (foldGate.withheld.length) {
+      console.warn(`[executor] citation-fidelity: withheld ${foldGate.withheld.length} unresolvable citation(s) from the folded panel rationale — ` +
+        foldGate.withheld.map((w) => w.raw).join("; "));
+      // INTO THE LEDGER, not just the log (review round 4, finding #5). The whole reason `citationsWithheld`
+      // was added is that "the withholding ledger existed only as a console.warn, which is not a record" —
+      // and this gate, added in the same PR, was still console.warn-only. A withholding the customer never
+      // sees and no record carries is indistinguishable from a citation that was never printed.
+      res.citationsWithheld = [...(res.citationsWithheld ?? []), ...foldGate.withheld];
+    }
+    res.decision = { ...res.decision, reason: foldGate.text };
   }
   const payload = buildV3Payload(res.decision, res.coverage, res.findings, generatedAt);
 

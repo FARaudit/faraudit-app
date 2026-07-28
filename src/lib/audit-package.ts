@@ -257,6 +257,11 @@ export async function auditPackage(input: AuditPackageInput): Promise<AuditResul
     panelFindings: input.panelFindings,     // card #523 (P2a-wire) — expert-panel VERIFIED facts unioned into the rail (undefined ⇒ byte-identical)
     panelFindingsPromise: input.panelFindingsPromise,  // card #570 — parallel-path producer promise (resolved at the rail merge); exactly one of the two is set
     temporal: input.temporal,               // VERDICT ARC (move 4) — verbatim forward to the orchestrator → VerdictInputs (undefined ⇒ byte-identical)
+    // CITATION-FIDELITY CORPUS (review round 4, finding #1). `input.groundingSource` is the COMPLETE
+    // pre-compression text; this ctx deliberately does not carry it (that would move `isGrounded` and the E1
+    // head pass onto a different corpus — a verdict-path change). Forwarding it as an explicit option gives
+    // the display-only citation gate the same text the executor's fold gate uses, without touching grounding.
+    citationSource: input.groundingSource,
 
     ...(judgment ? { judgmentReason: judgment.judgmentReason, judgmentEntail: judgment.judgmentEntail } : {}),
   });

@@ -1,0 +1,10 @@
+import { gateCitationsInText, extractRegulationTokens, corporaPairedInSource } from "@/lib/audit-citation-fidelity";
+process.env.AUDIT_CITATION_FIDELITY = "true";
+const SRC = "The contractor shall comply with DFARS provision 252.215-7009 and DLAD 52.211-9000 as applicable.";
+console.log("#2 word-boundary 'so far 0.5':");
+console.log("   ", JSON.stringify(gateCitationsInText("so far 0.5 percent of the total was withheld", SRC, "t").text));
+console.log("#3a extract('per DFARS provision 215-2'):", JSON.stringify(extractRegulationTokens("per DFARS provision 215-2")));
+console.log("#3a extract('per DFARS subpart 215-2'):", JSON.stringify(extractRegulationTokens("per DFARS subpart 215-2")));
+console.log("#3b corporaPairedInSource('252.215-7009', src):", JSON.stringify([...corporaPairedInSource("252.215-7009", SRC)]));
+console.log("#6 DLAD 52.211-9000:");
+console.log("   ", JSON.stringify(gateCitationsInText("See DLAD 52.211-9000 for packaging.", "no citations here at all", "t").text));
