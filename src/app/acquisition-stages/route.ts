@@ -39,8 +39,7 @@ export async function GET() {
     headers: {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
-      // Transitional cache flush — see next.config.ts.
-      "clear-site-data": '"cache"'
+
     }
   });
 }

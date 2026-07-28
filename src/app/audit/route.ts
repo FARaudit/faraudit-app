@@ -39,10 +39,7 @@ export async function GET() {
     headers: {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
-      // CEO 2026-05-25 transitional cache flush — see next.config.ts for
-      // the full explanation. Belt-and-suspenders here in case any browser
-      // somehow does reach this handler before the cached 308 fires.
-      "clear-site-data": '"cache"'
+
     }
   });
 }
