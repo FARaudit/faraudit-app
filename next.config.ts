@@ -60,19 +60,6 @@ const nextConfig: NextConfig = {
         source: "/:path*",
         headers: securityHeaders
       },
-      // CEO 2026-05-25 — transitional Clear-Site-Data on /home to flush the
-      // browser-cached 308 permanent redirects (the prior next.config used
-      // permanent redirects from /audit, /dashboard, /upstream-intel,
-      // /prospects → /home; removed but cached at browser level). Browser
-      // arrives at /home via the cached redirect, gets the header, clears
-      // its HTTP cache including the stale 308. Remove this entry once
-      // production user agents have rolled over (e.g. one week from now).
-      {
-        source: "/home",
-        headers: [
-          { key: "Clear-Site-Data", value: '"cache"' }
-        ]
-      },
       // ━━ CACHE STRATEGY (CEO 2026-06-03) ━━
       // Symptom: deploys took ~17 min to surface in normal browsers because
       // un-hashed /public/* assets (cc-app.js, run-audit.html, *-live.js)
