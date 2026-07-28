@@ -2218,7 +2218,7 @@ export function applyClauseSemanticsGuard(findings: TypedFinding[], opts?: { ena
 // VA Veterans-First statute/reg stack (38 U.S.C. 8127/8128, 38 CFR 74 — a DISTINCT authority the SME flagged); the
 // Small Business Act statute (15 U.S.C. 644/637/657); 52.204-8 / 52.212-3 (annual/commercial offeror reps);
 // 52.209-x (responsibility/qualification-to-award). Digit-boundary anchored (52.219-3 ≠ 52.2190).
-const ELIGIBILITY_AUTHORITY_RE = /(?<!\d)52\.219-\d{1,2}\b|(?<!\d)852\.219-\d{1,2}\b|(?<!\d)19\.\d{3,4}\b|\b19\.1[1-9]\b|\bFAR\s+(?:part\s+|subpart\s+)?19\b|\b(?:sub-?)?part\s+19\b|\bVAAR\b|\b819\.\d|13\s*C\.?F\.?R\.?\s*(?:part\s+|§\s*)?12[1-8]\b|38\s*U\.?S\.?C\.?\s*(?:§\s*)?812[78]\b|38\s*C\.?F\.?R\.?\s*(?:part\s+)?74\b|15\s*U\.?S\.?C\.?\s*(?:§\s*)?(?:644|637|657[abf])\b|(?<!\d)52\.204-8\b|(?<!\d)52\.212-3\b|(?<!\d)52\.209-\d{1,2}\b/i;
+export const ELIGIBILITY_AUTHORITY_RE = /(?<!\d)52\.219-\d{1,2}\b|(?<!\d)852\.219-\d{1,2}\b|(?<!\d)19\.\d{3,4}\b|\b19\.1[1-9]\b|\bFAR\s+(?:part\s+|subpart\s+)?19\b|\b(?:sub-?)?part\s+19\b|\bVAAR\b|\b819\.\d|13\s*C\.?F\.?R\.?\s*(?:part\s+|§\s*)?12[1-8]\b|38\s*U\.?S\.?C\.?\s*(?:§\s*)?812[78]\b|38\s*C\.?F\.?R\.?\s*(?:part\s+)?74\b|15\s*U\.?S\.?C\.?\s*(?:§\s*)?(?:644|637|657[abf])\b|(?<!\d)52\.204-8\b|(?<!\d)52\.212-3\b|(?<!\d)52\.209-\d{1,2}\b/i;
 // GENUINE non-set-aside bidder-eligibility bars that isPositiveSetAside + the structural regexes do NOT catch but
 // which must NEVER be softened to a caution (red-team real-bar-suppression class): export control (ITAR/EAR = a
 // US-person/registration eligibility constraint) and foreign ownership/control (FOCI). Over-keeping here is the

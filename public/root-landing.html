@@ -113,14 +113,16 @@
   .btn-ghost:hover{border-color:var(--mute-2);background:rgba(255,255,255,0.07)}
   .btn-lg{padding:13px 24px;font-size:14.5px;border-radius:10px}
 
-  /* live pill (green, pulsing) */
+  /* category pill (green dot, static — see note below) */
   .live-pill{
     display:inline-flex;align-items:center;gap:8px;height:26px;padding:0 12px;border-radius:999px;
     background:rgba(16,185,129,0.12);color:#6ee7b7;border:1px solid rgba(110,231,183,0.30);
     font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;
   }
-  .live-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green-500);box-shadow:0 0 0 3px rgba(16,185,129,.18);animation:pulse 1.6s ease-out infinite}
-  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(16,185,129,.45)}100%{box-shadow:0 0 0 8px rgba(16,185,129,0)}}
+  /* The PULSE is gone (CEO 2026-07-27), the pill is not. Its text — "Federal Contract Intelligence" — is a
+     category label and stays; a pulsing green dot beside it is a STATUS light, and there is no status behind
+     it. The dot itself is kept as static punctuation. */
+  .live-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green-500);box-shadow:0 0 0 3px rgba(16,185,129,.18)}
 
   /* ───────── hero ───────── */
   .hero{padding:148px 0 12px;position:relative}
@@ -129,7 +131,10 @@
     width:1100px;height:620px;pointer-events:none;z-index:0;
     background:radial-gradient(ellipse at 50% 0%, rgba(55,138,221,0.16), rgba(55,138,221,0) 62%);
   }
-  .hero-grid{position:relative;z-index:1;display:grid;grid-template-columns:1.05fr 0.95fr;gap:56px;align-items:center}
+  /* SINGLE-COLUMN HERO (CEO 2026-07-27). The right-hand KPI panel is gone: every element in it asserted
+     something the page had no source for, and an empty box or a placeholder would be worse than neither.
+     The copy column now runs full width; the lede keeps its own max-width so the measure stays readable. */
+  .hero-grid{position:relative;z-index:1;display:block}
   .hero h1{
     font-size:56px;font-weight:800;line-height:1.08;letter-spacing:-.04em;color:var(--ink);
     margin:24px 0 22px;text-wrap:balance;
@@ -141,34 +146,7 @@
   .hero-cta .seehow:hover{color:var(--ink)}
   .hero-cta .seehow .arrow{color:var(--accent)}
 
-  /* navy KPI hero panel — verbatim from command center .kpi.navy */
-  .kpi-navy{
-    position:relative;overflow:hidden;border-radius:16px;color:#fff;padding:22px 24px 20px;
-    background:linear-gradient(135deg,#0A1628 0%,#16294a 55%,#1e3a8a 100%);
-    box-shadow:var(--shadow-lg);border:1px solid rgba(255,255,255,0.06);
-  }
-  .kpi-navy::after{
-    content:"";position:absolute;inset:auto -40px -70px auto;width:240px;height:240px;border-radius:50%;
-    background:radial-gradient(circle,rgba(255,255,255,.12),rgba(255,255,255,0) 70%);pointer-events:none;
-  }
-  .kpi-navy .kpi-top{display:flex;align-items:center;gap:10px;margin-bottom:14px}
-  .kpi-navy .label{display:flex;align-items:center;gap:9px;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.8)}
-  .kpi-navy .label .ico{width:20px;height:20px;border-radius:6px;background:rgba(255,255,255,.14);display:grid;place-items:center}
-  .kpi-navy .corner-dot{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#93c5fd;background:rgba(255,255,255,.08);padding:4px 9px;border-radius:6px;border:1px solid rgba(255,255,255,.14)}
-  .kpi-navy .corner-dot::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;animation:livePulse 1.6s ease-in-out infinite}
-  @keyframes livePulse{0%,100%{box-shadow:0 0 0 0 rgba(147,197,253,.6)}50%{box-shadow:0 0 0 5px rgba(147,197,253,0)}}
-  .kpi-navy .num{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:60px;letter-spacing:-.02em;line-height:1;display:flex;align-items:baseline;gap:10px}
-  .kpi-navy .num .unit{font-size:15px;font-weight:500;color:rgba(255,255,255,.7);font-family:"Manrope"}
-  .kpi-navy .num-sub{font-size:13px;line-height:1.5;color:rgba(255,255,255,.82);margin-top:10px;max-width:90%}
-  .kpi-navy .num-sub b{color:#93c5fd;font-weight:700}
-  .kpi-navy .spark-lg{height:58px;width:100%;margin-top:6px}
-  .kpi-navy .spark-lg path{fill:none;stroke:#5eead4;stroke-width:1.6}
-  .kpi-navy .spark-lg path.fill{fill:rgba(94,234,212,0.16);stroke:none}
-  .kpi-navy .ticker{margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.10)}
-  .kpi-navy .ticker .head{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(181,212,244,0.55);margin-bottom:9px}
-  .kpi-navy .ticker .ln{display:flex;align-items:center;gap:10px;font-family:"IBM Plex Mono",monospace;font-size:11px;color:rgba(181,212,244,0.82);margin-bottom:6px;white-space:nowrap}
-  .kpi-navy .ticker .ln .t{color:rgba(181,212,244,0.45);width:26px;flex-shrink:0;font-size:10px}
-  .kpi-navy .ticker .ln .new{margin-left:auto;font-size:9px;color:#5eead4;letter-spacing:.06em}
+  /* The navy KPI hero panel and all of its rules were removed 2026-07-27 (CEO ruling) — see the hero. */
 
   /* ───────── section scaffolding ───────── */
   section.band{padding:96px 0;position:relative}
@@ -340,34 +318,13 @@
       <div class="hero-copy">
         <div class="reveal live-pill">Federal Contract Intelligence</div>
         <h1 class="reveal">A bid/no-bid verdict you can trust —<br/><span class="accent">because it tells you when it can't.</span></h1>
-        <p class="reveal lede">FARaudit runs the full federal BD arc — from the first government signal to recompete alert. Every finding cites the source line. When the documents can't support a verdict, it says so instead of guessing. It will never talk you into a loser — or out of a winnable contract.</p>
+        <p class="reveal lede">FARaudit runs the full federal BD arc — from the first government signal to recompete alert. Every finding cites the source line. When the documents can't support a verdict, it says so instead of guessing. Ambiguity routes to a no-verdict, not to a recommendation.</p>
         <div class="reveal hero-cta">
           <a class="btn btn-primary btn-lg" href="/access">Request access&nbsp;→</a>
           <a class="seehow" href="#how">See how it works <span class="arrow">↓</span></a>
         </div>
       </div>
 
-      <!-- navy KPI hero panel -->
-      <div class="reveal kpi-navy">
-        <div class="kpi-top">
-          <div class="label"><span class="ico">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M21 7v5h-5"/></svg>
-          </span>Live Solicitations</div>
-          <div class="corner-dot">Live</div>
-        </div>
-        <div class="num">200<span class="unit">on SAM.gov</span></div>
-        <div class="num-sub">Matched against your NAICS &amp; PSCs in the last 24h. <b>+14 vs. yesterday.</b></div>
-        <svg class="spark-lg" viewBox="0 0 300 58" preserveAspectRatio="none">
-          <path class="fill" d="M0,46 L20,42 L40,44 L60,36 L80,38 L100,30 L120,33 L140,24 L160,27 L180,18 L200,21 L220,14 L240,16 L260,9 L280,11 L300,5 L300,58 L0,58 Z"/>
-          <path d="M0,46 L20,42 L40,44 L60,36 L80,38 L100,30 L120,33 L140,24 L160,27 L180,18 L200,21 L220,14 L240,16 L260,9 L280,11 L300,5"/>
-        </svg>
-        <div class="ticker">
-          <div class="head">Ingest Stream</div>
-          <div class="ln"><span class="t">2m</span><span>FA8730 · AF · C5ISR · matched</span><span class="new">matched</span></div>
-          <div class="ln"><span class="t">9m</span><span>N00174 · Navy · IT svcs · matched</span><span class="new">matched</span></div>
-          <div class="ln"><span class="t">21m</span><span>70Z023 · DHS · cyber · new</span><span class="new">new</span></div>
-        </div>
-      </div>
     </div>
   </div>
 </section>
@@ -379,7 +336,7 @@
       <div class="reveal">
         <div class="eyebrow"><span class="idx">01</span> Trust</div>
         <h2 style="font-size:40px;font-weight:800;letter-spacing:-.035em;line-height:1.12;margin:18px 0 22px">A verdict that admits<br/>what it can't verify.</h2>
-        <p class="feat-intro">Six independent expert lenses. An adversarial verifier that tags every claim VERIFIED, UNVERIFIABLE, or REFUTED against source text. Missing sections return INCOMPLETE — never a confident guess on unread documents. Anyone can hand you a confident recommendation. FARaudit renders a verdict it can defend — or tells you it can't.</p>
+        <p class="feat-intro">Six independent expert lenses. An adversarial verifier that tags every claim VERIFIED, UNVERIFIABLE, or REFUTED against source text. Missing sections return INCOMPLETE — not a confident guess on unread documents. Anyone can hand you a confident recommendation. FARaudit renders a verdict it can defend — or tells you it can't.</p>
       </div>
 
       <!-- FA301626Q0068 proof card -->
@@ -410,10 +367,9 @@
         </div>
         <div class="caught">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-          All three caught
-          <span class="mono-time">4 min</span>
+          Each finding cited to its clause
         </div>
-        <div class="panel-caption">Live Air Force RFQ — two P0 traps and one disqualifying DFARS clause caught in four minutes.</div>
+        <div class="panel-caption">Air Force RFQ — CLIN quantity ambiguity and an FOB designation conflict, each cited to the clause it came from.</div>
       </div>
     </div>
   </div>
@@ -475,7 +431,7 @@
           <div class="eyebrow"><span class="idx">03</span> Proof</div>
           <h2>The SOW Influence Tracker.</h2>
         </div>
-        <p class="feat-intro" style="max-width:520px;margin-top:22px;margin-bottom:0">When the final solicitation drops, FARaudit cross-references your RFI response against it — a match score and the exact phrases that carried through. Proof your upstream work shaped the requirement. No other platform produces this.</p>
+        <p class="feat-intro" style="max-width:520px;margin-top:22px;margin-bottom:0">When the final solicitation drops, FARaudit cross-references your RFI response against it — a match score and the exact phrases that carried through. Proof your upstream work shaped the requirement.</p>
       </div>
 
       <div class="reveal sow-panel">
