@@ -128,7 +128,9 @@ console.log(`    └─ DIFFERS from fullSource ...... ${differing}   ← isGrou
 if (withGrounding === 0) {
   console.error(`\n✗ NO MEASURABLE POPULATION — every cached record either lacks groundingSource or carries a backfilled copy of fullSource.`);
   console.error(`  There is no number to report. A zero here would mean "the corpus cannot express this", NOT "the divergence does not happen".`);
-  console.error(`  Fix upstream: bank the real groundingSource at audit-executor-v3.ts:879, then re-pull records.\n`);
+  console.error(`  audit-executor-v3.ts:879 now banks the real run-time value (shipped 2026-07-28), but ONLY for audits`);
+  console.error(`  that ran after it. Re-pull records (scripts/audit-ai/pull-run-records.ts) once real audits have run;`);
+  console.error(`  the 54 pre-existing records are unrepairable and stay excluded.\n`);
   process.exit(1);
 }
 
