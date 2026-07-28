@@ -30,7 +30,9 @@ export interface V4Coverage {
   core?: { k: string; ok: boolean }[]; missing?: string[]; unreadable?: string[];
 }
 export interface V4Temporal { gateDays: number | null; windowDays: number | null; gateExceedsWindow: boolean; }
-export interface V4Finding { req: string; cite: string; excerpt?: string; curability?: string; temporal?: V4Temporal; driver?: boolean; }
+// `keyExcerpt` = the span the ANALYSIS examined (pre head-re-grounding). Identity/dedup keys read this;
+// `excerpt` is what the reader is shown. Absent the E1 flag they are the same string. ARC #747 · E1.
+export interface V4Finding { req: string; cite: string; excerpt?: string; keyExcerpt?: string; curability?: string; temporal?: V4Temporal; driver?: boolean; }
 export interface V4Findings { p0: V4Finding[]; p1: V4Finding[]; p2: V4Finding[]; unrated?: V4Finding[]; satisfied?: { req: string; cite: string }[]; }
 export interface V4Grounded<T> { grounded: boolean; } // { grounded:false } sentinel or the full derived shape
 export interface V4SubmissionL { grounded: true; lead?: string; rows: { vol: string; req: string; condition: string; cite: string }[]; }

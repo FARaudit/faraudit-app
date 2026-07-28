@@ -22,9 +22,18 @@ import { isBindingDoc, hasEngineText } from "./sam-attachments";
 import { looksMojibake } from "./pdf-ocr";
 import { NOTICE_BODY_DOC_NAME } from "./agentic-executor";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
-import { repairClippedExcerpts } from "./audit-excerpt-repair";
+import { repairClippedExcerpts, repairHeadClippedExcerpts, applyHeadRepairsTo, analyzedExcerptOf } from "./audit-excerpt-repair";
+// ATTRIBUTION USES THE ANALYZED SPAN, NOT THE DISPLAYED ONE (ARC #747 · E1). Every "does this finding cover
+// that text?" computation below — grounding attribution, region coverage, the eligibility floors, the caveat
+// emitters — asks whether the ANALYSIS examined a passage. Head re-grounding widens an excerpt backward so a
+// customer sees the whole clause; if that widened span answered these questions it would silently credit the
+// finding with source it never looked at, and an eligibility bar sitting one line above a quote would read as
+// already-covered. An adversarial probe demonstrated exactly that: a questions-deadline finding, widened,
+// swallowing a Top Secret facility-clearance bar and retiring the floor that should have fired.
+// `analyzedExcerptOf` returns the model's own excerpt when a repair widened it, and the excerpt itself
+// otherwise — so with the flag off, or on a finding no pass touched, every one of these is unchanged.
 import { SITE_VISIT_CONCLUDED_RE, BOA_HOLDER_ONLY_EMIT_RE, SITE_VISIT_MANDATORY_ATTENDANCE_RE } from "./audit-site-visit-patterns";
-import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyCyberRfiReconciliation, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyNmrNaicsDormancy, applyCheckboxStateFidelity, applyPerfObligationInsuranceTyping, applyClauseKeyedTypingFloor, applyStructuralAssertionFidelity, applyQuantityAmbiguityFidelity, applyFindingDedup, applyCrossFleetDedup, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, applyInquiryDeadlineBenignGuard, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, emitPerformanceUpkeepCaveats, deriveShadowVerdict, EngineInvariantError, type Decision, type ShadowVerdict } from "./audit-decide";
+import { isPositiveSetAside, isInquiryDeadlineBenign, hasOperativeEligibilityLanguage, ELIGIBILITY_AUTHORITY_RE, deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyCyberRfiReconciliation, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyNmrNaicsDormancy, applyCheckboxStateFidelity, applyPerfObligationInsuranceTyping, applyClauseKeyedTypingFloor, applyStructuralAssertionFidelity, applyQuantityAmbiguityFidelity, applyFindingDedup, applyCrossFleetDedup, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, applyInquiryDeadlineBenignGuard, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, emitPerformanceUpkeepCaveats, deriveShadowVerdict, EngineInvariantError, type Decision, type ShadowVerdict } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
 import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type ReasonCaller, type EntailmentCaller, type JudgmentCost, zeroCost } from "./audit-judgment-layer";
 import { highSignalSweep, boilerplateTrapSweep } from "./audit-grounding-sweep";
@@ -185,6 +194,29 @@ export interface RunDiagnostics {
  *  part36 the carrier is the SEALED construction binding-content manifest (present elements = the §A–M analog),
  *  computed at ingest over FULL doc text. The :574 completeness FORMULA is untouched — only WHICH set populates
  *  `required` changes. Flag-off / no manifest ⇒ procurementPart never returns part36 ⇒ byte-identical UCF path. */
+/** Number `prefix#N` ids WITHOUT ever re-issuing one the set already holds.
+ *
+ *  Every emitter here used to number from zero unconditionally, which is correct only while nothing upstream
+ *  already carries that emitter's ids. The judgment-first / replay shape breaks exactly that assumption: the
+ *  seed IS a previous run's persisted findings, so a record holding keyfact_detector#0 came back with TWO
+ *  findings answering to #0 — the Nonmanufacturer Rule and a delivery schedule. Duplicate ids are not cosmetic:
+ *  anything that pairs findings by id (repair propagation, dedup bookkeeping, replay drift, every differential
+ *  harness) can silently act on the wrong row, and a widened quote landing on the wrong requirement is the
+ *  fabrication shape this arc exists to close.
+ *
+ *  Live ladder runs are unaffected — nothing is ever taken, so the numbering is identical to before. This
+ *  diverges only where it would otherwise have produced a duplicate. Census: scripts/audit-ai/_dupe-id-census.ts. */
+function assignUniqueFindingIds(rows: TypedFinding[], prefix: string, existing: TypedFinding[]): void {
+  const taken = new Set(existing.map((f) => f.id).filter(Boolean) as string[]);
+  let n = 0;
+  for (const f of rows) {
+    let id = `${prefix}#${n++}`;
+    while (taken.has(id)) id = `${prefix}#${n++}`;
+    f.id = id;
+    taken.add(id);
+  }
+}
+
 export function buildManifest(ctx: AuditToolContext): string[] {
   if (procurementPart(ctx) === "part36-construction" && ctx.constructionManifest) return constructionRequired(ctx.constructionManifest);
   return BINDING_SECTIONS.filter((k) => readSection(ctx, k).present);
@@ -637,7 +669,7 @@ function groundedBy(obligation: string, findings: TypedFinding[], sec: string, s
   const ids: string[] = [];
   for (const f of findings) {
     if (!f.id) continue;
-    const ex = norm(f.excerpt || "");
+    const ex = norm(analyzedExcerptOf(f) || "");
     const fSec = findingSection(f);
     // Legacy path — UNCHANGED any flag state: same-letter citation + exact 4-gram.
     if (fSec === sec && grams.some((g) => ex.includes(g))) { ids.push(f.id); continue; }
@@ -646,7 +678,12 @@ function groundedBy(obligation: string, findings: TypedFinding[], sec: string, s
     const sectionOk = fSec === sec
       || (fSec === null && (f.citation || "").trim().length > 0 && !!sectionNText && !!ex && sectionNText.includes(ex));
     if (!sectionOk) continue;
-    if (passesSubstantiveBar(obligation, vToks, f.excerpt || "")) ids.push(f.id);
+    // ANALYZED span, not the displayed one. `passesSubstantiveBar` tokenises the excerpt and asks whether it
+    // COVERS the obligation's tokens, so widening only ever adds tokens and can only make an obligation
+    // easier to claim — the dangerous direction. Its sibling at the legacy path above was converted in the
+    // first E1 pass and this one was missed: two lines apart, the same finding was answering "did the
+    // analysis examine this?" with two different spans.
+    if (passesSubstantiveBar(obligation, vToks, analyzedExcerptOf(f) || "")) ids.push(f.id);
   }
   return [...new Set(ids)];
 }
@@ -689,7 +726,7 @@ export function groundedSourceRegionNames(fullSource: string, findings: TypedFin
   //   substantive excerpt (≥24 norm chars) AND a UNIQUE containing region (hits===1). Ambiguous (0 or >1) ⇒ strip
   //   nothing ⇒ the gap disclosure is KEPT (conservative — never hide a real gap; at worst leaves a grounded region listed).
   for (const f of decisionBearing) {
-    const ex = norm(f.excerpt || "");
+    const ex = norm(analyzedExcerptOf(f) || "");
     if (ex.length < 24) continue;
     const hits = regions.filter((r) => r.text.includes(ex));
     if (hits.length === 1) out.add(nameKey(hits[0].name));
@@ -756,7 +793,7 @@ export function documentsCovered(
     // finding the engine would actually act on can lift the INCOMPLETE veto. Flag-gated on crossAttGate ⇒ flag-OFF
     // byte-identical (a `dropped` finding still counted before).
     if (findings.some((f) => {
-      const ex = norm(f.excerpt || "");
+      const ex = norm(analyzedExcerptOf(f) || "");
       if (!(ex.length > 0 && nRegion.includes(ex) && !primaryNorm.includes(ex))) return false;
       if (crossAttGate && disposeFinding(f) === "dropped") return false;   // #372 B — boilerplate/dropped finding is not decision-bearing → credits no coverage
       if (crossAttGate && otherAttNorms.some((o) => o.name !== r.name && o.t.includes(ex))) return false; // excerpt shared with ANOTHER attachment → doesn't prove THIS one analyzed
@@ -1128,7 +1165,7 @@ export function noticeBodyEligibilityUngrounded(fullSource: string, findings: Ty
   const covering: Array<[number, number]> = [];
   for (const f of findings) {
     if (disposeFinding(f) === "dropped") continue;
-    const ex = norm(f.excerpt || "");
+    const ex = norm(analyzedExcerptOf(f) || "");
     if (!ex) continue;
     const s = nNotice.indexOf(ex);
     if (s >= 0) covering.push([s, s + ex.length]);
@@ -1192,7 +1229,7 @@ export function emitNoticeBodyEligBarFindings(fullSource: string, findings: Type
   const covering: Array<[number, number]> = [];
   for (const f of findings) {
     if (disposeFinding(f) === "dropped") continue;
-    const ex = norm(f.excerpt || "");
+    const ex = norm(analyzedExcerptOf(f) || "");
     if (!ex) continue;
     const s = nNotice.indexOf(ex);
     if (s >= 0) covering.push([s, s + ex.length]);
@@ -1363,7 +1400,7 @@ export function emitSizeStandardCaveats(fullSource: string, findings: TypedFindi
   const covering: Array<[number, number]> = [];
   for (const f of findings) {
     if (disposeFinding(f) === "dropped") continue;
-    const ex = norm(f.excerpt || "");
+    const ex = norm(analyzedExcerptOf(f) || "");
     if (!ex) continue;
     const s = nNotice.indexOf(ex);
     if (s >= 0) covering.push([s, s + ex.length]);
@@ -1417,7 +1454,7 @@ export function emitSelfDeterminableCaveats(fullSource: string, findings: TypedF
   const covering: Array<[number, number]> = [];
   for (const f of findings) {
     if (disposeFinding(f) === "dropped") continue;
-    const ex = norm(f.excerpt || "");
+    const ex = norm(analyzedExcerptOf(f) || "");
     if (!ex) continue;
     const s = nNotice.indexOf(ex);
     if (s >= 0) covering.push([s, s + ex.length]);
@@ -1515,7 +1552,7 @@ export function constructionDocumentsCovered(ctx: AuditToolContext, findings: Ty
     // an excerpt shared with ANOTHER attachment (a flow-down phrase in both) must NOT certify THIS doc as analyzed
     // → false COMPLETE; exclude it (mirrors documentsCovered line ~397).
     if (!findings.some((f) => {
-      const ex = norm(f.excerpt || "");
+      const ex = norm(analyzedExcerptOf(f) || "");
       if (!(ex.length > 0 && nRegion.includes(ex) && !primaryNorm.includes(ex))) return false;
       if (otherAttNorms.some((o) => o.name !== r.name && o.t.includes(ex))) return false;   // shared with ANOTHER attachment → doesn't prove THIS one analyzed
       return true;
@@ -1566,7 +1603,10 @@ export function findingProvenance(fullSource: string, findings: TypedFinding[]):
   const out: Array<{ id: string; doc: string; excerpt: string }> = [];
   for (const f of findings) {
     if (!f.id || !f.excerpt) continue;
-    const ex = norm(f.excerpt);
+    // Attribution asks which DOCUMENT the analysis read, so it matches on the analyzed span. The displayed
+    // excerpt is re-grounded against `groundingSource`, which on a compressed-digest run is not the text
+    // these regions are built from — matching it here returns "(ungrounded)" for a finding that is grounded.
+    const ex = norm(analyzedExcerptOf(f));
     out.push({ id: f.id, doc: regions.find((r) => r.n.includes(ex))?.name ?? "(ungrounded)", excerpt: f.excerpt });
   }
   return out;
@@ -1879,7 +1919,7 @@ function sectionUngroundedEligBars(text: string, findings: TypedFinding[], decla
   const covering: Array<[number, number]> = [];
   for (const f of findings) {
     if (disposeFinding(f) === "dropped") continue;
-    const ex = norm(f.excerpt || "");
+    const ex = norm(analyzedExcerptOf(f) || "");
     if (!ex) continue;
     const s = nText.indexOf(ex);
     if (s >= 0) covering.push([s, s + ex.length]);
@@ -1944,13 +1984,23 @@ export function completenessOf(ctx: AuditToolContext, required: string[], findin
     // Which documents carry a GROUNDED finding — an element is analyzed if a finding lands in the doc that carries it
     // (findingProvenance maps each finding's excerpt to its assembled-doc region; "(ungrounded)" excluded).
     const analyzedDocs = new Set(findingProvenance(ctx.fullSource, findings).map((p) => p.doc).filter((d) => d && d !== "(ungrounded)"));
-    const cov = constructionCoverage(ctx.constructionManifest, ctx.fullSource, findings.map((f) => f.excerpt || ""), analyzedDocs);
+    // THE HAYSTACK DIRECTION — the one place widening can manufacture coverage rather than lose it.
+    // constructionCoverage does `nExcerpts.some((ex) => ex.includes(nAnchor))` (audit-construction-manifest.ts:227):
+    // the excerpt is the HAYSTACK and the manifest element's anchor is the needle. Everywhere else in this
+    // file the excerpt is the needle, where a longer span can only be harder to match. Here a head widened
+    // backward across an extractor wrap that carries a NEIGHBOURING element's anchor — a Davis-Bacon WD
+    // header, a CSI code — marks that element ANALYZED, and the part-36 completeness proof returns COMPLETE
+    // for an element no finding examined.
+    const cov = constructionCoverage(ctx.constructionManifest, ctx.fullSource, findings.map((f) => analyzedExcerptOf(f) || ""), analyzedDocs);
     for (const e of ctx.constructionManifest.elements) {
       if (!e.present) continue;
       const covered = cov.covered.includes(e.key);
       const dropped = cov.droppedByCompressor.includes(e.key);
       // Provenance backstop (adversarial review): a covered element cites the findings whose excerpt carries its anchor.
-      const cited = covered && e.anchor ? findings.filter((f) => f.id && nrm(f.excerpt || "").includes(nrm(e.anchor!))).map((f) => f.id!) : [];
+      // Same haystack direction as the line above, and worse in consequence: this one CITES the finding's id
+      // as the provenance backstop, so a swallowed neighbouring anchor does not just certify the element —
+      // it names a finding as the proof for text that finding never analyzed.
+      const cited = covered && e.anchor ? findings.filter((f) => f.id && nrm(analyzedExcerptOf(f) || "").includes(nrm(e.anchor!))).map((f) => f.id!) : [];
       attestations.push({
         section: e.key,
         status: covered ? "covered_direct" : "obligations_ungrounded",
@@ -1975,7 +2025,11 @@ export function completenessOf(ctx: AuditToolContext, required: string[], findin
     // S7 (Brain card 274) — a section is covered_direct ONLY by a finding CITED TO THAT SAME SECTION whose excerpt is
     // in the section text. Without the findingSection guard, a §B-cited finding whose sentence coincidentally appears
     // in §H/§M text falsely certified §H/§M covered → false-COMPLETE. Same guard the covered_attested path uses (groundedBy).
-    const direct = findings.filter((f) => f.excerpt && findingSection(f) === sec && nText.includes(norm(f.excerpt)));
+    // Needle direction (safe — a longer span can only fail to match), but still the wrong question: this asks
+    // whether the ANALYSIS covered the section. The head pass grounds against `groundingSource`, while
+    // `nText` comes from ctx.sections/fullSource; on a compressed-digest run the widened span is verbatim in
+    // the former and absent from the latter, so covered_direct is LOST and the run goes false INCOMPLETE.
+    const direct = findings.filter((f) => f.excerpt && findingSection(f) === sec && nText.includes(norm(analyzedExcerptOf(f))));
     // PHASE 4 (Brain, flag AUDIT_COVERED_DIRECT_BAR_FLOOR) — COVERED_DIRECT HARD-BAR FLOOR. Before the covered_direct
     // blanket short-circuit (below) OR the read_no_obligation valve can certify a non-per-obligation binding section
     // ({B,C,D,E,F,H}) covered, refuse if the section carries an UNGROUNDED (non-self-cert-demotable) eligibility bar
@@ -2315,9 +2369,28 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     // against real source with the SAME isGrounded substring check the lenses use: a finding whose excerpt is NOT
     // verbatim in source has grounded set false and is DROPPED here (fail-safe — a hallucinated/paraphrased excerpt
     // never survives, Rule 64 / I3). This is the load-bearing re-grounding the proposer's grounded:false depends on.
+    // MERGE NOTE (E1 × main, 2026-07-28) — E1 replaced the index-based `judgment#${j}` numbering with real id
+    // uniqueness; main split the same map so the DROPPED subset is nameable for the grounding-backstop telemetry
+    // below. Independent concerns, both kept: the map result is bound first, then filtered, then E1's id pass runs
+    // on the survivors. The index-based numbering E1 deleted is NOT reinstated.
     const _seedRegrounded = opts.seedFindings.map((f) => ({ ...f, grounded: isGrounded(ctx, f) }));
     const reground = _seedRegrounded.filter((f) => f.grounded);
-    reground.forEach((f, j) => { f.id = f.id ?? `judgment#${j}`; });
+    // ID UNIQUENESS ON THE SEED PATH (review round 4, finding #2). This used to be `f.id ?? judgment#${j}` with
+    // `j` the index AFTER the grounded filter — the one numbering the dupe-id fix did not convert. A seed is a
+    // prior run's `result.findings`, which MIXES id-carrying rows with id-less ones: the notice-body eligibility
+    // and size-standard caveat emitters push findings with no `id` at all. Drop three judgment rows in
+    // re-grounding and the id-less rows slide onto indices a surviving `judgment#N` already holds — the exact
+    // duplicate `applyHeadRepairsTo` matches on, which writes one finding's quote onto ANOTHER's requirement.
+    // A seed banked before the dupe-id fix can also carry duplicates of its own, so uniqueness is enforced
+    // across the whole set rather than only over the id-less rows: first claim wins, every later collision is
+    // re-issued through the same helper the lens paths use.
+    const claimed: TypedFinding[] = [];
+    const reissue: TypedFinding[] = [];
+    const seenSeedIds = new Set<string>();
+    for (const f of reground) {
+      if (f.id && !seenSeedIds.has(f.id)) { seenSeedIds.add(f.id); claimed.push(f); } else reissue.push(f);
+    }
+    assignUniqueFindingIds(reissue, "judgment", claimed);
     findings = reground;
     perLens["judgment"] = reground.length;
     // Same VERDICT-INERT grounding-backstop telemetry as the lens path below — this re-grounding drops findings by
@@ -2361,7 +2434,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     if (_dropRead > 0)
       console.warn(`[grounding-backstop] ⚠ ${_dropRead} finding(s) were deleted whose excerpt IS verbatim in fullSource but absent from the grounding corpus (groundingDiverged=${_gDiverged}) — CONSISTENT WITH the divergence class rather than model invention. Not proof: presence in fullSource does not establish the text was SERVED to that lens (a truncated read leaves text present but unseen). Investigate, do not report as a confirmed count.`);
     experts.forEach((spec, i) => {
-      runs[i].findings.forEach((f, j) => { f.id = `${spec.key}#${j}`; });
+      assignUniqueFindingIds(runs[i].findings, spec.key, findings);
       perLens[spec.key] = runs[i].findings.length; findings.push(...runs[i].findings);
       runs[i].sectionsRead.forEach((s) => sectionsRead.add(s));
       runs[i].docsRead.forEach((d) => docsRead.add(d));
@@ -2398,7 +2471,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //         Set AUDIT_GROUNDING_SWEEP="false" to disable.
   if (process.env.AUDIT_GROUNDING_SWEEP !== "false") {
     const swept = highSignalSweep(ctx.fullSource);
-    swept.forEach((f, j) => { f.id = `deterministic_sweep#${j}`; });
+    assignUniqueFindingIds(swept, "deterministic_sweep", findings);
     if (swept.length) { perLens["deterministic_sweep"] = swept.length; findings.push(...swept); }
   }
 
@@ -2410,7 +2483,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   const boilerplateAttestOn = process.env.AUDIT_BOILERPLATE_ATTEST === "true";
   if (boilerplateAttestOn) {
     const traps = boilerplateTrapSweep(ctx.fullSource);
-    traps.forEach((f, j) => { f.id = `boilerplate_trap#${j}`; });
+    assignUniqueFindingIds(traps, "boilerplate_trap", findings);
     if (traps.length) { perLens["boilerplate_trap_sweep"] = traps.length; findings.push(...traps); }
   }
 
@@ -2468,7 +2541,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //         never an eligibility gate (invisible to the 206-A guarantee). part12-commercial gate is inside the pass.
   if (process.env.AUDIT_PROCEDURAL_COVERAGE_LENS === "true") {
     const proc = await proceduralCoveragePass(ctx, { extract: opts.proceduralExtract });
-    proc.forEach((f, j) => { f.id = `procedural_coverage#${j}`; });
+    assignUniqueFindingIds(proc, "procedural_coverage", findings);
     if (proc.length) {
       perLens["procedural_coverage"] = proc.length;
       findings.push(...proc);
@@ -2491,6 +2564,30 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     console.log(`[orchestrator] excerpt-repair: re-grounded ${repair.repaired} clipped excerpt(s)${repair.unrepairable ? `, ${repair.unrepairable} unrepairable (left clipped)` : ""}` +
       (repair.changes.length ? ` — ${repair.changes.map((c) => c.id ?? c.lens).join(", ")}` : ""));
   }
+
+  // HEAD-SIDE RE-GROUNDING WAS HERE (P2.6b) AND HAS MOVED — see the post-verdict block near the return.
+  //
+  // WHY IT MOVED (2026-07-27, `/code-review high` on PR #292, finding #1). At this position the widened
+  // `f.excerpt` flowed into every classifier in audit-decide (~28 sites building `hay`/`blob` strings from
+  // `f.excerpt`, lines 183-3455). The review reproduced a live flip with this PR's own fixture:
+  // `isInquiryDeadlineBenign` returns true before widening and false after, so the finding stays
+  // `no_one_can_move` and deriveVerdict escalates it — a BID becomes NHR/NO_BID on the strength of text the
+  // analysis never examined.
+  //
+  // The first fix I reached for was to sweep all 28 sites with `analyzedExcerptOf`. That is the enumeration
+  // pattern this arc keeps losing to: four row shapes each needed their own rule, and each was one shape
+  // short. Twenty-eight call sites would be twenty-eight chances to miss one, and the next lens added to
+  // audit-decide would reopen it silently.
+  //
+  // Widening a quote is a DISPLAY improvement. Running it after the verdict makes it STRUCTURALLY incapable
+  // of reaching a classifier — no decide-layer site needs to change, and none can regress. The prior
+  // placement was defended as "neutral for coverage, measured 0 deltas over 40 records"; that was true of the
+  // banked corpus and false of the mechanism, which is exactly the kind of reassurance a corpus can give and
+  // a structure cannot take away. [[feedback_display_span_vs_analyzed_span]]
+  //
+  // Nothing is lost by the move: coverage uses the excerpt as a NEEDLE, so the shorter (original) span can
+  // only match more easily, and the customer-facing purpose — restoring the dropped citation head for the
+  // reader — is served identically after the decision.
 
   // P4 — completeness (B-corrected): every binding section READ + obligation-coverage (direct or attested
   //      with cited finding IDs); experts must have converged. Attestations carried for trace adjudication.
@@ -2626,7 +2723,16 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   {
     const before = findings.length;
     findings = applyKeyfactDetector(findings, ctx.fullSource, { enabled: process.env.AUDIT_KEYFACT_DETECTOR === "true", procurementPart: procurementPart(ctx) });
-    for (let k = before; k < findings.length; k++) { findings[k].id = `keyfact_detector#${k - before}`; }
+    // COLLISION-FREE IDS. This numbered from zero unconditionally, so it re-issued an id the set was already
+    // using whenever the incoming findings already carried keyfact ids — which is exactly the judgment-first /
+    // replay shape, where the seed is a previous run's persisted findings. A banked record carrying
+    // keyfact_detector#0 and #1 came back with TWO findings answering to #0, one of them the Nonmanufacturer
+    // Rule and the other a delivery schedule. Found by running the rail, not by reading it: the duplicate made
+    // an id-keyed differential harness silently compare unrelated findings.
+    //
+    // Live runs are unaffected — the lenses emit no keyfact ids, so nothing is ever taken and the numbering is
+    // identical to before. It only diverges where it would otherwise have produced a duplicate.
+    assignUniqueFindingIds(findings.slice(before), "keyfact_detector", findings.slice(0, before));
     if (findings.length > before) perLens["keyfact_detector"] = findings.length - before;
   }
 
@@ -2865,7 +2971,10 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // coverage-stage replay. Rides the AUDIT_BANK_RUN_RECORD flag: when banking is off the snapshot is never taken and
   // `_bankDiag` stays undefined ⇒ AuditResult.diagnostics absent ⇒ byte-identical. Never read by deriveVerdict.
   const _bankInstrOn = process.env.AUDIT_BANK_RUN_RECORD === "true";
-  const _preDedupFindings = _bankInstrOn ? findings.slice() : null;
+  // Per-finding copies, not `.slice()` (review round 3, finding #1). A shallow array copy holds the SAME
+  // objects, so the post-verdict head pass would rewrite the excerpts inside this "pre-processing" snapshot
+  // too — a diagnostic whose entire value is showing the findings as they stood at this stage.
+  const _preDedupFindings = _bankInstrOn ? findings.map((f) => ({ ...f })) : null;
   findings = applyFindingDedup(findings, { enabled: process.env.AUDIT_FINDING_DEDUP === "true" });
   // CROSS-FLEET DEADLINE-DEDUP (Phase 3 Unit 6 follow-on) — collapses the no-clause cross-fleet inflation the clause gate
   // can't reach: plain rows restating one dated deadline across the two paraphrasing panels. Runs right after the clause
@@ -2901,7 +3010,15 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
       } catch { /* logging never affects the verdict */ }
     }
   }
-  const inputs: VerdictInputs = { findings, bidderProfile, samSetAside: opts.setAside ?? null, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(opts.dispositiveCompletenessForEligibility !== undefined ? { dispositiveCompletenessForEligibility: opts.dispositiveCompletenessForEligibility } : {}), ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(process.env.AUDIT_SITEVISIT_SEVERITY_FLOOR === "true" ? { siteVisitSeverityFloor: true } : {}), ...(coverageV2 ? { coverageV2 } : {}), ...(soleSourceLock ? { soleSourceLock } : {}), ...(opts.temporal ? { temporalSnapshot: opts.temporal.snapshot, liveSam: opts.temporal.liveSam, ingestedAmendmentComplete: opts.temporal.ingestedAmendmentComplete, today: opts.temporal.today, nowIso: opts.temporal.nowIso ?? null } : {}) };
+  // SNAPSHOT, not the live array (review round 3, finding #1). `inputs` is what the verdict was derived from,
+  // and `audit-run-record.ts` both PERSISTS it and REPLAYS `deriveVerdict(rec.result.inputs)` off it. The
+  // post-verdict head pass below mutates findings IN PLACE, so sharing the objects would let a span widened
+  // for the reader travel into the banked record and be re-decided on replay — `isInquiryDeadlineBenign` flips
+  // and a BID re-derives as NHR. Placement after `deriveVerdict` protects the live verdict; only a copy
+  // protects the recorded one. Shallow per-finding copies: the fields decide reads are all primitives, and
+  // nothing downstream compares finding identity across the two arrays (checked). Values are identical at this
+  // point, so a flag-OFF run banks byte-identical JSON.
+  const inputs: VerdictInputs = { findings: findings.map((f) => ({ ...f })), bidderProfile, samSetAside: opts.setAside ?? null, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(opts.dispositiveCompletenessForEligibility !== undefined ? { dispositiveCompletenessForEligibility: opts.dispositiveCompletenessForEligibility } : {}), ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(process.env.AUDIT_SITEVISIT_SEVERITY_FLOOR === "true" ? { siteVisitSeverityFloor: true } : {}), ...(coverageV2 ? { coverageV2 } : {}), ...(soleSourceLock ? { soleSourceLock } : {}), ...(opts.temporal ? { temporalSnapshot: opts.temporal.snapshot, liveSam: opts.temporal.liveSam, ingestedAmendmentComplete: opts.temporal.ingestedAmendmentComplete, today: opts.temporal.today, nowIso: opts.temporal.nowIso ?? null } : {}) };
   // Phase-1 SHADOW (cards #596/#597) — compute the positive-shape pole BESIDE the real verdict and bank it. VERDICT-INERT:
   // the shadow is never routed on; the live deriveVerdict below is untouched. Gated on AUDIT_POSITIVE_VERDICT_POLE (default-
   // OFF ⇒ never computed ⇒ byte-identical) AND banking on (the diagnostics carrier). naics is the SAM fact (Rule 64).
@@ -2933,5 +3050,66 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     throw e;
   }
 
+  // ── HEAD-SIDE RE-GROUNDING (ARC #747 · E1, flag AUDIT_EXCERPT_HEAD_REGROUND, default OFF) ──────────────
+  // Moved here from P2.6b. The verdict is already derived and `inputs` already holds the findings it was
+  // derived from, so nothing this pass does can reach a classifier. See the note at the old site for why
+  // structure beat sweeping 28 call sites.
+  //
+  // CLASSIFIER-INVARIANCE GUARD. Placement protects the VERDICT; it does not protect the READER. Review
+  // finding #2 showed a widened quote for a questions-deadline finding reading
+  // "Offerors must possess a Top Secret facility clearance at time of proposal submission questions shall be
+  // submitted…" — verbatim, and corroborating an obligation it does not belong to. Finding #3 showed a
+  // title-case heading crossing the walk and flipping `isPositiveSetAside`. No refusal rule catches either,
+  // because the extractor emitted no terminator between the clauses.
+  //
+  // So the guard is not another shape rule: a widening that CHANGES WHAT THE SPAN WOULD BE CLASSIFIED AS is
+  // not a repair, it is a rewrite, and it is refused. That is a semantic test on the outcome rather than a
+  // guess about the layout, so it closes the shapes we have not thought of too — including the title-case
+  // heading this branch had recorded as a KNOWN GAP.
+  const headRepair = repairHeadClippedExcerpts(findings, ctx.groundingSource ?? ctx.fullSource, {
+    rejectIfClassificationMoves: (before, after) => classificationSignature(before) !== classificationSignature(after),
+  });
+  // REACH BOTH PERSISTED SETS (review round 3, finding #2). `deriveVerdict` decides on COPIES — `dispositions`
+  // is `deciding.map(f => ({...f, disposition}))` and `showStoppers` is a subset of those — and it took them
+  // before this pass ran, because this pass is deliberately post-verdict. `audit-v3-report.ts` then persists
+  // the show-stopper band from `decision.showStoppers`, not from `findings`. So the restored head reached the
+  // whole report EXCEPT the one tile the founding clipped excerpt renders in. Post-verdict and display-only:
+  // the span was already accepted for this finding above, `excerptPreReground` travels with it, and a widening
+  // the classifier guard refused was never in `changes` to begin with.
+  const stopperRepairs = applyHeadRepairsTo(
+    (decision as { showStoppers?: Array<{ id?: string; lens?: string; excerpt?: string; excerptPreReground?: string }> }).showStoppers,
+    headRepair.changes);
+  const dispositionRepairs = applyHeadRepairsTo(
+    (decision as { dispositions?: Array<{ id?: string; lens?: string; excerpt?: string; excerptPreReground?: string }> }).dispositions,
+    headRepair.changes);
+  if (headRepair.repaired || headRepair.unrepairable || headRepair.skipped.length) {
+    console.log(`[orchestrator] excerpt-head-reground: restored ${headRepair.repaired} clipped head(s)` +
+      `${stopperRepairs ? `, ${stopperRepairs} propagated to show-stopper(s)` : ""}` +
+      `${dispositionRepairs ? `, ${dispositionRepairs} to disposition(s)` : ""}` +
+      `${headRepair.unrepairable ? `, ${headRepair.unrepairable} left as emitted` : ""}` +
+      `${headRepair.skipped.length ? `, ${headRepair.skipped.length} skipped (${[...new Set(headRepair.skipped.map((s) => s.reason))].join(" · ")})` : ""}` +
+      (headRepair.changes.length ? ` — ${headRepair.changes.map((c) => c.id ?? c.lens).join(", ")}` : ""));
+  }
+
   return { decision, inputs, findings, coverage: { required, covered, missing, attestations, coreMissing }, perLens, conflict, sectionsRead: [...sectionsRead], trace, ...(verifierDrops.length ? { verifierDrops } : {}), ...(judgmentLayerEnabled() && (opts.judgmentReason || opts.judgmentEntail) ? { judgmentCost } : {}), ...(_bankDiag ? { diagnostics: _bankDiag } : {}) };
+}
+
+/** Every decide-layer reading of a finding that could move on a widened excerpt, collapsed to one string.
+ *  If this differs before and after a repair, the repair changed what the engine would conclude — so the
+ *  repair is refused and the customer keeps the excerpt the model emitted.
+ *
+ *  These are the classifiers the review reproduced flips on, plus their nearest siblings on the same axes
+ *  (set-aside, structural bar, eligibility authority, benign-inquiry, site-visit). It is deliberately a
+ *  SIGNATURE rather than a list of guards to re-run: adding a classifier here is cheap, and a classifier
+ *  that is missing can only make the guard less willing to refuse — never more willing to accept a rewrite
+ *  it should have caught, because refusal is the safe direction. */
+function classificationSignature(f: TypedFinding): string {
+  return [
+    isPositiveSetAside(f),
+    isInquiryDeadlineBenign(f),
+    hasOperativeEligibilityLanguage(f.excerpt ?? ""),
+    ELIGIBILITY_AUTHORITY_RE.test(`${f.citation ?? ""} ${f.requirement ?? ""} ${f.excerpt ?? ""}`),
+    SITE_VISIT_CONCLUDED_RE.test(f.excerpt ?? ""),
+    SITE_VISIT_MANDATORY_ATTENDANCE_RE.test(f.excerpt ?? ""),
+  ].join("|");
 }

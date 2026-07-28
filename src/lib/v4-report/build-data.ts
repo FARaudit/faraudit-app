@@ -91,6 +91,16 @@ function unionFindings(showStoppers: FindingLite[], findings: FindingLite[]): Fi
 function mapFinding(f: FindingLite): V4Finding {
   const out: V4Finding = { req: sanitizeProse(f.requirement), cite: s(f.citation) };
   if (f.excerpt) out.excerpt = s(f.excerpt);
+  // DEDUP IDENTITY IS AN ANALYSIS QUESTION (ARC #747 · E1). `excerptHeadKey` keys on the first 120 normalized
+  // chars — precisely the region head re-grounding rewrites. Without this, widening a quote for the reader
+  // silently changes which findings are "the same obligation": two findings from one clause, previously
+  // distinct, extend back to the same clause start, collide, and `dedupeByExcerpt` keeps the survivor while
+  // DISCARDING the loser's requirement and severity — an obligation disappears from the customer's report.
+  // That is the PR #293 defect class, reached by a different road. So identity keys on the span the analysis
+  // examined, never on the span the reader sees. Flag-OFF `excerptPreReground` is undefined ⇒ keyExcerpt ===
+  // excerpt ⇒ every key is byte-identical to today.
+  const analyzed = (f as { excerptPreReground?: string }).excerptPreReground ?? f.excerpt;
+  if (analyzed) out.keyExcerpt = s(analyzed);
   // "Clears when" callout: the curability note. curableInWindow implies a gate the bidder can clear.
   if (f.note) out.curability = s(f.note);
   // temporal timing-evidence strip — render only when the arriving field is present (Brain #1).
@@ -146,7 +156,7 @@ function buildFindings(showStoppers: FindingLite[], all: FindingLite[]): V4Findi
     seen.add(k);
     if (f.disposition === "dropped") continue;
     if (f.disposition === "met") { satisfied.push({ req: s(f.requirement), cite: s(f.citation) }); continue; }
-    if (severityHonestEnabled() && f.excerpt) p0Heads.add(excerptHeadKey(f.excerpt));
+    if (severityHonestEnabled() && f.excerpt) p0Heads.add(excerptHeadKey(f.excerptPreReground ?? f.excerpt));
     p0.push(mapFinding(f));
   }
   // Everything else — gates (P0-non-blocker + P1) / advisories (P2). No block-award language.
@@ -155,7 +165,7 @@ function buildFindings(showStoppers: FindingLite[], all: FindingLite[]): V4Findi
     if (seen.has(k)) continue; // already rendered as a show-stopper (or a dup)
     seen.add(k);
     // Flag-ON cross-tier: same bar as a show-stopper (identical excerpt-head) → do not also render it as a gate.
-    if (severityHonestEnabled() && f.excerpt && p0Heads.has(excerptHeadKey(f.excerpt))) continue;
+    if (severityHonestEnabled() && f.excerpt && p0Heads.has(excerptHeadKey(f.excerptPreReground ?? f.excerpt))) continue;
     if (f.disposition === "dropped") continue;
     if (f.disposition === "met") { satisfied.push({ req: s(f.requirement), cite: s(f.citation) }); continue; }
     const v = mapFinding(f);
@@ -197,7 +207,7 @@ export function dedupeByExcerpt(list: V4Finding[]): V4Finding[] {
   const byKey = new Map<string, V4Finding>();
   const out: V4Finding[] = [];
   for (const f of list) {
-    const k = f.excerpt ? excerptHeadKey(f.excerpt) : "";
+    const k = f.excerpt ? excerptHeadKey(f.keyExcerpt ?? f.excerpt) : "";
     if (!k) { out.push(f); continue; }
     const survivor = byKey.get(k);
     if (survivor) {
@@ -273,7 +283,7 @@ export function dedupeNearFindings(list: V4Finding[]): V4Finding[] {
 function dedupeLiteByExcerpt(list: FindingLite[]): FindingLite[] {
   if (!severityHonestEnabled()) return list;
   const seen = new Set<string>(); const out: FindingLite[] = [];
-  for (const f of list) { const k = f.excerpt ? excerptHeadKey(f.excerpt) : ""; if (k && seen.has(k)) continue; if (k) seen.add(k); out.push(f); }
+  for (const f of list) { const k = f.excerpt ? excerptHeadKey(f.excerptPreReground ?? f.excerpt) : ""; if (k && seen.has(k)) continue; if (k) seen.add(k); out.push(f); }
   return out;
 }
 
@@ -591,7 +601,16 @@ export function buildV4Data(audit: Record<string, unknown>): V4Data {
     const setAsideType = s(audit.set_aside_type);
     const bodyDeniesSetAside = process.env.AUDIT_SETASIDE_HEADER_RECONCILE === "true"
       && !setAsideType
-      && (p.findings || []).some((f) => /no\s+socioeconomic\s+set.?aside|52\.219-6\s+(is\s+)?absent/i.test(`${s(f.requirement)} ${s(f.excerpt)}`));
+      // THE ANALYZED SPAN, not the displayed one (review round 5, finding #1). This predicate asks what the
+      // ENGINE FOUND — "did the body deny the set-aside?" — and then overrides a SAM-sourced masthead fact with
+      // the answer. Its three siblings in this file were converted; this one was missed, and it is the one with
+      // the largest blast radius. Reproduced against the real pass: where the source wraps as "…no socioeconomic
+      // set-aside\napplies; offerors shall submit unit prices…", a pricing finding quoting from "applies;" gets
+      // its head restored — legitimately, the classification guard sees no change — and the widened DISPLAY span
+      // now contains "no socioeconomic set-aside" while the span the analysis actually examined does not. The
+      // masthead would flip to "None confirmed" on the strength of text no lens ever read. [[L45]]
+      && (p.findings || []).some((f) => /no\s+socioeconomic\s+set.?aside|52\.219-6\s+(is\s+)?absent/i.test(
+        `${s(f.requirement)} ${s((f as { excerptPreReground?: string }).excerptPreReground ?? f.excerpt)}`));
     if (bodyDeniesSetAside) {
       facts.push({ k: "Set-aside", v: "None confirmed", sub: `SAM coding "${setAside}" present; no operative set-aside clause (52.219-6 absent) — confirm` });
     } else {

@@ -16,7 +16,7 @@
 
 import type { AuditResult, RunDiagnostics } from "./audit-orchestrator";
 import { buildManifest, completenessOf, coreMissingFor, locateObligationContext } from "./audit-orchestrator";
-import { detectFormat, procurementPart, type AuditToolContext } from "./audit-tools";
+import { detectFormat, procurementPart, requiresProposalSections, type AuditToolContext } from "./audit-tools";
 import { deriveVerdict, applyFindingDedup, applyCrossFleetDedup } from "./audit-decide";
 import { gradeCoverageV2, verifyRecitalInSource, type CoverageV2 } from "./audit-gate-v2";
 import type { TypedFinding, VerdictInputs, BidderProfile } from "./audit-findings";
@@ -39,9 +39,22 @@ export interface RunRecordMeta {
  *  curated `flags` subset recorded only ~5 keys, so 13 class-B flags were unrecoverable — card #578/#580 finding). */
 export function captureAuditFlagEnv(env: Record<string, string | undefined>): Record<string, string> {
   const out: Record<string, string> = {};
+  const malformed: string[] = [];
   for (const k of Object.keys(env).filter((k) => k.startsWith("AUDIT_")).sort()) {
     const v = env[k];
-    if (typeof v === "string") out[k] = v;
+    if (typeof v !== "string") continue;
+    out[k] = v;
+    // A key containing whitespace is a SETTING MISTAKE, not a flag: several banked records carry a single
+    // variable literally named "AUDIT_A AUDIT_B AUDIT_C …" = "true", which means those ~30 flags were never
+    // set at all in that run. Capture stays faithful — the record must show what actually ran, mistake
+    // included — but the mistake is announced instead of banked as if it were a flag state. Silent capture is
+    // how a run whose flags differed from production got replayed as evidence ABOUT production.
+    if (/\s/.test(k.trim())) malformed.push(k);
+  }
+  if (malformed.length) {
+    const hidden = malformed.reduce((n, k) => n + k.trim().split(/\s+/).filter((t) => t.startsWith("AUDIT_")).length, 0);
+    console.warn(`[run-record] MALFORMED flag env: ${malformed.length} variable name(s) contain whitespace, hiding ~${hidden} flag(s) that are therefore UNSET in this run — ` +
+      malformed.map((k) => `"${k.slice(0, 60)}${k.length > 60 ? "…" : ""}"`).join(" · "));
   }
   return out;
 }
@@ -67,6 +80,34 @@ export interface RunRecordInput {
   naics: string | null;
   setAside: string | null;
   manifestComplete: boolean | null;             // the external N8 signal the run used (null = not supplied)
+  // ── COVERAGE-DETERMINING INPUTS (added 2026-07-27; ALL OPTIONAL so every existing record still loads) ──
+  // Without these a replay cannot reproduce the run's coverage, and the gap is not subtle: a banked run graded
+  // `missing: ["L"]` and reached BID_WITH_CAUTION, while replaying the same record from the same source graded
+  // C/L/M absent and capped at INCOMPLETE. `noticeType` + `formIdentified` are the reason — Layer-2 (card 262)
+  // uses them to SCOPE whether §L/§M are required at all, so omitting them silently changes what "complete"
+  // means. The consequence was not academic: no banked record can be replayed to a committal verdict, which is
+  // why all 46 carry an EMPTY show-stopper band and the report's most consequential region has no $0 evidence
+  // behind it at all.
+  //
+  // Deliberately NOT banked: `groundingSource`. It is byte-identical to `fullSource` in all 39 records that
+  // carry both, so persisting it again would double the largest field to store a copy. Replay defaults it to
+  // fullSource, which is exactly what the orchestrator does when it is absent.
+  noticeType?: string | null;                   // SAM notice type — scopes the §L/§M requirement (Layer-2, card 262)
+  formIdentified?: boolean;                     // whether a substantive primary form was recognized — corroborates body-absent
+  // `documentsComplete` was declared here alongside the three fields above and then never written by the
+  // banker and never read by the replay — a dead field on the one interface whose entire purpose is replay
+  // fidelity, which reads to the next person as "the record carries this signal" (review round 5, finding #5).
+  // REMOVED rather than wired, because the record already carries it: `result.inputs` is the full
+  // VerdictInputs, and `documentsComplete` lives there (audit-findings.ts:215) as the value deriveVerdict
+  // actually used. A second copy on the input side could only ever disagree with it.
+  // BANKED, NOT YET CONSUMED BY REPLAY — say so rather than imply otherwise (review round 4, finding #1). The
+  // only readers of `ctx.noticeBodyText` are the eligibility floor and the three caveat emitters, and all four
+  // live inside `runAgenticAudit`; `replayRunRecord` runs the deterministic stages only, none of which touch it.
+  // It is banked anyway because a compressed-digest run does NOT keep the notice body recoverable from
+  // `fullSource` (the emitters' `docRegions` fallback finds nothing there), so dropping it would foreclose ever
+  // replaying the floor. Cost is real — a second copy of the notice body — and it is the reason `groundingSource`
+  // above is deliberately NOT banked; revisit if a compressed-digest run is never replayed.
+  noticeBodyText?: string;                      // raw SAM notice body — what the live-run eligibility floor reads
 }
 
 export interface RunRecord {
@@ -110,7 +151,13 @@ export interface BuildRunRecordArgs {
 /** Capture a complete, replayable record from a finished paid run. Pure — computes the deterministic
  *  format/manifest snapshot off the source and copies the run's grounded outputs verbatim. */
 export function buildRunRecord(args: BuildRunRecordArgs): RunRecord {
-  const ctx: AuditToolContext = { fullSource: args.input.fullSource, sections: args.input.sections };
+  // CAPTURE SCOPES THE WAY REPLAY DOES (review round 4, finding #3). `format.coreMissing` is a snapshot taken
+  // at capture; when replay learned to scope §L/§M by notice type, capture kept the fail-safe "solicitation-type
+  // buy" default — so a Sources Sought record recorded coreMissing ["C","L","M"] while its own replay computed
+  // []. Same inputs, same function, two answers, baked into every new record. Both sides now read the banked
+  // scoping inputs, so the snapshot agrees with the replay it is supposed to be a baseline for.
+  const ctx: AuditToolContext = { fullSource: args.input.fullSource, sections: args.input.sections,
+    ...(args.input.noticeBodyText ? { noticeBodyText: args.input.noticeBodyText } : {}) };
   return {
     schema: RUN_RECORD_SCHEMA,
     meta: args.meta,
@@ -119,7 +166,11 @@ export function buildRunRecord(args: BuildRunRecordArgs): RunRecord {
       formatDetected: detectFormat(ctx),
       procurementPart: procurementPart(ctx),
       manifest: buildManifest(ctx),
-      coreMissing: coreMissingFor(ctx, { commercialHonestFail: args.commercialHonestFail }),
+      coreMissing: coreMissingFor(ctx, {
+        commercialHonestFail: args.commercialHonestFail,
+        ...(args.input.noticeType !== undefined ? { requiresLM: requiresProposalSections(args.input.noticeType) } : {}),
+        ...(args.input.formIdentified !== undefined ? { formIdentified: args.input.formIdentified } : {}),
+      }),
     },
     result: {
       verdict: args.result.decision.verdict,
@@ -172,6 +223,14 @@ export interface ReplayResult {
  *  persisted inputs. `drift` lists any place the record's recorded values disagree with a fresh deterministic
  *  recompute (stale record / changed engine). Options mirror the run-env flags so the replay is faithful. */
 export function replayRunRecord(rec: RunRecord, opts?: { sectionMDepth?: boolean; commercialHonestFail?: boolean }): ReplayResult {
+  // MERGE NOTE (E1 × main, 2026-07-28) — both sides added an OPTIONAL field to this same ctx literal, for
+  // the same reason and with the same caveat: make a banked input ADDRESSABLE in replay. They are independent,
+  // so both are kept. Neither changes replay output today.
+  //
+  // The notice body rides ctx as it does in the live run. NOTE it changes nothing here today: no deterministic
+  // stage below reads it (see the field's note on RunRecordInput). It is placed on ctx so that wiring the
+  // eligibility floor into replay is a one-line change rather than a re-capture of the whole corpus.
+  //
   // GROUNDFIXTURE — carry the banked groundingSource into ctx so it is at least ADDRESSABLE. Until
   // this line existed the field was banked and then unreachable: ctx was built from fullSource
   // alone, so a corpus WITH groundingSource and one WITHOUT produced byte-identical output, which
@@ -200,14 +259,24 @@ export function replayRunRecord(rec: RunRecord, opts?: { sectionMDepth?: boolean
   // what gets BANKED. Changing it is a TIER V verdict-path change requiring a design panel. It is
   // also unnecessary: groundingSource is already persisted in `input`; only the REPLAY needs to
   // read it. This function is reached from scripts/ and tests only.
-  const ctx: AuditToolContext = { fullSource: rec.input.fullSource, sections: rec.input.sections, groundingSource: rec.input.groundingSource };
+  const ctx: AuditToolContext = { fullSource: rec.input.fullSource, sections: rec.input.sections, groundingSource: rec.input.groundingSource,
+    ...(rec.input.noticeBodyText ? { noticeBodyText: rec.input.noticeBodyText } : {}) };
   const findings: TypedFinding[] = rec.result.findings;
   const sectionsRead = new Set(rec.result.sectionsRead);
 
   const formatDetected = detectFormat(ctx);
   const part = procurementPart(ctx);
   const required = buildManifest(ctx);
-  const coreMissing = coreMissingFor(ctx, { commercialHonestFail: opts?.commercialHonestFail });
+  // SCOPE THE §L/§M REQUIREMENT THE WAY THE RUN DID. `coreMissingFor` has always accepted requiresLM /
+  // formIdentified; replay never supplied them, so it fell back to the fail-safe "solicitation-type buy"
+  // default and could grade sections missing that the run never required. Records banked before these fields
+  // existed have `noticeType === undefined`, and `requiresProposalSections(undefined)` returns the same
+  // fail-safe default — so old records replay byte-identically and only NEW records gain the fidelity.
+  const coreMissing = coreMissingFor(ctx, {
+    commercialHonestFail: opts?.commercialHonestFail,
+    ...(rec.input.noticeType !== undefined ? { requiresLM: requiresProposalSections(rec.input.noticeType) } : {}),
+    ...(rec.input.formIdentified !== undefined ? { formIdentified: rec.input.formIdentified } : {}),
+  });
   const { covered, missing, attestations } = completenessOf(ctx, required, findings, sectionsRead, { sectionMDepth: opts?.sectionMDepth });
 
   const sections: SectionReplay[] = attestations.map((a) => ({
