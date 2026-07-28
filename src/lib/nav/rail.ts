@@ -61,7 +61,10 @@ export const NAV_GROUPS: RailGroup[] = [
     items: [
       { key: "today", label: "Today", href: "/command-center", icon: I.today },
       { key: "run-audit", label: "Run Audit", href: "/audit", icon: I.runAudit, badge: { text: "New", kind: "new" } },
-      { key: "past-audits", label: "Past Audits", href: "/past-audits", icon: I.pastAudits, badge: { text: "15", kind: "count" } },
+      // No hardcoded count — the badge text is bound client-side from the
+      // customer's real audits (dashboard-live.js writeSidebarBadge). An empty
+      // count badge is hidden by that same script until a real number exists.
+      { key: "past-audits", label: "Past Audits", href: "/past-audits", icon: I.pastAudits, badge: { text: "", kind: "count" } },
       { key: "pipeline", label: "Pipeline", href: "/pipeline", icon: I.pipeline, badge: { text: "3", kind: "danger" } },
     ],
   },
@@ -117,7 +120,9 @@ function renderItem(it: RailItem, activeKey: string, counts: RailCounts): string
   let badge = "";
   if (it.badge) {
     const txt = counts[it.key] ?? it.badge.text;
-    badge = `<span class="${BADGE_CLASS[it.badge.kind]}">${esc(txt)}</span>`;
+    // An empty text means "no number yet" — render no pill at all rather than
+    // an empty one; the owning page binds a live count client-side.
+    if (txt) badge = `<span class="${BADGE_CLASS[it.badge.kind]}">${esc(txt)}</span>`;
   }
   return (
     `<a class="sb-icon${active}" href="${it.href}">` +

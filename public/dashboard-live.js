@@ -424,10 +424,18 @@
     if (!link) return;
     link.setAttribute("title", "Past Audits — " + open + " open (response deadline not yet passed) of " + total + " total");
     var el = link.querySelector(".sb-badge");
-    if (el) {
-      el.textContent = String(open);
-      el.setAttribute("title", open + " open — response deadline not yet passed (of " + total + " total)");
+    if (!el) {
+      // The served rail renders no pill when it has no real number — create it
+      // here, where the number exists.
+      el = document.createElement("span");
+      el.className = "sb-badge count";
+      var label = link.querySelector(".sb-label");
+      if (label && label.nextSibling) link.insertBefore(el, label.nextSibling);
+      else link.appendChild(el);
     }
+    el.style.display = "";
+    el.textContent = String(open);
+    el.setAttribute("title", open + " open — response deadline not yet passed (of " + total + " total)");
     var tip = link.querySelector(".sb-tip");
     if (tip) tip.textContent = "Past Audits · " + open + " open";
   }
