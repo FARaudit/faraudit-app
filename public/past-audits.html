@@ -136,7 +136,7 @@ button{font-family:inherit}
 .dl.pending::before{background:var(--mute-2)}
 
 /* filter tabs */
-.filters{display:flex;align-items:center;gap:6px;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--card-soft);flex-wrap:wrap}
+.filters{display:flex;align-items:center;gap:9px;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--card-soft);flex-wrap:wrap}
 /* Filter bar */
 /* RULING 1 — 7 slicers, one pill family (Design WIRE-MAP #456) */
 .pa-filterbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 12px}
@@ -166,11 +166,13 @@ tr.needs-attention:hover{background:linear-gradient(90deg,rgba(217,119,6,.11),rg
 .deadline-tag{display:inline-flex;align-items:center;gap:5px;font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--amber-700)}
 .deadline-tag::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--amber-600)}
 [data-theme="dark"] .deadline-tag{color:#fcd34d}
-.fbtn{height:32px;padding:0 13px;border-radius:8px;border:1px solid var(--line);background:var(--card);cursor:pointer;font-family:"Manrope",sans-serif;font-size:12px;font-weight:600;color:var(--ink-2);display:inline-flex;align-items:center;gap:7px;transition:all .14s}
+.fbtn{height:34px;padding:0 12px;border-radius:9px;border:1px solid var(--line);background:var(--card-soft);cursor:pointer;font-family:"Manrope",sans-serif;font-size:12.5px;font-weight:600;color:var(--ink-2);display:inline-flex;align-items:center;gap:7px;transition:border-color .14s,background .14s,box-shadow .14s,color .14s}
 .fbtn:hover{border-color:var(--mute-2)}
 .fbtn .n{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--mute);background:var(--line-3);border-radius:5px;padding:1px 6px;line-height:1.4}
-.fbtn.active{background:var(--navy-800);border-color:var(--navy-800);color:#fff}
-.fbtn.active .n{background:rgba(255,255,255,.15);color:#fff}
+.fbtn.active{border-color:var(--accent);background:rgba(55,138,221,.07);box-shadow:0 0 0 3px rgba(55,138,221,.08);color:var(--accent-deep)}
+.fbtn.active .n{background:rgba(55,138,221,.14);color:var(--accent-deep)}
+[data-theme="dark"] .fbtn.active{background:rgba(55,138,221,.14);border-color:var(--accent);color:var(--accent-light)}
+[data-theme="dark"] .fbtn.active .n{background:rgba(55,138,221,.25);color:var(--accent-light)}
 .filters .spacer{flex:1}
 .sort-hint{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute-2);display:inline-flex;align-items:center;gap:6px}
 
@@ -320,7 +322,7 @@ tr.hidden{display:none}
   <form action="/api/auth/sign-out" method="post" style="display:contents">
     <button type="submit" class="sb-icon sb-signout" aria-label="Sign out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg><span class="sb-label">Sign out</span><span class="sb-tip">Sign out</span></button>
   </form>
-  <div class="sb-bottom"><div class="sb-avatar">JR</div></div>
+  <div class="sb-bottom"><div class="sb-avatar"></div></div>
 </aside>
 
   <!-- ═════════════ MAIN ═════════════ -->
@@ -343,8 +345,8 @@ tr.hidden{display:none}
           <span class="nbadge" style="display:none"></span>
         </button>
         <div class="user-chip">
-          <div class="av">JR</div>
-          <div><div class="nm">Jose Rodriguez</div></div>
+          <div class="av"></div>
+          <div><div class="nm"></div></div>
         </div>
       </div>
     </div>
