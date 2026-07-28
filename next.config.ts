@@ -116,6 +116,17 @@ const nextConfig: NextConfig = {
     return [
       { source: "/login", destination: "/sign-in", permanent: true },
       { source: "/login/:path*", destination: "/sign-in", permanent: true },
+      // /signin.html was a design placeholder that accepted ANY credentials, printed "Identity verified."
+      // and bounced the visitor to /home — where middleware sent them straight back to /sign-in, because
+      // nothing had authenticated. It was the "Sign In" link on the landing page. The file is deleted;
+      // this catches bookmarks and any old link. Redirects are checked before /public, so it holds even if
+      // a file by that name ever reappears. TEMPORARY (307) on purpose — a 308 would cache in browsers and
+      // is exactly the trap documented in the headers() block above.
+      { source: "/signin.html", destination: "/sign-in", permanent: false },
+      // /sign-in.html was the other half of the same problem: a served design mock of the sign-in page whose
+      // form carried onsubmit="return false". Nothing linked to it, but it answered 200 in production, so a
+      // visitor who found it typed a password into a control that did nothing at all.
+      { source: "/sign-in.html", destination: "/sign-in", permanent: false },
       // /alerts has no route under src/app — keep redirecting to /home so the
       // path doesn't 404. Re-add to a route folder + delete this when ready.
       { source: "/alerts", destination: "/home", permanent: true }
