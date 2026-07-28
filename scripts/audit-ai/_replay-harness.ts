@@ -149,7 +149,11 @@ const applyFlagEnv = (flagEnv: Record<string, string>) => {
 
   let sha = "unknown";
   try { sha = execSync("git rev-parse --short HEAD", { encoding: "utf8" }).trim(); } catch { /* detached/no-git */ }
-  const dirty = (() => { try { return execSync("git status --porcelain", { encoding: "utf8" }).trim().length > 0; } catch { return false; } })();
+  // --untracked-files=no on purpose: only TRACKED modifications can change replay behaviour.
+  // Untracked scratch scripts, the record cache and the gitignored ceo/ tree cannot, and counting
+  // them marked every pin "not reproducible" — a warning that fires on benign state is a warning
+  // that gets ignored, which is the same failure as no warning at all.
+  const dirty = (() => { try { return execSync("git status --porcelain --untracked-files=no", { encoding: "utf8" }).trim().length > 0; } catch { return false; } })();
 
   const sols = Object.keys(perSol).sort((a, b) => perSol[b] - perSol[a]);
   const top2 = sols.slice(0, 2).reduce((n, s) => n + perSol[s], 0);
