@@ -48,9 +48,19 @@ export function captureAuditFlagEnv(env: Record<string, string | undefined>): Re
 
 export interface RunRecordInput {
   fullSource: string;                           // assembled package source — REQUIRED for replay (detectSections/coverage)
-  // Pre-compression full text (audit-executor-v3.ts:537, `docs.map(d=>d.text).join`). Diverges from
-  // fullSource ONLY when chunked ingest compressed the package; grounding must read THIS, not the
-  // digest (audit-expert.ts:36). Optional: records banked before 2026-07-27 lack it and fall back.
+  // Pre-filter, pre-drop, pre-compression full text (audit-executor-v3.ts:537, `docs.map(d=>d.text).join`
+  // over the doc list, which assembly never reassigns). Grounding reads THIS, not the digest
+  // (audit-expert.ts:36).
+  //   ⚠ CORRECTION (2026-07-28): the previous note here said it "diverges from fullSource ONLY when chunked
+  //   ingest compressed the package." That is false on the live configuration and it is the same wrong premise
+  //   _groundfixture-backfill.ts used to justify writing this field as a copy of fullSource. AUDIT_CHUNKED_INGEST
+  //   is false but AUDIT_LOSSLESS_INGEST is TRUE, and even the lossless fits-whole early return
+  //   (agentic-lossless-ingest.ts:79) returns assembleFullSource(docs), which carries the per-doc
+  //   "==== DOCUMENT: n ====" delimiters this string lacks. fullSource is additionally APPENDED to after
+  //   assembly (audit-executor-v3.ts:412, arc-B vision wage rates) while this is computed later from the
+  //   untouched docs. So for any multi-document package the two differ, in BOTH directions, on every run.
+  // Optional: records banked before 2026-07-28 lack a run-time value and fall back to fullSource. A record
+  // carrying meta.backfill.field === "input.groundingSource" has a RECONSTRUCTED value — treat it as absent.
   groundingSource?: string;
   sections?: Record<string, string>;            // optional precomputed section map (if the run supplied one)
   bidderProfile: BidderProfile | null;
