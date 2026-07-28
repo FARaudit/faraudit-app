@@ -853,12 +853,13 @@ export function CommandCenterClient({
                       </svg>
                     </span>
                     Traps Caught
-                    <span className="corner-dot">CORPUS</span>
+                    {/* CORPUS -> ENGINE 2026-07-27 (card #758): these are engine run counts, not a moat. */}
+                    <span className="corner-dot">ENGINE</span>
                   </div>
                   <div>
                     <div className="num">
                       {stats.total_traps_caught}
-                      <span className="unit">in corpus</span>
+                      <span className="unit">across runs</span>
                     </div>
                     <div className="sub">{MOCK_KPI_DELTAS.deadlinesSub}</div>
                   </div>

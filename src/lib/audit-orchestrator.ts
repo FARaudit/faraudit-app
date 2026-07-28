@@ -13,7 +13,7 @@
 // callModel + verify are INJECTED → the whole cycle is unit-testable with stubs ($0). The real run is PAID.
 
 import { runAgenticExpert, isGrounded, type CallModel, type ExpertSpec } from "./audit-expert";
-import { readSection, sectionFullText, procurementPart, requiresProposalSections, materializeSections, parseDocRegions, resolvePrimary, ATTACHMENT_COVERAGE_ENABLED, type AuditToolContext } from "./audit-tools";
+import { readSection, sectionFullText, procurementPart, requiresProposalSections, materializeSections, parseDocRegions, resolvePrimary, normalizeForSearch, phrasePresentInNormalized, ATTACHMENT_COVERAGE_ENABLED, type AuditToolContext } from "./audit-tools";
 import { constructionRequired, constructionCoreMissing, constructionCoverage } from "./audit-construction-manifest";
 import { recomputeGrounding } from "./audit-grounding-recompute";
 import { detectSoleSourceLock } from "./audit-sole-source-lock";
@@ -172,7 +172,7 @@ export interface AuditResult {
   perLens: Record<string, number>;
   conflict: boolean;
   sectionsRead: string[];                                                                 // union across all agents (pure-observer)
-  trace: Record<string, { converged: boolean; turns: number; sectionsRead: string[]; tools: Array<{ turn: number; tools: Array<{ name: string; input: Record<string, unknown> }> }> }>; // per-lens
+  trace: Record<string, { converged: boolean; turns: number; dropped: number; droppedInReadSource: number; sectionsRead: string[]; tools: Array<{ turn: number; tools: Array<{ name: string; input: Record<string, unknown> }> }> }>; // per-lens; dropped* are VERDICT-INERT telemetry (see the expert-phase log)
   verifierDrops?: CorrectedDrop[];                                                        // card 274 RULING 1 — skeptic drops (empty-corrected + overturned), telemetry-visible; absent when none
   judgmentCost?: JudgmentCost;                                                            // J-1/J-2 per-audit token/call ledger (card 246 acceptance h); absent when the layer is off
   diagnostics?: RunDiagnostics;                                                           // card #582 CAPTURE-ONLY — verdict-inert bank instrumentation (pre-dedup snapshot + stage counts); present only when AUDIT_BANK_RUN_RECORD is on; NEVER read by deriveVerdict
@@ -2369,7 +2369,12 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     // against real source with the SAME isGrounded substring check the lenses use: a finding whose excerpt is NOT
     // verbatim in source has grounded set false and is DROPPED here (fail-safe — a hallucinated/paraphrased excerpt
     // never survives, Rule 64 / I3). This is the load-bearing re-grounding the proposer's grounded:false depends on.
-    const reground = opts.seedFindings.map((f) => ({ ...f, grounded: isGrounded(ctx, f) })).filter((f) => f.grounded);
+    // MERGE NOTE (E1 × main, 2026-07-28) — E1 replaced the index-based `judgment#${j}` numbering with real id
+    // uniqueness; main split the same map so the DROPPED subset is nameable for the grounding-backstop telemetry
+    // below. Independent concerns, both kept: the map result is bound first, then filtered, then E1's id pass runs
+    // on the survivors. The index-based numbering E1 deleted is NOT reinstated.
+    const _seedRegrounded = opts.seedFindings.map((f) => ({ ...f, grounded: isGrounded(ctx, f) }));
+    const reground = _seedRegrounded.filter((f) => f.grounded);
     // ID UNIQUENESS ON THE SEED PATH (review round 4, finding #2). This used to be `f.id ?? judgment#${j}` with
     // `j` the index AFTER the grounded filter — the one numbering the dupe-id fix did not convert. A seed is a
     // prior run's `result.findings`, which MIXES id-carrying rows with id-less ones: the notice-body eligibility
@@ -2388,22 +2393,53 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     assignUniqueFindingIds(reissue, "judgment", claimed);
     findings = reground;
     perLens["judgment"] = reground.length;
+    // Same VERDICT-INERT grounding-backstop telemetry as the lens path below — this re-grounding drops findings by
+    // the identical isGrounded gate, so its drops were equally invisible. Counted here rather than reported as zero.
+    const _seedDrops = _seedRegrounded.filter((f) => !f.grounded);
+    // Same cost discipline as the lens path: when the corpora do not diverge, isGrounded already ran the
+    // identical fullSource search and returned false, so the count is provably 0 — don't pay to recompute a
+    // constant. When they do, normalize once rather than per finding.
+    const _seedDiverged = !!ctx.groundingSource && ctx.groundingSource !== ctx.fullSource;
+    const _seedNormedFull = _seedDiverged && _seedDrops.length ? normalizeForSearch(ctx.fullSource) : null;
+    const _seedDropRead = _seedNormedFull === null ? 0
+      : _seedDrops.filter((f) => f.excerpt && f.excerpt.trim().length >= 4 && phrasePresentInNormalized(_seedNormedFull, f.excerpt)).length;
+    console.log(`[grounding-backstop] path=judgment-seed dropped=${_seedDrops.length} droppedInReadSource=${_seedDropRead} groundingDiverged=${_seedDiverged}`);
+    if (_seedDropRead > 0)
+      console.warn(`[grounding-backstop] ⚠ ${_seedDropRead} seed finding(s) were deleted whose excerpt IS verbatim in fullSource but absent from the grounding corpus — CONSISTENT WITH the divergence class rather than model invention. Not proof: presence in fullSource does not establish the text was SERVED (a truncated read leaves text present but unseen). Investigate, do not report as a confirmed count.`);
     // The proposer read the WHOLE assembled source → every present section counts as read for completeness (a
     // binding section whose obligations the proposer failed to ground still fails completenessOf → honest-fail).
     Object.keys(materializeSections(ctx)).forEach((s) => sectionsRead.add(s));
-    trace["judgment"] = { converged: true, turns: 1, sectionsRead: [...sectionsRead], tools: [] };
+    trace["judgment"] = { converged: true, turns: 1, dropped: _seedDrops.length, droppedInReadSource: _seedDropRead, sectionsRead: [...sectionsRead], tools: [] };
     allConverged = true;
   } else {
     const _tExp = Date.now();
     const runs = await Promise.all(experts.map((spec) => runAgenticExpert(spec, ctx, { callModel, maxTurns, signal })));
     console.log(`[timing] expert-phase ${Date.now() - _tExp}ms · turns/lens ${experts.map((s, i) => `${s.key}:${runs[i].turns}`).join(" ")} · docsRead=${runs.reduce((n, r) => n + r.docsRead.length, 0)}`);
+    // GROUNDING-BACKSTOP TELEMETRY (verdict-inert). runAgenticExpert has always returned `dropped`; until now
+    // NOTHING read it, so findings deleted by the grounding backstop left no trace anywhere — no log, no field,
+    // nothing persisted. That made the one question worth asking ("is the backstop deleting findings the lens
+    // legitimately read?") unanswerable from production. Both counters are surfaced here and on the trace; neither
+    // is read by deriveVerdict or by any coverage computation.
+    //   dropped             — every ungrounded finding. A healthy, expected number: the backstop refusing invention.
+    //   droppedInReadSource — the SUBSET whose excerpt IS verbatim in fullSource. Strongly suggests isGrounded
+    //                         rejected text the model genuinely read, which happens when groundingSource diverges
+    //                         from fullSource (audit-expert.ts:36 checks groundingSource ONLY and never falls
+    //                         back). It is a SIGNAL, not a proof: presence in fullSource does not establish the
+    //                         span was served to that lens — a truncated read_document leaves text present but
+    //                         unseen, so an invented excerpt that happens to sit past the cut counts here too.
+    const _dropTot = runs.reduce((n, r) => n + r.dropped, 0);
+    const _dropRead = runs.reduce((n, r) => n + r.droppedInReadSource, 0);
+    const _gDiverged = !!ctx.groundingSource && ctx.groundingSource !== ctx.fullSource;
+    console.log(`[grounding-backstop] dropped=${_dropTot} droppedInReadSource=${_dropRead} groundingDiverged=${_gDiverged} · per-lens ${experts.map((s, i) => `${s.key}:${runs[i].dropped}/${runs[i].droppedInReadSource}`).join(" ")}`);
+    if (_dropRead > 0)
+      console.warn(`[grounding-backstop] ⚠ ${_dropRead} finding(s) were deleted whose excerpt IS verbatim in fullSource but absent from the grounding corpus (groundingDiverged=${_gDiverged}) — CONSISTENT WITH the divergence class rather than model invention. Not proof: presence in fullSource does not establish the text was SERVED to that lens (a truncated read leaves text present but unseen). Investigate, do not report as a confirmed count.`);
     experts.forEach((spec, i) => {
       assignUniqueFindingIds(runs[i].findings, spec.key, findings);
       perLens[spec.key] = runs[i].findings.length; findings.push(...runs[i].findings);
       runs[i].sectionsRead.forEach((s) => sectionsRead.add(s));
       runs[i].docsRead.forEach((d) => docsRead.add(d));
       runs[i].attestations.forEach((a) => attestedDocs.add(a));
-      trace[spec.key] = { converged: runs[i].converged, turns: runs[i].turns, sectionsRead: runs[i].sectionsRead, tools: runs[i].trace };
+      trace[spec.key] = { converged: runs[i].converged, turns: runs[i].turns, dropped: runs[i].dropped, droppedInReadSource: runs[i].droppedInReadSource, sectionsRead: runs[i].sectionsRead, tools: runs[i].trace };
     });
     allConverged = runs.every((r) => r.converged);
   }

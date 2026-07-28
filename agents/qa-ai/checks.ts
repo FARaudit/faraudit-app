@@ -34,7 +34,10 @@ const ROUTE_STATUS: CheckSpec[] = [
   { name: "faraudit.com /",                kind: "route_status", url: "https://faraudit.com/",                expect: [200, 307, 308] },
   { name: "faraudit.com /landing.html",    kind: "route_status", url: "https://faraudit.com/landing.html",    expect: [200, 307, 308] },
   { name: "faraudit.com /access.html",     kind: "route_status", url: "https://faraudit.com/access.html",     expect: [200, 307, 308] },
-  { name: "faraudit.com /signin.html",     kind: "route_status", url: "https://faraudit.com/signin.html",     expect: [200, 307, 308] },
+  // The real front door. /signin.html was a placeholder that authenticated nothing; it is deleted and
+  // redirected, so a 200 there would mean the fake door came back — hence 307/308 only, never 200.
+  { name: "faraudit.com /sign-in",         kind: "route_status", url: "https://faraudit.com/sign-in",         expect: [200, 307, 308] },
+  { name: "faraudit.com /signin.html",     kind: "route_status", url: "https://faraudit.com/signin.html",     expect: [307, 308] },
   { name: "bullrize.com /",                kind: "route_status", url: "https://bullrize.com/",                expect: [200, 307, 308] },
   { name: "lexanchor.ai /",                kind: "route_status", url: "https://lexanchor.ai/",                expect: [200, 307, 308] },
   { name: "lexanchor.ai /pricing",         kind: "route_status", url: "https://lexanchor.ai/pricing",         expect: [200, 307, 308] },

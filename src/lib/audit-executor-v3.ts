@@ -878,6 +878,19 @@ export async function executeAgenticPrimary(
       result: res,
       input: {
         fullSource,
+        // Bank the REAL run-time grounding corpus (:537), not a reconstruction. Until now this was never banked,
+        // so every value in the record cache was written afterwards by _groundfixture-backfill.ts as a literal
+        // COPY of fullSource — which cannot differ from its original at any rate, making the corpus structurally
+        // unable to express the isGrounded-vs-fullSource divergence and guaranteeing that every "grounding
+        // changed nothing" measurement came out clean before it was taken.
+        // BEHAVIOURALLY INERT — the only thing that changes is that the banked FILE now contains the real
+        // string. buildRunRecord's ctx (audit-run-record.ts:99) reads fullSource/sections only, so
+        // detectFormat / buildManifest / coreMissingFor are byte-identical; and replayRunRecord, although it
+        // does put this into its ctx (:193), still grounds via findingProvenance(ctx.fullSource), so its output
+        // is unchanged too. Both asserted in audit-run-record-grounding-bank.test.ts rather than assumed.
+        // This is a PRECONDITION FOR MEASUREMENT, not a fix and not a grounding change — do not describe it as
+        // one. It makes the record corpus able to express the divergence; nothing yet reads it to decide.
+        groundingSource,
         bidderProfile,
         naics: solicitation?.naicsCode ?? null,
         setAside: solicitation?.typeOfSetAside ?? null,

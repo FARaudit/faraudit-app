@@ -218,6 +218,20 @@ export function findInSource(ctx: AuditToolContext, phrase: string, limit = 3): 
   return { phrase, hits };
 }
 
+/** PRESENCE-ONLY counterpart to findInSource, for callers testing MANY phrases against ONE source.
+ *  findInSource builds normWithMap(src) on EVERY call — a per-character loop plus a number[] the length of the
+ *  source — because it must map hits back to original offsets to slice an excerpt. A caller that only needs
+ *  yes/no pays that O(n) rebuild per phrase for an index it never reads; on a multi-megabyte package inside the
+ *  parallel expert phase that is real blocking CPU on a paid path with a wall-clock budget.
+ *  Normalize the source ONCE with normalizeForSearch, then test each phrase with phrasePresentInNormalized.
+ *  Same normalization and the same >=3-char floor as findInSource's hit test, so the answer is identical —
+ *  asserted in src/lib/audit-expert-grounding-telemetry.test.ts rather than assumed. */
+export const normalizeForSearch = (s: string): string => norm(s);
+export function phrasePresentInNormalized(normedSource: string, phrase: string): boolean {
+  const p = norm(phrase);
+  return p.length >= 3 && normedSource.includes(p);
+}
+
 // ── ATTACHMENT COVERAGE (Brain #347 — read_document, flag AUDIT_ATTACHMENT_COVERAGE) ────────────────────────
 // ROOT (card #347): the lens toolset had NO read path to a binding document that isn't a UCF section — read_section
 // reads A–M only, so a standalone binding ATTACHMENT (Security Requirements, RFI answers, a standalone SOW, a wage

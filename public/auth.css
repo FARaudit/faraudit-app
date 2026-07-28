@@ -1,6 +1,8 @@
 /* ═══════════════════════════════════════════════════════
    FARaudit auth pages — post-sign dark navy
-   Shared by sign-in.html and access.html
+   Shared by the /sign-in route (src/app/sign-in/page.tsx) and access.html.
+   The static sign-in.html / signin.html mocks this once dressed are deleted —
+   they collected passwords and authenticated nothing.
    ═══════════════════════════════════════════════════════ */
 :root{
   --accent:#378ADD;

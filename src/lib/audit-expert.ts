@@ -9,7 +9,7 @@
 // The model call is INJECTED (CallModel) so the loop is unit-testable with a stub ($0); the default impl
 // wraps the Anthropic SDK tool-use call. Running the real loop is PAID and gated.
 
-import { AUDIT_TOOLS, auditToolsFor, listBindingDocuments, runAuditTool, findInSource, ATTACHMENT_COVERAGE_ENABLED, type AuditToolContext } from "./audit-tools";
+import { AUDIT_TOOLS, auditToolsFor, listBindingDocuments, runAuditTool, findInSource, normalizeForSearch, phrasePresentInNormalized, ATTACHMENT_COVERAGE_ENABLED, type AuditToolContext } from "./audit-tools";
 import type { TypedFinding, RequirementKind, Controllability } from "./audit-findings";
 
 /** What the expert emits per requirement (pre-grounding) — facts, no verdict. */
@@ -53,7 +53,7 @@ export async function runAgenticExpert(
   spec: ExpertSpec,
   ctx: AuditToolContext,
   opts: { callModel: CallModel; maxTurns?: number; signal?: AbortSignal },
-): Promise<{ findings: TypedFinding[]; turns: number; dropped: number; converged: boolean; sectionsRead: string[]; docsRead: string[]; attestations: string[]; trace: Array<{ turn: number; tools: Array<{ name: string; input: Record<string, unknown> }> }> }> {
+): Promise<{ findings: TypedFinding[]; turns: number; dropped: number; droppedInReadSource: number; converged: boolean; sectionsRead: string[]; docsRead: string[]; attestations: string[]; trace: Array<{ turn: number; tools: Array<{ name: string; input: Record<string, unknown> }> }> }> {
   const baseMaxTurns = opts.maxTurns ?? 8;
   const priorToolResults: ToolResult[][] = [];
   // PURE-OBSERVER trace (Brain card-48 guardrail 1): logging only, ZERO behavior change. Records every tool
@@ -110,15 +110,42 @@ export async function runAgenticExpert(
     const out = await opts.callModel({ system: spec.system, userTask, priorToolResults, forceSubmit: turn === maxTurns, signal: opts.signal });
     if (out.findings) {
       let dropped = 0;
+      // TELEMETRY ONLY (verdict-inert) — of the dropped findings, how many quoted text that IS verbatim in
+      // ctx.fullSource, i.e. in the source the lens was actually given to read? `dropped` alone conflates two
+      // very different events: a model inventing an excerpt (expected, healthy — the backstop working), and the
+      // backstop deleting a finding grounded in text the model genuinely read. The second happens when
+      // groundingSource diverges from fullSource, because isGrounded (:36) checks groundingSource ONLY and does
+      // not fall back — so content appended to fullSource after the grounding corpus was taken (the arc-B
+      // VISION-CONFIRMED WAGE RATES block, audit-executor-v3.ts:412) is unreachable to it. Counting the two
+      // apart is the whole point; a bare `dropped` cannot answer the question it appears to answer.
+      //
+      // COST DISCIPLINE — this sits in the PAID parallel expert phase, whose budget two live runs have already
+      // breached (see :72-73), so it must not add unbounded blocking CPU:
+      //   • when the corpora do NOT diverge, isGrounded already evaluated the byte-identical fullSource search
+      //     and returned false, so this counter is PROVABLY always 0 — skip it entirely rather than pay for a
+      //     constant. `divergent` is computed once, outside the loop.
+      //   • when they DO diverge, normalize fullSource ONCE (lazily, only if something is actually dropped)
+      //     instead of calling findInSource per finding, which would rebuild an offset map the size of the
+      //     source every time for an index this never reads.
+      let droppedInReadSource = 0;
+      const divergent = !!ctx.groundingSource && ctx.groundingSource !== ctx.fullSource;
+      let normedFull: string | null = null;
       const findings: TypedFinding[] = [];
       for (const f of out.findings) {
-        if (!isGrounded(ctx, f)) { dropped++; continue; } // deterministic backstop — ungrounded never survives
+        if (!isGrounded(ctx, f)) {                        // deterministic backstop — ungrounded never survives
+          dropped++;
+          if (divergent && f.excerpt && f.excerpt.trim().length >= 4) {
+            normedFull ??= normalizeForSearch(ctx.fullSource);
+            if (phrasePresentInNormalized(normedFull, f.excerpt)) droppedInReadSource++;
+          }
+          continue;
+        }
         findings.push({ requirement: f.requirement, citation: f.citation, excerpt: f.excerpt, kind: f.kind, controllability: f.controllability, grounded: true, lens: spec.key, requiredAttribute: f.requiredAttribute, curableInWindow: f.curableInWindow, severity: f.severity });
       }
       // Attest ONLY docs the lens PROVABLY read (docsRead) — a claimed attestation for an unread doc is dropped here,
       // so documentsCovered never sees a rubber-stamp (belt-and-suspenders with its own attested∧read gate).
       const attestations = (out.attestations ?? []).filter((n) => { const r = runAuditTool(ctx, "read_document", { name: n }) as { present?: boolean; name?: string }; return !!(r?.present && r.name && docsRead.has(r.name)); }).map((n) => { const r = runAuditTool(ctx, "read_document", { name: n }) as { name?: string }; return r?.name ?? n; });
-      return { findings, turns: turn, dropped, converged: true, sectionsRead: [...sectionsRead], docsRead: [...docsRead], attestations: [...new Set(attestations)], trace };
+      return { findings, turns: turn, dropped, droppedInReadSource, converged: true, sectionsRead: [...sectionsRead], docsRead: [...docsRead], attestations: [...new Set(attestations)], trace };
     }
     // observe (pure logging) then execute the tools the expert called, deterministically, feeding results back.
     trace.push({ turn, tools: out.toolCalls.map((tc) => ({ name: tc.name, input: tc.input })) });
@@ -143,7 +170,7 @@ export async function runAgenticExpert(
     if (out.toolCalls.length > 0)
       priorToolResults.push(out.toolCalls.map((tc) => ({ id: tc.id, name: tc.name, input: tc.input, result: runAuditTool(ctx, tc.name, tc.input) })));
   }
-  return { findings: [], turns: maxTurns, dropped: 0, converged: false, sectionsRead: [...sectionsRead], docsRead: [...docsRead], attestations: [], trace };
+  return { findings: [], turns: maxTurns, dropped: 0, droppedInReadSource: 0, converged: false, sectionsRead: [...sectionsRead], docsRead: [...docsRead], attestations: [], trace };
 }
 
 /** The `submit_findings` tool — its input_schema FORCES a typed findings array (structured output via a

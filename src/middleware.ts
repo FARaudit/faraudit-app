@@ -13,8 +13,6 @@ const PUBLIC = [
   "/access",
   "/landing.html",
   "/access.html",
-  "/signin.html",
-  "/sign-in.html",
   "/pricing.html",
   "/how-it-works.html",
   "/learn.html",

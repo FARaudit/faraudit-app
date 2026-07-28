@@ -137,7 +137,7 @@ button{font-family:inherit}
 
 /* filter tabs */
 .filters{display:flex;align-items:center;gap:6px;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--card-soft);flex-wrap:wrap}
-/* Card 366 Phase-2 filter bar — minimal hooks; Design polishes later. */
+/* Filter bar */
 /* RULING 1 — 7 slicers, one pill family (Design WIRE-MAP #456) */
 .pa-filterbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 12px}
 .pa-slicer{position:relative;display:inline-flex;align-items:center;height:34px;padding:0 30px 0 12px;border:1px solid var(--line);border-radius:9px;background:var(--card-soft);transition:border-color .14s,background .14s,box-shadow .14s}
@@ -407,9 +407,6 @@ tr.hidden{display:none}
           </div>
         </div>
 
-        <!-- Card 366 Phase-2 filter bar (functional, minimal — Design polishes later).
-             Card #450: NAICS + Set-aside selects now live (fetchRecentAudits returns
-             naics_code + set_aside; options populated from the loaded rows). -->
         <div class="pa-filterbar" id="paFilterbar">
           <label class="pa-slicer"><span class="pa-slicer-lbl">Time</span>
             <select class="pa-filter" id="fTime" aria-label="Time aperture">

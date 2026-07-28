@@ -78,3 +78,7 @@ supabase/.temp/
 # Paid-run diagnostic records (card 197) — contain real solicitation source; never commit
 scripts/audit-ai/run-records/*
 !scripts/audit-ai/run-records/.gitkeep
+
+# GROUNDFIXTURE — local cache of banked RunRecords pulled from the Supabase run-records
+# bucket. Regenerated on demand by _replay-harness.ts (--refresh); never a source of truth.
+scripts/audit-ai/.run-record-cache/
