@@ -53,7 +53,7 @@ export async function runAgenticExpert(
   spec: ExpertSpec,
   ctx: AuditToolContext,
   opts: { callModel: CallModel; maxTurns?: number; signal?: AbortSignal },
-): Promise<{ findings: TypedFinding[]; turns: number; dropped: number; converged: boolean; sectionsRead: string[]; docsRead: string[]; attestations: string[]; trace: Array<{ turn: number; tools: Array<{ name: string; input: Record<string, unknown> }> }> }> {
+): Promise<{ findings: TypedFinding[]; turns: number; dropped: number; droppedInReadSource: number; converged: boolean; sectionsRead: string[]; docsRead: string[]; attestations: string[]; trace: Array<{ turn: number; tools: Array<{ name: string; input: Record<string, unknown> }> }> }> {
   const baseMaxTurns = opts.maxTurns ?? 8;
   const priorToolResults: ToolResult[][] = [];
   // PURE-OBSERVER trace (Brain card-48 guardrail 1): logging only, ZERO behavior change. Records every tool
@@ -110,15 +110,29 @@ export async function runAgenticExpert(
     const out = await opts.callModel({ system: spec.system, userTask, priorToolResults, forceSubmit: turn === maxTurns, signal: opts.signal });
     if (out.findings) {
       let dropped = 0;
+      // TELEMETRY ONLY (verdict-inert) — of the dropped findings, how many quoted text that IS verbatim in
+      // ctx.fullSource, i.e. in the source the lens was actually given to read? `dropped` alone conflates two
+      // very different events: a model inventing an excerpt (expected, healthy — the backstop working), and the
+      // backstop deleting a finding grounded in text the model genuinely read. The second happens when
+      // groundingSource diverges from fullSource, because isGrounded (:36) checks groundingSource ONLY and does
+      // not fall back — so content appended to fullSource after the grounding corpus was taken (the arc-B
+      // VISION-CONFIRMED WAGE RATES block, audit-executor-v3.ts:412) is unreachable to it. Counting the two
+      // apart is the whole point; a bare `dropped` cannot answer the question it appears to answer.
+      // Costs one substring search per DROPPED finding only — nothing on the healthy path.
+      let droppedInReadSource = 0;
       const findings: TypedFinding[] = [];
       for (const f of out.findings) {
-        if (!isGrounded(ctx, f)) { dropped++; continue; } // deterministic backstop — ungrounded never survives
+        if (!isGrounded(ctx, f)) {                        // deterministic backstop — ungrounded never survives
+          dropped++;
+          if (f.excerpt && f.excerpt.trim().length >= 4 && findInSource({ fullSource: ctx.fullSource }, f.excerpt).hits.length > 0) droppedInReadSource++;
+          continue;
+        }
         findings.push({ requirement: f.requirement, citation: f.citation, excerpt: f.excerpt, kind: f.kind, controllability: f.controllability, grounded: true, lens: spec.key, requiredAttribute: f.requiredAttribute, curableInWindow: f.curableInWindow, severity: f.severity });
       }
       // Attest ONLY docs the lens PROVABLY read (docsRead) — a claimed attestation for an unread doc is dropped here,
       // so documentsCovered never sees a rubber-stamp (belt-and-suspenders with its own attested∧read gate).
       const attestations = (out.attestations ?? []).filter((n) => { const r = runAuditTool(ctx, "read_document", { name: n }) as { present?: boolean; name?: string }; return !!(r?.present && r.name && docsRead.has(r.name)); }).map((n) => { const r = runAuditTool(ctx, "read_document", { name: n }) as { name?: string }; return r?.name ?? n; });
-      return { findings, turns: turn, dropped, converged: true, sectionsRead: [...sectionsRead], docsRead: [...docsRead], attestations: [...new Set(attestations)], trace };
+      return { findings, turns: turn, dropped, droppedInReadSource, converged: true, sectionsRead: [...sectionsRead], docsRead: [...docsRead], attestations: [...new Set(attestations)], trace };
     }
     // observe (pure logging) then execute the tools the expert called, deterministically, feeding results back.
     trace.push({ turn, tools: out.toolCalls.map((tc) => ({ name: tc.name, input: tc.input })) });
@@ -143,7 +157,7 @@ export async function runAgenticExpert(
     if (out.toolCalls.length > 0)
       priorToolResults.push(out.toolCalls.map((tc) => ({ id: tc.id, name: tc.name, input: tc.input, result: runAuditTool(ctx, tc.name, tc.input) })));
   }
-  return { findings: [], turns: maxTurns, dropped: 0, converged: false, sectionsRead: [...sectionsRead], docsRead: [...docsRead], attestations: [], trace };
+  return { findings: [], turns: maxTurns, dropped: 0, droppedInReadSource: 0, converged: false, sectionsRead: [...sectionsRead], docsRead: [...docsRead], attestations: [], trace };
 }
 
 /** The `submit_findings` tool — its input_schema FORCES a typed findings array (structured output via a
