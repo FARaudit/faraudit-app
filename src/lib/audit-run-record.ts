@@ -48,6 +48,10 @@ export function captureAuditFlagEnv(env: Record<string, string | undefined>): Re
 
 export interface RunRecordInput {
   fullSource: string;                           // assembled package source — REQUIRED for replay (detectSections/coverage)
+  // Pre-compression full text (audit-executor-v3.ts:537, `docs.map(d=>d.text).join`). Diverges from
+  // fullSource ONLY when chunked ingest compressed the package; grounding must read THIS, not the
+  // digest (audit-expert.ts:36). Optional: records banked before 2026-07-27 lack it and fall back.
+  groundingSource?: string;
   sections?: Record<string, string>;            // optional precomputed section map (if the run supplied one)
   bidderProfile: BidderProfile | null;
   naics: string | null;
@@ -158,7 +162,35 @@ export interface ReplayResult {
  *  persisted inputs. `drift` lists any place the record's recorded values disagree with a fresh deterministic
  *  recompute (stale record / changed engine). Options mirror the run-env flags so the replay is faithful. */
 export function replayRunRecord(rec: RunRecord, opts?: { sectionMDepth?: boolean; commercialHonestFail?: boolean }): ReplayResult {
-  const ctx: AuditToolContext = { fullSource: rec.input.fullSource, sections: rec.input.sections };
+  // GROUNDFIXTURE — carry the banked groundingSource into ctx so it is at least ADDRESSABLE. Until
+  // this line existed the field was banked and then unreachable: ctx was built from fullSource
+  // alone, so a corpus WITH groundingSource and one WITHOUT produced byte-identical output, which
+  // made every "grounding changed nothing" delta structurally guaranteed rather than measured.
+  //
+  // ⚠ THIS CHANGE IS INERT TODAY — PROVEN, NOT ASSUMED. A falsification probe
+  // (scripts/audit-ai/_gf-grounding-probe.ts) emptied groundingSource entirely on all 4 reproducing
+  // records and NOTHING moved: grounded counts and drift identical, 0/4 detected. The reason is
+  // that this replay's grounding math does not read ctx.groundingSource at all — completenessOf
+  // calls findingProvenance(ctx.fullSource, findings) (audit-orchestrator.ts:1946), hardcoded to
+  // the digest. The groundingSource-aware check is isGrounded (audit-expert.ts:36), and its callers
+  // live in audit-orchestrator.ts, which reaches production via audit-package → audit-executor-v3.
+  //
+  // So this line is a NECESSARY PRECONDITION and nothing more. DO NOT read it as "the replay now
+  // grounds against source" — it does not, and the fixture is still not grounding-capable. Closing
+  // that gap means changing grounding computation inside audit-orchestrator.ts, which is
+  // production verdict-path code: TIER V, design panel first.
+  //
+  // Falls back to fullSource when a record has no banked groundingSource — which is what
+  // audit-expert.ts:36 does anyway (it only diverges when the two differ), so the fallback is the
+  // pre-existing behaviour, not a new assumption.
+  //
+  // DELIBERATELY NOT DONE at the sibling ctx in buildRunRecord (:99). That one is
+  // PRODUCTION-REACHABLE — audit-run-record-bank.ts → bankRunRecord → audit-executor-v3.ts:869,
+  // on every real audit — and its ctx feeds detectFormat / buildManifest / coreMissingFor, i.e.
+  // what gets BANKED. Changing it is a TIER V verdict-path change requiring a design panel. It is
+  // also unnecessary: groundingSource is already persisted in `input`; only the REPLAY needs to
+  // read it. This function is reached from scripts/ and tests only.
+  const ctx: AuditToolContext = { fullSource: rec.input.fullSource, sections: rec.input.sections, groundingSource: rec.input.groundingSource };
   const findings: TypedFinding[] = rec.result.findings;
   const sectionsRead = new Set(rec.result.sectionsRead);
 
