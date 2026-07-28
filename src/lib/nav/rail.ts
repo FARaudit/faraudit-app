@@ -65,7 +65,7 @@ export const NAV_GROUPS: RailGroup[] = [
       // customer's real audits (dashboard-live.js writeSidebarBadge). An empty
       // count badge is hidden by that same script until a real number exists.
       { key: "past-audits", label: "Past Audits", href: "/past-audits", icon: I.pastAudits, badge: { text: "", kind: "count" } },
-      { key: "pipeline", label: "Pipeline", href: "/pipeline", icon: I.pipeline, badge: { text: "3", kind: "danger" } },
+      { key: "pipeline", label: "Pipeline", href: "/pipeline", icon: I.pipeline },
     ],
   },
   {
@@ -79,14 +79,14 @@ export const NAV_GROUPS: RailGroup[] = [
     label: "Market Intel",
     items: [
       { key: "defense-intel", label: "Defense Intel", href: "/defense-intel", icon: I.defenseIntel },
-      { key: "agencies", label: "Defense Agencies", href: "/agencies", icon: I.agencies, badge: { text: "8", kind: "count" } },
+      { key: "agencies", label: "Defense Agencies", href: "/agencies", icon: I.agencies },
       { key: "contracting-officers", label: "Contracting Officers", href: "/contracting-officers", icon: I.cos },
     ],
   },
   {
     label: "Compliance",
     items: [
-      { key: "cmmc", label: "CMMC Readiness", href: "/cmmc", icon: I.cmmc, badge: { text: "72%", kind: "count" } },
+      { key: "cmmc", label: "CMMC Readiness", href: "/cmmc", icon: I.cmmc },
       { key: "teaming-partners", label: "Teaming Partners", href: "/teaming-partners", icon: I.teaming, badge: { text: "Soon", kind: "soon" } },
     ],
   },

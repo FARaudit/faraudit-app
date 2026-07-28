@@ -141,9 +141,13 @@
     // audit OR a live audit whose response deadline has already passed.
     // WIRE-MAP #456 Ruling 2 — expose the trigger so the row picks the reason:
     // failed → red status badge is the reason; deadline → keep truthful badge + amber tag.
+    // Needs-attention is an ALARM, not an archive marker: it fires for a failed
+    // audit, or an audit still in flight whose response deadline already passed.
+    // A completed audit of a since-closed solicitation is normal history — flagging
+    // it painted 80 of 103 rows amber and made the flag meaningless.
     var deadlinePassed = (dueTs !== Infinity && dueTs < Date.now());
-    var attn = (st === "failed") || deadlinePassed;
-    var attnType = (st === "failed") ? "failed" : (deadlinePassed ? "deadline" : null);
+    var attn = (st === "failed") || (st === "pending" && deadlinePassed);
+    var attnType = (st === "failed") ? "failed" : ((st === "pending" && deadlinePassed) ? "deadline" : null);
     return {
       // uuid is the row's OWN audit — row navigation uses it so a clicked row
       // opens that report, not the newest audit sharing its solicitation number.
@@ -323,13 +327,13 @@
     var completed = rows.filter(function (r) { return r.status === "complete"; });
     var bidRows = completed.filter(function (r) { return r.rec === "Bid" || r.rec === "Bid · caution"; });
     var declineRows = completed.filter(function (r) { return r.rec === "No-bid" || r.rec === "Ineligible"; });
-    var attnRows = rows.filter(function (r) { return r.attn; });
+    var stillOpen = rows.filter(function (r) { return r.dueTs !== Infinity && r.dueTs > Date.now(); });
     var last30 = rows.filter(function (r) { return r.age <= 720; }).length;
     var bidPct = completed.length > 0 ? Math.round((bidRows.length / completed.length) * 100) : 0;
     setKPI(0, String(total), '<b>' + last30 + '</b> in the last 30 days');
     setKPI(1, String(bidRows.length), '<b>' + bidPct + '%</b> of completed — bid or bid-with-caution');
     setKPI(2, String(declineRows.length), 'committal declines — no-bid or ineligible');
-    setKPI(3, String(attnRows.length), 'failed, or response deadline passed');
+    setKPI(3, String(stillOpen.length), 'response window still open — you can still bid');
   }
 
   function writeDistribution() {
