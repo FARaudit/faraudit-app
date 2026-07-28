@@ -3890,7 +3890,10 @@ function CustomerMetricsCard({ counter, recentAudits }: { counter: HeaderCounter
 
   return (
     <div className="rc-section">
-      <div className="rc-hdr"><div className="rc-title">Your Metrics</div><div className="rc-sub">vs corpus</div></div>
+      {/* "vs corpus" removed 2026-07-27 (card #758): it benchmarked the customer against a
+          reference nobody computes — the uncomputed-default class, on a signed-in surface.
+          These are the account's own numbers; no comparison basis replaces it. */}
+      <div className="rc-hdr"><div className="rc-title">Your Metrics</div></div>
       <div style={{ padding: "12px 16px" }}>
         <MetricBlock
           label="Milestone — Design Partner status"
@@ -3906,13 +3909,13 @@ function CustomerMetricsCard({ counter, recentAudits }: { counter: HeaderCounter
           color={engagement >= 60 ? "var(--green)" : engagement >= 30 ? "var(--amber)" : "var(--red)"}
           sub="Audits + outcomes logged + notes added"
         />
-        <MetricBlock
-          label="Corpus contribution"
-          value={`${counter.traps} data points`}
-          pct={Math.min(100, (counter.traps / 100) * 100)}
-          color="var(--blue)"
-          sub="Every trap your audits caught feeds the FARaudit corpus"
-        />
+        {/* "Corpus contribution" removed 2026-07-27 (card #758). Three problems in one block:
+            the label and the sub-line ("Every trap your audits caught feeds the FARaudit
+            corpus") state the RETIRED corpus claim directly to a paying customer, and the
+            progress bar divided by a denominator of 100 that nothing computes. A MetricBlock
+            needs a pct, and there is no honest denominator here — so the element goes rather
+            than acquiring an invented one. The customer's trap count is not lost: it still
+            drives the Milestone and Engagement blocks above. */}
         <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
           <div style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--t40)", letterSpacing: ".14em", textTransform: "uppercase", marginBottom: 4 }}>
             Win rate (this account)
@@ -4251,7 +4254,9 @@ function LaborRatesPanel(_props: { naicsOptions: string[] }) {
     <div className="intel-tab-content">
       <div className="intel-section">
         <div className="is-header">
-          <div className="is-title">Labor Rate Intelligence · SCA + corpus benchmarks</div>
+          {/* "· SCA + corpus benchmarks" dropped 2026-07-27 (card #758) — no corpus benchmark
+              exists, and no replacement comparison basis is substituted for it. */}
+          <div className="is-title">Labor Rate Intelligence</div>
           <div className="is-refresh">
             <NaicsCombobox
               value={naics}
