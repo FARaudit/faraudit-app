@@ -11,7 +11,9 @@ export async function GET(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const limit = parseInt(req.nextUrl.searchParams.get("limit") ?? "50");
-    const rows = await fetchRecentAudits(supabase, user.id, limit).catch(() => []);
+    // Rule 61 — a query failure must surface as a failure (500 → the page's visible
+    // error state), never as an empty list a customer reads as "no audits yet."
+    const rows = await fetchRecentAudits(supabase, user.id, limit);
     // FA-167.1 — resolve the buying-office leaf server-side through the SAME
     // cleanAgencyName() the audit report uses (strips the redundant DoD parent),
     // so run-audit.html's static card JS can render the office leaf without

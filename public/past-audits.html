@@ -296,7 +296,7 @@ tr.hidden{display:none}
   <a class="sb-icon" href="/command-center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="sb-label">Today</span><span class="sb-tip">Today</span></a>
   <a class="sb-icon" href="/audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg><span class="sb-label">Run Audit</span><span class="sb-badge new">New</span><span class="sb-tip">Run Audit</span></a>
   <a class="sb-icon" href="/acquisition-stages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span class="sb-label">Acquisition Stages</span><span class="sb-tip">Acquisition Stages</span></a>
-  <a class="sb-icon active" href="/dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="sb-label">Past Audits</span><span class="sb-badge count">15</span><span class="sb-tip">Past Audits</span></a>
+  <a class="sb-icon active" href="/past-audits"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="sb-label">Past Audits</span><span class="sb-badge count" style="display:none"></span><span class="sb-tip">Past Audits</span></a>
   <a class="sb-icon" href="/pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg><span class="sb-label">Pipeline</span><span class="sb-badge danger">3</span><span class="sb-tip">Pipeline</span></a>
   <a class="sb-icon" href="/capability-statement"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span class="sb-label">Capability Statement</span><span class="sb-tip">Capability Statement</span></a>
   <div class="sb-divider"></div>
@@ -355,7 +355,7 @@ tr.hidden{display:none}
         <div class="heading">
           <p class="eyebrow">Dashboard · Decision History</p>
           <h1>Past Audits</h1>
-          <p class="sub">Every solicitation FARaudit has scored for you — <b>15 records</b>, newest first.</p>
+          <p class="sub">Every solicitation FARaudit has audited for you — <b>&mdash;</b>, newest first.</p>
         </div>
         <a class="cta-primary" href="/audit">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 5v14M5 12h14"/></svg>
@@ -367,42 +367,42 @@ tr.hidden{display:none}
       <section class="kpi-strip">
         <div class="kpi" data-tone="blue">
           <div class="kpi-top"><p class="lbl">Audits Run</p><span class="kpi-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg></span></div>
-          <div class="kpi-val">15</div>
-          <div class="foot"><span class="delta up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M7 14l5-5 5 5"/></svg>+4</span> vs. last 30 days</div>
+          <div class="kpi-val">&mdash;</div>
+          <div class="foot">&nbsp;</div>
         </div>
         <div class="kpi" data-tone="green">
-          <div class="kpi-top"><p class="lbl">Proceed-Rated</p><span class="kpi-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5L20 6"/></svg></span></div>
-          <div class="kpi-val">3</div>
-          <div class="foot"><b>20%</b> of completed — clear to bid</div>
+          <div class="kpi-top"><p class="lbl">Bid-Rated</p><span class="kpi-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5L20 6"/></svg></span></div>
+          <div class="kpi-val">&mdash;</div>
+          <div class="foot">&nbsp;</div>
         </div>
         <div class="kpi" data-tone="red">
-          <div class="kpi-top"><p class="lbl">Decline Calls</p><span class="kpi-ico red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span></div>
-          <div class="kpi-val">4</div>
-          <div class="foot">decline calls — <b>losses avoided</b></div>
+          <div class="kpi-top"><p class="lbl">No-Bid / Ineligible</p><span class="kpi-ico red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span></div>
+          <div class="kpi-val">&mdash;</div>
+          <div class="foot">&nbsp;</div>
         </div>
         <div class="kpi">
-          <div class="kpi-top"><p class="lbl">Avg Score · Scored</p><span class="kpi-ico navy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></span></div>
-          <div class="kpi-val">65<span class="unit">/100</span></div>
-          <div class="spark"><i style="height:64%"></i><i style="height:78%"></i><i style="height:52%"></i><i class="tall" style="height:94%"></i><i style="height:70%"></i><i style="height:48%"></i><i style="height:60%"></i><i style="height:38%"></i></div>
+          <div class="kpi-top"><p class="lbl">Needs Attention</p><span class="kpi-ico navy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4M12 16h.01"/><circle cx="12" cy="12" r="9"/></svg></span></div>
+          <div class="kpi-val">&mdash;</div>
+          <div class="foot">&nbsp;</div>
         </div>
       </section>
 
       <!-- ledger -->
       <section class="ledger">
         <div class="ledger-head">
-          <div class="lh-title">Audit Ledger <span class="ct" id="visCount">15 of 15</span></div>
+          <div class="lh-title">Audit Ledger <span class="ct" id="visCount"></span></div>
           <div class="dist">
             <div class="dist-bar">
-              <span class="d-proceed" style="width:20%"></span>
-              <span class="d-caution" style="width:27%"></span>
-              <span class="d-decline" style="width:27%"></span>
-              <span class="d-pending" style="width:26%"></span>
+              <span class="d-proceed" style="width:0%"></span>
+              <span class="d-caution" style="width:0%"></span>
+              <span class="d-decline" style="width:0%"></span>
+              <span class="d-pending" style="width:0%"></span>
             </div>
             <div class="dist-legend">
-              <span class="dl proceed"><b>3</b>&nbsp;Proceed</span>
-              <span class="dl caution"><b>4</b>&nbsp;Caution</span>
-              <span class="dl decline"><b>4</b>&nbsp;Decline</span>
-              <span class="dl pending"><b>4</b>&nbsp;Pending</span>
+              <span class="dl proceed"><b>&mdash;</b>&nbsp;Bid</span>
+              <span class="dl caution"><b>&mdash;</b>&nbsp;Caution</span>
+              <span class="dl decline"><b>&mdash;</b>&nbsp;No-bid&nbsp;·&nbsp;Inelig.</span>
+              <span class="dl pending"><b>&mdash;</b>&nbsp;Review&nbsp;·&nbsp;Open</span>
             </div>
           </div>
         </div>
@@ -428,9 +428,12 @@ tr.hidden{display:none}
           <label class="pa-slicer"><span class="pa-slicer-lbl">Recommendation</span>
             <select class="pa-filter" id="fRec" aria-label="Recommendation">
               <option value="all">All recommendations</option>
-              <option value="Proceed">Proceed</option>
-              <option value="Caution">Caution</option>
-              <option value="Decline">Decline</option>
+              <option value="Bid">Bid</option>
+              <option value="Bid · caution">Bid · caution</option>
+              <option value="No-bid">No-bid</option>
+              <option value="Ineligible">Ineligible</option>
+              <option value="Needs review">Needs review</option>
+              <option value="Incomplete">Incomplete</option>
             </select>
             <svg class="pa-slicer-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
           </label>
@@ -455,12 +458,15 @@ tr.hidden{display:none}
         </div>
 
         <div class="filters" id="filters">
-          <button class="fbtn active" data-filter="all">All <span class="n">15</span></button>
-          <button class="fbtn" data-filter="Proceed">Proceed <span class="n">3</span></button>
-          <button class="fbtn" data-filter="Caution">Caution <span class="n">4</span></button>
-          <button class="fbtn" data-filter="Decline">Decline <span class="n">4</span></button>
-          <button class="fbtn" data-filter="open">Pending <span class="n">4</span></button>
-          <button class="fbtn" data-filter="failed">Failed <span class="n">0</span></button>
+          <button class="fbtn active" data-filter="all">All <span class="n">&mdash;</span></button>
+          <button class="fbtn" data-filter="Bid">Bid <span class="n">&mdash;</span></button>
+          <button class="fbtn" data-filter="Bid · caution">Bid · caution <span class="n">&mdash;</span></button>
+          <button class="fbtn" data-filter="No-bid">No-bid <span class="n">&mdash;</span></button>
+          <button class="fbtn" data-filter="Ineligible">Ineligible <span class="n">&mdash;</span></button>
+          <button class="fbtn" data-filter="Needs review">Review <span class="n">&mdash;</span></button>
+          <button class="fbtn" data-filter="Incomplete">Incomplete <span class="n">&mdash;</span></button>
+          <button class="fbtn" data-filter="open">Pending <span class="n">&mdash;</span></button>
+          <button class="fbtn" data-filter="failed">Failed <span class="n">&mdash;</span></button>
           <span class="spacer" style="flex:1"></span>
           <span class="sort-hint"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M6 12h12M9 18h6"/></svg>Click a column header to sort</span>
         </div>
@@ -474,8 +480,7 @@ tr.hidden{display:none}
                 <th class="sortable" data-sort="agency">Agency</th>
                 <th class="sortable" data-sort="type">Type</th>
                 <th class="sortable" data-sort="due">Due</th>
-                <th class="sortable" data-sort="audited">Audited</th>
-                <th class="right sortable sorted" data-sort="score">Score<span class="arr">▼</span></th>
+                <th class="sortable sorted" data-sort="audited">Audited<span class="arr">▼</span></th>
                 <th class="sortable" data-sort="rec">Recommendation</th>
                 <th class="sortable" data-sort="status">Status</th>
                 <th class="right">Report</th>
@@ -490,202 +495,11 @@ tr.hidden{display:none}
 </div>
 
 <script>
-// ── LIVE AUDIT LEDGER (ARC #747, 2026-07-27) ──────────────────────────────────────────────────────────
-// This page previously shipped a hardcoded array of FIFTEEN FICTIONAL audits — SPY-6, F-35, a DLA/H-60 buy —
-// and served them to every signed-in customer. It never asked the server for anything. The filter bar above
-// was decorative: seven <select>s and a Clear button with no listener on any of them, and the row count read
-// "of 15" because 15 was typed into the page. Verified live on the authed surface before this change.
-//
-// The list is now the customer's own audits from /api/audits (user-scoped server-side). There is no mock
-// fallback anywhere below: if the request fails the table says so. A fallback here would recreate the exact
-// defect — a page that looks populated when it knows nothing.
-let AUDITS = [];
-function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
-
-// SIX-POLE VOCABULARY — same mapping the audit list uses (public/run-audit.html), kept in step deliberately.
-// The engine issues six poles; this filter previously offered three (Proceed/Caution/Decline), so half the
-// outcomes were unrepresentable AND the control implied they did not exist. Nothing falls back to a sibling
-// pole: an unrecognised value renders UNRESOLVED rather than borrowing a neighbour's word.
-const POLE_REC = {
-  BID: 'Bid', BID_WITH_CAUTION: 'Bid · caution', NO_BID: 'No-bid', INELIGIBLE: 'Ineligible',
-  NEEDS_HUMAN_REVIEW: 'Needs review', INCOMPLETE: 'Incomplete', OUT_OF_SCOPE: 'Out of scope'
-};
-function recOf(a){
-  const pole = String(a.v3_verdict||'').toUpperCase().replace(/[\s-]+/g,'_');
-  if (POLE_REC[pole]) return POLE_REC[pole];
-  if (pole) return 'Unresolved';
-  // Legacy rows with no v3 pole: read what WAS recorded for their era. Faithful; guessing past it is not.
-  const ev = String(a.exec_verdict||'').toUpperCase().replace(/[\s_]+/g,'-');
-  if (ev==='NO-BID'||ev==='NOBID') return 'No-bid';
-  if (ev==='CAUTION') return 'Bid · caution';
-  if (ev==='PROCEED'||ev==='GO'||ev==='BID') return 'Bid';
-  const r = String(a.recommendation||'').toUpperCase();
-  if (r==='DECLINE') return 'No-bid';
-  if (r==='PROCEED') return 'Bid';
-  if (r.indexOf('CAUTION')!==-1) return 'Bid · caution';
-  return null;   // absent, not guessed — renders as an em dash
-}
-function agoOf(iso){
-  if(!iso) return {label:'—', hours:1e9};
-  const h=(Date.now()-new Date(iso).getTime())/36e5;
-  if(h<1) return {label:Math.max(1,Math.round(h*60))+'m ago', hours:h};
-  if(h<24) return {label:Math.round(h)+'h ago', hours:h};
-  const d=Math.round(h/24);
-  return {label:(d<7?d+'d ago':Math.round(d/7)+'w ago'), hours:h};
-}
-function mapRow(a){
-  const t=agoOf(a.completed_at||a.created_at);
-  return {
-    id: String(a.solicitation_number||a.notice_id||a.id||'').trim() || String(a.id||''),
-    slug: String(a.id||''),
-    title: String(a.title||'').trim() || '—',
-    agency: String(a.office_display||a.agency||'').trim() || '—',
-    date: t.label, age: t.hours,
-    type: String(a.document_type||'').trim() || '—',
-    naics: String(a.naics_code||'').trim(),
-    setAside: String(a.set_aside||'').trim(),
-    score: (typeof a.compliance_score==='number') ? a.compliance_score : null,
-    rec: recOf(a),
-    status: String(a.status||'').trim() || 'complete'
-  };
-}
-
-function scoreTone(s){ if(s==null) return 's-none'; if(s>=80) return 's-hi'; if(s>=65) return 's-md'; if(s>=40) return 's-lo'; return 's-no'; }
-function recClass(r){
-  // Six poles → the three existing tone classes. Committal decisions keep their register; the non-committal
-  // poles (needs review / incomplete / unresolved) deliberately take NEITHER green nor red, because painting
-  // them would assert a decision the engine did not issue.
-  if(!r) return 'none';
-  if(r==='Bid') return 'proceed';
-  if(r==='Bid · caution') return 'caution';
-  if(r==='No-bid'||r==='Ineligible') return 'decline';
-  return 'none';
-}
-
-let curFilter='all', sortKey='score', sortDir=-1;
-
-function rowMatches(a){
-  if(!(curFilter==='all' || (curFilter==='open' ? a.status!=='complete' : a.rec===curFilter))) return false;
-  // Filter bar (previously inert markup — seven selects with no listener on any of them).
-  const g=(id)=>{ const el=document.getElementById(id); return el? el.value : 'all'; };
-  const eq=(v,val)=> v==='all' || String(val||'')===v;
-  if(!eq(g('fRec'), a.rec)) return false;
-  if(!eq(g('fStatus'), a.status)) return false;
-  if(!eq(g('fAgency'), a.agency)) return false;
-  if(!eq(g('fType'), a.type)) return false;
-  if(!eq(g('fNaics'), a.naics)) return false;
-  if(!eq(g('fSetAside'), a.setAside)) return false;
-  const t=g('fTime');
-  if(t!=='all'){ const max=parseFloat(t); if(isFinite(max) && a.age>max) return false; }
-  return true;
-}
-
-function render(){
-  const data=[...AUDITS].sort((x,y)=>{
-    let xv,yv;
-    if(sortKey==='score'){ xv=x.score==null?-1:x.score; yv=y.score==null?-1:y.score; }
-    else if(sortKey==='date'){ xv=x.age; yv=y.age; }
-    else { xv=x.id; yv=y.id; return sortDir*xv.localeCompare(yv); }
-    return sortDir*(xv-yv);
-  });
-  const body=document.getElementById('ledgerBody');
-  let vis=0;
-  body.innerHTML=data.map(a=>{
-    const show=rowMatches(a); if(show) vis++;
-    const tone=scoreTone(a.score);
-    const scoreCell = a.score==null
-      ? `<span class="score s-none">—</span>`
-      : `<div class="score-cell"><span class="score-meter"><i class="si ${tone}" style="width:${a.score}%"></i></span><span class="score ${tone}">${a.score}</span></div>`;
-    const recCell = a.rec
-      ? `<span class="rec ${recClass(a.rec)}">${esc(a.rec)}</span>`
-      : `<span class="rec none">—</span>`;
-    const slug=a.slug||'';
-    return `<tr data-rec="${a.rec||''}" class="${show?'':'hidden'}">
-      <td class="cell-id">${esc(a.id)}</td>
-      <td class="cell-title" title="${esc(a.title)}">${esc(a.title)}</td>
-      <td class="cell-agency">${esc(a.agency)}</td>
-      <td><span class="doctype">${esc(a.type)}</span></td>
-      <td class="cell-due">—</td>
-      <td class="cell-date">${esc(a.date)}</td>
-      <td class="right">${a.score==null?scoreCell:scoreCell}</td>
-      <td>${recCell}</td>
-      <td><span class="status ${esc(a.status)}">${esc(a.status)}</span></td>
-      <td class="right"><a class="view-link" href="/audit/${slug}">View<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></td>
-    </tr>`;
-  }).join('');
-  // Was hardcoded "of 15" — the mock's row count, printed regardless of what was on screen.
-  document.getElementById('visCount').textContent = vis+' of '+AUDITS.length;
-}
-
-/* filters */
-document.getElementById('filters').addEventListener('click',function(e){
-  const b=e.target.closest('.fbtn'); if(!b) return;
-  document.querySelectorAll('.fbtn').forEach(x=>x.classList.toggle('active',x===b));
-  curFilter=b.dataset.filter; render();
-});
-
-/* sort */
-document.querySelectorAll('th.sortable').forEach(th=>{
-  th.addEventListener('click',function(){
-    const k=th.dataset.sort;
-    if(sortKey===k){ sortDir*=-1; } else { sortKey=k; sortDir = (k==='id')?1:-1; }
-    document.querySelectorAll('th.sortable').forEach(x=>{x.classList.remove('sorted'); const a=x.querySelector('.arr'); if(a) a.remove();});
-    th.classList.add('sorted');
-    const arr=document.createElement('span'); arr.className='arr'; arr.textContent = sortDir<0?'▼':'▲'; th.appendChild(arr);
-    render();
-  });
-});
-
-/* filter bar — these <select>s previously had no listener at all */
-['fTime','fAgency','fType','fRec','fStatus','fNaics','fSetAside'].forEach(function(id){
-  var el=document.getElementById(id); if(el) el.addEventListener('change', render);
-});
-var clr=document.getElementById('paClear');
-if(clr) clr.addEventListener('click', function(){
-  ['fTime','fAgency','fType','fRec','fStatus','fNaics','fSetAside'].forEach(function(id){
-    var el=document.getElementById(id); if(el) el.value='all';
-  });
-  render();
-});
-
-/* Populate the value-driven slicers from the customer's OWN rows — never a fixed list, which would imply
-   options they do not have and hide ones they do. */
-function fillSlicer(id, values){
-  var el=document.getElementById(id); if(!el) return;
-  var keep=el.value;
-  var uniq=[...new Set(values.filter(Boolean))].sort();
-  el.innerHTML = el.options[0].outerHTML + uniq.map(function(v){
-    return '<option value="'+esc(v)+'">'+esc(v)+'</option>';
-  }).join('');
-  el.value = uniq.indexOf(keep)>=0 ? keep : 'all';
-}
-
-function setLedgerMessage(msg){
-  var body=document.getElementById('ledgerBody');
-  if(body) body.innerHTML='<tr><td colspan="10" class="cell-title" style="padding:22px 12px;color:var(--mute)">'+esc(msg)+'</td></tr>';
-  var c=document.getElementById('visCount'); if(c) c.textContent='';
-}
-
-/* LIVE LOAD. No mock fallback: if this fails the page says so rather than showing a populated ledger it
-   cannot vouch for. A fallback here would recreate the defect this change exists to remove. */
-setLedgerMessage('Loading your audits…');
-fetch('/api/audits?limit=200',{headers:{accept:'application/json'}})
-  .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
-  .then(function(d){
-    AUDITS = (d && Array.isArray(d.audits) ? d.audits : []).map(mapRow);
-    if(!AUDITS.length){ setLedgerMessage('No audits yet — run one from Run Audit and it will appear here.'); return; }
-    fillSlicer('fAgency', AUDITS.map(function(a){return a.agency;}).filter(function(v){return v!=='—';}));
-    fillSlicer('fType',   AUDITS.map(function(a){return a.type;}).filter(function(v){return v!=='—';}));
-    fillSlicer('fNaics',  AUDITS.map(function(a){return a.naics;}));
-    fillSlicer('fSetAside',AUDITS.map(function(a){return a.setAside;}));
-    fillSlicer('fRec',    AUDITS.map(function(a){return a.rec;}));
-    fillSlicer('fStatus', AUDITS.map(function(a){return a.status;}));
-    render();
-  })
-  .catch(function(err){
-    setLedgerMessage('Could not load your audits ('+(err&&err.message||'error')+'). Reload to try again.');
-  });
-
+// The live wiring for this page lives in dashboard-live.js — the single owner of
+// the ledger, KPIs, distribution, chips, slicers, search and sidebar badge. A
+// second inline wiring (ARC #747) briefly coexisted here; two writers on one
+// table meant the last one to resolve won, so its six-pole fix never reliably
+// reached the screen. Six-pole vocabulary + Rule 61 failure states now live there.
 </script>
 
 <script src="dashboard-live.js"></script>
