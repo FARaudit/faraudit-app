@@ -199,7 +199,9 @@ export function railScript(): string {
     // a wrong name is not (Rule 61).
     `fetch('/api/profile',{credentials:'include'}).then(function(r){return r.ok?r.json():null;}).then(function(p){` +
     `if(!p)return;var name=(p.full_name||'').trim()||String(p.email||'').split('@')[0];if(!name)return;` +
-    `var parts=name.split(/\\s+/),ini=((parts[0]||'')[0]||'')+((parts.length>1?parts[parts.length-1][0]:(parts[0]||'')[1])||'');ini=ini.toUpperCase();` +
+    // suffixes (Jr/Sr/II/III/IV) are not surnames — initials skip them
+    `var parts=name.split(/\\s+/).filter(function(w){return !/^(jr|sr|ii|iii|iv|v)\\.?$/i.test(w);});` +
+    `var ini=((parts[0]||'')[0]||'')+((parts.length>1?parts[parts.length-1][0]:(parts[0]||'')[1])||'');ini=ini.toUpperCase();` +
     `document.querySelectorAll('.sb-avatar').forEach(function(e){e.textContent=ini;});` +
     `document.querySelectorAll('.sb-avatar-name').forEach(function(e){e.textContent=name;});` +
     `document.querySelectorAll('.user-chip .nm').forEach(function(e){e.textContent=name;});` +
