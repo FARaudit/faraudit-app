@@ -29,7 +29,7 @@ export async function POST(
   // cron-ingested notice_id, which would make .maybeSingle() throw on >1 row.
   const { data: pa, error: paErr } = await supabase
     .from("pending_audits")
-    .select("notice_id, solicitation_number, title, agency, naics_code, set_aside, response_deadline")
+    .select("notice_id, solicitation_number, title, agency, naics_code, set_aside, response_deadline, document_type")
     .eq("notice_id", notice_id)
     .neq("source", "user")
     .maybeSingle();
@@ -38,14 +38,11 @@ export async function POST(
 
   // Step 1a — DEADLINE GUARD (CEO 2026-06-03 · Audit-AI cleanup A).
   // Reject pins for opportunities whose response_deadline is in the past, or
-  // is closing within 6h (the cron runs daily at 11:30 UTC = 06:30 CT — 6h
-  // is the minimum window we need to score before the bid window closes).
-  // Without this guard, expired pins become orphans: pending_audits rows
-  // that the cron skips forever (per the V1 cron fetchPending's
-  // response_deadline > now() filter — agents/audit-ai/queue.ts, deleted in
-  // 5dc9b18), polluting the dashboard with gray
-  // "…" tiles indefinitely. The cleanup-expired pass downstream sweeps the
-  // existing orphans; this guard prevents new ones.
+  // is closing within 6h — too late to run any audit before the bid window
+  // closes. Without this guard, expired pins become orphans: stub audits rows
+  // nothing will ever score, polluting the dashboard with gray "…" tiles
+  // indefinitely. (The 6h figure dates from the deleted audit-ai daily cron —
+  // 5dc9b18 — but stands on its own as a minimum scoring window.)
   if (pa.response_deadline) {
     const deadlineMs = new Date(pa.response_deadline).getTime();
     const cutoffMs   = Date.now() + 6 * 60 * 60 * 1000;
@@ -54,7 +51,7 @@ export async function POST(
       return NextResponse.json({
         error: expired
           ? "This opportunity's response deadline has already passed — no time left to audit."
-          : "This opportunity's response deadline is less than 6 hours away — the next Audit-AI run can't score it before the bid window closes.",
+          : "This opportunity's response deadline is less than 6 hours away — not enough time to score it before the bid window closes.",
         code: expired ? "deadline_expired" : "deadline_too_soon",
         response_deadline: pa.response_deadline
       }, { status: 409 });
@@ -102,6 +99,9 @@ export async function POST(
       naics_code:          pa.naics_code,
       set_aside:           pa.set_aside,
       response_deadline:   pa.response_deadline,
+      // Already classifyDocType-normalized by sam-ingest; null for legacy
+      // pending rows stays null rather than a guessed bucket.
+      document_type:       pa.document_type ?? null,
       user_id:             user.id,
       status:              "pending",
       in_pipeline:         true,

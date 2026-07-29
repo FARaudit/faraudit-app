@@ -6,10 +6,10 @@
 // internal noticedesc/award refs in returned payloads still use api.sam.gov;
 // only the search endpoint is hosted at sam.gov/api/prod.
 //
-// Filters: naicsCode (one per call), typeOfSetAside (one per call), postedFrom,
-// postedTo, limit, offset. Date format: MM/dd/yyyy. Limit max 1000, offset max
-// 9000 (so ~10K results per filter combo before pagination breaks down — fine
-// for our scope).
+// Filters: ncode (one NAICS per call), typeOfSetAside (one per call),
+// postedFrom, postedTo, limit, offset. Date format: MM/dd/yyyy. Limit max 1000,
+// offset max 9000 (so ~10K results per filter combo before pagination breaks
+// down — fine for our scope).
 
 const SAM_API_KEY = process.env.SAM_API_KEY;
 
@@ -57,7 +57,11 @@ async function searchPage(p: SamSearchParams): Promise<{ items: SamOpportunity[]
   if (!SAM_API_KEY) throw new Error("SAM_API_KEY not set");
   const params = new URLSearchParams({
     api_key: SAM_API_KEY,
-    naicsCode: p.naicsCode,
+    // ncode, NOT naicsCode — probed 2026-07-29: naicsCode is silently
+    // ignored (returns the full unfiltered feed); ncode actually filters.
+    // typeOfSetAside probed the same day: filters correctly, unknown values
+    // return 0 (fail-closed). Mirrors src/lib/sam.ts searchOpportunitiesByNaics.
+    ncode: p.naicsCode,
     typeOfSetAside: p.setAside,
     postedFrom: p.postedFrom,
     postedTo: p.postedTo,

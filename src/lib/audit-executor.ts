@@ -2,7 +2,8 @@
 //
 // The one pipeline the sync route, the resident audit-worker, and the watcher all
 // run, so their behavior can never drift. executeAudit() routes into the AGENTIC V3
-// engine (executeAgenticPrimary) — persist complete → best-effort corpus inserts.
+// engine (executeAgenticPrimary) — persist complete → cost recording. No corpus
+// step: the corpus program is retired, and no corpus insert exists in this path.
 // (T3 truth fix 2026-07-07: the old header described a "V1 3-call engine → persist →
 // V2 shadow" pipeline; V1/V2 are RETIRED — V3 is the sole engine.)
 //

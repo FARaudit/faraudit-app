@@ -130,7 +130,7 @@ export async function POST(req: Request) {
     } else if (text.startsWith("/audit ")) {
       reply = await triggerAuditReply(text.slice("/audit ".length).trim());
     } else {
-      reply = `APEX CEO Bot\n\n/brief — morning digest\n/status — route health\n/tasks — today's tasks\n/prospects — pipeline\n/mrr — revenue vs target\n/83b — election status\n/learn fa|br|la — education\n/news — company news\n/done [item] — log it\n/build [note] — queue it\n\n— Vertex Intelligence —\n/signals — top 5 Bullrize signals\n/corpus — FARaudit corpus stats\n/pipeline — solicitations by stage\n/fleet — Railway agent status\n/audit [notice_id] — manual audit trigger`;
+      reply = `APEX CEO Bot\n\n/brief — morning digest\n/status — route health\n/tasks — today's tasks\n/prospects — pipeline\n/mrr — revenue vs target\n/83b — election status\n/learn fa|br|la — education\n/news — company news\n/done [item] — log it\n/build [note] — queue it\n\n— Vertex Intelligence —\n/signals — top 5 Bullrize signals\n/corpus — FARaudit corpus stats\n/pipeline — solicitations by stage\n/fleet — Railway agent status\n/audit [notice_id] — run an audit now`;
     }
   } catch (err) {
     console.error("[telegram-route] handler error:", err);
@@ -209,40 +209,81 @@ async function fleetReply(): Promise<string> {
       return `${s.name} · unreachable`;
     }
   }));
-  // Railway agent status — we can only confirm "scheduled" by reading their last cron-output footprint.
+  // Agent status — confirmed only by reading each service's last output
+  // footprint (audits rows come from the resident audit-worker + watcher, not
+  // a cron; sam-ingest is the one true cron here).
   const sb = getAdminClient();
-  let agentLine = "Railway crons: schema unavailable";
+  let agentLine = "Railway agents: schema unavailable";
   if (sb) {
     const since24h = new Date(Date.now() - 24 * 3600_000).toISOString();
     const [recentAudits, recentPending] = await Promise.all([
       sb.from("audits").select("*", { count: "exact", head: true }).gte("created_at", since24h),
       sb.from("pending_audits").select("*", { count: "exact", head: true }).gte("created_at", since24h).eq("source", "sam_live")
     ]);
-    agentLine = `audit-ai 24h: ${recentAudits.count || 0} new audits\nsam-ingest 24h: ${recentPending.count || 0} new solicitations`;
+    agentLine = `audits 24h: ${recentAudits.count || 0} new\nsam-ingest 24h: ${recentPending.count || 0} solicitations ingested`;
   }
   return `Railway fleet — ${new Date().toLocaleTimeString("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit" })} CT\n\n${results.join("\n")}\n\n${agentLine}`;
 }
 
 async function triggerAuditReply(noticeId: string): Promise<string> {
   if (!noticeId) return "Usage: /audit <notice_id>";
-  // Insert into pending_audits with manual source so audit-ai picks it up next cron tick.
+  // Corpus retirement (2026-07-29): the audit-ai cron this used to enqueue for
+  // was deleted (5dc9b18), so "picked up next cron tick" could never happen.
+  // Manual audits now ride the USER lane — the same path as the product's async
+  // enqueue: a pre-attributed audits row (the resident worker hard-fails rows
+  // without audit_id) plus a pending_audits row with source='user' that the
+  // worker claims within its ~10s poll. The worker re-fetches SAM facts and the
+  // full document set at run time, so this route stays metadata-light.
   const sb = getAdminClient();
   if (!sb) return "Manual audit · admin client unavailable.";
-  // Skip if already queued.
-  // FA-116: notice_id is only unique among non-user rows — maybeSingle() would
-  // throw on a user duplicate, so scope the dedupe check to cron-sourced rows.
-  const { data: existing } = await sb.from("pending_audits").select("id, status").eq("notice_id", noticeId).neq("source", "user").maybeSingle();
-  if (existing) {
-    return `Manual audit · ${noticeId} already queued (status: ${existing.status}). audit-ai will pick it up next cron tick (06:30 CDT).`;
+  if (!/^[a-f0-9]{32}$/i.test(noticeId)) {
+    return `Manual audit · "${noticeId}" is not a SAM notice id (32 hex chars). Copy it from the SAM.gov notice URL or the /home feed.`;
   }
+  // Attribution: Telegram has no Supabase session, but the audits row needs an
+  // owner (RLS read on /audit/[id] + quota/cost land on this account). Honest
+  // fail when unset — never fabricate ownership.
+  const userId = process.env.TELEGRAM_AUDIT_USER_ID;
+  if (!userId) {
+    return "Manual audit · TELEGRAM_AUDIT_USER_ID is not set in Vercel env. Set it to the account UUID that should own Telegram-triggered audits (quota + report visibility land there).";
+  }
+  const base = (process.env.NEXT_PUBLIC_APP_URL || "https://faraudit.com").replace(/\/+$/, "");
+  // Dedupe: an in-flight user-lane run for this notice already yields a report —
+  // don't double-spend. Completed/failed runs don't block a fresh re-audit.
+  const { data: inflight } = await sb
+    .from("pending_audits")
+    .select("audit_id, status")
+    .eq("notice_id", noticeId)
+    .eq("source", "user")
+    .in("status", ["pending", "processing"])
+    .limit(1)
+    .maybeSingle();
+  if (inflight) {
+    return `Manual audit · ${noticeId} already in flight (${inflight.status}). Report: ${base}/audit/${inflight.audit_id}`;
+  }
+  const { data: audit, error: auditErr } = await sb
+    .from("audits")
+    .insert({
+      notice_id: noticeId,
+      title: `Telegram manual audit · ${noticeId}`,
+      user_id: userId,
+      status: "processing"
+    })
+    .select("id")
+    .single();
+  if (auditErr || !audit) return `Manual audit · audits insert failed: ${auditErr?.message ?? "no row returned"}`;
   const { error } = await sb.from("pending_audits").insert({
     notice_id: noticeId,
-    title: `Telegram-triggered manual audit · ${noticeId}`,
-    source: "telegram_manual",
+    title: `Telegram manual audit · ${noticeId}`,
+    source: "user",
     status: "pending",
-    notice_type: "solicitation"
+    user_id: userId,
+    audit_id: audit.id
   });
-  if (error) return `Manual audit · queue failed: ${error.message}`;
-  return `Manual audit queued · ${noticeId}\n\naudit-ai will run at next 06:30 CDT cron tick. Result will appear in /audit/[id] once complete.`;
+  if (error) {
+    // Never leave an orphaned 'processing' audits row the worker can't see.
+    await sb.from("audits").update({ status: "failed", error_message: `telegram enqueue failed: ${error.message}` }).eq("id", audit.id);
+    return `Manual audit · queue failed: ${error.message}`;
+  }
+  return `Manual audit queued · ${noticeId}\n\nThe resident audit worker claims it within ~10s and fetches SAM facts + documents at run time. Report: ${base}/audit/${audit.id}`;
 }
 

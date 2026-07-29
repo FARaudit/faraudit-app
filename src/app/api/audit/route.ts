@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
-import { fetchSolicitationByNoticeId, resolveAgency, resolveOfficeLeaf, type Solicitation } from "@/lib/sam";
-import { classifyDocType } from "../../../../agents/sam-ingest/helpers";
+import { classifyDocType, fetchSolicitationByNoticeId, resolveAgency, resolveOfficeLeaf, type Solicitation } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
 import { assembleSamDocumentSet, assembleUploadedDocumentSet, deriveSolTokenFromFilenames, hasEngineText, type AssembledDocumentSet, type IngestionMeta } from "@/lib/sam-attachments";
 import { extractText } from "@/lib/pdf-text-extractor";
