@@ -1,14 +1,15 @@
-// CANONICAL · src/lib/audit-engine.ts is the canonical source.
-// agents/audit-ai/audit-engine.ts is the parity-locked DERIVED copy.
-// Any edit here MUST be applied to that file in the same commit. The Audit-AI
-// cron can't import from src/lib/ at runtime (Railway Root Directory =
-// agents/audit-ai/ means src/ isn't in the container) — hence the vendored
-// twin. Both files MUST stay byte-equivalent below this header.
+// CANONICAL · src/lib/audit-engine.ts is the ONLY audit engine — no vendored
+// twin exists. The former parity-locked copy (agents/audit-ai/audit-engine.ts)
+// was deleted with the whole V1 Audit-AI cron fork in 5dc9b18 (2026-06-28,
+// "purge V1/shadow audit engine"), and the Railway Audit-AI service no longer
+// exists (fleet verified 2026-07-29 via `railway status` — no service deploys
+// from agents/audit-ai/). Production reaches this engine through
+// agents/audit-worker, which runs from the repo root and imports src/lib
+// directly, so there is nothing to mirror — edit here only.
 //
-// FA-2 cleanup helper · imported on a per-twin path (Railway = ./anthropic-files,
-// Vercel = @/lib/anthropic-files which re-exports from canonical). The IMPORT
-// path is the only line that differs between the two engine files — everything
-// from `type ContentBlock` onward is byte-equivalent. See parity header.
+// FA-2 cleanup helper · @/lib/anthropic-files re-exports from
+// agents/audit-ai/anthropic-files.ts — one of two leaf modules (with pdf.ts)
+// that survived the purge and remain live via src/lib imports.
 import { deletePdfFromFilesApi } from "@/lib/anthropic-files";
 import { isEnvOn } from "@/lib/env-flags";
 

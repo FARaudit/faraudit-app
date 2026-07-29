@@ -1,7 +1,6 @@
-// PARITY NOTE: agents/audit-ai/sam.ts is a byte-equivalent vendored copy of
-// this file. Any edit here MUST be applied to that file in the same commit.
-// The Audit-AI cron can't import from src/lib/ at runtime (Railway Root
-// Directory = agents/audit-ai/ means src/ isn't in the container).
+// SOLE COPY — the former byte-equivalent vendored twin (agents/audit-ai/sam.ts)
+// was deleted with the V1 Audit-AI cron fork in 5dc9b18 (2026-06-28). No
+// mirroring required; edit here only.
 
 import type { LiveSamStatus } from "./audit-temporal";
 import { fetchNoticeVersionCount } from "./sam-history";

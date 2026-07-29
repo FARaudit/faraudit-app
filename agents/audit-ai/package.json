@@ -1,14 +1,8 @@
 {
   "name": "audit-ai",
   "version": "0.1.0",
-  "description": "FARaudit Audit AI — Railway worker. Pulls solicitations from pending_audits queue, runs the upgraded 3-call audit engine, writes outcomes to the corpus.",
-  "main": "index.ts",
+  "description": "RESIDUAL — the V1 Audit-AI Railway worker was deleted in 5dc9b18 (2026-06-28); no Railway service deploys from this directory. Only anthropic-files.ts and pdf.ts remain, live via src/lib imports (deps resolve from the repo-root node_modules). This file is kept for its 'type: module' flag on those files.",
   "type": "module",
-  "scripts": {
-    "start": "tsx index.ts",
-    "seed": "tsx seed.ts",
-    "dry-run": "DRY_RUN=true tsx index.ts"
-  },
   "engines": {
     "node": ">=22"
   },

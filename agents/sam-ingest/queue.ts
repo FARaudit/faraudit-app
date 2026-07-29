@@ -1,6 +1,7 @@
 // Tiny self-contained Supabase wrapper for the sam-ingest worker.
-// Mirrors agents/audit-ai/queue.ts's upsert path; we don't import across
-// agents to keep each one independently deployable.
+// Mirrors the upsert path of the former agents/audit-ai/queue.ts (deleted in
+// 5dc9b18); we don't import across agents to keep each one independently
+// deployable.
 
 import { createClient } from "@supabase/supabase-js";
 

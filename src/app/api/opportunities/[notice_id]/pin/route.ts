@@ -41,8 +41,9 @@ export async function POST(
   // is closing within 6h (the cron runs daily at 11:30 UTC = 06:30 CT — 6h
   // is the minimum window we need to score before the bid window closes).
   // Without this guard, expired pins become orphans: pending_audits rows
-  // that the cron skips forever (per fetchPending's response_deadline > now()
-  // filter in agents/audit-ai/queue.ts), polluting the dashboard with gray
+  // that the cron skips forever (per the V1 cron fetchPending's
+  // response_deadline > now() filter — agents/audit-ai/queue.ts, deleted in
+  // 5dc9b18), polluting the dashboard with gray
   // "…" tiles indefinitely. The cleanup-expired pass downstream sweeps the
   // existing orphans; this guard prevents new ones.
   if (pa.response_deadline) {

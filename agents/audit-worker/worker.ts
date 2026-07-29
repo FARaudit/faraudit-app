@@ -1,8 +1,8 @@
 // FA-116 — resident worker loop for user-enqueued audits.
 //
 // Claims pending_audits rows with source='user' AND status='pending' (its own
-// disjoint consumer set — agents/audit-ai's cron fetchPending excludes user
-// rows, so there are no claim races across services). No response_deadline
+// disjoint consumer set — the former V1 Audit-AI cron's fetchPending excluded
+// user rows; that cron was deleted in 5dc9b18). No response_deadline
 // filter: auditing an expired solicitation is a supported user flow
 // (closed-state report mode). No CORPUS_TARGET gate: user audits are paid
 // product actions, never throttled by the corpus ceiling.
