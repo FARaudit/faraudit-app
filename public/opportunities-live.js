@@ -168,7 +168,12 @@
       const res = await fetch('/api/command-center-data', { credentials: 'include' });
       if (!res.ok) throw new Error('opportunities fetch failed: ' + res.status);
       const data = await res.json();
-      const opps = Array.isArray(data.opportunities) ? data.opportunities : [];
+      // null = the server's live SAM fetch failed. That is an outage, not an
+      // empty feed — route it to the 'error' state, never 'empty'.
+      if (!Array.isArray(data.opportunities)) {
+        throw new Error('live SAM feed unavailable (opportunities=' + data.opportunities + ')');
+      }
+      const opps = data.opportunities;
       // The ingest queue can hold multiple rows for the same notice — showing
       // one notice 3× inflates every count. Dedupe on the DISPLAY identity
       // (same precedence as mapOpp's `id`), not on notice_id: a base notice and
