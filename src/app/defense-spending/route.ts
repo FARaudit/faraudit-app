@@ -27,7 +27,7 @@ export async function GET() {
   );
   let html = await readFile(filePath, "utf8");
 
-  html = injectRail(html, "defense-intel");
+  html = injectRail(html, "defense-spending");
   html = injectDefenseTabs(html, "spending"); // Phase 5 item 2 — News/Spending tab strip
 
   return new Response(html, {

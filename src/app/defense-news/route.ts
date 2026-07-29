@@ -138,7 +138,7 @@ export async function GET() {
   // Phase 5 — swap the page's stale copy-pasted rail for the single shared rail.
   // (Defense News lives under the new "Defense Intel" group, so it highlights
   // that item.) Proof page for Design's 1:1 before propagating to all routes.
-  html = injectRail(html, "defense-intel");
+  html = injectRail(html, "defense-news");
   html = injectDefenseTabs(html, "news"); // Phase 5 item 2 — News/Spending tab strip
 
   return new Response(html, {
