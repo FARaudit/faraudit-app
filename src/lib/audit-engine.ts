@@ -7,6 +7,7 @@
 // agents/audit-ai/anthropic-files.ts.
 import { deletePdfFromFilesApi } from "@/lib/anthropic-files";
 import { isEnvOn } from "@/lib/env-flags";
+import { sizeStandardFor, formatSizeStandard } from "@/lib/sba-size-standards";
 
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 // Model: Opus 4.8 (CEO decision 2026-06-19) — reverts the May-4 Sonnet swap.
@@ -1774,28 +1775,13 @@ JSON only, no prose.`;
 // decisions that should never vary.
 // ═══════════════════════════════════════════════════════════════════════════
 
-// Fix 1 — NAICS size standard lookup. SBA's published table. Render call sites
-// must use this helper exclusively; the model must not generate size standards.
-const NAICS_SIZE_STANDARDS: Record<string, { employees?: number; revenue?: string; label: string }> = {
-  "336411": { employees: 1500, label: "Aircraft Manufacturing" },
-  "336412": { employees: 1500, label: "Aircraft Engine & Engine Parts Manufacturing" },
-  "336413": { employees: 1250, label: "Other Aircraft Parts & Auxiliary Equipment Manufacturing" },
-  "336414": { employees: 1250, label: "Guided Missile & Space Vehicle Manufacturing" },
-  "332710": { employees: 500,  label: "Machine Shops" },
-  "332721": { employees: 500,  label: "Precision Turned Product Manufacturing" },
-  "332722": { employees: 500,  label: "Bolt, Nut, Screw, Rivet & Washer Manufacturing" },
-  "541330": { revenue: "$25.5M", label: "Engineering Services" },
-  "541512": { employees: 150,  label: "Computer Systems Design Services" },
-  "541519": { employees: 150,  label: "Other Computer Related Services" },
-  "561210": { revenue: "$47M",  label: "Facilities Support Services" }
-};
+// Fix 1 — NAICS size standard lookup. Render call sites must use this helper
+// exclusively; the model must not generate size standards. The table itself
+// lives in sba-size-standards.ts (single source, primary-source-verified) —
+// a code it doesn't carry gets the pointer string, never a guessed number.
 export function getNaicsSizeStandard(naicsCode: string | null | undefined): string {
-  if (!naicsCode) return "See SBA Table of Size Standards";
-  const entry = NAICS_SIZE_STANDARDS[naicsCode];
-  if (!entry) return "See SBA Table of Size Standards";
-  if (entry.employees) return `${entry.employees.toLocaleString()} employees`;
-  if (entry.revenue) return `${entry.revenue} avg annual receipts`;
-  return "See SBA Table of Size Standards";
+  const std = sizeStandardFor(naicsCode);
+  return std ? formatSizeStandard(std) : "See SBA Table of Size Standards";
 }
 
 // Fix 11 — PIID decode. DLA / Army / AF / USCG / WPAFB issuing-activity prefix
