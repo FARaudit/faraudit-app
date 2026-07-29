@@ -148,11 +148,11 @@
     }
     if (meta) {
       if (state === 'live') {
-        const ingest = opts && opts.lastIngest ? ' · last ingest ' + opts.lastIngest : '';
-        meta.innerHTML = 'Live solicitations from the <b>SAM.gov daily ingest</b> · ' +
+        const ingest = opts && opts.lastIngest ? ' · refreshed ' + opts.lastIngest : '';
+        meta.innerHTML = 'Live solicitations read from <b>SAM.gov</b> · ' +
           opts.count + ' notice' + (opts.count === 1 ? '' : 's') + ingest;
       } else if (state === 'empty') {
-        meta.innerHTML = 'Connected to the <b>SAM.gov daily ingest</b> — no notices in the current window.';
+        meta.innerHTML = 'Connected to the <b>live SAM.gov feed</b> — no notices in the current window.';
       } else if (state === 'error') {
         meta.textContent = 'SAM.gov feed unavailable — nothing shown below is sample data.';
       } else {
