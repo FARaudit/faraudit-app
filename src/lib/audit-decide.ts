@@ -3435,6 +3435,14 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //    weaken a green light, never invent one and never bury a real bar. Flag OFF ⇒ null ⇒ capCommittal's U-A
   //    branch is dead code and the coverage-NHR return runs exactly as before (byte-identical).
   let uncoveredCoverageCaution: string | null = null;
+  // #687 PRESERVATION (U-A red-team, 2026-07-29): an honest-fail exit reached only BECAUSE the cap released the
+  // coverage mute must not LOSE the named uncovered item — the generic INCOMPLETE / none-survived templates say
+  // nothing about it, which is the exact masking the #687 ruling struck ("the INCOMPLETE reason hides it behind
+  // a manifest complaint"). Appended, never prepended: the exit's own driver stays the headline. Applied at the
+  // GENERIC exits only (1b/2b/temporal/manifest) — an NHR exit that names its own more-decisive bar is not
+  // information-losing, and the item stays persisted in coverageV2.disqualifierUncovered for every consumer.
+  // Null (flag OFF / no cap banked) ⇒ identity ⇒ byte-identical.
+  const withCoverageCaution = (reason: string): string => (uncoveredCoverageCaution ? `${reason} ${uncoveredCoverageCaution}` : reason);
   const capCommittal = (d: Decision): Decision => {
     // guard: only a committal (BID/BWC) is capped; any non-committal reaching here is returned untouched.
     let out = d;
@@ -3519,7 +3527,10 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
     // SEAM FILL (card #472) — on the coverage-NHR cap ONLY (never INCOMPLETE: unreadable ⇒ findings untrustworthy), lift
     // any grounded site-visit/eligibility bar in dispositions[] into the persisted showStoppers[] slot so it renders in
     // the show-stopper band, not the P2 advisories. Same filter/flag family as the notice-body pole. OFF ⇒ [] (identical).
-    if (v2.cap === "NEEDS_HUMAN_REVIEW" && coverageCapNotMuteEnabled() && v2.kind !== "credential_conditional") {
+    // FAIL-CLOSED DISCRIMINATOR (red-team F4): the mute is released ONLY on the POSITIVE "uncovered_obligation"
+    // tag — an absent or unrecognized kind keeps the NHR (fail-toward-disqualifier; a future kind-less NHR return
+    // must never silently downgrade a mute to a committal cap).
+    if (v2.cap === "NEEDS_HUMAN_REVIEW" && coverageCapNotMuteEnabled() && v2.kind === "uncovered_obligation") {
       // U-A CAP-NOT-MUTE (panel 2026-07-29): an uncovered obligation no longer mutes the pole. Bank the named
       // caution and FALL THROUGH — every bar / honest-fail / show-stopper path below runs at full force, and only
       // a would-be committal exit is capped (capCommittal) to BID_WITH_CAUTION carrying this item. The NHR
@@ -3567,7 +3578,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //     drop) caps EVERY pole to INCOMPLETE, committal included: an unread binding doc could carry OR waive a bar,
   //     so no verdict can be certified over a partial read. Explicit `=== false` ⇒ callers that omit it are unchanged.
   if (inp.documentsComplete === false)
-    return mk("INCOMPLETE", honestFailEligible(), "Document set not complete — a posted binding document could not be confirmed read in full (unfetched, scanned/no-text, or truncated)." + (inp.coverageGap ? ` Gap: ${inp.coverageGap}.` : ""), dispositions, []);
+    return mk("INCOMPLETE", honestFailEligible(), withCoverageCaution("Document set not complete — a posted binding document could not be confirmed read in full (unfetched, scanned/no-text, or truncated)." + (inp.coverageGap ? ` Gap: ${inp.coverageGap}.` : "")), dispositions, []);
 
   // 1c. AMENDMENT A (Brain card-304, F bake-off) — Candidate A's citation-grounded unread/missing-material signals are
   //     manifest-ADJACENT: a package can pass the deterministic manifest gate yet Candidate A observe a referenced
@@ -3603,7 +3614,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   // it would sail past a `length === 0` test and fall through to a clean default BID. A materially-empty verified set
   // (no non-`dropped` survivor) → NEEDS_HUMAN_REVIEW, never a default BID. (`every` on [] is true → literal-empty covered.)
   if (dispositions.every((f) => f.disposition === "dropped"))
-    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "No decision-bearing findings survived over complete coverage (empty or all-boilerplate verified set) — a clean BID cannot rest on a materially-empty set. Human review required.", dispositions, [], "verification");
+    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), withCoverageCaution(`No decision-bearing findings survived over ${uncoveredCoverageCaution ? "the graded coverage" : "complete coverage"} (empty or all-boilerplate verified set) — a clean BID cannot rest on a materially-empty set. Human review required.`), dispositions, [], "verification");
 
   // 3. Show-stoppers — BRAIN CARD 226 FORK 2: DEFAULT-DENY NO_BID (positive-allow, not negative-deny). A committal
   //    NO_BID is reachable ONLY on a POSITIVE match to the UNIVERSAL_DEFECT allowlist (the solicitation is
@@ -3824,7 +3835,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //   solicitation whose live currency we could not confirm cannot carry a committal verdict → INCOMPLETE naming the
   //   gap. temporal-null / flag-OFF ⇒ temporalIndeterminate=false ⇒ not reached ⇒ byte-identical.
   if (temporalIndeterminate)
-    return mk("INCOMPLETE", honestFailEligible(), `Cannot confirm the solicitation is still open — ${temporalCapReason}. A bid/caution verdict cannot stand until currency is confirmed on SAM.`, dispositions, []);
+    return mk("INCOMPLETE", honestFailEligible(), withCoverageCaution(`Cannot confirm the solicitation is still open — ${temporalCapReason}. A bid/caution verdict cannot stand until currency is confirmed on SAM.`), dispositions, []);
 
   // 5c. CURABLE bar (curableInWindow === true) under unknown status → a genuine residual risk → BID_WITH_CAUTION.
   //     The deterministic CAUTION-FLOOR (Brain card 75-R2 / 78-R1) joins here: a finding marked cautionFloor
@@ -3835,7 +3846,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   const residual = unknownBars.filter((f) => f.curableInWindow === true);
   const floored = dispositions.filter((f) => f.cautionFloor === true);
   if (residual.length || floored.length) {
-    if (manifestIncomplete) return mk("INCOMPLETE", honestFailEligible(), "A manifest-named attachment went unfetched — a 'caution' (no-bar) verdict cannot stand on an incomplete read.", dispositions, []);
+    if (manifestIncomplete) return mk("INCOMPLETE", honestFailEligible(), withCoverageCaution("A manifest-named attachment went unfetched — a 'caution' (no-bar) verdict cannot stand on an incomplete read."), dispositions, []);
     const reasons = [
       residual.length ? `residual curable risk(s) to confirm within the window: ${names(residual)}` : "",
       floored.length ? `qualification caution(s) to verify: ${names(floored)}` : "",
@@ -3848,7 +3859,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   // 6. Default — open, eligible, every unmet item is a bidder-controllable gate-to-clear → BID — UNLESS the read
   //    was incomplete (then we cannot assert "no bar found").
   if (manifestIncomplete)
-    return mk("INCOMPLETE", honestFailEligible(), "A manifest-named attachment went unfetched — a 'no bar found' (BID) verdict cannot stand on an incomplete read.", dispositions, []);
+    return mk("INCOMPLETE", honestFailEligible(), withCoverageCaution("A manifest-named attachment went unfetched — a 'no bar found' (BID) verdict cannot stand on an incomplete read."), dispositions, []);
   return capCommittal(committalEligible() === null
     ? mk("BID", null, `${committalCaution()}Open; eligibility not determined — verify the eligibility gate(s) above; all other unmet items are bidder-controllable gates to clear.`, dispositions, [])
     : mk("BID", true, "Open, eligible; all unmet items are bidder-controllable gates to clear (the work of bidding).", dispositions, []));

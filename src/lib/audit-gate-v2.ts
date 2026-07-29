@@ -1128,9 +1128,30 @@ export function gateV2Outcome(cov: CoverageV2, opts?: { findings?: Array<{ kind?
     // credential-during-performance / SAM-active), upgrade the reason prose to an actionable conditional. CAP is
     // UNCHANGED (still NEEDS_HUMAN_REVIEW — verdict untouched). The credential is grounded from the obligation and the
     // phrasing makes NO claim about the bidder (fabrication-invariant compliant). Flag-OFF ⇒ the legacy line below.
+    // ── KIND TRUTH (U-A red-team F1/F2, 2026-07-29) — bucket-wide and FLAG-INDEPENDENT. Whether this NHR is a
+    // firm-fact credential-conditional (Rule 70 case (c) — never released to a committal cap) is a property of
+    // the WHOLE firing bucket, not of the quoted head and not of the #575b PROSE flag. Two defects this closes:
+    //   F1 — kind was emitted only inside the credentialConditionalReasonEnabled() branch, so arming cap-not-mute
+    //        without the prose flag silently capped every credential conditional (prose flag owned a verdict
+    //        discriminator);
+    //   F2 — kind was derived from the ranked head `d` alone, so a cc item at index ≥1 behind a higher-ranked
+    //        non-cc item lost its mute (head-only prose selection silently promoted to verdict authority).
+    // The prose upgrade below stays behind #575b exactly as shipped; cap/reason are untouched in every
+    // pre-existing flag state (kind is additive — only the U-A consumer reads it).
+    const ccHead = credentialConditionalRecital(d.obligation) ? d : undefined;
+    const ccAny = ccHead ?? firing.find((f) => credentialConditionalRecital(f.obligation));
+    const kind: "credential_conditional" | "uncovered_obligation" = ccAny ? "credential_conditional" : "uncovered_obligation";
     if (credentialConditionalReasonEnabled()) {
-      const cc = credentialConditionalRecital(d.obligation);
-      if (cc) return { cap: "NEEDS_HUMAN_REVIEW", kind: "credential_conditional", reason: `A credential-conditional requirement ${where} could not be grounded to a finding — it requires ${cc.credential}. Confirm your firm holds this before bidding — human verification needed: "${d.obligation.slice(0, 120)}".${ctxNote}` };
+      // Prose selection: pre-U-A behavior quotes the head iff the HEAD is cc (byte-identical with cap-not-mute
+      // OFF); with cap-not-mute ON the prose may quote the cc item found anywhere in the bucket — under the cap
+      // regime the cc item IS the reason the mute holds, so it is the sentence the customer must see.
+      const ccQuote = process.env.AUDIT_COVERAGE_CAP_NOT_MUTE === "true" ? ccAny : ccHead;
+      if (ccQuote) {
+        const cc = credentialConditionalRecital(ccQuote.obligation)!;
+        const ccWhere = ccQuote.locatedAt ? `at ${ccQuote.locatedAt}` : `in §${ccQuote.section}`;
+        const ccCtx = ccQuote.contextNote ? ` ${clampNote(ccQuote.contextNote)}` : "";
+        return { cap: "NEEDS_HUMAN_REVIEW", kind: "credential_conditional", reason: `A credential-conditional requirement ${ccWhere} could not be grounded to a finding — it requires ${cc.credential}. Confirm your firm holds this before bidding — human verification needed: "${ccQuote.obligation.slice(0, 120)}".${ccCtx}` };
+      }
     }
     // ── B4 (Brain ruling on cards #690/#691, 2026-07-23) — STOP CHARACTERIZING AN UNRANKED SENTENCE AS A BAR ──
     // Flag `AUDIT_BANNER_NO_UNRANKED_BAR_CLAIM`, default-OFF. CAP-INVARIANT / REASON-VARIANT / VERDICT-INERT.
@@ -1149,9 +1170,12 @@ export function gateV2Outcome(cov: CoverageV2, opts?: { findings?: Array<{ kind?
     if (bannerNoUnrankedBarClaimEnabled()) {
       const n = cov.disqualifierUncovered.length;
       const more = n > 1 ? ` ${n} obligations in this package could not be grounded; this excerpt is the first in document order, not necessarily the most significant.` : "";
-      return { cap: "NEEDS_HUMAN_REVIEW", kind: "uncovered_obligation", reason: `An obligation ${where} could not be grounded to a finding — human verification needed: "${d.obligation.slice(0, 120)}".${more}${ctxNote}` };
+      // `kind` is the BUCKET-WIDE truth computed above — a cc item anywhere keeps kind "credential_conditional"
+      // even when this prose branch quotes a different (higher-ranked) item, so the U-A consumer never releases
+      // the mute over an unexamined firm-fact conditional (red-team F1/F2).
+      return { cap: "NEEDS_HUMAN_REVIEW", kind, reason: `An obligation ${where} could not be grounded to a finding — human verification needed: "${d.obligation.slice(0, 120)}".${more}${ctxNote}` };
     }
-    return { cap: "NEEDS_HUMAN_REVIEW", kind: "uncovered_obligation", reason: `A potential disqualifying requirement ${where} could not be grounded to a finding — human verification needed: "${d.obligation.slice(0, 120)}".${ctxNote}` };
+    return { cap: "NEEDS_HUMAN_REVIEW", kind, reason: `A potential disqualifying requirement ${where} could not be grounded to a finding — human verification needed: "${d.obligation.slice(0, 120)}".${ctxNote}` };
   }
   const nonBar = cov.ungroundedNonBarSignal ?? [];
   const demoted = nonBar.length
