@@ -33,8 +33,12 @@ export async function GET(req: Request) {
     );
   }
   const limit = Number.parseInt(searchParams.get("limit") || "10", 10) || 10;
+  // Filters are OPT-IN and echoed back in the response so a caller can only
+  // caption what was actually applied (?active=1&setAside=SBA).
+  const activeOnly = searchParams.get("active") === "1";
+  const setAside = searchParams.get("setAside") || undefined;
 
-  const outcome = await searchOpportunitiesByNaics({ naicsCodes, limit });
+  const outcome = await searchOpportunitiesByNaics({ naicsCodes, limit, activeOnly, setAside });
 
   if (!outcome.ok) {
     return NextResponse.json(
@@ -57,5 +61,10 @@ export async function GET(req: Request) {
     uiLink: s.noticeId ? `https://sam.gov/opp/${s.noticeId}/view` : null,
   }));
 
-  return NextResponse.json({ source: "live", total: outcome.total, opportunities });
+  return NextResponse.json({
+    source: "live",
+    total: outcome.total,
+    filters: { activeOnly, setAside: setAside ?? null },
+    opportunities,
+  });
 }

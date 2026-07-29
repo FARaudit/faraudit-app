@@ -14,7 +14,23 @@
   const D = window.DSO;
   const $ = (id) => document.getElementById(id);
   const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-  const money = (m) => m == null ? '—' : '$' + (m % 1 === 0 ? m : m.toFixed(1)) + 'M';
+
+  // Every string below originates in the SAM feed (notice titles, agency names,
+  // incumbent names are all poster-controlled text) and is interpolated into
+  // innerHTML — so it MUST be escaped. Covers attribute context too (" and ').
+  const esc = (s) => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+  // Stated values are shown at their real magnitude: a $45,000 ceiling is
+  // "$45K", never "$0.0M" (a rounded-to-zero display of a real number is the
+  // same false-zero class this page exists to eliminate).
+  const money = (m) => {
+    if (m == null) return '—';
+    if (m >= 1) return '$' + (m % 1 === 0 ? m : m.toFixed(1)) + 'M';
+    const k = m * 1000;
+    return '$' + (k >= 1 ? (k % 1 === 0 ? k : k.toFixed(1)) + 'K' : Math.round(m * 1e6).toLocaleString());
+  };
 
   const S = { naics: new Set(), naicsInit: false, stage: 'all', sa: 'all', q: '', view: null, sort: 'fit', sel: null };
 
@@ -28,9 +44,9 @@
   function pursuitInsight(o) {
     const saElig = ['SB', 'SDVOSB', '8(a)', 'HUBZone'].includes(o.sa);
     const upstream = o.stage === 'sources' || o.stage === 'presol';
-    if (upstream) return `Upstream window — shape the requirement before the RFP drops${saElig ? `, and it's ${o.sa}-eligible` : ''}.`;
-    if (o.incumbent != null && o.fit != null) return `Recompete read: incumbent on record is <em>${o.incumbent}</em> — lead on your ${o.fit}/100 audited fit and price.`;
-    if (o.incumbent != null) return `Incumbent on record: <em>${o.incumbent}</em> — expect a recompete posture.`;
+    if (upstream) return `Upstream window — shape the requirement before the RFP drops${saElig ? `, and it's ${esc(o.sa)}-eligible` : ''}.`;
+    if (o.incumbent != null && o.fit != null) return `Recompete read: incumbent on record is <em>${esc(o.incumbent)}</em> — lead on your ${o.fit}/100 audited fit and price.`;
+    if (o.incumbent != null) return `Incumbent on record: <em>${esc(o.incumbent)}</em> — expect a recompete posture.`;
     if (o.fit != null) return `${fitTier(o.fit)} at ${o.fit}/100 — ${o.days != null && o.days <= 7 ? 'move now, the window is closing.' : 'time to prep a strong bid.'}`;
     return `Not yet audited — run the audit for a scored, grounded read.`;
   }
@@ -55,9 +71,11 @@
   }
 
   function applyView() {
-    // saved views override the discrete filters but keep NAICS
+    // Saved views override the discrete filters but keep NAICS. The stage
+    // segment stays on 'all': the upstream view's own predicate admits BOTH
+    // presol and sources rows, and forcing S.stage='sources' here used to
+    // reject every pre-solicitation before that predicate ran.
     S.stage = 'all'; S.sa = 'all';
-    if (S.view === 'upstream') S.stage = 'sources';
     sync();
   }
   function sync() {
@@ -179,7 +197,14 @@
 
     const x = d3.scaleLinear().domain([0, 80]).range([m.l, W - m.r]);
     const y = d3.scaleLinear().domain([0, 35]).range([H - m.b, m.t]);
-    const r = d3.scaleSqrt().domain([55, 100]).range([5, 22]);
+    // clamp(true): compliance_score is 0–100, and an unclamped sqrt scale
+    // extrapolates NEGATIVE below the domain floor (fit 30 → r = −7.8 → the
+    // browser drops the circle and the row silently vanishes from the chart).
+    const r = d3.scaleSqrt().domain([55, 100]).range([5, 22]).clamp(true);
+    // Un-audited rows have NO size to encode. They plot at the floor radius
+    // with a dashed outline + no fill so the size channel never implies a
+    // score the engine did not compute.
+    const RADIUS_NA = 5;
     const medX = 14, medY = 10;
     // sweet-spot zone (soon + high value)
     svg.append('rect').attr('x', x(0)).attr('y', m.t).attr('width', x(medX) - x(0)).attr('height', y(medY) - m.t).attr('fill', css('--green-500')).attr('opacity', .05);
@@ -194,12 +219,14 @@
     svg.selectAll('circle.bub').data(data, d => d.id).join('circle')
       .attr('class', d => 'bub' + (S.sel === d.id ? ' sel' : ''))
       .attr('cx', d => x(Math.min(78, d.days))).attr('cy', d => y(Math.min(34, d.ceiling)))
-      .attr('r', d => r(d.fit == null ? 55 : d.fit)).attr('fill', d => D.STAGE_META[d.stage].color).attr('opacity', .6)
-      .attr('stroke', d => D.STAGE_META[d.stage].color).attr('stroke-width', .5)
+      .attr('r', d => d.fit == null ? RADIUS_NA : r(d.fit))
+      .attr('fill', d => d.fit == null ? 'none' : D.STAGE_META[d.stage].color).attr('opacity', .6)
+      .attr('stroke', d => D.STAGE_META[d.stage].color).attr('stroke-width', d => d.fit == null ? 1.2 : .5)
+      .attr('stroke-dasharray', d => d.fit == null ? '2,2' : null)
       .on('mousemove', (ev, d) => {
         const tip = $('bubTip');
-        tip.innerHTML = `<div style="font-family:Manrope;font-weight:800;font-size:12px;margin-bottom:3px;max-width:200px">${d.title}</div>
-          <div style="font-family:'IBM Plex Mono';font-size:10px;color:#cbd5e1;line-height:1.5">${d.agency} · fit <b style="color:#fff">${d.fit == null ? 'not audited' : d.fit}</b><br>${money(d.ceiling)} ceiling · <b style="color:#fff">${d.days}d</b> left · ${D.STAGE_META[d.stage].label}</div>`;
+        tip.innerHTML = `<div style="font-family:Manrope;font-weight:800;font-size:12px;margin-bottom:3px;max-width:200px">${esc(d.title)}</div>
+          <div style="font-family:'IBM Plex Mono';font-size:10px;color:#cbd5e1;line-height:1.5">${esc(d.agency)} · fit <b style="color:#fff">${d.fit == null ? 'not audited' : d.fit}</b><br>${money(d.ceiling)} ceiling · <b style="color:#fff">${d.days}d</b> left · ${D.STAGE_META[d.stage].label}</div>`;
         tip.style.display = 'block'; tip.style.left = Math.min(ev.clientX + 14, window.innerWidth - 230) + 'px'; tip.style.top = (ev.clientY + 14) + 'px';
       })
       .on('mouseleave', () => $('bubTip').style.display = 'none')
@@ -234,7 +261,7 @@
         : `<div class="act-days ${u}">${o.days}d<small>${(o.type || '').toUpperCase()}</small></div>`;
       return `<div class="act-row${S.sel === o.id ? ' sel' : ''}" data-id="${o.id}">
         ${fitRing(o.fit)}
-        <div class="act-info"><div class="act-title">${o.title}</div><div class="act-agy">${o.agency}${o.ceiling != null ? ' · ' + money(o.ceiling) : ''}</div></div>
+        <div class="act-info"><div class="act-title">${esc(o.title)}</div><div class="act-agy">${esc(o.agency)}${o.ceiling != null ? ' · ' + money(o.ceiling) : ''}</div></div>
         ${daysHtml}
       </div>`;
     }).join('') : `<div class="empty">No pursuits match your filters.</div>`;
@@ -265,7 +292,7 @@
       (unpriced ? ` · ${unpriced} without a stated value` : '');
 
     const maxDays = 80;
-    const WATCHED = D.WATCHED_NOTICE_IDS;   // Set, or null = watch state unavailable
+    const WATCHED = D.WATCHED_NOTICE_IDS;   // Map notice_id→status, or null = unavailable
     const PIPE = D.PIPELINE_IDS;            // Set, or null = pipeline state unavailable
     $('plist').innerHTML = data.length ? data.map(o => {
       const u = urg(o.days), sm = D.STAGE_META[o.stage];
@@ -282,13 +309,13 @@
       const ceilingHtml = o.ceiling != null
         ? `<div class="pc-ceiling">${money(o.ceiling)}<small>CEILING</small></div>`
         : `<div class="pc-ceiling" style="color:var(--mute-2)">—<small>NO STATED VALUE</small></div>`;
-      return `<div class="pcard stage-${o.stage}${S.sel === o.id ? ' sel' : ''}" id="pc-${cssId(o.id)}" data-id="${o.id}">
+      return `<div class="pcard stage-${o.stage}${S.sel === o.id ? ' sel' : ''}" id="pc-${cssId(o.id)}" data-id="${esc(o.id)}">
         ${fitTile(o.fit)}
         <div class="pc-main">
-          <div class="pc-title">${o.title}</div>
-          <div class="pc-agy">${o.agency}${o.office ? ' · ' + o.office : ''} · <span class="pc-idin">${o.id}</span></div>
+          <div class="pc-title">${esc(o.title)}</div>
+          <div class="pc-agy">${esc(o.agency)}${o.office ? ' · ' + esc(o.office) : ''} · <span class="pc-idin">${esc(o.id)}</span></div>
           <div class="pc-chips">
-            <span class="chip naics">${o.naics || 'NAICS —'}</span>
+            <span class="chip naics">${esc(o.naics) || 'NAICS —'}</span>
             <span class="chip ${saCls}">${o.sa === 'Full' ? 'Full &amp; Open' : o.sa}</span>
             <span class="chip stage" style="background:${sm.color}">${sm.label}</span>
           </div>
@@ -301,8 +328,8 @@
           ${auditRef
             ? `<a class="btn-open" href="/audit?noticeId=${encodeURIComponent(auditRef)}">Run Audit</a>`
             : `<a class="btn-open" style="opacity:.5;pointer-events:none" title="No notice reference">Run Audit</a>`}
-          <button class="btn-save" data-track="${(o.id || '').replace(/"/g, '&quot;')}" data-pipe-stage="${o.stage === 'presol' ? '01' : o.stage === 'sources' ? '02' : '03'}" data-pipe-title="${(o.title || '').replace(/"/g, '&quot;')}" data-pipe-agency="${(o.agency || '').replace(/"/g, '&quot;')}" data-pipe-naics="${o.naics || ''}" data-pipe-deadline="${o.response_deadline || ''}" data-pipe-ceiling="${o.ceiling != null ? o.ceiling : ''}"><svg class="ic-add" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg><svg class="ic-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg><span class="bs-add">Pipeline</span><span class="bs-on">In Pipeline</span></button>
-          <button class="btn-watch" data-watch-notice="${o.notice_id || ''}" data-watch-title="${(o.title || '').replace(/"/g, '&quot;')}" data-watch-agency="${(o.agency || '').replace(/"/g, '&quot;')}" data-watch-naics="${o.naics || ''}" data-watch-type="${(o.notice_type || '').replace(/"/g, '&quot;')}" data-watch-deadline="${o.response_deadline || ''}" data-watch-sol="${(o.id || '').replace(/"/g, '&quot;')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg><span class="bw-off">Track</span><span class="bw-on">Tracking</span></button>
+          <button class="btn-save" data-track="${esc(o.id)}"><svg class="ic-add" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg><svg class="ic-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg><span class="bs-add">Pipeline</span><span class="bs-on">In Pipeline</span></button>
+          <button class="btn-watch" data-watch-notice="${esc(o.notice_id)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg><span class="bw-off">Track</span><span class="bw-on">Tracking</span></button>
         </div>
         <div class="pc-insight"><span class="ai-tag">Insight</span><span class="ai-txt">${aiTip}</span></div>
       </div>`;
@@ -313,7 +340,8 @@
     // 'tracking'). PIPE === null → state unknown → disabled, never faked.
     $('plist').querySelectorAll('.btn-save').forEach(b => {
       const id = b.dataset.track;
-      if (!id) { b.disabled = true; b.title = 'No solicitation reference'; return; }
+      const o = D.OPPS.find(x => x.id === id);
+      if (!id || !o) { b.disabled = true; b.title = 'No solicitation reference'; return; }
       if (PIPE == null) { b.disabled = true; b.title = 'Pipeline state unavailable'; return; }
       if (PIPE.has(id)) b.classList.add('on');
       b.onclick = (e) => {
@@ -328,20 +356,29 @@
               headers: { 'content-type': 'application/json' },
               body: JSON.stringify({
                 solicitationNumber: id,
-                title: b.dataset.pipeTitle || null,
-                agency: b.dataset.pipeAgency || null,
-                naics: b.dataset.pipeNaics || null,
-                dueDate: b.dataset.pipeDeadline || null,
-                estimatedValueM: b.dataset.pipeCeiling ? Number(b.dataset.pipeCeiling) : null,
-                stageCode: b.dataset.pipeStage || null
+                title: o.title || null,
+                agency: o.agency || null,
+                naics: o.naics || null,
+                dueDate: o.response_deadline || null,
+                estimatedValueM: o.ceiling,
+                stageCode: o.stage === 'presol' ? '01' : o.stage === 'sources' ? '02' : '03'
               })
             });
         req.then(r => r.json().catch(() => ({})).then(d => ({ ok: r.ok, data: d })))
           .then(out => {
             b.dataset._busy = '';
             if (!out.ok) { console.warn('[pipeline] failed', out); return; }
-            if (on) { PIPE.delete(id); b.classList.remove('on'); }
-            else    { PIPE.add(id);    b.classList.add('on'); }
+            if (on) {
+              // removed:0 means the server REFUSED (the pursuit advanced past
+              // capture). Flipping the button off there would assert a removal
+              // that never happened — keep it on and say why.
+              if (!(out.data && out.data.removed > 0)) {
+                b.title = 'Advanced past capture on the pipeline board — remove it there';
+                console.warn('[pipeline] delete refused (row advanced)', out);
+                return;
+              }
+              PIPE.delete(id); b.classList.remove('on');
+            } else { PIPE.add(id); b.classList.add('on'); }
           })
           .catch(err => { b.dataset._busy = ''; console.warn('[pipeline] error', err); });
       };
@@ -352,9 +389,19 @@
     // un-tracked rendering is a false negative).
     $('plist').querySelectorAll('.btn-watch').forEach(b => {
       const noticeId = b.dataset.watchNotice;
-      if (!noticeId) { b.disabled = true; b.title = 'No notice id'; return; }
+      const o = D.OPPS.find(x => x.notice_id === noticeId);
+      if (!noticeId || !o) { b.disabled = true; b.title = 'No notice id'; return; }
       if (WATCHED == null) { b.disabled = true; b.title = 'Watch state unavailable'; return; }
-      if (WATCHED.has(noticeId)) b.classList.add('on');
+      const watchStatus = WATCHED.get(noticeId) || null;
+      if (watchStatus) b.classList.add('on');
+      // A watch that advanced beyond 'watching' (posted / audited) carries audit
+      // linkage and history. Un-tracking would DELETE that row, so the toggle is
+      // disabled for those — the watch is managed from /watching, not here.
+      if (watchStatus && watchStatus !== 'watching') {
+        b.disabled = true;
+        b.title = `Watch has advanced (${watchStatus}) — manage it on the Watching page`;
+        return;
+      }
       b.onclick = (e) => {
         e.stopPropagation();
         if (b.dataset._busy === '1') return;
@@ -372,11 +419,11 @@
               headers: { 'content-type': 'application/json' },
               body: JSON.stringify({
                 noticeId,
-                title: b.dataset.watchTitle || null,
-                agency: b.dataset.watchAgency || null,
-                solicitationNumber: b.dataset.watchSol || null,
-                noticeType: b.dataset.watchType || null,
-                responseDeadline: b.dataset.watchDeadline || null
+                title: o.title || null,
+                agency: o.agency || null,
+                solicitationNumber: o.id || null,
+                noticeType: o.notice_type || null,
+                responseDeadline: o.response_deadline || null
               })
             };
         fetch(url, init)
@@ -385,7 +432,7 @@
             b.dataset._busy = '';
             if (!out.ok) { console.warn('[watch] failed', out); return; }
             if (on) { WATCHED.delete(noticeId); b.classList.remove('on'); }
-            else    { WATCHED.add(noticeId);    b.classList.add('on'); }
+            else    { WATCHED.set(noticeId, out.data && out.data.status ? out.data.status : 'watching'); b.classList.add('on'); }
           })
           .catch(err => { b.dataset._busy = ''; console.warn('[watch] error', err); });
       };

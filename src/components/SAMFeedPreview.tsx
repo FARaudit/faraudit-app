@@ -17,7 +17,9 @@ export default function SAMFeedPreview() {
   const [source, setSource] = useState("");
 
   useEffect(() => {
-    fetch("/api/sam?naics=336413&limit=5")
+    // active=1&setAside=SBA are what make the "active small business" caption
+    // below true — the filters must be requested, not assumed.
+    fetch("/api/sam?naics=336413&limit=5&active=1&setAside=SBA")
       .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
       .then(({ ok, data }) => {
         // /api/sam is fail-closed: non-200 means the feed is unavailable and

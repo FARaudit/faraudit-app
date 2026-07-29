@@ -24,10 +24,24 @@
     return 'SB';
   }
 
-  // SAM document_type → DSO stage (presol|sources|rfp|eval).
+  // document_type → DSO stage (presol|sources|rfp|eval).
+  //
+  // The ingest stores the CANONICAL short codes produced by classifyDocType()
+  // (src/lib/sam.ts / agents/sam-ingest/helpers.ts): SrcSght · PreSol ·
+  // Combined · RFQ · IDIQ · BPA · TaskOrd · Mod · Award · Other. Matching those
+  // first is what makes the stage lanes correct; the long-string tests below
+  // remain only for rows written before the classifier landed (and for raw SAM
+  // `type` strings arriving from other paths).
+  const DOCTYPE_STAGE = {
+    presol: 'presol', srcsght: 'sources', combined: 'sources',
+    award: 'eval', mod: 'eval',
+    rfq: 'rfp', idiq: 'rfp', bpa: 'rfp', taskord: 'rfp'
+  };
   function normStage(docType, status) {
-    const d = String(docType || '').toLowerCase();
+    const raw = String(docType || '').trim();
+    const d = raw.toLowerCase();
     const s = String(status || '').toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(DOCTYPE_STAGE, d)) return DOCTYPE_STAGE[d];
     if (d.includes('pre-sol') || d.includes('presol') || d.includes('synopsis only')) return 'presol';
     if (d.includes('sources sought') || d.includes('rfi') || d.includes('combined')) return 'sources';
     if (d.includes('award') || d.includes('justification') || s.includes('award') || s.includes('eval')) return 'eval';
@@ -79,17 +93,20 @@
     };
   }
 
-  // Returns a Set of watched notice ids, or null when the watch state could
-  // not be fetched — the render layer disables Track buttons on null rather
-  // than showing every row as un-tracked (a false negative).
+  // Returns a Map of notice_id → watch STATUS ('watching' | 'posted' |
+  // 'audited'), or null when the watch state could not be fetched — the render
+  // layer disables Track buttons on null rather than showing every row as
+  // un-tracked (a false negative). The status matters: a watch that advanced
+  // past 'watching' carries audit linkage, and un-tracking would delete it, so
+  // the render layer makes those non-toggleable.
   async function hydrateWatchedSet(opps) {
     const noticeIds = opps.map(o => o.notice_id).filter(Boolean);
-    if (!noticeIds.length) return new Set();
+    if (!noticeIds.length) return new Map();
     try {
       const res = await fetch('/api/watch?noticeIds=' + encodeURIComponent(noticeIds.join(',')), { credentials: 'include' });
       if (!res.ok) return null;
       const data = await res.json();
-      return new Set(Object.keys(data.watching || {}));
+      return new Map(Object.entries(data.watching || {}));
     } catch (_) {
       return null;
     }
@@ -153,12 +170,16 @@
       const data = await res.json();
       const opps = Array.isArray(data.opportunities) ? data.opportunities : [];
       // The ingest queue can hold multiple rows for the same notice — showing
-      // one notice 3× inflates every count. Keep the first occurrence per
-      // notice_id (the query orders created_at desc, so first = newest).
+      // one notice 3× inflates every count. Dedupe on the DISPLAY identity
+      // (same precedence as mapOpp's `id`), not on notice_id: a base notice and
+      // its amendment share a solicitation_number but carry different
+      // notice_ids, so a notice_id key would keep both and then render them as
+      // two cards with identical DOM ids and one shared Pipeline toggle.
+      // The query orders created_at desc, so the first occurrence is newest.
       const seen = new Set();
       const mapped = [];
       opps.forEach(function (o) {
-        const key = o.notice_id || o.solicitation_number || o.id;
+        const key = o.solicitation_number || o.notice_id || o.id;
         if (key && seen.has(key)) return;
         if (key) seen.add(key);
         mapped.push(mapOpp(o));

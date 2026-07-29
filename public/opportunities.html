@@ -461,7 +461,8 @@ button{font-family:inherit}
 (function(){
   var btn=document.getElementById('bellBtn'),menu=document.getElementById('bellMenu');
   if(!btn||!menu)return;
-  function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  /* escapes attribute context too — n.link is interpolated into href="…" */
+  function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
   function relTime(iso){var ms=new Date(iso).getTime();if(isNaN(ms))return'';var h=Math.floor((Date.now()-ms)/3600000);if(h<1)return'just now';if(h<48)return h+'h ago';return Math.floor(h/24)+'d ago';}
   var ROW='padding:9px 10px;border-radius:8px;font-size:12px;line-height:1.4;color:var(--ink-2)';
   function close(){menu.hidden=true;btn.setAttribute('aria-expanded','false');}

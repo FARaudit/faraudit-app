@@ -78,9 +78,14 @@ export async function POST(req: Request) {
     }
 
     const dueDate = body.dueDate ? String(body.dueDate).slice(0, 10) : null;
+    // estimated_value is stored as a PLAIN NUMBER of dollars (as text — the
+    // column is text). It must stay parseable: command-center-data sums it with
+    // parseFloat(), and a display string like "$18.4M" parses to NaN → 0, so
+    // every row added here would have counted as $0 in the weighted pipeline
+    // total. Formatting happens at render (public/pipeline-live.js).
     const estValue =
       typeof body.estimatedValueM === "number" && Number.isFinite(body.estimatedValueM)
-        ? `$${body.estimatedValueM % 1 === 0 ? body.estimatedValueM : body.estimatedValueM.toFixed(1)}M`
+        ? String(Math.round(body.estimatedValueM * 1e6))
         : null;
 
     const stage = CAPTURE_STAGES.includes(String(body.stageCode)) ? String(body.stageCode) : "03";
@@ -100,7 +105,10 @@ export async function POST(req: Request) {
       .single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    return NextResponse.json({ ok: true, id: data?.id ?? null, stage: data?.stage ?? "tracking", created: true });
+    // No `?? "tracking"` fallback: an insert that returned no row has no
+    // persisted stage to report, and "tracking" is a value the constraint
+    // rejects — reporting it would be a fabricated success (Rule 61).
+    return NextResponse.json({ ok: true, id: data?.id ?? null, stage: data?.stage ?? null, created: true });
   } catch (err) {
     console.error("[api/pipeline POST]", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });

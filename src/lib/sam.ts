@@ -182,6 +182,11 @@ export async function searchOpportunitiesByNaics(opts: {
   naicsCodes: string[];
   limit?: number;
   daysBack?: number;
+  // Optional upstream filters. Omitted = no filter applied — callers that
+  // LABEL their results ("active small business solicitations") must pass
+  // these, or the caption asserts a filter the query never applied.
+  activeOnly?: boolean;
+  setAside?: string;
 }): Promise<SamSearchOutcome> {
   const apiKey = process.env.SAM_API_KEY;
   if (!apiKey) {
@@ -205,6 +210,8 @@ export async function searchOpportunitiesByNaics(opts: {
           limit: String(limit),
           ptype: "o,p,k,r,s",
         });
+        if (opts.activeOnly) params.set("active", "Yes");
+        if (opts.setAside) params.set("typeOfSetAside", opts.setAside);
         const res = await fetch(`${SAM_SEARCH}?${params.toString()}`, {
           headers: { Accept: "application/json" },
           signal: AbortSignal.timeout(20000),
