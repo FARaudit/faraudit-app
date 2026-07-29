@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase-server";
 import {
   fetchHeaderCounter,
-  fetchOpportunities,
   fetchRecentAudits,
   fetchKOs,
   fetchAgencyStats,
@@ -22,9 +21,8 @@ export default async function HomePage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
 
-  const [counter, opportunities, recentAudits, kos, agencies, defenseSpending] = await Promise.all([
+  const [counter, recentAudits, kos, agencies, defenseSpending] = await Promise.all([
     fetchHeaderCounter(supabase).catch(() => ({ audits: 0, traps: 0 })),
-    fetchOpportunities(supabase, { limit: 200 }).catch(() => []),
     fetchRecentAudits(supabase, user.id, 200).catch(() => []),
     fetchKOs(supabase).catch(() => []),
     fetchAgencyStats(supabase).catch(() => []),
@@ -48,7 +46,6 @@ export default async function HomePage() {
     <HomeClient
       user={{ email: user.email || "", id: user.id }}
       counter={counter}
-      opportunities={opportunities}
       recentAudits={recentAuditsForCard}
       kos={kos}
       agencies={agencies}

@@ -1,10 +1,7 @@
-// GET /watching — Phase 5 item 3 redirect.
-// Design's ruling folded the standalone "Watching" page into the /home SPA's
-// Opportunities tab as a "Saved" view (backed by the same watched concept).
-// This route now redirects to that Saved view instead of serving the legacy
-// public/watching.html shell. Auth-gated like the other app routes; the hash
-// "#opportunities=saved" is read by HomeClient to open Opportunities pre-
-// filtered to Saved (matches the /defense-intel redirect pattern, Phase 5 2a).
+// GET /watching — legacy redirect.
+// The Opportunities tab (and its "Saved" view, which this route used to deep-
+// link) was retired with the pending_audits-backed SAM feed (2026-07-29).
+// Watcher emails still link here, so keep the route alive and land on /home.
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase-server";
 
@@ -15,6 +12,6 @@ export async function GET() {
   const {
     data: { user }
   } = await supabase.auth.getUser();
-  if (!user) redirect("/sign-in?next=/home%23opportunities=saved");
-  redirect("/home#opportunities=saved");
+  if (!user) redirect("/sign-in?next=/home");
+  redirect("/home");
 }

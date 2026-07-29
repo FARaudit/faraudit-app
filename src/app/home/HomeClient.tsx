@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef, useCallback, Fragment } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { isPieeUrl, getPieeInstructions } from "@/lib/piee-detector";
 import { createBrowserClient } from "@/lib/supabase-browser";
 import { STORAGE_UPLOAD_THRESHOLD_BYTES } from "@/lib/validators";
 import type {
   HeaderCounter,
-  OpportunityRow,
   AuditRow,
   KORow,
   AgencyRow,
@@ -20,47 +19,47 @@ import FeedbackWidget from "@/app/_components/feedback-widget";
 
 type TabKey =
   | "home" | "audit" | "past-audits" | "pipeline" | "capability"
-  | "opportunities" | "defense-spending" | "news" | "contracting-officers" | "agencies"
+  | "defense-spending" | "news" | "contracting-officers" | "agencies"
   | "protests" | "regulatory" | "cmmc" | "wages" | "teaming";
 
 // Legacy hash redirect map · keeps CEO bookmarks + LinkedIn links alive after
 // the Prompt 8 sidebar IA restructure. Old hashes silently rewrite to their
-// new equivalents on /home page mount.
+// new equivalents on /home page mount. The Opportunities tab (pending_audits-
+// backed SAM feed) was retired 2026-07-29 — its hashes land on Today.
 const LEGACY_HASH_MAP: Record<string, TabKey> = {
-  sam: "opportunities",
+  sam: "home",
+  opportunities: "home",
+  "opportunities=saved": "home",
+  saved: "home",
   budget: "defense-spending",
   ko: "contracting-officers",
   "ko-intelligence": "contracting-officers",
   agency: "agencies",
   "agency-intelligence": "agencies",
   protest: "protests",
-  rfi: "opportunities",
-  "rfi-response": "opportunities",
+  rfi: "home",
+  "rfi-response": "home",
   subcontracts: "home",
   labor: "wages",
   reports: "past-audits"
 };
-type FilterKey = "All" | "P0 · P1" | "≤7 Days" | "Small Business" | "IDIQ" | "Pre-Sol";
 
 interface Props {
   user: { email: string; id: string };
   counter: HeaderCounter;
-  opportunities: OpportunityRow[];
   recentAudits: AuditRow[];
   kos: KORow[];
   agencies: AgencyRow[];
   defenseSpending: DefenseSpendingRow[];
 }
 
-const FILTERS: FilterKey[] = ["All", "P0 · P1", "≤7 Days", "Small Business", "IDIQ", "Pre-Sol"];
-
 const TAB_KEYS: TabKey[] = [
   "home", "audit", "past-audits", "pipeline", "capability",
-  "opportunities", "defense-spending", "news", "contracting-officers", "agencies",
+  "defense-spending", "news", "contracting-officers", "agencies",
   "protests", "regulatory", "cmmc", "wages", "teaming"
 ];
 
-export default function HomeClient({ user, counter, opportunities: initialOpportunities, recentAudits: initialRecentAudits, kos, agencies, defenseSpending }: Props) {
+export default function HomeClient({ user, counter, recentAudits: initialRecentAudits, kos, agencies, defenseSpending }: Props) {
   const router = useRouter();
   // Locally-mutable audit list — pinning/unpinning from Past Audits flips
   // in_pipeline on the matching row so the Pipeline Kanban re-derives without
@@ -69,44 +68,15 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
   const updateAudit = useCallback((id: string, patch: Partial<AuditRow>) => {
     setRecentAudits((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
   }, []);
-  // FA-89: opportunities lifted to state so Watch/Pipeline toggles in the
-  // Opportunities tab can optimistically reflect without a page reload.
-  const [opportunities, setOpportunities] = useState<OpportunityRow[]>(initialOpportunities);
-  const updateOpportunity = useCallback((noticeId: string, patch: Partial<OpportunityRow>) => {
-    setOpportunities((prev) => prev.map((o) => (o.notice_id === noticeId ? { ...o, ...patch } : o)));
-  }, []);
-  // FA-89 Opportunities tab filters
-  const [oppSearch, setOppSearch] = useState("");
-  const [oppSetAside, setOppSetAside] = useState<string>("All");
-  const [oppDeadline, setOppDeadline] = useState<"active" | "all" | "<=3" | "<=7" | "<=30" | "expired" | "saved">("active");
-  const [oppValue, setOppValue] = useState<string>("all");
-  const [oppSort, setOppSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "signal", dir: "asc" });
-  // FA-89i: collapsible filter bar + per-row hover state for action overflow.
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [hoveredRowId, setHoveredRowId] = useState<string | null>(null);
-  // FA-89e: ephemeral per-row "just pinned" confirmation — keyed by notice_id,
-  // value is Date.now() of the pin event. Used to render "Pinned ✓" + a "View
-  // in Pipeline →" link for ~2s after a successful pin, then revert to the
-  // normal "Pinned" label.
-  const [pinConfirmedAt, setPinConfirmedAt] = useState<Record<string, number>>({});
-  // Phase 5 item 3: one-shot flag set by the hash-apply effect when arriving via
-  // the /watching → /home#opportunities=saved redirect (or a #saved deep link).
-  // The Opportunities reset-on-tab effect consumes it once to land on the Saved
-  // filter instead of the default "active" filter, then clears it so subsequent
-  // tab visits behave normally.
-  const savedDeepLinkRef = useRef(false);
   // Mount-gate: SSR + first client paint both render null, then hydration completes
   // and the real UI mounts. Eliminates React hydration mismatch from bare `new Date()`
-  // / `Date.now()` calls in render path (enrichRow, hoursUntilNextSamIngest, and the
-  // DeadlineCalendar / BudgetPanel components). /home is auth-walled so the SSR-loss
-  // tradeoff is invisible to public visitors.
+  // / `Date.now()` calls in render path (the DeadlineCalendar / BudgetPanel
+  // components). /home is auth-walled so the SSR-loss tradeoff is invisible to
+  // public visitors.
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
   const [tab, setTabState] = useState<TabKey>("home");
-  const [filter, setFilter] = useState<FilterKey>("All");
-  const [naics, setNaics] = useState<string>("all");
   const [feedTs, setFeedTs] = useState<string>("just now");
-  const [auditPrefill, setAuditPrefill] = useState<{ notice_id: string; title: string | null; agency: string | null; naics_code: string | null } | null>(null);
   // Lifted so the Today tab's "Critical — Act Today" card can pre-apply the
   // P0 filter when it switches to past-audits. Counter (auditP0Count) and
   // PastAuditsPanel's "p0" filter both use compliance_score < 40 so the math
@@ -115,25 +85,10 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
   // Phase 5 1c: avatar account-menu popover (replaces the old Account nav group).
   const [acctMenuOpen, setAcctMenuOpen] = useState(false);
 
-  // FA-89i FIX 4: reset Opportunities filters whenever the tab becomes active —
-  // returning to a clean default view instead of stale filter state from a
-  // prior visit (which often hid the seeded demo rows behind a forgotten chip).
-  useEffect(() => {
-    if (tab === "opportunities") {
-      setOppDeadline(savedDeepLinkRef.current ? "saved" : "active");
-      savedDeepLinkRef.current = false;
-      setOppSearch("");
-      setOppSetAside("All");
-      setOppValue("all");
-      setFiltersOpen(false);
-    }
-  }, [tab]);
-
-  // FA-89i FIX 5: sync local recentAudits with refreshed prop. After a pin/
-  // unpin POST, togglePatch calls router.refresh() which re-runs page.tsx and
-  // delivers a fresh initialRecentAudits prop with the new stub row included.
+  // FA-89i FIX 5: sync local recentAudits with the refreshed prop — a
+  // router.refresh() re-runs page.tsx and delivers a fresh initialRecentAudits.
   // useState's lazy initializer would otherwise ignore the new prop, so we
-  // explicitly sync here so the Pipeline Kanban picks up the new audit.
+  // explicitly sync here so the Pipeline Kanban picks up changed audits.
   useEffect(() => {
     setRecentAudits(initialRecentAudits);
   }, [initialRecentAudits]);
@@ -149,14 +104,6 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
     if (typeof window === "undefined") return;
     const apply = () => {
       const raw = window.location.hash.replace("#", "");
-      // Phase 5 item 3: /watching redirects here. "opportunities=saved" (and the
-      // bare "saved" alias) open the Opportunities tab pre-filtered to Saved.
-      if (raw === "opportunities=saved" || raw === "saved") {
-        savedDeepLinkRef.current = true;
-        window.history.replaceState(null, "", "#opportunities=saved");
-        setTabState("opportunities");
-        return;
-      }
       // Legacy hash → new hash (silent rewrite, preserves bookmarks).
       if (raw && raw in LEGACY_HASH_MAP) {
         const next = LEGACY_HASH_MAP[raw];
@@ -182,186 +129,33 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
     return () => clearInterval(t);
   }, []);
 
+  // NAICS dropdown options for the Defense Spending / Teaming / Wage panels —
+  // derived from the user's own audits now that the pending_audits-backed
+  // opportunities feed is retired.
   const naicsOptions = useMemo(() => {
     const set = new Set<string>();
-    opportunities.forEach((o) => { if (o.naics_code) set.add(o.naics_code); });
+    recentAudits.forEach((a) => { if (a.naics_code) set.add(a.naics_code); });
     return Array.from(set).sort();
-  }, [opportunities]);
+  }, [recentAudits]);
 
-  const enriched = useMemo(() => opportunities.map(enrichRow), [opportunities]);
-
-  const filtered = useMemo(() => {
-    return enriched.filter((r) => {
-      if (naics && naics !== "all" && r.row.naics_code !== naics) return false;
-      if (filter === "P0 · P1") return r.risk === "rp0" || r.risk === "rp1";
-      if (filter === "≤7 Days") return r.daysNum != null && r.daysNum >= 0 && r.daysNum <= 7;
-      if (filter === "Small Business") return ["SB", "SDVOSB", "WOSB", "8(a)"].includes(r.saLabel);
-      if (filter === "IDIQ") {
-        const dt = (r.row.document_type || "").toUpperCase();
-        const nt = (r.row.notice_type || "").toUpperCase();
-        return dt.includes("IDIQ") || nt.includes("IDIQ") || nt.includes("COMBINED SYNOPSIS") || dt.includes("COMBINED SYNOPSIS");
-      }
-      if (filter === "Pre-Sol") {
-        const nt = (r.row.notice_type || "").toLowerCase().replace(/[_-]/g, "");
-        const dt = (r.row.document_type || "").toLowerCase().replace(/[_-]/g, "");
-        return nt.includes("presol") || nt.includes("presolicitation") || nt.includes("sourcessought")
-          || dt.includes("presol") || dt.includes("presolicitation") || dt.includes("sourcessought");
-      }
-      return true;
-    });
-  }, [enriched, filter, naics]);
-
-  // FA-89: Opportunities tab-specific filter + sort. Independent from the
-  // Today-tab "filter" chip enum above. Composes 4 dimensions (search,
-  // set-aside, deadline, sort) and excludes rows without a real solicitation
-  // number so the demo never lands on a UUID-prefilled audit.
-  // FA-89g: compact USD formatter for award_ceiling. $1.2M / $450K / $1,234.
-  const formatValue = (v: number | null): string => {
-    if (v == null) return "";
-    if (v >= 1000000) return "$" + (v / 1000000).toFixed(1) + "M";
-    if (v >= 1000)    return "$" + Math.round(v / 1000) + "K";
-    return "$" + v;
-  };
-
-  // P2 polish: acronym guard for the naive word-by-word title-case below —
-  // "USMS" must not become "Usms", "AQ HQ" not "Aq Hq". Tokens in the set
-  // (and tokens containing digits, e.g. FY26 / D07 / 15M10226QA4700149)
-  // keep their original uppercase form.
-  const TITLE_ACRONYMS = new Set([
-    "USMS","USCG","USAF","USMC","USN","USA","USDA","USPS","US","U.S.",
-    "DLA","DFAS","DISA","DCMA","DCSA","DOD","DOJ","DOE","DOT","DOI","DOL","DOC","DHS","HHS",
-    "IRS","FBI","ATF","DEA","ICE","CBP","TSA","FAA","FEMA","NIH","CDC","VA","GSA","NASA","NOAA",
-    "HQ","AQ","AFB","AFMC","AFLCMC","NAVSUP","NAVAIR","NAVSEA",
-    "RFQ","RFP","IFB","RFI","IDIQ","BPA","PWS","SOW","SOO","CLIN","NSN","FOB",
-    "FAR","DFARS","CFR","USC","II","III","IV"
-  ]);
-  const caseToken = (t: string): string => {
-    const m = /^([A-Za-z0-9.&-]+)(.*)$/.exec(t);
-    const core = m ? m[1] : t;
-    const rest = m ? m[2] : "";
-    if (TITLE_ACRONYMS.has(core.toUpperCase())) return core.toUpperCase() + rest;
-    if (/\d/.test(core)) return core.toUpperCase() + rest;
-    return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
-  };
-
-  // FA-89j: agency short-name display. pending_audits.agency arrives as
-  // "DEPT OF DEFENSE · DEPT OF THE AIR FORCE" from resolveAgency in sam-ingest
-  // helpers (two segments joined by " · "). Take first segment, strip prefix/
-  // suffix decorations, title-case, then look up a 2-3 letter short-name in
-  // the map. "Defense" mapping handles the post-strip DoD case where
-  // "DEPT OF DEFENSE" → "DEFENSE" → "Defense"; the literal "Dept Of Defense"
-  // entry per spec is also present for any pre-strip variant.
-  const agencyShort = (raw: string | null): string => {
-    if (!raw || !raw.trim()) return "—";
-    let s = raw.split("·")[0].trim();
-    s = s.replace(/,\s*DEPARTMENT\s+OF\s+THE\s*$/i, "").trim();
-    s = s.replace(/,\s*DEPARTMENT\s+OF\s*$/i, "").trim();
-    s = s.replace(/,\s*DEPT\s+OF\s*$/i, "").trim();
-    s = s.replace(/^DEPARTMENT\s+OF\s+/i, "").trim();
-    s = s.replace(/^DEPT\s+OF\s+/i, "").trim();
-    if (!s) return "—";
-    const titled = s.replace(/\w\S*/g, caseToken);
-    const shortMap: Record<string, string> = {
-      "Defense": "Dept of Defense",
-      "Dept Of Defense": "Dept of Defense",
-      "Veterans Affairs": "VA",
-      "Health And Human Services": "HHS",
-      "Homeland Security": "DHS",
-      "Transportation": "DOT",
-      "Agriculture": "USDA",
-      "Interior": "DOI",
-      "Justice": "DOJ",
-      "Energy": "DOE",
-      "Commerce": "DOC",
-      "Labor": "DOL",
-      "National Aeronautics And Space Administration": "NASA",
-      "General Services Administration": "GSA"
-    };
-    return shortMap[titled] ?? titled;
-  };
-
-  // FA-89 display helpers — strip SAM PSC prefix (e.g. "N083--", "Y1BG--") and
-  // title-case the result so the demo shows readable solicitation titles.
-  const cleanTitle = (raw: string | null): string => {
-    if (!raw) return "—";
-    const stripped = raw.replace(/^[A-Z0-9]{2,6}--\s*/i, "");
-    return stripped.replace(/\w\S*/g, caseToken);
-  };
-
-    const oppRows = useMemo(() => {
-    let rows = enriched.filter((r) => !!r.row.solicitation_number);
-    if (naics && naics !== "all") {
-      rows = rows.filter((r) => r.row.naics_code === naics);
-    }
-    if (oppSearch.trim()) {
-      const q = oppSearch.toLowerCase();
-      rows = rows.filter((r) =>
-        (r.row.title ?? "").toLowerCase().includes(q) ||
-        (r.row.title_plain ?? "").toLowerCase().includes(q) ||
-        (r.row.agency ?? "").toLowerCase().includes(q) ||
-        (r.row.solicitation_number ?? "").toLowerCase().includes(q) ||
-        (r.row.notice_id ?? "").toLowerCase().includes(q)
-      );
-    }
-    if (oppSetAside !== "All") {
-      rows = rows.filter((r) => r.saLabel === oppSetAside);
-    }
-    if (oppDeadline === "active")  rows = rows.filter((r) => r.daysNum == null || r.daysNum >= 0);
-    if (oppDeadline === "<=3")     rows = rows.filter((r) => r.daysNum != null && r.daysNum >= 0 && r.daysNum <= 3);
-    if (oppDeadline === "<=7")     rows = rows.filter((r) => r.daysNum != null && r.daysNum >= 0 && r.daysNum <= 7);
-    if (oppDeadline === "<=30")    rows = rows.filter((r) => r.daysNum != null && r.daysNum >= 0 && r.daysNum <= 30);
-    if (oppDeadline === "expired") rows = rows.filter((r) => r.daysNum != null && r.daysNum < 0);
-    if (oppDeadline === "saved")   rows = rows.filter((r) => r.row.watched === true);
-    if (oppValue === "<100k")     rows = rows.filter((r) => r.row.award_ceiling != null && r.row.award_ceiling < 100000);
-    if (oppValue === "100k-500k") rows = rows.filter((r) => r.row.award_ceiling != null && r.row.award_ceiling >= 100000 && r.row.award_ceiling <= 500000);
-    if (oppValue === "500k-1m")   rows = rows.filter((r) => r.row.award_ceiling != null && r.row.award_ceiling > 500000 && r.row.award_ceiling <= 1000000);
-    if (oppValue === ">1m")       rows = rows.filter((r) => r.row.award_ceiling != null && r.row.award_ceiling > 1000000);
-    const riskOrder: Record<string, number> = { rp0: 0, rp1: 1, rp2: 2, "": 3 };
-    rows = [...rows].sort((a, b) => {
-      if (oppSort.key === "risk" || oppSort.key === "signal") {
-        const rDiff = (riskOrder[a.risk] ?? 3) - (riskOrder[b.risk] ?? 3);
-        if (rDiff !== 0) return oppSort.dir === "asc" ? rDiff : -rDiff;
-        return (a.daysNum ?? 9999) - (b.daysNum ?? 9999);
-      }
-      if (oppSort.key === "deadline") {
-        const d = (a.daysNum ?? 9999) - (b.daysNum ?? 9999);
-        return oppSort.dir === "asc" ? d : -d;
-      }
-      if (oppSort.key === "posted") {
-        const d = new Date(a.row.created_at ?? 0).getTime() - new Date(b.row.created_at ?? 0).getTime();
-        return oppSort.dir === "asc" ? d : -d;
-      }
-      if (oppSort.key === "agency") {
-        return oppSort.dir === "asc"
-          ? (a.row.agency ?? "").localeCompare(b.row.agency ?? "")
-          : (b.row.agency ?? "").localeCompare(a.row.agency ?? "");
-      }
-      if (oppSort.key === "title") {
-        return oppSort.dir === "asc"
-          ? (a.row.title ?? "").localeCompare(b.row.title ?? "")
-          : (b.row.title ?? "").localeCompare(a.row.title ?? "");
-      }
-      return 0;
-    });
-    return rows;
-  }, [enriched, naics, oppSearch, oppSetAside, oppDeadline, oppValue, oppSort]);
-
-  const p0Rows = filtered.filter((r) => r.risk === "rp0");
-  const otherRows = filtered.filter((r) => r.risk !== "rp0");
-
-  const stats = useMemo(() => {
-    const total = enriched.length;
-    const p0 = enriched.filter((r) => r.risk === "rp0").length;
-    const exp = enriched.filter((r) => r.daysNum != null && r.daysNum >= 0 && r.daysNum <= 7).length;
-    return { total, p0, exp };
-  }, [enriched]);
-
-  // Audit-derived P0 count for the situation card header. Different data
-  // source than stats.p0 (which counts queue opportunities); the cards
-  // below render badges from recentAudits, so the counter must read the
-  // same source to stay consistent.
+  // Audit-derived P0 count for the situation card header — the cards below
+  // render badges from recentAudits, so the counter reads the same source.
   const auditP0Count = useMemo(
     () => recentAudits.filter((a) => a.compliance_score != null && a.compliance_score < 40).length,
+    [recentAudits]
+  );
+
+  // Audited solicitations whose response deadline closes within 7 days —
+  // drives the "Expiring This Week" situation card (deadlines render on the
+  // Pipeline tab's Deadline Calendar).
+  const expiringSoon = useMemo(
+    () => recentAudits.filter((a) => {
+      if (!a.response_deadline) return false;
+      const dl = Date.parse(a.response_deadline);
+      if (Number.isNaN(dl)) return false;
+      const days = Math.floor((dl - Date.now()) / 86400_000);
+      return days >= 0 && days <= 7;
+    }).length,
     [recentAudits]
   );
 
@@ -397,7 +191,6 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
             </div>
           </div>
           <div className="tb-right">
-            <div className="tb-live"><div className="live-dot" />Live · <span>{stats.total}</span> Active</div>
             <FeedbackWidget userEmail={user.email ?? null} />
             <a className="tb-user" href="/home" title={user.email}>
               <div className="user-av">{initials || "U"}</div>
@@ -447,14 +240,6 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
 
           {/* GROUP 2 — Find & Track */}
           <div className="nav-label">Find &amp; Track</div>
-          <button className={`nav-item ${tab === "opportunities" ? "active" : ""}`} onClick={() => setTab("opportunities")}>
-            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
-              <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.2"/>
-              <path d="M5 8l2 2 4-4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Opportunities
-            <span className="nav-ct ct-green">Live</span>
-          </button>
           <button className={`nav-item ${tab === "capability" ? "active" : ""}`} onClick={() => setTab("capability")}>
             <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
               <path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2"/>
@@ -561,10 +346,6 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
             <button className={`ptab ${tab === "audit" ? "active" : ""}`} onClick={() => setTab("audit")}>
               <div className="ptab-dot gold" />Run Audit
             </button>
-            <button className={`ptab ${tab === "opportunities" ? "active" : ""}`} onClick={() => setTab("opportunities")}>
-              <div className="ptab-dot green" />Opportunities
-              <span className="ptab-count green">{stats.total}</span>
-            </button>
             <button className={`ptab ${tab === "defense-spending" ? "active" : ""}`} onClick={() => setTab("defense-spending")}>
               <div className="ptab-dot blue" />Defense Spending
             </button>
@@ -573,7 +354,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
             </button>
             <button className={`ptab ${tab === "pipeline" ? "active" : ""}`} onClick={() => setTab("pipeline")}>
               <div className="ptab-dot gold" />Pipeline
-              {stats.p0 > 0 && <span className="ptab-count gold">{stats.p0}</span>}
+              {pipelineCount > 0 && <span className="ptab-count gold">{pipelineCount}</span>}
             </button>
           </div>
 
@@ -594,17 +375,17 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                   <div className="sit-sub" style={{ fontSize: 11, color: "rgba(238, 243, 250,.85)", lineHeight: 1.55, marginTop: 6 }}>Solicitations with compliance traps that could disqualify your bid or cost you money on delivery.</div>
                   <div style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--red)", marginTop: 10, borderTop: "1px solid rgba(220,38,38,.15)", paddingTop: 8 }}>Review P0 Flags →</div>
                 </button>
-                <button className="sit-card" style={{ borderTop: "3px solid var(--amber)" }} onClick={() => setFilter("≤7 Days")}>
+                <button className="sit-card" style={{ borderTop: "3px solid var(--amber)" }} onClick={() => setTab("pipeline")}>
                   <div className="sit-label" style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".12em", color: "var(--amber)", marginBottom: 8 }}>⏱ Expiring This Week</div>
-                  <div className="sit-value gold">{stats.exp}</div>
-                  <div className="sit-sub" style={{ fontSize: 11, color: "rgba(238, 243, 250,.85)", lineHeight: 1.55, marginTop: 6 }}>Submission deadlines closing in 7 days or less. Missed windows are permanent — no extensions after closing time.</div>
-                  <div style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--amber)", marginTop: 10, borderTop: "1px solid rgba(245,158,11,.15)", paddingTop: 8 }}>View Expiring →</div>
+                  <div className="sit-value gold">{expiringSoon}</div>
+                  <div className="sit-sub" style={{ fontSize: 11, color: "rgba(238, 243, 250,.85)", lineHeight: 1.55, marginTop: 6 }}>Audited solicitations with response deadlines closing in 7 days or less. Missed windows are permanent — no extensions after closing time.</div>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--amber)", marginTop: 10, borderTop: "1px solid rgba(245,158,11,.15)", paddingTop: 8 }}>View Deadline Calendar →</div>
                 </button>
-                <button className="sit-card" style={{ borderTop: "3px solid var(--gold)" }} onClick={() => setTab("opportunities")}>
-                  <div className="sit-label" style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".12em", color: "var(--gold2)", marginBottom: 8 }}>● Live on SAM.gov Now</div>
-                  <div className="sit-value gold">{stats.total}</div>
-                  <div className="sit-sub" style={{ fontSize: 11, color: "rgba(238, 243, 250,.85)", lineHeight: 1.55, marginTop: 6 }}>Active federal solicitations posted right now across your NAICS codes. Updated by sam-ingest cron — every one is a potential contract.</div>
-                  <div style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--gold)", marginTop: 10, borderTop: "1px solid rgba(55, 138, 221,.15)", paddingTop: 8 }}>Open SAM.gov Feed →</div>
+                <button className="sit-card" style={{ borderTop: "3px solid var(--gold)" }} onClick={() => setTab("pipeline")}>
+                  <div className="sit-label" style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".12em", color: "var(--gold2)", marginBottom: 8 }}>◆ In Your Pipeline</div>
+                  <div className="sit-value gold">{pipelineCount}</div>
+                  <div className="sit-sub" style={{ fontSize: 11, color: "rgba(238, 243, 250,.85)", lineHeight: 1.55, marginTop: 6 }}>Solicitations you&apos;re actively pursuing — tracked on the Pipeline Kanban with deadlines, stages, and outcomes.</div>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--gold)", marginTop: 10, borderTop: "1px solid rgba(55, 138, 221,.15)", paddingTop: 8 }}>Open Pipeline →</div>
                 </button>
                 <button className="sit-card" style={{ borderTop: "3px solid var(--green)" }} onClick={() => setTab("past-audits")}>
                   <div className="sit-label" style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".12em", color: "var(--green)", marginBottom: 8 }}>✓ Your Audit Activity</div>
@@ -632,74 +413,22 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                 <span className="upload-cta-btn">Run Audit →</span>
               </button>
 
-              {/* Two col body */}
+              {/* Two col body — Recent Audits took over the left column when the
+                  pending_audits-backed Intelligence Feed was retired (2026-07-29). */}
               <div className="two-col">
                 <div className="feed-wrap">
                   <div className="feed-hdr">
                     <div className="feed-hdr-l">
-                      <div className="feed-title">Intelligence Feed</div>
-                      <div className="feed-sub">Filtered to your NAICS · {feedTs}</div>
+                      <div className="feed-title">Recent Audits</div>
+                      <div className="feed-sub">Your last {Math.min(20, recentAudits.length)} reports · updated {feedTs}</div>
                     </div>
-                    <div className="live-chip"><div className="live-dot" />LIVE</div>
-                  </div>
-                  <div className="feed-filters">
-                    {FILTERS.map((f) => (
-                      <button key={f} className={`ff ${filter === f ? "active" : ""}`} onClick={() => setFilter(f)}>{f}</button>
-                    ))}
-                  </div>
-                  <div className="feed-cols">
-                    <div className="fcol">NAICS</div><div className="fcol">Solicitation</div>
-                    <div className="fcol">Agency</div><div className="fcol">Days</div>
-                    <div className="fcol">Type</div><div className="fcol">Set-Aside</div>
-                    <div className="fcol">Risk</div>
                   </div>
                   <div className="feed-scroll">
-                    {filtered.length === 0 && (
-                      <div className="empty-state">
-                        {opportunities.length === 0
-                          ? `Feed populates daily at 06:00 CDT · sam-ingest cron next run in ${hoursUntilNextSamIngest()} hour${hoursUntilNextSamIngest() === 1 ? "" : "s"}`
-                          : "No solicitations match this filter."}
-                      </div>
-                    )}
-                    {p0Rows.length > 0 && filter === "All" && (
-                      <div className="feed-section-hdr">
-                        <div className="fsh-label">⚠ Requires Immediate Action</div>
-                        <div className="fsh-count">{p0Rows.length} P0</div>
-                      </div>
-                    )}
-                    {p0Rows.filter((r) => r.row.solicitation_number).map((r) => <FeedRowCmp key={r.row.id} r={r} onClick={() => {
-                      setAuditPrefill({
-                        // solicitation_number is guaranteed non-null by the
-                        // upstream .filter() — pre-solicitation notices without
-                        // a real sol# are filtered out of the feed entirely so
-                        // the demo never lands on a UUID prefill.
-                        notice_id: r.row.solicitation_number as string,
-                        title: r.row.title ?? null,
-                        agency: r.row.agency ?? null,
-                        naics_code: r.row.naics_code ?? null
-                      });
-                      setTab("audit");
-                    }} />)}
-                    {otherRows.filter((r) => r.row.solicitation_number).map((r) => <FeedRowCmp key={r.row.id} r={r} onClick={() => {
-                      setAuditPrefill({
-                        notice_id: r.row.solicitation_number as string,
-                        title: r.row.title ?? null,
-                        agency: r.row.agency ?? null,
-                        naics_code: r.row.naics_code ?? null
-                      });
-                      setTab("audit");
-                    }} />)}
-                  </div>
-                </div>
-
-                <div className="right-col">
-                  <div className="rc-section">
-                    <div className="rc-hdr"><div className="rc-title">Recent Audits</div><div className="rc-sub">Last {Math.min(5, recentAudits.length)}</div></div>
                     {recentAudits.length === 0 && (
-                      <div className="empty-state">No audits yet.</div>
+                      <div className="empty-state">No audits yet — drop a solicitation PDF above to run your first.</div>
                     )}
                     <div className="ra-dark ra-list">
-                    {recentAudits.slice(0, 5).map((a) => {
+                    {recentAudits.slice(0, 20).map((a) => {
                       // FA-167 — Design-lead "Recently Audited" card. Whole card
                       // links to the report; verdict drives badge + pill colour
                       // from the spec --vd-* tokens (one is-* class).
@@ -734,6 +463,9 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                     })}
                     </div>
                   </div>
+                </div>
+
+                <div className="right-col">
                   <div className="rc-section">
                     <div className="rc-hdr"><div className="rc-title">Account Intelligence</div></div>
                     <div className="acct-grid">
@@ -754,463 +486,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
 
             {/* AUDIT */}
             <div className={`tab-panel ${tab === "audit" ? "active" : ""}`}>
-              <RunAuditPanel prefill={auditPrefill} active={tab === "audit"} onPrefillClear={() => setAuditPrefill(null)} />
-            </div>
-
-            {/* SAM */}
-            <div className={`tab-panel ${tab === "opportunities" ? "active" : ""}`}>
-              <div className="intel-tab-content">
-                <div className="intel-section">
-                  <div className="is-header">
-                    <div className="is-title">SAM.gov · Live Opportunity Feed</div>
-                    <div className="is-refresh">
-                      <NaicsCombobox
-                        value={naics === "all" ? "" : naics}
-                        onChange={(c) => setNaics(c || "all")}
-                        options={naicsOptions}
-                        includeAll
-                      />
-                      <span>Last updated <span>{feedTs}</span> · {oppRows.length} matching</span>
-                    </div>
-                  </div>
-
-                  {/* KPI strip — totals from the unfiltered enriched set */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
-                    {[
-                      { label: "Active", value: enriched.filter((r) => !!r.row.solicitation_number && (r.daysNum == null || r.daysNum >= 0)).length, color: "var(--text)" },
-                      { label: "P0 Risk", value: enriched.filter((r) => r.risk === "rp0").length, color: "var(--red)" },
-                      { label: "Expiring ≤7d", value: enriched.filter((r) => r.daysNum != null && r.daysNum >= 0 && r.daysNum <= 7).length, color: "var(--amber)" },
-                      { label: "In Pipeline", value: opportunities.filter((o) => o.in_pipeline === true).length, color: "var(--blue)" }
-                    ].map((k) => (
-                      <div key={k.label} style={{ background: "var(--void3)", border: "1px solid var(--border)", borderRadius: 4, padding: "10px 14px" }}>
-                        <div style={{ fontFamily: "var(--mono)", fontSize: 20, fontWeight: 700, color: k.color }}>{k.value}</div>
-                        <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t40)", textTransform: "uppercase", letterSpacing: ".08em", marginTop: 2 }}>{k.label}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* FA-89i CHANGE 1: collapsible filter bar — search always visible,
-                       chip rows hidden by default behind a FILTERS toggle. */}
-                  {(() => {
-                    const anyActive = oppSetAside !== "All" || oppDeadline !== "active" || oppValue !== "all";
-                    return (
-                      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
-                        <input
-                          type="text"
-                          placeholder="Search by title, agency, or solicitation number..."
-                          value={oppSearch}
-                          onChange={(e) => setOppSearch(e.target.value)}
-                          style={{
-                            flex: 1,
-                            padding: "8px 12px",
-                            fontSize: 12,
-                            borderRadius: 6,
-                            border: ".5px solid var(--border2)",
-                            background: "var(--void3)",
-                            color: "var(--text)",
-                            outline: "none"
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setFiltersOpen((v) => !v)}
-                          style={{
-                            fontFamily: "var(--mono)", fontSize: 10, fontWeight: 700,
-                            letterSpacing: ".08em", textTransform: "uppercase",
-                            color: anyActive ? "var(--amber)" : "var(--t40)",
-                            background: "transparent", border: "none", cursor: "pointer",
-                            padding: "4px 8px", display: "flex", alignItems: "center", gap: 4
-                          }}
-                        >
-                          Filters {filtersOpen ? "▲" : "▼"}{anyActive && <span style={{ color: "var(--amber)", fontSize: 14, lineHeight: 1 }}>•</span>}
-                        </button>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Chip rows — collapsed by default */}
-                  {filtersOpen && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-
-                    {/* Set-aside filter */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--t40)", whiteSpace: "nowrap", minWidth: 70 }}>
-                        Set-Aside
-                      </span>
-                      {([
-                        ["All", "All"],
-                        ["SB", "Small Business"],
-                        ["SDVOSB", "Service-Disabled Veteran"],
-                        ["WOSB", "Women-Owned"],
-                        ["8(a)", "8(a) Program"],
-                        ["HUBZone", "HUBZone"]
-                      ] as const).map(([val, lbl]) => {
-                        const active = oppSetAside === val;
-                        return (
-                          <button
-                            key={val}
-                            type="button"
-                            onClick={() => setOppSetAside(val)}
-                            style={{
-                              padding: "4px 12px",
-                              borderRadius: 12,
-                              fontSize: 11,
-                              fontWeight: 600,
-                              cursor: "pointer",
-                              border: active ? "1px solid var(--blue)" : "1px solid var(--border)",
-                              background: active ? "rgba(96,165,250,.14)" : "transparent",
-                              color: active ? "var(--blue)" : "var(--t40)",
-                              transition: "all .15s"
-                            }}
-                          >
-                            {lbl}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Deadline filter */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--t40)", whiteSpace: "nowrap", minWidth: 70 }}>
-                        Deadline
-                      </span>
-                      {([
-                        ["active", "Active"],
-                        ["all", "All (incl. expired)"],
-                        ["<=3", "≤ 3 Days"],
-                        ["<=7", "≤ 7 Days"],
-                        ["<=30", "≤ 30 Days"],
-                        ["expired", "Expired"],
-                        ["saved", "Saved"]
-                      ] as const).map(([val, lbl]) => {
-                        const active = oppDeadline === val;
-                        return (
-                          <button
-                            key={val}
-                            type="button"
-                            onClick={() => setOppDeadline(val)}
-                            style={{
-                              padding: "4px 12px",
-                              borderRadius: 12,
-                              fontSize: 11,
-                              fontWeight: 600,
-                              cursor: "pointer",
-                              border: active ? "1px solid var(--amber)" : "1px solid var(--border)",
-                              background: active ? "rgba(245,158,11,.14)" : "transparent",
-                              color: active ? "var(--amber)" : "var(--t40)",
-                              transition: "all .15s"
-                            }}
-                          >
-                            {lbl}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Value filter */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--t40)", whiteSpace: "nowrap", minWidth: 70 }}>
-                        Value
-                      </span>
-                      {([
-                        ["all", "All"],
-                        ["<100k", "Under $100K"],
-                        ["100k-500k", "$100K–$500K"],
-                        ["500k-1m", "$500K–$1M"],
-                        [">1m", "Over $1M"]
-                      ] as const).map(([val, lbl]) => {
-                        const active = oppValue === val;
-                        return (
-                          <button
-                            key={val}
-                            type="button"
-                            onClick={() => setOppValue(val)}
-                            style={{
-                              padding: "4px 12px",
-                              borderRadius: 12,
-                              fontSize: 11,
-                              fontWeight: 600,
-                              cursor: "pointer",
-                              border: active ? "1px solid var(--green)" : "1px solid var(--border)",
-                              background: active ? "rgba(16,185,129,.14)" : "transparent",
-                              color: active ? "var(--green)" : "var(--t40)",
-                              transition: "all .15s"
-                            }}
-                          >
-                            {lbl}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                  </div>
-                  )}
-
-                  {/* Sortable column header — FA-89i: 7 cols (DEADLINE+RISK merged into SIGNAL) */}
-                  <div style={{ display: "grid", gridTemplateColumns: "130px 1fr 150px 90px 110px 100px 180px", gap: 8, padding: "8px 10px", fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--t40)", borderBottom: "1px solid var(--border)" }}>
-                    {[
-                      { key: "sol",       label: "Sol #",     sortable: false },
-                      { key: "title",     label: "Title / AI Summary", sortable: true },
-                      { key: "agency",    label: "Agency",    sortable: true },
-                      { key: "set-aside", label: "Set-Aside", sortable: false },
-                      { key: "signal",    label: "Signal",    sortable: true },
-                      { key: "audit",     label: "Audit",     sortable: false },
-                      { key: "actions",   label: "Actions",   sortable: false }
-                    ].map((col) => (
-                      <div
-                        key={col.key}
-                        onClick={() => {
-                          if (!col.sortable) return;
-                          setOppSort((s) => s.key === col.key ? { key: col.key, dir: s.dir === "asc" ? "desc" : "asc" } : { key: col.key, dir: "asc" });
-                        }}
-                        style={{ cursor: col.sortable ? "pointer" : "default", display: "flex", alignItems: "center", gap: 4, userSelect: "none" }}
-                      >
-                        {col.label}
-                        {col.sortable && oppSort.key === col.key && <span style={{ fontSize: 8, color: "var(--gold)" }}>{oppSort.dir === "asc" ? "↑" : "↓"}</span>}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Rows */}
-                  <div style={{ maxHeight: "calc(100vh - 360px)", overflowY: "auto", paddingBottom: 20 }}>
-                    {oppRows.length === 0 && (
-                      <div className="empty-state">
-                        {opportunities.length === 0
-                          ? `Feed populates daily at 06:00 CDT · sam-ingest cron next run in ${hoursUntilNextSamIngest()} hour${hoursUntilNextSamIngest() === 1 ? "" : "s"}`
-                          : "No opportunities match your filters."}
-                      </div>
-                    )}
-                    {oppRows.map((r) => {
-                      const solNum = r.row.solicitation_number as string;
-                      const agency = agencyShort(r.row.agency);
-                      const saColors: Record<string, { bg: string; fg: string }> = {
-                        SB:       { bg: "rgba(74,222,128,.14)",  fg: "var(--green)" },
-                        SDVOSB:   { bg: "rgba(96,165,250,.14)",  fg: "var(--blue)" },
-                        WOSB:     { bg: "rgba(168,85,247,.14)",  fg: "#C084FC" },
-                        "8(a)":   { bg: "rgba(249,115,22,.14)",  fg: "#FB923C" },
-                        HUBZone:  { bg: "rgba(234,179,8,.14)",   fg: "#FACC15" },
-                        UNREST:   { bg: "rgba(148,163,184,.10)", fg: "var(--t60)" }
-                      };
-                      const saC = saColors[r.saLabel] ?? saColors.UNREST;
-                      const auditColors: Record<string, { bg: string; fg: string }> = {
-                        complete:   { bg: "rgba(74,222,128,.14)",  fg: "var(--green)" },
-                        processing: { bg: "rgba(245,158,11,.14)",  fg: "var(--amber)" },
-                        failed:     { bg: "rgba(220,38,38,.14)",   fg: "var(--red)" },
-                        pending:    { bg: "rgba(148,163,184,.10)", fg: "var(--t60)" },
-                        none:       { bg: "transparent",           fg: "var(--t40)" }
-                      };
-                      const auC = auditColors[r.auditStatusCls] ?? auditColors.none;
-                      const dlColors: Record<string, string> = { urg: "var(--red)", soon: "var(--amber)", ok: "var(--t60)", exp: "var(--t40)", none: "var(--t40)" };
-                      const rc = r.risk === "rp0" ? "var(--red)" : r.risk === "rp1" ? "var(--amber)" : r.risk === "rp2" ? "var(--blue)" : "var(--gold)";
-                      const rb = r.risk === "rp0" ? "rgba(220,38,38,.14)" : r.risk === "rp1" ? "rgba(245,158,11,.11)" : r.risk === "rp2" ? "rgba(96,165,250,.10)" : "rgba(55, 138, 221,.08)";
-
-                      const onOpenAudit = () => {
-                        setAuditPrefill({
-                          notice_id: solNum,
-                          title: r.row.title ?? null,
-                          agency: r.row.agency ?? null,
-                          naics_code: r.row.naics_code ?? null
-                        });
-                        setTab("audit");
-                      };
-
-                      const togglePatch = async (field: "in_pipeline" | "watched"): Promise<boolean> => {
-                        const next = !r.row[field];
-                        updateOpportunity(r.row.notice_id, { [field]: next });
-                        // FA-89h: in_pipeline now routes through dedicated pin/unpin
-                        // endpoints that also create a stub audit row so the row
-                        // appears in the Pipeline Kanban. Watched still uses the
-                        // generic PATCH endpoint — single-table flip only.
-                        const url =
-                          field === "in_pipeline" && next === true
-                            ? `/api/opportunities/${encodeURIComponent(r.row.notice_id)}/pin`
-                          : field === "in_pipeline" && next === false
-                            ? `/api/opportunities/${encodeURIComponent(r.row.notice_id)}/unpin`
-                          : `/api/opportunities/${encodeURIComponent(r.row.notice_id)}`;
-                        const method = field === "in_pipeline" ? "POST" : "PATCH";
-                        const body = field === "in_pipeline" ? "{}" : JSON.stringify({ [field]: next });
-                        try {
-                          const res = await fetch(url, {
-                            method,
-                            headers: { "Content-Type": "application/json" },
-                            credentials: "include",
-                            body
-                          });
-                          if (!res.ok) {
-                            // FA-89h.1: surface partial-failure details from the
-                            // pin/unpin saga response so silent half-states are
-                            // visible during testing instead of disappearing
-                            // into a generic optimistic rollback.
-                            if (field === "in_pipeline") {
-                              try {
-                                const detail = await res.json();
-                                console.warn(`[togglePatch] ${next ? "pin" : "unpin"} failed for ${r.row.notice_id}: status=${res.status}`, detail);
-                              } catch {
-                                console.warn(`[togglePatch] ${next ? "pin" : "unpin"} failed for ${r.row.notice_id}: status=${res.status} (no JSON body)`);
-                              }
-                            }
-                            updateOpportunity(r.row.notice_id, { [field]: !next });
-                            return false;
-                          }
-                          // FA-89i FIX 5: refresh page Server Component so the
-                          // Pipeline Kanban picks up the new/removed stub audit
-                          // row immediately. Pairs with the initialRecentAudits
-                          // sync useEffect at the top of HomeClient.
-                          if (field === "in_pipeline") {
-                            router.refresh();
-                          }
-                          // Flash "Pinned ✓ → View in Pipeline" for ~2s on pipeline pin success.
-                          if (field === "in_pipeline" && next === true) {
-                            const ts = Date.now();
-                            setPinConfirmedAt((prev) => ({ ...prev, [r.row.notice_id]: ts }));
-                            setTimeout(() => {
-                              setPinConfirmedAt((prev) => {
-                                if (prev[r.row.notice_id] !== ts) return prev;
-                                const nextMap = { ...prev };
-                                delete nextMap[r.row.notice_id];
-                                return nextMap;
-                              });
-                            }, 2000);
-                          }
-                          return true;
-                        } catch {
-                          updateOpportunity(r.row.notice_id, { [field]: !next });
-                          return false;
-                        }
-                      };
-                      // Phase 5 item 3 — "Move to Pipeline" for a Saved row. Reuses the
-                      // EXISTING pin saga (togglePatch("in_pipeline") → POST /api/opportunities/
-                      // [notice_id]/pin, which flips pending_audits.in_pipeline and creates the
-                      // stub audits row the Pipeline Kanban renders), then drops the Saved flag
-                      // so the item "moves" out of Saved into the Pipeline. Only un-saves if the
-                      // pin actually stuck; on a failed pin togglePatch rolls its own optimistic
-                      // state back and we leave the row in Saved untouched.
-                      const moveSavedToPipeline = async () => {
-                        if (r.row.in_pipeline === true) return;
-                        const pinned = await togglePatch("in_pipeline");
-                        if (pinned && r.row.watched === true) {
-                          await togglePatch("watched");
-                        }
-                      };
-                      const isJustPinned = pinConfirmedAt[r.row.notice_id] != null && Date.now() - pinConfirmedAt[r.row.notice_id] < 2000;
-
-                      const isHovered = hoveredRowId === r.row.notice_id;
-                      // FA-PIEE-01: PIEE-hosted solicitations can't be auto-fetched.
-                      const isPiee = isPieeUrl(r.row.pdf_url ?? "");
-                      return (
-                        <Fragment key={r.row.id}>
-                        <div
-                          onMouseEnter={() => setHoveredRowId(r.row.notice_id)}
-                          onMouseLeave={() => setHoveredRowId((curr) => curr === r.row.notice_id ? null : curr)}
-                          style={{
-                            display: "grid", gridTemplateColumns: "130px 1fr 150px 90px 110px 100px 180px", gap: 8,
-                            padding: "8px 10px", borderBottom: "1px solid var(--border)", alignItems: "center",
-                            background: r.row.in_pipeline ? "rgba(96,165,250,.06)" : r.row.watched ? "rgba(245,158,11,.04)" : "transparent",
-                            transition: "background .15s"
-                          }}
-                        >
-                          <span onClick={onOpenAudit} title={r.row.title || displaySolicitationId(r.row)} style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--gold)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "pointer" }}>{displaySolicitationId(r.row)}</span>
-                          <div onClick={onOpenAudit} title={r.row.title || ""} style={{ display: "flex", flexDirection: "column", gap: 1, overflow: "hidden", cursor: "pointer", minWidth: 0 }}>
-                            {isPiee && (
-                              <span style={{ alignSelf: "flex-start", fontSize: 8, background: "rgba(168,85,247,.15)", color: "#C084FC", padding: "1px 5px", borderRadius: 2, marginBottom: 2, fontFamily: "var(--mono)", fontWeight: 700, letterSpacing: ".08em", lineHeight: 1, flexShrink: 0 }} title="Hosted on PIEE — manual download + upload required">PIEE</span>
-                            )}
-                            {r.row.title_plain ? (
-                              <>
-                                <div style={{ display: "flex", alignItems: "baseline", overflow: "hidden" }}>
-                                  <span style={{ fontSize: 8, background: "rgba(96,165,250,.15)", color: "var(--blue)", padding: "1px 4px", borderRadius: 2, marginRight: 4, fontFamily: "var(--mono)", fontWeight: 700, letterSpacing: ".08em", flexShrink: 0, lineHeight: 1 }}>AI</span>
-                                  <span style={{ fontFamily: "var(--serif)", fontSize: 12, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.row.title_plain}</span>
-                                </div>
-                                <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontStyle: "italic", color: "var(--t40)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cleanTitle(r.row.title)}</span>
-                              </>
-                            ) : (
-                              <span style={{ fontFamily: "var(--serif)", fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cleanTitle(r.row.title)}</span>
-                            )}
-                          </div>
-                          <span title={r.row.agency || ""} style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t60)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{agency}</span>
-                          <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: saC.bg, color: saC.fg, textAlign: "center", letterSpacing: ".04em" }}>{({ SB: "Small Business", SDVOSB: "Serv-Disabled Vet", WOSB: "Women-Owned", "8(a)": "8(a) Program", HUBZone: "HUBZone", UNREST: "Unrestricted" } as Record<string, string>)[r.saLabel] ?? r.saLabel}</span>
-                          {/* FA-89i: merged SIGNAL cell — daysLabel above, risk pill below */}
-                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifySelf: "center", justifyContent: "center", gap: 3 }}>
-                            <span style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 600, color: dlColors[r.daysCls] ?? "var(--t40)", textAlign: "center", lineHeight: 1 }}>{r.daysLabel}</span>
-                            <span style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 2, background: rb, color: rc, border: `1px solid ${rc}40`, lineHeight: 1, letterSpacing: ".06em" }}>{r.riskLabel || "—"}</span>
-                          </div>
-                          <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: auC.bg, color: auC.fg, textAlign: "center", justifySelf: "center", display: "inline-flex", justifyContent: "center", alignItems: "center" }}>{r.auditStatusLabel}</span>
-                          {/* FA-89i CHANGE 3 + Phase 7: Audit always-visible primary. Save is now an
-                              always-visible quiet star bookmark (Treatment 2) — hover-gating removed so it's
-                              discoverable at rest + on touch. Pipeline still reveals on hover but stays
-                              visible when active so the row reflects state. */}
-                          {(() => {
-                            const watched = r.row.watched === true;
-                            const pinned  = r.row.in_pipeline === true;
-                            // Hover-conditioned visibility on the Pipeline action only —
-                            // kept visible when active so the row reflects state.
-                            const showPipe  = isHovered || pinned || isJustPinned;
-                            return (
-                              <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); onOpenAudit(); }}
-                                  style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".06em", padding: "3px 8px", borderRadius: 2, cursor: "pointer", background: "var(--gold)", color: "var(--void)", border: "1px solid var(--gold)" }}
-                                >
-                                  Audit →
-                                </button>
-                                {/* Phase 7 — Save = always-visible quiet star bookmark. Presentation only;
-                                    the togglePatch("watched") mutation (#55) is unchanged. */}
-                                <button
-                                  type="button"
-                                  className={`opp-save${watched ? " is-saved" : ""}`}
-                                  onClick={(e) => { e.stopPropagation(); togglePatch("watched"); }}
-                                  aria-label="Save opportunity"
-                                  aria-pressed={watched}
-                                  title="Save — still deciding"
-                                >
-                                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" /></svg>
-                                </button>
-                                {watched && !pinned && !isJustPinned && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); moveSavedToPipeline(); }}
-                                    style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".06em", padding: "3px 8px", borderRadius: 2, cursor: "pointer", background: "transparent", color: "var(--blue)", border: "1px solid rgba(96,165,250,.5)", opacity: isHovered || watched ? 1 : 0, pointerEvents: isHovered || watched ? "auto" : "none", transition: "opacity .15s", whiteSpace: "nowrap" }}
-                                    title="Move this saved opportunity into the Pipeline"
-                                  >
-                                    → Pipeline
-                                  </button>
-                                )}
-                                {isJustPinned ? (
-                                  <a
-                                    href="/home#pipeline"
-                                    onClick={(e) => { e.stopPropagation(); }}
-                                    style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".06em", padding: "3px 8px", borderRadius: 2, cursor: "pointer", background: "rgba(96,165,250,.22)", color: "var(--blue)", border: "1px solid rgba(96,165,250,.7)", textDecoration: "none", whiteSpace: "nowrap", opacity: 1, transition: "opacity .15s" }}
-                                    title="Pinned to Pipeline — click to view"
-                                  >
-                                    Pinned ✓ → Pipeline
-                                  </a>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); togglePatch("in_pipeline"); }}
-                                    style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".06em", padding: "3px 8px", borderRadius: 2, cursor: "pointer", background: pinned ? "rgba(96,165,250,.14)" : "transparent", color: pinned ? "var(--blue)" : "var(--t60)", border: `1px solid ${pinned ? "rgba(96,165,250,.5)" : "var(--border2)"}`, opacity: showPipe ? 1 : 0, pointerEvents: showPipe ? "auto" : "none", transition: "opacity .15s" }}
-                                    title={pinned ? "View in Pipeline tab — click to unpin" : "Add to Pipeline"}
-                                  >
-                                    {pinned ? "Pinned" : "Pipeline"}
-                                  </button>
-                                )}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                        {/* FA-PIEE-01: manual-upload instruction on hover for PIEE-gated rows. */}
-                        {isPiee && isHovered && (
-                          <div style={{ padding: "6px 12px 9px 140px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "flex-start", gap: 8, background: "rgba(168,85,247,.04)" }}>
-                            <span style={{ flexShrink: 0, fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".08em", padding: "1px 5px", borderRadius: 2, background: "rgba(168,85,247,.15)", color: "#C084FC", border: "1px solid rgba(168,85,247,.35)", lineHeight: 1.4 }}>PIEE</span>
-                            <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t60)", lineHeight: 1.5 }}>{getPieeInstructions()}</span>
-                          </div>
-                        )}
-                        </Fragment>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
+              <RunAuditPanel active={tab === "audit"} />
             </div>
 
             {/* BUDGET — live USAspending.gov */}
@@ -1297,156 +573,6 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-interface Enriched {
-  row: OpportunityRow;
-  daysNum: number | null;
-  daysCls: "urg" | "soon" | "ok" | "exp" | "none";
-  daysLabel: string;
-  risk: "rp0" | "rp1" | "rp2" | "";
-  riskLabel: string;
-  saCls: "sb" | "sd" | "wo" | "a8" | "hz" | "un";
-  saLabel: string;
-  auditStatusCls: "pending" | "processing" | "complete" | "failed" | "none";
-  auditStatusLabel: string;
-}
-
-// Hours until the next sam-ingest cron run (06:00 CDT = 11:00 UTC).
-// Returns at least 1 so the empty-state never displays "in 0 hours".
-function hoursUntilNextSamIngest(): number {
-  const now = new Date();
-  const nextRun = new Date();
-  nextRun.setUTCHours(11, 0, 0, 0);
-  if (nextRun.getTime() <= now.getTime()) {
-    nextRun.setUTCDate(nextRun.getUTCDate() + 1);
-  }
-  const hours = Math.ceil((nextRun.getTime() - now.getTime()) / 3_600_000);
-  return Math.max(1, hours);
-}
-
-function enrichRow(row: OpportunityRow): Enriched {
-  // Days column shows time-to-deadline (calendar days from now until
-  // response_deadline). Was incorrectly computing days-since-creation, so every
-  // row read "3d" because the recent backfill burst ingested most of the
-  // corpus three days ago. Mirrors the daysOut math the risk classifier uses
-  // so risk tier and Days display agree on the same calendar.
-  // TODO(v1): classifier uses fractional daysOut, display uses Math.floor —
-  // boundary rows (e.g., 3.08 days) show "3d" but classify as P1. Reconcile in
-  // v1 alongside the archived_at column work for expired notices.
-  const daysNum: number | null = (() => {
-    if (!row.response_deadline) return null;
-    const dl = Date.parse(row.response_deadline);
-    if (Number.isNaN(dl)) return null;
-    return Math.floor((dl - Date.now()) / 86400_000);
-  })();
-  const daysCls: Enriched["daysCls"] =
-    daysNum == null ? "none" :
-    daysNum < 0     ? "exp"  :
-    daysNum <= 3    ? "urg"  :
-    daysNum <= 7    ? "soon" :
-                      "ok";
-  const daysLabel =
-    daysNum == null ? "—" :
-    daysNum < 0     ? "expired" :
-    daysNum === 0   ? "today" :
-    daysNum === 1   ? "1d" :
-                      `${daysNum}d`;
-
-  // Risk verdict — three layers in priority order:
-  //   1. Persisted classifyRisk verdict from sam-ingest / backfill (row.risk_level)
-  //   2. View-time deadline escalation: ≤3d → P0, ≤7d → at least P1
-  //      (mirrors helpers.ts daysOut >= 0 gate so expired deadlines don't fire;
-  //      escalation only PROMOTES, never demotes)
-  //   3. Audited rows w/o persisted risk_level fall back to compliance_score
-  let label: "P0" | "P1" | "P2" | "Watch" = "Watch";
-  if (row.risk_level === "P0" || row.risk_level === "P1" || row.risk_level === "P2" || row.risk_level === "Watch") {
-    label = row.risk_level;
-  } else if (row.compliance_score != null) {
-    if (row.compliance_score < 40) label = "P0";
-    else if (row.compliance_score < 70) label = "P1";
-    else label = "P2";
-  } else if (poleToRecommendation(row) === "DECLINE") {
-    label = "P0";
-  }
-  if (row.response_deadline) {
-    const dl = Date.parse(row.response_deadline);
-    if (!Number.isNaN(dl)) {
-      const daysOut = (dl - Date.now()) / 86400000;
-      if (daysOut >= 0 && daysOut <= 3) {
-        label = "P0";
-      } else if (daysOut >= 0 && daysOut <= 7 && (label === "Watch" || label === "P2")) {
-        label = "P1";
-      }
-    }
-  }
-  const risk: Enriched["risk"] =
-    label === "P0" ? "rp0" : label === "P1" ? "rp1" : label === "P2" ? "rp2" : "";
-  const riskLabel = label;
-
-  const sa = (row.set_aside || "").toLowerCase();
-  let saCls: Enriched["saCls"] = "un";
-  let saLabel = "UNREST";
-  if (sa.includes("8(a)") || sa.includes("8a")) { saCls = "a8"; saLabel = "8(a)"; }
-  else if (sa.includes("woman")) { saCls = "wo"; saLabel = "WOSB"; }
-  else if (sa.includes("sdvosb") || sa.includes("service-disabled")) { saCls = "sd"; saLabel = "SDVOSB"; }
-  else if (sa.includes("hubzone")) { saCls = "hz"; saLabel = "HUBZone"; }
-  else if (sa.includes("small")) { saCls = "sb"; saLabel = "SB"; }
-
-  // FA-89f: binary audit status — reads row.is_audited (cross-referenced
-  // from the audits table at fetch time), NOT pending_audits.status which is
-  // the ingest queue state.
-  const auditEntry = row.is_audited
-    ? { cls: "complete" as const, label: "Audited ✓" }
-    : { cls: "pending"  as const, label: "Not Audited" };
-
-  return { row, daysNum, daysCls, daysLabel, risk, riskLabel, saCls, saLabel, auditStatusCls: auditEntry.cls, auditStatusLabel: auditEntry.label };
-}
-
-function FeedRowCmp({ r, onClick }: { r: Enriched; onClick: () => void }) {
-  const riskCls = r.risk === "rp0" ? "rk0" : r.risk === "rp1" ? "rk1" : r.risk === "rp2" ? "rk2" : "rkw";
-  const nt = (r.row.notice_type || "").toLowerCase();
-  const isPreSol = nt === "pre_sol" || nt === "sources_sought";
-  return (
-    <div className={`feed-row ${r.risk}`} onClick={onClick}>
-      <span className="f-naics">{r.row.naics_code || "—"}</span>
-      <div style={{ minWidth: 0 }}>
-        <div className="f-title" title={r.row.title || ""}>
-          {isPreSol && (
-            <span style={{
-              fontFamily: "var(--mono)", fontSize: 7, fontWeight: 700,
-              padding: "1px 5px", marginRight: 6, borderRadius: 2,
-              letterSpacing: ".1em", textTransform: "uppercase",
-              color: "#A78BFA", background: "rgba(167,139,250,.10)",
-              border: "1px solid rgba(167,139,250,.28)"
-            }}>
-              {nt === "sources_sought" ? "Src Sought" : "Pre-Sol"}
-            </span>
-          )}
-          {r.row.incumbent_name && (
-            <span
-              title={`Incumbent: ${r.row.incumbent_name}`}
-              style={{
-                fontFamily: "var(--mono)", fontSize: 7, fontWeight: 700,
-                padding: "1px 5px", marginRight: 6, borderRadius: 2,
-                letterSpacing: ".1em", textTransform: "uppercase",
-                color: "var(--blue)", background: "rgba(96,165,250,.08)",
-                border: "1px solid rgba(96,165,250,.22)"
-              }}
-            >
-              Inc
-            </span>
-          )}
-          {r.row.title || "—"}
-        </div>
-      </div>
-      <span className="f-agency" title={r.row.agency || ""}>{r.row.agency || "—"}</span>
-      <span className={`f-days ${r.daysCls === "none" ? "" : r.daysCls}`}>{r.daysLabel}</span>
-      <span className="f-type" title={r.row.document_type || ""}>{r.row.document_type || "—"}</span>
-      <span className={`f-sa sa-${r.saCls}`}>{r.saLabel}</span>
-      <span className={`f-risk ${riskCls}`}>{r.riskLabel}</span>
     </div>
   );
 }
@@ -2476,12 +1602,8 @@ function PipelineKanban({ audits }: { audits: AuditRow[] }) {
     //        notice_id. Failed audits are already removed so a re-audit only
     //        survives if it succeeded.
     // FIX 2: only audits the user has explicitly added to pipeline appear.
-    // FA-89h: admit Opportunities-pin stub rows (audit_source='opportunities_pin')
-    // even though they have no compliance_score yet — they're tracking-only
-    // placeholders so the Pipeline Kanban shows pinned solicitations before any
-    // real audit has run.
     const successful = audits.filter(
-      (a) => a.in_pipeline === true && a.status !== "failed" && (a.compliance_score != null || a.audit_source === "opportunities_pin")
+      (a) => a.in_pipeline === true && a.status !== "failed" && a.compliance_score != null
     );
     const sortedDesc = [...successful].sort((a, b) => {
       const ta = a.created_at ? new Date(a.created_at).getTime() : 0;

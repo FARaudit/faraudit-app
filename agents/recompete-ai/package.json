@@ -1,7 +1,7 @@
 {
   "name": "recompete-ai",
   "version": "0.1.0",
-  "description": "FARaudit Recompete AI — Railway daily worker. Scans audits.outcome=won, estimates contract duration, flags expiring within 180d, writes pending_audits source=recompete, Telegram-alerts CEO.",
+  "description": "FARaudit Recompete AI — Railway daily worker. Scans audits.outcome=won, estimates contract duration, flags expiring within 180d, Telegram-alerts CEO once per audit (dedup via audits.recompete_alerted_at). Alert-only since 2026-07-29.",
   "main": "index.ts",
   "type": "module",
   "scripts": {

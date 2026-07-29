@@ -127,10 +127,13 @@ export async function POST(req: Request) {
       reply = await pipelineReply();
     } else if (text === "/fleet") {
       reply = await fleetReply();
-    } else if (text.startsWith("/audit ")) {
-      reply = await triggerAuditReply(text.slice("/audit ".length).trim());
+    } else if (text === "/audit" || text.startsWith("/audit ")) {
+      // Retired 2026-07-29: this command fed pending_audits rows with
+      // source='telegram_manual', which nothing has consumed since the V1
+      // Audit-AI purge (the resident worker claims source='user' only).
+      reply = "Manual audit via Telegram is retired — nothing consumed its queue. Run the audit in the app instead: https://faraudit.com/home#audit (paste the notice_id or upload the PDF).";
     } else {
-      reply = `APEX CEO Bot\n\n/brief — morning digest\n/status — route health\n/tasks — today's tasks\n/prospects — pipeline\n/mrr — revenue vs target\n/83b — election status\n/learn fa|br|la — education\n/news — company news\n/done [item] — log it\n/build [note] — queue it\n\n— Vertex Intelligence —\n/signals — top 5 Bullrize signals\n/corpus — FARaudit corpus stats\n/pipeline — solicitations by stage\n/fleet — Railway agent status\n/audit [notice_id] — manual audit trigger`;
+      reply = `APEX CEO Bot\n\n/brief — morning digest\n/status — route health\n/tasks — today's tasks\n/prospects — pipeline\n/mrr — revenue vs target\n/83b — election status\n/learn fa|br|la — education\n/news — company news\n/done [item] — log it\n/build [note] — queue it\n\n— Vertex Intelligence —\n/signals — top 5 Bullrize signals\n/corpus — FARaudit corpus stats\n/pipeline — solicitations by stage\n/fleet — Railway agent status`;
     }
   } catch (err) {
     console.error("[telegram-route] handler error:", err);
@@ -170,14 +173,14 @@ async function topSignalsReply(): Promise<string> {
 async function corpusReply(): Promise<string> {
   const sb = getAdminClient();
   if (!sb) return "Corpus · admin client unavailable.";
-  const [audits, traps, pending] = await Promise.all([
+  // Pending-queue count dropped 2026-07-29: the pending_audits SAM queue is
+  // retired (sam-ingest gone since 2026-05-30) — the count was frozen noise.
+  const [audits, traps] = await Promise.all([
     sb.from("audits").select("*", { count: "exact", head: true }),
-    sb.from("fa_intelligence_corpus").select("*", { count: "exact", head: true }),
-    sb.from("pending_audits").select("*", { count: "exact", head: true }).eq("status", "pending")
+    sb.from("fa_intelligence_corpus").select("*", { count: "exact", head: true })
   ]);
   const total = audits.count || 0;
-  const targetPct = Math.min(100, (total / 10_000) * 100).toFixed(1);
-  return `FARaudit corpus — ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}\n\nAudits: ${total.toLocaleString()}\nTraps caught: ${traps.count || 0}\nPending queue: ${pending.count || 0}\nProgress to 10K: ${targetPct}%`;
+  return `FARaudit — ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}\n\nAudits: ${total.toLocaleString()}\nTraps caught: ${traps.count || 0}`;
 }
 
 async function pipelineReply(): Promise<string> {
@@ -213,36 +216,13 @@ async function fleetReply(): Promise<string> {
   const sb = getAdminClient();
   let agentLine = "Railway crons: schema unavailable";
   if (sb) {
+    // sam-ingest line dropped 2026-07-29: the service was retired 2026-05-30,
+    // so its "new solicitations" count was a permanent 0.
     const since24h = new Date(Date.now() - 24 * 3600_000).toISOString();
-    const [recentAudits, recentPending] = await Promise.all([
-      sb.from("audits").select("*", { count: "exact", head: true }).gte("created_at", since24h),
-      sb.from("pending_audits").select("*", { count: "exact", head: true }).gte("created_at", since24h).eq("source", "sam_live")
-    ]);
-    agentLine = `audit-ai 24h: ${recentAudits.count || 0} new audits\nsam-ingest 24h: ${recentPending.count || 0} new solicitations`;
+    const { count } = await sb.from("audits").select("*", { count: "exact", head: true }).gte("created_at", since24h);
+    agentLine = `audits 24h: ${count || 0} new`;
   }
   return `Railway fleet — ${new Date().toLocaleTimeString("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit" })} CT\n\n${results.join("\n")}\n\n${agentLine}`;
 }
 
-async function triggerAuditReply(noticeId: string): Promise<string> {
-  if (!noticeId) return "Usage: /audit <notice_id>";
-  // Insert into pending_audits with manual source so audit-ai picks it up next cron tick.
-  const sb = getAdminClient();
-  if (!sb) return "Manual audit · admin client unavailable.";
-  // Skip if already queued.
-  // FA-116: notice_id is only unique among non-user rows — maybeSingle() would
-  // throw on a user duplicate, so scope the dedupe check to cron-sourced rows.
-  const { data: existing } = await sb.from("pending_audits").select("id, status").eq("notice_id", noticeId).neq("source", "user").maybeSingle();
-  if (existing) {
-    return `Manual audit · ${noticeId} already queued (status: ${existing.status}). audit-ai will pick it up next cron tick (06:30 CDT).`;
-  }
-  const { error } = await sb.from("pending_audits").insert({
-    notice_id: noticeId,
-    title: `Telegram-triggered manual audit · ${noticeId}`,
-    source: "telegram_manual",
-    status: "pending",
-    notice_type: "solicitation"
-  });
-  if (error) return `Manual audit · queue failed: ${error.message}`;
-  return `Manual audit queued · ${noticeId}\n\naudit-ai will run at next 06:30 CDT cron tick. Result will appear in /audit/[id] once complete.`;
-}
 

@@ -3,7 +3,6 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies }            from "next/headers";
 import {
   fetchHeaderCounter,
-  fetchOpportunities,
   fetchRecentAudits,
   fetchHomeStats,
 } from "@/lib/bd-os/queries";
@@ -71,10 +70,9 @@ export async function GET() {
         ? _useTokens[0][0].toUpperCase()
         : (_useTokens[0][0] + _useTokens[_useTokens.length - 1][0]).toUpperCase();
 
-    const [counters, homeStats, rawOpps, recentAudits, pipelineRows] = await Promise.all([
+    const [counters, homeStats, recentAudits, pipelineRows] = await Promise.all([
       fetchHeaderCounter(supabase).catch(() => ({ audits: 0, traps: 0 })),
       fetchHomeStats(supabase).catch(() => null),
-      fetchOpportunities(supabase, { limit: 250 }).catch(() => []),
       fetchRecentAudits(supabase, user.id, 200).catch(() => []),
       // Pipeline rows for the user — feeds Active Pursuits funnel, .ps-mid/.ps-right
       // aggregates, sidebar Pipeline danger badge, and since-bar pursuitsAdvanced.
@@ -95,13 +93,11 @@ export async function GET() {
     const weekMs = 7 * dayMs;
     const day2Ms = 2 * dayMs;
 
-    // Drop already-expired opps so the feed only carries actionable rows.
-    const opportunities = (rawOpps as any[]).filter((o) => {
-      if (!o?.response_deadline) return true;
-      const ms = new Date(o.response_deadline).getTime();
-      if (Number.isNaN(ms)) return true;
-      return ms >= nowMs;
-    });
+    // The pending_audits-backed opportunities feed is retired (sam-ingest was
+    // retired 2026-05; every surviving queue row is past its deadline, so this
+    // list has served empty since then). Kept as an empty array so the static
+    // command-center/today consumers keep their response shape.
+    const opportunities: any[] = [];
 
     // ── Brief-head "since you last looked" deltas ──
     const newMatches24h = opportunities.filter((o) => {
