@@ -63,8 +63,11 @@ const nextConfig: NextConfig = {
   // 2026-07-29: externalized pdf-parse loaded, then "Cannot find module '@napi-rs/canvas'" from
   // /var/task/node_modules/pdf-parse). Force the package + its platform binary siblings into
   // every API function's trace so pdfjs gets real canvas, same as the worker.
+  // Round-3 preview proof: canvas then shipped, but pdfjs dynamic-imports pdf.worker.mjs from
+  // pdf-parse's dist at runtime — untraceable statically ("Setting up fake worker failed:
+  // Cannot find module '…/pdf-parse/dist/…/pdf.worker.mjs'"). Ship the whole package.
   outputFileTracingIncludes: {
-    "/api/**": ["./node_modules/@napi-rs/**"],
+    "/api/**": ["./node_modules/@napi-rs/**", "./node_modules/pdf-parse/**"],
   },
   async headers() {
     return [
