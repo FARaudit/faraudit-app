@@ -2,12 +2,12 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase-server";
 import {
   fetchHeaderCounter,
-  fetchOpportunities,
   fetchRecentAudits,
   fetchKOs,
   fetchAgencyStats,
   fetchDefenseSpending
 } from "@/lib/bd-os/queries";
+import { fetchLiveOpportunities } from "@/lib/bd-os/live-opportunities";
 import { cleanAgencyName } from "@/lib/audit-engine";
 import HomeClient from "./HomeClient";
 import "./home.css";
@@ -24,7 +24,10 @@ export default async function HomePage() {
 
   const [counter, opportunities, recentAudits, kos, agencies, defenseSpending] = await Promise.all([
     fetchHeaderCounter(supabase).catch(() => ({ audits: 0, traps: 0 })),
-    fetchOpportunities(supabase, { limit: 200 }).catch(() => []),
+    // Live SAM.gov feed (CEO 2026-07-29: go live-source; the sam-ingest cron
+    // that fed pending_audits was retired 2026-05-30 and the queue froze).
+    // Fail-closed inside; on error the feed renders empty, never stale rows.
+    fetchLiveOpportunities(supabase).catch(() => []),
     fetchRecentAudits(supabase, user.id, 200).catch(() => []),
     fetchKOs(supabase).catch(() => []),
     fetchAgencyStats(supabase).catch(() => []),
