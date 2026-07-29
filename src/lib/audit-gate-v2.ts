@@ -428,6 +428,12 @@ const conditionalTinaDemotionEnabled = () => process.env.AUDIT_CONDITIONAL_TINA_
 const TINA_EXCEPTION_CLAUSE_RE = /\b(?:15\.)?403-1(?!\d)\b/i;
 export function isConditionalTinaBoilerplate(ob: string): boolean {
   if (!COST_PRICING_DATA_RE.test(ob) || !TINA_EXCEPTION_CLAUSE_RE.test(ob)) return false;
+  // U-B (panel 2026-07-29, red-team-traced false-BID vector, probe S1-reproduced): the strip-then-hasBarSignal
+  // belt is MEASURED blind to bid-guarantee/NMR/SPRS/50%-rule vocabulary, so a conditional-TINA sentence that
+  // ALSO carries a co-sentenced kill-class duty ("…per 15.403-1; the offeror shall comply with the
+  // nonmanufacturer rule at 52.219-33…") was demoted whole. With capture armed, any kill-class token in the
+  // ORIGINAL sentence refuses the demotion (fail-toward-disqualifier). Flag-OFF ⇒ byte-identical.
+  if (consequenceCaptureEnabled() && TINA_KILL_COSENTENCE_RE.test(ob)) return false;
   const stripped = ob.replace(new RegExp(COST_PRICING_DATA_RE.source, "gi"), " ");
   return !hasBarSignal(stripped); // a bar signal surviving the strip ⇒ a real compound bar ⇒ do NOT demote
 }
@@ -643,6 +649,41 @@ function recitalContinuation(after: string): string {
   return out.trim();
 }
 
+// ═══ U-B · RELEASE VISIBILITY + CONSEQUENCE CAPTURE (panel 2026-07-29 · probes scripts/audit-ai/_ub-probe.ts) ═══
+// Two flags, default-OFF, byte-identical OFF:
+//   AUDIT_RELEASE_LEDGER      — the silent boilerplate release is RECORDED (releasedBoilerplate bucket). Verdict-inert.
+//   AUDIT_CONSEQUENCE_CAPTURE — a released-class duty whose SEVERED next-sentence window carries a rejection
+//                               consequence ESCALATES instead of vanishing (obligationsOf splits on [.;\n], so
+//                               "shall acknowledge all amendments." travels apart from "failure ... will not be
+//                               considered." — measured 82/478 released items across the banked cohort); and the
+//                               conditional-TINA demotion refuses a co-sentenced NMR/kill-class bar.
+const releaseLedgerEnabled = () => process.env.AUDIT_RELEASE_LEDGER === "true";
+const consequenceCaptureEnabled = () => process.env.AUDIT_CONSEQUENCE_CAPTURE === "true";
+// Rejection-consequence SHAPE (allowlist, #507 doctrine — affirmative kill vocabulary, not a bar-word blocklist).
+const CONSEQUENCE_TAIL_RE = /\b(?:reject(?:ed|ion)?|unacceptable|ineligible|non-?responsive|will\s+not\s+be\s+considered|disqualif\w*|no\s+further\s+consideration|removed\s+from\s+consideration)\b/i;
+// Kill-class vocabulary hasBarSignal is MEASURED blind to (panel: bid guarantee / NMR / SPRS / 50%-rule) — the
+// conditional-TINA strip-then-hasBarSignal belt cannot see these, so a co-sentenced bar was demoted (false-BID vector,
+// reproduced by probe S1). Affirmative shape allowlist, never a blocklist.
+const TINA_KILL_COSENTENCE_RE = /\b(?:non-?manufacturer|52\.219-33|small\s+business\s+manufacturer|bid\s+guarantee|bid\s+bond|sprs|50\s*(?:%|percent)|fifty\s+percent)\b/i;
+/** U-B consequence lookup — the NEXT-SENTENCE window after a duty, the OPPOSITE contract of verifyRecitalInSource's
+ *  continuation (which deliberately STOPS at a sentence terminator; its purpose is a severed mid-sentence tail, and
+ *  reading further would false-veto). Here the following sentence IS the target: a rejection consequence adjacent to a
+ *  duty is the panel's sentence-pair unit. Whitespace/case-tolerant locate (same escaping as verifyRecitalInSource);
+ *  bounded 300-char window; null when the obligation is not verbatim-locatable (⇒ capture declines, release stands —
+ *  fail-open here is safe because the ledger still records it). ONE implementation shared by the orchestrator, the
+ *  replay path, and the probes. */
+export function consequenceTailAfter(fullSource: string, ob: string): string | null {
+  const src = fullSource ?? "";
+  const needle = ob.trim();
+  if (needle.length < 16) return null;
+  const pattern = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+  try {
+    const m = new RegExp(pattern, "i").exec(src);
+    if (!m) return null;
+    return src.slice(m.index + m[0].length, m.index + m[0].length + 300);
+  } catch { return null; }
+}
+
 export function verifyRecitalInSource(fullSource: string, ob: string): { present: boolean; continuation: string } | null {
   const src = fullSource ?? "";
   const nob = benignNorm(ob);
@@ -805,6 +846,12 @@ export interface CoverageV2 {
    *  NHR and instead attaches as a CAVEAT (credential named verbatim) to the committal verdict. Present ONLY when
    *  AUDIT_PERFORMANCE_UPKEEP_CAVEAT is on ⇒ flag-OFF the serialized coverageV2 is byte-identical. */
   caveatRecital?: Array<{ section: string; obligation: string; credential: string }>;
+  /** U-B RELEASE LEDGER (panel 2026-07-29): obligations importanceOf() released as "boilerplate" — previously a
+   *  SILENT drop (the :863 `continue`; measured 478/2680 = 18% of ungrounded READ obligations across the banked
+   *  cohort, 82 with a kill consequence in the severed next sentence). Verdict-INERT observability: count + names
+   *  ride the serialized coverageV2 into the run record. Present ONLY when AUDIT_RELEASE_LEDGER is on ⇒ flag-OFF
+   *  the serialized coverageV2 is byte-identical (the caveatRecital pattern). */
+  releasedBoilerplate?: Array<{ section: string; obligation: string }>;
   /** Importance-weighted covered fraction in [0,1] — surfaced as a signal (never a veto). 1 when nothing required. */
   coverageGrade: number;
 }
@@ -820,10 +867,13 @@ export function gradeCoverageV2(attestations: SectionAttestation[], opts?: {
    *  tail for the continuation veto). Supplied by the orchestrator (holds ctx.fullSource). Double-gated: a caller-
    *  supplied fn NEVER runs flag-OFF (the block short-circuits before it is consulted). Absent ⇒ no benign claim. */
   verifyRecitalPresence?: (ob: string) => { present: boolean; continuation: string } | null;
+  /** U-B — next-sentence window lookup for consequence capture (consequenceTailAfter). Absent ⇒ capture declines. */
+  consequenceTail?: (ob: string) => string | null;
 }): CoverageV2 {
   const unreadable: string[] = [];
   const ungroundedRead: string[] = [];
   const disqualifierUncovered: Array<{ section: string; obligation: string; locatedAt?: string; contextNote?: string }> = [];
+  const releasedBoilerplate: Array<{ section: string; obligation: string }> = [];
   const ungroundedNonBarSignal: Array<{ section: string; obligation: string }> = [];
   const benignCoveredRecital: Array<{ section: string; obligation: string; arm: string }> = [];
   const caveatRecital: Array<{ section: string; obligation: string; credential: string }> = [];
@@ -860,7 +910,23 @@ export function gradeCoverageV2(attestations: SectionAttestation[], opts?: {
       // signal (ungroundedNonBarSignal). Flag-OFF ⇒ ambiguous always escalates ⇒ byte-identical.
       for (const ob of realUngrounded) {
         const imp = importanceOf(ob);
-        if (imp === "boilerplate") continue;
+        if (imp === "boilerplate") {
+          // U-B CONSEQUENCE CAPTURE: before releasing, read the SEVERED next-sentence window — a duty whose
+          // adjacent consequence says reject/unacceptable/ineligible is a kill-gate obligationsOf split apart
+          // ("shall acknowledge all amendments." ⟂ "failure ... will not be considered."). Escalate it to
+          // disqualifierUncovered (under armed U-A that surfaces as the NAMED committal caution or holds via the
+          // firm-fact spectrum — never a silent drop, never an ambient mute). Tail unlocatable ⇒ capture declines
+          // and the release stands (the ledger below still records it). Flag-OFF ⇒ branch skipped ⇒ byte-identical.
+          if (consequenceCaptureEnabled()) {
+            const tail = opts?.consequenceTail?.(ob) ?? null;
+            if (tail && CONSEQUENCE_TAIL_RE.test(tail)) {
+              disqualifierUncovered.push(enrich({ section: a.section, obligation: ob })); continue;
+            }
+          }
+          // U-B RELEASE LEDGER: the silent drop becomes a RECORDED drop (verdict-inert; rides the run record).
+          if (releaseLedgerEnabled()) releasedBoilerplate.push({ section: a.section, obligation: ob });
+          continue;
+        }
         if (imp === "disqualifier") { disqualifierUncovered.push(enrich({ section: a.section, obligation: ob })); continue; }
         // BENIGN-IN-SOURCE RECITAL TRIAGE (card #572, flag AUDIT_BENIGN_RECITAL_COVERED, default-OFF). Runs ONLY on the
         // ambiguous class (a DISQUALIFIER_RE hit already returned above — never laundered) and BEFORE the ambiguous
@@ -907,6 +973,8 @@ export function gradeCoverageV2(attestations: SectionAttestation[], opts?: {
     ...(benignRecitalCoveredEnabled() ? { benignCoveredRecital } : {}),
     // card #576 — include the caveat bucket ONLY when the flag is on ⇒ flag-OFF serialized coverageV2 byte-identical.
     ...(performanceUpkeepCaveatEnabled() ? { caveatRecital } : {}),
+    // U-B — include the release ledger ONLY when the flag is on ⇒ flag-OFF serialized coverageV2 byte-identical.
+    ...(releaseLedgerEnabled() ? { releasedBoilerplate } : {}),
     coverageGrade: totalWeight === 0 ? 1 : coveredWeight / totalWeight,
   };
 }

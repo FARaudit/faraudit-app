@@ -18,7 +18,7 @@ import type { AuditResult, RunDiagnostics } from "./audit-orchestrator";
 import { buildManifest, completenessOf, coreMissingFor, locateObligationContext } from "./audit-orchestrator";
 import { detectFormat, procurementPart, requiresProposalSections, type AuditToolContext } from "./audit-tools";
 import { deriveVerdict, applyFindingDedup, applyCrossFleetDedup } from "./audit-decide";
-import { gradeCoverageV2, verifyRecitalInSource, type CoverageV2 } from "./audit-gate-v2";
+import { consequenceTailAfter, gradeCoverageV2, verifyRecitalInSource, type CoverageV2 } from "./audit-gate-v2";
 import type { TypedFinding, VerdictInputs, BidderProfile } from "./audit-findings";
 
 export const RUN_RECORD_SCHEMA = "run-record/v1" as const;
@@ -355,6 +355,7 @@ export function replayCoverageStage(rec: RunRecord): CoverageStageReplay {
   const cov = gradeCoverageV2(atts, {
     locate: (ob) => locateObligationContext(src, ob),
     verifyRecitalPresence: (ob) => verifyRecitalInSource(src, ob),
+    consequenceTail: (ob) => consequenceTailAfter(src, ob),   // U-B — replay mirrors the production sentence-pair lookup
   });
   const pre = rec.result.diagnostics?.preProcessingFindings ?? null;
   let dedup: CoverageStageReplay["dedup"] = null;

@@ -41,7 +41,7 @@ import { highSignalSweep, boilerplateTrapSweep } from "./audit-grounding-sweep";
 import { createHash } from "node:crypto";
 import type { TypedFinding, BidderProfile, VerdictInputs, Controllability } from "./audit-findings";
 import { scanPackageMarkers, absenceClaimContradicted } from "./absence-grounding-gate";
-import { disqualifierTriggersOf, GATE_V2_ENABLED, gradeCoverageV2, groundingVariantToleranceEnabled, importanceOf, isLedgerDemotableNonBar, verifyRecitalInSource } from "./audit-gate-v2";
+import { consequenceTailAfter, disqualifierTriggersOf, GATE_V2_ENABLED, gradeCoverageV2, groundingVariantToleranceEnabled, importanceOf, isLedgerDemotableNonBar, verifyRecitalInSource } from "./audit-gate-v2";
 
 // B1 (Brain card #421 Fork-1) — §L/§M coverage-ledger honors boilerplate. A READ §L/§M whose ONLY ungrounded
 // obligation sentences are administrative BOILERPLATE (importanceOf==="boilerplate") reads COVERED-WITH-SIGNAL, not
@@ -3008,7 +3008,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   const _bankDiag: RunDiagnostics | undefined = _preDedupFindings
     ? { preProcessingFindings: _preDedupFindings, stageCounts: { preDedup: _preDedupFindings.length, postDedup: findings.length }, ...(ver.ledger ? { verifierLedger: ver.ledger } : {}) }
     : undefined;
-  const coverageV2 = GATE_V2_ENABLED ? gradeCoverageV2(attestations, { locate: (ob) => locateObligationContext(ctx.fullSource, ob), verifyRecitalPresence: (ob) => verifyRecitalInSource(ctx.fullSource, ob) }) : undefined;
+  const coverageV2 = GATE_V2_ENABLED ? gradeCoverageV2(attestations, { locate: (ob) => locateObligationContext(ctx.fullSource, ob), verifyRecitalPresence: (ob) => verifyRecitalInSource(ctx.fullSource, ob), consequenceTail: (ob) => consequenceTailAfter(ctx.fullSource, ob) }) : undefined;
   // card #576 — an ordinary-course performance-upkeep recital demoted off NHR (coverageV2.caveatRecital, present ONLY
   // flag-ON) is surfaced as a BID_WITH_CAUTION-floor caveat before deriveVerdict. Flag-OFF ⇒ caveatRecital absent ⇒
   // emitter is a no-op ⇒ byte-identical.
