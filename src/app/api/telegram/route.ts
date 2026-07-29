@@ -130,7 +130,7 @@ export async function POST(req: Request) {
     } else if (text.startsWith("/audit ")) {
       reply = await triggerAuditReply(text.slice("/audit ".length).trim());
     } else {
-      reply = `APEX CEO Bot\n\n/brief — morning digest\n/status — route health\n/tasks — today's tasks\n/prospects — pipeline\n/mrr — revenue vs target\n/83b — election status\n/learn fa|br|la — education\n/news — company news\n/done [item] — log it\n/build [note] — queue it\n\n— Vertex Intelligence —\n/signals — top 5 Bullrize signals\n/corpus — FARaudit corpus stats\n/pipeline — solicitations by stage\n/fleet — Railway agent status\n/audit [notice_id] — manual audit trigger`;
+      reply = `APEX CEO Bot\n\n/brief — morning digest\n/status — route health\n/tasks — today's tasks\n/prospects — pipeline\n/mrr — revenue vs target\n/83b — election status\n/learn fa|br|la — education\n/news — company news\n/done [item] — log it\n/build [note] — queue it\n\n— Vertex Intelligence —\n/signals — top 5 Bullrize signals\n/corpus — FARaudit corpus stats\n/pipeline — solicitations by stage\n/fleet — Railway agent status`;
     }
   } catch (err) {
     console.error("[telegram-route] handler error:", err);
@@ -209,40 +209,29 @@ async function fleetReply(): Promise<string> {
       return `${s.name} · unreachable`;
     }
   }));
-  // Railway agent status — we can only confirm "scheduled" by reading their last cron-output footprint.
+  // Agent status — confirmed only by reading each service's last output
+  // footprint (audits rows come from the resident audit-worker + watcher, not
+  // a cron; sam-ingest is the one true cron here).
   const sb = getAdminClient();
-  let agentLine = "Railway crons: schema unavailable";
+  let agentLine = "Railway agents: schema unavailable";
   if (sb) {
     const since24h = new Date(Date.now() - 24 * 3600_000).toISOString();
     const [recentAudits, recentPending] = await Promise.all([
       sb.from("audits").select("*", { count: "exact", head: true }).gte("created_at", since24h),
       sb.from("pending_audits").select("*", { count: "exact", head: true }).gte("created_at", since24h).eq("source", "sam_live")
     ]);
-    agentLine = `audit-ai 24h: ${recentAudits.count || 0} new audits\nsam-ingest 24h: ${recentPending.count || 0} new solicitations`;
+    agentLine = `audits 24h: ${recentAudits.count || 0} new\nsam-ingest 24h: ${recentPending.count || 0} new solicitations`;
   }
   return `Railway fleet — ${new Date().toLocaleTimeString("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit" })} CT\n\n${results.join("\n")}\n\n${agentLine}`;
 }
 
+// RETIRED (2026-07-29): this used to insert pending_audits rows with
+// source='telegram_manual' for the audit-ai cron, deleted 2026-06-28 ·
+// 5dc9b18. No consumer remains (the resident audit-worker claims
+// source='user' only), so enqueueing here would park rows forever. Point at
+// the web flow instead of lying about a cron pickup.
 async function triggerAuditReply(noticeId: string): Promise<string> {
-  if (!noticeId) return "Usage: /audit <notice_id>";
-  // Insert into pending_audits with manual source so audit-ai picks it up next cron tick.
-  const sb = getAdminClient();
-  if (!sb) return "Manual audit · admin client unavailable.";
-  // Skip if already queued.
-  // FA-116: notice_id is only unique among non-user rows — maybeSingle() would
-  // throw on a user duplicate, so scope the dedupe check to cron-sourced rows.
-  const { data: existing } = await sb.from("pending_audits").select("id, status").eq("notice_id", noticeId).neq("source", "user").maybeSingle();
-  if (existing) {
-    return `Manual audit · ${noticeId} already queued (status: ${existing.status}). audit-ai will pick it up next cron tick (06:30 CDT).`;
-  }
-  const { error } = await sb.from("pending_audits").insert({
-    notice_id: noticeId,
-    title: `Telegram-triggered manual audit · ${noticeId}`,
-    source: "telegram_manual",
-    status: "pending",
-    notice_type: "solicitation"
-  });
-  if (error) return `Manual audit · queue failed: ${error.message}`;
-  return `Manual audit queued · ${noticeId}\n\naudit-ai will run at next 06:30 CDT cron tick. Result will appear in /audit/[id] once complete.`;
+  const suffix = noticeId ? ` for ${noticeId}` : "";
+  return `Manual audit via Telegram is retired — the cron auditor no longer exists.\n\nTo run an audit${suffix}, use the web flow: https://faraudit.com/audit`;
 }
 

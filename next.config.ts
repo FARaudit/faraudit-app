@@ -54,26 +54,25 @@ const nextConfig: NextConfig = {
   // has_text=false on preview but extracted fine on the box). Shipping them
   // verbatim from node_modules makes require() resolve at runtime, same as local.
   //
-  // pdf-parse — SAME defect class, found live 2026-07-29 on GET /api/audit/resolve:
-  // webpack bundles pdf-parse's pdfjs-dist into the route chunk, where pdfjs's
-  // dynamic require of @napi-rs/canvas dies ("Cannot load @napi-rs/canvas
-  // package") → no DOMMatrix polyfill → extractText throws "DOMMatrix is not
-  // defined" on EVERY serverless PDF parse (the door's content read + /api/audit's
-  // sync-path has_text census both silently degrade to their honest fallbacks).
-  // External = plain runtime require from node_modules, identical to local + the
-  // Railway worker (where the same commit extracts fine).
-  serverExternalPackages: ["@sparticuz/chromium", "puppeteer-core", "mammoth", "exceljs", "pdf-parse"],
-  // pdfjs loads @napi-rs/canvas AND its own pdf.worker.mjs via dynamic
-  // require/import the file tracer misses — a pruned-file-set probe (2026-07-29)
-  // proved the nft trace ships index.cjs but NOT pdf.worker.mjs ("Setting up
-  // fake worker failed") and can miss the native binary. Either miss silently
-  // recreates the serverless extraction failure. Force-include both packages
-  // whole for the two routes that parse PDFs serverless (the canvas glob also
-  // matches the platform dirs, e.g. @napi-rs/canvas-linux-x64-gnu on Vercel;
-  // harmless where a platform dir is absent).
+  // pdf-parse — SAME defect class, found INDEPENDENTLY twice on 2026-07-29 (this branch: the
+  // demo refetch, 422-char source, verdict INCOMPLETE; main #322: GET /api/audit/resolve):
+  // webpack bundles pdf-parse's pdfjs-dist into the route chunk, where pdfjs's dynamic
+  // require of @napi-rs/canvas dies ("Cannot load @napi-rs/canvas package") → no DOMMatrix →
+  // extractText throws on EVERY serverless PDF parse, while the Railway worker (plain node,
+  // same commit) extracts fine. External = plain runtime require from node_modules.
+  serverExternalPackages: ["@sparticuz/chromium", "puppeteer-core", "mammoth", "exceljs", "pdf-parse", "@napi-rs/canvas"],
+  // pdfjs loads @napi-rs/canvas AND its own pdf.worker.mjs via dynamic require/import the
+  // file tracer misses — the round-2 preview proof of this branch ("Setting up fake worker
+  // failed: Cannot find module '…/pdf-parse/dist/…/pdf.worker.mjs'") and main #322's
+  // pruned-file-set probe found the same two misses independently. Either miss silently
+  // recreates the extraction failure, so force-include BOTH packages whole. MERGE NOTE
+  // (2026-07-29, this branch × main #322): main scoped the includes to /api/audit/resolve +
+  // /api/audit, which leaves /api/audit/[id]/refetch and /api/internal/watcher-tick — both of
+  // which parse PDFs through the same extractor — with pruned traces (the refetch route is
+  // where this branch's live proof ran). Union: one /api/** glob covering every API function;
+  // the @napi-rs/** glob also matches the platform dirs (e.g. canvas-linux-x64-gnu).
   outputFileTracingIncludes: {
-    "/api/audit/resolve": ["./node_modules/pdf-parse/**/*", "./node_modules/@napi-rs/canvas*/**/*"],
-    "/api/audit": ["./node_modules/pdf-parse/**/*", "./node_modules/@napi-rs/canvas*/**/*"]
+    "/api/**": ["./node_modules/pdf-parse/**/*", "./node_modules/@napi-rs/**"],
   },
   async headers() {
     return [
