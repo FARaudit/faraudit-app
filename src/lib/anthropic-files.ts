@@ -4,8 +4,9 @@
 // This file imports + re-exports its public surface so Vercel-side consumers
 // via @/lib/anthropic-files get the same API without knowing about the
 // cross-package import. Same one-way pattern as kSamNonPdfError /
-// kImageResizeError (Vercel build can reach agents/, Railway cannot reach src/,
-// so re-export from the canonical side works).
+// kImageResizeError. (The direction dates from the V1 Audit-AI Railway worker,
+// whose container couldn't reach src/; that worker was deleted in 5dc9b18 —
+// the re-export is harmless legacy structure, kept because it's tiny.)
 //
 // All implementation lives in the canonical file. This twin is intentionally
 // tiny to minimize parity-drift surface area.

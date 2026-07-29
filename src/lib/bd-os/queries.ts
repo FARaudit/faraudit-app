@@ -65,6 +65,45 @@ export async function fetchCorpusStats(client: SupabaseClient): Promise<CorpusSt
   };
 }
 
+// ─── Opportunities row shape ──────────────────────────────────────────────
+// The pending_audits-backed fetchOpportunities() was retired 2026-07-29 (the
+// queue froze when sam-ingest was deleted). This type survives as the shape
+// contract for the LIVE feed — produced by fetchLiveOpportunities() in
+// ./live-opportunities.ts and consumed by HomeClient.
+export interface OpportunityRow {
+  id: string;
+  notice_id: string;
+  solicitation_number: string | null;
+  title: string | null;
+  agency: string | null;
+  naics_code: string | null;
+  set_aside: string | null;
+  document_type: string | null;
+  notice_type: string | null;
+  incumbent_name: string | null;
+  source: string;
+  status: string;
+  recommendation: string | null;
+  /** R3: derived from compliance_json.v3.verdict on the matching audits row. */
+  v3_verdict: string | null;
+  compliance_score: number | null;
+  bid_no_bid: string | null;
+  pdf_url: string | null;
+  risk_level: string | null;
+  response_deadline: string | null;
+  in_pipeline: boolean;
+  watched: boolean;
+  title_plain: string | null;
+  // FA-89f: true iff a completed audits row exists for this notice_id —
+  // computed at fetch time. Drives the AUDIT badge in the UI.
+  is_audited: boolean;
+  // FA-89g: SAM-derived award ceiling (USD). Either awardCeiling or
+  // baseAndAllOptionsValue on the SAM payload, whichever the agency populated.
+  award_ceiling: number | null;
+  created_at: string;
+  processed_at: string | null;
+}
+
 // ─── Tab 3: Audit (history) ───────────────────────────────────────────────
 export interface AuditRow {
   id: string;

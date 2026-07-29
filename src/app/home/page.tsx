@@ -7,6 +7,7 @@ import {
   fetchAgencyStats,
   fetchDefenseSpending
 } from "@/lib/bd-os/queries";
+import { fetchLiveOpportunities } from "@/lib/bd-os/live-opportunities";
 import { cleanAgencyName } from "@/lib/audit-engine";
 import HomeClient from "./HomeClient";
 import "./home.css";
@@ -21,8 +22,12 @@ export default async function HomePage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
 
-  const [counter, recentAudits, kos, agencies, defenseSpending] = await Promise.all([
+  const [counter, opportunities, recentAudits, kos, agencies, defenseSpending] = await Promise.all([
     fetchHeaderCounter(supabase).catch(() => ({ audits: 0, traps: 0 })),
+    // Live SAM.gov feed (CEO 2026-07-29: go live-source; the sam-ingest cron
+    // that fed pending_audits was retired 2026-05-30 and the queue froze).
+    // Fail-closed inside; on error the feed renders empty, never stale rows.
+    fetchLiveOpportunities(supabase).catch(() => []),
     fetchRecentAudits(supabase, user.id, 200).catch(() => []),
     fetchKOs(supabase).catch(() => []),
     fetchAgencyStats(supabase).catch(() => []),
@@ -46,6 +51,7 @@ export default async function HomePage() {
     <HomeClient
       user={{ email: user.email || "", id: user.id }}
       counter={counter}
+      opportunities={opportunities}
       recentAudits={recentAuditsForCard}
       kos={kos}
       agencies={agencies}

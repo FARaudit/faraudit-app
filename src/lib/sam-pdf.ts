@@ -13,15 +13,15 @@
 // redirect: "follow", 30s timeout, Content-Disposition filename plumbing,
 // and image resize policy.
 //
-// Why duplicated, not imported wholesale: agents/audit-ai/ ships to Railway
-// with Root Directory = agents/audit-ai/ — only that folder lands in the worker
-// container, no /src/. Symmetrically, the Vercel build does not ship agents/.
-// Cross-importing helpers between containers would break one or the other.
-// The kSamNonPdfError + kImageResizeError CONSTANTS are the one exception: they
-// import from the canonical pdf.ts (Vercel build can reach agents/, Railway
-// cannot reach src/, so the one-way direction works). All other helpers are
-// mirrored. Consolidating into a shared workspace package is P2 hygiene,
-// separate from FA-1.
+// Why duplicated, not imported wholesale: HISTORICAL. The V1 Audit-AI Railway
+// worker shipped with Root Directory = agents/audit-ai/ (no /src/ in its
+// container), so helpers could not cross-import. That worker was deleted in
+// 5dc9b18 (2026-06-28) — every surviving consumer now builds with the full
+// repo tree, so the split is legacy structure, not a container constraint.
+// The kSamNonPdfError + kImageResizeError CONSTANTS import from the canonical
+// pdf.ts; all other helpers are mirrored (security-critical constants
+// parity-enforced by src/lib/sam-url-guard.test.ts). Consolidating into one
+// module is now-unblocked P2 hygiene.
 //
 // Handles seven SAM.gov payload formats with magic-byte + content-sniff detection:
 //   PDF   (%PDF / 25504446)        → base64 → Anthropic document block
