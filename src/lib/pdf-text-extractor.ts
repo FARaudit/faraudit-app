@@ -91,20 +91,31 @@ export async function extractText(pdfBuffer: Buffer): Promise<ExtractedDocument>
     // unavailable (untraced serverless bundle, missing platform binary), pdfjs references
     // DOMMatrix at module init and the require below THREW — turning every PDF into an empty
     // placeholder and the audit into an honest INCOMPLETE. TEXT extraction needs the globals to
-    // EXIST, not to render; a minimal stub keeps getText() alive. Guarded: with real canvas
-    // present (local, worker, externalized bundle) none of these assignments run.
+    // EXIST, not to render; a minimal stub keeps getText() alive. Node never defines DOMMatrix
+    // before pdfjs loads canvas, so the presence check alone cannot gate the stub — probe canvas
+    // itself: a try-require catches both an untraced bundle AND a resolvable package whose
+    // platform binary fails to load. With canvas loadable, pdfjs installs its own real polyfills.
     const g = globalThis as Record<string, unknown>;
-    if (typeof g.DOMMatrix === "undefined") {
-      g.DOMMatrix = class DOMMatrixStub {
-        a = 1; b = 0; c = 0; d = 1; e = 0; f = 0;
-        constructor(init?: number[]) {
-          if (Array.isArray(init) && init.length >= 6) [this.a, this.b, this.c, this.d, this.e, this.f] = init;
-        }
-      };
-      warnings.push("DOMMatrix stubbed — canvas package unavailable (text-only extraction)");
+    let canvasLoadable = true;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("@napi-rs/canvas");
+    } catch {
+      canvasLoadable = false;
     }
-    if (typeof g.ImageData === "undefined") g.ImageData = class ImageDataStub {};
-    if (typeof g.Path2D === "undefined") g.Path2D = class Path2DStub {};
+    if (!canvasLoadable) {
+      if (typeof g.DOMMatrix === "undefined") {
+        g.DOMMatrix = class DOMMatrixStub {
+          a = 1; b = 0; c = 0; d = 1; e = 0; f = 0;
+          constructor(init?: number[]) {
+            if (Array.isArray(init) && init.length >= 6) [this.a, this.b, this.c, this.d, this.e, this.f] = init;
+          }
+        };
+        warnings.push("DOMMatrix stubbed — canvas package unavailable (text-only extraction)");
+      }
+      if (typeof g.ImageData === "undefined") g.ImageData = class ImageDataStub {};
+      if (typeof g.Path2D === "undefined") g.Path2D = class Path2DStub {};
+    }
     // pdf-parse@^2.x exports default differently than v1; handle both.
     // v2 exposes a class-based PDFParse with getText(); v1 exposes a callable.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
