@@ -119,18 +119,19 @@ const check = (label: string, ok: boolean, detail: string) => {
     check("G3b credential-conditional stays NHR with AUDIT_CREDENTIAL_CONDITIONAL_REASON=false (kind ≠ prose)",
       g3b.verdict === "NEEDS_HUMAN_REVIEW", `got ${g3b.verdict} :: ${(g3b.reason ?? "").slice(0, 120)}`);
 
-    // G4 — review P1 (round-2 F-R2-3 rebuilt this leg: the first construction was INERT — its cc item carried
-    // bar vocab, so B3 ranking promoted it to the quoted head where even the head-only derivation tagged it).
-    // DISTINGUISHING construction: the head is a tier-1 DISQUALIFIER_RE item (non-cc, outranks everything), the
-    // cc item is bar-vocab-FREE at index ≥1 — head-only kind derivation calls this bucket "uncovered" (RED
-    // pre-fix at 3858078), the bucket-wide scan holds the mute (GREEN post-fix).
+    // G4 — review P1 (round-2 F-R2-3 rebuilt this leg: the first construction was INERT — its cc item's bar
+    // vocab ranked it to the quoted head where even the head-only derivation tagged it). DISTINGUISHING
+    // construction (mechanism per round-3: the head is tier-1 importanceOf=disqualifier and OUTRANKS the cc
+    // item's tier-2 — "license" is itself BAR_SIGNAL vocab, so the cc item is NOT bar-free; it stays at index
+    // ≥1 because tier-1 > tier-2 and the sort is stable). Head-only kind derivation calls this bucket
+    // "uncovered" (RED pre-fix at 3858078); the bucket-wide scan holds the mute (GREEN post-fix).
     const ccDeepInputs = JSON.parse(JSON.stringify(bb.result.inputs));
     ccDeepInputs.coverageV2.disqualifierUncovered = [
       { section: "L", obligation: "Offerors that fail to submit the required descriptive literature will not be considered for award." },
       { section: "H", obligation: "The contractor shall maintain a valid professional license during the entire contract performance." },
     ];
     const g4 = deriveVerdict(ccDeepInputs);
-    check("G4 bar-vocab-free credential-conditional at index ≥1 → NEEDS_HUMAN_REVIEW (whole-bucket cc scan)",
+    check("G4 credential-conditional outranked to index ≥1 → NEEDS_HUMAN_REVIEW (whole-bucket cc scan)",
       g4.verdict === "NEEDS_HUMAN_REVIEW", `got ${g4.verdict} :: ${(g4.reason ?? "").slice(0, 120)}`);
 
     // G5 — round-2 F-R2-2: the DECISIVE end of the Rule 70(c) firm-fact spectrum (pre-award possession of a
