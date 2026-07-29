@@ -1,5 +1,7 @@
 # Recompete AI — Railway cron worker.
-# Runs daily at 12:00 UTC = 07:00 CDT (after audit-ai 06:30 CDT cron).
+# Runs daily at 12:00 UTC = 07:00 CDT. (The 07:00 slot originally followed the
+# audit-ai 06:30 CDT cron, deleted 2026-06-28 · 5dc9b18 — no ordering
+# dependency remains.)
 # Configure Root Directory = agents/recompete-ai in Railway dashboard.
 # nixpacks.toml in this directory disables the build phase explicitly.
 

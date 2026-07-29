@@ -1,7 +1,7 @@
-// PARITY NOTE: agents/audit-ai/sam.ts is a byte-equivalent vendored copy of
-// this file. Any edit here MUST be applied to that file in the same commit.
-// The Audit-AI cron can't import from src/lib/ at runtime (Railway Root
-// Directory = agents/audit-ai/ means src/ isn't in the container).
+// This file is the single source — no vendored mirror. (The former parity
+// copy agents/audit-ai/sam.ts was deleted with the V1 cron fork in 5dc9b18;
+// the Railway audit worker is agents/audit-worker/, which builds with Root
+// Directory = / and imports @/lib/sam directly.)
 
 import type { LiveSamStatus } from "./audit-temporal";
 import { fetchNoticeVersionCount } from "./sam-history";
@@ -68,6 +68,30 @@ export function sanitizeSolicitationNumber(raw: string | null | undefined): stri
   if (/\s/.test(t)) return null;
   if (t.length > 25) return null;
   return t;
+}
+
+// Document-type normalizer. Mirrors agents/sam-ingest/helpers.ts:classifyDocType
+// so audits.document_type and pending_audits.document_type share one vocabulary
+// (the Past Audits Type column + fType slicer read audits.document_type).
+// Deterministic on SAM's `type` string only — never inferred from sol# letters
+// or titles. Priority: contract-structure markers first (IDIQ / BPA / Task
+// Order / Mod), then SAM canonical type strings, then title-cased first word;
+// empty / null input returns "Other".
+export function classifyDocType(t: string | null): string {
+  const raw = (t || "").trim();
+  const s = raw.toLowerCase();
+  if (s.includes("idiq")) return "IDIQ";
+  if (s.includes("bpa")) return "BPA";
+  if (s.includes("task order")) return "TaskOrd";
+  if (s.includes("modification")) return "Mod";
+  if (s.includes("sources sought")) return "SrcSght";
+  if (s.includes("presolicitation") || s.includes("pre-sol") || s.includes("pre sol")) return "PreSol";
+  if (s.includes("combined")) return "Combined";
+  if (s.includes("award")) return "Award";
+  if (s.includes("solicitation")) return "RFQ"; // most common defense small-biz type
+  if (!raw) return "Other";
+  const first = raw.split(/[\s/,]+/)[0] || raw;
+  return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
 }
 
 // Agency resolver. Mirrors agents/sam-ingest/helpers.ts:resolveAgency to keep

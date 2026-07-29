@@ -130,7 +130,7 @@ export async function POST(req: Request) {
     } else if (text.startsWith("/audit ")) {
       reply = await triggerAuditReply(text.slice("/audit ".length).trim());
     } else {
-      reply = `APEX CEO Bot\n\n/brief — morning digest\n/status — route health\n/tasks — today's tasks\n/prospects — pipeline\n/mrr — revenue vs target\n/83b — election status\n/learn fa|br|la — education\n/news — company news\n/done [item] — log it\n/build [note] — queue it\n\n— Vertex Intelligence —\n/signals — top 5 Bullrize signals\n/corpus — FARaudit corpus stats\n/pipeline — solicitations by stage\n/fleet — Railway agent status\n/audit [notice_id] — manual audit trigger`;
+      reply = `APEX CEO Bot\n\n/brief — morning digest\n/status — route health\n/tasks — today's tasks\n/prospects — pipeline\n/mrr — revenue vs target\n/83b — election status\n/learn fa|br|la — education\n/news — company news\n/done [item] — log it\n/build [note] — queue it\n\n— Vertex Intelligence —\n/signals — top 5 Bullrize signals\n/corpus — FARaudit corpus stats\n/pipeline — solicitations by stage\n/fleet — Railway agent status\n/audit [notice_id] — run an audit now`;
     }
   } catch (err) {
     console.error("[telegram-route] handler error:", err);
@@ -209,9 +209,11 @@ async function fleetReply(): Promise<string> {
       return `${s.name} · unreachable`;
     }
   }));
-  // Railway agent status — we can only confirm "scheduled" by reading their last cron-output footprint.
+  // Agent status — confirmed only by reading each service's last output
+  // footprint (audits rows come from the resident audit-worker + watcher, not
+  // a cron; sam-ingest is the one true cron here).
   const sb = getAdminClient();
-  let agentLine = "Railway crons: schema unavailable";
+  let agentLine = "Railway agents: schema unavailable";
   if (sb) {
     const since24h = new Date(Date.now() - 24 * 3600_000).toISOString();
     const [recentAudits, recentPending] = await Promise.all([

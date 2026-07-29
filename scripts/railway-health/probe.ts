@@ -7,8 +7,16 @@
 // would have flagged that within minutes.
 //
 // Data source · Railway CLI subprocess.
-//   - `railway status --json` (entire project view including all services)
-//   - `railway deployment list --json` per service (last ~20 deployments)
+//   - `railway status --json` (entire project view including all services,
+//     plus instance-level nextCronRunAt for cron health)
+//   - `railway deployment list --json` per service (last ~20 deployments;
+//     SKIPPED watch-pattern entries are ignored — they carry no health signal
+//     and can flood the whole window on busy push days)
+//
+// Cron services (manifest cronSchedule non-null) are NOT judged on deployment
+// recency: cron runs mostly don't create deployment entries, so deploy age
+// only measures when code was last pushed. Cron health = nextCronRunAt is
+// present and not in the past.
 // Pragmatic v1 choice over GraphQL: CLI handles auth automatically (CEO's
 // existing `railway login` token works) and the JSON shape is the same as
 // what the GraphQL endpoint returns. Future v2 can add direct GraphQL via
@@ -63,6 +71,7 @@ interface ServiceInstance {
   serviceId: string;
   serviceName: string;
   cronSchedule?: string | null;
+  nextCronRunAt?: string | null;
   startCommand?: string | null;
   latestDeployment?: Deployment;
 }
@@ -75,6 +84,7 @@ interface ServiceHealth {
   drift: DriftReason[];
   lastSuccess?: string;
   lastSuccessAge?: string;
+  nextCronRunAt?: string | null;
   recentFailureCount?: number;
   actualRootDirectory?: string | null;
   actualCronSchedule?: string | null;
@@ -121,6 +131,15 @@ function minutesSince(iso: string): number {
   return (Date.now() - new Date(iso).getTime()) / 60000;
 }
 
+// Railway reports rootDirectory with a leading slash ("/agents/qa-ai"); the
+// manifest uses repo-relative paths ("agents/qa-ai"). Same directory — compare
+// slash-insensitively so formatting alone never reads as drift.
+function normRootDir(dir: string | null | undefined): string | null {
+  if (dir == null) return null;
+  const stripped = dir.replace(/^\/+/, "");
+  return stripped === "" ? null : stripped;
+}
+
 function fmtAge(minutes: number): string {
   if (minutes < 60) return `${Math.round(minutes)}m ago`;
   if (minutes < 1440) return `${(minutes / 60).toFixed(1)}h ago`;
@@ -133,8 +152,8 @@ function checkService(svc: ServiceInstance, expected: Manifest[string], deployme
   const actualRootDirectory = svc.latestDeployment?.meta?.rootDirectory ?? null;
   const actualCronSchedule = svc.cronSchedule ?? null;
 
-  // 1. rootDirectory drift
-  if (expected.rootDirectory !== undefined && actualRootDirectory !== expected.rootDirectory) {
+  // 1. rootDirectory drift (slash-insensitive — see normRootDir)
+  if (expected.rootDirectory !== undefined && normRootDir(actualRootDirectory) !== normRootDir(expected.rootDirectory)) {
     drift.push(`rootDirectory: ${actualRootDirectory ?? "null"} vs expected ${expected.rootDirectory ?? "null"}`);
   }
 
@@ -143,29 +162,52 @@ function checkService(svc: ServiceInstance, expected: Manifest[string], deployme
     drift.push(`cronSchedule: "${actualCronSchedule ?? "null"}" vs expected "${expected.cronSchedule ?? "null"}"`);
   }
 
-  // 3. Time since last SUCCESS
-  const successDeployment = deployments.find((d) => d.status === "SUCCESS");
+  // SKIPPED entries are watch-pattern no-ops from monorepo pushes — they carry
+  // no health signal and can flood the entire ~20-entry window on busy push
+  // days, scrolling the last real SUCCESS out of view.
+  const realDeployments = deployments.filter((d) => d.status !== "SKIPPED");
+
+  // 3. Time since last SUCCESS.
+  // Cron RUNS mostly do not create deployment entries, so for cron services
+  // deployment recency measures code-push recency, not cron health — the
+  // staleness threshold only applies to non-cron services. Cron health is
+  // checked via nextCronRunAt below.
+  const isCron = expected.cronSchedule !== null;
+  const successDeployment = realDeployments.find((d) => d.status === "SUCCESS");
   let lastSuccessAgeMin: number | undefined;
   let lastSuccess: string | undefined;
   if (successDeployment) {
     lastSuccessAgeMin = minutesSince(successDeployment.createdAt);
     lastSuccess = successDeployment.createdAt;
-    if (lastSuccessAgeMin > expected.max_minutes_since_last_success) {
+    if (!isCron && lastSuccessAgeMin > expected.max_minutes_since_last_success) {
       drift.push(`last success ${fmtAge(lastSuccessAgeMin)} (max ${expected.max_minutes_since_last_success}m)`);
     }
-  } else if (deployments.length > 0) {
-    drift.push(`no SUCCESS in last ${deployments.length} deployments`);
+  } else if (realDeployments.length > 0) {
+    drift.push(`no SUCCESS in last ${realDeployments.length} real deployments (${deployments.length - realDeployments.length} SKIPPED ignored)`);
+  }
+  // realDeployments empty + deployments non-empty = window is all SKIPPED → no signal, not a failure.
+
+  // 3b. Cron scheduled check: Railway populates instance-level nextCronRunAt
+  // for any service with an active cron. Absent = cron not scheduled at all;
+  // in the past beyond a grace period = scheduler stuck.
+  const nextCronRunAt = svc.nextCronRunAt ?? null;
+  if (isCron) {
+    if (!nextCronRunAt) {
+      drift.push(`cron not scheduled: nextCronRunAt absent (expected "${expected.cronSchedule}")`);
+    } else if (minutesSince(nextCronRunAt) > 30) {
+      drift.push(`cron overdue: nextCronRunAt ${fmtAge(minutesSince(nextCronRunAt))}`);
+    }
   }
 
-  // 4. Chronic failure pattern: ≥3 of last 10 are FAILED/CRASHED
-  const recentFailures = deployments.slice(0, 10).filter((d) => /FAIL|CRASH|ERROR/.test(d.status));
+  // 4. Chronic failure pattern: ≥3 of last 10 real deployments are FAILED/CRASHED
+  const recentFailures = realDeployments.slice(0, 10).filter((d) => /FAIL|CRASH|ERROR/.test(d.status));
   if (recentFailures.length >= 3) {
     drift.push(`chronic failures: ${recentFailures.length}/10 recent`);
   }
 
   let status: ServiceHealth["status"];
   if (drift.length === 0) status = "green";
-  else if (drift.length === 1 && /last success/.test(drift[0])) status = "yellow";
+  else if (drift.length === 1 && /last success|cron overdue/.test(drift[0])) status = "yellow";
   else status = "red";
 
   // Action-needed hint
@@ -174,10 +216,14 @@ function checkService(svc: ServiceInstance, expected: Manifest[string], deployme
     actionNeeded = `Set Root Directory to "${expected.rootDirectory}" in Railway dashboard → ${svc.serviceName} → Settings`;
   } else if (drift.some((d) => d.startsWith("cronSchedule"))) {
     actionNeeded = `Update cron schedule in railway.toml + redeploy`;
+  } else if (drift.some((d) => /cron not scheduled/.test(d))) {
+    actionNeeded = `Cron missing from service config · check railway.toml cronSchedule + redeploy`;
+  } else if (drift.some((d) => /cron overdue/.test(d))) {
+    actionNeeded = `Cron scheduler stuck · check Cron Runs tab in Railway dashboard`;
   } else if (drift.some((d) => /chronic failures/.test(d))) {
     actionNeeded = `Inspect recent deployment logs · investigate root cause`;
   } else if (drift.some((d) => /last success/.test(d))) {
-    actionNeeded = `Cron skipped or stuck · check Cron Runs tab in Railway dashboard`;
+    actionNeeded = `Service stale · check recent deployments in Railway dashboard`;
   }
 
   return {
@@ -186,6 +232,7 @@ function checkService(svc: ServiceInstance, expected: Manifest[string], deployme
     drift,
     lastSuccess,
     lastSuccessAge: lastSuccessAgeMin !== undefined ? fmtAge(lastSuccessAgeMin) : undefined,
+    nextCronRunAt,
     recentFailureCount: recentFailures.length,
     actualRootDirectory,
     actualCronSchedule,

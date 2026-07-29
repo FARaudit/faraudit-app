@@ -1,16 +1,13 @@
-// CANONICAL · src/lib/audit-engine.ts is the canonical source.
-// agents/audit-ai/audit-engine.ts is the parity-locked DERIVED copy.
-// Any edit here MUST be applied to that file in the same commit. The Audit-AI
-// cron can't import from src/lib/ at runtime (Railway Root Directory =
-// agents/audit-ai/ means src/ isn't in the container) — hence the vendored
-// twin. Both files MUST stay byte-equivalent below this header.
+// This file is the single source — no vendored mirror. (The former parity
+// copy agents/audit-ai/audit-engine.ts was deleted with the V1 cron fork in
+// 5dc9b18; the Railway audit worker is agents/audit-worker/, which builds with
+// Root Directory = / and imports this module through src/lib/audit-executor.)
 //
-// FA-2 cleanup helper · imported on a per-twin path (Railway = ./anthropic-files,
-// Vercel = @/lib/anthropic-files which re-exports from canonical). The IMPORT
-// path is the only line that differs between the two engine files — everything
-// from `type ContentBlock` onward is byte-equivalent. See parity header.
+// FA-2 cleanup helper · @/lib/anthropic-files re-exports from the canonical
+// agents/audit-ai/anthropic-files.ts.
 import { deletePdfFromFilesApi } from "@/lib/anthropic-files";
 import { isEnvOn } from "@/lib/env-flags";
+import { sizeStandardFor, formatSizeStandard } from "@/lib/sba-size-standards";
 
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 // Model: Opus 4.8 (CEO decision 2026-06-19) — reverts the May-4 Sonnet swap.
@@ -1778,28 +1775,13 @@ JSON only, no prose.`;
 // decisions that should never vary.
 // ═══════════════════════════════════════════════════════════════════════════
 
-// Fix 1 — NAICS size standard lookup. SBA's published table. Render call sites
-// must use this helper exclusively; the model must not generate size standards.
-const NAICS_SIZE_STANDARDS: Record<string, { employees?: number; revenue?: string; label: string }> = {
-  "336411": { employees: 1500, label: "Aircraft Manufacturing" },
-  "336412": { employees: 1500, label: "Aircraft Engine & Engine Parts Manufacturing" },
-  "336413": { employees: 1250, label: "Other Aircraft Parts & Auxiliary Equipment Manufacturing" },
-  "336414": { employees: 1250, label: "Guided Missile & Space Vehicle Manufacturing" },
-  "332710": { employees: 500,  label: "Machine Shops" },
-  "332721": { employees: 500,  label: "Precision Turned Product Manufacturing" },
-  "332722": { employees: 500,  label: "Bolt, Nut, Screw, Rivet & Washer Manufacturing" },
-  "541330": { revenue: "$25.5M", label: "Engineering Services" },
-  "541512": { employees: 150,  label: "Computer Systems Design Services" },
-  "541519": { employees: 150,  label: "Other Computer Related Services" },
-  "561210": { revenue: "$47M",  label: "Facilities Support Services" }
-};
+// Fix 1 — NAICS size standard lookup. Render call sites must use this helper
+// exclusively; the model must not generate size standards. The table itself
+// lives in sba-size-standards.ts (single source, primary-source-verified) —
+// a code it doesn't carry gets the pointer string, never a guessed number.
 export function getNaicsSizeStandard(naicsCode: string | null | undefined): string {
-  if (!naicsCode) return "See SBA Table of Size Standards";
-  const entry = NAICS_SIZE_STANDARDS[naicsCode];
-  if (!entry) return "See SBA Table of Size Standards";
-  if (entry.employees) return `${entry.employees.toLocaleString()} employees`;
-  if (entry.revenue) return `${entry.revenue} avg annual receipts`;
-  return "See SBA Table of Size Standards";
+  const std = sizeStandardFor(naicsCode);
+  return std ? formatSizeStandard(std) : "See SBA Table of Size Standards";
 }
 
 // Fix 11 — PIID decode. DLA / Army / AF / USCG / WPAFB issuing-activity prefix

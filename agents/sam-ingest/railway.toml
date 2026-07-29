@@ -1,7 +1,8 @@
 # SAM Ingest — Railway cron worker.
-# Runs at 11:00 UTC = 06:00 CDT (30 min before audit-ai's 06:30 CDT cron) so
-# any solicitations posted overnight land in pending_audits before the
-# auditor wakes up.
+# Runs at 11:00 UTC = 06:00 CDT so solicitations posted overnight land in
+# pending_audits (source='sam_live') each morning. These rows feed the
+# /opportunities surface — no auditor consumes them (the audit-ai 06:30 CDT
+# cron that used to was deleted 2026-06-28 · 5dc9b18).
 #
 # Service is configured with Root Directory = agents/sam-ingest (set in Railway
 # dashboard May 4 2026 · Sprint 2.2.0). Watch Paths scoped to agents/sam-ingest/**.
