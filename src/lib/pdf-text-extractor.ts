@@ -121,20 +121,25 @@ export async function extractText(pdfBuffer: Buffer): Promise<ExtractedDocument>
     if (typeof PdfParseCtor === "function") {
       // pdf-parse v2 returns { pages: Array<{ text, num }>, text, total }
       // pdf-parse v1 returns { text, numpages, ... } from a callable
+      // Dispatch on the PROTOTYPE, not by try/catch: the old shape swallowed the v2 path's real
+      // error and then invoked the v2 CLASS as a function — the preview proof (2026-07-29)
+      // surfaced only the mask ("Class constructors cannot be invoked without 'new'") while the
+      // root cause stayed invisible. A masked root cause here is how the Vercel extraction
+      // outage survived undiagnosed; never re-call as fallback, log and let the outer catch own it.
       let pagesArr: Array<{ text?: string; num?: number }> | null = null;
-      try {
-        const inst = new PdfParseCtor({ data: pdfBuffer });
-        if (typeof inst.getText === "function") {
+      const isV2Class = typeof (PdfParseCtor as { prototype?: { getText?: unknown } }).prototype?.getText === "function";
+      if (isV2Class) {
+        try {
+          const inst = new PdfParseCtor({ data: pdfBuffer });
           const out = await inst.getText();
           rawText = String(out?.text ?? "");
           if (Array.isArray(out?.pages)) pagesArr = out.pages;
           pageCount = Array.isArray(out?.pages) ? out.pages.length : Number(out?.numpages ?? 1);
-        } else {
-          const out = await PdfParseCtor(pdfBuffer);
-          rawText = String(out?.text ?? "");
-          pageCount = Number(out?.numpages ?? 1);
+        } catch (err) {
+          console.error(`[PDF-DIAG] v2 getText THREW (original error, unmasked): ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}`);
+          throw err;
         }
-      } catch {
+      } else {
         const out = await PdfParseCtor(pdfBuffer);
         rawText = String(out?.text ?? "");
         pageCount = Number(out?.numpages ?? 1);

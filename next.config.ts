@@ -59,6 +59,13 @@ const nextConfig: NextConfig = {
   // defined") → 422-char source → honest INCOMPLETE on refetch/inline audits, while the
   // worker (plain node) read the same documents fine.
   serverExternalPackages: ["@sparticuz/chromium", "puppeteer-core", "mammoth", "exceljs", "pdf-parse", "@napi-rs/canvas"],
+  // NFT does not trace @napi-rs/canvas's platform-conditional native require (preview proof
+  // 2026-07-29: externalized pdf-parse loaded, then "Cannot find module '@napi-rs/canvas'" from
+  // /var/task/node_modules/pdf-parse). Force the package + its platform binary siblings into
+  // every API function's trace so pdfjs gets real canvas, same as the worker.
+  outputFileTracingIncludes: {
+    "/api/**": ["./node_modules/@napi-rs/**"],
+  },
   async headers() {
     return [
       {
