@@ -24,7 +24,7 @@ import { executeAudit, type AuditExecutionInput } from "@/lib/audit-executor";
 import { buildBidderProfileFromCapability } from "@/lib/audit-bidder-profile";
 import { AGENTIC_V3_PRIMARY_ENABLED } from "@/lib/audit-executor-v3";
 import { isAnthropicTransient } from "@/lib/anthropic-files";
-import { fetchSolicitationByNoticeId, type Solicitation } from "@/lib/sam";
+import { fetchSolicitationByNoticeId, resolveAgency, resolveOfficeLeaf, type Solicitation } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
 import { assembleSamDocumentSet, assembleUploadedDocumentSet, deriveSolTokenFromFilenames, type AssembledDocumentSet } from "@/lib/sam-attachments";
 import { MAX_PDF_BYTES } from "@/lib/validators";
@@ -345,6 +345,22 @@ async function processOne(row: UserPendingRow): Promise<void> {
       .from("audits")
       .update({ current_stage: "retrieval", stage_updated_at: new Date().toISOString() })
       .eq("id", row.audit_id);
+    // REFETCH DETECTION (2026-07-29, refetch→async) — the refetch route stamps
+    // compliance_json.last_refetched_at at enqueue time, so a pre-run stamp
+    // means this row re-runs an EXISTING audits row (a refetch), not a fresh
+    // enqueue (whose compliance_json is null at this point). executeAudit
+    // replaces compliance_json wholesale, so the stamp must be re-merged after
+    // a successful run — the idempotency cache and the metadata-only classifier
+    // both read it. JSON-path select keeps the read light (no v3 payload pull).
+    let isRefetch = false;
+    {
+      const { data: preRow } = await supabase
+        .from("audits")
+        .select("stamp:compliance_json->last_refetched_at")
+        .eq("id", row.audit_id)
+        .maybeSingle();
+      isRefetch = Boolean((preRow as { stamp?: unknown } | null)?.stamp);
+    }
     const input = await buildInput(row);
     const result = await executeAudit(supabase, row.audit_id, input);
     // T1-2 — compare-and-set on status='processing'. Under a rolling deploy the
@@ -371,6 +387,21 @@ async function processOne(row: UserPendingRow): Promise<void> {
       return;
     }
     console.log(`[audit-worker] done ${label} · ${result.recommendation} · score=${result.compliance_score} · ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+    // REFETCH BOOKKEEPING merge-back — executeAudit replaced compliance_json
+    // with the V3 payload; re-stamp last_refetched_at + pdf_source (mirrors the
+    // retired inline route's merge-back). Best-effort: the report itself is
+    // already correct and durably persisted; only the refetch cache/classifier
+    // bookkeeping is at stake. Runs only after we WON the markProcessed CAS, so
+    // it can never stomp a replacement worker's run.
+    if (isRefetch) {
+      const { data: fresh } = await supabase.from("audits").select("compliance_json").eq("id", row.audit_id).single();
+      const freshCj = (fresh?.compliance_json as Record<string, unknown> | null) ?? {};
+      const { error: mbErr } = await supabase
+        .from("audits")
+        .update({ compliance_json: { ...freshCj, last_refetched_at: new Date().toISOString(), pdf_source: input.pdfSource } })
+        .eq("id", row.audit_id);
+      if (mbErr) console.warn(`[audit-worker] refetch bookkeeping merge-back failed for ${row.audit_id}: ${mbErr.message}`);
+    }
     // FA-132 — storage hygiene: the stashed bytes served their purpose once
     // the run completes. Best-effort delete on SUCCESS only — failed rows
     // keep their bytes (forensics + a released claim's re-run needs them).
@@ -459,14 +490,39 @@ async function markFailed(id: string, message: string): Promise<void> {
 // audits re-fetch the notice live and download the document here.
 async function buildInput(row: UserPendingRow): Promise<AuditExecutionInput> {
   let solicitation: Solicitation | null = null;
+  let liveSam = false;
   if (!/^pdf-/i.test(row.notice_id)) {
     try {
       solicitation = await fetchSolicitationByNoticeId(row.notice_id);
+      liveSam = !!solicitation;
     } catch (err) {
       console.warn(`[audit-worker] SAM re-fetch failed for ${row.notice_id}: ${err instanceof Error ? err.message : err}`);
     }
   }
   if (!solicitation) solicitation = synthesizeFromRow(row);
+
+  // REFETCH PARITY (2026-07-29, refetch→async) — refresh the SAM fact columns the
+  // masthead reads from the LIVE record. The refetch route used to do this inline;
+  // now the worker owns it for every live-SAM run. Facts-vs-analysis law: write
+  // ONLY the facts the live record actually provides — never null a known-good
+  // value (an amendment's new deadline lands; a sparse record keeps the old one).
+  // For fresh enqueues this rewrites the values the route inserted seconds ago.
+  if (liveSam && row.audit_id) {
+    const factRefresh: Record<string, unknown> = {};
+    const freshAgency = resolveAgency(solicitation);
+    const freshOffice = resolveOfficeLeaf(solicitation);
+    if (solicitation.title) factRefresh.title = solicitation.title;
+    if (freshAgency) factRefresh.agency = freshAgency;
+    if (solicitation.naicsCode) factRefresh.naics_code = solicitation.naicsCode;
+    if (solicitation.typeOfSetAside) factRefresh.set_aside = solicitation.typeOfSetAside;
+    if (solicitation.postedDate) factRefresh.posted_date = solicitation.postedDate;
+    if (solicitation.responseDeadLine) factRefresh.response_deadline = solicitation.responseDeadLine;
+    if (freshOffice) factRefresh.office_leaf = freshOffice;
+    if (Object.keys(factRefresh).length > 0) {
+      const { error: factErr } = await supabase.from("audits").update(factRefresh).eq("id", row.audit_id);
+      if (factErr) console.warn(`[audit-worker] SAM fact refresh failed for ${row.audit_id} (non-fatal): ${factErr.message}`);
+    }
+  }
 
   let pdfBase64: string | null = null;
   let pdfBuffer: Buffer | null = null;
