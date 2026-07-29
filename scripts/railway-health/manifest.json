@@ -1,44 +1,62 @@
 {
-  "Audit-AI": {
-    "rootDirectory": "agents/audit-ai",
-    "cronSchedule": "30 11 * * *",
-    "max_minutes_since_last_success": 1500,
-    "_notes": "Daily 06:30 CDT = 11:30 UTC · processes pending_audits queue with Sonnet 4.6"
-  },
-  "email-ai-v3": {
-    "rootDirectory": "agents/email-ai-v3",
-    "cronSchedule": "*/30 * * * *",
-    "max_minutes_since_last_success": 60,
-    "_notes": "Every 30 min · Gmail organize · canonical v3 service (replaces stale Email-AI per P0-6b 2026-05-13)"
-  },
-  "QA-AI": {
-    "rootDirectory": "agents/qa-ai",
-    "cronSchedule": "*/30 * * * *",
-    "max_minutes_since_last_success": 60,
-    "_notes": "Every 30 min · route health probes"
-  },
-  "Recompete-AI": {
-    "rootDirectory": "agents/recompete-ai",
-    "cronSchedule": "0 12 * * *",
-    "max_minutes_since_last_success": 1500,
-    "_notes": "Daily 07:00 CDT = 12:00 UTC · upcoming-recompete digest"
-  },
-  "Regulatory-AI": {
-    "rootDirectory": "agents/regulatory-ai",
-    "cronSchedule": "0 13 * * *",
-    "max_minutes_since_last_success": 1500,
-    "_notes": "Daily 08:00 CDT = 13:00 UTC · FAR/DFARS digest"
-  },
-  "Sam-Ingest": {
-    "rootDirectory": "agents/sam-ingest",
-    "cronSchedule": "0 11 * * *",
-    "max_minutes_since_last_success": 1500,
-    "_notes": "Daily 06:00 CDT = 11:00 UTC · pending_audits queue feed"
+  "PDF Service": {
+    "rootDirectory": "agents/pdf-service",
+    "cronSchedule": null,
+    "max_minutes_since_last_success": 20160,
+    "_notes": "Resident HTTP service (Dockerfile · /healthz) · last-success here = last code deploy, so the 14d ceiling only catches a fleet-wide deploy drought"
   },
   "apex-intel-pipeline": {
     "rootDirectory": null,
     "cronSchedule": "15 12 * * *",
     "max_minutes_since_last_success": 1500,
-    "_notes": "Cross-platform intelligence cron · root-level service"
+    "_notes": "Cross-platform intelligence cron · CLI-deployed (no repo link) · instance-level cronSchedule reads null in `railway status --json` while deployment meta carries 15 12 * * * — if this flags cron drift, verify the Cron Runs tab before touching anything"
+  },
+  "QA-AI": {
+    "rootDirectory": "/agents/qa-ai",
+    "cronSchedule": "0 0 31 2 *",
+    "max_minutes_since_last_success": 20160,
+    "_notes": "PARKED per railway.toml 2026-07-07 (#170, Feb-31 never fires) · live dashboard still shows */30 * * * * with a real nextCronRunAt — probe flags this until the dashboard cron is parked to match, or the toml park is reverted"
+  },
+  "Regulatory-AI": {
+    "rootDirectory": "/agents/regulatory-ai",
+    "cronSchedule": "0 13 * * *",
+    "max_minutes_since_last_success": 1500,
+    "_notes": "Daily 08:00 CDT = 13:00 UTC · FAR/DFARS digest · live dashboard drifted to 0 0 * * * (19:00 CDT) vs toml 0 13 — probe flags until the dashboard is set back"
+  },
+  "bullrize-cron": {
+    "rootDirectory": ".",
+    "cronSchedule": null,
+    "max_minutes_since_last_success": 43200,
+    "_notes": "Separate repo Bullrize/bullrize-cron (sec-corpus-builder) · dormant — no scheduled run since 2026-07-07 (same day as the #170 cron-parking sweep) · daily-pipeline is the live Bullrize cron"
+  },
+  "audit-worker": {
+    "rootDirectory": null,
+    "cronSchedule": null,
+    "max_minutes_since_last_success": 20160,
+    "_notes": "Resident queue worker · deploys from repo root (rootDirectory null by design) · claims pending_audits source='user' only"
+  },
+  "email-ai-v3": {
+    "rootDirectory": "/agents/email-ai-v3",
+    "cronSchedule": "*/30 * * * *",
+    "max_minutes_since_last_success": 60,
+    "_notes": "Every 30 min · Gmail organize · one-shot script, cron lives in the Railway dashboard (not toml) · live dashboard shows NO cron as of 2026-07-29 — probe flags until */30 is restored in the dashboard or the service is intentionally parked"
+  },
+  "bullrize daily-pipeline": {
+    "rootDirectory": ".",
+    "cronSchedule": null,
+    "max_minutes_since_last_success": 3000,
+    "_notes": "Separate repo Bullrize/bullrize · daily 12:00 UTC cron declared in its own toml (instance-level cron reads null — Railway quirk) · runs DO create deployment entries, so last-success age + chronic-failure checks are the real monitors here"
+  },
+  "Recompete-AI": {
+    "rootDirectory": "/agents/recompete-ai",
+    "cronSchedule": "0 12 * * *",
+    "max_minutes_since_last_success": 1500,
+    "_notes": "Daily 07:00 CDT = 12:00 UTC · upcoming-recompete digest · inserts pending_audits source='recompete' (NOTE: nothing consumes non-user pending rows since the V1 Audit-AI purge, 5dc9b18)"
+  },
+  "Prospector AI": {
+    "rootDirectory": null,
+    "cronSchedule": null,
+    "max_minutes_since_last_success": 43200,
+    "_notes": "Weekly BD prospector (agents/prospector-ai) · PARKED 2026-07-07 per its toml (restore 0 11 * * 1 to resume) · NOT a sam-ingest replacement — sam-ingest was retired 2026-05-30, its scheduling role moved to Vercel Cron /api/internal/watcher-tick (043d229)"
   }
 }
