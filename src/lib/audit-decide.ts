@@ -2922,6 +2922,32 @@ export function requiredAttributeGrounded(requiredAttribute: string, source: str
   return value.length >= 4 && nSrc.includes(value);
 }
 
+// ═══ U-C · PROFILE SCHEMA V2 (panel 2026-07-29 M2 · flag AUDIT_PROFILE_SCHEMA_V2, default-OFF) ═══
+// Closes the two red-team-traced false-BID vectors (design_verdict_inversion_q2): B1 — no time dimension, so a
+// decertified cert read as live and DELETED the 206-A verify-caution (worse than a null profile); B2 — the
+// exact-match fast path bypassed NON_SELF_CLEARABLE_BAR_RE, so an asserted profile string cleared FCL/QPL/size
+// structural bars. Flag OFF ⇒ every branch byte-identical (probe O1 + suites).
+const profileSchemaV2Enabled = () => process.env.AUDIT_PROFILE_SCHEMA_V2 === "true";
+const AUTHORITATIVE_SOURCES = new Set(["sam_api", "sba_api", "verified_import"]);
+// Namespaces a customer can NEVER self-assert into "satisfies" (the SB seat's floor): socioeconomic programs,
+// size/NAICS, clearances/FCL, OEM/QPL, SAM registration. Site-visit attendance / vehicle-holder style
+// bidder-knowable namespaces are deliberately NOT floored (asserted-OK; the 206-A caution still governs wording).
+const AUTHORITATIVE_ONLY_NS = new Set(["se", "setaside", "naics", "size", "clearance", "fcl", "oem", "qpl", "sam", "registration"]);
+const attrNamespace = (attr: string): string => (attr.includes(":") ? attr.slice(0, attr.indexOf(":")).toLowerCase() : "");
+/** V2 discipline: may this attribute SATISFY from this profile? Stale (expired against asOf, or an expiry with
+ *  no clock) ⇒ no. A floored namespace with no authoritative-source record ⇒ no (legacy bare tokens read as
+ *  asserted). Pure; consulted only under the flag. */
+function profileAttrSatisfiable(profile: BidderProfile, attr: string): boolean {
+  const records = profile.attributes ?? [];
+  const canon = canonicalizeEligibilityAttr(attr);
+  const rec = records.find((r) => r.attr === attr || (canon !== null && canonicalizeEligibilityAttr(r.attr) === canon));
+  if (rec?.expiresAt !== undefined && (!profile.asOf || rec.expiresAt <= profile.asOf)) return false;
+  if (AUTHORITATIVE_ONLY_NS.has(attrNamespace(attr))) {
+    if (!rec || !AUTHORITATIVE_SOURCES.has(rec.source)) return false;
+  }
+  return true;
+}
+
 export function firmStatus(f: TypedFinding, profile: BidderProfile | null, source?: string): "satisfies" | "fails" | "unknown" {
   if (!profile || !f.requiredAttribute) return "unknown";
   // FORK-7 Finding-1 (Brain card 242, review-hardened) — an NMR finding the Fork-7 gate has processed (nmrGuard)
@@ -2931,19 +2957,31 @@ export function firmStatus(f: TypedFinding, profile: BidderProfile | null, sourc
   // firmStatus is byte-identical to pre-diff (the keyfact NMR keeps its card-206-A unverified-gate path).
   if (f.nmrGuard === true && f.requiredAttribute === NMR_ATTRIBUTE) return nmrFirmStatus(profile);
   const held = profile.satisfiedAttributes ?? []; // ?? [] — sibling-consistent guard (nmrFirmStatus already does this); a profile missing the array must not throw mid-verdict
-  // Exact attribute match (trusted/gold closed-world profile) — unchanged.
-  if (held.includes(f.requiredAttribute)) return "satisfies";
+  // U-C: closedWorld is NEVER honored on a profile carrying customer-asserted records — a trusted/complete
+  // claim cannot ride on self-asserted data (flag-gated; flag OFF ⇒ profile.closedWorld exactly as before).
+  const effectiveClosedWorld = !!profile.closedWorld
+    && !(profileSchemaV2Enabled() && (profile.attributes ?? []).some((r) => r.source === "customer_asserted"));
+  // Exact attribute match — trusted/gold CLOSED-WORLD keeps the unguarded fast path. Under U-C (flag ON) an
+  // OPEN-WORLD exact match gets the SAME discipline as the canonical path below: the NON_SELF_CLEARABLE
+  // structural guard (B2 — an asserted string never clears FCL/QPL/size) + freshness/provenance (B1 — a stale
+  // or floored-namespace attribute cannot satisfy; it falls to "unknown", where 206-A keeps the verify-caution).
+  if (held.includes(f.requiredAttribute)) {
+    if (!profileSchemaV2Enabled() || effectiveClosedWorld) return "satisfies";
+    const exactHay = `${f.requirement} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""}`;
+    if (!NON_SELF_CLEARABLE_BAR_RE.test(exactHay) && profileAttrSatisfiable(profile, f.requiredAttribute)) return "satisfies";
+    // guarded exact match declined → fall through (canonical block / open-world unknown) — never a silent clear.
+  }
   // Canonical SOCIOECONOMIC match — OPEN-WORLD ONLY (a self-asserted capability statement).
   // Restricted to open-world so a closed-world/gold profile is never flipped fails→satisfies
   // by a non-exact socioeconomic string (code-review #3). And it is BLOCKED when the bar
   // carries structural/sole-source/size language (Finding 2) — a self-asserted set-aside cert
   // may clear a PURE set-aside eligibility bar, never a bundled structural/size show-stopper.
   // OPEN-WORLD is now the DEFAULT (Brain card-254 B): run this block unless the profile is EXPLICITLY closed-world.
-  if (!profile.closedWorld) {
+  if (!effectiveClosedWorld) {
     const reqCanon = canonicalizeEligibilityAttr(f.requiredAttribute);
     if (reqCanon && held.some((a) => canonicalizeEligibilityAttr(a) === reqCanon)) {
       const hay = `${f.requirement} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""}`;
-      if (!NON_SELF_CLEARABLE_BAR_RE.test(hay)) return "satisfies";
+      if (!NON_SELF_CLEARABLE_BAR_RE.test(hay) && (!profileSchemaV2Enabled() || profileAttrSatisfiable(profile, f.requiredAttribute))) return "satisfies";
       // bundled structural/size bar → don't self-clear; fall through to unknown (human review).
     }
     // OPEN-WORLD: a not-held attribute is NOT proof the firm fails — it may simply be

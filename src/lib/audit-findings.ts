@@ -181,8 +181,24 @@ export interface TypedFinding {
 
 /** KNOWN firm attributes. null = unknown → a bidder_cannot_move bar CANNOT be proven failed → caution,
  *  never INELIGIBLE (the standing facts-vs-analysis / no-blind-INELIGIBLE doctrine). */
+/** U-C PROFILE SCHEMA V2 (panel 2026-07-29 M2, SB-seat table): an attribute is an INPUT with provenance and
+ *  expiry — never a derived boolean. `source` is the provenance class the authoritative-namespace floor keys on
+ *  (se:/setaside:/naics:/size:/clearance:/fcl:/oem:/qpl:/sam:/registration: satisfy only from an authoritative
+ *  source — SAM verified via API, never asserted). `expiresAt` compared against the profile's `asOf` clock
+ *  (stamped at construction — replay-faithful; the engine never reads a wall clock): expired ⇒ the attribute
+ *  cannot satisfy ⇒ the card-206-A verify-caution path keeps the "⚠ ELIGIBILITY NOT VERIFIED" banner. */
+export interface ProfileAttributeRecord {
+  attr: string;                                                        // canonical token, e.g. "se:sdvosb"
+  source: "sam_api" | "sba_api" | "verified_import" | "customer_asserted" | "document";
+  verifiedAt?: string;                                                 // ISO — when the source last confirmed it
+  expiresAt?: string;                                                  // ISO — certification/registration expiry
+}
 export interface BidderProfile {
   satisfiedAttributes: string[]; // qualifications the firm HOLDS (NAICS-small codes, certs, clearances) — matched against requiredAttribute
+  /** U-C — the provenance/expiry records behind satisfiedAttributes. Consulted only under AUDIT_PROFILE_SCHEMA_V2. */
+  attributes?: ProfileAttributeRecord[];
+  /** U-C — the freshness clock (ISO, stamped at profile construction). An expiry with no clock reads as stale. */
+  asOf?: string;
   // WORLD-ASSUMPTION (Brain card-254 B ruling, 2026-07-04 — FAIL-SAFE DEFAULT FLIP). The DEFAULT (both flags
   // absent) is now OPEN-WORLD: a self-asserted, possibly-incomplete profile where a HELD attribute may CLEAR a
   // bar, but a not-listed attribute is NOT proof the firm fails — it is merely unstated → "unknown" (NHR / human
