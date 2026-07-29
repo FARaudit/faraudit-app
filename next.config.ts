@@ -53,7 +53,12 @@ const nextConfig: NextConfig = {
   // locally (the 2026-07-06 preview divergence: two .docx synopsis forms read
   // has_text=false on preview but extracted fine on the box). Shipping them
   // verbatim from node_modules makes require() resolve at runtime, same as local.
-  serverExternalPackages: ["@sparticuz/chromium", "puppeteer-core", "mammoth", "exceljs"],
+  // pdf-parse + @napi-rs/canvas (2026-07-29): the SAME class hit the PDF path — bundled
+  // pdf-parse's pdfjs referenced DOMMatrix at chunk-init, @napi-rs/canvas wasn't traced into
+  // the function bundle, so EVERY Vercel-side PDF extraction threw ("DOMMatrix is not
+  // defined") → 422-char source → honest INCOMPLETE on refetch/inline audits, while the
+  // worker (plain node) read the same documents fine.
+  serverExternalPackages: ["@sparticuz/chromium", "puppeteer-core", "mammoth", "exceljs", "pdf-parse", "@napi-rs/canvas"],
   async headers() {
     return [
       {

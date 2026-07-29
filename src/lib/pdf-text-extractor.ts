@@ -87,6 +87,24 @@ export async function extractText(pdfBuffer: Buffer): Promise<ExtractedDocument>
   const warnings: string[] = [];
 
   try {
+    // BELT (2026-07-29, pairs with next.config serverExternalPackages): when @napi-rs/canvas is
+    // unavailable (untraced serverless bundle, missing platform binary), pdfjs references
+    // DOMMatrix at module init and the require below THREW — turning every PDF into an empty
+    // placeholder and the audit into an honest INCOMPLETE. TEXT extraction needs the globals to
+    // EXIST, not to render; a minimal stub keeps getText() alive. Guarded: with real canvas
+    // present (local, worker, externalized bundle) none of these assignments run.
+    const g = globalThis as Record<string, unknown>;
+    if (typeof g.DOMMatrix === "undefined") {
+      g.DOMMatrix = class DOMMatrixStub {
+        a = 1; b = 0; c = 0; d = 1; e = 0; f = 0;
+        constructor(init?: number[]) {
+          if (Array.isArray(init) && init.length >= 6) [this.a, this.b, this.c, this.d, this.e, this.f] = init;
+        }
+      };
+      warnings.push("DOMMatrix stubbed — canvas package unavailable (text-only extraction)");
+    }
+    if (typeof g.ImageData === "undefined") g.ImageData = class ImageDataStub {};
+    if (typeof g.Path2D === "undefined") g.Path2D = class Path2DStub {};
     // pdf-parse@^2.x exports default differently than v1; handle both.
     // v2 exposes a class-based PDFParse with getText(); v1 exposes a callable.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
