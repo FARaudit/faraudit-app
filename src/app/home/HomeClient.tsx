@@ -1141,6 +1141,12 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                           {(() => {
                             const watched = r.row.watched === true;
                             const pinned  = r.row.in_pipeline === true;
+                            // Live SAM rows (source='sam_live') have no pending_audits
+                            // backing row — the Save/Pipeline mutations PATCH/POST that
+                            // table by notice_id and can only 404. Hide those controls
+                            // instead of shipping dead buttons; Audit stays (prefill
+                            // comes from the row itself).
+                            const liveRow = r.row.source === "sam_live";
                             // Hover-conditioned visibility on the Pipeline action only —
                             // kept visible when active so the row reflects state.
                             const showPipe  = isHovered || pinned || isJustPinned;
@@ -1155,7 +1161,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                                 </button>
                                 {/* Phase 7 — Save = always-visible quiet star bookmark. Presentation only;
                                     the togglePatch("watched") mutation (#55) is unchanged. */}
-                                <button
+                                {!liveRow && <button
                                   type="button"
                                   className={`opp-save${watched ? " is-saved" : ""}`}
                                   onClick={(e) => { e.stopPropagation(); togglePatch("watched"); }}
@@ -1164,8 +1170,8 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                                   title="Save — still deciding"
                                 >
                                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" /></svg>
-                                </button>
-                                {watched && !pinned && !isJustPinned && (
+                                </button>}
+                                {!liveRow && watched && !pinned && !isJustPinned && (
                                   <button
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); moveSavedToPipeline(); }}
@@ -1175,7 +1181,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                                     → Pipeline
                                   </button>
                                 )}
-                                {isJustPinned ? (
+                                {!liveRow && (isJustPinned ? (
                                   <a
                                     href="/home#pipeline"
                                     onClick={(e) => { e.stopPropagation(); }}
@@ -1193,7 +1199,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                                   >
                                     {pinned ? "Pinned" : "Pipeline"}
                                   </button>
-                                )}
+                                ))}
                               </div>
                             );
                           })()}
