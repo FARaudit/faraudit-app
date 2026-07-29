@@ -87,6 +87,51 @@ const barFinding = (requiredAttribute: string, requirement: string, excerpt: str
   check("P6 closedWorld NOT honored when records carry customer_asserted (never closedWorld on customer profiles)",
     d.firmStatus(FCL_BAR, sneakyClosed) === "unknown", `got ${d.firmStatus(FCL_BAR, sneakyClosed)}`);
 
+  // ═══ V-legs (verification round F1-F4, executed findings — RED pre-fix) ═══
+  flag(true);
+  const asserted = (attr: string, extra?: object) => ({
+    satisfiedAttributes: [attr],
+    attributes: [{ attr, source: "customer_asserted", verifiedAt: "2026-07-01", expiresAt: "2027-07-01" }],
+    asOf: "2026-07-29", ...extra,
+  } as never);
+  // F1 — bare/variant spellings of floored-class attrs must hit the floor via the CANONICAL namespace
+  const bare8a = barFinding("8a_certification", "8(a) set-aside: offeror must be a certified 8(a) participant.", "certified 8(a) program participant");
+  check("V1 bare-spelling '8a_certification' asserted → unknown (floor keys on canonical namespace)",
+    d.firmStatus(bare8a, asserted("8a_certification")) === "unknown", `got ${d.firmStatus(bare8a, asserted("8a_certification"))}`);
+  // F2 — missing floored namespaces: sb: (PRODUCTION emitter token), cmmc:, sprs:, nonmanufacturer:
+  const sbBar = barFinding("sb:total", "Total small business set-aside: only small business concerns may submit offers.", "set aside 100 percent for small business concerns");
+  check("V2a 'sb:total' asserted (the production Total-SB token) → unknown",
+    d.firmStatus(sbBar, asserted("sb:total")) === "unknown", `got ${d.firmStatus(sbBar, asserted("sb:total"))}`);
+  const cmmcBar = barFinding("cmmc:level-2", "Offeror must hold CMMC Level 2 certification at award.", "CMMC Level 2 certification is required");
+  check("V2b 'cmmc:level-2' asserted → unknown",
+    d.firmStatus(cmmcBar, asserted("cmmc:level-2")) === "unknown", `got ${d.firmStatus(cmmcBar, asserted("cmmc:level-2"))}`);
+  const nmrTok = barFinding("nonmanufacturer:compliant", "The nonmanufacturer rule applies to this acquisition.", "offeror shall supply the product of a small business manufacturer");
+  check("V2c 'nonmanufacturer:compliant' asserted via the GENERIC path → unknown",
+    d.firmStatus(nmrTok, asserted("nonmanufacturer:compliant")) === "unknown", `got ${d.firmStatus(nmrTok, asserted("nonmanufacturer:compliant"))}`);
+  // F3 — multi-record: ANY expired sibling for the same canonical attr vetoes; ordering must not matter
+  const twinA = {
+    satisfiedAttributes: ["se:sdvosb"], asOf: "2026-07-29",
+    attributes: [
+      { attr: "se:sdvosb", source: "sba_api", verifiedAt: "2026-07-01" },
+      { attr: "se:sdvosb", source: "sba_api", verifiedAt: "2024-01-01", expiresAt: "2025-01-01" },
+    ],
+  } as never;
+  check("V3 a no-expiry record must not SHADOW its expired sibling (any-expired veto, order-independent)",
+    d.firmStatus(SE_BAR, twinA) === "unknown", `got ${d.firmStatus(SE_BAR, twinA)}`);
+  // F4 — non-ISO / unparseable dates fail STALE, never fresh
+  const badDates = {
+    satisfiedAttributes: ["se:sdvosb"], asOf: "07/29/2026",
+    attributes: [{ attr: "se:sdvosb", source: "sba_api", expiresAt: "2020-01-01" }],
+  } as never;
+  check("V4a ISO past expiry vs non-ISO asOf → unknown (parse-or-stale, never lexicographic)",
+    d.firmStatus(SE_BAR, badDates) === "unknown", `got ${d.firmStatus(SE_BAR, badDates)}`);
+  const garbage = {
+    satisfiedAttributes: ["se:sdvosb"], asOf: "2026-07-29",
+    attributes: [{ attr: "se:sdvosb", source: "sba_api", expiresAt: "next year" }],
+  } as never;
+  check("V4b unparseable expiry → unknown (stale, fail-safe)",
+    d.firmStatus(SE_BAR, garbage) === "unknown", `got ${d.firmStatus(SE_BAR, garbage)}`);
+
   // ── E2E: the deleted-caution vector through deriveVerdict (tristate armed, as prod) ──
   process.env.AUDIT_ELIGIBLE_TRISTATE = "true";
   const baseInputs = {

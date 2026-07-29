@@ -2929,21 +2929,41 @@ export function requiredAttributeGrounded(requiredAttribute: string, source: str
 // structural bars. Flag OFF ⇒ every branch byte-identical (probe O1 + suites).
 const profileSchemaV2Enabled = () => process.env.AUDIT_PROFILE_SCHEMA_V2 === "true";
 const AUTHORITATIVE_SOURCES = new Set(["sam_api", "sba_api", "verified_import"]);
-// Namespaces a customer can NEVER self-assert into "satisfies" (the SB seat's floor): socioeconomic programs,
-// size/NAICS, clearances/FCL, OEM/QPL, SAM registration. Site-visit attendance / vehicle-holder style
-// bidder-knowable namespaces are deliberately NOT floored (asserted-OK; the 206-A caution still governs wording).
-const AUTHORITATIVE_ONLY_NS = new Set(["se", "setaside", "naics", "size", "clearance", "fcl", "oem", "qpl", "sam", "registration"]);
+// Namespaces a customer can NEVER self-assert into "satisfies" (the SB seat's floor): socioeconomic programs
+// (incl. sb: — "sb:total" is a PRODUCTION deterministic-emitter token, verification F2), size/NAICS,
+// clearances/FCL, OEM/QPL, SAM registration, CMMC/SPRS/CAGE, and the nonmanufacturer/NMR tokens on the GENERIC
+// path (the nmrGuard branch keeps its own FORK-7 resolution — a documented U-C gap, verification F5: it applies
+// no freshness/provenance discipline; NMR is a per-bid supply arrangement, bidder-knowable class). Site-visit
+// attendance / vehicle-holder style bidder-knowable namespaces are deliberately NOT floored (asserted-OK;
+// the 206-A caution still governs wording).
+const AUTHORITATIVE_ONLY_NS = new Set(["se", "setaside", "naics", "size", "clearance", "fcl", "oem", "qpl", "sam", "registration", "sb", "cmmc", "sprs", "cage", "nonmanufacturer", "nmr"]);
 const attrNamespace = (attr: string): string => (attr.includes(":") ? attr.slice(0, attr.indexOf(":")).toLowerCase() : "");
-/** V2 discipline: may this attribute SATISFY from this profile? Stale (expired against asOf, or an expiry with
- *  no clock) ⇒ no. A floored namespace with no authoritative-source record ⇒ no (legacy bare tokens read as
- *  asserted). Pure; consulted only under the flag. */
+/** V2 discipline: may this attribute SATISFY from this profile? Verification-round hardened:
+ *  F3 — ALL matching records are evaluated; ANY expired (or unparseable-dated) match VETOES, so a no-expiry
+ *       sibling can never shadow a recorded revocation and construction order cannot flip the pole;
+ *  F4 — dates go through Date.parse; NaN on either side of an expiry comparison ⇒ stale (never lexicographic);
+ *  F1 — the floor keys on BOTH the raw prefix and the CANONICAL form's prefix, so a model-emitted bare
+ *       spelling ("8a_certification" → se:) cannot bypass it. Pure; consulted only under the flag. */
 function profileAttrSatisfiable(profile: BidderProfile, attr: string): boolean {
   const records = profile.attributes ?? [];
   const canon = canonicalizeEligibilityAttr(attr);
-  const rec = records.find((r) => r.attr === attr || (canon !== null && canonicalizeEligibilityAttr(r.attr) === canon));
-  if (rec?.expiresAt !== undefined && (!profile.asOf || rec.expiresAt <= profile.asOf)) return false;
-  if (AUTHORITATIVE_ONLY_NS.has(attrNamespace(attr))) {
-    if (!rec || !AUTHORITATIVE_SOURCES.has(rec.source)) return false;
+  const matches = records.filter((r) => r.attr === attr || (canon !== null && canonicalizeEligibilityAttr(r.attr) === canon));
+  for (const rec of matches) {
+    if (rec.expiresAt !== undefined) {
+      const exp = Date.parse(rec.expiresAt);
+      const at = profile.asOf !== undefined ? Date.parse(profile.asOf) : NaN;
+      if (Number.isNaN(exp) || Number.isNaN(at) || exp <= at) return false;
+    }
+  }
+  // F1 (hardened past the reviewer's suggested direction — canonicalizeEligibilityAttr("8a_certification") is
+  // null, not "se:8a"): an attr with NEITHER a namespace NOR a canonical form is UNRECOGNIZABLE — it cannot
+  // self-assert (fail-toward-disqualifier); only an authoritative record can satisfy it.
+  const rawNs = attrNamespace(attr);
+  const floored = AUTHORITATIVE_ONLY_NS.has(rawNs)
+    || (canon !== null && AUTHORITATIVE_ONLY_NS.has(attrNamespace(canon)))
+    || (rawNs === "" && canon === null);
+  if (floored) {
+    if (!matches.some((r) => AUTHORITATIVE_SOURCES.has(r.source))) return false;
   }
   return true;
 }
