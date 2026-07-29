@@ -6,6 +6,8 @@ import {
   fetchRecentAudits,
   fetchHomeStats,
 } from "@/lib/bd-os/queries";
+import { fetchLiveOpportunities } from "@/lib/bd-os/live-opportunities";
+import type { OpportunityRow } from "@/lib/bd-os/queries";
 import { poleToRecommendation } from "@/lib/verdict-pole";
 
 export const dynamic = "force-dynamic";
@@ -70,9 +72,14 @@ export async function GET() {
         ? _useTokens[0][0].toUpperCase()
         : (_useTokens[0][0] + _useTokens[_useTokens.length - 1][0]).toUpperCase();
 
-    const [counters, homeStats, recentAudits, pipelineRows] = await Promise.all([
+    const [counters, homeStats, liveOpps, recentAudits, pipelineRows] = await Promise.all([
       fetchHeaderCounter(supabase).catch(() => ({ audits: 0, traps: 0 })),
       fetchHomeStats(supabase).catch(() => null),
+      // Live SAM feed (CEO 2026-07-29: go live-source; PR #334 library). null —
+      // not [] — on failure: the /opportunities page renders a distinct
+      // "unavailable" state, and an empty array here would misreport an
+      // upstream outage as an honestly-empty feed.
+      fetchLiveOpportunities(supabase).catch(() => null as OpportunityRow[] | null),
       fetchRecentAudits(supabase, user.id, 200).catch(() => []),
       // Pipeline rows for the user — feeds Active Pursuits funnel, .ps-mid/.ps-right
       // aggregates, sidebar Pipeline danger badge, and since-bar pursuitsAdvanced.
@@ -93,11 +100,10 @@ export async function GET() {
     const weekMs = 7 * dayMs;
     const day2Ms = 2 * dayMs;
 
-    // The pending_audits-backed opportunities feed is retired (sam-ingest was
-    // retired 2026-05; every surviving queue row is past its deadline, so this
-    // list has served empty since then). Kept as an empty array so the static
-    // command-center/today consumers keep their response shape.
-    const opportunities: any[] = [];
+    // Derived counts run on [] when the live fetch failed — the response's
+    // `opportunities` field itself stays null so the client can tell
+    // outage from empty.
+    const opportunities: OpportunityRow[] = liveOpps ?? [];
 
     // ── Brief-head "since you last looked" deltas ──
     const newMatches24h = opportunities.filter((o) => {
@@ -192,11 +198,9 @@ export async function GET() {
       ? Math.min(100, Math.round((auditsUsedMonth / FREE_TIER_QUOTA) * 100))
       : 0;
 
-    // .sb-badge.live on the Opportunities sidebar item — "Live" if SAM.gov
-    // synced within the last 5 minutes, else "Stale". Computed from lastSync
-    // string written below (which is always "now" at request time, so always
-    // "Live" — the client compares against actual fetch time).
-    const ingestStatus = "Live"; // always live at API-response time
+    // .sb-badge.live on the Opportunities sidebar item — computed from the
+    // actual live-SAM fetch outcome, never asserted.
+    const ingestStatus = liveOpps ? "Live" : "Unavailable";
 
     // ── Quick Audit panel ──
     const recentAudits4 = audits.slice(0, 4);
@@ -205,14 +209,24 @@ export async function GET() {
       return !isNaN(ts) && (nowMs - ts) < weekMs;
     }).length;
 
+    // Live-feed deadline count within 7 days — replaces homeStats.expiring_7d /
+    // live_sam_gov, which count pending_audits rows (structurally zero since the
+    // queue froze; a hardcoded 0 next to a live feed would be its own lie).
+    const deadlineSoon7d = opportunities.filter((o) => {
+      if (!o.response_deadline) return false;
+      const ms = new Date(o.response_deadline).getTime();
+      return !isNaN(ms) && ms > nowMs && ms <= nowMs + weekMs;
+    }).length;
+
     return NextResponse.json({
-      // ── existing fields (unchanged) ──
-      liveCount:        homeStats?.live_sam_gov         ?? opportunities.length,
+      // ── existing fields ──
+      liveCount:        liveOpps ? liveOpps.length : (homeStats?.live_sam_gov ?? 0),
       trapCount:        homeStats?.total_traps_caught   ?? counters.traps,
-      deadlineSoon:     homeStats?.expiring_7d          ?? 0,
+      deadlineSoon:     liveOpps ? deadlineSoon7d : (homeStats?.expiring_7d ?? 0),
       auditsThisMonth:  homeStats?.audit_activity_month ?? counters.audits,
       auditTotal:       audits.length,
-      opportunities:    opportunities,
+      // null = live fetch failed (client renders "unavailable", not "empty")
+      opportunities:    liveOpps,
       lastSync:         new Date().toISOString(),
 
       // ── Phase 4 additions ──
