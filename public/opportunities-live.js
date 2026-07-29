@@ -148,7 +148,11 @@
     }
     if (meta) {
       if (state === 'live') {
-        const ingest = opts && opts.lastIngest ? ' · refreshed ' + opts.lastIngest : '';
+        // LAST_INGEST is the newest row's SAM postedDate — a fact about the
+        // NOTICES, not about our fetch. Label it as such: the live feed itself
+        // is at most 30 minutes old (fetchLiveOpportunities' cache window), so
+        // "refreshed 22h ago" would understate freshness by a day.
+        const ingest = opts && opts.lastIngest ? ' · newest posted ' + opts.lastIngest : '';
         meta.innerHTML = 'Live solicitations read from <b>SAM.gov</b> · ' +
           opts.count + ' notice' + (opts.count === 1 ? '' : 's') + ingest;
       } else if (state === 'empty') {
@@ -202,7 +206,8 @@
         window.DSO.NAICS.push({ code: code, label: counts[code] + ' in feed' });
       });
 
-      // Newest ingest write among rendered rows = honest "last ingest" time.
+      // Newest postedDate among rendered rows. Live rows carry created_at =
+      // SAM postedDate (date-only), so this dates the NOTICES, not the fetch.
       const newest = mapped.reduce(function (acc, o) {
         const t = o.ingested_at ? new Date(o.ingested_at).getTime() : NaN;
         return !isNaN(t) && t > acc ? t : acc;
