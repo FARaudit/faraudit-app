@@ -6,6 +6,7 @@ import { extractText } from "@/lib/pdf-text-extractor";
 import { detectSections } from "@/lib/section-boundary-detector";
 import { anthropic } from "@/lib/anthropic";
 import { samFetchWithKey } from "@/lib/sam-url-guard";
+import { isEnvOn } from "@/lib/env-flags";
 import { resolveSamDescription } from "@/lib/sam-description";
 import {
   detectBodySections,
@@ -122,6 +123,18 @@ async function detectPrimarySectionsFromText(
   primary: DocumentPlanEntry,
   requestDeadline: number
 ): Promise<ContentSections | null> {
+  // Flag AUDIT_DOOR_PRIMARY_READ (default OFF). This read has NEVER succeeded on
+  // the serverless surface — pdf-parse was bundled without @napi-rs/canvas from
+  // the day it shipped, so every prod attempt threw "DOMMatrix is not defined"
+  // and degraded to name-based coverage. The bundling is fixed (next.config
+  // serverExternalPackages), which would ACTIVATE the door's never-live-exercised
+  // "absent" claims ("not in the posted package" — pauses the run) as a side
+  // effect. Per the OCR-gate precedent (AUDIT_WORKER_OCR): installing the
+  // capability must not auto-activate it — activation is a deliberate flag flip
+  // after the read is verified on the live surface. Flag OFF ⇒ skip the download
+  // + parse entirely ⇒ same null → name-based/notice-body coverage prod has
+  // always shown.
+  if (!isEnvOn(process.env.AUDIT_DOOR_PRIMARY_READ)) return null;
   const apiKey = process.env.SAM_API_KEY;
   if (!apiKey) return null;
 
@@ -165,12 +178,22 @@ async function detectPrimarySectionsFromText(
   } catch {
     return null;
   }
+  // Rule 61 (honest-fail) — extractText never throws; it swallows a parser/env
+  // failure into a placeholder marked extractionMethod="fallback". That is an
+  // extraction FAILURE (e.g. the serverless DOMMatrix class), NOT an image-only
+  // PDF: don't let it ride the image-only branch below (it would silently read
+  // as "scanned"), and don't leave it as an empty success — log it as a door
+  // failure so the class is visible in the function logs, then fall back.
+  if (doc.extractionMethod === "fallback") {
+    console.error(`[DOOR-DIAG] primary content read FAILED (extractor fallback, not image-only): ${doc.warnings.join(" | ")} — coverage degrades to name-based`);
+    return null;
+  }
   // Fix #3 — VISION FAST-PATH (Brain card 39). The text layer is empty/thin (a scanned/image-only
   // PDF). Instead of giving up (which would falsely read as "missing"), READ THE PAGES with a cheap
   // vision model — but ONLY for a SMALL doc (<5 pages), synchronously, so the door stays fast. A larger
   // scanned doc → null → the section state is UNVERIFIED (Fix #4) and the MAP (the full audit) owns the
   // authoritative read. Never block the door on a big vision call.
-  const imageOnly = doc.extractionMethod === "fallback" || doc.warnings.some((w) => w.startsWith("LOW_TEXT_YIELD"));
+  const imageOnly = doc.warnings.some((w) => w.startsWith("LOW_TEXT_YIELD"));
   if (imageOnly) {
     if (doc.pageCount >= 1 && doc.pageCount < 5) return await detectPrimarySectionsViaVision(buf, remainingMs());
     return null; // too large to read synchronously at the door — unverified; the MAP confirms

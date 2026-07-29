@@ -186,6 +186,10 @@ export function classifyRisk(
 // blank cells. Now falls back to a normalized short-form bucket so the Type
 // column is always populated.
 //
+// MIRROR: src/lib/sam.ts:classifyDocType is a copy of this function (the audit
+// write path can't import from agents/). Any edit here must be applied there in
+// the same commit — src/lib/sam-doctype-parity.test.ts enforces the parity.
+//
 // Priority: contract-structure markers first (IDIQ / BPA / Task Order / Mod
 // are more specific than the generic SAM "type" string and may co-occur with
 // it). Then SAM canonical type strings normalized per spec. Final fallback:
