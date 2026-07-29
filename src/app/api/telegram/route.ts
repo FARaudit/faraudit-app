@@ -130,7 +130,7 @@ export async function POST(req: Request) {
     } else if (text.startsWith("/audit ")) {
       reply = await triggerAuditReply(text.slice("/audit ".length).trim());
     } else {
-      reply = `APEX CEO Bot\n\n/brief — morning digest\n/status — route health\n/tasks — today's tasks\n/prospects — pipeline\n/mrr — revenue vs target\n/83b — election status\n/learn fa|br|la — education\n/news — company news\n/done [item] — log it\n/build [note] — queue it\n\n— Vertex Intelligence —\n/signals — top 5 Bullrize signals\n/corpus — FARaudit corpus stats\n/pipeline — solicitations by stage\n/fleet — Railway agent status`;
+      reply = `APEX CEO Bot\n\n/brief — morning digest\n/status — route health\n/tasks — today's tasks\n/prospects — pipeline\n/mrr — revenue vs target\n/83b — election status\n/learn fa|br|la — education\n/news — company news\n/done [item] — log it\n/build [note] — queue it\n\n— Vertex Intelligence —\n/signals — top 5 Bullrize signals\n/corpus — FARaudit corpus stats\n/pipeline — solicitations by stage\n/fleet — Railway agent status\n/audit [notice_id] — run an audit now`;
     }
   } catch (err) {
     console.error("[telegram-route] handler error:", err);
@@ -220,18 +220,70 @@ async function fleetReply(): Promise<string> {
       sb.from("audits").select("*", { count: "exact", head: true }).gte("created_at", since24h),
       sb.from("pending_audits").select("*", { count: "exact", head: true }).gte("created_at", since24h).eq("source", "sam_live")
     ]);
-    agentLine = `audits 24h: ${recentAudits.count || 0} new\nsam-ingest 24h: ${recentPending.count || 0} new solicitations`;
+    agentLine = `audits 24h: ${recentAudits.count || 0} new\nsam-ingest 24h: ${recentPending.count || 0} solicitations ingested`;
   }
   return `Railway fleet — ${new Date().toLocaleTimeString("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit" })} CT\n\n${results.join("\n")}\n\n${agentLine}`;
 }
 
-// RETIRED (2026-07-29): this used to insert pending_audits rows with
-// source='telegram_manual' for the audit-ai cron, deleted 2026-06-28 ·
-// 5dc9b18. No consumer remains (the resident audit-worker claims
-// source='user' only), so enqueueing here would park rows forever. Point at
-// the web flow instead of lying about a cron pickup.
 async function triggerAuditReply(noticeId: string): Promise<string> {
-  const suffix = noticeId ? ` for ${noticeId}` : "";
-  return `Manual audit via Telegram is retired — the cron auditor no longer exists.\n\nTo run an audit${suffix}, use the web flow: https://faraudit.com/audit`;
+  if (!noticeId) return "Usage: /audit <notice_id>";
+  // Corpus retirement (2026-07-29): the audit-ai cron this used to enqueue for
+  // was deleted (5dc9b18), so "picked up next cron tick" could never happen.
+  // Manual audits now ride the USER lane — the same path as the product's async
+  // enqueue: a pre-attributed audits row (the resident worker hard-fails rows
+  // without audit_id) plus a pending_audits row with source='user' that the
+  // worker claims within its ~10s poll. The worker re-fetches SAM facts and the
+  // full document set at run time, so this route stays metadata-light.
+  const sb = getAdminClient();
+  if (!sb) return "Manual audit · admin client unavailable.";
+  if (!/^[a-f0-9]{32}$/i.test(noticeId)) {
+    return `Manual audit · "${noticeId}" is not a SAM notice id (32 hex chars). Copy it from the SAM.gov notice URL or the /home feed.`;
+  }
+  // Attribution: Telegram has no Supabase session, but the audits row needs an
+  // owner (RLS read on /audit/[id] + quota/cost land on this account). Honest
+  // fail when unset — never fabricate ownership.
+  const userId = process.env.TELEGRAM_AUDIT_USER_ID;
+  if (!userId) {
+    return "Manual audit · TELEGRAM_AUDIT_USER_ID is not set in Vercel env. Set it to the account UUID that should own Telegram-triggered audits (quota + report visibility land there).";
+  }
+  const base = (process.env.NEXT_PUBLIC_APP_URL || "https://faraudit.com").replace(/\/+$/, "");
+  // Dedupe: an in-flight user-lane run for this notice already yields a report —
+  // don't double-spend. Completed/failed runs don't block a fresh re-audit.
+  const { data: inflight } = await sb
+    .from("pending_audits")
+    .select("audit_id, status")
+    .eq("notice_id", noticeId)
+    .eq("source", "user")
+    .in("status", ["pending", "processing"])
+    .limit(1)
+    .maybeSingle();
+  if (inflight) {
+    return `Manual audit · ${noticeId} already in flight (${inflight.status}). Report: ${base}/audit/${inflight.audit_id}`;
+  }
+  const { data: audit, error: auditErr } = await sb
+    .from("audits")
+    .insert({
+      notice_id: noticeId,
+      title: `Telegram manual audit · ${noticeId}`,
+      user_id: userId,
+      status: "processing"
+    })
+    .select("id")
+    .single();
+  if (auditErr || !audit) return `Manual audit · audits insert failed: ${auditErr?.message ?? "no row returned"}`;
+  const { error } = await sb.from("pending_audits").insert({
+    notice_id: noticeId,
+    title: `Telegram manual audit · ${noticeId}`,
+    source: "user",
+    status: "pending",
+    user_id: userId,
+    audit_id: audit.id
+  });
+  if (error) {
+    // Never leave an orphaned 'processing' audits row the worker can't see.
+    await sb.from("audits").update({ status: "failed", error_message: `telegram enqueue failed: ${error.message}` }).eq("id", audit.id);
+    return `Manual audit · queue failed: ${error.message}`;
+  }
+  return `Manual audit queued · ${noticeId}\n\nThe resident audit worker claims it within ~10s and fetches SAM facts + documents at run time. Report: ${base}/audit/${audit.id}`;
 }
 
