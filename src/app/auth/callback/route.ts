@@ -22,7 +22,11 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type"); // recovery | signup | invite | magiclink | email_change
-  const next = searchParams.get("next") ?? searchParams.get("redirect_to") ?? "/dashboard";
+  // Same open-redirect guard as the sign-in page: `next` arrives from a link
+  // and is used as a redirect target, so only same-origin absolute PATHS are
+  // honored ("//evil.com" and absolute URLs fall back to the default).
+  const rawNext = searchParams.get("next") ?? searchParams.get("redirect_to") ?? "";
+  const next = /^\/(?!\/)[^\\\x00-\x1f]*$/.test(rawNext) ? rawNext : "/dashboard";
 
   // Diagnostic — Vercel function logs will show which flow Supabase is using
   // for this project. Drop the log line once production is stable.

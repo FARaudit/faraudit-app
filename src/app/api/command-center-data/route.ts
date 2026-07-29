@@ -8,16 +8,16 @@ import {
   fetchHomeStats,
 } from "@/lib/bd-os/queries";
 import { poleToRecommendation } from "@/lib/verdict-pole";
+import type { PipelineStage } from "@/lib/pipeline-stages";
 
 export const dynamic = "force-dynamic";
 
 // Map the 8 pipeline DB stage codes to the 5 Brief funnel buckets.
 // DB codes (per public/pipeline-live.js STAGE_LABELS):
-//   01 Pre-Sol Synopsis · 02 Sources Sought · 03 Solicitation ·
-//   04 Proposal Dev · 05 Submission · 06 Evaluation · 07 Award · 08 Post-Award
+// Codes + labels are canonical in src/lib/pipeline-stages.ts.
 // Design funnel buckets (.fseg.s0–s4):
 //   Capture · Drafting · Pricing · Review · Submit
-const STAGE_TO_BUCKET: Record<string, "s0" | "s1" | "s2" | "s3" | "s4"> = {
+const STAGE_TO_BUCKET: Record<PipelineStage, "s0" | "s1" | "s2" | "s3" | "s4"> = {
   "01": "s0", "02": "s0",
   "03": "s1", "04": "s1",
   "05": "s2",
@@ -153,7 +153,7 @@ export async function GET() {
     // Funnel bucket counts (s0-s4) — matches design .fseg.s0/s1/s2/s3/s4 selector.
     const pipelineFunnel: Record<string, number> = { s0: 0, s1: 0, s2: 0, s3: 0, s4: 0 };
     (pipelineRows as any[]).forEach((c) => {
-      const bucket = STAGE_TO_BUCKET[c.stage as string];
+      const bucket = STAGE_TO_BUCKET[c.stage as PipelineStage];
       if (bucket) pipelineFunnel[bucket]++;
     });
 

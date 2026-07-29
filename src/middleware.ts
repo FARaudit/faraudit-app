@@ -70,9 +70,16 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (!user) {
+    // `next` must carry the QUERY too, not just the pathname: deep links like
+    // /audit?noticeId=<ref> (the Opportunities "Run Audit" button) otherwise
+    // dropped their parameters and landed the user on an empty form after
+    // signing in. Cloning also inherited the original params onto the sign-in
+    // URL as strays, so build the target explicitly instead.
+    const target = `${pathname}${request.nextUrl.search}`;
     const url = request.nextUrl.clone();
     url.pathname = "/sign-in";
-    url.searchParams.set("next", pathname);
+    url.search = "";
+    url.searchParams.set("next", target);
     return NextResponse.redirect(url);
   }
 

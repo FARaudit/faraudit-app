@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
+import { CAPTURE_STAGES, isPipelineStage } from "@/lib/pipeline-stages";
 
 export const dynamic = "force-dynamic";
 
@@ -12,10 +13,9 @@ export const dynamic = "force-dynamic";
 //        a pursuit the user advanced into proposal work ('04'+) is never
 //        silently destroyed by a toggle.
 //
-// Stage codes: the LIVE pipeline table's check constraint accepts the
-// '01'..'08' codes that pipeline-live.js + command-center-data already use
-// (probed 2026-07-29: 'tracking' from the repo migration is REJECTED by the
-// deployed constraint — the live schema is the truth here).
+// Stage codes come from src/lib/pipeline-stages.ts (the canonical vocabulary).
+// The repo migration originally named a different set; 20260729190000 aligns
+// the DB constraint with those codes.
 
 export async function GET() {
   try {
@@ -45,10 +45,9 @@ interface PostBody {
   naics?: string | null;
   dueDate?: string | null;         // ISO datetime or date
   estimatedValueM?: number | null; // real stated ceiling in $M — never invented
-  stageCode?: string | null;       // '01' pre-sol · '02' sources sought · '03' solicitation
+  stageCode?: string | null;       // capture stage — see src/lib/pipeline-stages.ts
 }
 
-const CAPTURE_STAGES = ["01", "02", "03"];
 
 export async function POST(req: Request) {
   try {
@@ -88,7 +87,7 @@ export async function POST(req: Request) {
         ? String(Math.round(body.estimatedValueM * 1e6))
         : null;
 
-    const stage = CAPTURE_STAGES.includes(String(body.stageCode)) ? String(body.stageCode) : "03";
+    const stage = isPipelineStage(body.stageCode) && CAPTURE_STAGES.includes(body.stageCode) ? body.stageCode : "03";
     const { data, error } = await supabase
       .from("pipeline")
       .insert({
@@ -103,7 +102,25 @@ export async function POST(req: Request) {
       })
       .select("id, stage")
       .single();
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      // 23505 = unique violation on (user_id, solicitation_number). The check
+      // above races — two rapid clicks can both find nothing and both insert —
+      // so the DATABASE is the arbiter of idempotency and a conflict here means
+      // "already in the pipeline", not a failure. (The unique index is added by
+      // 20260729190000_pipeline_stage_codes.sql; until it is applied this branch
+      // simply never fires and the narrow race remains.)
+      if (error.code === "23505") {
+        const { data: existingRow } = await supabase
+          .from("pipeline")
+          .select("id, stage")
+          .eq("user_id", user.id)
+          .eq("solicitation_number", ref)
+          .limit(1)
+          .maybeSingle();
+        return NextResponse.json({ ok: true, id: existingRow?.id ?? null, stage: existingRow?.stage ?? null, created: false });
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
     // No `?? "tracking"` fallback: an insert that returned no row has no
     // persisted stage to report, and "tracking" is a value the constraint

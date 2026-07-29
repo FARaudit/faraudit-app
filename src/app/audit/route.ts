@@ -19,12 +19,18 @@ import { injectRail } from "@/lib/nav/rail";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: Request) {
   const supabase = await createServerClient();
   const {
     data: { user }
   } = await supabase.auth.getUser();
-  if (!user) redirect("/sign-in?next=/audit");
+  if (!user) {
+    // Preserve the query string in `next`. The Opportunities "Run Audit" button
+    // deep-links to /audit?noticeId=<ref>; a bare next=/audit dropped it, so a
+    // signed-out user landed on an empty form after signing in.
+    const search = new URL(req.url).search;
+    redirect(`/sign-in?next=${encodeURIComponent(`/audit${search}`)}`);
+  }
 
   const filePath = path.join(
     process.cwd(),

@@ -29,3 +29,20 @@ where stage in ('tracking','rfi_submitted','bid_no_bid','proposal_in_progress','
 alter table public.pipeline drop constraint if exists pipeline_stage_check;
 alter table public.pipeline add constraint pipeline_stage_check
   check (stage in ('01','02','03','04','05','06','07','08'));
+
+-- One pursuit per (user, solicitation) — enforced, not merely checked.
+-- The Opportunities Pipeline button used a select-then-insert for idempotency,
+-- which races: two rapid clicks both pass the existence check and insert twice
+-- (reproduced: 3 concurrent POSTs → 3 rows). This index makes the DB the
+-- arbiter so the route can upsert. Duplicates are collapsed first, keeping the
+-- earliest row per pair (it carries any stage the user has since advanced).
+delete from public.pipeline p
+using public.pipeline q
+where p.user_id = q.user_id
+  and p.solicitation_number = q.solicitation_number
+  and p.solicitation_number is not null
+  and p.ctid > q.ctid;
+
+create unique index if not exists pipeline_user_solicitation_uniq
+  on public.pipeline (user_id, solicitation_number)
+  where solicitation_number is not null;

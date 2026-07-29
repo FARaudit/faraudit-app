@@ -446,7 +446,7 @@ button{font-family:inherit}
   });
 })();
 </script>
-<script>(function(){if(window.__farWatcherHydratedV2)return;window.__farWatcherHydratedV2=1;function setWatching(n){document.querySelectorAll('[data-sb-watching-count]').forEach(function(e){if(n>0){e.textContent=String(n);e.style.display='';}else{e.textContent='';e.style.display='none';}});}function setBell(n){document.querySelectorAll('.icon-btn .nbadge').forEach(function(e){if(n>0){e.textContent=String(n);e.style.display='';}else{e.textContent='';e.style.display='none';}});}fetch('/api/watched-notices',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(!d)return;setWatching((d.kpi&&d.kpi.watching)||0);}).catch(function(){});fetch('/api/notifications?limit=1',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(!d)return;setBell(d.unreadCount||0);}).catch(function(){});})();</script>
+<script>(function(){if(window.__farWatcherHydratedV2)return;window.__farWatcherHydratedV2=1;function setWatching(n){document.querySelectorAll('[data-sb-watching-count]').forEach(function(e){if(n>0){e.textContent=String(n);e.style.display='';}else{e.textContent='';e.style.display='none';}});}function setBell(n){document.querySelectorAll('.icon-btn .nbadge').forEach(function(e){if(n>0){e.textContent=String(n);e.style.display='';}else{e.textContent='';e.style.display='none';}});}fetch('/api/watched-notices',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(!d)return;setWatching((d.kpi&&d.kpi.watching)||0);}).catch(function(){});window.__farSetBell=setBell;/* bell count is set by the notifications module below — one fetch serves both */})();</script>
 <script>
 /* ⌘K / topbar search → focuses the pursuit filter input (the page's one search). */
 (function(){
@@ -466,6 +466,18 @@ button{font-family:inherit}
   function relTime(iso){var ms=new Date(iso).getTime();if(isNaN(ms))return'';var h=Math.floor((Date.now()-ms)/3600000);if(h<1)return'just now';if(h<48)return h+'h ago';return Math.floor(h/24)+'d ago';}
   var ROW='padding:9px 10px;border-radius:8px;font-size:12px;line-height:1.4;color:var(--ink-2)';
   function close(){menu.hidden=true;btn.setAttribute('aria-expanded','false');}
+  /* ONE fetch serves the badge and the popover. Two independent fetches used to
+     race here, so the badge count and the list the user opened could disagree. */
+  var pending=null;
+  function load(force){
+    if(pending&&!force)return pending;
+    pending=fetch('/api/notifications?limit=15',{credentials:'include',headers:{accept:'application/json'}})
+      .then(function(r){return r.ok?r.json():null;})
+      .then(function(d){ if(d&&window.__farSetBell)window.__farSetBell(d.unreadCount||0); return d; })
+      .catch(function(){return null;});
+    return pending;
+  }
+  load();
   function render(rows){
     if(!rows.length){menu.innerHTML='<div style="'+ROW+';color:var(--mute)">No notifications.</div>';return;}
     menu.innerHTML=rows.map(function(n){
@@ -482,10 +494,7 @@ button{font-family:inherit}
     if(!menu.hidden){close();return;}
     menu.hidden=false;btn.setAttribute('aria-expanded','true');
     menu.innerHTML='<div style="'+ROW+';color:var(--mute)">Loading…</div>';
-    fetch('/api/notifications?limit=15',{credentials:'include',headers:{accept:'application/json'}})
-      .then(function(r){return r.ok?r.json():null;})
-      .then(function(d){if(!d){menu.innerHTML='<div style="'+ROW+';color:var(--red-600)">Notifications unavailable right now.</div>';return;}render(d.notifications||[]);})
-      .catch(function(){menu.innerHTML='<div style="'+ROW+';color:var(--red-600)">Notifications unavailable right now.</div>';});
+    load().then(function(d){if(!d){menu.innerHTML='<div style="'+ROW+';color:var(--red-600)">Notifications unavailable right now.</div>';return;}render(d.notifications||[]);});
   });
   document.addEventListener('click',function(e){if(!menu.hidden&&!menu.contains(e.target))close();});
   document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});

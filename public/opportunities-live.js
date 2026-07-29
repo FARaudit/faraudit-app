@@ -2,12 +2,12 @@
    Fetches /api/command-center-data and populates window.DSO.OPPS in place,
    then calls window.DSO_APP.render(). dso-app.js is the render layer.
 
-   HONESTY CONTRACT (probe: scratchpad probe-page.mjs, run RED pre-fix):
+   Contract:
    - No sample rows exist anywhere; DSO.OPPS starts empty.
    - Fetch failure  → FEED_STATE 'error'  → explicit unavailable state.
    - Zero rows      → FEED_STATE 'empty'  → explicit "feed is empty" state.
    - Unknown values stay null (fit / ceiling / days / incumbent) — the render
-     layer shows "—" / "not audited", never 0, never 999, never a default. */
+     layer shows "—" / "not audited", never a placeholder number. */
 (function () {
   'use strict';
 
@@ -87,7 +87,6 @@
       ceiling: ceilingNum,                                     // null = not stated
       days: daysUntil(o.response_deadline),                    // null = no deadline
       fit: typeof o.compliance_score === 'number' ? o.compliance_score : null, // null = not audited
-      is_audited: !!o.is_audited,
       incumbent: o.incumbent_name || null,                     // null = none on record
       ingested_at: o.created_at || null
     };
@@ -164,6 +163,10 @@
   async function wire() {
     if (!window.DSO) return;
     setFeedStatus('loading');
+    // Pipeline membership does not depend on the feed — start it now instead of
+    // serializing it behind the feed fetch. (hydratePipelineSet never rejects;
+    // it resolves null on failure.)
+    const pipelineP = hydratePipelineSet();
     try {
       const res = await fetch('/api/command-center-data', { credentials: 'include' });
       if (!res.ok) throw new Error('opportunities fetch failed: ' + res.status);
@@ -202,14 +205,28 @@
         const t = o.ingested_at ? new Date(o.ingested_at).getTime() : NaN;
         return !isNaN(t) && t > acc ? t : acc;
       }, 0);
-      window.DSO.LAST_INGEST = newest ? relTime(new Date(newest).toISOString()) : null;
-      setFeedStatus(window.DSO.FEED_STATE, { count: mapped.length, lastIngest: window.DSO.LAST_INGEST });
+      setFeedStatus(window.DSO.FEED_STATE, {
+        count: mapped.length,
+        lastIngest: newest ? relTime(new Date(newest).toISOString()) : null
+      });
 
-      // Watch + pipeline state for visible rows (null = unavailable → the
-      // render layer disables those buttons instead of faking "off").
-      const hydrated = await Promise.all([hydrateWatchedSet(mapped), hydratePipelineSet()]);
+      // PAINT NOW. Watch/pipeline state only affects two buttons per row, and
+      // the render layer already draws those disabled while state is null — so
+      // holding the whole page behind two more round-trips (a stalled endpoint
+      // meant seconds of "Connecting…" with the data already in memory) buys
+      // nothing.
+      if (window.DSO_APP && typeof window.DSO_APP.render === 'function') {
+        window.DSO_APP.render();
+      }
+
+      // Then hydrate the button state and refresh just the list.
+      const hydrated = await Promise.all([hydrateWatchedSet(mapped), pipelineP]);
       window.DSO.WATCHED_NOTICE_IDS = hydrated[0];
       window.DSO.PIPELINE_IDS = hydrated[1];
+      if (window.DSO_APP && typeof window.DSO_APP.renderList === 'function') {
+        window.DSO_APP.renderList();
+      }
+      return;
     } catch (e) {
       console.error('[opportunities-live] wire failed:', e);
       window.DSO.OPPS.length = 0;

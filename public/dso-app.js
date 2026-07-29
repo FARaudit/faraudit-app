@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════
    FARaudit · Opportunities — render + viz + interactions.
 
-   NULL-HONESTY CONTRACT (probe: scratchpad probe-page.mjs):
+   NULL-HONESTY CONTRACT:
    - fit === null      → neutral "no score" tile/ring, excluded from Avg Fit,
                          never a 0 and never a TRAP verdict.
    - ceiling === null  → "—", excluded from $ sums (counted as "unpriced").
@@ -32,11 +32,13 @@
     return '$' + (k >= 1 ? (k % 1 === 0 ? k : k.toFixed(1)) + 'K' : Math.round(m * 1e6).toLocaleString());
   };
 
-  const S = { naics: new Set(), naicsInit: false, stage: 'all', sa: 'all', q: '', view: null, sort: 'fit', sel: null };
+  const S = { naics: new Set(), stage: 'all', sa: 'all', q: '', view: null, sort: 'fit', sel: null };
 
   const fitColor = (f) => f >= 85 ? css('--green-600') : f >= 70 ? css('--accent') : f >= 60 ? css('--amber-600') : css('--red-600');
   const fitTier = (f) => f >= 85 ? 'Strong fit' : f >= 70 ? 'Workable' : 'Stretch';
-  const urg = (d) => d == null ? 'none' : d <= 3 ? 'crit' : d <= 7 ? 'warn' : 'ok';
+  // Callers guard days == null before using this (those rows render an
+  // explicit NO DEADLINE state instead of an urgency class).
+  const urg = (d) => d <= 3 ? 'crit' : d <= 7 ? 'warn' : 'ok';
 
   // One-line advisory drawn ONLY from fields we actually have. No invented
   // incumbency claims, no invented win-rate statistics, no scores for
@@ -66,7 +68,15 @@
     $('sortSeg').innerHTML = [['fit', 'Best fit'], ['deadline', 'Closing'], ['ceiling', 'Value']].map(s => `<button data-sort="${s[0]}" class="${s[0] === S.sort ? 'active' : ''}">${s[1]}</button>`).join('');
     $('sortSeg').querySelectorAll('button').forEach(b => b.onclick = () => { S.sort = b.dataset.sort; $('sortSeg').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b)); renderList(); });
 
-    $('searchInput').addEventListener('input', e => { S.q = e.target.value.toLowerCase(); renderAll(); });
+    // Debounced: an undebounced handler rebuilt the whole page (chart + every
+    // card + every listener) on each keystroke — 9 full rebuilds for a 9-char
+    // query.
+    let searchTimer;
+    $('searchInput').addEventListener('input', e => {
+      S.q = e.target.value.toLowerCase();
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(renderAll, 140);
+    });
     $('resetBtn').onclick = () => { S.naics = new Set(D.NAICS.map(n => n.code)); S.stage = 'all'; S.sa = 'all'; S.q = ''; S.view = null; S.sel = null; $('searchInput').value = ''; sync(); renderAll(); };
   }
 
@@ -107,7 +117,7 @@
     : 'feed is empty';
 
   /* ─── KPIs ─── */
-  function renderKPIs() {
+  function renderKPIs(pre) {
     let cards;
     if (D.FEED_STATE !== 'live') {
       // No live rows → no numbers. '—' is the only honest value here.
@@ -119,7 +129,7 @@
         { lbl: 'Avg Fit Score', val: '—', unit: '', foot, tone: 'blue' }
       ];
     } else {
-      const f = filtered();
+      const f = pre || filtered();
       const priced = f.filter(o => o.ceiling != null);
       const ceil = priced.reduce((a, o) => a + o.ceiling, 0);
       const unpriced = f.length - priced.length;
@@ -173,12 +183,12 @@
   }
 
   /* ─── bubble chart ─── */
-  function renderBubble() {
+  function renderBubble(pre) {
     const svg = d3.select('#bubbleSvg'); svg.selectAll('*').remove();
     const W = $('bubbleSvg').clientWidth || 640, H = 380;
     const m = { t: 22, r: 18, b: 38, l: 52 };
     svg.attr('viewBox', `0 0 ${W} ${H}`);
-    const all = filtered();
+    const all = pre || filtered();
     // Only rows with BOTH a stated deadline and a stated ceiling can be
     // placed truthfully on a deadline-vs-ceiling plane.
     const data = all.filter(o => o.days != null && o.ceiling != null);
@@ -230,7 +240,7 @@
         tip.style.display = 'block'; tip.style.left = Math.min(ev.clientX + 14, window.innerWidth - 230) + 'px'; tip.style.top = (ev.clientY + 14) + 'px';
       })
       .on('mouseleave', () => $('bubTip').style.display = 'none')
-      .on('click', (ev, d) => { S.sel = (S.sel === d.id ? null : d.id); renderBubble(); renderActList(); renderList(); });
+      .on('click', (ev, d) => { S.sel = (S.sel === d.id ? null : d.id); applySelection(); });
 
     const excludedNote = excluded > 0
       ? `<span class="lg" style="color:var(--mute-2)">· ${excluded} of ${all.length} not plotted (no stated $ or deadline)</span>`
@@ -239,7 +249,7 @@
   }
 
   /* ─── act now list ─── */
-  function renderActList() {
+  function renderActList(pre) {
     if (D.FEED_STATE !== 'live') {
       $('actList').innerHTML = `<div class="empty">${
         D.FEED_STATE === 'loading' ? 'Connecting to the SAM.gov feed…'
@@ -248,7 +258,7 @@
       return;
     }
     // Deadline-less rows can't be ranked by urgency — they sort last.
-    const data = filtered().slice().sort((a, b) => {
+    const data = (pre || filtered()).slice().sort((a, b) => {
       if (a.days == null && b.days == null) return (b.fit ?? -1) - (a.fit ?? -1);
       if (a.days == null) return 1;
       if (b.days == null) return -1;
@@ -265,11 +275,11 @@
         ${daysHtml}
       </div>`;
     }).join('') : `<div class="empty">No pursuits match your filters.</div>`;
-    $('actList').querySelectorAll('.act-row').forEach(r => r.onclick = () => { S.sel = (S.sel === r.dataset.id ? null : r.dataset.id); renderBubble(); renderActList(); renderList(); scrollToCard(r.dataset.id); });
+    $('actList').querySelectorAll('.act-row').forEach(r => r.onclick = () => { S.sel = (S.sel === r.dataset.id ? null : r.dataset.id); applySelection(); scrollToCard(r.dataset.id); });
   }
 
   /* ─── pursuit list ─── */
-  function renderList() {
+  function renderList(pre) {
     if (D.FEED_STATE !== 'live') {
       $('plistCount').innerHTML = stateFoot();
       $('plist').innerHTML = `<div class="empty">${
@@ -278,7 +288,7 @@
         : 'The ingest feed is empty right now — nothing matched the daily SAM.gov pull.'}</div>`;
       return;
     }
-    let data = filtered().slice();
+    let data = (pre || filtered()).slice();
     const last = (v) => v == null ? -Infinity : v;
     if (S.sort === 'fit') data.sort((a, b) => last(b.fit) - last(a.fit) || (a.days ?? Infinity) - (b.days ?? Infinity));
     else if (S.sort === 'deadline') data.sort((a, b) => (a.days ?? Infinity) - (b.days ?? Infinity));
@@ -334,7 +344,7 @@
         <div class="pc-insight"><span class="ai-tag">Insight</span><span class="ai-txt">${aiTip}</span></div>
       </div>`;
     }).join('') : `<div class="empty">No pursuits match your filters. Try widening NAICS or clearing a saved view.</div>`;
-    $('plist').querySelectorAll('.pcard').forEach(c => c.onclick = (e) => { if (e.target.closest('a,button')) return; S.sel = (S.sel === c.dataset.id ? null : c.dataset.id); renderBubble(); renderActList(); renderList(); });
+    $('plist').querySelectorAll('.pcard').forEach(c => c.onclick = (e) => { if (e.target.closest('a,button')) return; S.sel = (S.sel === c.dataset.id ? null : c.dataset.id); applySelection(); });
 
     // Pipeline button — persists through POST/DELETE /api/pipeline (stage
     // 'tracking'). PIPE === null → state unknown → disabled, never faked.
@@ -442,7 +452,7 @@
   function scrollToCard(id) { const el = $('pc-' + cssId(id)); if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 90, behavior: 'smooth' }); }
 
   /* ─── insight ─── */
-  function renderInsight() {
+  function renderInsight(pre) {
     let html;
     if (D.FEED_STATE === 'loading') {
       html = `<span class="ib-label">Status</span>Connecting to the SAM.gov ingest…`;
@@ -458,7 +468,7 @@
       const incPart = o.incumbent != null ? ` Incumbent on record: ${o.incumbent}.` : '';
       html = `<span class="ib-label">Focus</span><b>${o.title}</b> — ${fitPart}${ceilPart}${daysPart}.${incPart}`;
     } else {
-      const f = filtered();
+      const f = pre || filtered();
       const hot = f.filter(o => o.fit != null && o.fit >= 85 && o.days != null && o.days <= 10);
       if (hot.length) {
         const hotPriced = hot.filter(o => o.ceiling != null);
@@ -498,10 +508,25 @@
     el.querySelectorAll('[data-more]').forEach(p => p.onclick = () => { naicsExpanded = p.dataset.more === '1'; renderHeaderNaics(); });
   }
 
+  // Selection is a class change, not a data change — updating it in place
+  // avoids destroying and rebuilding the very card the user just clicked
+  // (which also killed hover/scroll state and re-attached every listener).
+  function applySelection() {
+    $('plist').querySelectorAll('.pcard').forEach(c => c.classList.toggle('sel', c.dataset.id === S.sel));
+    $('actList').querySelectorAll('.act-row').forEach(r => r.classList.toggle('sel', r.dataset.id === S.sel));
+    if (window.d3) d3.select('#bubbleSvg').selectAll('circle.bub').attr('class', d => 'bub' + (S.sel === d.id ? ' sel' : ''));
+    renderInsight();
+  }
+
   function renderAll() {
-    // First live render: select every feed NAICS code by default.
-    if (!S.naicsInit && D.NAICS.length) { S.naics = new Set(D.NAICS.map(n => n.code)); S.naicsInit = true; }
-    renderHeaderNaics(); renderKPIs(); renderBubble(); renderActList(); renderList(); renderInsight();
+    // First live render: select every feed NAICS code by default. S.naics is
+    // empty exactly when it has never been initialised (pill clicks keep at
+    // least one code, reset repopulates), so no separate flag is needed.
+    if (!S.naics.size && D.NAICS.length) S.naics = new Set(D.NAICS.map(n => n.code));
+    // filtered() is O(n) over the feed — compute once and share it across the
+    // five widgets instead of re-deriving identical results per widget.
+    const f = D.FEED_STATE === 'live' ? filtered() : [];
+    renderHeaderNaics(); renderKPIs(f); renderBubble(f); renderActList(f); renderList(f); renderInsight(f);
   }
   function onThemeChange() { renderAll(); }
 
@@ -509,6 +534,6 @@
     buildControls(); renderAll();
     let to; window.addEventListener('resize', () => { clearTimeout(to); to = setTimeout(renderBubble, 220); });
   }
-  window.DSO_APP = { render: renderAll, onThemeChange };
+  window.DSO_APP = { render: renderAll, renderList, onThemeChange };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

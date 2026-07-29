@@ -40,5 +40,5 @@ window.DSO = (function () {
   // WATCHED_NOTICE_IDS: Map notice_id→watch status · PIPELINE_IDS: Set of
   // solicitation refs. Both null until hydrated (null = state unavailable, which
   // the render layer shows as a disabled control rather than a false "off").
-  return { OPPS, NAICS, STAGES, STAGE_META, SETASIDES, SAVED_VIEWS, FEED_STATE: 'loading', WATCHED_NOTICE_IDS: null, PIPELINE_IDS: null, LAST_INGEST: null };
+  return { OPPS, NAICS, STAGES, STAGE_META, SETASIDES, SAVED_VIEWS, FEED_STATE: 'loading', WATCHED_NOTICE_IDS: null, PIPELINE_IDS: null };
 })();

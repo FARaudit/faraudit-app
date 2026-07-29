@@ -15,7 +15,13 @@ function SignInForm() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const urlError     = searchParams.get("error");
-  const next         = searchParams.get("next") ?? "/command-center";
+  // OPEN-REDIRECT GUARD: `next` is attacker-controllable via a crafted
+  // /sign-in?next=… link, and it is fed to router.push() and to the magic-link
+  // emailRedirectTo. Only same-origin absolute PATHS are honored — anything
+  // else (absolute URL, protocol-relative "//evil.com", or a control character
+  // smuggled in) falls back to the default landing page.
+  const rawNext      = searchParams.get("next") ?? "";
+  const next         = /^\/(?!\/)[^\\\x00-\x1f]*$/.test(rawNext) ? rawNext : "/command-center";
 
   // ── Handlers (unchanged from prior version) ──
   const handleSubmit = async (e: FormEvent) => {

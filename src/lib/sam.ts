@@ -140,6 +140,15 @@ export function resolveOfficeLeaf(s: {
 // agents/sam-ingest/sam-client.ts for the same fix applied to the cron.
 const SAM_SEARCH = "https://sam.gov/api/prod/opportunities/v2/search";
 
+// The ONE canonical public URL for a notice. Three hand-built variants existed
+// (this route, src/app/dashboard/sam-feed.tsx without the "/view" suffix, and
+// the shape src/app/api/audit/resolve accepts) — a link the product generated
+// could therefore fail to resolve in the product's own audit intake.
+export function samNoticeUrl(noticeId: string | null | undefined): string | null {
+  const id = (noticeId || "").trim();
+  return id ? `https://sam.gov/opp/${encodeURIComponent(id)}/view` : null;
+}
+
 function mapOpportunity(o: Record<string, unknown>): Solicitation {
   return {
     noticeId: (o.noticeId as string | undefined) || "",

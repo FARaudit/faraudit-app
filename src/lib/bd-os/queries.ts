@@ -159,7 +159,7 @@ export async function fetchOpportunities(
     if (auditByNotice.has(a.notice_id)) continue; // first hit wins = latest by completed_at desc
     auditByNotice.set(a.notice_id, { compliance_score: a.compliance_score, recommendation: a.recommendation, v3_verdict: (a.v3_verdict as string | null) ?? null });
   }
-  return rawRows.map((r) => {
+  const mapped = rawRows.map((r) => {
     const base = { solicitation_number: null, document_type: null, notice_type: null, incumbent_name: null, risk_level: null, response_deadline: null, in_pipeline: false, watched: false, title_plain: null, is_audited: false, award_ceiling: null, v3_verdict: null, ...(r as object) } as OpportunityRow;
     const matched = base.notice_id ? auditByNotice.get(base.notice_id) : null;
     base.is_audited = !!matched;
@@ -170,6 +170,23 @@ export async function fetchOpportunities(
       if (matched.recommendation != null) base.recommendation = matched.recommendation;
     }
     return base;
+  });
+
+  // DEDUPE at the shared source. pending_audits is an ingest QUEUE: the same
+  // notice can be enqueued more than once (re-runs, re-fetched amendments), and
+  // every consumer of this function — /home stats, command-center-data, the
+  // Opportunities feed — was counting those repeats as distinct pursuits
+  // Keyed on the identity the
+  // surfaces DISPLAY (solicitation_number first, so a base notice and its
+  // amendment collapse into one), and rows are ordered created_at desc above,
+  // so the first occurrence kept is the newest.
+  const seen = new Set<string>();
+  return mapped.filter((row) => {
+    const key = row.solicitation_number || row.notice_id || null;
+    if (!key) return true; // nothing to key on — never silently dropped
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
   });
 }
 

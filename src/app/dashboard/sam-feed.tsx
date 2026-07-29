@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { samNoticeUrl } from "@/lib/sam";
 
 interface SAMRow {
   noticeId: string;
@@ -85,7 +86,7 @@ export default function SAMFeed() {
       {rows.map((r) => (
         <a
           key={r.noticeId}
-          href={r.uiLink ?? `https://sam.gov/opp/${r.noticeId}`}
+          href={r.uiLink ?? samNoticeUrl(r.noticeId) ?? "https://sam.gov"}
           target="_blank"
           rel="noopener noreferrer"
           className="group flex items-start justify-between gap-6 bg-surface hover:bg-surface-2 px-6 py-5 border-b border-border last:border-b-0 transition-colors"

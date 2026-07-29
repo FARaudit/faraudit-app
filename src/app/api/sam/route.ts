@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { resolveAgency, searchOpportunitiesByNaics } from "@/lib/sam";
+import { resolveAgency, samNoticeUrl, searchOpportunitiesByNaics } from "@/lib/sam";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,7 +58,7 @@ export async function GET(req: Request) {
     setAside: s.typeOfSetAside,
     solicitationNumber: s.solicitationNumber,
     description: s.description.slice(0, 300),
-    uiLink: s.noticeId ? `https://sam.gov/opp/${s.noticeId}/view` : null,
+    uiLink: samNoticeUrl(s.noticeId),
   }));
 
   return NextResponse.json({
