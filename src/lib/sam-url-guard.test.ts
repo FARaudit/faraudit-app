@@ -3,7 +3,7 @@
 //
 // Part A — the canonical guard (src/lib/sam-url-guard.ts) rejects the SSRF /
 // key-leak attack surface and accepts only sam.gov (initial) + sam.gov/S3 (redirect).
-// Part B — the VENDORED copy (agents/audit-ai/pdf.ts, which cannot import src/) has
+// Part B — the VENDORED copy (agents/audit-ai/pdf.ts, a V1-era mirror) has
 // NOT drifted on the security-critical constants: the two host allowlists + the
 // redirect cap are byte-identical across both files. A one-sided edit = a security
 // regression; this test fails loudly on drift (the "Keep in sync" comment is not
