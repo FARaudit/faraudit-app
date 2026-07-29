@@ -636,10 +636,14 @@ async function buildInput(row: UserPendingRow): Promise<AuditExecutionInput> {
     try {
       const { data: capRow } = await supabase
         .from("capability_statements")
-        .select("certifications")
+        .select("certifications, attributes_v2, size_facts")
         .eq("user_id", row.user_id)
         .maybeSingle();
-      bidderProfile = buildBidderProfileFromCapability(capRow);
+      // solicitation is non-null here (synthesizeFromRow fallback above) — V2 wiring must match the
+      // sync route EXACTLY (verification F1: this constructor was the fourth site; missing it left the
+      // authoritative records unloaded on the live async path, so verified certs decided on the route
+      // path but stayed unknown on worker audits — the refetch no-divergence contract broke).
+      bidderProfile = buildBidderProfileFromCapability(capRow, { solicitationNaics: solicitation.naicsCode });
     } catch { /* unknown firm on any error — never block the audit */ }
   }
 

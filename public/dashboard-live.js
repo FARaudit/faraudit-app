@@ -26,10 +26,9 @@
 
   var STATE = {
     rows: [],
-    filter: "all",
-    // Card 366 Phase-2 filter bar — AND'd across the chip + search. Card #450
-    // wired NAICS + set-aside now that fetchRecentAudits returns both columns.
-    f: { time: "all", agency: "all", type: "all", rec: "all", status: "all", naics: "all", setAside: "all" },
+    // card #769 — the verdict rail owns the verdict axis (one field, one control)
+    seg: "all",
+    f: { time: "all", window: "all", agency: "all", type: "all", naics: "all", setAside: "all" },
     // Default order: most recently audited first (CEO ruling 2026-07-28).
     // 'audited' sorts on age-hours; dir 1 = ascending age = newest first.
     sortKey: "audited",
@@ -126,6 +125,27 @@
     return null; // absent, not guessed — renders as an em dash
   }
 
+  // ── card #769: ONE precedence chain owns the partition — verdict first, run
+  // state second, never two independent fields. And ONE window derivation feeds
+  // the row flag, the Deadline-passed tag, the Window slicer AND the Still Open
+  // KPI (R9a) — the F6 bug was two code paths disagreeing on one field.
+  var SEG = [
+    { k: "bid", label: "Bid" }, { k: "caution", label: "Bid \u00b7 caution" },
+    { k: "nobid", label: "No-bid" }, { k: "inelig", label: "Ineligible" },
+    { k: "review", label: "Needs review" }, { k: "incomplete", label: "Incomplete" },
+    { k: "inflight", label: "In flight" }, { k: "failed", label: "Run failed" }
+  ];
+  var SL = {}; SEG.forEach(function (s) { SL[s.k] = s.label; });
+  var RECMAP = { "Bid": "bid", "Bid \u00b7 caution": "caution", "No-bid": "nobid", "Ineligible": "inelig", "Needs review": "review", "Incomplete": "incomplete" };
+  function segOf(rec, status) {
+    if (rec && RECMAP[rec]) return RECMAP[rec];
+    return status === "failed" ? "failed" : "inflight";
+  }
+  function windowOf(dueTs) {
+    if (dueTs === Infinity) return "none";
+    return dueTs < Date.now() ? "passed" : "open";
+  }
+
   function statusBucket(audit) {
     var s = (audit.status || "").toLowerCase();
     if (s === "complete") return "complete";
@@ -141,13 +161,12 @@
     // audit OR a live audit whose response deadline has already passed.
     // WIRE-MAP #456 Ruling 2 — expose the trigger so the row picks the reason:
     // failed → red status badge is the reason; deadline → keep truthful badge + amber tag.
-    // Needs-attention is an ALARM, not an archive marker: it fires for a failed
-    // audit, or an audit still in flight whose response deadline already passed.
-    // A completed audit of a since-closed solicitation is normal history — flagging
-    // it painted 80 of 103 rows amber and made the flag meaningless.
-    var deadlinePassed = (dueTs !== Infinity && dueTs < Date.now());
-    var attn = (st === "failed") || (st === "pending" && deadlinePassed);
-    var attnType = (st === "failed") ? "failed" : ((st === "pending" && deadlinePassed) ? "deadline" : null);
+    // card #769 R9a — needs-attention derives from the SAME windowOf/seg chain
+    // as the tag, the Window slicer and the Still Open KPI (Design ruling
+    // supersedes the earlier pending-only narrowing).
+    var w = windowOf(dueTs);
+    var attn = (st === "failed") || (w === "passed");
+    var attnType = (st === "failed") ? "failed" : (w === "passed" ? "deadline" : null);
     return {
       // uuid is the row's OWN audit — row navigation uses it so a clicked row
       // opens that report, not the newest audit sharing its solicitation number.
@@ -166,6 +185,8 @@
       dueTs:  dueTs,
       rec:    recommendationBucket(audit),
       status: st,
+      _s:     segOf(recommendationBucket(audit), st),
+      _w:     w,
       attn:   attn,
       attnType: attnType
     };
@@ -178,44 +199,30 @@
 
   // Build the EXACT row markup the design's inline render() uses (verbatim copy).
   function buildRowHTML(a) {
-    // Six poles → the three existing tone classes. Committal decisions keep their
-    // register; non-committal poles (needs review / incomplete / unresolved) take
-    // NEITHER green nor red — painting them would assert a decision the engine
-    // did not issue.
-    var recClassStr = "none";
-    if (a.rec === "Bid") recClassStr = "proceed";
-    else if (a.rec === "Bid · caution") recClassStr = "caution";
-    else if (a.rec === "No-bid" || a.rec === "Ineligible") recClassStr = "decline";
-    var recCell = a.rec
-      ? '<span class="rec ' + recClassStr + '">' + esc(a.rec) + '</span>'
-      : '<span class="rec none">—</span>';
     var slug = encodeURIComponent(a.uuid || a.id);
-    // WIRE-MAP #456 Ruling 2 — needs-attention: amber flag in the ID cell + a reason
-    // in the status cell (failed → red badge is the reason; deadline → truthful badge + amber tag).
     var attnFlag = a.attn
       ? '<span class="attn-flag" title="Needs attention"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>'
-      : '';
-    var statusInner = '<span class="status ' + esc(a.status) + '">' + esc(a.status) + '</span>'
-      + (a.attnType === "deadline" ? '<span class="deadline-tag">Deadline passed</span>' : '');
-    return '<tr data-rec="' + esc(a.rec || "") + '" data-sol="' + esc(a.id) + '" data-uuid="' + esc(a.uuid) + '"' + (a.attn ? ' class="needs-attention" data-attn="' + esc(a.attnType) + '"' : "") + '>'
+      : "";
+    var failed = a._s === "failed";
+    var stInner = failed ? '<span class="failed-badge">RUN FAILED</span>'
+      : (a.status === "pending" ? "running" : "complete");
+    if (a._w === "passed") stInner += '<span class="deadline-tag">Deadline passed</span>';
+    return '<tr data-pole="' + esc(a._s) + '" data-rec="' + esc(a.rec || "") + '" data-sol="' + esc(a.id) + '" data-uuid="' + esc(a.uuid) + '"' + (a.attn ? ' class="needs-attention" data-attn="' + esc(a.attnType) + '"' : "") + '>'
       + '<td class="cell-id">' + esc(a.id) + attnFlag + '</td>'
       + '<td class="cell-title" title="' + esc(a.title) + '">' + esc(a.title) + '</td>'
       + '<td class="cell-agency">' + esc(a.agency) + '</td>'
-      + '<td><span class="doctype">' + esc(a.type) + '</span></td>'
+      + '<td>' + (a.type && a.type !== "\u2014" ? '<span class="doctype">' + esc(a.type) + '</span>' : '<span class="cell-date">\u2014</span>') + '</td>'
       + '<td class="cell-due">' + esc(a.due) + '</td>'
       + '<td class="cell-date">' + esc(a.date) + '</td>'
-      + '<td>' + recCell + '</td>'
-      + '<td><span class="st-cell">' + statusInner + '</span></td>'
-      + '<td class="right"><a class="view-link" href="/audit/' + slug + '">View<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></td>'
+      + '<td><span class="vcell" data-pole="' + esc(a._s) + '"><i class="pd ' + esc(a._s) + '"></i>' + esc(SL[a._s]) + '</span></td>'
+      + '<td><span class="stcell">' + stInner + '</span></td>'
+      + '<td class="right"><a class="view-link" href="/audit/' + slug + '">' + (failed ? "Re-run" : "View") + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></td>'
       + '</tr>';
   }
 
   // ── Filter + sort + search pipeline ──
   function rowMatchesFilter(a) {
-    if (STATE.filter === "all") return true;
-    if (STATE.filter === "open")   return a.status === "pending";
-    if (STATE.filter === "failed") return a.status === "failed";
-    return a.rec === STATE.filter;
+    return STATE.seg === "all" || a._s === STATE.seg;
   }
   // Card 366 Phase-2 filter bar — AND across time / agency / type / rec / status.
   function rowMatchesBar(a) {
@@ -224,10 +231,9 @@
       var maxH = f.time === "30" ? 720 : (f.time === "quarter" ? 2160 : 8760);
       if (!(a.age <= maxH)) return false;
     }
+    if (f.window !== "all" && a._w !== f.window) return false;
     if (f.agency !== "all" && a.agency !== f.agency) return false;
     if (f.type   !== "all" && a.type   !== f.type)   return false;
-    if (f.rec    !== "all" && a.rec    !== f.rec)    return false;
-    if (f.status !== "all" && a.status !== f.status) return false;
     if (f.naics  !== "all" && a.naics  !== f.naics)  return false;
     if (f.setAside !== "all" && a.setAside !== f.setAside) return false;
     return true;
@@ -278,6 +284,7 @@
         + '</td></tr>';
       var vce = document.getElementById("visCount");
       if (vce) vce.textContent = "";
+      writeSelfCheck([]);
       return;
     }
     syncSlicers();
@@ -291,15 +298,78 @@
         + 'No audits yet — <a href="/audit" style="color:var(--blue-600);font-weight:600;text-decoration:none">run your first audit →</a>'
         + '</td></tr>';
     } else if (visible.length === 0) {
-      body.innerHTML = '<tr><td colspan="9" style="padding:28px 16px;text-align:center;color:var(--mute);font-size:13px">'
-        + 'No audits match this filter/search. <a href="#" class="cc-clear-filters" style="color:var(--blue-600);font-weight:600;text-decoration:none">Clear →</a>'
+      // R10 — honest empty: name the combination, offer clear. Never a blank
+      // region that looks like data loaded.
+      body.innerHTML = '<tr><td colspan="9" style="padding:34px 18px;text-align:center">'
+        + '<span style="display:block;font-size:13px;font-weight:700;color:var(--ink);margin-bottom:5px">No audits match this combination</span>'
+        + '<span style="display:block;font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--mute)">' + esc(describeFilters().join(" + ") || "no filters") + ' \u2014 <a href="#" class="cc-clear-filters" style="color:var(--blue-600);font-weight:600;text-decoration:none">clear filters</a></span>'
         + '</td></tr>';
     } else {
       body.innerHTML = visible.map(buildRowHTML).join("");
     }
     var vc = document.getElementById("visCount");
-    if (vc) vc.textContent = visible.length + " of " + mset.length;
+    if (vc) {
+      var bits = describeFilters();
+      vc.textContent = visible.length + " of " + STATE.rows.length + (bits.length ? " \u00b7 " + bits.join(" \u00b7 ") : "");
+    }
     wireRowClicks();
+    writeSelfCheck(visible);
+  }
+
+  // R6 — the filter description lands in the EXISTING readout; no second count.
+  function describeFilters() {
+    var bits = [];
+    if (STATE.seg !== "all") bits.push(SL[STATE.seg]);
+    if (STATE.f.window !== "all") bits.push({ open: "still open", passed: "window passed", none: "no due date" }[STATE.f.window]);
+    ["agency", "type", "naics", "setAside"].forEach(function (k) { if (STATE.f[k] !== "all") bits.push(STATE.f[k]); });
+    if (STATE.search) bits.push('"' + STATE.search + '"');
+    return bits;
+  }
+
+  // card #769 C1–C5 — computed on every render so a broken port reports itself.
+  function writeSelfCheck(visible) {
+    var el = document.getElementById("integ");
+    if (!el) return;
+    if (STATE.loadError) { el.innerHTML = "Self-check suspended \u2014 audits could not be loaded."; return; }
+    var rows = STATE.rows.filter(function (a) { return rowMatchesSearch(a) && rowMatchesBar(a); });
+    var c = segCounts(rows);
+    var railSum = SEG.reduce(function (a, g) { return a + c[g.k]; }, 0);
+    var c1 = railSum === rows.length;
+    var dbl = STATE.rows.filter(function (r) { return r.rec && RECMAP[r.rec] && (r.status === "failed" || r.status === "pending"); }).length;
+    var c2 = dbl === 0;
+    var rail = document.getElementById("poleRail"), c3 = true;
+    if (rail) {
+      var rr = rail.getBoundingClientRect();
+      c3 = rail.scrollWidth <= rail.clientWidth + 1 && [].every.call(rail.querySelectorAll(".pole"), function (p) { var b = p.getBoundingClientRect(); return b.right <= rr.right + 1 && b.bottom <= rr.bottom + 1; });
+    }
+    // C4 \u2014 active states are TINTS over the unchanged card colour, never fills
+    // (Design's isTint: low-alpha background OR low-alpha gradient layer over
+    // the card colour). This was the check missing from the first port \u2014 named
+    // in card #771; the count read "4 of 4" because this one wasn't running.
+    var c4 = true;
+    var inactive = document.querySelector("#poleRail .pole:not(.is-active)");
+    if (inactive) {
+      var cardBg = getComputedStyle(inactive).backgroundColor;
+      var isTint = function (e) {
+        var cs = getComputedStyle(e), m = cs.backgroundColor.match(/[\d.]+/g);
+        var a = m ? (m.length > 3 ? parseFloat(m[3]) : 1) : 1;
+        if (a <= 0.2) return true;
+        var g = cs.backgroundImage.match(/rgba?\(([^)]*)\)/);
+        if (!g) return false;
+        var gm = g[1].split(",").map(parseFloat), ga = gm.length > 3 ? gm[3] : 1;
+        return ga <= 0.2 && cs.backgroundColor === cardBg;
+      };
+      var act = document.querySelectorAll("#poleRail .pole.is-active, #paFilterbar .pa-slicer.is-active");
+      c4 = [].every.call(act, isTint);
+    }
+    var pv = visible.filter(function (r) { return r._w === "passed"; }).length;
+    var flagged = [].filter.call(document.querySelectorAll("#ledgerBody tr.needs-attention"), function (tr) { return tr.querySelector(".deadline-tag"); }).length;
+    var c5 = flagged === pv;
+    var checks = [c1, c2, c3, c4, c5];
+    var pass = checks.filter(Boolean).length;
+    el.innerHTML = "Self-check \u00b7 <b>" + pass + " of " + checks.length + "</b> computed checks pass"
+      + (pass < checks.length ? ' \u00b7 <b style="color:var(--red-600)">' + (checks.length - pass) + " FAIL</b>" : "")
+      + " \u2014 rail sums to the ledger count (" + railSum + "=" + rows.length + "), every row in exactly one segment, nothing clipped, active states are tints not fills, every passed deadline flagged (" + flagged + "/" + pv + ").";
   }
 
   function writeKPIs() {
@@ -323,83 +393,65 @@
       return;
     }
     var rows = STATE.rows;
-    var total = rows.length;
-    var completed = rows.filter(function (r) { return r.status === "complete"; });
-    var bidRows = completed.filter(function (r) { return r.rec === "Bid" || r.rec === "Bid · caution"; });
-    var declineRows = completed.filter(function (r) { return r.rec === "No-bid" || r.rec === "Ineligible"; });
-    var stillOpen = rows.filter(function (r) { return r.dueTs !== Infinity && r.dueTs > Date.now(); });
+    var c = segCounts(rows);
+    var verdicts = c.bid + c.caution + c.nobid + c.inelig + c.review + c.incomplete;
+    var open = rows.filter(function (r) { return r._w === "open"; }).length;
     var last30 = rows.filter(function (r) { return r.age <= 720; }).length;
-    var bidPct = completed.length > 0 ? Math.round((bidRows.length / completed.length) * 100) : 0;
-    setKPI(0, String(total), '<b>' + last30 + '</b> in the last 30 days');
-    setKPI(1, String(bidRows.length), '<b>' + bidPct + '%</b> of completed — bid or bid-with-caution');
-    setKPI(2, String(declineRows.length), 'committal declines — no-bid or ineligible');
-    setKPI(3, String(stillOpen.length), 'response window still open — you can still bid');
+    function pdi(k) { return '<i class="pd ' + k + '"></i>'; }
+    setKPI(0, String(rows.length), "<b>" + last30 + "</b> in the last 30 days");
+    // R4 — the aggregate names the poles it sums; no unnamed percentage, ever.
+    setKPI(1, String(c.bid + c.caution), '<span class="agg"><span class="t">' + pdi("bid") + "Bid " + c.bid + '</span><span class="op">+</span><span class="t">' + pdi("caution") + "Bid\u00b7caution " + c.caution + '</span><span class="den">\u00b7 of ' + verdicts + ' with a verdict</span></span>');
+    setKPI(2, String(c.nobid + c.inelig), '<span class="agg"><span class="t">' + pdi("nobid") + "No-bid " + c.nobid + '</span><span class="op">+</span><span class="t">' + pdi("inelig") + "Ineligible " + c.inelig + '</span><span class="den">\u00b7 committal declines</span></span>');
+    setKPI(3, String(open), 'response window still open \u2014 <b>you can still bid</b>');
   }
 
   function writeDistribution() {
-    var rows = STATE.rows;
-    var total = rows.length;
-    // Six poles → the four bar segments, aggregated HONESTLY: committal green,
-    // caution amber, committal red, and everything undecided (pending / needs
-    // review / incomplete / unresolved) in the neutral segment — never painted
-    // onto a committal color.
-    var buckets = { bid: 0, caution: 0, decline: 0, other: 0 };
-    rows.forEach(function (r) {
-      if (r.status !== "complete") buckets.other++;
-      else if (r.rec === "Bid") buckets.bid++;
-      else if (r.rec === "Bid · caution") buckets.caution++;
-      else if (r.rec === "No-bid" || r.rec === "Ineligible") buckets.decline++;
-      else buckets.other++;
+    var bar = document.getElementById("distBar") || document.querySelector(".dist-bar");
+    if (!bar) return;
+    if (STATE.loadError) { bar.innerHTML = ""; return; }
+    var rows = STATE.rows.filter(function (a) { return rowMatchesSearch(a) && rowMatchesBar(a); });
+    var c = segCounts(rows), total = rows.length || 1, h = "";
+    SEG.forEach(function (g) {
+      if (c[g.k]) h += '<span class="s-' + g.k + '" style="width:' + (c[g.k] / total * 100).toFixed(2) + '%" title="' + g.label + " " + c[g.k] + '"></span>';
     });
-    function pct(n) { return total > 0 ? Math.round((n / total) * 100) : 0; }
-    var bar = document.querySelector(".dist-bar");
-    if (bar) {
-      var widths = {
-        ".d-proceed": pct(buckets.bid),
-        ".d-caution": pct(buckets.caution),
-        ".d-decline": pct(buckets.decline),
-        ".d-pending": pct(buckets.other)
-      };
-      Object.keys(widths).forEach(function (sel) {
-        var s = bar.querySelector(sel);
-        if (s) s.style.width = widths[sel] + "%";
-      });
-    }
-    var legend = document.querySelector(".dist-legend");
-    if (legend) {
-      function setLeg(cls, n) {
-        var el = legend.querySelector(".dl." + cls + " b");
-        if (el) el.textContent = STATE.loadError ? "—" : String(n);
-      }
-      setLeg("proceed", buckets.bid);
-      setLeg("caution", buckets.caution);
-      setLeg("decline", buckets.decline);
-      setLeg("pending", buckets.other);
-    }
+    bar.innerHTML = h;
   }
 
-  function writeFilterCounts() {
-    // Chip counts reflect the current filter-bar + search aperture, not the raw total.
+  function segCounts(rows) {
+    var c = {}; SEG.forEach(function (g) { c[g.k] = 0; });
+    rows.forEach(function (r) { c[r._s]++; });
+    return c;
+  }
+  function renderRail() {
+    var rail = document.getElementById("poleRail");
+    if (!rail) return;
     var rows = STATE.rows.filter(function (a) { return rowMatchesSearch(a) && rowMatchesBar(a); });
-    function recCount(label) {
-      return rows.filter(function (r) { return r.rec === label && r.status === "complete"; }).length;
-    }
-    var counts = {
-      all: rows.length,
-      "Bid": recCount("Bid"),
-      "Bid · caution": recCount("Bid · caution"),
-      "No-bid": recCount("No-bid"),
-      "Ineligible": recCount("Ineligible"),
-      "Needs review": recCount("Needs review"),
-      "Incomplete": recCount("Incomplete"),
-      open:   rows.filter(function (r) { return r.status === "pending"; }).length,
-      failed: rows.filter(function (r) { return r.status === "failed"; }).length
-    };
-    document.querySelectorAll(".filters .fbtn").forEach(function (btn) {
-      var k = btn.dataset.filter;
-      var n = btn.querySelector(".n");
-      if (n && counts[k] != null) n.textContent = STATE.loadError ? "—" : String(counts[k]);
+    var c = segCounts(rows);
+    var h = '<button class="pole' + (STATE.seg === "all" ? " is-active" : "") + '" data-seg="all"><span class="pl">All</span><span class="pn">' + (STATE.loadError ? "\u2014" : rows.length) + "</span></button>";
+    SEG.forEach(function (g) {
+      h += '<button class="pole' + (STATE.seg === g.k ? " is-active" : "") + '" data-seg="' + g.k + '"' + (c[g.k] === 0 ? ' data-empty="1"' : "")
+        + (g.k === "inflight" ? ' title="Past this boundary: no verdict was issued"' : "")
+        + '><i class="pd ' + g.k + '"></i><span class="pl">' + g.label + '</span><span class="pn">' + (STATE.loadError ? "\u2014" : c[g.k]) + "</span></button>";
     });
+    rail.innerHTML = h;
+    [].forEach.call(rail.querySelectorAll(".pole"), function (b) {
+      b.addEventListener("click", function () {
+        STATE.seg = (b.dataset.seg === "all" || STATE.seg === b.dataset.seg) ? "all" : b.dataset.seg;
+        writeAll();
+      });
+    });
+    // R3 — the band prints its own measured width + one-row threshold so a wrapped
+    // rail is never mistaken for a defect.
+    var rn = document.getElementById("railNote");
+    if (rn) {
+      var wrap0 = rail.style.flexWrap; rail.style.flexWrap = "nowrap";
+      var natural = rail.scrollWidth; rail.style.flexWrap = wrap0;
+      var railRows = Math.max(1, Math.round(rail.getBoundingClientRect().height / 39));
+      var tbl = document.querySelector("table.dash"), twrap = document.querySelector(".table-wrap");
+      rn.innerHTML = "Control band <b>" + rail.clientWidth + "px</b> \u00b7 one row at <b>\u2265" + natural + "px</b> \u00b7 "
+        + (railRows === 1 ? "<b>one row</b> here" : "<b>" + railRows + " rows</b> here \u2014 the band is narrower than the rail needs, nothing is hidden")
+        + (tbl && twrap ? " \u00b7 table needs <b>" + tbl.scrollWidth + "px</b>, has <b>" + twrap.clientWidth + "px</b>" : "");
+    }
   }
 
   function writeHeaderSub() {
@@ -451,8 +503,8 @@
     // (do NOT build Today here). failed OR deadline-passed.
     window.__paNeedsAttention = STATE.rows.filter(function (r) { return r.attn; }).length;
     writeKPIs();
+    renderRail();
     writeDistribution();
-    writeFilterCounts();
     writeHeaderSub();
     writeTable();
   }
@@ -460,18 +512,8 @@
   // ── Wires — this script is the page's ONLY writer (the duplicate inline
   // wiring was removed; two listeners per control meant the last writer won
   // and the ARC #747 six-pole fix never reached the screen). ──
-  function wireFilters() {
-    var filters = document.getElementById("filters");
-    if (!filters || filters.dataset.ccWired) return;
-    filters.dataset.ccWired = "1";
-    filters.addEventListener("click", function (e) {
-      var btn = e.target.closest && e.target.closest(".fbtn");
-      if (!btn) return;
-      filters.querySelectorAll(".fbtn").forEach(function (b) { b.classList.toggle("active", b === btn); });
-      STATE.filter = btn.dataset.filter || "all";
-      writeTable();
-    });
-  }
+  // card #769 R1 — the chip row is deleted; the verdict rail (renderRail) owns
+  // the verdict axis. No field is filterable from two controls.
 
   function wireSort() {
     document.querySelectorAll("th.sortable").forEach(function (th) {
@@ -566,7 +608,7 @@
       clear.dataset.ccWired = "1";
       clear.addEventListener("click", function (e) {
         e.preventDefault();
-        STATE.filter = "all";
+        STATE.seg = "all";
         STATE.search = "";
         STATE.f = { time: "all", agency: "all", type: "all", rec: "all", status: "all", naics: "all", setAside: "all" };
         document.querySelectorAll(".pa-filter").forEach(function (s) { s.value = "all"; });
@@ -575,8 +617,7 @@
         });
         var input = document.querySelector(".cc-search-input");
         if (input) input.value = "";
-        writeFilterCounts();
-        writeTable();
+        writeAll();
       });
     }
   }
@@ -604,6 +645,18 @@
       el.innerHTML = opts;
       if (cur && (cur === "all" || values.indexOf(cur) !== -1)) el.value = cur;
     }
+    // Window slicer options carry counts from the ONE windowOf derivation (R8)
+    var wc = { open: 0, passed: 0, none: 0 };
+    STATE.rows.forEach(function (r) { wc[r._w]++; });
+    var fw = document.getElementById("fWindow");
+    if (fw) {
+      var cur = fw.value || "all";
+      fw.innerHTML = '<option value="all">All windows</option>'
+        + '<option value="open">Still open (' + wc.open + ')</option>'
+        + '<option value="passed">Passed (' + wc.passed + ')</option>'
+        + '<option value="none">No date (' + wc.none + ')</option>';
+      fw.value = cur;
+    }
     fill("fAgency", distinct("agency"), "All agencies");
     fill("fType", distinct("type"), "All types");
     // NAICS: bare code — no title in the audits row payload (WIRE-MAP fallback: "no title on file → bare code").
@@ -622,36 +675,34 @@
       var slicer = sel.closest(".pa-slicer");
       if (slicer) slicer.classList.toggle("is-active", active);
     });
-    if (STATE.filter && STATE.filter !== "all") anyActive = true;
+    if (STATE.seg && STATE.seg !== "all") anyActive = true;
     if (STATE.search && STATE.search !== "") anyActive = true;
     var clr = document.getElementById("paClear");
     if (clr) clr.hidden = !anyActive;
   }
 
   function wireFilterBar() {
-    [["fTime", "time"], ["fAgency", "agency"], ["fType", "type"], ["fRec", "rec"], ["fStatus", "status"], ["fNaics", "naics"], ["fSetAside", "setAside"]].forEach(function (pair) {
+    [["fTime", "time"], ["fWindow", "window"], ["fAgency", "agency"], ["fType", "type"], ["fNaics", "naics"], ["fSetAside", "setAside"]].forEach(function (pair) {
       var el = document.getElementById(pair[0]);
       if (!el || el.dataset.ccWired) return;
       el.dataset.ccWired = "1";
       el.addEventListener("change", function () {
         STATE.f[pair[1]] = el.value || "all";
-        writeFilterCounts();
-        writeTable();
+        writeAll();
       });
     });
     var clr = document.getElementById("paClear");
     if (clr && !clr.dataset.ccWired) {
       clr.dataset.ccWired = "1";
       clr.addEventListener("click", function () {
-        STATE.f = { time: "all", agency: "all", type: "all", rec: "all", status: "all", naics: "all", setAside: "all" };
-        STATE.filter = "all";
+        STATE.f = { time: "all", window: "all", agency: "all", type: "all", naics: "all", setAside: "all" };
+        STATE.seg = "all";
         STATE.search = "";
         document.querySelectorAll(".pa-filter").forEach(function (s) { s.value = "all"; });
         document.querySelectorAll(".fbtn").forEach(function (b) { b.classList.toggle("active", b.dataset.filter === "all"); });
         var input = document.querySelector(".cc-search-input");
         if (input) input.value = "";
-        writeFilterCounts();
-        writeTable();
+        writeAll();
       });
     }
   }
@@ -660,7 +711,6 @@
   async function wireDashboard() {
     // Attach additive listeners FIRST (before fetch).
     // Inline handlers are already in place from parse-time; ours run after.
-    wireFilters();
     wireSort();
     wireSearch();
     wireFilterBar();

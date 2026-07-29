@@ -150,8 +150,10 @@ export function renderRail(activeKey: string, counts: RailCounts = {}): string {
     `  <div class="sb-logo-row"><div class="sb-logo">F</div><span class="sb-wordmark">FAR<span class="wm-au">audit</span></span></div>\n  ` +
     groups +
     `\n  <div class="sb-bottom">\n` +
+    // Identity is NEVER hardcoded — the rail script fills these from
+    // /api/profile (the signed-in user). Empty until real data exists.
     `    <button class="sb-avatar-btn" id="sbAvatarBtn" type="button" aria-haspopup="true" aria-expanded="false">` +
-    `<span class="sb-avatar">JR</span><span class="sb-avatar-name">Jose Rodriguez</span>` +
+    `<span class="sb-avatar"></span><span class="sb-avatar-name"></span>` +
     `<svg class="sb-avatar-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></button>\n` +
     `    <div class="sb-avatar-menu" id="sbAvatarMenu" role="menu" hidden>\n` +
     `      <a class="sb-am-item" role="menuitem" href="/settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${I.settings}</svg>Profile &amp; Settings</a>\n` +
@@ -188,10 +190,23 @@ export function railStyle(): string {
 export function railScript(): string {
   return (
     `<script>(function(){var b=document.getElementById('sbAvatarBtn'),m=document.getElementById('sbAvatarMenu');` +
-    `if(!b||!m)return;function close(){m.hidden=true;b.setAttribute('aria-expanded','false');}` +
+    `if(b&&m){var close=function(){m.hidden=true;b.setAttribute('aria-expanded','false');};` +
     `b.addEventListener('click',function(e){e.stopPropagation();var o=m.hidden;m.hidden=!o;b.setAttribute('aria-expanded',String(o));});` +
     `document.addEventListener('click',function(e){if(!m.hidden&&!m.contains(e.target)&&e.target!==b)close();});` +
-    `document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});})();</script>`
+    `document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});}` +
+    // Identity hydration — the SIGNED-IN user from /api/profile, never a
+    // hardcoded name. On failure identity stays blank: empty is honest,
+    // a wrong name is not (Rule 61).
+    `fetch('/api/profile',{credentials:'include'}).then(function(r){return r.ok?r.json():null;}).then(function(p){` +
+    `if(!p)return;var name=(p.full_name||'').trim()||String(p.email||'').split('@')[0];if(!name)return;` +
+    // suffixes (Jr/Sr/II/III/IV) are not surnames — initials skip them
+    `var parts=name.split(/\\s+/).filter(function(w){return !/^(jr|sr|ii|iii|iv|v)\\.?$/i.test(w);});` +
+    `var ini=((parts[0]||'')[0]||'')+((parts.length>1?parts[parts.length-1][0]:(parts[0]||'')[1])||'');ini=ini.toUpperCase();` +
+    `document.querySelectorAll('.sb-avatar').forEach(function(e){e.textContent=ini;});` +
+    `document.querySelectorAll('.sb-avatar-name').forEach(function(e){e.textContent=name;});` +
+    `document.querySelectorAll('.user-chip .nm').forEach(function(e){e.textContent=name;});` +
+    `document.querySelectorAll('.user-chip .av').forEach(function(e){e.textContent=ini;});` +
+    `}).catch(function(){});})();</script>`
   );
 }
 

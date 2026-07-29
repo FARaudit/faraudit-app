@@ -1339,7 +1339,14 @@ export function applyNmrNaicsDormancy(
       cautionFloor: undefined,
       severity: "P2" as const,
       nmrGuard: true,
-      requirement: `Applicability flag: the Nonmanufacturer Rule (FAR 52.219-33) is legally DORMANT on this acquisition — the assigned NAICS ${digits} (sector ${sector}) is not a supply/manufacturing/wholesale/retail code, so 13 CFR 121.406(b)(3)-(4) makes the NMR inapplicable (it governs supply buys only). Present in the clause matrix but not an eligibility bar for this buy; confirm scope with the Contracting Officer.`,
+      // NMR-CITATION-HONESTY (flag AUDIT_NMR_CITATION_HONESTY, panel gate-4 AUTO-F on 150c3ab3): "Present in the
+      // clause matrix" is a DOCUMENT-presence claim this gate never verifies — on 150c3ab3 the literal 52.219-33
+      // has zero occurrences in the package (the grounding lives in VAAR 852.219-73(d)). The honest form grounds
+      // on the excerpt the finding CARRIES (kept by the spread) — true whether or not the clause is in the matrix.
+      // Rule-identity naming of the NMR by its FAR number is a regulatory fact and stays. Flag-OFF ⇒ legacy text.
+      requirement: process.env.AUDIT_NMR_CITATION_HONESTY === "true"
+        ? `Applicability flag: the Nonmanufacturer Rule (FAR 52.219-33) is legally DORMANT on this acquisition — the assigned NAICS ${digits} (sector ${sector}) is not a supply/manufacturing/wholesale/retail code, so 13 CFR 121.406(b)(3)-(4) makes the NMR inapplicable (it governs supply buys only). Referenced in the solicitation text (see excerpt) but not an eligibility bar for this buy; confirm scope with the Contracting Officer.`
+        : `Applicability flag: the Nonmanufacturer Rule (FAR 52.219-33) is legally DORMANT on this acquisition — the assigned NAICS ${digits} (sector ${sector}) is not a supply/manufacturing/wholesale/retail code, so 13 CFR 121.406(b)(3)-(4) makes the NMR inapplicable (it governs supply buys only). Present in the clause matrix but not an eligibility bar for this buy; confirm scope with the Contracting Officer.`,
     };
   });
   if (touched) console.log(`[decide] NMR NAICS-dormancy: assigned NAICS ${digits} (sector ${sector}) non-supply → 52.219-33 demoted to P2 applicability flag (13 CFR 121.406(b)(3)-(4))`);
@@ -2915,6 +2922,52 @@ export function requiredAttributeGrounded(requiredAttribute: string, source: str
   return value.length >= 4 && nSrc.includes(value);
 }
 
+// ═══ U-C · PROFILE SCHEMA V2 (panel 2026-07-29 M2 · flag AUDIT_PROFILE_SCHEMA_V2, default-OFF) ═══
+// Closes the two red-team-traced false-BID vectors (design_verdict_inversion_q2): B1 — no time dimension, so a
+// decertified cert read as live and DELETED the 206-A verify-caution (worse than a null profile); B2 — the
+// exact-match fast path bypassed NON_SELF_CLEARABLE_BAR_RE, so an asserted profile string cleared FCL/QPL/size
+// structural bars. Flag OFF ⇒ every branch byte-identical (probe O1 + suites).
+const profileSchemaV2Enabled = () => process.env.AUDIT_PROFILE_SCHEMA_V2 === "true";
+const AUTHORITATIVE_SOURCES = new Set(["sam_api", "sba_api", "verified_import"]);
+// Namespaces a customer can NEVER self-assert into "satisfies" (the SB seat's floor): socioeconomic programs
+// (incl. sb: — "sb:total" is a PRODUCTION deterministic-emitter token, verification F2), size/NAICS,
+// clearances/FCL, OEM/QPL, SAM registration, CMMC/SPRS/CAGE, and the nonmanufacturer/NMR tokens on the GENERIC
+// path (the nmrGuard branch keeps its own FORK-7 resolution — a documented U-C gap, verification F5: it applies
+// no freshness/provenance discipline; NMR is a per-bid supply arrangement, bidder-knowable class). Site-visit
+// attendance / vehicle-holder style bidder-knowable namespaces are deliberately NOT floored (asserted-OK;
+// the 206-A caution still governs wording).
+const AUTHORITATIVE_ONLY_NS = new Set(["se", "setaside", "naics", "size", "clearance", "fcl", "oem", "qpl", "sam", "registration", "sb", "cmmc", "sprs", "cage", "nonmanufacturer", "nmr"]);
+const attrNamespace = (attr: string): string => (attr.includes(":") ? attr.slice(0, attr.indexOf(":")).toLowerCase() : "");
+/** V2 discipline: may this attribute SATISFY from this profile? Verification-round hardened:
+ *  F3 — ALL matching records are evaluated; ANY expired (or unparseable-dated) match VETOES, so a no-expiry
+ *       sibling can never shadow a recorded revocation and construction order cannot flip the pole;
+ *  F4 — dates go through Date.parse; NaN on either side of an expiry comparison ⇒ stale (never lexicographic);
+ *  F1 — the floor keys on BOTH the raw prefix and the CANONICAL form's prefix, so a model-emitted bare
+ *       spelling ("8a_certification" → se:) cannot bypass it. Pure; consulted only under the flag. */
+function profileAttrSatisfiable(profile: BidderProfile, attr: string): boolean {
+  const records = profile.attributes ?? [];
+  const canon = canonicalizeEligibilityAttr(attr);
+  const matches = records.filter((r) => r.attr === attr || (canon !== null && canonicalizeEligibilityAttr(r.attr) === canon));
+  for (const rec of matches) {
+    if (rec.expiresAt !== undefined) {
+      const exp = Date.parse(rec.expiresAt);
+      const at = profile.asOf !== undefined ? Date.parse(profile.asOf) : NaN;
+      if (Number.isNaN(exp) || Number.isNaN(at) || exp <= at) return false;
+    }
+  }
+  // F1 (hardened past the reviewer's suggested direction — canonicalizeEligibilityAttr("8a_certification") is
+  // null, not "se:8a"): an attr with NEITHER a namespace NOR a canonical form is UNRECOGNIZABLE — it cannot
+  // self-assert (fail-toward-disqualifier); only an authoritative record can satisfy it.
+  const rawNs = attrNamespace(attr);
+  const floored = AUTHORITATIVE_ONLY_NS.has(rawNs)
+    || (canon !== null && AUTHORITATIVE_ONLY_NS.has(attrNamespace(canon)))
+    || (rawNs === "" && canon === null);
+  if (floored) {
+    if (!matches.some((r) => AUTHORITATIVE_SOURCES.has(r.source))) return false;
+  }
+  return true;
+}
+
 export function firmStatus(f: TypedFinding, profile: BidderProfile | null, source?: string): "satisfies" | "fails" | "unknown" {
   if (!profile || !f.requiredAttribute) return "unknown";
   // FORK-7 Finding-1 (Brain card 242, review-hardened) — an NMR finding the Fork-7 gate has processed (nmrGuard)
@@ -2924,19 +2977,31 @@ export function firmStatus(f: TypedFinding, profile: BidderProfile | null, sourc
   // firmStatus is byte-identical to pre-diff (the keyfact NMR keeps its card-206-A unverified-gate path).
   if (f.nmrGuard === true && f.requiredAttribute === NMR_ATTRIBUTE) return nmrFirmStatus(profile);
   const held = profile.satisfiedAttributes ?? []; // ?? [] — sibling-consistent guard (nmrFirmStatus already does this); a profile missing the array must not throw mid-verdict
-  // Exact attribute match (trusted/gold closed-world profile) — unchanged.
-  if (held.includes(f.requiredAttribute)) return "satisfies";
+  // U-C: closedWorld is NEVER honored on a profile carrying customer-asserted records — a trusted/complete
+  // claim cannot ride on self-asserted data (flag-gated; flag OFF ⇒ profile.closedWorld exactly as before).
+  const effectiveClosedWorld = !!profile.closedWorld
+    && !(profileSchemaV2Enabled() && (profile.attributes ?? []).some((r) => r.source === "customer_asserted"));
+  // Exact attribute match — trusted/gold CLOSED-WORLD keeps the unguarded fast path. Under U-C (flag ON) an
+  // OPEN-WORLD exact match gets the SAME discipline as the canonical path below: the NON_SELF_CLEARABLE
+  // structural guard (B2 — an asserted string never clears FCL/QPL/size) + freshness/provenance (B1 — a stale
+  // or floored-namespace attribute cannot satisfy; it falls to "unknown", where 206-A keeps the verify-caution).
+  if (held.includes(f.requiredAttribute)) {
+    if (!profileSchemaV2Enabled() || effectiveClosedWorld) return "satisfies";
+    const exactHay = `${f.requirement} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""}`;
+    if (!NON_SELF_CLEARABLE_BAR_RE.test(exactHay) && profileAttrSatisfiable(profile, f.requiredAttribute)) return "satisfies";
+    // guarded exact match declined → fall through (canonical block / open-world unknown) — never a silent clear.
+  }
   // Canonical SOCIOECONOMIC match — OPEN-WORLD ONLY (a self-asserted capability statement).
   // Restricted to open-world so a closed-world/gold profile is never flipped fails→satisfies
   // by a non-exact socioeconomic string (code-review #3). And it is BLOCKED when the bar
   // carries structural/sole-source/size language (Finding 2) — a self-asserted set-aside cert
   // may clear a PURE set-aside eligibility bar, never a bundled structural/size show-stopper.
   // OPEN-WORLD is now the DEFAULT (Brain card-254 B): run this block unless the profile is EXPLICITLY closed-world.
-  if (!profile.closedWorld) {
+  if (!effectiveClosedWorld) {
     const reqCanon = canonicalizeEligibilityAttr(f.requiredAttribute);
     if (reqCanon && held.some((a) => canonicalizeEligibilityAttr(a) === reqCanon)) {
       const hay = `${f.requirement} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""}`;
-      if (!NON_SELF_CLEARABLE_BAR_RE.test(hay)) return "satisfies";
+      if (!NON_SELF_CLEARABLE_BAR_RE.test(hay) && (!profileSchemaV2Enabled() || profileAttrSatisfiable(profile, f.requiredAttribute))) return "satisfies";
       // bundled structural/size bar → don't self-clear; fall through to unknown (human review).
     }
     // OPEN-WORLD: a not-held attribute is NOT proof the firm fails — it may simply be
@@ -3142,6 +3207,7 @@ export function applyClauseKeyedTypingFloor(findings: TypedFinding[], o: { enabl
 // CMMC/clearance/QPL bar, an at-award possession frame, or an untyped bar. Flag-OFF ⇒ never called ⇒ byte-identical.
 const selfClearablePackageEnabled = () => process.env.AUDIT_SELF_CLEARABLE_PACKAGE === "true";
 const incompletePrecedenceEnabled = () => process.env.AUDIT_INCOMPLETE_PRECEDENCE === "true"; // Brain #664 — documentsComplete=false not subordinate to coverage-pole NHR
+const coverageCapNotMuteEnabled = () => process.env.AUDIT_COVERAGE_CAP_NOT_MUTE === "true"; // U-A cap-not-mute (panel 2026-07-29) — uncovered obligation caps committal at BWC, never NHR-mutes
 // ── Vehicle A–E · item A + E (flag AUDIT_VERDICT_POLE_PRECEDENCE, default-OFF) ─────────────────────────────────────
 const verdictPolePrecedenceEnabled = () => process.env.AUDIT_VERDICT_POLE_PRECEDENCE === "true";
 // item E (design-panel R1, hard dependency of A's site-visit fire) — the promoted finding's excerpt must carry
@@ -3419,13 +3485,35 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
           setAsideBackstopNotices(inp.source, inp.samSetAside),
         )
       : null;
+  // ── U-A CAP-NOT-MUTE (panel ceo/VERDICT-INVERSION-PANEL-2026-07-29.md · flag AUDIT_COVERAGE_CAP_NOT_MUTE,
+  //    default-OFF). When the GATE_V2 coverage cap fires on an UNCOVERED OBLIGATION (kind "uncovered_obligation",
+  //    never "credential_conditional" — Rule 70 case (c) keeps its NHR), the verdict is no longer MUTED to NHR:
+  //    the named caution is banked here and every bar/honest-fail path below runs at full force. Only a would-be
+  //    COMMITTAL exit is then capped to BID_WITH_CAUTION carrying the named item — an uncovered obligation can
+  //    weaken a green light, never invent one and never bury a real bar. Flag OFF ⇒ null ⇒ capCommittal's U-A
+  //    branch is dead code and the coverage-NHR return runs exactly as before (byte-identical).
+  let uncoveredCoverageCaution: string | null = null;
+  // #687 PRESERVATION (U-A red-team, 2026-07-29): an honest-fail exit reached only BECAUSE the cap released the
+  // coverage mute must not LOSE the named uncovered item — the generic INCOMPLETE / none-survived templates say
+  // nothing about it, which is the exact masking the #687 ruling struck ("the INCOMPLETE reason hides it behind
+  // a manifest complaint"). Appended, never prepended: the exit's own driver stays the headline. Applied at the
+  // GENERIC exits only (1b/2b/temporal/manifest) — an NHR exit that names its own more-decisive bar is not
+  // information-losing, and the item stays persisted in coverageV2.disqualifierUncovered for every consumer.
+  // Null (flag OFF / no cap banked) ⇒ identity ⇒ byte-identical.
+  const withCoverageCaution = (reason: string): string => (uncoveredCoverageCaution ? `${reason} ${uncoveredCoverageCaution}` : reason);
   const capCommittal = (d: Decision): Decision => {
     // guard: only a committal (BID/BWC) is capped; any non-committal reaching here is returned untouched.
-    if (!setAsideBackstop || (d.verdict !== "BID" && d.verdict !== "BID_WITH_CAUTION")) return d;
-    // BWC cap — floor to BID_WITH_CAUTION, eligible=null (not determined past an unaccounted-for set-aside pool),
-    // prepend the named caveat to whatever committal reason we were about to emit. There is no NHR path here by
-    // construction: the backstop's cap type is the BWC literal.
-    return enforceVerdictWordInvariant(mk("BID_WITH_CAUTION", null, `${setAsideBackstop.reason} ${d.reason}`.trim(), d.dispositions, d.showStoppers));
+    let out = d;
+    if (setAsideBackstop && (out.verdict === "BID" || out.verdict === "BID_WITH_CAUTION"))
+      // BWC cap — floor to BID_WITH_CAUTION, eligible=null (not determined past an unaccounted-for set-aside pool),
+      // prepend the named caveat to whatever committal reason we were about to emit. There is no NHR path here by
+      // construction: the backstop's cap type is the BWC literal.
+      out = enforceVerdictWordInvariant(mk("BID_WITH_CAUTION", null, `${setAsideBackstop.reason} ${out.reason}`.trim(), out.dispositions, out.showStoppers));
+    // U-A: the uncovered-obligation caution caps a committal to BWC with the item NAMED. `eligible` is preserved —
+    // a coverage gap is not an eligibility claim (the set-aside backstop above nulls it for its own reason).
+    if (uncoveredCoverageCaution && (out.verdict === "BID" || out.verdict === "BID_WITH_CAUTION"))
+      out = mk("BID_WITH_CAUTION", out.eligible, `${uncoveredCoverageCaution} ${out.reason}`.trim(), out.dispositions, out.showStoppers);
+    return out;
   };
 
   // 0. PRIMARY INDETERMINATE (Gauntlet Card #370 R1) — before any coverage/eligibility reasoning: on a multi-doc package
@@ -3497,7 +3585,17 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
     // SEAM FILL (card #472) — on the coverage-NHR cap ONLY (never INCOMPLETE: unreadable ⇒ findings untrustworthy), lift
     // any grounded site-visit/eligibility bar in dispositions[] into the persisted showStoppers[] slot so it renders in
     // the show-stopper band, not the P2 advisories. Same filter/flag family as the notice-body pole. OFF ⇒ [] (identical).
-    if (v2.cap === "NEEDS_HUMAN_REVIEW") {
+    // FAIL-CLOSED DISCRIMINATOR (red-team F4): the mute is released ONLY on the POSITIVE "uncovered_obligation"
+    // tag — an absent or unrecognized kind keeps the NHR (fail-toward-disqualifier; a future kind-less NHR return
+    // must never silently downgrade a mute to a committal cap).
+    if (v2.cap === "NEEDS_HUMAN_REVIEW" && coverageCapNotMuteEnabled() && v2.kind === "uncovered_obligation") {
+      // U-A CAP-NOT-MUTE (panel 2026-07-29): an uncovered obligation no longer mutes the pole. Bank the named
+      // caution and FALL THROUGH — every bar / honest-fail / show-stopper path below runs at full force, and only
+      // a would-be committal exit is capped (capCommittal) to BID_WITH_CAUTION carrying this item. The NHR
+      // vocabulary ("human verification needed") is reframed to caution vocabulary; the item stays named verbatim.
+      // A credential-conditional NHR (kind guard above) is NEVER routed here — Rule 70 case (c) keeps its mute.
+      uncoveredCoverageCaution = `CAUTION — ${v2.reason.replace(/ — human verification needed:/, " — verify this item before relying on the verdict:")}`;
+    } else if (v2.cap === "NEEDS_HUMAN_REVIEW") {
       // Stoppers are computed when EITHER flag needs them (headline lead or persisted fill), from the SAME filter.
       const covStoppers = (coverageNhrStopperFillEnabled() || nhrHeadlineShowStopperFirstEnabled())
         ? siteVisitEligStoppers(dispositions, inp.bidderProfile, inp.source) : [];
@@ -3538,7 +3636,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //     drop) caps EVERY pole to INCOMPLETE, committal included: an unread binding doc could carry OR waive a bar,
   //     so no verdict can be certified over a partial read. Explicit `=== false` ⇒ callers that omit it are unchanged.
   if (inp.documentsComplete === false)
-    return mk("INCOMPLETE", honestFailEligible(), "Document set not complete — a posted binding document could not be confirmed read in full (unfetched, scanned/no-text, or truncated)." + (inp.coverageGap ? ` Gap: ${inp.coverageGap}.` : ""), dispositions, []);
+    return mk("INCOMPLETE", honestFailEligible(), withCoverageCaution("Document set not complete — a posted binding document could not be confirmed read in full (unfetched, scanned/no-text, or truncated)." + (inp.coverageGap ? ` Gap: ${inp.coverageGap}.` : "")), dispositions, []);
 
   // 1c. AMENDMENT A (Brain card-304, F bake-off) — Candidate A's citation-grounded unread/missing-material signals are
   //     manifest-ADJACENT: a package can pass the deterministic manifest gate yet Candidate A observe a referenced
@@ -3546,7 +3644,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //     never committal. Uses nhrEligible() (an undetermined verdict never asserts eligible=false — Gate-2 finding #4).
   //     Absent/empty unreadEvidence ⇒ byte-identical (no effect). Candidate A has NO verdict authority; this routes it.
   if (inp.unreadEvidence && inp.unreadEvidence.length)
-    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), `Unread/missing referenced material observed — human verification needed: ${clampToWord(inp.unreadEvidence.map((u) => u.note).join("; "), 220)}`, dispositions, [], "coverage");
+    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), withCoverageCaution(`Unread/missing referenced material observed — human verification needed: ${clampToWord(inp.unreadEvidence.map((u) => u.note).join("; "), 220)}`), dispositions, [], "coverage");
 
   // 1d. SET-ASIDE CONFLICT (Brain #332) — SAM (system of record) and the document name DIFFERENT set-aside programs.
   //     This changes WHO is eligible (an ineligible firm could bid, or an eligible firm could walk — zero-contract-
@@ -3561,7 +3659,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
 
   // 2. Verification soundness — if adversarial verification did not succeed, the findings aren't trustworthy.
   if (!inp.verifierSound)
-    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "Adversarial verification did not succeed — findings not trustworthy enough to decide.", dispositions, [], "verification");
+    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), withCoverageCaution("Adversarial verification did not succeed — findings not trustworthy enough to decide."), dispositions, [], "verification");
 
   // 2b. VERIFIED-FLOOR (Brain card 224 fork 1) — coverage is complete and verification reported sound, yet ZERO
   //     findings survive to decide over (none raised, or every one overturned). A committal verdict CANNOT rest
@@ -3574,7 +3672,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   // it would sail past a `length === 0` test and fall through to a clean default BID. A materially-empty verified set
   // (no non-`dropped` survivor) → NEEDS_HUMAN_REVIEW, never a default BID. (`every` on [] is true → literal-empty covered.)
   if (dispositions.every((f) => f.disposition === "dropped"))
-    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "No decision-bearing findings survived over complete coverage (empty or all-boilerplate verified set) — a clean BID cannot rest on a materially-empty set. Human review required.", dispositions, [], "verification");
+    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), withCoverageCaution(`No decision-bearing findings survived over ${uncoveredCoverageCaution ? "the graded coverage" : "complete coverage"} (empty or all-boilerplate verified set) — a clean BID cannot rest on a materially-empty set. Human review required.`), dispositions, [], "verification");
 
   // 3. Show-stoppers — BRAIN CARD 226 FORK 2: DEFAULT-DENY NO_BID (positive-allow, not negative-deny). A committal
   //    NO_BID is reachable ONLY on a POSITIVE match to the UNIVERSAL_DEFECT allowlist (the solicitation is
@@ -3715,7 +3813,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
 
   // 4. Unresolved material conflict between experts the loop could not reconcile.
   if (inp.conflict)
-    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), "Unresolved material conflict between experts.", dispositions, [], "conflict");
+    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), withCoverageCaution("Unresolved material conflict between experts."), dispositions, [], "conflict");
 
   // 4b. SELF-CLEARABLE PACKAGE (card #590 Modified-B, flag AUDIT_SELF_CLEARABLE_PACKAGE, default-OFF). VERIFIER-SOVEREIGN
   //     — only reached with verifierSound=true (step 2) + coverage/documents complete + no show-stopper/universal defect
@@ -3795,7 +3893,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //   solicitation whose live currency we could not confirm cannot carry a committal verdict → INCOMPLETE naming the
   //   gap. temporal-null / flag-OFF ⇒ temporalIndeterminate=false ⇒ not reached ⇒ byte-identical.
   if (temporalIndeterminate)
-    return mk("INCOMPLETE", honestFailEligible(), `Cannot confirm the solicitation is still open — ${temporalCapReason}. A bid/caution verdict cannot stand until currency is confirmed on SAM.`, dispositions, []);
+    return mk("INCOMPLETE", honestFailEligible(), withCoverageCaution(`Cannot confirm the solicitation is still open — ${temporalCapReason}. A bid/caution verdict cannot stand until currency is confirmed on SAM.`), dispositions, []);
 
   // 5c. CURABLE bar (curableInWindow === true) under unknown status → a genuine residual risk → BID_WITH_CAUTION.
   //     The deterministic CAUTION-FLOOR (Brain card 75-R2 / 78-R1) joins here: a finding marked cautionFloor
@@ -3806,7 +3904,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   const residual = unknownBars.filter((f) => f.curableInWindow === true);
   const floored = dispositions.filter((f) => f.cautionFloor === true);
   if (residual.length || floored.length) {
-    if (manifestIncomplete) return mk("INCOMPLETE", honestFailEligible(), "A manifest-named attachment went unfetched — a 'caution' (no-bar) verdict cannot stand on an incomplete read.", dispositions, []);
+    if (manifestIncomplete) return mk("INCOMPLETE", honestFailEligible(), withCoverageCaution("A manifest-named attachment went unfetched — a 'caution' (no-bar) verdict cannot stand on an incomplete read."), dispositions, []);
     const reasons = [
       residual.length ? `residual curable risk(s) to confirm within the window: ${names(residual)}` : "",
       floored.length ? `qualification caution(s) to verify: ${names(floored)}` : "",
@@ -3819,7 +3917,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   // 6. Default — open, eligible, every unmet item is a bidder-controllable gate-to-clear → BID — UNLESS the read
   //    was incomplete (then we cannot assert "no bar found").
   if (manifestIncomplete)
-    return mk("INCOMPLETE", honestFailEligible(), "A manifest-named attachment went unfetched — a 'no bar found' (BID) verdict cannot stand on an incomplete read.", dispositions, []);
+    return mk("INCOMPLETE", honestFailEligible(), withCoverageCaution("A manifest-named attachment went unfetched — a 'no bar found' (BID) verdict cannot stand on an incomplete read."), dispositions, []);
   return capCommittal(committalEligible() === null
     ? mk("BID", null, `${committalCaution()}Open; eligibility not determined — verify the eligibility gate(s) above; all other unmet items are bidder-controllable gates to clear.`, dispositions, [])
     : mk("BID", true, "Open, eligible; all unmet items are bidder-controllable gates to clear (the work of bidding).", dispositions, []));

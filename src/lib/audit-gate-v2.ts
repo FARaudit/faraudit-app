@@ -428,6 +428,12 @@ const conditionalTinaDemotionEnabled = () => process.env.AUDIT_CONDITIONAL_TINA_
 const TINA_EXCEPTION_CLAUSE_RE = /\b(?:15\.)?403-1(?!\d)\b/i;
 export function isConditionalTinaBoilerplate(ob: string): boolean {
   if (!COST_PRICING_DATA_RE.test(ob) || !TINA_EXCEPTION_CLAUSE_RE.test(ob)) return false;
+  // U-B (panel 2026-07-29, red-team-traced false-BID vector, probe S1-reproduced): the strip-then-hasBarSignal
+  // belt is MEASURED blind to bid-guarantee/NMR/SPRS/50%-rule vocabulary, so a conditional-TINA sentence that
+  // ALSO carries a co-sentenced kill-class duty ("…per 15.403-1; the offeror shall comply with the
+  // nonmanufacturer rule at 52.219-33…") was demoted whole. With capture armed, any kill-class token in the
+  // ORIGINAL sentence refuses the demotion (fail-toward-disqualifier). Flag-OFF ⇒ byte-identical.
+  if (consequenceCaptureEnabled() && TINA_KILL_COSENTENCE_RE.test(ob)) return false;
   const stripped = ob.replace(new RegExp(COST_PRICING_DATA_RE.source, "gi"), " ");
   return !hasBarSignal(stripped); // a bar signal surviving the strip ⇒ a real compound bar ⇒ do NOT demote
 }
@@ -643,6 +649,82 @@ function recitalContinuation(after: string): string {
   return out.trim();
 }
 
+// ═══ U-B · RELEASE VISIBILITY + CONSEQUENCE CAPTURE (panel 2026-07-29 · probes scripts/audit-ai/_ub-probe.ts) ═══
+// Two flags, default-OFF, byte-identical OFF:
+//   AUDIT_RELEASE_LEDGER      — the silent boilerplate release is RECORDED (releasedBoilerplate bucket). Verdict-inert.
+//   AUDIT_CONSEQUENCE_CAPTURE — a released-class duty whose SEVERED next-sentence window carries a rejection
+//                               consequence ESCALATES instead of vanishing (obligationsOf splits on [.;\n], so
+//                               "shall acknowledge all amendments." travels apart from "failure ... will not be
+//                               considered." — measured 82/478 released items across the banked cohort); and the
+//                               conditional-TINA demotion refuses a co-sentenced NMR/kill-class bar.
+const releaseLedgerEnabled = () => process.env.AUDIT_RELEASE_LEDGER === "true";
+const consequenceCaptureEnabled = () => process.env.AUDIT_CONSEQUENCE_CAPTURE === "true";
+// Rejection-consequence SHAPE (allowlist, #507 doctrine). NARROWED per the U-B verification round (executed
+// over-fires): `reject` not after "right to" (52.212-1(g) reserves-the-right boilerplate + performance-QA
+// personnel rejection are standing government rights, not duty-specific kill consequences); `unacceptable`
+// not inside the rating-scale enumeration "acceptable or unacceptable" and not the adjective "unacceptable
+// risk" (pricing-adequacy prose — fired repeatedly on real 3726R0033 records). "rated Technically
+// Unacceptable" remains a capture (V5b) — only the enumeration and the risk-adjective are excluded.
+const CONSEQUENCE_TAIL_RE = /(?<!right\s+to\s+)\breject(?:ed|ion)?\b|(?<!acceptable\s+or\s+)\bunacceptable\b(?!\s+risk)|\bineligible\b|\bnon-?responsive\b|\bwill\s+not\s+be\s+considered\b|\bdisqualif\w*\b|\bno\s+further\s+consideration\b|\bremoved\s+from\s+consideration\b/i;
+// Kill-class vocabulary hasBarSignal is MEASURED blind to (panel: bid guarantee / NMR / SPRS / 50%-rule) — the
+// conditional-TINA strip-then-hasBarSignal belt cannot see these, so a co-sentenced bar was demoted (false-BID vector,
+// reproduced by probe S1). Affirmative shape allowlist, never a blocklist.
+// Verification-round F4/F5: the original class-level trailing \b DEADENED the "50%" spelling (\b after "%"
+// requires a word char), so the guard's most common spelling never fired — and the bare token over-refused on
+// benign progress-payment prose. The 50%-rule arm is now its own SCOPED shape: the percentage must co-occur
+// (same [.;] segment, ≤80 chars) with cost/manufactur*/subcontract* — the limitations-on-subcontracting frame.
+const TINA_KILL_TOKEN_RE = /\b(?:non-?manufacturer|52\.219-33|small\s+business\s+manufacturer|bid\s+guarantee|bid\s+bond|sprs)\b/i;
+const TINA_50RULE_RE = /(?:50\s*(?:%|\bpercent\b)|\bfifty\s+percent\b)[^.;]{0,80}\b(?:cost|manufactur\w*|subcontract\w*)|\b(?:cost\s+of|manufactur\w*|subcontract\w*)\b[^.;]{0,80}(?:50\s*(?:%|\bpercent\b)|\bfifty\s+percent\b)/i;
+const TINA_KILL_COSENTENCE_RE = { test: (ob: string): boolean => TINA_KILL_TOKEN_RE.test(ob) || TINA_50RULE_RE.test(ob) };
+/** U-B consequence lookup — the NEXT-SENTENCE window after a duty, the OPPOSITE contract of verifyRecitalInSource's
+ *  continuation (which deliberately STOPS at a sentence terminator; its purpose is a severed mid-sentence tail, and
+ *  reading further would false-veto). Here the following sentence IS the target: a rejection consequence adjacent to a
+ *  duty is the panel's sentence-pair unit. Whitespace/case-tolerant locate (same escaping as verifyRecitalInSource);
+ *  bounded 300-char window; null when the obligation is not verbatim-locatable (⇒ capture declines, release stands —
+ *  fail-open here is safe because the ledger still records it). ONE implementation shared by the orchestrator, the
+ *  replay path, and the probes. */
+export function consequenceTailsAfter(fullSource: string, ob: string): string[] {
+  const src = fullSource ?? "";
+  const needle = ob.trim();
+  if (needle.length < 16) return [];
+  const pattern = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+  const tails: string[] = [];
+  try {
+    // ALL occurrences (verification F2 — first-occurrence-only both missed the real §L pair behind an appendix
+    // copy and captured a wrong-occurrence tail), bounded at 8. Each tail is CLAMPED at the next document
+    // delimiter (verification F3 — a QASP's opening line is not the prior document's consequence) and at 300 chars.
+    const re = new RegExp(pattern, "gi");
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(src)) !== null && tails.length < 8) {
+      let tail = src.slice(m.index + m[0].length, m.index + m[0].length + 450);
+      const docCut = tail.indexOf("==== DOCUMENT:");
+      if (docCut >= 0) tail = tail.slice(0, docCut);
+      if (tail.trim()) tails.push(tail);
+      if (m.index === re.lastIndex) re.lastIndex++;
+    }
+  } catch { return []; }
+  return tails;
+}
+/** The sentence-pair KILL test (one place; probes + sweep share it). The examined unit is the first TWO
+ *  SUBSTANTIVE sentences (≥25 chars) of the tail window — measured necessity (150c3ab3): a duty severed
+ *  mid-sentence yields a rest-of-own-sentence fragment first ("…and virus checked prior to submission."),
+ *  and URL/email dots produce degenerate micro-segments ("William." / "Shaver@va.gov."), so a strict
+ *  single-first-sentence unit missed the genuine adjacent kill ("Quote submissions … shall result in the
+ *  quote being rated Technically Unacceptable."). Anything further than two substantive sentences is
+ *  adjacency noise (verification F1d) and never examined. EACH sentence gets the SAME release discipline
+ *  the obligation side has: LPTA-methodology / government-eval-methodology sentences are not kill
+ *  consequences (F1a), and the narrowed shape excludes the rating-scale / risk-adjective /
+ *  reserves-the-right senses (F1b/F1c). */
+export function isKillConsequenceTail(tail: string): boolean {
+  const segs = tail.split(/(?<=[.!?])/).map((x) => x.trim()).filter((x) => x.length >= 25).slice(0, 2);
+  for (const sent of segs) {
+    if (!CONSEQUENCE_TAIL_RE.test(sent)) continue;
+    if (isLptaConsequenceNonBar(sent) || isGovtEvalMethodologyNonBar(sent)) continue;
+    return true;
+  }
+  return false;
+}
+
 export function verifyRecitalInSource(fullSource: string, ob: string): { present: boolean; continuation: string } | null {
   const src = fullSource ?? "";
   const nob = benignNorm(ob);
@@ -694,6 +776,14 @@ const CREDENTIAL_TOKEN_RE = /\b(?:licens\w*|certificat\w*|certification|accredit
 const MAINTAIN_CREDENTIAL_RE = /\bmaintain\b([^.;]{0,180}?)\b(?:during\s+(?:the\s+)?(?:entire\s+)?(?:contract\s+|order\s+)?performance(?:\s+period)?|throughout\s+the\s+(?:life\s+of|period\s+of\s+performance|performance))\b/i;
 // "maintain an active SAM registration" / "active registration in SAM" — SAM token MANDATORY (Gauntlet F1: an optional
 // SAM token mislabeled ANY "maintain an active registration" — e.g. a state nursing-board registry — as SAM).
+// U-A firm-fact noun set (U-A.1 verification F1) — a SUPERSET of CREDENTIAL_TOKEN_RE used ONLY by the
+// firm_fact_bar possession arm in gateV2Outcome. Adds: permit / credential / qualification(s) (noun stem only —
+// adjective "qualified" excluded by construction) / verb-form "registered" / rating (facility-clearance-adjacent,
+// e.g. an interim DCSA facility rating) / authorization + Authority-to-Operate. CREDENTIAL_TOKEN_RE itself is
+// NOT widened: it also gates the #575b cc prose branch, which is armed in prod.
+const FIRM_FACT_NOUN_RE = new RegExp(
+  CREDENTIAL_TOKEN_RE.source + String.raw`|\bpermit\w*\b|\bcredential\w*\b|\bqualificat\w*\b|\bregistered\b|\brating\b|\bauthori[sz]ation\w*\b|\bauthority\s+to\s+operate\b`,
+  "i");
 const SAM_ACTIVE_RE = /\bmaintain\s+an?\s+active\s+(?:sam(?:\.gov)?|system\s+for\s+award\s+management)\s+registration\b|\bactive\s+registration\s+in\s+(?:sam\b|the\s+system\s+for\s+award\s+management)\b/i;
 
 /** Recognize a credential-conditional bar obligation and extract its credential phrase VERBATIM from the obligation
@@ -797,6 +887,12 @@ export interface CoverageV2 {
    *  NHR and instead attaches as a CAVEAT (credential named verbatim) to the committal verdict. Present ONLY when
    *  AUDIT_PERFORMANCE_UPKEEP_CAVEAT is on ⇒ flag-OFF the serialized coverageV2 is byte-identical. */
   caveatRecital?: Array<{ section: string; obligation: string; credential: string }>;
+  /** U-B RELEASE LEDGER (panel 2026-07-29): obligations importanceOf() released as "boilerplate" — previously a
+   *  SILENT drop (the :863 `continue`; measured 478/2680 = 18% of ungrounded READ obligations across the banked
+   *  cohort, 82 with a kill consequence in the severed next sentence). Verdict-INERT observability: count + names
+   *  ride the serialized coverageV2 into the run record. Present ONLY when AUDIT_RELEASE_LEDGER is on ⇒ flag-OFF
+   *  the serialized coverageV2 is byte-identical (the caveatRecital pattern). */
+  releasedBoilerplate?: Array<{ section: string; obligation: string }>;
   /** Importance-weighted covered fraction in [0,1] — surfaced as a signal (never a veto). 1 when nothing required. */
   coverageGrade: number;
 }
@@ -812,10 +908,13 @@ export function gradeCoverageV2(attestations: SectionAttestation[], opts?: {
    *  tail for the continuation veto). Supplied by the orchestrator (holds ctx.fullSource). Double-gated: a caller-
    *  supplied fn NEVER runs flag-OFF (the block short-circuits before it is consulted). Absent ⇒ no benign claim. */
   verifyRecitalPresence?: (ob: string) => { present: boolean; continuation: string } | null;
+  /** U-B — all-occurrence next-sentence window lookup (consequenceTailsAfter). Absent ⇒ capture declines. */
+  consequenceTails?: (ob: string) => string[];
 }): CoverageV2 {
   const unreadable: string[] = [];
   const ungroundedRead: string[] = [];
   const disqualifierUncovered: Array<{ section: string; obligation: string; locatedAt?: string; contextNote?: string }> = [];
+  const releasedBoilerplate: Array<{ section: string; obligation: string }> = [];
   const ungroundedNonBarSignal: Array<{ section: string; obligation: string }> = [];
   const benignCoveredRecital: Array<{ section: string; obligation: string; arm: string }> = [];
   const caveatRecital: Array<{ section: string; obligation: string; credential: string }> = [];
@@ -852,7 +951,23 @@ export function gradeCoverageV2(attestations: SectionAttestation[], opts?: {
       // signal (ungroundedNonBarSignal). Flag-OFF ⇒ ambiguous always escalates ⇒ byte-identical.
       for (const ob of realUngrounded) {
         const imp = importanceOf(ob);
-        if (imp === "boilerplate") continue;
+        if (imp === "boilerplate") {
+          // U-B CONSEQUENCE CAPTURE: before releasing, read the SEVERED next-sentence window — a duty whose
+          // adjacent consequence says reject/unacceptable/ineligible is a kill-gate obligationsOf split apart
+          // ("shall acknowledge all amendments." ⟂ "failure ... will not be considered."). Escalate it to
+          // disqualifierUncovered (under armed U-A that surfaces as the NAMED committal caution or holds via the
+          // firm-fact spectrum — never a silent drop, never an ambient mute). Tail unlocatable ⇒ capture declines
+          // and the release stands (the ledger below still records it). Flag-OFF ⇒ branch skipped ⇒ byte-identical.
+          if (consequenceCaptureEnabled()) {
+            const tails = opts?.consequenceTails?.(ob) ?? [];
+            if (tails.some((t) => isKillConsequenceTail(t))) {
+              disqualifierUncovered.push(enrich({ section: a.section, obligation: ob })); continue;
+            }
+          }
+          // U-B RELEASE LEDGER: the silent drop becomes a RECORDED drop (verdict-inert; rides the run record).
+          if (releaseLedgerEnabled()) releasedBoilerplate.push({ section: a.section, obligation: ob });
+          continue;
+        }
         if (imp === "disqualifier") { disqualifierUncovered.push(enrich({ section: a.section, obligation: ob })); continue; }
         // BENIGN-IN-SOURCE RECITAL TRIAGE (card #572, flag AUDIT_BENIGN_RECITAL_COVERED, default-OFF). Runs ONLY on the
         // ambiguous class (a DISQUALIFIER_RE hit already returned above — never laundered) and BEFORE the ambiguous
@@ -899,11 +1014,21 @@ export function gradeCoverageV2(attestations: SectionAttestation[], opts?: {
     ...(benignRecitalCoveredEnabled() ? { benignCoveredRecital } : {}),
     // card #576 — include the caveat bucket ONLY when the flag is on ⇒ flag-OFF serialized coverageV2 byte-identical.
     ...(performanceUpkeepCaveatEnabled() ? { caveatRecital } : {}),
+    // U-B — include the release ledger ONLY when the flag is on ⇒ flag-OFF serialized coverageV2 byte-identical.
+    ...(releaseLedgerEnabled() ? { releasedBoilerplate } : {}),
     coverageGrade: totalWeight === 0 ? 1 : coveredWeight / totalWeight,
   };
 }
 
-export type GateV2Outcome = { cap: "INCOMPLETE" | "NEEDS_HUMAN_REVIEW" | null; reason: string };
+// `kind` (U-A cap-not-mute, panel ceo/VERDICT-INVERSION-PANEL-2026-07-29.md) discriminates WHICH NHR branch
+// fired so deriveVerdict can route them differently under AUDIT_COVERAGE_CAP_NOT_MUTE: an "uncovered_obligation"
+// NHR becomes a BID_WITH_CAUTION cap (never a mute), while a "credential_conditional" NHR keeps its full force
+// (Rule 70 case (c): an unverifiable firm-fact a bar turns on). Additive — cap/reason are untouched, so every
+// existing consumer is byte-identical whether or not it reads the field.
+// "firm_fact_bar" (round-2 F-R2-2): a pre-award possession frame or long-lead/scarce credential anywhere in the
+// firing bucket — the decisive end of the Rule 70(c) firm-fact spectrum. Kept muted by the consumer's fail-closed
+// positive test exactly like "credential_conditional".
+export type GateV2Outcome = { cap: "INCOMPLETE" | "NEEDS_HUMAN_REVIEW" | null; reason: string; kind?: "credential_conditional" | "firm_fact_bar" | "uncovered_obligation" };
 
 // ── VERDICT ARC step 4 (moves 1+2) — VERBATIM-VETO RETIREMENT, flag `AUDIT_RETIRE_VERBATIM_VETO` default-OFF ──
 // Move 2 as ratified: "retire the verbatim MATCH, keep the source-obligation ENUMERATION." This flag implements
@@ -1123,9 +1248,56 @@ export function gateV2Outcome(cov: CoverageV2, opts?: { findings?: Array<{ kind?
     // credential-during-performance / SAM-active), upgrade the reason prose to an actionable conditional. CAP is
     // UNCHANGED (still NEEDS_HUMAN_REVIEW — verdict untouched). The credential is grounded from the obligation and the
     // phrasing makes NO claim about the bidder (fabrication-invariant compliant). Flag-OFF ⇒ the legacy line below.
+    // ── KIND TRUTH (U-A red-team F1/F2, 2026-07-29) — bucket-wide and FLAG-INDEPENDENT. Whether this NHR is a
+    // firm-fact credential-conditional (Rule 70 case (c) — never released to a committal cap) is a property of
+    // the WHOLE firing bucket, not of the quoted head and not of the #575b PROSE flag. Two defects this closes:
+    //   F1 — kind was emitted only inside the credentialConditionalReasonEnabled() branch, so arming cap-not-mute
+    //        without the prose flag silently capped every credential conditional (prose flag owned a verdict
+    //        discriminator);
+    //   F2 — kind was derived from the ranked head `d` alone, so a cc item at index ≥1 behind a higher-ranked
+    //        non-cc item lost its mute (head-only prose selection silently promoted to verdict authority).
+    // The prose upgrade below stays behind #575b exactly as shipped; cap/reason are untouched in every
+    // pre-existing flag state (kind is additive — only the U-A consumer reads it).
+    const ccHead = credentialConditionalRecital(d.obligation) ? d : undefined;
+    const ccAny = ccHead ?? firing.find((f) => credentialConditionalRecital(f.obligation));
+    // F-R2-2 (round-2 red-team, executed): Rule 70 case (c) is the firm-fact SPECTRUM, not the #575b prose
+    // family alone. Without this, the DECISIVE end of the spectrum — "must possess a Top Secret facility
+    // clearance at the time of award" (pre-award possession), CMMC/QPL/ITAR (long-lead credentials) — was
+    // RELEASED to a billable committal cap while the routine end ("maintain an active SAM registration")
+    // held its mute: severity inverted. Same pure, flag-independent classifiers the self-clearable
+    // recognizer uses (card #590). "firm_fact_bar" keeps the mute via the consumer's fail-closed positive
+    // test (it releases ONLY "uncovered_obligation") — no consumer change needed.
+    // U-A.1 NARROWING (round-3 finding 1): the possession-frame arm holds ONLY with a credential noun in the
+    // SAME obligation — the bare "must hold/possess" token alone re-muted §L submission mechanics ("hold prices
+    // firm for 90 days", "shall hold a pre-bid conference"), silently re-muting a slice of the release cohort.
+    // Scoped HERE only: PREAWARD_POSSESSION_RE itself is shared with the #576 upkeep discriminator and the #590
+    // self-clearable recognizer and is untouched. The long-lead arm is unchanged (its tokens ARE credential nouns).
+    // The noun set is FIRM_FACT_NOUN_RE (below), a U-A-scoped SUPERSET of CREDENTIAL_TOKEN_RE — the shared regex
+    // is deliberately NOT widened (it also gates the #575b cc prose branch, armed in prod; widening it would
+    // change served reasons with no new flag). U-A.1-verification F1 (executed): the bare CREDENTIAL_TOKEN_RE
+    // set over-released credential-noun-by-reference ("qualifications described in Section H"), permits,
+    // verb-form "registered", "credentials", facility RATING, and Authority to Operate — all firm-facts the
+    // parent held. Adjective "qualified" is deliberately NOT matched (qualificat\w* only), so the
+    // equipment-and-qualified-personnel mechanics class stays released (probe R4).
+    const firmFactAny = ccAny ? undefined : firing.find((f) =>
+      (hasPreAwardPossession(f.obligation) && FIRM_FACT_NOUN_RE.test(f.obligation)) || hasLongLeadCredential(f.obligation));
+    const kind: "credential_conditional" | "firm_fact_bar" | "uncovered_obligation" =
+      ccAny ? "credential_conditional" : firmFactAny ? "firm_fact_bar" : "uncovered_obligation";
     if (credentialConditionalReasonEnabled()) {
-      const cc = credentialConditionalRecital(d.obligation);
-      if (cc) return { cap: "NEEDS_HUMAN_REVIEW", reason: `A credential-conditional requirement ${where} could not be grounded to a finding — it requires ${cc.credential}. Confirm your firm holds this before bidding — human verification needed: "${d.obligation.slice(0, 120)}".${ctxNote}` };
+      // Prose selection: pre-U-A behavior quotes the head iff the HEAD is cc (byte-identical with cap-not-mute
+      // OFF); with cap-not-mute ON the prose may quote the cc item found anywhere in the bucket — under the cap
+      // regime the cc item IS the reason the mute holds, so it is the sentence the customer must see.
+      const ccQuote = process.env.AUDIT_COVERAGE_CAP_NOT_MUTE === "true" ? ccAny : ccHead;
+      if (ccQuote) {
+        const cc = credentialConditionalRecital(ccQuote.obligation)!;
+        const ccWhere = ccQuote.locatedAt ? `at ${ccQuote.locatedAt}` : `in §${ccQuote.section}`;
+        const ccCtx = ccQuote.contextNote ? ` ${clampNote(ccQuote.contextNote)}` : "";
+        // F-R2-4: under the cap regime the cc item may not be the B3-ranked head — disclose the count so the
+        // ranked most-significant item is never silently absent from the customer reason. Cap OFF ⇒ "" (byte-identical).
+        const ccMore = process.env.AUDIT_COVERAGE_CAP_NOT_MUTE === "true" && cov.disqualifierUncovered.length > 1
+          ? ` ${cov.disqualifierUncovered.length} obligations in this package could not be grounded; this one is quoted because it turns on a firm credential.` : "";
+        return { cap: "NEEDS_HUMAN_REVIEW", kind: "credential_conditional", reason: `A credential-conditional requirement ${ccWhere} could not be grounded to a finding — it requires ${cc.credential}. Confirm your firm holds this before bidding — human verification needed: "${ccQuote.obligation.slice(0, 120)}".${ccMore}${ccCtx}` };
+      }
     }
     // ── B4 (Brain ruling on cards #690/#691, 2026-07-23) — STOP CHARACTERIZING AN UNRANKED SENTENCE AS A BAR ──
     // Flag `AUDIT_BANNER_NO_UNRANKED_BAR_CLAIM`, default-OFF. CAP-INVARIANT / REASON-VARIANT / VERDICT-INERT.
@@ -1144,9 +1316,12 @@ export function gateV2Outcome(cov: CoverageV2, opts?: { findings?: Array<{ kind?
     if (bannerNoUnrankedBarClaimEnabled()) {
       const n = cov.disqualifierUncovered.length;
       const more = n > 1 ? ` ${n} obligations in this package could not be grounded; this excerpt is the first in document order, not necessarily the most significant.` : "";
-      return { cap: "NEEDS_HUMAN_REVIEW", reason: `An obligation ${where} could not be grounded to a finding — human verification needed: "${d.obligation.slice(0, 120)}".${more}${ctxNote}` };
+      // `kind` is the BUCKET-WIDE truth computed above — a cc item anywhere keeps kind "credential_conditional"
+      // even when this prose branch quotes a different (higher-ranked) item, so the U-A consumer never releases
+      // the mute over an unexamined firm-fact conditional (red-team F1/F2).
+      return { cap: "NEEDS_HUMAN_REVIEW", kind, reason: `An obligation ${where} could not be grounded to a finding — human verification needed: "${d.obligation.slice(0, 120)}".${more}${ctxNote}` };
     }
-    return { cap: "NEEDS_HUMAN_REVIEW", reason: `A potential disqualifying requirement ${where} could not be grounded to a finding — human verification needed: "${d.obligation.slice(0, 120)}".${ctxNote}` };
+    return { cap: "NEEDS_HUMAN_REVIEW", kind, reason: `A potential disqualifying requirement ${where} could not be grounded to a finding — human verification needed: "${d.obligation.slice(0, 120)}".${ctxNote}` };
   }
   const nonBar = cov.ungroundedNonBarSignal ?? [];
   const demoted = nonBar.length

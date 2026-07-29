@@ -174,9 +174,18 @@ export function applyKeyfactDetector(
   const nmrBarAlreadyEmitted = findings.some((f) => f.kind === "eligibility_bar" && NMR_RE.test(`${f.requirement} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""} ${f.citation ?? ""}`));
   if (setAsideCtx && supplyCtx && !nmrBarAlreadyEmitted) {
     const span = verbatimSpan(src, /[^\n]*(?:non-?manufacturer rule|52\.219-33)[^\n]*/i);
+    // NMR-CITATION-HONESTY (flag AUDIT_NMR_CITATION_HONESTY, panel gate-4 AUTO-F on 150c3ab3 — ROOT-5 analog):
+    // "(source clause list)" is a DOCUMENT-presence claim, so it may only be asserted when the literal clause
+    // number is confirmed in the source by deterministic substring (Rule 64; dash-variant tolerant — the panel
+    // verified zero occurrences under any dash variant). NMR prose grounded in another regulation's clause text
+    // (150c3ab3: VAAR 852.219-73(d)) cites the regulatory basis + the excerpt, never a clause the package lacks.
+    const nmrLiteralInSource = /52\.219[-‑–—]33/.test(src);
+    const honestCitation = process.env.AUDIT_NMR_CITATION_HONESTY === "true" && !nmrLiteralInSource;
     if (span) add.push({
       requirement: NMR_CAUTION,
-      citation: "FAR 52.219-33 (source clause list) · 13 CFR 121.406(b)",
+      citation: honestCitation
+        ? "Nonmanufacturer rule referenced in solicitation text (see excerpt) · 13 CFR 121.406(b)"
+        : "FAR 52.219-33 (source clause list) · 13 CFR 121.406(b)",
       excerpt: span, kind: "eligibility_bar", controllability: "bidder_controls",
       requiredAttribute: "nonmanufacturer:compliant", curableInWindow: true, grounded: true, lens: "keyfact_detector",
     });

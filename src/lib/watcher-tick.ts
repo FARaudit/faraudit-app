@@ -356,10 +356,10 @@ export async function runWatcherTick(opts: WatcherTickOptions = {}): Promise<Wat
       try {
         const { data: capRow } = await admin
           .from("capability_statements")
-          .select("certifications")
+          .select("certifications, attributes_v2, size_facts")
           .eq("user_id", row.user_id)
           .maybeSingle();
-        bidderProfile = buildBidderProfileFromCapability(capRow);
+        bidderProfile = buildBidderProfileFromCapability(capRow, { solicitationNaics: solicitation.naicsCode });
       } catch { /* unknown firm on any error — never block the audit */ }
 
       // Build the engine input (SAM PDF fetch/ingest).

@@ -519,9 +519,12 @@ export async function POST(req: NextRequest) {
       office_leaf: resolveOfficeLeaf(solicitation), // FA-151
       naics_code: solicitation.naicsCode,
       set_aside: solicitation.typeOfSetAside,
+      // Stamped at creation from the SAM notice type (classifyDocType = the
+      // ingest's source of truth) — the upload/sol# path used to leave this
+      // null, which is why 74 of 103 audits had an empty Type column.
+      document_type: classifyDocType(solicitation.type ?? null),
       posted_date: solicitation.postedDate,
       response_deadline: solicitation.responseDeadLine,
-      document_type: classifyDocType(solicitation.type),
       user_id: user.id,
       status: "processing"
     })
@@ -547,10 +550,10 @@ export async function POST(req: NextRequest) {
     try {
       const { data: capRow } = await supabase
         .from("capability_statements")
-        .select("certifications")
+        .select("certifications, attributes_v2, size_facts")
         .eq("user_id", user.id)
         .maybeSingle();
-      bidderProfile = buildBidderProfileFromCapability(capRow);
+      bidderProfile = buildBidderProfileFromCapability(capRow, { solicitationNaics: solicitation.naicsCode });
     } catch { /* unknown firm on any error — never block the audit */ }
   }
 
@@ -726,9 +729,12 @@ async function enqueueAsyncAudit(args: {
       office_leaf: resolveOfficeLeaf(solicitation), // FA-151
       naics_code: solicitation.naicsCode,
       set_aside: solicitation.typeOfSetAside,
+      // Stamped at creation from the SAM notice type (classifyDocType = the
+      // ingest's source of truth) — the upload/sol# path used to leave this
+      // null, which is why 74 of 103 audits had an empty Type column.
+      document_type: classifyDocType(solicitation.type ?? null),
       posted_date: solicitation.postedDate,
       response_deadline: solicitation.responseDeadLine,
-      document_type: classifyDocType(solicitation.type),
       user_id: userId,
       status: "processing"
     })

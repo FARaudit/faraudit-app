@@ -122,27 +122,77 @@ button{font-family:inherit}
 .dist{margin-left:auto;display:flex;align-items:center;gap:14px}
 .dist-bar{display:flex;height:9px;width:240px;border-radius:6px;overflow:hidden;border:1px solid var(--line)}
 .dist-bar span{height:100%}
-.dist-bar .d-proceed{background:var(--green-500)}
-.dist-bar .d-caution{background:var(--amber-600)}
-.dist-bar .d-decline{background:var(--red-600)}
-.dist-bar .d-pending{background:var(--mute-2)}
-.dist-legend{display:flex;align-items:center;gap:12px}
-.dl{display:flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;color:var(--mute);white-space:nowrap}
-.dl b{color:var(--ink-2)}
-.dl::before{content:"";width:8px;height:8px;border-radius:2px;flex-shrink:0}
-.dl.proceed::before{background:var(--green-500)}
-.dl.caution::before{background:var(--amber-600)}
-.dl.decline::before{background:var(--red-600)}
-.dl.pending::before{background:var(--mute-2)}
 
 /* filter tabs */
-.filters{display:flex;align-items:center;gap:6px;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--card-soft);flex-wrap:wrap}
 /* Filter bar */
 /* RULING 1 — 7 slicers, one pill family (Design WIRE-MAP #456) */
+/* ══ card #769 — one control language (PORT, Design 2026-07-28) ══ */
+.dist-bar .s-bid{background:var(--green-500)}
+.dist-bar .s-caution{background:var(--amber-600)}
+.dist-bar .s-nobid{background:var(--red-600)}
+.dist-bar .s-inelig{background:var(--red-700)}
+.dist-bar .s-review{background:var(--mute-2)}
+.dist-bar .s-incomplete{background:var(--mute-2);opacity:.5}
+.dist-bar .s-inflight{background:var(--line-3);box-shadow:inset 0 0 0 1px var(--mute-2)}
+.dist-bar .s-failed{background:var(--line-3);box-shadow:inset 0 0 0 1px var(--mute-2);opacity:.7}
+.pa-controls{padding:14px 22px;border-bottom:1px solid var(--line);background:var(--card-soft);display:flex;flex-direction:column;gap:11px}
+.pa-poles{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;border:1px solid var(--line);border-radius:10px;background:var(--card);overflow:hidden;width:max-content;max-width:100%}
+.pole{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 10px;border:0;border-right:1px solid var(--line);background:var(--card);cursor:pointer;transition:background-color .14s}
+.pole:last-child{border-right:0}
+.pole:hover{background:linear-gradient(var(--line-3),var(--line-3)),var(--card)}
+.pole .pl{font-size:12.5px;font-weight:600;color:var(--ink-2);white-space:nowrap}
+.pole .pn{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--mute);background:var(--line-3);border-radius:5px;padding:1px 5px;line-height:1.4;text-align:center}
+.pole.is-active{background:linear-gradient(rgba(55,138,221,.07),rgba(55,138,221,.07)),var(--card);box-shadow:inset 0 0 0 1px var(--accent)}
+.pole.is-active .pl{color:var(--accent-deep);font-weight:700}
+.pole.is-active .pn{background:rgba(55,138,221,.14);color:var(--accent-deep)}
+.pole:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--accent),0 0 0 3px rgba(55,138,221,.28)}
+[data-theme="dark"] .pole.is-active{background:linear-gradient(rgba(55,138,221,.14),rgba(55,138,221,.14)),var(--card)}
+[data-theme="dark"] .pole.is-active .pl,[data-theme="dark"] .pole.is-active .pn{color:var(--accent-light)}
+.pole[data-empty="1"] .pl,.pole[data-empty="1"] .pn{color:var(--mute-2)}
+.pole[data-seg="inflight"]{border-left:3px solid var(--line)}
+.railnote{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute);letter-spacing:.02em}
+.railnote b{color:var(--ink-2);font-weight:700}
+.pd{width:9px;height:9px;border-radius:2px;flex:none;background:var(--mute-2)}
+.pd.bid{background:var(--green-500)}
+.pd.caution{background:var(--amber-600)}
+.pd.nobid{background:var(--red-600)}
+.pd.inelig{background:transparent;box-shadow:inset 0 0 0 2px var(--red-700)}
+.pd.review{background:var(--mute-2)}
+.pd.incomplete{background:transparent;border:1.5px dashed var(--mute-2)}
+.pd.inflight{background:transparent;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--mute-2)}
+.pd.failed{background:transparent;border-radius:50%;border:1.5px dashed var(--mute-2)}
+tr[data-pole="bid"] .cell-id::before{background:var(--green-500)}
+tr[data-pole="caution"] .cell-id::before{background:var(--amber-600)}
+tr[data-pole="nobid"] .cell-id::before{background:var(--red-600)}
+tr[data-pole="inelig"] .cell-id::before{background:var(--red-700)}
+tr[data-pole="review"] .cell-id::before{background:var(--mute-2)}
+tr[data-pole="incomplete"] .cell-id::before{background:var(--mute-2);opacity:.5}
+tr[data-pole="inflight"] .cell-id::before,tr[data-pole="failed"] .cell-id::before{background:transparent;box-shadow:inset 0 0 0 1.5px var(--mute-2)}
+.vcell{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;white-space:nowrap}
+.vcell .pd{width:8px;height:8px}
+.vcell[data-pole="bid"]{color:var(--green-700)}
+.vcell[data-pole="caution"]{color:var(--amber-700)}
+.vcell[data-pole="nobid"],.vcell[data-pole="inelig"]{color:var(--red-700)}
+.vcell[data-pole="review"],.vcell[data-pole="incomplete"],.vcell[data-pole="inflight"],.vcell[data-pole="failed"]{color:var(--ink-2);font-weight:600}
+[data-theme="dark"] .vcell[data-pole="bid"]{color:#6ee7b7}
+[data-theme="dark"] .vcell[data-pole="caution"]{color:#fcd34d}
+[data-theme="dark"] .vcell[data-pole="nobid"],[data-theme="dark"] .vcell[data-pole="inelig"]{color:#fca5a5}
+.stcell{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-2);display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+.deadline-tag{display:inline-flex;align-items:center;gap:5px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;color:var(--amber-700)}
+.deadline-tag::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--amber-600)}
+[data-theme="dark"] .deadline-tag{color:#fcd34d}
+.failed-badge{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:5px;background:var(--red-50);color:var(--red-700);font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.06em}
+[data-theme="dark"] .failed-badge{background:rgba(220,38,38,.14);color:#fca5a5}
+.kpi .agg{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute);display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.kpi .agg .t{display:inline-flex;align-items:center;gap:5px;color:var(--ink-2);font-weight:700}
+.kpi .agg .op{color:var(--mute-2)}
+.kpi .agg .den{color:var(--mute)}
+.integ{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute);line-height:1.6;padding:12px 22px;border-top:1px solid var(--line);background:var(--card-soft)}
+.integ b{color:var(--ink-2);font-weight:700}
 .pa-filterbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 12px}
 .pa-slicer{position:relative;display:inline-flex;align-items:center;height:34px;padding:0 30px 0 12px;border:1px solid var(--line);border-radius:9px;background:var(--card-soft);transition:border-color .14s,background .14s,box-shadow .14s}
 .pa-slicer:hover{border-color:var(--mute-2)}
-.pa-slicer-lbl{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);margin-right:8px;pointer-events:none}
+.pa-slicer-lbl{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);margin-right:8px;pointer-events:none}
 .pa-slicer .pa-filter{appearance:none;-webkit-appearance:none;height:auto;border:0;background:transparent;font-family:"Manrope",sans-serif;font-size:12.5px;font-weight:600;color:var(--ink);cursor:pointer;outline:none;padding:0;margin:0}
 .pa-slicer-chev{position:absolute;right:11px;top:50%;transform:translateY(-50%);width:12px;height:12px;color:var(--mute-2);pointer-events:none;transition:color .14s}
 .pa-slicer.is-active{border-color:var(--accent);background:rgba(55,138,221,.07);box-shadow:0 0 0 3px rgba(55,138,221,.08)}
@@ -166,11 +216,6 @@ tr.needs-attention:hover{background:linear-gradient(90deg,rgba(217,119,6,.11),rg
 .deadline-tag{display:inline-flex;align-items:center;gap:5px;font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--amber-700)}
 .deadline-tag::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--amber-600)}
 [data-theme="dark"] .deadline-tag{color:#fcd34d}
-.fbtn{height:32px;padding:0 13px;border-radius:8px;border:1px solid var(--line);background:var(--card);cursor:pointer;font-family:"Manrope",sans-serif;font-size:12px;font-weight:600;color:var(--ink-2);display:inline-flex;align-items:center;gap:7px;transition:all .14s}
-.fbtn:hover{border-color:var(--mute-2)}
-.fbtn .n{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--mute);background:var(--line-3);border-radius:5px;padding:1px 6px;line-height:1.4}
-.fbtn.active{background:var(--navy-800);border-color:var(--navy-800);color:#fff}
-.fbtn.active .n{background:rgba(255,255,255,.15);color:#fff}
 .filters .spacer{flex:1}
 .sort-hint{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute-2);display:inline-flex;align-items:center;gap:6px}
 
@@ -320,7 +365,7 @@ tr.hidden{display:none}
   <form action="/api/auth/sign-out" method="post" style="display:contents">
     <button type="submit" class="sb-icon sb-signout" aria-label="Sign out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg><span class="sb-label">Sign out</span><span class="sb-tip">Sign out</span></button>
   </form>
-  <div class="sb-bottom"><div class="sb-avatar">JR</div></div>
+  <div class="sb-bottom"><div class="sb-avatar"></div></div>
 </aside>
 
   <!-- ═════════════ MAIN ═════════════ -->
@@ -343,8 +388,8 @@ tr.hidden{display:none}
           <span class="nbadge" style="display:none"></span>
         </button>
         <div class="user-chip">
-          <div class="av">JR</div>
-          <div><div class="nm">Jose Rodriguez</div></div>
+          <div class="av"></div>
+          <div><div class="nm"></div></div>
         </div>
       </div>
     </div>
@@ -392,21 +437,11 @@ tr.hidden{display:none}
         <div class="ledger-head">
           <div class="lh-title">Audit Ledger <span class="ct" id="visCount"></span></div>
           <div class="dist">
-            <div class="dist-bar">
-              <span class="d-proceed" style="width:0%"></span>
-              <span class="d-caution" style="width:0%"></span>
-              <span class="d-decline" style="width:0%"></span>
-              <span class="d-pending" style="width:0%"></span>
+            <div class="dist-bar" id="distBar"></div>
             </div>
-            <div class="dist-legend">
-              <span class="dl proceed"><b>&mdash;</b>&nbsp;Bid</span>
-              <span class="dl caution"><b>&mdash;</b>&nbsp;Caution</span>
-              <span class="dl decline"><b>&mdash;</b>&nbsp;No-bid&nbsp;·&nbsp;Inelig.</span>
-              <span class="dl pending"><b>&mdash;</b>&nbsp;Review&nbsp;·&nbsp;Open</span>
-            </div>
-          </div>
         </div>
 
+        <div class="pa-controls"><div class="pa-poles" id="poleRail" role="group" aria-label="Verdict"></div>
         <div class="pa-filterbar" id="paFilterbar">
           <label class="pa-slicer"><span class="pa-slicer-lbl">Time</span>
             <select class="pa-filter" id="fTime" aria-label="Time aperture">
@@ -425,24 +460,12 @@ tr.hidden{display:none}
             <select class="pa-filter" id="fType" aria-label="Type"><option value="all">All types</option></select>
             <svg class="pa-slicer-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
           </label>
-          <label class="pa-slicer"><span class="pa-slicer-lbl">Recommendation</span>
-            <select class="pa-filter" id="fRec" aria-label="Recommendation">
-              <option value="all">All recommendations</option>
-              <option value="Bid">Bid</option>
-              <option value="Bid · caution">Bid · caution</option>
-              <option value="No-bid">No-bid</option>
-              <option value="Ineligible">Ineligible</option>
-              <option value="Needs review">Needs review</option>
-              <option value="Incomplete">Incomplete</option>
-            </select>
-            <svg class="pa-slicer-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-          </label>
-          <label class="pa-slicer"><span class="pa-slicer-lbl">Status</span>
-            <select class="pa-filter" id="fStatus" aria-label="Status">
-              <option value="all">All statuses</option>
-              <option value="complete">Complete</option>
-              <option value="pending">Pending</option>
-              <option value="failed">Failed</option>
+          <label class="pa-slicer"><span class="pa-slicer-lbl">Window</span>
+            <select class="pa-filter" id="fWindow" aria-label="Window">
+              <option value="all">All windows</option>
+              <option value="open">Still open</option>
+              <option value="passed">Passed</option>
+              <option value="none">No date</option>
             </select>
             <svg class="pa-slicer-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
           </label>
@@ -456,20 +479,7 @@ tr.hidden{display:none}
           </label>
           <button class="pa-filter-clear" id="paClear" type="button" hidden>Clear</button>
         </div>
-
-        <div class="filters" id="filters">
-          <button class="fbtn active" data-filter="all">All <span class="n">&mdash;</span></button>
-          <button class="fbtn" data-filter="Bid">Bid <span class="n">&mdash;</span></button>
-          <button class="fbtn" data-filter="Bid · caution">Bid · caution <span class="n">&mdash;</span></button>
-          <button class="fbtn" data-filter="No-bid">No-bid <span class="n">&mdash;</span></button>
-          <button class="fbtn" data-filter="Ineligible">Ineligible <span class="n">&mdash;</span></button>
-          <button class="fbtn" data-filter="Needs review">Review <span class="n">&mdash;</span></button>
-          <button class="fbtn" data-filter="Incomplete">Incomplete <span class="n">&mdash;</span></button>
-          <button class="fbtn" data-filter="open">Pending <span class="n">&mdash;</span></button>
-          <button class="fbtn" data-filter="failed">Failed <span class="n">&mdash;</span></button>
-          <span class="spacer" style="flex:1"></span>
-          <span class="sort-hint"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M6 12h12M9 18h6"/></svg>Click a column header to sort</span>
-        </div>
+        <div class="railnote" id="railNote"></div></div>
 
         <div class="table-wrap">
           <table class="dash" id="ledgerTable">
@@ -481,7 +491,7 @@ tr.hidden{display:none}
                 <th class="sortable" data-sort="type">Type</th>
                 <th class="sortable" data-sort="due">Response Due</th>
                 <th class="sortable sorted" data-sort="audited">Audited<span class="arr">▼</span></th>
-                <th class="sortable" data-sort="rec">Recommendation</th>
+                <th class="sortable" data-sort="rec">Verdict</th>
                 <th class="sortable" data-sort="status">Status</th>
                 <th class="right">Report</th>
               </tr>
@@ -489,6 +499,7 @@ tr.hidden{display:none}
             <tbody id="ledgerBody"></tbody>
           </table>
         </div>
+        <div class="integ" id="integ"></div>
       </section>
     </div>
   </main>
