@@ -608,7 +608,10 @@ function removeNotSolicitationSections(html: string): string {
 // both fire — fine for our case since the template's toast is informational).
 //
 //   data-fetch  → POST /api/audit/<id>/refetch · spinner state on the button
-//                  · reload on success · toast on failure.
+//                  · toast on failure. The route 202-enqueues the re-run
+//                  (async worker path); the redirect lands on the report page
+//                  in its processing state, whose poller reloads onto the
+//                  freshened report when the worker finishes.
 //   data-track  → toast "Coming soon — auto-audit when the solicitation
 //                  posts." The watcher surface isn't built; "watch" mode is
 //                  also gated to "upload" rendering until it lands, so this
@@ -653,7 +656,8 @@ function injectCtaHandlers(html: string, auditId: string, noticeId: string): str
             else alert(msg);
             return;
           }
-          // Reload onto the freshened audit page.
+          // 202 queued → the report page renders its processing state and
+          // polls to the freshened report. already_fetched → unchanged report.
           window.location.href = (out.data && out.data.redirect) || ('/audit/' + AUDIT_ID);
         })
         .catch(function(err){

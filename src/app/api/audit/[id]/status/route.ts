@@ -15,12 +15,14 @@
 // Accepts a UUID or a solicitation_number slug, mirroring /audit/[id].
 
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const HERO_AUDIT_ID = "7e389f1a-0fc4-4ba2-8299-c86d23adb62a";
 
 export async function GET(
   _req: NextRequest,
@@ -53,6 +55,19 @@ export async function GET(
       .limit(1);
     if (error) return NextResponse.json({ error: error.message }, { status: 503 });
     audit = data && data.length > 0 ? (data[0] as Record<string, unknown>) : null;
+  }
+  // Gated service-role fallback for the curated demo audit only — mirrors
+  // /audit/[id] and the refetch route (the hero row has user_id=null, so the
+  // RLS read returns nothing). Without this, a hero refetch leaves every
+  // viewer's processing page polling a 404 forever (frozen spinner).
+  if (!audit && id.toLowerCase() === HERO_AUDIT_ID) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (url && serviceKey) {
+      const adminClient = createClient(url, serviceKey, { auth: { persistSession: false } });
+      const { data } = await adminClient.from("audits").select(cols).eq("id", HERO_AUDIT_ID).maybeSingle();
+      audit = data as Record<string, unknown> | null;
+    }
   }
   if (!audit) return NextResponse.json({ error: "audit not found" }, { status: 404 });
 

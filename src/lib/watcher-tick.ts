@@ -98,7 +98,7 @@ async function fetchEmailForUser(admin: SupabaseClient, userId: string): Promise
 
 // Build the executeAudit input from a posted SAM solicitation. Assembles the FULL
 // form-first document set (ingestion + attachments) like the main customer POST and the
-// refetch route, then runs through executeAudit() (→ the agentic V3 engine), so a watcher
+// audit-worker's SAM arm, then runs through executeAudit() (→ the agentic V3 engine), so a watcher
 // audit is a REAL complete audit (not single-doc/forced-incomplete) and inherits the
 // engine="agentic_v3" marker + honest-fail gate the customer path uses.
 async function buildWatcherAuditInput(
@@ -120,7 +120,7 @@ async function buildWatcherAuditInput(
   let ingestion: IngestionMeta | null = null;
 
   // Full form-first multi-attachment assembly — identical to the main customer POST and
-  // the refetch route. The watcher decrements a real audit-quota unit, so the customer
+  // the audit-worker's SAM arm. The watcher decrements a real audit-quota unit, so the customer
   // gets a REAL complete audit; without the manifest the engine would force
   // documents_complete=false on every multi-attachment notice. Manifest failure / no
   // primary falls through to the single-doc path below (honest-fail stays the degrade).

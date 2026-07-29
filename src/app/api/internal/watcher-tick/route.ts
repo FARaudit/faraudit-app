@@ -19,7 +19,7 @@ import { runWatcherTick } from "@/lib/watcher-tick";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 // runAudit (Sonnet 4.6 three-call pipeline) per row × up to MAX_TICK_PER_RUN
-// rows — share the 300s budget the main audit POST + refetch already use.
+// rows — share the 300s budget the main audit POST already uses.
 export const maxDuration = 300;
 
 function timingSafeEqual(a: string, b: string): boolean {
