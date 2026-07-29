@@ -694,6 +694,14 @@ const CREDENTIAL_TOKEN_RE = /\b(?:licens\w*|certificat\w*|certification|accredit
 const MAINTAIN_CREDENTIAL_RE = /\bmaintain\b([^.;]{0,180}?)\b(?:during\s+(?:the\s+)?(?:entire\s+)?(?:contract\s+|order\s+)?performance(?:\s+period)?|throughout\s+the\s+(?:life\s+of|period\s+of\s+performance|performance))\b/i;
 // "maintain an active SAM registration" / "active registration in SAM" — SAM token MANDATORY (Gauntlet F1: an optional
 // SAM token mislabeled ANY "maintain an active registration" — e.g. a state nursing-board registry — as SAM).
+// U-A firm-fact noun set (U-A.1 verification F1) — a SUPERSET of CREDENTIAL_TOKEN_RE used ONLY by the
+// firm_fact_bar possession arm in gateV2Outcome. Adds: permit / credential / qualification(s) (noun stem only —
+// adjective "qualified" excluded by construction) / verb-form "registered" / rating (facility-clearance-adjacent,
+// e.g. an interim DCSA facility rating) / authorization + Authority-to-Operate. CREDENTIAL_TOKEN_RE itself is
+// NOT widened: it also gates the #575b cc prose branch, which is armed in prod.
+const FIRM_FACT_NOUN_RE = new RegExp(
+  CREDENTIAL_TOKEN_RE.source + String.raw`|\bpermit\w*\b|\bcredential\w*\b|\bqualificat\w*\b|\bregistered\b|\brating\b|\bauthori[sz]ation\w*\b|\bauthority\s+to\s+operate\b`,
+  "i");
 const SAM_ACTIVE_RE = /\bmaintain\s+an?\s+active\s+(?:sam(?:\.gov)?|system\s+for\s+award\s+management)\s+registration\b|\bactive\s+registration\s+in\s+(?:sam\b|the\s+system\s+for\s+award\s+management)\b/i;
 
 /** Recognize a credential-conditional bar obligation and extract its credential phrase VERBATIM from the obligation
@@ -1155,8 +1163,15 @@ export function gateV2Outcome(cov: CoverageV2, opts?: { findings?: Array<{ kind?
     // firm for 90 days", "shall hold a pre-bid conference"), silently re-muting a slice of the release cohort.
     // Scoped HERE only: PREAWARD_POSSESSION_RE itself is shared with the #576 upkeep discriminator and the #590
     // self-clearable recognizer and is untouched. The long-lead arm is unchanged (its tokens ARE credential nouns).
+    // The noun set is FIRM_FACT_NOUN_RE (below), a U-A-scoped SUPERSET of CREDENTIAL_TOKEN_RE — the shared regex
+    // is deliberately NOT widened (it also gates the #575b cc prose branch, armed in prod; widening it would
+    // change served reasons with no new flag). U-A.1-verification F1 (executed): the bare CREDENTIAL_TOKEN_RE
+    // set over-released credential-noun-by-reference ("qualifications described in Section H"), permits,
+    // verb-form "registered", "credentials", facility RATING, and Authority to Operate — all firm-facts the
+    // parent held. Adjective "qualified" is deliberately NOT matched (qualificat\w* only), so the
+    // equipment-and-qualified-personnel mechanics class stays released (probe R4).
     const firmFactAny = ccAny ? undefined : firing.find((f) =>
-      (hasPreAwardPossession(f.obligation) && CREDENTIAL_TOKEN_RE.test(f.obligation)) || hasLongLeadCredential(f.obligation));
+      (hasPreAwardPossession(f.obligation) && FIRM_FACT_NOUN_RE.test(f.obligation)) || hasLongLeadCredential(f.obligation));
     const kind: "credential_conditional" | "firm_fact_bar" | "uncovered_obligation" =
       ccAny ? "credential_conditional" : firmFactAny ? "firm_fact_bar" : "uncovered_obligation";
     if (credentialConditionalReasonEnabled()) {

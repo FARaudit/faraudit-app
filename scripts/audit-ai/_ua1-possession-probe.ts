@@ -63,6 +63,27 @@ const check = (label: string, ok: boolean, detail: string) => {
   check("H5 credential-conditional family untouched → HOLDS NEEDS_HUMAN_REVIEW",
     h5.verdict === "NEEDS_HUMAN_REVIEW", `got ${h5.verdict}`);
 
+  // ── H6-H11 (U-A.1 verification F1, executed): firm-fact phrasings the PARENT held that the bare
+  // CREDENTIAL_TOKEN_RE narrowing RELEASED — credential-noun-by-reference, permit, verb-form "registered",
+  // "credentials", facility rating, Authority to Operate. All must HOLD. ──
+  const f1Sentences: Array<[string, string]> = [
+    ["H6 qualifications-by-reference", "The offeror must possess the qualifications described in Section H at the time of award."],
+    ["H7 permits", "The contractor must hold all permits required by the State of California at time of proposal submission."],
+    ["H8 verb-form 'registered'", "At the time of award, the offeror must be registered as a general contractor with the Nevada State Contractors Board and shall hold that standing through award."],
+    ["H9 'credentials'", "Key personnel must possess the credentials specified in the PWS at the time of award."],
+    ["H10 facility rating", "The offeror must possess an interim facility rating issued by DCSA prior to award."],
+    ["H11 Authority to Operate", "The offeror must possess an Authority to Operate for the hosting environment prior to contract start."],
+  ];
+  for (const [label, ob] of f1Sentences) {
+    const v = withBucket([ob]);
+    check(`${label} → HOLDS NEEDS_HUMAN_REVIEW`, v.verdict === "NEEDS_HUMAN_REVIEW", `got ${v.verdict}`);
+  }
+  // R4 — collision guard from the same review: "qualified personnel" (adjective form) must NOT re-hold the
+  // equipment/personnel mechanics class — the noun set is qualificat\w*, not qualif\w*.
+  const r4 = withBucket(["The Contractor must possess adequate equipment and qualified personnel to perform the work described herein."]);
+  check("R4 'equipment and qualified personnel' → still RELEASES to BID_WITH_CAUTION",
+    r4.verdict === "BID_WITH_CAUTION", `got ${r4.verdict} :: ${(r4.reason ?? "").slice(0, 110)}`);
+
   // ── OFF-state guard: with the flag OFF everything above is the pre-U-A NHR mute (byte-identity class) ──
   process.env.AUDIT_COVERAGE_CAP_NOT_MUTE = "false";
   const off = withBucket(["Offerors must hold their prices firm for a period of 90 days from the date of quote submission."]);
