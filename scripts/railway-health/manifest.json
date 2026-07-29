@@ -23,12 +23,6 @@
     "max_minutes_since_last_success": 1500,
     "_notes": "Daily 08:00 CDT = 13:00 UTC · FAR/DFARS digest · live dashboard drifted to 0 0 * * * (19:00 CDT) vs toml 0 13 — probe flags until the dashboard is set back"
   },
-  "bullrize-cron": {
-    "rootDirectory": ".",
-    "cronSchedule": null,
-    "max_minutes_since_last_success": 43200,
-    "_notes": "Separate repo Bullrize/bullrize-cron (sec-corpus-builder) · dormant — no scheduled run since 2026-07-07 (same day as the #170 cron-parking sweep) · daily-pipeline is the live Bullrize cron"
-  },
   "audit-worker": {
     "rootDirectory": null,
     "cronSchedule": null,
@@ -40,12 +34,6 @@
     "cronSchedule": "*/30 * * * *",
     "max_minutes_since_last_success": 60,
     "_notes": "Every 30 min · Gmail organize · one-shot script, cron lives in the Railway dashboard (not toml) · live dashboard shows NO cron as of 2026-07-29 — probe flags until */30 is restored in the dashboard or the service is intentionally parked"
-  },
-  "bullrize daily-pipeline": {
-    "rootDirectory": ".",
-    "cronSchedule": null,
-    "max_minutes_since_last_success": 3000,
-    "_notes": "Separate repo Bullrize/bullrize · daily 12:00 UTC cron declared in its own toml (instance-level cron reads null — Railway quirk) · runs DO create deployment entries, so last-success age + chronic-failure checks are the real monitors here"
   },
   "Recompete-AI": {
     "rootDirectory": "/agents/recompete-ai",
