@@ -903,7 +903,12 @@ export function gradeCoverageV2(attestations: SectionAttestation[], opts?: {
   };
 }
 
-export type GateV2Outcome = { cap: "INCOMPLETE" | "NEEDS_HUMAN_REVIEW" | null; reason: string };
+// `kind` (U-A cap-not-mute, panel ceo/VERDICT-INVERSION-PANEL-2026-07-29.md) discriminates WHICH NHR branch
+// fired so deriveVerdict can route them differently under AUDIT_COVERAGE_CAP_NOT_MUTE: an "uncovered_obligation"
+// NHR becomes a BID_WITH_CAUTION cap (never a mute), while a "credential_conditional" NHR keeps its full force
+// (Rule 70 case (c): an unverifiable firm-fact a bar turns on). Additive — cap/reason are untouched, so every
+// existing consumer is byte-identical whether or not it reads the field.
+export type GateV2Outcome = { cap: "INCOMPLETE" | "NEEDS_HUMAN_REVIEW" | null; reason: string; kind?: "credential_conditional" | "uncovered_obligation" };
 
 // ── VERDICT ARC step 4 (moves 1+2) — VERBATIM-VETO RETIREMENT, flag `AUDIT_RETIRE_VERBATIM_VETO` default-OFF ──
 // Move 2 as ratified: "retire the verbatim MATCH, keep the source-obligation ENUMERATION." This flag implements
@@ -1125,7 +1130,7 @@ export function gateV2Outcome(cov: CoverageV2, opts?: { findings?: Array<{ kind?
     // phrasing makes NO claim about the bidder (fabrication-invariant compliant). Flag-OFF ⇒ the legacy line below.
     if (credentialConditionalReasonEnabled()) {
       const cc = credentialConditionalRecital(d.obligation);
-      if (cc) return { cap: "NEEDS_HUMAN_REVIEW", reason: `A credential-conditional requirement ${where} could not be grounded to a finding — it requires ${cc.credential}. Confirm your firm holds this before bidding — human verification needed: "${d.obligation.slice(0, 120)}".${ctxNote}` };
+      if (cc) return { cap: "NEEDS_HUMAN_REVIEW", kind: "credential_conditional", reason: `A credential-conditional requirement ${where} could not be grounded to a finding — it requires ${cc.credential}. Confirm your firm holds this before bidding — human verification needed: "${d.obligation.slice(0, 120)}".${ctxNote}` };
     }
     // ── B4 (Brain ruling on cards #690/#691, 2026-07-23) — STOP CHARACTERIZING AN UNRANKED SENTENCE AS A BAR ──
     // Flag `AUDIT_BANNER_NO_UNRANKED_BAR_CLAIM`, default-OFF. CAP-INVARIANT / REASON-VARIANT / VERDICT-INERT.
@@ -1144,9 +1149,9 @@ export function gateV2Outcome(cov: CoverageV2, opts?: { findings?: Array<{ kind?
     if (bannerNoUnrankedBarClaimEnabled()) {
       const n = cov.disqualifierUncovered.length;
       const more = n > 1 ? ` ${n} obligations in this package could not be grounded; this excerpt is the first in document order, not necessarily the most significant.` : "";
-      return { cap: "NEEDS_HUMAN_REVIEW", reason: `An obligation ${where} could not be grounded to a finding — human verification needed: "${d.obligation.slice(0, 120)}".${more}${ctxNote}` };
+      return { cap: "NEEDS_HUMAN_REVIEW", kind: "uncovered_obligation", reason: `An obligation ${where} could not be grounded to a finding — human verification needed: "${d.obligation.slice(0, 120)}".${more}${ctxNote}` };
     }
-    return { cap: "NEEDS_HUMAN_REVIEW", reason: `A potential disqualifying requirement ${where} could not be grounded to a finding — human verification needed: "${d.obligation.slice(0, 120)}".${ctxNote}` };
+    return { cap: "NEEDS_HUMAN_REVIEW", kind: "uncovered_obligation", reason: `A potential disqualifying requirement ${where} could not be grounded to a finding — human verification needed: "${d.obligation.slice(0, 120)}".${ctxNote}` };
   }
   const nonBar = cov.ungroundedNonBarSignal ?? [];
   const demoted = nonBar.length

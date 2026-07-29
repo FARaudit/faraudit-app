@@ -3149,6 +3149,7 @@ export function applyClauseKeyedTypingFloor(findings: TypedFinding[], o: { enabl
 // CMMC/clearance/QPL bar, an at-award possession frame, or an untyped bar. Flag-OFF ⇒ never called ⇒ byte-identical.
 const selfClearablePackageEnabled = () => process.env.AUDIT_SELF_CLEARABLE_PACKAGE === "true";
 const incompletePrecedenceEnabled = () => process.env.AUDIT_INCOMPLETE_PRECEDENCE === "true"; // Brain #664 — documentsComplete=false not subordinate to coverage-pole NHR
+const coverageCapNotMuteEnabled = () => process.env.AUDIT_COVERAGE_CAP_NOT_MUTE === "true"; // U-A cap-not-mute (panel 2026-07-29) — uncovered obligation caps committal at BWC, never NHR-mutes
 // ── Vehicle A–E · item A + E (flag AUDIT_VERDICT_POLE_PRECEDENCE, default-OFF) ─────────────────────────────────────
 const verdictPolePrecedenceEnabled = () => process.env.AUDIT_VERDICT_POLE_PRECEDENCE === "true";
 // item E (design-panel R1, hard dependency of A's site-visit fire) — the promoted finding's excerpt must carry
@@ -3426,13 +3427,27 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
           setAsideBackstopNotices(inp.source, inp.samSetAside),
         )
       : null;
+  // ── U-A CAP-NOT-MUTE (panel ceo/VERDICT-INVERSION-PANEL-2026-07-29.md · flag AUDIT_COVERAGE_CAP_NOT_MUTE,
+  //    default-OFF). When the GATE_V2 coverage cap fires on an UNCOVERED OBLIGATION (kind "uncovered_obligation",
+  //    never "credential_conditional" — Rule 70 case (c) keeps its NHR), the verdict is no longer MUTED to NHR:
+  //    the named caution is banked here and every bar/honest-fail path below runs at full force. Only a would-be
+  //    COMMITTAL exit is then capped to BID_WITH_CAUTION carrying the named item — an uncovered obligation can
+  //    weaken a green light, never invent one and never bury a real bar. Flag OFF ⇒ null ⇒ capCommittal's U-A
+  //    branch is dead code and the coverage-NHR return runs exactly as before (byte-identical).
+  let uncoveredCoverageCaution: string | null = null;
   const capCommittal = (d: Decision): Decision => {
     // guard: only a committal (BID/BWC) is capped; any non-committal reaching here is returned untouched.
-    if (!setAsideBackstop || (d.verdict !== "BID" && d.verdict !== "BID_WITH_CAUTION")) return d;
-    // BWC cap — floor to BID_WITH_CAUTION, eligible=null (not determined past an unaccounted-for set-aside pool),
-    // prepend the named caveat to whatever committal reason we were about to emit. There is no NHR path here by
-    // construction: the backstop's cap type is the BWC literal.
-    return enforceVerdictWordInvariant(mk("BID_WITH_CAUTION", null, `${setAsideBackstop.reason} ${d.reason}`.trim(), d.dispositions, d.showStoppers));
+    let out = d;
+    if (setAsideBackstop && (out.verdict === "BID" || out.verdict === "BID_WITH_CAUTION"))
+      // BWC cap — floor to BID_WITH_CAUTION, eligible=null (not determined past an unaccounted-for set-aside pool),
+      // prepend the named caveat to whatever committal reason we were about to emit. There is no NHR path here by
+      // construction: the backstop's cap type is the BWC literal.
+      out = enforceVerdictWordInvariant(mk("BID_WITH_CAUTION", null, `${setAsideBackstop.reason} ${out.reason}`.trim(), out.dispositions, out.showStoppers));
+    // U-A: the uncovered-obligation caution caps a committal to BWC with the item NAMED. `eligible` is preserved —
+    // a coverage gap is not an eligibility claim (the set-aside backstop above nulls it for its own reason).
+    if (uncoveredCoverageCaution && (out.verdict === "BID" || out.verdict === "BID_WITH_CAUTION"))
+      out = mk("BID_WITH_CAUTION", out.eligible, `${uncoveredCoverageCaution} ${out.reason}`.trim(), out.dispositions, out.showStoppers);
+    return out;
   };
 
   // 0. PRIMARY INDETERMINATE (Gauntlet Card #370 R1) — before any coverage/eligibility reasoning: on a multi-doc package
@@ -3504,7 +3519,14 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
     // SEAM FILL (card #472) — on the coverage-NHR cap ONLY (never INCOMPLETE: unreadable ⇒ findings untrustworthy), lift
     // any grounded site-visit/eligibility bar in dispositions[] into the persisted showStoppers[] slot so it renders in
     // the show-stopper band, not the P2 advisories. Same filter/flag family as the notice-body pole. OFF ⇒ [] (identical).
-    if (v2.cap === "NEEDS_HUMAN_REVIEW") {
+    if (v2.cap === "NEEDS_HUMAN_REVIEW" && coverageCapNotMuteEnabled() && v2.kind !== "credential_conditional") {
+      // U-A CAP-NOT-MUTE (panel 2026-07-29): an uncovered obligation no longer mutes the pole. Bank the named
+      // caution and FALL THROUGH — every bar / honest-fail / show-stopper path below runs at full force, and only
+      // a would-be committal exit is capped (capCommittal) to BID_WITH_CAUTION carrying this item. The NHR
+      // vocabulary ("human verification needed") is reframed to caution vocabulary; the item stays named verbatim.
+      // A credential-conditional NHR (kind guard above) is NEVER routed here — Rule 70 case (c) keeps its mute.
+      uncoveredCoverageCaution = `CAUTION — ${v2.reason.replace(/ — human verification needed:/, " — verify this item before relying on the verdict:")}`;
+    } else if (v2.cap === "NEEDS_HUMAN_REVIEW") {
       // Stoppers are computed when EITHER flag needs them (headline lead or persisted fill), from the SAME filter.
       const covStoppers = (coverageNhrStopperFillEnabled() || nhrHeadlineShowStopperFirstEnabled())
         ? siteVisitEligStoppers(dispositions, inp.bidderProfile, inp.source) : [];
