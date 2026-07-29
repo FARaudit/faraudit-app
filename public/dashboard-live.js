@@ -342,14 +342,34 @@
       var rr = rail.getBoundingClientRect();
       c3 = rail.scrollWidth <= rail.clientWidth + 1 && [].every.call(rail.querySelectorAll(".pole"), function (p) { var b = p.getBoundingClientRect(); return b.right <= rr.right + 1 && b.bottom <= rr.bottom + 1; });
     }
+    // C4 \u2014 active states are TINTS over the unchanged card colour, never fills
+    // (Design's isTint: low-alpha background OR low-alpha gradient layer over
+    // the card colour). This was the check missing from the first port \u2014 named
+    // in card #771; the count read "4 of 4" because this one wasn't running.
+    var c4 = true;
+    var inactive = document.querySelector("#poleRail .pole:not(.is-active)");
+    if (inactive) {
+      var cardBg = getComputedStyle(inactive).backgroundColor;
+      var isTint = function (e) {
+        var cs = getComputedStyle(e), m = cs.backgroundColor.match(/[\d.]+/g);
+        var a = m ? (m.length > 3 ? parseFloat(m[3]) : 1) : 1;
+        if (a <= 0.2) return true;
+        var g = cs.backgroundImage.match(/rgba?\(([^)]*)\)/);
+        if (!g) return false;
+        var gm = g[1].split(",").map(parseFloat), ga = gm.length > 3 ? gm[3] : 1;
+        return ga <= 0.2 && cs.backgroundColor === cardBg;
+      };
+      var act = document.querySelectorAll("#poleRail .pole.is-active, #paFilterbar .pa-slicer.is-active");
+      c4 = [].every.call(act, isTint);
+    }
     var pv = visible.filter(function (r) { return r._w === "passed"; }).length;
     var flagged = [].filter.call(document.querySelectorAll("#ledgerBody tr.needs-attention"), function (tr) { return tr.querySelector(".deadline-tag"); }).length;
     var c5 = flagged === pv;
-    var checks = [c1, c2, c3, c5];
+    var checks = [c1, c2, c3, c4, c5];
     var pass = checks.filter(Boolean).length;
     el.innerHTML = "Self-check \u00b7 <b>" + pass + " of " + checks.length + "</b> computed checks pass"
       + (pass < checks.length ? ' \u00b7 <b style="color:var(--red-600)">' + (checks.length - pass) + " FAIL</b>" : "")
-      + " \u2014 rail sums to the ledger count (" + railSum + "=" + rows.length + "), every row in exactly one segment, nothing clipped, every passed deadline flagged (" + flagged + "/" + pv + ").";
+      + " \u2014 rail sums to the ledger count (" + railSum + "=" + rows.length + "), every row in exactly one segment, nothing clipped, active states are tints not fills, every passed deadline flagged (" + flagged + "/" + pv + ").";
   }
 
   function writeKPIs() {
