@@ -1339,7 +1339,14 @@ export function applyNmrNaicsDormancy(
       cautionFloor: undefined,
       severity: "P2" as const,
       nmrGuard: true,
-      requirement: `Applicability flag: the Nonmanufacturer Rule (FAR 52.219-33) is legally DORMANT on this acquisition — the assigned NAICS ${digits} (sector ${sector}) is not a supply/manufacturing/wholesale/retail code, so 13 CFR 121.406(b)(3)-(4) makes the NMR inapplicable (it governs supply buys only). Present in the clause matrix but not an eligibility bar for this buy; confirm scope with the Contracting Officer.`,
+      // NMR-CITATION-HONESTY (flag AUDIT_NMR_CITATION_HONESTY, panel gate-4 AUTO-F on 150c3ab3): "Present in the
+      // clause matrix" is a DOCUMENT-presence claim this gate never verifies — on 150c3ab3 the literal 52.219-33
+      // has zero occurrences in the package (the grounding lives in VAAR 852.219-73(d)). The honest form grounds
+      // on the excerpt the finding CARRIES (kept by the spread) — true whether or not the clause is in the matrix.
+      // Rule-identity naming of the NMR by its FAR number is a regulatory fact and stays. Flag-OFF ⇒ legacy text.
+      requirement: process.env.AUDIT_NMR_CITATION_HONESTY === "true"
+        ? `Applicability flag: the Nonmanufacturer Rule (FAR 52.219-33) is legally DORMANT on this acquisition — the assigned NAICS ${digits} (sector ${sector}) is not a supply/manufacturing/wholesale/retail code, so 13 CFR 121.406(b)(3)-(4) makes the NMR inapplicable (it governs supply buys only). Referenced in the solicitation text (see excerpt) but not an eligibility bar for this buy; confirm scope with the Contracting Officer.`
+        : `Applicability flag: the Nonmanufacturer Rule (FAR 52.219-33) is legally DORMANT on this acquisition — the assigned NAICS ${digits} (sector ${sector}) is not a supply/manufacturing/wholesale/retail code, so 13 CFR 121.406(b)(3)-(4) makes the NMR inapplicable (it governs supply buys only). Present in the clause matrix but not an eligibility bar for this buy; confirm scope with the Contracting Officer.`,
     };
   });
   if (touched) console.log(`[decide] NMR NAICS-dormancy: assigned NAICS ${digits} (sector ${sector}) non-supply → 52.219-33 demoted to P2 applicability flag (13 CFR 121.406(b)(3)-(4))`);
