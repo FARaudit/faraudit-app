@@ -2,7 +2,8 @@
    FARaudit · Opportunities — Pursuit Intelligence data shell.
 
    OPPS starts EMPTY and is populated exclusively by opportunities-live.js
-   from /api/command-center-data (Supabase pending_audits ← SAM.gov ingest).
+   from /api/command-center-data (live SAM.gov read via fetchLiveOpportunities;
+   the pending_audits queue is retired).
    No sample rows ship here: an upstream failure renders an explicit
    "feed unavailable" state, never plausible-looking data.
 
