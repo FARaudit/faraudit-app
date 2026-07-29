@@ -25,7 +25,28 @@ import { join } from "node:path";
 
 const SRC = process.argv[2] || join(process.cwd(), "public", "dashboard-live.js");
 const src = readFileSync(SRC, "utf8");
-console.log(`target: ${SRC}\n`);
+console.log(`target: ${SRC} (${src.length} bytes)\n`);
+
+// ── FAIL CLOSED ON UNRECOGNIZABLE INPUT ──────────────────────────────────────
+// Every check below is "the bad pattern is ABSENT", so a file that isn't
+// dashboard-live.js at all scores partial ✅s. Caught live 2026-07-29: pointing
+// this gate at the DEPLOYED asset returned an HTTP 307 body (15 bytes) and two
+// checks passed on it — an inert input reading as a passing input. Unrecognized
+// bytes must land on the restrictive pole, never the permissive one, so the
+// fingerprint is asserted BEFORE any absence-based check runs.
+const FINGERPRINT: Array<[string, RegExp]> = [
+  ["dashboard-live IIFE header", /Past Audits \/ Dashboard live wiring/],
+  ["the STATE object", /\bvar\s+STATE\s*=\s*\{/],
+  ["the row predicate", /function\s+rowMatchesBar/],
+];
+const missingPrint = FINGERPRINT.filter(([, re]) => !re.test(src)).map(([n]) => n);
+if (missingPrint.length) {
+  console.error(`❌ ABORT — target is not public/dashboard-live.js (missing: ${missingPrint.join(", ")}).`);
+  console.error(`   First 120 bytes: ${JSON.stringify(src.slice(0, 120))}`);
+  console.error(`   Refusing to report on unrecognizable bytes: every check here tests for the ABSENCE`);
+  console.error(`   of a bad pattern, so a redirect body / 404 page / empty file would score partial passes.`);
+  process.exit(2);
+}
 
 let failures = 0;
 const assert = (c: boolean, m: string) => {
