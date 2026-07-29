@@ -19,6 +19,7 @@
 // "extraction incomplete — verify" on the affected surface. Never emit a
 // confidently-wrong deterministic parse.
 
+import { parseDelimiterName, resolvePrimary } from "./primary-doc-resolve";
 import type { ExtractedDocument } from "./pdf-text-extractor";
 
 export type SectionConfidence = "high" | "medium" | "low" | "missing";
@@ -167,7 +168,34 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
   const DOC_DELIM_RE = /^={4}\s+DOCUMENT:\s+.+\s+={4}$/i; // the EXACT assembleFullSource delimiter (4 equals both sides) — strict so a stray in-body "=== DOCUMENT" line can't false-split
   const docMarkers: number[] = [];
   for (let i = 0; i < allLines.length; i++) { if (DOC_DELIM_RE.test(allLines[i].text.trim())) docMarkers.push(i); }
-  const primaryEnd = docMarkers.length >= 2 ? docMarkers[1] : allLines.length;
+  let primaryStart = 0;
+  let primaryEnd = docMarkers.length >= 2 ? docMarkers[1] : allLines.length;
+  // ── PRIMARY-DOCUMENT ELECTION (root-b U1, flag AUDIT_PRIMARY_DOC_ELECTION, default-OFF) ──────────────────
+  // The positional primary ([marker0, marker1)) assumes doc#1 IS the solicitation — but SAM assembly routinely
+  // writes AMENDMENTS first (measured 2026-07-29: 150c3ab3, SPRRA2-26-R-0034, 36C24126Q0569 — 3/3 packages put a
+  // stub amendment at doc#1 and the real solicitation last, so the section map came back EMPTY on the real buy).
+  // Under the flag, the primary REGION is chosen by the SAME ratified identity election docRegions uses
+  // (resolvePrimary, Card #370 R1: solicitation-form / UCF-density score; amendment markers DISQUALIFY; panel-on-
+  // design ruling 2026-07-29: ONE election in the engine, never a second scoring). Fail direction: the election is
+  // honored ONLY when confident — on confident=false the positional window is RETAINED and a warning is pushed;
+  // the existing primaryIndeterminate path (audit-orchestrator, ATTACHMENT_COVERAGE) owns the honest-fail/NHR
+  // routing, and this detector must not invent a second one. Flag-OFF ⇒ positional, byte-identical.
+  if (process.env.AUDIT_PRIMARY_DOC_ELECTION === "true" && docMarkers.length >= 2) {
+    const bounds = docMarkers.map((m, i) => ({
+      start: m + 1,
+      end: i + 1 < docMarkers.length ? docMarkers[i + 1] : allLines.length,
+      name: parseDelimiterName(allLines[m].text) ?? "(unnamed)",
+    }));
+    const regions = bounds.map((b) => ({ name: b.name, text: allLines.slice(b.start, b.end).map((l) => l.text).join("\n") }));
+    const pick = resolvePrimary(regions);
+    if (pick.confident && pick.index >= 0) {
+      primaryStart = bounds[pick.index].start;
+      primaryEnd = bounds[pick.index].end;
+      if (pick.index !== 0) warnings.push(`primary-doc election: region #${pick.index + 1} "${regions[pick.index].name}" elected as the solicitation over doc#1 (identity election, Card #370)`);
+    } else {
+      warnings.push("primary-doc election: no region confidently identifies as the solicitation — positional primary retained (honest-fail routing owns the escalation)");
+    }
+  }
   // The FORMAT of a solicitation is a property of its PRIMARY document, never of an attachment or the
   // Layer-1 notice body. Scope format detection to the primary region (same [marker0, marker1) discipline
   // section detection uses — C-11), else a stray "REQUEST FOR QUOTATION" / "SF 1449" / combined-synopsis
@@ -175,7 +203,7 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
   // absent from a recognized primary form — collapses coreMissingFor to [] = a FALSE-COMPLETE (the exact
   // notice-body-blind class L1 closes). A single-doc package has no delimiter ⇒ primaryEnd = EOF ⇒ this is
   // the whole source ⇒ byte-identical to the pre-scoping behavior (every single-blob gold source unaffected).
-  const primaryText = docMarkers.length >= 2 ? allLines.slice(0, primaryEnd).map((l) => l.text).join("\n") : fullText;
+  const primaryText = docMarkers.length >= 2 ? allLines.slice(primaryStart, primaryEnd).map((l) => l.text).join("\n") : fullText;
 
   // ─── Format detection (primary region only — see primaryText note above) ───
   let formatDetected: FormatType = "unknown";
@@ -205,7 +233,7 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
   const boundaries: Boundary[] = [];
 
   // Pass 1: explicit "SECTION X" headers — high confidence (primary region only — C-11)
-  for (let i = 0; i < primaryEnd; i++) {
+  for (let i = primaryStart; i < primaryEnd; i++) {
     const line = allLines[i].text.trim();
     if (isTocLine(line)) continue; // T0-7 — a single-line TOC entry ("SECTION B … …3") must not mint a boundary that beats the real header
     for (const pat of UCF_HEADER_PATTERNS) {
@@ -230,7 +258,7 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
   const foundKeys = new Set(boundaries.map((b) => b.key));
   for (const [key, pattern] of Object.entries(UCF_TITLE_PATTERNS)) {
     if (foundKeys.has(key)) continue;
-    for (let i = 0; i < primaryEnd; i++) {
+    for (let i = primaryStart; i < primaryEnd; i++) {
       if (pattern.test(allLines[i].text.trim())) {
         if (isTocLine(allLines[i].text)) continue; // T0-7 — skip a single-line TOC entry; keep scanning for the real heading
         boundaries.push({ key, lineIdx: i, confidence: "medium", matchedPattern: pattern.source });
@@ -246,7 +274,7 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
   // pattern (so "A - SOMETHING" cannot false-fire — A has no title pattern). Primary region only; medium; skips
   // keys already found. Anti-false-positive: a genuine "C - 1.0 SCOPE" only credits §C if §C's title keywords follow.
   const LETTER_DASH_RE = /^([A-M])\s*[-–—:]\s*(.+)$/;
-  for (let i = 0; i < primaryEnd; i++) {
+  for (let i = primaryStart; i < primaryEnd; i++) {
     const m = LETTER_DASH_RE.exec(allLines[i].text.trim());
     if (!m) continue;
     const key = m[1].toUpperCase();
@@ -274,7 +302,7 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
   };
   for (const [key, pat] of Object.entries(COMMERCIAL_CLAUSE_HEAD)) {
     if (foundKeys.has(key)) continue;
-    for (let i = 0; i < primaryEnd; i++) {
+    for (let i = primaryStart; i < primaryEnd; i++) {
       const t = allLines[i].text.trim();
       if (!pat.test(t)) continue;
       // Reject a PROSE / cross-reference line — the catastrophic false-COMPLETE vector (expert-panel
@@ -300,7 +328,7 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
   if (!foundKeys.has("C")) {
     const NSN_RE = /\b\d{4}-\d{2}-\d{3}-\d{4}\b/;
     const ITEM_DESC_RE = /\b(ITEM\s+DESCRIPTION|MFG\s+name|Schedule\s+of\s+Supplies)/i;
-    for (let i = 0; i < primaryEnd; i++) {
+    for (let i = primaryStart; i < primaryEnd; i++) {
       const t = allLines[i].text.trim();
       if (NSN_RE.test(t) || ITEM_DESC_RE.test(t)) {
         boundaries.push({ key: "C", lineIdx: i, confidence: "low", matchedPattern: "DLA_SF18_NSN_INLINE" });
