@@ -2,9 +2,9 @@
 //
 // Panel-ratified U-B (ceo/VERDICT-INVERSION-PANEL-2026-07-29.md): the gate's silent boilerplate release gets a
 // LEDGER; the obligation sweep carries a duty's severed CONSEQUENCE (sentence-pair unit); the conditional-TINA
-// demotion must not swallow a co-sentenced NMR/kill-class bar. Measured: 478/2680 (18%) ungrounded READ
-// obligations silently released across the 59-record cohort; 82 with a kill tail in the next sentence; TINA/NMR
-// = 0 corpus instances (panel traced it in shipped code → synthetic legs here).
+// demotion must not swallow a co-sentenced NMR/kill-class bar. Measured (status-filtered, sweep-reachable): 279/1822 (15%)
+// silently released across the 59-record cohort; 41 with a kill tail adjacent; TINA/NMR = 0 corpus instances
+// even with the fixed 50%-arm ruler (panel traced the vector in shipped code → synthetic legs here).
 //
 // Flags (default OFF · byte-identical OFF):
 //   AUDIT_RELEASE_LEDGER       — releasedBoilerplate bucket (count + names) in CoverageV2 → run record. Verdict-inert.
@@ -30,15 +30,15 @@ const att = (ungrounded: string[]) => [{ section: "L", status: "obligations_ungr
   const g = await import("../../src/lib/audit-gate-v2");
   // production-shape tail callback: the shared exported lookup when it exists (post-build), else a faithful
   // local stand-in (pre-build) — the POST battery additionally proves the orchestrator wires the real export.
-  const tailFn = (src: string) => (ob: string): string | null =>
-    (g as { consequenceTailAfter?: (s: string, o: string) => string | null }).consequenceTailAfter?.(src, ob)
-    ?? (() => { const i = src.indexOf(ob); return i >= 0 ? src.slice(i + ob.length, i + ob.length + 300) : null; })();
+  const tailFn = (src: string) => (ob: string): string[] =>
+    (g as { consequenceTailsAfter?: (s: string, o: string) => string[] }).consequenceTailsAfter?.(src, ob)
+    ?? (() => { const i = src.indexOf(ob); return i >= 0 ? [src.slice(i + ob.length, i + ob.length + 300)] : []; })();
 
   const run = (ungrounded: string[], src: string, flags: Record<string, string>) => {
     const prev: Array<[string, string | undefined]> = Object.keys(flags).map((k) => [k, process.env[k]]);
     for (const [k, v] of Object.entries(flags)) process.env[k] = v;
     try {
-      return g.gradeCoverageV2(att(ungrounded), { verifyRecitalPresence: (ob) => g.verifyRecitalInSource(src, ob), consequenceTail: tailFn(src) } as never);
+      return g.gradeCoverageV2(att(ungrounded), { verifyRecitalPresence: (ob) => g.verifyRecitalInSource(src, ob), consequenceTails: tailFn(src) } as never);
     } finally { for (const [k, v] of prev) { if (v === undefined) delete process.env[k]; else process.env[k] = v; } }
   };
   const SRC_KILL = `SECTION L INSTRUCTIONS. ${DUTY} ${KILL_TAIL} END.`;
@@ -79,6 +79,44 @@ const att = (ungrounded: string[]) => [{ section: "L", status: "obligations_ungr
   check("P4 both flags OFF → no escalation, no ledger key (byte-identical silent release)",
     !off.disqualifierUncovered.some((d: { obligation: string }) => d.obligation === DUTY)
     && !("releasedBoilerplate" in (off as Record<string, unknown>)), `keys=${Object.keys(off).join(",")}`);
+
+  // ═══ V-legs (verification round, executed findings — RED pre-fix) ═══
+  // V1-V4 · tail over-fire: benign tails must NOT capture (the tail gets the same release discipline as obligations)
+  const benignTails: Array<[string, string]> = [
+    ["V1 LPTA eval-methodology tail (verbatim FA303026Q0020 driver — isLptaConsequenceNonBar-accepted)", "Quotes failing to meet one or more Technical Criteria will deem the quote not technically acceptable and will not be considered for award."],
+    ["V2 rating-scale enumeration tail", "Each factor will be rated acceptable or unacceptable by the evaluation team."],
+    ["V3 pricing-adequacy adjective tail", "The Government will determine whether the offeror is not at an unacceptable risk with prices proposed too low."],
+    ["V4a 52.212-1(g) right-to-reject tail", "The Government reserves the right to reject any or all quotations received."],
+    ["V4b performance-QA right-to-reject tail", "The Government reserves the right to reject any of the Service Provider's personnel during performance."],
+  ];
+  for (const [label, tail] of benignTails) {
+    const v = run([DUTY], `SECTION L. ${DUTY} ${tail} END.`, { AUDIT_CONSEQUENCE_CAPTURE: "true", AUDIT_RELEASE_LEDGER: "false" });
+    check(`${label} → NOT captured`, !v.disqualifierUncovered.some((d: { obligation: string }) => d.obligation === DUTY), `captured`);
+  }
+  // V5 · genuine kill framings must STILL capture (over-narrowing guard)
+  const killTails: Array<[string, string]> = [
+    ["V5a will-not-be-considered", KILL_TAIL],
+    ["V5b rated-Technically-Unacceptable", "Failure to comply with these instructions will result in the quotation being rated Technically Unacceptable."],
+  ];
+  for (const [label, tail] of killTails) {
+    const v = run([DUTY], `SECTION L. ${DUTY} ${tail} END.`, { AUDIT_CONSEQUENCE_CAPTURE: "true", AUDIT_RELEASE_LEDGER: "false" });
+    check(`${label} → captured`, v.disqualifierUncovered.some((d: { obligation: string }) => d.obligation === DUTY), `missed`);
+  }
+  // V6 · document boundary: a next-document QASP opening is NOT this duty's consequence
+  const v6 = run([DUTY], `SECTION L. ${DUTY}\n==== DOCUMENT: QASP.pdf ====\nServices rated unacceptable shall be re-performed at no cost.`, { AUDIT_CONSEQUENCE_CAPTURE: "true", AUDIT_RELEASE_LEDGER: "false" });
+  check("V6 kill vocab across a ==== DOCUMENT: boundary → NOT captured", !v6.disqualifierUncovered.some((d: { obligation: string }) => d.obligation === DUTY), `captured across boundary`);
+  // V7 · all-occurrence scan: duty duplicated, kill tail only at the SECOND occurrence → captured
+  const v7src = `APPENDIX (reference only). ${DUTY} The appendix restates instructions for convenience. SECTION L. ${DUTY} ${KILL_TAIL} END.`;
+  const v7 = run([DUTY], v7src, { AUDIT_CONSEQUENCE_CAPTURE: "true", AUDIT_RELEASE_LEDGER: "false" });
+  check("V7 duty duplicated, kill tail at 2nd occurrence → captured (all-occurrence scan)", v7.disqualifierUncovered.some((d: { obligation: string }) => d.obligation === DUTY), `missed (first-occurrence-only)`);
+  // V8 · the TINA guard's 50% arm: '50%' spelling must fire; benign progress-payment '50 percent' must NOT
+  const prevCap2 = process.env.AUDIT_CONSEQUENCE_CAPTURE;
+  process.env.AUDIT_CONSEQUENCE_CAPTURE = "true";
+  const v8a = g.isConditionalTinaBoilerplate("Certified cost or pricing data are not required per FAR 15.403-1; at least 50% of the cost of manufacturing must be performed by the offeror.");
+  check("V8a NMR 50%-rule spelled '50%' → NOT demotable (guard fires)", v8a === false, `demotable=${v8a}`);
+  const v8b = g.isConditionalTinaBoilerplate("Certified cost or pricing data are not required per FAR 15.403-1; progress payments will be made at 50 percent of the contract price.");
+  check("V8b benign progress-payment '50 percent' → still demotable (guard scoped)", v8b === true, `demotable=${v8b}`);
+  process.env.AUDIT_CONSEQUENCE_CAPTURE = prevCap2 ?? "";
 
   console.log(`\n${pass} pass · ${fail} fail`);
   process.exit(fail ? 1 : 0);

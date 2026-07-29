@@ -659,12 +659,23 @@ function recitalContinuation(after: string): string {
 //                               conditional-TINA demotion refuses a co-sentenced NMR/kill-class bar.
 const releaseLedgerEnabled = () => process.env.AUDIT_RELEASE_LEDGER === "true";
 const consequenceCaptureEnabled = () => process.env.AUDIT_CONSEQUENCE_CAPTURE === "true";
-// Rejection-consequence SHAPE (allowlist, #507 doctrine — affirmative kill vocabulary, not a bar-word blocklist).
-const CONSEQUENCE_TAIL_RE = /\b(?:reject(?:ed|ion)?|unacceptable|ineligible|non-?responsive|will\s+not\s+be\s+considered|disqualif\w*|no\s+further\s+consideration|removed\s+from\s+consideration)\b/i;
+// Rejection-consequence SHAPE (allowlist, #507 doctrine). NARROWED per the U-B verification round (executed
+// over-fires): `reject` not after "right to" (52.212-1(g) reserves-the-right boilerplate + performance-QA
+// personnel rejection are standing government rights, not duty-specific kill consequences); `unacceptable`
+// not inside the rating-scale enumeration "acceptable or unacceptable" and not the adjective "unacceptable
+// risk" (pricing-adequacy prose — fired repeatedly on real 3726R0033 records). "rated Technically
+// Unacceptable" remains a capture (V5b) — only the enumeration and the risk-adjective are excluded.
+const CONSEQUENCE_TAIL_RE = /(?<!right\s+to\s+)\breject(?:ed|ion)?\b|(?<!acceptable\s+or\s+)\bunacceptable\b(?!\s+risk)|\bineligible\b|\bnon-?responsive\b|\bwill\s+not\s+be\s+considered\b|\bdisqualif\w*\b|\bno\s+further\s+consideration\b|\bremoved\s+from\s+consideration\b/i;
 // Kill-class vocabulary hasBarSignal is MEASURED blind to (panel: bid guarantee / NMR / SPRS / 50%-rule) — the
 // conditional-TINA strip-then-hasBarSignal belt cannot see these, so a co-sentenced bar was demoted (false-BID vector,
 // reproduced by probe S1). Affirmative shape allowlist, never a blocklist.
-const TINA_KILL_COSENTENCE_RE = /\b(?:non-?manufacturer|52\.219-33|small\s+business\s+manufacturer|bid\s+guarantee|bid\s+bond|sprs|50\s*(?:%|percent)|fifty\s+percent)\b/i;
+// Verification-round F4/F5: the original class-level trailing \b DEADENED the "50%" spelling (\b after "%"
+// requires a word char), so the guard's most common spelling never fired — and the bare token over-refused on
+// benign progress-payment prose. The 50%-rule arm is now its own SCOPED shape: the percentage must co-occur
+// (same [.;] segment, ≤80 chars) with cost/manufactur*/subcontract* — the limitations-on-subcontracting frame.
+const TINA_KILL_TOKEN_RE = /\b(?:non-?manufacturer|52\.219-33|small\s+business\s+manufacturer|bid\s+guarantee|bid\s+bond|sprs)\b/i;
+const TINA_50RULE_RE = /(?:50\s*(?:%|\bpercent\b)|\bfifty\s+percent\b)[^.;]{0,80}\b(?:cost|manufactur\w*|subcontract\w*)|\b(?:cost\s+of|manufactur\w*|subcontract\w*)\b[^.;]{0,80}(?:50\s*(?:%|\bpercent\b)|\bfifty\s+percent\b)/i;
+const TINA_KILL_COSENTENCE_RE = { test: (ob: string): boolean => TINA_KILL_TOKEN_RE.test(ob) || TINA_50RULE_RE.test(ob) };
 /** U-B consequence lookup — the NEXT-SENTENCE window after a duty, the OPPOSITE contract of verifyRecitalInSource's
  *  continuation (which deliberately STOPS at a sentence terminator; its purpose is a severed mid-sentence tail, and
  *  reading further would false-veto). Here the following sentence IS the target: a rejection consequence adjacent to a
@@ -672,16 +683,46 @@ const TINA_KILL_COSENTENCE_RE = /\b(?:non-?manufacturer|52\.219-33|small\s+busin
  *  bounded 300-char window; null when the obligation is not verbatim-locatable (⇒ capture declines, release stands —
  *  fail-open here is safe because the ledger still records it). ONE implementation shared by the orchestrator, the
  *  replay path, and the probes. */
-export function consequenceTailAfter(fullSource: string, ob: string): string | null {
+export function consequenceTailsAfter(fullSource: string, ob: string): string[] {
   const src = fullSource ?? "";
   const needle = ob.trim();
-  if (needle.length < 16) return null;
+  if (needle.length < 16) return [];
   const pattern = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+  const tails: string[] = [];
   try {
-    const m = new RegExp(pattern, "i").exec(src);
-    if (!m) return null;
-    return src.slice(m.index + m[0].length, m.index + m[0].length + 300);
-  } catch { return null; }
+    // ALL occurrences (verification F2 — first-occurrence-only both missed the real §L pair behind an appendix
+    // copy and captured a wrong-occurrence tail), bounded at 8. Each tail is CLAMPED at the next document
+    // delimiter (verification F3 — a QASP's opening line is not the prior document's consequence) and at 300 chars.
+    const re = new RegExp(pattern, "gi");
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(src)) !== null && tails.length < 8) {
+      let tail = src.slice(m.index + m[0].length, m.index + m[0].length + 450);
+      const docCut = tail.indexOf("==== DOCUMENT:");
+      if (docCut >= 0) tail = tail.slice(0, docCut);
+      if (tail.trim()) tails.push(tail);
+      if (m.index === re.lastIndex) re.lastIndex++;
+    }
+  } catch { return []; }
+  return tails;
+}
+/** The sentence-pair KILL test (one place; probes + sweep share it). The examined unit is the first TWO
+ *  SUBSTANTIVE sentences (≥25 chars) of the tail window — measured necessity (150c3ab3): a duty severed
+ *  mid-sentence yields a rest-of-own-sentence fragment first ("…and virus checked prior to submission."),
+ *  and URL/email dots produce degenerate micro-segments ("William." / "Shaver@va.gov."), so a strict
+ *  single-first-sentence unit missed the genuine adjacent kill ("Quote submissions … shall result in the
+ *  quote being rated Technically Unacceptable."). Anything further than two substantive sentences is
+ *  adjacency noise (verification F1d) and never examined. EACH sentence gets the SAME release discipline
+ *  the obligation side has: LPTA-methodology / government-eval-methodology sentences are not kill
+ *  consequences (F1a), and the narrowed shape excludes the rating-scale / risk-adjective /
+ *  reserves-the-right senses (F1b/F1c). */
+export function isKillConsequenceTail(tail: string): boolean {
+  const segs = tail.split(/(?<=[.!?])/).map((x) => x.trim()).filter((x) => x.length >= 25).slice(0, 2);
+  for (const sent of segs) {
+    if (!CONSEQUENCE_TAIL_RE.test(sent)) continue;
+    if (isLptaConsequenceNonBar(sent) || isGovtEvalMethodologyNonBar(sent)) continue;
+    return true;
+  }
+  return false;
 }
 
 export function verifyRecitalInSource(fullSource: string, ob: string): { present: boolean; continuation: string } | null {
@@ -867,8 +908,8 @@ export function gradeCoverageV2(attestations: SectionAttestation[], opts?: {
    *  tail for the continuation veto). Supplied by the orchestrator (holds ctx.fullSource). Double-gated: a caller-
    *  supplied fn NEVER runs flag-OFF (the block short-circuits before it is consulted). Absent ⇒ no benign claim. */
   verifyRecitalPresence?: (ob: string) => { present: boolean; continuation: string } | null;
-  /** U-B — next-sentence window lookup for consequence capture (consequenceTailAfter). Absent ⇒ capture declines. */
-  consequenceTail?: (ob: string) => string | null;
+  /** U-B — all-occurrence next-sentence window lookup (consequenceTailsAfter). Absent ⇒ capture declines. */
+  consequenceTails?: (ob: string) => string[];
 }): CoverageV2 {
   const unreadable: string[] = [];
   const ungroundedRead: string[] = [];
@@ -918,8 +959,8 @@ export function gradeCoverageV2(attestations: SectionAttestation[], opts?: {
           // firm-fact spectrum — never a silent drop, never an ambient mute). Tail unlocatable ⇒ capture declines
           // and the release stands (the ledger below still records it). Flag-OFF ⇒ branch skipped ⇒ byte-identical.
           if (consequenceCaptureEnabled()) {
-            const tail = opts?.consequenceTail?.(ob) ?? null;
-            if (tail && CONSEQUENCE_TAIL_RE.test(tail)) {
+            const tails = opts?.consequenceTails?.(ob) ?? [];
+            if (tails.some((t) => isKillConsequenceTail(t))) {
               disqualifierUncovered.push(enrich({ section: a.section, obligation: ob })); continue;
             }
           }

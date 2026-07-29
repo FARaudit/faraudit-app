@@ -12,7 +12,7 @@ const bb = JSON.parse(readFileSync("scripts/audit-ai/run-records/_ua-bb1d6997.js
 for (const [k, v] of Object.entries(bb.meta?.flagEnv ?? {})) if (v !== undefined) process.env[k] = v as string;
 
 const CONSEQUENCE_RE = /\b(?:reject(?:ed|ion)?|unacceptable|ineligible|non-?responsive|will\s+not\s+be\s+considered|disqualif\w*|no\s+further\s+consideration|removed\s+from\s+consideration)\b/i;
-const NMR_KILL_RE = /\b(?:non-?manufacturer|52\.219-33|small\s+business\s+manufacturer|bid\s+guarantee|bid\s+bond|sprs|50\s*(?:%|percent)\b|fifty\s+percent)\b/i;
+const NMR_KILL_RE = /\b(?:non-?manufacturer|52\.219-33|small\s+business\s+manufacturer|bid\s+guarantee|bid\s+bond|sprs)\b|50\s*(?:%|\bpercent\b)|\bfifty\s+percent\b/i;
 const norm = (s: string) => s.replace(/\s+/g, " ").trim();
 
 (async () => {
