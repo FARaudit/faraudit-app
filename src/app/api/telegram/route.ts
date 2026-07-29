@@ -128,6 +128,9 @@ export async function POST(req: Request) {
     } else if (text === "/fleet") {
       reply = await fleetReply();
     } else if (text.startsWith("/audit ")) {
+      // PR #328/#326 rebuilt /audit on the live USER lane (source='user' +
+      // pre-attributed audits row — the resident worker claims it). The old
+      // dead-queue telegram_manual enqueue is gone; this command is live.
       reply = await triggerAuditReply(text.slice("/audit ".length).trim());
     } else {
       reply = `APEX CEO Bot\n\n/brief — morning digest\n/status — route health\n/tasks — today's tasks\n/prospects — pipeline\n/mrr — revenue vs target\n/83b — election status\n/learn fa|br|la — education\n/news — company news\n/done [item] — log it\n/build [note] — queue it\n\n— Vertex Intelligence —\n/signals — top 5 Bullrize signals\n/corpus — FARaudit corpus stats\n/pipeline — solicitations by stage\n/fleet — Railway agent status\n/audit [notice_id] — run an audit now`;
@@ -170,14 +173,14 @@ async function topSignalsReply(): Promise<string> {
 async function corpusReply(): Promise<string> {
   const sb = getAdminClient();
   if (!sb) return "Corpus · admin client unavailable.";
-  const [audits, traps, pending] = await Promise.all([
+  // Pending-queue count dropped 2026-07-29: the pending_audits SAM queue is
+  // retired (sam-ingest gone since 2026-05-30) — the count was frozen noise.
+  const [audits, traps] = await Promise.all([
     sb.from("audits").select("*", { count: "exact", head: true }),
-    sb.from("fa_intelligence_corpus").select("*", { count: "exact", head: true }),
-    sb.from("pending_audits").select("*", { count: "exact", head: true }).eq("status", "pending")
+    sb.from("fa_intelligence_corpus").select("*", { count: "exact", head: true })
   ]);
   const total = audits.count || 0;
-  const targetPct = Math.min(100, (total / 10_000) * 100).toFixed(1);
-  return `FARaudit corpus — ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}\n\nAudits: ${total.toLocaleString()}\nTraps caught: ${traps.count || 0}\nPending queue: ${pending.count || 0}\nProgress to 10K: ${targetPct}%`;
+  return `FARaudit — ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}\n\nAudits: ${total.toLocaleString()}\nTraps caught: ${traps.count || 0}`;
 }
 
 async function pipelineReply(): Promise<string> {
@@ -211,16 +214,16 @@ async function fleetReply(): Promise<string> {
   }));
   // Agent status — confirmed only by reading each service's last output
   // footprint (audits rows come from the resident audit-worker + watcher, not
-  // a cron; sam-ingest is the one true cron here).
+  // a cron).
   const sb = getAdminClient();
   let agentLine = "Railway agents: schema unavailable";
   if (sb) {
+    // sam-ingest line dropped 2026-07-29: the service was deleted 2026-05-30
+    // (Railway CLI-verified), so its "new solicitations" count was a
+    // permanent 0.
     const since24h = new Date(Date.now() - 24 * 3600_000).toISOString();
-    const [recentAudits, recentPending] = await Promise.all([
-      sb.from("audits").select("*", { count: "exact", head: true }).gte("created_at", since24h),
-      sb.from("pending_audits").select("*", { count: "exact", head: true }).gte("created_at", since24h).eq("source", "sam_live")
-    ]);
-    agentLine = `audits 24h: ${recentAudits.count || 0} new\nsam-ingest 24h: ${recentPending.count || 0} solicitations ingested`;
+    const { count } = await sb.from("audits").select("*", { count: "exact", head: true }).gte("created_at", since24h);
+    agentLine = `audits 24h: ${count || 0} new`;
   }
   return `Railway fleet — ${new Date().toLocaleTimeString("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit" })} CT\n\n${results.join("\n")}\n\n${agentLine}`;
 }

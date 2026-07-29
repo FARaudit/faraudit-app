@@ -65,7 +65,11 @@ export async function fetchCorpusStats(client: SupabaseClient): Promise<CorpusSt
   };
 }
 
-// ─── Tab 2: Opportunities ─────────────────────────────────────────────────
+// ─── Opportunities row shape ──────────────────────────────────────────────
+// The pending_audits-backed fetchOpportunities() was retired 2026-07-29 (the
+// queue froze when sam-ingest was deleted). This type survives as the shape
+// contract for the LIVE feed — produced by fetchLiveOpportunities() in
+// ./live-opportunities.ts and consumed by HomeClient.
 export interface OpportunityRow {
   id: string;
   notice_id: string;
@@ -85,92 +89,19 @@ export interface OpportunityRow {
   compliance_score: number | null;
   bid_no_bid: string | null;
   pdf_url: string | null;
-  // Migration 020: deterministic risk classifier verdict (sam-ingest stamps
-  // at write time; backfill-fields reconciles existing rows). UI combines
-  // this static verdict with response_deadline at render time.
   risk_level: string | null;
   response_deadline: string | null;
   in_pipeline: boolean;
   watched: boolean;
   title_plain: string | null;
-  // FA-89f: cross-reference flag — true iff a row in audits with this
-  // notice_id exists with status='complete'. Computed at fetch time, NOT
-  // a real column on pending_audits. Drives the AUDIT badge in the UI.
+  // FA-89f: true iff a completed audits row exists for this notice_id —
+  // computed at fetch time. Drives the AUDIT badge in the UI.
   is_audited: boolean;
   // FA-89g: SAM-derived award ceiling (USD). Either awardCeiling or
   // baseAndAllOptionsValue on the SAM payload, whichever the agency populated.
   award_ceiling: number | null;
   created_at: string;
   processed_at: string | null;
-}
-
-export async function fetchOpportunities(
-  client: SupabaseClient,
-  opts: { limit?: number; status?: string | null; naics?: string | null } = {}
-): Promise<OpportunityRow[]> {
-  // notice_type was added in migration 003 but that migration was never applied
-  // to apex-production — so RICH used to error out and silently fall through to
-  // BASIC on every page load. Dropped from RICH; if/when migration 003 is
-  // applied, add it back here. document_type and incumbent_name DO exist on
-  // production (migrations 002 + 004 applied · schema probed 2026-05-04).
-  // solicitation_number was added in migration 019 (2026-05-07); RICH includes
-  // it · BASIC stays without it so the page renders even if 019 hasn't been
-  // applied yet (graceful degradation to notice_id fallback in the UI binding).
-  // risk_level + response_deadline added in migration 020 (2026-05-07); same
-  // graceful-degradation pattern — RICH includes them, BASIC stays without
-  // them, falls through if either migration is unapplied.
-  const RICH = "id, notice_id, solicitation_number, title, agency, naics_code, set_aside, document_type, incumbent_name, source, status, recommendation, compliance_score, bid_no_bid, pdf_url, risk_level, response_deadline, in_pipeline, watched, title_plain, award_ceiling, created_at, processed_at";
-  const BASIC = "id, notice_id, title, agency, naics_code, set_aside, source, status, recommendation, compliance_score, bid_no_bid, pdf_url, created_at, processed_at";
-  let rawRows: unknown[] = [];
-  for (const cols of [RICH, BASIC]) {
-    let q = client
-      .from("pending_audits")
-      .select(cols)
-      .not("notice_id", "like", "fa7-demo-%") // FA-164: hide FA-7 demo-queue seed rows
-      .order("created_at", { ascending: false })
-      .limit(opts.limit || 100);
-    if (opts.status) q = q.eq("status", opts.status);
-    if (opts.naics) q = q.eq("naics_code", opts.naics);
-    const { data, error } = await q;
-    if (error) {
-      if (cols === RICH) continue; // migration not applied yet → fall through to BASIC
-      throw new Error(`fetchOpportunities: ${error.message}`);
-    }
-    rawRows = (data || []) as unknown[];
-    break;
-  }
-  // FA-89f: cross-reference audits table — both for is_audited flag AND for
-  // backfilling compliance_score/recommendation. pending_audits is the SAM.gov
-  // ingest queue; AI-derived score+recommendation live in the audits table.
-  // For each pending row, look up the latest completed audit by notice_id
-  // (sorted desc on completed_at) and let those values override the queue's
-  // empty placeholders. Without this, command-center insights stay null
-  // because the queue row never gets the AI verdict written back to it.
-  const { data: completedAudits } = await client
-    .from("audits")
-    // R3: also select v3_verdict alias so poleToRecommendation can prefer the
-    // authoritative pole over the stale recommendation column.
-    .select("notice_id, compliance_score, recommendation, v3_verdict:compliance_json->v3->>verdict, completed_at")
-    .eq("status", "complete")
-    .order("completed_at", { ascending: false });
-  const auditByNotice = new Map<string, { compliance_score: number | null; recommendation: string | null; v3_verdict: string | null }>();
-  for (const a of (completedAudits || []) as Array<{ notice_id: string | null; compliance_score: number | null; recommendation: string | null; v3_verdict: string | null }>) {
-    if (!a.notice_id) continue;
-    if (auditByNotice.has(a.notice_id)) continue; // first hit wins = latest by completed_at desc
-    auditByNotice.set(a.notice_id, { compliance_score: a.compliance_score, recommendation: a.recommendation, v3_verdict: (a.v3_verdict as string | null) ?? null });
-  }
-  return rawRows.map((r) => {
-    const base = { solicitation_number: null, document_type: null, notice_type: null, incumbent_name: null, risk_level: null, response_deadline: null, in_pipeline: false, watched: false, title_plain: null, is_audited: false, award_ceiling: null, v3_verdict: null, ...(r as object) } as OpportunityRow;
-    const matched = base.notice_id ? auditByNotice.get(base.notice_id) : null;
-    base.is_audited = !!matched;
-    if (matched) {
-      if (matched.compliance_score != null) base.compliance_score = matched.compliance_score;
-      // R3: backfill the derived pole value; recommendation column goes inert for new rows.
-      base.v3_verdict = matched.v3_verdict;
-      if (matched.recommendation != null) base.recommendation = matched.recommendation;
-    }
-    return base;
-  });
 }
 
 // ─── Tab 3: Audit (history) ───────────────────────────────────────────────

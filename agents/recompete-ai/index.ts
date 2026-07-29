@@ -1,11 +1,16 @@
-// Recompete AI — daily Railway cron worker.
+// Recompete AI — daily Railway cron worker. ALERT-ONLY.
 //
 // Scans audits.outcome='won' rows. For each, estimates the period of
 // performance (preferring overview_json.period_of_performance, falling
 // back to a 12-month default). When a contract is within 180 days of
-// estimated expiration AND we haven't already queued a recompete for
-// that origin audit, write a new pending_audits row with
-// source='recompete' + recompete_origin_audit set, then Telegram-alert.
+// estimated expiration AND we haven't already alerted on that audit,
+// Telegram-alert and stamp audits.recompete_alerted_at (migration
+// 20260729190000) so the alert fires once per audit.
+//
+// 2026-07-29: this agent used to enqueue pending_audits rows with
+// source='recompete', but nothing has consumed non-user rows since the V1
+// Audit-AI purge — the queue write was a dead end and was retired (CEO
+// decision: alert-only).
 //
 // DRY_RUN=true logs the plan but writes nothing.
 
@@ -46,6 +51,7 @@ interface WonAudit {
   bid_submit_date: string | null;
   outcome_date: string | null;
   overview_json: Record<string, unknown> | null;
+  recompete_alerted_at: string | null;
 }
 
 // Parse "12 months", "1 year", "Base year + 4 option years", "36 months"
@@ -81,7 +87,7 @@ async function run() {
   // 1. Pull all won audits with a submission/outcome anchor.
   const { data: won, error: wonErr } = await supabase
     .from("audits")
-    .select("id, notice_id, title, agency, naics_code, set_aside, bid_submit_date, outcome_date, overview_json")
+    .select("id, notice_id, title, agency, naics_code, set_aside, bid_submit_date, outcome_date, overview_json, recompete_alerted_at")
     .eq("outcome", "won");
   if (wonErr) {
     console.error("[recompete-ai] failed to query audits:", wonErr.message);
@@ -96,33 +102,14 @@ async function run() {
     return;
   }
 
-  // 2. Pull pending_audits already emitted by recompete-ai so we don't double-emit.
-  const { data: existingRecompetes } = await supabase
-    .from("pending_audits")
-    .select("recompete_origin_audit")
-    .eq("source", "recompete");
-  const alreadyEmitted = new Set(
-    ((existingRecompetes as Array<{ recompete_origin_audit: string | null }>) || [])
-      .map((r) => r.recompete_origin_audit)
-      .filter((id): id is string => !!id)
-  );
-
   const now = new Date();
-  const newRows: Array<{
-    notice_id: string;
-    title: string | null;
-    agency: string | null;
-    naics_code: string | null;
-    set_aside: string | null;
-    source: "recompete";
-    notice_type: "recompete";
-    notes: string;
-    recompete_origin_audit: string;
-  }> = [];
+  const alertedIds: string[] = [];
   const alertsToSend: string[] = [];
+  const planLines: string[] = [];
 
   for (const a of candidates) {
-    if (alreadyEmitted.has(a.id)) continue;
+    // Dedup: one alert per audit, recorded on the audit row itself.
+    if (a.recompete_alerted_at) continue;
     const start = startDate(a);
     if (!start) {
       console.log(`  · skip ${a.id} · no submit/outcome date`);
@@ -143,56 +130,52 @@ async function run() {
       continue;
     }
 
-    const recompeteNoticeId = `RECOMPETE-${a.notice_id || a.id.slice(0, 8)}-${expires.toISOString().slice(0, 7)}`;
-    newRows.push({
-      notice_id: recompeteNoticeId,
-      title: a.title ? `Recompete watch — ${a.title}` : "Recompete watch",
-      agency: a.agency,
-      naics_code: a.naics_code,
-      set_aside: a.set_aside,
-      source: "recompete",
-      notice_type: "recompete",
-      notes: `Origin audit ${a.id} · estimated ${months}-month PoP · expires ${expires.toISOString().slice(0, 10)} · ${daysToExpiry}d remaining`,
-      recompete_origin_audit: a.id
-    });
+    alertedIds.push(a.id);
+    planLines.push(`${a.notice_id || a.id} · estimated ${months}-month PoP · expires ${expires.toISOString().slice(0, 10)} · ${daysToExpiry}d remaining`);
     alertsToSend.push(`⚠️ *Recompete watch* — ${a.notice_id || "—"} expires in ${daysToExpiry}d (${a.agency || "agency unknown"})`);
   }
 
-  console.log(`[recompete-ai] ${newRows.length} new recompete watch row(s) to emit`);
+  console.log(`[recompete-ai] ${alertsToSend.length} new recompete alert(s) to send`);
 
   if (DRY_RUN) {
-    newRows.slice(0, 10).forEach((r) => console.log(`  [DRY] ${r.notice_id} · ${r.notes}`));
+    planLines.slice(0, 10).forEach((l) => console.log(`  [DRY] ${l}`));
     console.log("[DRY_RUN] no DB write · no Telegram send");
     return;
   }
 
-  if (newRows.length === 0) {
+  if (alertsToSend.length === 0) {
     console.log("[recompete-ai] nothing new · exiting clean");
     return;
   }
 
-  const { error: insertErr } = await supabase.from("pending_audits").insert(newRows);
-  if (insertErr) {
-    console.error("[recompete-ai] insert failed:", insertErr.message);
-    // Try to alert anyway so the CEO knows.
-    await sendAlert(`❌ recompete-ai insert failed: ${insertErr.message}`);
-    process.exit(1);
-  }
-  console.log(`[recompete-ai] inserted ${newRows.length} pending_audits rows`);
-
   // Telegram digest — one message with all alerts (4096-char cap respected).
   const summary = [
     `*Recompete AI · ${new Date().toISOString().slice(0, 10)}*`,
-    `${newRows.length} contract(s) within ${ALERT_WINDOW_DAYS} days of expiry:`,
+    `${alertsToSend.length} contract(s) within ${ALERT_WINDOW_DAYS} days of expiry:`,
     "",
     ...alertsToSend.slice(0, 20)
   ].join("\n");
   const sent = await sendAlert(summary);
   if (!sent.ok) {
-    console.warn(`[recompete-ai] telegram alert failed: ${sent.reason}`);
-  } else {
-    console.log("[recompete-ai] telegram digest sent");
+    // Alert lost — exit red WITHOUT stamping so tomorrow's run retries.
+    console.error(`[recompete-ai] telegram alert failed: ${sent.reason}`);
+    process.exit(1);
   }
+  console.log("[recompete-ai] telegram digest sent");
+
+  // 2. Stamp the alerted audits so each alerts exactly once. Alert-then-stamp:
+  // a stamp failure means a duplicate alert tomorrow (acceptable) rather than
+  // a silently lost one — exit red so the failure is visible on Railway.
+  const { error: stampErr } = await supabase
+    .from("audits")
+    .update({ recompete_alerted_at: new Date().toISOString() })
+    .in("id", alertedIds);
+  if (stampErr) {
+    console.error("[recompete-ai] recompete_alerted_at stamp failed:", stampErr.message);
+    await sendAlert(`❌ recompete-ai: alert sent but dedup stamp FAILED (${stampErr.message}) — expect duplicate alerts until fixed. Is migration 20260729190000 applied?`);
+    process.exit(1);
+  }
+  console.log(`[recompete-ai] stamped ${alertedIds.length} audit(s)`);
 }
 
 run().catch((err) => {
