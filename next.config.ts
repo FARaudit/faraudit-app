@@ -53,7 +53,28 @@ const nextConfig: NextConfig = {
   // locally (the 2026-07-06 preview divergence: two .docx synopsis forms read
   // has_text=false on preview but extracted fine on the box). Shipping them
   // verbatim from node_modules makes require() resolve at runtime, same as local.
-  serverExternalPackages: ["@sparticuz/chromium", "puppeteer-core", "mammoth", "exceljs"],
+  //
+  // pdf-parse — SAME defect class, found live 2026-07-29 on GET /api/audit/resolve:
+  // webpack bundles pdf-parse's pdfjs-dist into the route chunk, where pdfjs's
+  // dynamic require of @napi-rs/canvas dies ("Cannot load @napi-rs/canvas
+  // package") → no DOMMatrix polyfill → extractText throws "DOMMatrix is not
+  // defined" on EVERY serverless PDF parse (the door's content read + /api/audit's
+  // sync-path has_text census both silently degrade to their honest fallbacks).
+  // External = plain runtime require from node_modules, identical to local + the
+  // Railway worker (where the same commit extracts fine).
+  serverExternalPackages: ["@sparticuz/chromium", "puppeteer-core", "mammoth", "exceljs", "pdf-parse"],
+  // pdfjs loads @napi-rs/canvas AND its own pdf.worker.mjs via dynamic
+  // require/import the file tracer misses — a pruned-file-set probe (2026-07-29)
+  // proved the nft trace ships index.cjs but NOT pdf.worker.mjs ("Setting up
+  // fake worker failed") and can miss the native binary. Either miss silently
+  // recreates the serverless extraction failure. Force-include both packages
+  // whole for the two routes that parse PDFs serverless (the canvas glob also
+  // matches the platform dirs, e.g. @napi-rs/canvas-linux-x64-gnu on Vercel;
+  // harmless where a platform dir is absent).
+  outputFileTracingIncludes: {
+    "/api/audit/resolve": ["./node_modules/pdf-parse/**/*", "./node_modules/@napi-rs/canvas*/**/*"],
+    "/api/audit": ["./node_modules/pdf-parse/**/*", "./node_modules/@napi-rs/canvas*/**/*"]
+  },
   async headers() {
     return [
       {
