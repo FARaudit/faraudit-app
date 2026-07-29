@@ -39,6 +39,11 @@ const I = {
   capability: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
   opportunities: '<circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/>',
   defenseIntel: '<path d="M12 3L4 8v8l8 5 8-5V8l-8-5z"/>',
+  // Defense Spending — NOT a new icon: this is the exact path the production
+  // Command Center already uses for the `spend` desk (public/cc-app.js DESK.spend),
+  // reused so the broken-out rail item carries the icon customers already associate
+  // with Defense Spending. No design change.
+  spend: '<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 16v-4"/><path d="M13 16V9"/><path d="M18 16v-2"/>',
   agencies: '<path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/>',
   cos: '<circle cx="9" cy="9" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M21 17c-.5-2-2-3.5-4-3.5"/>',
   cmmc: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>',
@@ -53,7 +58,14 @@ const I = {
 // The five weighted groups — importance order within each (spec §A).
 // GAO Protests + Acquisition Stages intentionally OFF the rail (routes preserved,
 // surfaced contextually). Watching folded into Opportunities → Saved (item 3).
-// Defense News + Defense Spending folded into Defense Intel (item 2).
+// Defense News + Defense Spending were folded into Defense Intel (Phase 5 item 2)
+// and are BROKEN BACK OUT as of 2026-07-29 (CEO: "I want defense intel out, no
+// changes to design"). Both routes always existed with live data (news + spending)
+// but were unreachable from the rail — only the combined entry was listed, and
+// /defense-intel is a pure redirect to /defense-news with no content of its own.
+// This is a nav change ONLY: no page markup, styling, or the in-page News|Spending
+// tab strip is touched, and /defense-intel stays as a working redirect so any
+// existing link keeps resolving.
 export const NAV_GROUPS: RailGroup[] = [
   {
     label: "Daily",
@@ -78,7 +90,8 @@ export const NAV_GROUPS: RailGroup[] = [
   {
     label: "Market Intel",
     items: [
-      { key: "defense-intel", label: "Defense Intel", href: "/defense-intel", icon: I.defenseIntel },
+      { key: "defense-news", label: "Defense News", href: "/defense-news", icon: I.defenseIntel },
+      { key: "defense-spending", label: "Defense Spending", href: "/defense-spending", icon: I.spend },
       { key: "agencies", label: "Defense Agencies", href: "/agencies", icon: I.agencies },
       { key: "contracting-officers", label: "Contracting Officers", href: "/contracting-officers", icon: I.cos },
     ],
