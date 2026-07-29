@@ -11,9 +11,13 @@ This probe queries Railway's deployment state, compares against an expected-
 state manifest, and flags drift in three categories:
 
 1. **Config drift** — `rootDirectory` or `cronSchedule` differs from manifest
-2. **Stale last-success** — too long since a SUCCESS deployment for this
-   service's cron cadence
-3. **Chronic failures** — ≥3 of the last 10 deployments FAILED/CRASHED
+2. **Cron not scheduled / overdue** — for cron services, Railway's
+   instance-level `nextCronRunAt` is absent (cron not registered) or sits
+   >30 min in the past (scheduler stuck)
+3. **Stale last-success** — non-cron services only: too long since a SUCCESS
+   deployment
+4. **Chronic failures** — ≥3 of the last 10 real (non-SKIPPED) deployments
+   FAILED/CRASHED
 
 ## When to run
 
@@ -55,9 +59,10 @@ Email-AI            │ 🔥 red   │ 4m ago       │ rootDirectory: null vs e
 
 ### Status semantics
 
-- **green** — zero drift, recent SUCCESS, no failure pattern
-- **yellow** — only "stale last_success" (cron skipped or service idle)
-- **red** — config drift OR chronic failures OR multiple drift signals
+- **green** — zero drift, no failure pattern, cron scheduled (if applicable)
+- **yellow** — only "stale last_success" (non-cron) or "cron overdue"
+- **red** — config drift OR cron not scheduled OR chronic failures OR
+  multiple drift signals
 
 ### Caveats
 
@@ -67,15 +72,29 @@ Email-AI            │ 🔥 red   │ 4m ago       │ rootDirectory: null vs e
   SUCCESS (the deploy/build succeeded; the runtime crash is logged
   separately). Cross-check via `railway logs <deployment-id>` when a service
   is suspect.
+- `SKIPPED` deployments (watch-pattern no-ops from monorepo pushes) are
+  excluded from all health math. On busy push days they can fill the entire
+  ~20-entry window — before this exclusion, a healthy service could show
+  "no SUCCESS in last 20 deployments" purely because its last real SUCCESS
+  scrolled out of the window (observed on Recompete-AI, 2026-07-29). A
+  window that is 100% SKIPPED contributes no signal at all.
+- **Cron services are not judged on deployment recency.** Railway cron RUNS
+  mostly do not create deployment entries, so deployment age only measures
+  when code was last pushed. Cron health is instead read from the
+  instance-level `nextCronRunAt` in `railway status --json`: absent → red
+  ("cron not scheduled"), >30 min in the past → yellow ("cron overdue").
+  Note `nextCronRunAt` proves the cron is *scheduled*, not that the last run
+  *succeeded* — Railway's API does not expose per-run cron history to the
+  CLI; cross-check the Cron Runs tab in the dashboard for run outcomes.
 - `rootDirectory: null` is reported as drift but does NOT always mean the
   service is broken. Most agents in the responsible-perfection monorepo run
   with full-path `startCommand`s (e.g. `node agents/audit-ai/index.js`) that
   work regardless of Root Directory. The drift IS still real and worth fixing
   for build-phase consistency, but rootDirectory drift alone is not a
   reliable operational-failure signal.
-- Operational signal: a service is genuinely failing if `last_run` shows
-  "no SUCCESS in last 10 deployments" OR last_run is much older than the
-  configured cadence.
+- Operational signal: a service is genuinely failing if real (non-SKIPPED)
+  deployments exist but none is SUCCESS, if chronic failures fire, or — for
+  cron services — if `nextCronRunAt` is absent or overdue.
 
 ## Maintaining the manifest
 
