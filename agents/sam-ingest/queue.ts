@@ -1,6 +1,7 @@
 // Tiny self-contained Supabase wrapper for the sam-ingest worker.
-// Mirrors agents/audit-ai/queue.ts's upsert path; we don't import across
-// agents to keep each one independently deployable.
+// Self-contained by design — no cross-agent imports, so the worker stays
+// independently deployable. (Historically mirrored agents/audit-ai/queue.ts;
+// that file was deleted with the audit-ai cron fork in 5dc9b18.)
 
 import { createClient } from "@supabase/supabase-js";
 
@@ -41,13 +42,12 @@ export interface PendingAuditInsert {
 // hit "existence check:" with no error body when passing 2539 IDs at once.
 const BATCH = 100;
 
-// Doctrine cap (P0-1, 2026-05-08): pending_audits queue must not exceed
-// PENDING_QUEUE_CAP rows in status='pending'. Audit-AI processes 10/batch (QUEUE_BATCH_SIZE=10 · updated May 10 2026),
-// so anything beyond this just sits until its response deadline passes
-// and becomes irrelevant — and it falsely inflates the "1,200 pending"
-// alarm count on dashboards. Cap is enforced at insert time. Existing
-// excess (1,125 rows when this shipped) is trimmed via a one-shot SQL
-// purge applied separately via Supabase Studio.
+// Doctrine cap (P0-1, 2026-05-08; reframed 2026-07-29): pending_audits must
+// not exceed PENDING_QUEUE_CAP rows in status='pending'. With the audit
+// consumer retired this is purely FEED hygiene — sam_live rows are /home
+// Intelligence Feed entries, and an uncapped table fills with expired notices
+// that falsely inflate the "1,200 pending" alarm count on dashboards. Cap is
+// enforced at insert time.
 export const PENDING_QUEUE_CAP = 250;
 
 export async function insertNew(rows: PendingAuditInsert[]): Promise<{ inserted: number; skipped: number }> {
@@ -57,7 +57,7 @@ export async function insertNew(rows: PendingAuditInsert[]): Promise<{ inserted:
   for (let i = 0; i < rows.length; i += BATCH) {
     const slice = rows.slice(i, i + BATCH);
     // FA-116: ignore user-enqueued rows — a user auditing a notice must not
-    // block the cron from ingesting that same notice into the corpus queue.
+    // block the cron from ingesting that same notice into the feed.
     const { data: existing, error: existErr } = await supabase
       .from("pending_audits")
       .select("notice_id")

@@ -3,8 +3,15 @@
 //
 // For each (NAICS × set-aside) combo, paginates SAM.gov for solicitations
 // posted in the last DAILY_WINDOW_DAYS days, dedupes by notice_id, and inserts
-// new rows into pending_audits with source='sam_live'. Audit AI consumes from
-// there on its own cron.
+// new rows into pending_audits with source='sam_live'.
+//
+// What these rows ARE (corpus retirement, 2026-07-29): live entries for the
+// /home Intelligence Feed (src/lib/bd-os/queries.ts reads pending_audits
+// directly) and the seed for the watcher-tick fan-out below. No audit consumer
+// exists — the audit-ai cron that once claimed these rows was deleted (5dc9b18)
+// with the corpus program itself. status='pending' on a sam_live row means
+// "live feed entry", not "awaiting audit"; only source='user' rows are audit
+// work (claimed by the resident audit-worker).
 //
 // Env: SAM_API_KEY · NEXT_PUBLIC_SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY ·
 //      NAICS_CODES · SET_ASIDES · DAILY_WINDOW_DAYS · PAGE_LIMIT · DRY_RUN

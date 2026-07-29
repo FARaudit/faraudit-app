@@ -1,15 +1,23 @@
 // FA-116 — resident worker loop for user-enqueued audits.
 //
-// Claims pending_audits rows with source='user' AND status='pending' (its own
-// disjoint consumer set — agents/audit-ai's cron fetchPending excludes user
-// rows, so there are no claim races across services). No response_deadline
-// filter: auditing an expired solicitation is a supported user flow
-// (closed-state report mode). No CORPUS_TARGET gate: user audits are paid
-// product actions, never throttled by the corpus ceiling.
+// Claims pending_audits rows with source='user' AND status='pending'. Claim
+// disjointness: since the V1 purge (5dc9b18) this is the ONLY pending_audits
+// consumer in the codebase — the agents/audit-ai cron fork that claimed
+// non-user rows was deleted (that directory keeps just the canonical
+// pdf.ts/anthropic-files.ts sources, no entrypoint or railway.toml), and
+// sam-ingest only inserts. The source filter scopes the claim set to user
+// rows (sam_live rows are /home Intelligence Feed entries, never audit work)
+// and gives the FA-149 test suite consumer isolation via WORKER_SOURCE. No response_deadline filter:
+// auditing an expired solicitation is a supported user flow (closed-state
+// report mode). No volume gate of any kind: user audits are paid product
+// actions, never throttled (the old corpus-building ceiling is retired with
+// the corpus program itself).
 //
-// Runs the IDENTICAL pipeline as the sync route via src/lib/audit-executor
-// (V1 3-call → persist → V2 shadow → corpus) against the audits row that the
-// route pre-attributed at enqueue time under the user's RLS session.
+// Runs the IDENTICAL pipeline as the sync route via src/lib/audit-executor:
+// executeAudit() → executeAgenticPrimary (the sole V3 agentic engine; V1
+// 3-call + V2 shadow are RETIRED) → persist + cost recording — against the
+// audits row that the route pre-attributed at enqueue time under the user's
+// RLS session.
 
 import { createClient } from "@supabase/supabase-js";
 import { executeAudit, type AuditExecutionInput } from "@/lib/audit-executor";
