@@ -5,8 +5,9 @@
 //          (or pass any number of days; default 365)
 //
 // Set DRY_RUN=true on first invocation to preview the row count + sample
-// before committing the inserts (and the downstream Anthropic spend when
-// audit-ai chews through them).
+// before committing the inserts. (No auditor consumes sam_live rows since the
+// audit-ai cron fork was deleted 2026-06-28 · 5dc9b18 — inserts only feed the
+// /opportunities surface, so there is no downstream Anthropic spend.)
 
 import dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });

@@ -18,13 +18,20 @@ const TABLE: Record<string, SizeStandard> = {
   // Manufacturing (employee-based)
   "332710": { kind: "employees", maxEmployees: 500 },   // Machine Shops
   "332721": { kind: "employees", maxEmployees: 500 },   // Precision Turned Product Mfg
+  "332722": { kind: "employees", maxEmployees: 600 },   // Bolt, Nut, Screw, Rivet & Washer Mfg
   "333415": { kind: "employees", maxEmployees: 1250 },  // AC / Commercial & Industrial Refrigeration Equipment Mfg
   "334290": { kind: "employees", maxEmployees: 800 },   // Other Communications Equipment Mfg
+  "336411": { kind: "employees", maxEmployees: 1500 },  // Aircraft Mfg
+  "336412": { kind: "employees", maxEmployees: 1500 },  // Aircraft Engine & Engine Parts Mfg
   "336413": { kind: "employees", maxEmployees: 1250 },  // Other Aircraft Part & Auxiliary Equipment Mfg
+  "336414": { kind: "employees", maxEmployees: 1300 },  // Guided Missile & Space Vehicle Mfg
   // Construction / services (receipts-based, USD)
   "236220": { kind: "receipts", maxReceiptsUsd: 45_000_000 },  // Commercial & Institutional Building Construction
   "541330": { kind: "receipts", maxReceiptsUsd: 25_500_000 },  // Engineering Services (base standard; military-program exceptions differ)
   "541511": { kind: "receipts", maxReceiptsUsd: 34_000_000 },  // Custom Computer Programming Services
+  "541512": { kind: "receipts", maxReceiptsUsd: 34_000_000 },  // Computer Systems Design Services
+  "541519": { kind: "receipts", maxReceiptsUsd: 34_000_000 },  // Other Computer Related Services (base standard; the 150-employee ITVAR standard is the footnote-18 exception, not this code's base)
+  "561210": { kind: "receipts", maxReceiptsUsd: 47_000_000 },  // Facilities Support Services
   "561320": { kind: "receipts", maxReceiptsUsd: 34_000_000 },  // Temporary Help Services
   "561720": { kind: "receipts", maxReceiptsUsd: 22_000_000 },  // Janitorial Services
   "561730": { kind: "receipts", maxReceiptsUsd: 9_500_000 },   // Landscaping Services
@@ -36,6 +43,14 @@ const TABLE: Record<string, SizeStandard> = {
 export function sizeStandardFor(naics: string | null | undefined): SizeStandard | null {
   const code = (naics ?? "").trim();
   return /^\d{6}$/.test(code) ? TABLE[code] ?? null : null;
+}
+
+/** Human-readable form of a size standard for report display: "1,250 employees" /
+ *  "$25.5M avg annual receipts". Formatting only — pass a standard obtained from
+ *  sizeStandardFor(); there is no unknown case here by construction. Pure. */
+export function formatSizeStandard(std: SizeStandard): string {
+  if (std.kind === "employees") return `${std.maxEmployees.toLocaleString("en-US")} employees`;
+  return `$${std.maxReceiptsUsd / 1_000_000}M avg annual receipts`;
 }
 
 /** Whether a firm with these affiliate-inclusive facts is small under `std`. Facts that are not

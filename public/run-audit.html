@@ -1299,5 +1299,22 @@ var __fdPartialNoticeId=null;
 (function(){var region=document.querySelector('.blk-recent .ra-region');if(!region)return;var sc=region.querySelector('.ra-scroll');if(!sc)return;function sync(){region.classList.toggle('is-overflowing',sc.scrollHeight>sc.clientHeight+1);}sync();if(typeof ResizeObserver!=='undefined'){new ResizeObserver(sync).observe(sc);}})();
 })();
 </script>
+<script>
+/* Deep-link prefill: /audit?noticeId=<ref> (the Opportunities "Run Audit"
+   button) drops the reference into the smart-detect field and fires the
+   existing format-check pipeline. Prefill only — fetching/enqueueing stays
+   behind the user's explicit click. */
+(function(){
+  try{
+    var ref=new URLSearchParams(location.search).get('noticeId');
+    if(!ref)return;
+    var input=document.querySelector('.ev-d .sm-input');
+    if(!input)return;
+    input.value=ref;
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+    input.focus();
+  }catch(e){}
+})();
+</script>
 </body>
 </html>
