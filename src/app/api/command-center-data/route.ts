@@ -6,7 +6,6 @@ import {
   fetchRecentAudits,
   fetchHomeStats,
 } from "@/lib/bd-os/queries";
-import { fetchLiveOpportunities } from "@/lib/bd-os/live-opportunities";
 import { poleToRecommendation } from "@/lib/verdict-pole";
 
 export const dynamic = "force-dynamic";
@@ -71,19 +70,10 @@ export async function GET() {
         ? _useTokens[0][0].toUpperCase()
         : (_useTokens[0][0] + _useTokens[_useTokens.length - 1][0]).toUpperCase();
 
-    const [counters, homeStats, recentAudits, opportunities, pipelineRows] = await Promise.all([
+    const [counters, homeStats, recentAudits, pipelineRows] = await Promise.all([
       fetchHeaderCounter(supabase).catch(() => ({ audits: 0, traps: 0 })),
       fetchHomeStats(supabase).catch(() => null),
       fetchRecentAudits(supabase, user.id, 200).catch(() => []),
-      // Card #774 repoint (CEO live-source ruling 2026-07-29): the static
-      // /opportunities + /today surfaces read the same live SAM feed as /home
-      // (30-min shared cache inside fetchLiveOpportunities). Fail-closed
-      // inside; on error log loudly and serve an empty feed — never stale or
-      // fabricated rows.
-      fetchLiveOpportunities(supabase).catch((err) => {
-        console.error("[command-center-data] live feed failed:", err instanceof Error ? err.message : err);
-        return [];
-      }),
       // Pipeline rows for the user — feeds Active Pursuits funnel, .ps-mid/.ps-right
       // aggregates, sidebar Pipeline danger badge, and since-bar pursuitsAdvanced.
       // PostgrestBuilder is a thenable but not a real Promise, so we use the
@@ -102,6 +92,12 @@ export async function GET() {
     const dayMs = 86400000;
     const weekMs = 7 * dayMs;
     const day2Ms = 2 * dayMs;
+
+    // The pending_audits-backed opportunities feed is retired (sam-ingest was
+    // retired 2026-05; every surviving queue row is past its deadline, so this
+    // list has served empty since then). Kept as an empty array so the static
+    // command-center/today consumers keep their response shape.
+    const opportunities: any[] = [];
 
     // ── Brief-head "since you last looked" deltas ──
     const newMatches24h = opportunities.filter((o) => {
@@ -210,18 +206,10 @@ export async function GET() {
     }).length;
 
     return NextResponse.json({
-      // ── existing fields ──
-      // liveCount + deadlineSoon derive from the live feed, not homeStats:
-      // live_sam_gov / expiring_7d count pending_audits status='pending'
-      // (permanent 0 since the queue retirement) — a dead-stat lie the live
-      // rows replace.
-      liveCount:        opportunities.length,
+      // ── existing fields (unchanged) ──
+      liveCount:        homeStats?.live_sam_gov         ?? opportunities.length,
       trapCount:        homeStats?.total_traps_caught   ?? counters.traps,
-      deadlineSoon:     opportunities.filter((o) => {
-        if (!o.response_deadline) return false;
-        const ms = new Date(o.response_deadline).getTime();
-        return !isNaN(ms) && ms > nowMs && ms <= nowMs + weekMs;
-      }).length,
+      deadlineSoon:     homeStats?.expiring_7d          ?? 0,
       auditsThisMonth:  homeStats?.audit_activity_month ?? counters.audits,
       auditTotal:       audits.length,
       opportunities:    opportunities,
