@@ -1,14 +1,10 @@
-// CANONICAL · src/lib/audit-engine.ts is the canonical source.
-// agents/audit-ai/audit-engine.ts is the parity-locked DERIVED copy.
-// Any edit here MUST be applied to that file in the same commit. The Audit-AI
-// cron can't import from src/lib/ at runtime (Railway Root Directory =
-// agents/audit-ai/ means src/ isn't in the container) — hence the vendored
-// twin. Both files MUST stay byte-equivalent below this header.
+// This file is the single source — no vendored mirror. (The former parity
+// copy agents/audit-ai/audit-engine.ts was deleted with the V1 cron fork in
+// 5dc9b18; the Railway audit worker is agents/audit-worker/, which builds with
+// Root Directory = / and imports this module through src/lib/audit-executor.)
 //
-// FA-2 cleanup helper · imported on a per-twin path (Railway = ./anthropic-files,
-// Vercel = @/lib/anthropic-files which re-exports from canonical). The IMPORT
-// path is the only line that differs between the two engine files — everything
-// from `type ContentBlock` onward is byte-equivalent. See parity header.
+// FA-2 cleanup helper · @/lib/anthropic-files re-exports from the canonical
+// agents/audit-ai/anthropic-files.ts.
 import { deletePdfFromFilesApi } from "@/lib/anthropic-files";
 import { isEnvOn } from "@/lib/env-flags";
 
