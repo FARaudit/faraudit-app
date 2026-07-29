@@ -41,7 +41,7 @@ const v2row = {
     { attr: "se:sdvosb", source: "sba_api", verifiedAt: "2026-07-15", expiresAt: "2029-07-15" },
     { attr: "registration:SAM-active", source: "sam_api", verifiedAt: "2026-07-15", expiresAt: "2027-05-01" },
   ],
-  size_facts: { receiptsAvg3yrAffiliateInclusive: 28_400_000, employeesAffiliateInclusive: 185, source: "verified_import", verifiedAt: "2026-07-15" },
+  size_facts: { receiptsAvg3yrAffiliateInclusiveUsd: 28_400_000, employeesAffiliateInclusive: 185, source: "verified_import", verifiedAt: "2026-07-15" },
 };
 
 // ── 1 · flag OFF ⇒ byte-identical legacy even with V2 data on the row ──
@@ -89,11 +89,36 @@ ok("size: unknown NAICS ⇒ no size emission (honest-fail, never a guessed thres
   !!pUnk?.attributes && !pUnk.attributes.some((r) => r.attr.startsWith("naics:") || r.attr === "sb:total"),
   JSON.stringify(pUnk?.attributes));
 const pNoFact = buildBidderProfileFromCapability(
-  { ...v2row, size_facts: { employeesAffiliateInclusive: 185, source: "verified_import" } } as any,
+  { ...v2row, size_facts: { employeesAffiliateInclusive: 185, source: "verified_import", verifiedAt: "2026-07-15" } } as any,
   { solicitationNaics: "236220", now: nowFn });
 ok("size: receipts standard but only employee fact ⇒ no emission (missing fact-kind = unknown)",
   !!pNoFact?.attributes && !pNoFact.attributes.some((r) => r.attr.startsWith("naics:") || r.attr === "sb:total"),
   JSON.stringify(pNoFact?.attributes));
+
+// ── 4b · size freshness + doctrine (verification round F5/F2) ──
+const pNoVer = buildBidderProfileFromCapability(
+  { ...v2row, size_facts: { receiptsAvg3yrAffiliateInclusiveUsd: 28_400_000, source: "verified_import" } } as any,
+  { solicitationNaics: "236220", now: nowFn });
+ok("size F5: facts WITHOUT verifiedAt ⇒ no emission (freshness discipline — stale-forever forbidden)",
+  !pNoVer?.attributes?.some((r) => r.attr.startsWith("naics:") || r.attr === "sb:total"),
+  JSON.stringify(pNoVer?.attributes));
+ok("size F5: emitted size records carry expiresAt = verifiedAt + 1 year",
+  !!p?.attributes && p.attributes.filter((r) => r.attr === "sb:total" || r.attr.startsWith("naics:"))
+    .every((r) => r.expiresAt === "2027-07-15T00:00:00.000Z"),
+  JSON.stringify(p?.attributes));
+const pSmuggle = buildBidderProfileFromCapability({
+  certifications: [],
+  attributes_v2: [
+    { attr: "sb:total", source: "verified_import" },          // stored derived size boolean — forbidden
+    { attr: "naics:236220-small", source: "sam_api" },        // forbidden
+    { attr: "size:small", source: "verified_import" },        // forbidden
+    { attr: "se:sdvosb", source: "sba_api" },                 // legitimate — must survive
+  ],
+} as any, { solicitationNaics: "561730", now: nowFn });
+ok("F2: size-class tokens (sb:/naics:/size:) in attributes_v2 are DROPPED — per-run computation is the only size source",
+  pSmuggle?.attributes?.length === 1 && pSmuggle.attributes[0].attr === "se:sdvosb"
+    && !pSmuggle.satisfiedAttributes.includes("sb:total") && !pSmuggle.satisfiedAttributes.includes("naics:236220-small"),
+  JSON.stringify(pSmuggle));
 
 // ── 5 · validation: malformed records dropped, valid kept; jsonb nulls tolerated ──
 const pVal = buildBidderProfileFromCapability({

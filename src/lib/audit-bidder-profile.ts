@@ -45,6 +45,12 @@ export interface ProfileConstructionOptions {
 
 const profileSchemaV2Enabled = () => process.env.AUDIT_PROFILE_SCHEMA_V2 === "true";
 const RECORD_SOURCES = new Set(["sam_api", "sba_api", "verified_import", "customer_asserted", "document"]);
+// Verification round F2: size-class namespaces may NEVER ride in via attributes_v2 — a stored
+// `sb:total`/`naics:*-small`/`size:*` record is exactly the NAICS-independent derived boolean the
+// per-run doctrine forbids (it would clear Total-SB bars on every solicitation regardless of the
+// standard). The per-run computation below is the ONLY size source. Namespace rule, not a phrase list.
+const SIZE_CLASS_NS = new Set(["sb", "size", "naics"]);
+const recordNamespace = (attr: string): string => (attr.includes(":") ? attr.slice(0, attr.indexOf(":")).toLowerCase() : "");
 
 /** Validate a jsonb attributes_v2 payload → well-formed ProfileAttributeRecord[]. Malformed rows
  *  are DROPPED (fail-safe: a record that cannot be trusted contributes nothing, it never blocks
@@ -56,6 +62,7 @@ function validAttributeRecords(raw: unknown): ProfileAttributeRecord[] {
     if (r === null || typeof r !== "object") continue;
     const { attr, source, verifiedAt, expiresAt } = r as Record<string, unknown>;
     if (typeof attr !== "string" || attr.trim().length === 0) continue;
+    if (SIZE_CLASS_NS.has(recordNamespace(attr.trim()))) continue;  // F2 — size is per-run only, never stored
     if (typeof source !== "string" || !RECORD_SOURCES.has(source)) continue;
     if (verifiedAt !== undefined && verifiedAt !== null && typeof verifiedAt !== "string") continue;
     if (expiresAt !== undefined && expiresAt !== null && typeof expiresAt !== "string") continue;
@@ -71,23 +78,30 @@ function validAttributeRecords(raw: unknown): ProfileAttributeRecord[] {
 
 /** Per-run size computation (U-C): affiliate-inclusive facts vs THIS solicitation's NAICS
  *  standard. Emits records ONLY on an affirmative small determination; every unknown
- *  (no facts / unknown NAICS / missing fact-kind / not-small) emits nothing. Pure. */
+ *  (no facts / unknown NAICS / missing fact-kind / not-small) emits nothing.
+ *  Freshness (verification round F5): facts without a parseable `verifiedAt` emit NOTHING —
+ *  receipts drift and a firm outgrows a standard, so a size determination with no time anchor
+ *  is the B1 "no time dimension" vector reintroduced. Emitted records expire one year after
+ *  verification (the SAM reps-and-certs recertification cadence), so the engine's
+ *  expiry-vs-asOf veto re-imposes the caution when the facts go stale. Pure. */
 function sizeAttributeRecords(rawFacts: unknown, solicitationNaics: string | null | undefined): ProfileAttributeRecord[] {
   if (rawFacts === null || typeof rawFacts !== "object") return [];
   const f = rawFacts as Record<string, unknown>;
   const std = sizeStandardFor(solicitationNaics);
   if (!std) return [];
   const small = isSmallUnder(std, {
-    receiptsAvg3yrUsd: f.receiptsAvg3yrAffiliateInclusive,
+    receiptsAvg3yrUsd: f.receiptsAvg3yrAffiliateInclusiveUsd,
     employees: f.employeesAffiliateInclusive,
   });
   if (small !== true) return [];
+  const verifiedMs = typeof f.verifiedAt === "string" ? Date.parse(f.verifiedAt) : NaN;
+  if (Number.isNaN(verifiedMs)) return [];  // F5 — no time anchor, no size determination
   const source = typeof f.source === "string" && RECORD_SOURCES.has(f.source)
     ? (f.source as ProfileAttributeRecord["source"]) : "customer_asserted";
-  const verifiedAt = typeof f.verifiedAt === "string" ? { verifiedAt: f.verifiedAt } : {};
+  const dates = { verifiedAt: f.verifiedAt as string, expiresAt: new Date(verifiedMs + 365 * 24 * 3600 * 1000).toISOString() };
   return [
-    { attr: `naics:${(solicitationNaics ?? "").trim()}-small`, source, ...verifiedAt },
-    { attr: "sb:total", source, ...verifiedAt },
+    { attr: `naics:${(solicitationNaics ?? "").trim()}-small`, source, ...dates },
+    { attr: "sb:total", source, ...dates },
   ];
 }
 
