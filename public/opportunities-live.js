@@ -1,7 +1,13 @@
-/* FARaudit · Defense Opportunities — Fork B live wiring.
-   Fetches /api/command-center-data, maps data.opportunities → window.DSO.OPPS
-   in place, then calls window.DSO_APP.render(). dso-app.js is the render
-   layer; this file only swaps data. */
+/* FARaudit · Opportunities — live wiring, fail-closed.
+   Fetches /api/command-center-data and populates window.DSO.OPPS in place,
+   then calls window.DSO_APP.render(). dso-app.js is the render layer.
+
+   HONESTY CONTRACT (probe: scratchpad probe-page.mjs, run RED pre-fix):
+   - No sample rows exist anywhere; DSO.OPPS starts empty.
+   - Fetch failure  → FEED_STATE 'error'  → explicit unavailable state.
+   - Zero rows      → FEED_STATE 'empty'  → explicit "feed is empty" state.
+   - Unknown values stay null (fit / ceiling / days / incumbent) — the render
+     layer shows "—" / "not audited", never 0, never 999, never a default. */
 (function () {
   'use strict';
 
@@ -28,32 +34,32 @@
     return 'rfp'; // RFP/RFQ/IFB/Solicitation default
   }
 
+  // null when there is no deadline — NEVER a placeholder number.
   function daysUntil(iso) {
-    if (!iso) return 999;
+    if (!iso) return null;
     const ms = new Date(iso).getTime();
-    if (isNaN(ms)) return 999;
+    if (isNaN(ms)) return null;
     return Math.ceil((ms - Date.now()) / 86400000);
   }
 
-  function postedAgo(iso) {
-    if (!iso) return '';
+  function relTime(iso) {
+    if (!iso) return null;
     const ms = new Date(iso).getTime();
-    if (isNaN(ms)) return '';
+    if (isNaN(ms)) return null;
     const diff = Date.now() - ms;
-    const d = Math.floor(diff / 86400000);
-    if (d <= 0) return 'today';
-    if (d === 1) return '1d ago';
-    if (d < 30) return d + 'd ago';
-    const mo = Math.floor(d / 30);
-    return mo + 'mo ago';
+    const h = Math.floor(diff / 3600000);
+    if (h < 1) return 'under an hour ago';
+    if (h < 48) return h + 'h ago';
+    return Math.floor(h / 24) + 'd ago';
   }
 
   function mapOpp(o) {
+    const ceilingNum = o.award_ceiling != null && !isNaN(Number(o.award_ceiling))
+      ? Number(o.award_ceiling) / 1e6
+      : null;
     return {
       id: o.solicitation_number || o.notice_id || o.id || '',
-      // notice_id is the durable SAM identifier the watcher keys off. Kept
-      // alongside the display `id` so the Track button can target it
-      // regardless of whether the display fell back to solicitation_number.
+      // notice_id is the durable SAM identifier the watcher + audit key off.
       notice_id: o.notice_id || '',
       title: o.title || 'Untitled',
       agency: o.agency || '',
@@ -61,52 +67,136 @@
       naics: o.naics_code || '',
       sa: normSetaside(o.set_aside),
       stage: normStage(o.document_type, o.status),
-      type: o.document_type || 'RFP',
+      type: o.document_type || 'Notice',
       notice_type: o.document_type || null,
       response_deadline: o.response_deadline || null,
-      ceiling: o.award_ceiling ? Number(o.award_ceiling) / 1e6 : 0,
-      days: daysUntil(o.response_deadline),
-      fit: typeof o.compliance_score === 'number' ? o.compliance_score : 0,
-      incumbent: o.incumbent_name || 'New requirement',
-      posted: postedAgo(o.created_at)
+      ceiling: ceilingNum,                                     // null = not stated
+      days: daysUntil(o.response_deadline),                    // null = no deadline
+      fit: typeof o.compliance_score === 'number' ? o.compliance_score : null, // null = not audited
+      is_audited: !!o.is_audited,
+      incumbent: o.incumbent_name || null,                     // null = none on record
+      ingested_at: o.created_at || null
     };
   }
 
+  // Returns a Set of watched notice ids, or null when the watch state could
+  // not be fetched — the render layer disables Track buttons on null rather
+  // than showing every row as un-tracked (a false negative).
   async function hydrateWatchedSet(opps) {
     const noticeIds = opps.map(o => o.notice_id).filter(Boolean);
     if (!noticeIds.length) return new Set();
     try {
       const res = await fetch('/api/watch?noticeIds=' + encodeURIComponent(noticeIds.join(',')), { credentials: 'include' });
-      if (!res.ok) return new Set();
+      if (!res.ok) return null;
       const data = await res.json();
       return new Set(Object.keys(data.watching || {}));
     } catch (_) {
-      return new Set();
+      return null;
+    }
+  }
+
+  // Pipeline membership by display id (pipeline table keys on solicitation_number).
+  // Returns a Set of ids, or null when unavailable.
+  async function hydratePipelineSet() {
+    try {
+      const res = await fetch('/api/pipeline', { credentials: 'include' });
+      if (!res.ok) return null;
+      const data = await res.json();
+      const s = new Set();
+      (data.pipeline || []).forEach(function (row) {
+        if (row.solicitation_number) s.add(row.solicitation_number);
+      });
+      return s;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Topbar status pill + header feed-meta line — bound to the REAL fetch
+  // outcome, never a hardcoded "LIVE".
+  function setFeedStatus(state, opts) {
+    const pill = document.getElementById('livePill');
+    const meta = document.getElementById('feedMeta');
+    if (pill) {
+      pill.classList.remove('err', 'wait');
+      if (state === 'live' || state === 'empty') {
+        pill.textContent = 'LIVE';
+      } else if (state === 'error') {
+        pill.classList.add('err');
+        pill.textContent = 'FEED UNAVAILABLE';
+      } else {
+        pill.classList.add('wait');
+        pill.textContent = 'CONNECTING…';
+      }
+    }
+    if (meta) {
+      if (state === 'live') {
+        const ingest = opts && opts.lastIngest ? ' · last ingest ' + opts.lastIngest : '';
+        meta.innerHTML = 'Live solicitations from the <b>SAM.gov daily ingest</b> · ' +
+          opts.count + ' notice' + (opts.count === 1 ? '' : 's') + ingest;
+      } else if (state === 'empty') {
+        meta.innerHTML = 'Connected to the <b>SAM.gov daily ingest</b> — no notices in the current window.';
+      } else if (state === 'error') {
+        meta.textContent = 'SAM.gov feed unavailable — nothing shown below is sample data.';
+      } else {
+        meta.textContent = 'Connecting to the SAM.gov ingest…';
+      }
     }
   }
 
   async function wire() {
+    if (!window.DSO) return;
+    setFeedStatus('loading');
     try {
       const res = await fetch('/api/command-center-data', { credentials: 'include' });
       if (!res.ok) throw new Error('opportunities fetch failed: ' + res.status);
       const data = await res.json();
-      if (!window.DSO) return;
       const opps = Array.isArray(data.opportunities) ? data.opportunities : [];
-      if (!opps.length) return; // empty state — keep design's empty render path
+      // The ingest queue can hold multiple rows for the same notice — showing
+      // one notice 3× inflates every count. Keep the first occurrence per
+      // notice_id (the query orders created_at desc, so first = newest).
+      const seen = new Set();
+      const mapped = [];
+      opps.forEach(function (o) {
+        const key = o.notice_id || o.solicitation_number || o.id;
+        if (key && seen.has(key)) return;
+        if (key) seen.add(key);
+        mapped.push(mapOpp(o));
+      });
 
-      const mapped = opps.map(mapOpp);
       window.DSO.OPPS.length = 0;
       window.DSO.OPPS.push(...mapped);
+      window.DSO.FEED_STATE = mapped.length ? 'live' : 'empty';
 
-      // Hydrate the watcher state for visible rows — populated as a Set on
-      // window so dso-app.js's renderList can read it without re-fetching.
-      window.DSO.WATCHED_NOTICE_IDS = await hydrateWatchedSet(mapped);
+      // Live NAICS pill set = distinct codes actually present in the feed.
+      const counts = {};
+      mapped.forEach(function (o) { if (o.naics) counts[o.naics] = (counts[o.naics] || 0) + 1; });
+      window.DSO.NAICS.length = 0;
+      Object.keys(counts).sort().forEach(function (code) {
+        window.DSO.NAICS.push({ code: code, label: counts[code] + ' in feed' });
+      });
 
-      if (window.DSO_APP && typeof window.DSO_APP.render === 'function') {
-        window.DSO_APP.render();
-      }
+      // Newest ingest write among rendered rows = honest "last ingest" time.
+      const newest = mapped.reduce(function (acc, o) {
+        const t = o.ingested_at ? new Date(o.ingested_at).getTime() : NaN;
+        return !isNaN(t) && t > acc ? t : acc;
+      }, 0);
+      window.DSO.LAST_INGEST = newest ? relTime(new Date(newest).toISOString()) : null;
+      setFeedStatus(window.DSO.FEED_STATE, { count: mapped.length, lastIngest: window.DSO.LAST_INGEST });
+
+      // Watch + pipeline state for visible rows (null = unavailable → the
+      // render layer disables those buttons instead of faking "off").
+      const hydrated = await Promise.all([hydrateWatchedSet(mapped), hydratePipelineSet()]);
+      window.DSO.WATCHED_NOTICE_IDS = hydrated[0];
+      window.DSO.PIPELINE_IDS = hydrated[1];
     } catch (e) {
       console.error('[opportunities-live] wire failed:', e);
+      window.DSO.OPPS.length = 0;
+      window.DSO.FEED_STATE = 'error';
+      setFeedStatus('error');
+    }
+    if (window.DSO_APP && typeof window.DSO_APP.render === 'function') {
+      window.DSO_APP.render();
     }
   }
 
