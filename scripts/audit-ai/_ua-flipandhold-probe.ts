@@ -119,23 +119,48 @@ const check = (label: string, ok: boolean, detail: string) => {
     check("G3b credential-conditional stays NHR with AUDIT_CREDENTIAL_CONDITIONAL_REASON=false (kind ≠ prose)",
       g3b.verdict === "NEEDS_HUMAN_REVIEW", `got ${g3b.verdict} :: ${(g3b.reason ?? "").slice(0, 120)}`);
 
-    // G4 — review P1: a credential-conditional item at index ≥1 (behind an admin item) keeps its Rule 70(c)
-    // mute under the flag — the cc scan must cover the WHOLE firing bucket, not just the quoted [0] item.
+    // G4 — review P1 (round-2 F-R2-3 rebuilt this leg: the first construction was INERT — its cc item carried
+    // bar vocab, so B3 ranking promoted it to the quoted head where even the head-only derivation tagged it).
+    // DISTINGUISHING construction: the head is a tier-1 DISQUALIFIER_RE item (non-cc, outranks everything), the
+    // cc item is bar-vocab-FREE at index ≥1 — head-only kind derivation calls this bucket "uncovered" (RED
+    // pre-fix at 3858078), the bucket-wide scan holds the mute (GREEN post-fix).
     const ccDeepInputs = JSON.parse(JSON.stringify(bb.result.inputs));
     ccDeepInputs.coverageV2.disqualifierUncovered = [
-      { section: "F", obligation: "the contract will also contain provision for four (4) annual option years: option year 1: 07/01/2027 - 06/30/2028" },
-      { section: "H", obligation: "The contractor shall maintain an active SAM registration throughout the period of performance; lapse is grounds for termination." },
+      { section: "L", obligation: "Offerors that fail to submit the required descriptive literature will not be considered for award." },
+      { section: "H", obligation: "The contractor shall maintain a valid professional license during the entire contract performance." },
     ];
     const g4 = deriveVerdict(ccDeepInputs);
-    check("G4 credential-conditional at index ≥1 → NEEDS_HUMAN_REVIEW (whole-bucket cc scan)",
-      g4.verdict === "NEEDS_HUMAN_REVIEW" && /credential-conditional/i.test(g4.reason ?? ""),
-      `got ${g4.verdict} :: ${(g4.reason ?? "").slice(0, 120)}`);
+    check("G4 bar-vocab-free credential-conditional at index ≥1 → NEEDS_HUMAN_REVIEW (whole-bucket cc scan)",
+      g4.verdict === "NEEDS_HUMAN_REVIEW", `got ${g4.verdict} :: ${(g4.reason ?? "").slice(0, 120)}`);
+
+    // G5 — round-2 F-R2-2: the DECISIVE end of the Rule 70(c) firm-fact spectrum (pre-award possession of a
+    // long-lead credential) must keep its mute — releasing it to a billable committal while SAM-maintenance
+    // held would invert severity.
+    const ffInputs = JSON.parse(JSON.stringify(bb.result.inputs));
+    ffInputs.coverageV2.disqualifierUncovered = [{
+      section: "L", obligation: "Offeror must possess a current Top Secret facility clearance at the time of award.",
+    }];
+    const g5 = deriveVerdict(ffInputs);
+    check("G5 pre-award possession of a long-lead credential → NEEDS_HUMAN_REVIEW (firm_fact_bar holds)",
+      g5.verdict === "NEEDS_HUMAN_REVIEW", `got ${g5.verdict} :: ${(g5.reason ?? "").slice(0, 120)}`);
+
+    // G6 — round-2 F-R2-1: the GENERIC verifier-unsound and conflict NHR exits must not LOSE the released item.
+    const vsInputs = { ...bb.result.inputs, documentsComplete: true, verifierSound: false };
+    const g6a = deriveVerdict(vsInputs);
+    check("G6a verifier-unsound NHR reason still NAMES the released item (caution appended)",
+      g6a.verdict === "NEEDS_HUMAN_REVIEW" && /CAUTION — /.test(g6a.reason ?? ""), `got ${g6a.verdict} :: ${(g6a.reason ?? "").slice(0, 140)}`);
+    const cfInputs = { ...bb.result.inputs, documentsComplete: true, conflict: true } as never;
+    const g6b = deriveVerdict(cfInputs);
+    check("G6b expert-conflict NHR reason still NAMES the released item (caution appended)",
+      g6b.verdict === "NEEDS_HUMAN_REVIEW" && /CAUTION — /.test(g6b.reason ?? ""), `got ${g6b.verdict} :: ${(g6b.reason ?? "").slice(0, 140)}`);
 
     // O1 — flag-OFF byte-identity (fresh process semantics: env flip + re-derive; the flag must be read at
     // CALL time in the new code for this in-process check to be valid — if it is import-time the build is wrong)
     process.env.AUDIT_COVERAGE_CAP_NOT_MUTE = "false";
     const off = deriveVerdict(bb.result.inputs);
-    check("O1 flag-OFF → NEEDS_HUMAN_REVIEW with the identical pre-fix reason (byte-identity)",
+    // (Label honesty, round-2 F-R2-5: this leg asserts verdict + the coverage-cap reason SHAPE; full byte-identity
+    // rests on the acceptance corpus flag-OFF run + the end-gauntlet matrix, not on this single substring.)
+    check("O1 flag-OFF → NEEDS_HUMAN_REVIEW via the coverage cap (byte-identity proven by corpus, not this leg)",
       off.verdict === "NEEDS_HUMAN_REVIEW" && /could not be grounded/i.test(off.reason ?? ""), `got ${off.verdict}`);
   }
 

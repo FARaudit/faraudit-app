@@ -3586,7 +3586,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //     never committal. Uses nhrEligible() (an undetermined verdict never asserts eligible=false — Gate-2 finding #4).
   //     Absent/empty unreadEvidence ⇒ byte-identical (no effect). Candidate A has NO verdict authority; this routes it.
   if (inp.unreadEvidence && inp.unreadEvidence.length)
-    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), `Unread/missing referenced material observed — human verification needed: ${clampToWord(inp.unreadEvidence.map((u) => u.note).join("; "), 220)}`, dispositions, [], "coverage");
+    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), withCoverageCaution(`Unread/missing referenced material observed — human verification needed: ${clampToWord(inp.unreadEvidence.map((u) => u.note).join("; "), 220)}`), dispositions, [], "coverage");
 
   // 1d. SET-ASIDE CONFLICT (Brain #332) — SAM (system of record) and the document name DIFFERENT set-aside programs.
   //     This changes WHO is eligible (an ineligible firm could bid, or an eligible firm could walk — zero-contract-
@@ -3601,7 +3601,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
 
   // 2. Verification soundness — if adversarial verification did not succeed, the findings aren't trustworthy.
   if (!inp.verifierSound)
-    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "Adversarial verification did not succeed — findings not trustworthy enough to decide.", dispositions, [], "verification");
+    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), withCoverageCaution("Adversarial verification did not succeed — findings not trustworthy enough to decide."), dispositions, [], "verification");
 
   // 2b. VERIFIED-FLOOR (Brain card 224 fork 1) — coverage is complete and verification reported sound, yet ZERO
   //     findings survive to decide over (none raised, or every one overturned). A committal verdict CANNOT rest
@@ -3755,7 +3755,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
 
   // 4. Unresolved material conflict between experts the loop could not reconcile.
   if (inp.conflict)
-    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), "Unresolved material conflict between experts.", dispositions, [], "conflict");
+    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), withCoverageCaution("Unresolved material conflict between experts."), dispositions, [], "conflict");
 
   // 4b. SELF-CLEARABLE PACKAGE (card #590 Modified-B, flag AUDIT_SELF_CLEARABLE_PACKAGE, default-OFF). VERIFIER-SOVEREIGN
   //     — only reached with verifierSound=true (step 2) + coverage/documents complete + no show-stopper/universal defect

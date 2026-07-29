@@ -908,7 +908,10 @@ export function gradeCoverageV2(attestations: SectionAttestation[], opts?: {
 // NHR becomes a BID_WITH_CAUTION cap (never a mute), while a "credential_conditional" NHR keeps its full force
 // (Rule 70 case (c): an unverifiable firm-fact a bar turns on). Additive — cap/reason are untouched, so every
 // existing consumer is byte-identical whether or not it reads the field.
-export type GateV2Outcome = { cap: "INCOMPLETE" | "NEEDS_HUMAN_REVIEW" | null; reason: string; kind?: "credential_conditional" | "uncovered_obligation" };
+// "firm_fact_bar" (round-2 F-R2-2): a pre-award possession frame or long-lead/scarce credential anywhere in the
+// firing bucket — the decisive end of the Rule 70(c) firm-fact spectrum. Kept muted by the consumer's fail-closed
+// positive test exactly like "credential_conditional".
+export type GateV2Outcome = { cap: "INCOMPLETE" | "NEEDS_HUMAN_REVIEW" | null; reason: string; kind?: "credential_conditional" | "firm_fact_bar" | "uncovered_obligation" };
 
 // ── VERDICT ARC step 4 (moves 1+2) — VERBATIM-VETO RETIREMENT, flag `AUDIT_RETIRE_VERBATIM_VETO` default-OFF ──
 // Move 2 as ratified: "retire the verbatim MATCH, keep the source-obligation ENUMERATION." This flag implements
@@ -1140,7 +1143,16 @@ export function gateV2Outcome(cov: CoverageV2, opts?: { findings?: Array<{ kind?
     // pre-existing flag state (kind is additive — only the U-A consumer reads it).
     const ccHead = credentialConditionalRecital(d.obligation) ? d : undefined;
     const ccAny = ccHead ?? firing.find((f) => credentialConditionalRecital(f.obligation));
-    const kind: "credential_conditional" | "uncovered_obligation" = ccAny ? "credential_conditional" : "uncovered_obligation";
+    // F-R2-2 (round-2 red-team, executed): Rule 70 case (c) is the firm-fact SPECTRUM, not the #575b prose
+    // family alone. Without this, the DECISIVE end of the spectrum — "must possess a Top Secret facility
+    // clearance at the time of award" (pre-award possession), CMMC/QPL/ITAR (long-lead credentials) — was
+    // RELEASED to a billable committal cap while the routine end ("maintain an active SAM registration")
+    // held its mute: severity inverted. Same pure, flag-independent classifiers the self-clearable
+    // recognizer uses (card #590). "firm_fact_bar" keeps the mute via the consumer's fail-closed positive
+    // test (it releases ONLY "uncovered_obligation") — no consumer change needed.
+    const firmFactAny = ccAny ? undefined : firing.find((f) => hasPreAwardPossession(f.obligation) || hasLongLeadCredential(f.obligation));
+    const kind: "credential_conditional" | "firm_fact_bar" | "uncovered_obligation" =
+      ccAny ? "credential_conditional" : firmFactAny ? "firm_fact_bar" : "uncovered_obligation";
     if (credentialConditionalReasonEnabled()) {
       // Prose selection: pre-U-A behavior quotes the head iff the HEAD is cc (byte-identical with cap-not-mute
       // OFF); with cap-not-mute ON the prose may quote the cc item found anywhere in the bucket — under the cap
@@ -1150,7 +1162,11 @@ export function gateV2Outcome(cov: CoverageV2, opts?: { findings?: Array<{ kind?
         const cc = credentialConditionalRecital(ccQuote.obligation)!;
         const ccWhere = ccQuote.locatedAt ? `at ${ccQuote.locatedAt}` : `in §${ccQuote.section}`;
         const ccCtx = ccQuote.contextNote ? ` ${clampNote(ccQuote.contextNote)}` : "";
-        return { cap: "NEEDS_HUMAN_REVIEW", kind: "credential_conditional", reason: `A credential-conditional requirement ${ccWhere} could not be grounded to a finding — it requires ${cc.credential}. Confirm your firm holds this before bidding — human verification needed: "${ccQuote.obligation.slice(0, 120)}".${ccCtx}` };
+        // F-R2-4: under the cap regime the cc item may not be the B3-ranked head — disclose the count so the
+        // ranked most-significant item is never silently absent from the customer reason. Cap OFF ⇒ "" (byte-identical).
+        const ccMore = process.env.AUDIT_COVERAGE_CAP_NOT_MUTE === "true" && cov.disqualifierUncovered.length > 1
+          ? ` ${cov.disqualifierUncovered.length} obligations in this package could not be grounded; this one is quoted because it turns on a firm credential.` : "";
+        return { cap: "NEEDS_HUMAN_REVIEW", kind: "credential_conditional", reason: `A credential-conditional requirement ${ccWhere} could not be grounded to a finding — it requires ${cc.credential}. Confirm your firm holds this before bidding — human verification needed: "${ccQuote.obligation.slice(0, 120)}".${ccMore}${ccCtx}` };
       }
     }
     // ── B4 (Brain ruling on cards #690/#691, 2026-07-23) — STOP CHARACTERIZING AN UNRANKED SENTENCE AS A BAR ──
