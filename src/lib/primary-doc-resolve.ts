@@ -53,8 +53,17 @@ const SOLICITATION_FORM_RE = /\bSF ?1449\b|SOLICITATION\/CONTRACT\/ORDER FOR COM
 // SF-30 (title past char 3000) evade disqualification while its "Request for Quotations" body still scored it as primary.
 const AMENDMENT_DOC_RE = /amendment of solicitation[\s\/]{0,3}modification of contract\b/i;
 const AMENDMENT_NAME_RE = /(?:^|[^a-z])(?:am|amd|amend(?:ment)?|mod(?:ification)?)[_\- .]?\d/i;
-const isAmendmentRegion = (r: { name: string; text: string }) =>
-  AMENDMENT_NAME_RE.test(r.name) || AMENDMENT_DOC_RE.test(r.text.slice(0, 20000));
+// ANCHOR EXTENSION (root-b U1, panel-on-design 2026-07-29: "extend resolvePrimary if its anchors are thin" —
+// measured confident=false on BOTH live CERT-5 packages). VA names amendment notices "SOL# 000N.docx" — no am/amd
+// filename token, no SF-30 form title — but their body carries the standard amendment-cover sentence ("The purpose
+// of this amendment is to extend the close date…"). Same 20000-char head window as every other identity anchor.
+// Direction note: a CONFORMED reissue that embeds an amendment cover page would be disqualified by this anchor —
+// that falls to confident=false → the caller's NHR routing, never a silent wrong pick (conservative).
+const AMENDMENT_PURPOSE_RE = /the purpose of this (?:amendment|modification) is/i;
+const isAmendmentRegion = (r: { name: string; text: string }) => {
+  const head = r.text.slice(0, 20000);
+  return AMENDMENT_NAME_RE.test(r.name) || AMENDMENT_DOC_RE.test(head) || AMENDMENT_PURPOSE_RE.test(head);
+};
 /** Pick the primary solicitation region by IDENTITY (Card #370 R1). Returns the chosen index and whether the pick is
  *  CONFIDENT (a real solicitation form / strong UCF structure was found on a non-amendment doc). `confident=false` on a
  *  multi-doc package means no doc looks like the solicitation → the caller must fail-toward NHR. `index` is a best-effort
@@ -70,7 +79,15 @@ export function resolvePrimary(regions: Array<{ name: string; text: string }>): 
     // "see Section C" cross-references — else a compliance-matrix / flow-down attachment that merely cites UCF sections
     // could out-score the true solicitation and be confidently mis-picked as primary (Card #370 code-review finding).
     const ucf = Math.min((r.text.match(/^\s*SECTION [A-M]\b/gim) || []).length, 13);
-    const score = (SOLICITATION_FORM_RE.test(head) ? 100 : 0) + ucf * 5;
+    // ANCHOR EXTENSION (root-b U1, panel-authorized 2026-07-29) — two solicitation identities that carry NO form:
+    //   · a LETTER RFP ("Letter Request for Proposal", the DLA SPRRA2-26-R-0034 shape), and
+    //   · a FAR 12.603 COMBINED SYNOPSIS/SOLICITATION (its definitional boilerplate IS the identity — the same
+    //     pattern the section detector's format pass uses; the 36C24126Q0569 shape).
+    // Both are form-grade identity statements (+100 class), not density heuristics.
+    const identity = SOLICITATION_FORM_RE.test(head)
+      || /letter request for proposal/i.test(head)
+      || /combined\s+synopsis\s*\/?\s*solicitation|format\s+(?:prescribed\s+)?in\s+(?:FAR\s+)?subpart\s+12\.6/i.test(head);
+    const score = (identity ? 100 : 0) + ucf * 5;
     if (score > bestScore) { bestScore = score; best = i; }
   });
   // CONFIDENT only when a real solicitation form OR strong UCF density (≥5 sections) was found on a non-amendment doc.

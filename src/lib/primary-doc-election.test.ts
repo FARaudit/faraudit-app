@@ -103,6 +103,40 @@ const withFlag = <T>(on: boolean, fn: () => T): T => {
     console.log("  (P7 skipped — 150c3ab3 snapshot not present)");
   }
 
+
+  // ── P8-P10 — ANCHOR EXTENSIONS (panel: "extend resolvePrimary if its anchors are thin"; measured 2026-07-29:
+  //    confident=false on BOTH live CERT-5 packages). Probes written RED-first against the un-extended election.
+  const { resolvePrimary } = await import("./primary-doc-resolve");
+
+  // P8 — LETTER RFP identity (the SPRRA2-26-R-0034 shape: DLA letter, no form header at all).
+  {
+    const pick = resolvePrimary([
+      { name: "RFP_SPRRA226R0034_AMD 0003.pdf", text: "AMENDMENT 3 updated parts list." },
+      { name: "parts-list.xlsx", text: "PN QTY UNIT PRICE" },
+      { name: "RFP SPRRA2-26-R-0034.pdf", text: "DEFENSE LOGISTICS AGENCY\nRE: Letter Request for Proposal (RFP) SPRRA2-26-R-0034\nRaytheon,\nThe Defense Logistics Agency wishes to price the part numbers." },
+    ]);
+    ok("P8 Letter RFP elected CONFIDENTLY (identity anchor)", pick.index === 2 && pick.confident === true);
+  }
+
+  // P9 — COMBINED SYNOPSIS identity (the 36C24126Q0569 shape: FAR 12.603 definitional boilerplate, no form).
+  {
+    const pick = resolvePrimary([
+      { name: "Q0569 0001.docx", text: "SOLICITATION NUMBER\n36C24126Q0569\nDESCRIPTION\nThe purpose of this amendment is to extend the close date from 06/16/2026 to 06/23/2026." },
+      { name: "Q0569.docx", text: "SOLICITATION NUMBER\n36C24126Q0569\nDESCRIPTION\nThis is a combined synopsis/solicitation for commercial items prepared in accordance with the format in Subpart 12.6, as supplemented." },
+    ]);
+    ok("P9 combined synopsis elected CONFIDENTLY over the amendment notice", pick.index === 1 && pick.confident === true);
+  }
+
+  // P10 — AMENDMENT-PURPOSE body boilerplate DISQUALIFIES (VA names amendments "SOL# 000N" — no am/amd token,
+  //       no SF-30 title; the body sentence is the identity).
+  {
+    const pick = resolvePrimary([
+      { name: "36C24126Q0569 0005.docx", text: "DESCRIPTION\nThe purpose of this amendment is to answer vendor questions." },
+      { name: "prose.txt", text: "unrelated prose with no identity signals at all" },
+    ]);
+    ok("P10 amendment-purpose body is disqualified from primary (falls to the non-amendment doc)", pick.index === 1);
+  }
+
   console.log(`\n──────────────  ${pass} pass · ${fail} fail`);
   process.exit(fail === 0 ? 0 : 1);
 })();
