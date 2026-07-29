@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
 import { fetchSolicitationByNoticeId, resolveAgency, resolveOfficeLeaf, type Solicitation } from "@/lib/sam";
+import { classifyDocType } from "../../../../agents/sam-ingest/helpers";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
 import { assembleSamDocumentSet, assembleUploadedDocumentSet, deriveSolTokenFromFilenames, hasEngineText, type AssembledDocumentSet, type IngestionMeta } from "@/lib/sam-attachments";
 import { extractText } from "@/lib/pdf-text-extractor";
@@ -519,6 +520,10 @@ export async function POST(req: NextRequest) {
       office_leaf: resolveOfficeLeaf(solicitation), // FA-151
       naics_code: solicitation.naicsCode,
       set_aside: solicitation.typeOfSetAside,
+      // Stamped at creation from the SAM notice type (classifyDocType = the
+      // ingest's source of truth) — the upload/sol# path used to leave this
+      // null, which is why 74 of 103 audits had an empty Type column.
+      document_type: classifyDocType(solicitation.type ?? null),
       posted_date: solicitation.postedDate,
       response_deadline: solicitation.responseDeadLine,
       user_id: user.id,
@@ -725,6 +730,10 @@ async function enqueueAsyncAudit(args: {
       office_leaf: resolveOfficeLeaf(solicitation), // FA-151
       naics_code: solicitation.naicsCode,
       set_aside: solicitation.typeOfSetAside,
+      // Stamped at creation from the SAM notice type (classifyDocType = the
+      // ingest's source of truth) — the upload/sol# path used to leave this
+      // null, which is why 74 of 103 audits had an empty Type column.
+      document_type: classifyDocType(solicitation.type ?? null),
       posted_date: solicitation.postedDate,
       response_deadline: solicitation.responseDeadLine,
       user_id: userId,
