@@ -1,8 +1,9 @@
-// PARITY NOTE (retired): agents/audit-ai/sam.ts was a byte-equivalent vendored
-// copy of this file; it was deleted in 5dc9b18 (V1/shadow engine purge), so no
-// vendored-copy sync is owed anymore. agents/sam-ingest/sam-client.ts remains a
-// sibling implementation of the same endpoint — keep host/param conventions
-// aligned when touching the search URL.
+// This file is the single source — no vendored mirror. (The former parity
+// copy agents/audit-ai/sam.ts was deleted with the V1 cron fork in 5dc9b18;
+// the Railway audit worker is agents/audit-worker/, which builds with Root
+// Directory = / and imports @/lib/sam directly.) agents/sam-ingest/sam-client.ts
+// remains a sibling implementation of the same endpoint — keep host/param
+// conventions aligned when touching the search URL.
 
 import type { LiveSamStatus } from "./audit-temporal";
 import { fetchNoticeVersionCount } from "./sam-history";

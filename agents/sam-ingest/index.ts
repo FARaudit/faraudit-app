@@ -3,8 +3,10 @@
 //
 // For each (NAICS × set-aside) combo, paginates SAM.gov for solicitations
 // posted in the last DAILY_WINDOW_DAYS days, dedupes by notice_id, and inserts
-// new rows into pending_audits with source='sam_live'. Audit AI consumes from
-// there on its own cron.
+// new rows into pending_audits with source='sam_live'. No auditor consumes
+// these rows (the audit-ai cron fork was deleted 2026-06-28 · 5dc9b18; the
+// resident audit-worker claims source='user' only) — they feed the
+// /opportunities surface, the pin flow, and BD-OS queries.
 //
 // Env: SAM_API_KEY · NEXT_PUBLIC_SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY ·
 //      NAICS_CODES · SET_ASIDES · DAILY_WINDOW_DAYS · PAGE_LIMIT · DRY_RUN
