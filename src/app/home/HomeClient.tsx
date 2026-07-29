@@ -603,7 +603,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                 <button className="sit-card" style={{ borderTop: "3px solid var(--gold)" }} onClick={() => setTab("opportunities")}>
                   <div className="sit-label" style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".12em", color: "var(--gold2)", marginBottom: 8 }}>● Live on SAM.gov Now</div>
                   <div className="sit-value gold">{stats.total}</div>
-                  <div className="sit-sub" style={{ fontSize: 11, color: "rgba(238, 243, 250,.85)", lineHeight: 1.55, marginTop: 6 }}>Active federal solicitations posted right now across your NAICS codes. Updated by sam-ingest cron — every one is a potential contract.</div>
+                  <div className="sit-sub" style={{ fontSize: 11, color: "rgba(238, 243, 250,.85)", lineHeight: 1.55, marginTop: 6 }}>Active federal solicitations posted right now across your NAICS codes. Read live from SAM.gov — every one is a potential contract.</div>
                   <div style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--gold)", marginTop: 10, borderTop: "1px solid rgba(55, 138, 221,.15)", paddingTop: 8 }}>Open SAM.gov Feed →</div>
                 </button>
                 <button className="sit-card" style={{ borderTop: "3px solid var(--green)" }} onClick={() => setTab("past-audits")}>
@@ -657,7 +657,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                     {filtered.length === 0 && (
                       <div className="empty-state">
                         {opportunities.length === 0
-                          ? `Feed populates daily at 06:00 CDT · sam-ingest cron next run in ${hoursUntilNextSamIngest()} hour${hoursUntilNextSamIngest() === 1 ? "" : "s"}`
+                          ? "Live SAM.gov feed returned no notices in the current window — it refreshes automatically as new notices post."
                           : "No solicitations match this filter."}
                       </div>
                     )}
@@ -976,7 +976,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                     {oppRows.length === 0 && (
                       <div className="empty-state">
                         {opportunities.length === 0
-                          ? `Feed populates daily at 06:00 CDT · sam-ingest cron next run in ${hoursUntilNextSamIngest()} hour${hoursUntilNextSamIngest() === 1 ? "" : "s"}`
+                          ? "Live SAM.gov feed returned no notices in the current window — it refreshes automatically as new notices post."
                           : "No opportunities match your filters."}
                       </div>
                     )}
@@ -1318,19 +1318,6 @@ interface Enriched {
   saLabel: string;
   auditStatusCls: "pending" | "processing" | "complete" | "failed" | "none";
   auditStatusLabel: string;
-}
-
-// Hours until the next sam-ingest cron run (06:00 CDT = 11:00 UTC).
-// Returns at least 1 so the empty-state never displays "in 0 hours".
-function hoursUntilNextSamIngest(): number {
-  const now = new Date();
-  const nextRun = new Date();
-  nextRun.setUTCHours(11, 0, 0, 0);
-  if (nextRun.getTime() <= now.getTime()) {
-    nextRun.setUTCDate(nextRun.getUTCDate() + 1);
-  }
-  const hours = Math.ceil((nextRun.getTime() - now.getTime()) / 3_600_000);
-  return Math.max(1, hours);
 }
 
 function enrichRow(row: OpportunityRow): Enriched {
