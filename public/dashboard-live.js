@@ -24,11 +24,25 @@
   //   - tr click → /audit/{sol}
   // ═══════════════════════════════════════════════════════
 
+  // ONE reset writer for the slicer set. Every place that clears filters calls
+  // this — the slicer-bar #paClear, the no-match "clear filters" link, and the
+  // STATE initializer below. Card #769 re-keyed the slicers (Status → Window,
+  // Recommendation → the verdict rail) and updated #paClear but not the
+  // no-match link, which kept resetting the retired rec/status keys and dropped
+  // `window`. STATE.f.window became undefined, rowMatchesBar's
+  // `f.window !== "all"` then rejected EVERY row, and syncSlicers hid the
+  // working clear — so the control offering to rescue you from the empty state
+  // emptied the ledger with no way back but a reload. Adding a slicer here
+  // fixes every reset at once. Gated by public/_past-audits-filter-reset.test.ts.
+  function defaultFilters() {
+    return { time: "all", window: "all", agency: "all", type: "all", naics: "all", setAside: "all" };
+  }
+
   var STATE = {
     rows: [],
     // card #769 — the verdict rail owns the verdict axis (one field, one control)
     seg: "all",
-    f: { time: "all", window: "all", agency: "all", type: "all", naics: "all", setAside: "all" },
+    f: defaultFilters(),
     // Default order: most recently audited first (CEO ruling 2026-07-28).
     // 'audited' sorts on age-hours; dir 1 = ascending age = newest first.
     sortKey: "audited",
@@ -172,6 +186,11 @@
       // opens that report, not the newest audit sharing its solicitation number.
       uuid:   String(audit.id || ""),
       id:     audit.solicitation_number || audit.notice_id || audit.id || "—",
+      // Can the failed-state page actually offer a retry? It strips both retry
+      // CTAs when the audit has no SAM notice behind it (upload-sourced,
+      // notice_id "pdf-…") — see _render-states.ts. Mirrored here so a row
+      // never advertises "Re-run" and lands on a page with nothing to click.
+      retryable: !!audit.notice_id && !/^pdf-/i.test(String(audit.notice_id)),
       title:  (audit.title || "Untitled").trim(),
       agency: normalizeAgency(audit.agency),
       naics:  audit.naics_code || "—",
@@ -216,7 +235,7 @@
       + '<td class="cell-date">' + esc(a.date) + '</td>'
       + '<td><span class="vcell" data-pole="' + esc(a._s) + '"><i class="pd ' + esc(a._s) + '"></i>' + esc(SL[a._s]) + '</span></td>'
       + '<td><span class="stcell">' + stInner + '</span></td>'
-      + '<td class="right"><a class="view-link" href="/audit/' + slug + '">' + (failed ? "Re-run" : "View") + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></td>'
+      + '<td class="right"><a class="view-link" href="/audit/' + slug + '">' + (failed && a.retryable ? "Re-run" : "View") + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></td>'
       + '</tr>';
   }
 
@@ -610,7 +629,7 @@
         e.preventDefault();
         STATE.seg = "all";
         STATE.search = "";
-        STATE.f = { time: "all", agency: "all", type: "all", rec: "all", status: "all", naics: "all", setAside: "all" };
+        STATE.f = defaultFilters();
         document.querySelectorAll(".pa-filter").forEach(function (s) { s.value = "all"; });
         document.querySelectorAll(".fbtn").forEach(function (b) {
           b.classList.toggle("active", b.dataset.filter === "all");
@@ -695,7 +714,7 @@
     if (clr && !clr.dataset.ccWired) {
       clr.dataset.ccWired = "1";
       clr.addEventListener("click", function () {
-        STATE.f = { time: "all", window: "all", agency: "all", type: "all", naics: "all", setAside: "all" };
+        STATE.f = defaultFilters();
         STATE.seg = "all";
         STATE.search = "";
         document.querySelectorAll(".pa-filter").forEach(function (s) { s.value = "all"; });
