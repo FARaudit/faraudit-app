@@ -1150,7 +1150,13 @@ export function gateV2Outcome(cov: CoverageV2, opts?: { findings?: Array<{ kind?
     // held its mute: severity inverted. Same pure, flag-independent classifiers the self-clearable
     // recognizer uses (card #590). "firm_fact_bar" keeps the mute via the consumer's fail-closed positive
     // test (it releases ONLY "uncovered_obligation") — no consumer change needed.
-    const firmFactAny = ccAny ? undefined : firing.find((f) => hasPreAwardPossession(f.obligation) || hasLongLeadCredential(f.obligation));
+    // U-A.1 NARROWING (round-3 finding 1): the possession-frame arm holds ONLY with a credential noun in the
+    // SAME obligation — the bare "must hold/possess" token alone re-muted §L submission mechanics ("hold prices
+    // firm for 90 days", "shall hold a pre-bid conference"), silently re-muting a slice of the release cohort.
+    // Scoped HERE only: PREAWARD_POSSESSION_RE itself is shared with the #576 upkeep discriminator and the #590
+    // self-clearable recognizer and is untouched. The long-lead arm is unchanged (its tokens ARE credential nouns).
+    const firmFactAny = ccAny ? undefined : firing.find((f) =>
+      (hasPreAwardPossession(f.obligation) && CREDENTIAL_TOKEN_RE.test(f.obligation)) || hasLongLeadCredential(f.obligation));
     const kind: "credential_conditional" | "firm_fact_bar" | "uncovered_obligation" =
       ccAny ? "credential_conditional" : firmFactAny ? "firm_fact_bar" : "uncovered_obligation";
     if (credentialConditionalReasonEnabled()) {
