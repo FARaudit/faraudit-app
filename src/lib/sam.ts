@@ -70,6 +70,30 @@ export function sanitizeSolicitationNumber(raw: string | null | undefined): stri
   return t;
 }
 
+// Document-type normalizer. Mirrors agents/sam-ingest/helpers.ts:classifyDocType
+// so audits.document_type and pending_audits.document_type share one vocabulary
+// (the Past Audits Type column + fType slicer read audits.document_type).
+// Deterministic on SAM's `type` string only — never inferred from sol# letters
+// or titles. Priority: contract-structure markers first (IDIQ / BPA / Task
+// Order / Mod), then SAM canonical type strings, then title-cased first word;
+// empty / null input returns "Other".
+export function classifyDocType(t: string | null): string {
+  const raw = (t || "").trim();
+  const s = raw.toLowerCase();
+  if (s.includes("idiq")) return "IDIQ";
+  if (s.includes("bpa")) return "BPA";
+  if (s.includes("task order")) return "TaskOrd";
+  if (s.includes("modification")) return "Mod";
+  if (s.includes("sources sought")) return "SrcSght";
+  if (s.includes("presolicitation") || s.includes("pre-sol") || s.includes("pre sol")) return "PreSol";
+  if (s.includes("combined")) return "Combined";
+  if (s.includes("award")) return "Award";
+  if (s.includes("solicitation")) return "RFQ"; // most common defense small-biz type
+  if (!raw) return "Other";
+  const first = raw.split(/[\s/,]+/)[0] || raw;
+  return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+}
+
 // Agency resolver. Mirrors agents/sam-ingest/helpers.ts:resolveAgency to keep
 // the audit and SAM-ingest paths consistent. Behavior:
 //   1. Pick fullParentPathName first; fall back to department / subTier for

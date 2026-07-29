@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
-import { fetchSolicitationByNoticeId, resolveAgency, resolveOfficeLeaf, type Solicitation } from "@/lib/sam";
+import { classifyDocType, fetchSolicitationByNoticeId, resolveAgency, resolveOfficeLeaf, type Solicitation } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
 import { assembleSamDocumentSet, assembleUploadedDocumentSet, deriveSolTokenFromFilenames, hasEngineText, type AssembledDocumentSet, type IngestionMeta } from "@/lib/sam-attachments";
 import { extractText } from "@/lib/pdf-text-extractor";
@@ -521,6 +521,7 @@ export async function POST(req: NextRequest) {
       set_aside: solicitation.typeOfSetAside,
       posted_date: solicitation.postedDate,
       response_deadline: solicitation.responseDeadLine,
+      document_type: classifyDocType(solicitation.type),
       user_id: user.id,
       status: "processing"
     })
@@ -727,6 +728,7 @@ async function enqueueAsyncAudit(args: {
       set_aside: solicitation.typeOfSetAside,
       posted_date: solicitation.postedDate,
       response_deadline: solicitation.responseDeadLine,
+      document_type: classifyDocType(solicitation.type),
       user_id: userId,
       status: "processing"
     })
