@@ -29,7 +29,7 @@ export async function POST(
   // cron-ingested notice_id, which would make .maybeSingle() throw on >1 row.
   const { data: pa, error: paErr } = await supabase
     .from("pending_audits")
-    .select("notice_id, solicitation_number, title, agency, naics_code, set_aside, response_deadline")
+    .select("notice_id, solicitation_number, title, agency, naics_code, set_aside, response_deadline, document_type")
     .eq("notice_id", notice_id)
     .neq("source", "user")
     .maybeSingle();
@@ -101,6 +101,9 @@ export async function POST(
       naics_code:          pa.naics_code,
       set_aside:           pa.set_aside,
       response_deadline:   pa.response_deadline,
+      // Already classifyDocType-normalized by sam-ingest; null for legacy
+      // pending rows stays null rather than a guessed bucket.
+      document_type:       pa.document_type ?? null,
       user_id:             user.id,
       status:              "pending",
       in_pipeline:         true,

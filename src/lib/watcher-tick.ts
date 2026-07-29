@@ -16,7 +16,7 @@
 // responsible for the gate (Bearer check inside the API route).
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { fetchSolicitationByNoticeId, resolveAgency, resolveOfficeLeaf, type Solicitation } from "@/lib/sam";
+import { classifyDocType, fetchSolicitationByNoticeId, resolveAgency, resolveOfficeLeaf, type Solicitation } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
 import { assembleSamDocumentSet, type AssembledDocumentSet, type IngestionMeta } from "@/lib/sam-attachments";
 import { uploadPdfToFilesApi } from "@/lib/anthropic-files";
@@ -356,10 +356,10 @@ export async function runWatcherTick(opts: WatcherTickOptions = {}): Promise<Wat
       try {
         const { data: capRow } = await admin
           .from("capability_statements")
-          .select("certifications")
+          .select("certifications, attributes_v2, size_facts")
           .eq("user_id", row.user_id)
           .maybeSingle();
-        bidderProfile = buildBidderProfileFromCapability(capRow);
+        bidderProfile = buildBidderProfileFromCapability(capRow, { solicitationNaics: solicitation.naicsCode });
       } catch { /* unknown firm on any error — never block the audit */ }
 
       // Build the engine input (SAM PDF fetch/ingest).
@@ -387,6 +387,7 @@ export async function runWatcherTick(opts: WatcherTickOptions = {}): Promise<Wat
           set_aside: solicitation.typeOfSetAside ?? null,
           posted_date: solicitation.postedDate ?? null,
           response_deadline: solicitation.responseDeadLine ?? row.response_deadline ?? null,
+          document_type: classifyDocType(solicitation.type ?? null),
           audit_source: "watcher_auto",
           status: "processing" as const
         })
