@@ -1,7 +1,8 @@
-// PARITY NOTE: agents/audit-ai/sam.ts is a byte-equivalent vendored copy of
-// this file. Any edit here MUST be applied to that file in the same commit.
-// The Audit-AI cron can't import from src/lib/ at runtime (Railway Root
-// Directory = agents/audit-ai/ means src/ isn't in the container).
+// PARITY NOTE (retired): agents/audit-ai/sam.ts was a byte-equivalent vendored
+// copy of this file; it was deleted in 5dc9b18 (V1/shadow engine purge), so no
+// vendored-copy sync is owed anymore. agents/sam-ingest/sam-client.ts remains a
+// sibling implementation of the same endpoint — keep host/param conventions
+// aligned when touching the search URL.
 
 import type { LiveSamStatus } from "./audit-temporal";
 import { fetchNoticeVersionCount } from "./sam-history";
@@ -132,6 +133,80 @@ function mapOpportunity(o: Record<string, unknown>): Solicitation {
     description: ((o.description as string | undefined) || "").slice(0, 4000),
     resourceLinks: Array.isArray(o.resourceLinks) ? (o.resourceLinks as string[]) : []
   };
+}
+
+// ── NAICS search (the /api/sam feed) ─────────────────────────────────────────
+// SAM v2 search REQUIRES postedFrom AND postedTo (MM/dd/yyyy) and accepts ONE
+// naicsCode per call — a comma-joined list silently matches nothing useful.
+// Mirrors agents/sam-ingest/sam-client.ts (the cron client that demonstrably
+// works against this endpoint). Fail-closed by construction: any per-code call
+// failing fails the whole search — a partial result presented as the full feed
+// would be a lie. Error strings are sanitized (status/kind only) so the api_key
+// embedded in upstream URLs can never reach a response body.
+
+export type SamSearchOutcome =
+  | { ok: true; total: number; solicitations: Solicitation[] }
+  | { ok: false; kind: "unconfigured" | "upstream"; error: string };
+
+function fmtSamDate(d: Date): string {
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${mm}/${dd}/${d.getFullYear()}`;
+}
+
+export async function searchOpportunitiesByNaics(opts: {
+  naicsCodes: string[];
+  limit?: number;
+  daysBack?: number;
+}): Promise<SamSearchOutcome> {
+  const apiKey = process.env.SAM_API_KEY;
+  if (!apiKey) {
+    return { ok: false, kind: "unconfigured", error: "SAM_API_KEY is not configured on the server" };
+  }
+  const limit = Math.min(Math.max(opts.limit ?? 10, 1), 100);
+  const daysBack = Math.min(Math.max(opts.daysBack ?? 30, 1), 365);
+  const to = new Date();
+  const from = new Date(to.getTime() - daysBack * 86400_000);
+
+  try {
+    const pages = await Promise.all(
+      opts.naicsCodes.map(async (code) => {
+        // ncode, NOT naicsCode — probed 2026-07-29: naicsCode is silently
+        // ignored (returns the full unfiltered feed); ncode actually filters.
+        const params = new URLSearchParams({
+          api_key: apiKey,
+          ncode: code,
+          postedFrom: fmtSamDate(from),
+          postedTo: fmtSamDate(to),
+          limit: String(limit),
+          ptype: "o,p,k,r,s",
+        });
+        const res = await fetch(`${SAM_SEARCH}?${params.toString()}`, {
+          headers: { Accept: "application/json" },
+          signal: AbortSignal.timeout(20000),
+        });
+        // Status only — the upstream body/URL can embed the api_key.
+        if (!res.ok) throw new Error(`SAM.gov responded ${res.status}`);
+        const data = await res.json();
+        return {
+          items: ((data.opportunitiesData || []) as Record<string, unknown>[]).map(mapOpportunity),
+          total: typeof data.totalRecords === "number" ? data.totalRecords : 0,
+        };
+      })
+    );
+    const merged = pages
+      .flatMap((p) => p.items)
+      .sort((a, b) => String(b.postedDate ?? "").localeCompare(String(a.postedDate ?? "")))
+      .slice(0, limit);
+    return { ok: true, total: pages.reduce((s, p) => s + p.total, 0), solicitations: merged };
+  } catch (err) {
+    // Sanitized: keep our own status-shaped message, downgrade anything else
+    // (timeouts, DNS, TLS) to a generic kind so no URL/key fragment survives.
+    const msg = err instanceof Error && /^SAM\.gov responded \d{3}$/.test(err.message)
+      ? err.message
+      : "SAM.gov request failed (network or timeout)";
+    return { ok: false, kind: "upstream", error: msg };
+  }
 }
 
 // User-entered IDs come in two flavors: SAM UUID notice IDs (e.g.

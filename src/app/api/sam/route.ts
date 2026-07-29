@@ -1,95 +1,61 @@
 import { NextResponse } from "next/server";
+import { resolveAgency, searchOpportunitiesByNaics } from "@/lib/sam";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const SAM_API_KEY = process.env.SAM_API_KEY || "";
+// /api/sam — live SAM.gov opportunity search, fail-closed.
+//
+// This route NEVER returns sample rows. Its three outcomes:
+//   200 { source: "live", total, opportunities }   — real upstream data
+//   503 { source: "unconfigured", error }          — SAM_API_KEY missing
+//   502 { source: "error", error }                 — upstream failed
+// The UI must render the non-200 shapes as an explicit unavailable state.
+// The API key lives server-side only and error strings are sanitized in
+// src/lib/sam.ts (status only), so the key can never reach a response body.
+// Proof: src/app/api/sam/route.failclosed.test.ts (run RED pre-fix).
 
-const DEMO_OPPORTUNITIES = [
-  {
-    id: "DEMO-001",
-    title: "Machined Aluminum Components for F-35 Program",
-    agency: "Department of Defense — Lockheed Martin Corp",
-    naics: "336413",
-    type: "Solicitation",
-    postedDate: new Date(Date.now() - 2 * 86400000).toISOString(),
-    responseDeadline: new Date(Date.now() + 14 * 86400000).toISOString(),
-    setAside: "Total Small Business",
-    solicitationNumber: "DEMO-FA3016-26-Q-XXXX",
-    description: "This is demo data. Add SAM_API_KEY to see live solicitations.",
-    uiLink: "https://sam.gov"
-  },
-  {
-    id: "DEMO-002",
-    title: "CNC Precision Parts for T-38 Talon Trainer",
-    agency: "Air Force Materiel Command",
-    naics: "336413",
-    type: "Solicitation",
-    postedDate: new Date(Date.now() - 1 * 86400000).toISOString(),
-    responseDeadline: new Date(Date.now() + 21 * 86400000).toISOString(),
-    setAside: "Total Small Business",
-    solicitationNumber: "DEMO-FA3016-26-Q-YYYY",
-    description: "Sample solicitation for CNC machined parts for T-38 Talon trainer aircraft maintenance.",
-    uiLink: "https://sam.gov"
-  }
-];
+const DEFAULT_NAICS = ["336413", "332710", "332720", "332999", "334511"];
+const MAX_CODES = 6;
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const naics = searchParams.get("naics") || "336413,332710,332720,332999,334511";
-  const limit = searchParams.get("limit") || "10";
 
-  if (!SAM_API_KEY) {
-    return NextResponse.json({
-      source: "demo",
-      notice: "Add SAM_API_KEY environment variable to enable live feed. Register free at open.gsa.gov/api/get-opportunities-public-api/",
-      opportunities: DEMO_OPPORTUNITIES
-    });
+  const naicsRaw = searchParams.get("naics");
+  const naicsCodes = (naicsRaw ? naicsRaw.split(",") : DEFAULT_NAICS)
+    .map((c) => c.trim())
+    .filter((c) => /^\d{6}$/.test(c))
+    .slice(0, MAX_CODES);
+  if (naicsCodes.length === 0) {
+    return NextResponse.json(
+      { source: "error", error: "naics must be one or more 6-digit codes", opportunities: [] },
+      { status: 400 }
+    );
+  }
+  const limit = Number.parseInt(searchParams.get("limit") || "10", 10) || 10;
+
+  const outcome = await searchOpportunitiesByNaics({ naicsCodes, limit });
+
+  if (!outcome.ok) {
+    return NextResponse.json(
+      { source: outcome.kind === "unconfigured" ? "unconfigured" : "error", error: outcome.error, opportunities: [] },
+      { status: outcome.kind === "unconfigured" ? 503 : 502 }
+    );
   }
 
-  try {
-    const today = new Date();
-    const thirtyDaysAgo = new Date(today.getTime() - 30 * 86400000);
-    const dateStr = thirtyDaysAgo.toISOString().split("T")[0].replace(/-/g, "");
+  const opportunities = outcome.solicitations.map((s) => ({
+    id: s.noticeId,
+    title: s.title,
+    agency: resolveAgency(s),
+    naics: s.naicsCode,
+    type: s.type,
+    postedDate: s.postedDate,
+    responseDeadline: s.responseDeadLine,
+    setAside: s.typeOfSetAside,
+    solicitationNumber: s.solicitationNumber,
+    description: s.description.slice(0, 300),
+    uiLink: s.noticeId ? `https://sam.gov/opp/${s.noticeId}/view` : null,
+  }));
 
-    // sam.gov/api/prod, NOT api.sam.gov (the latter 404s).
-    const url = `https://sam.gov/api/prod/opportunities/v2/search?api_key=${SAM_API_KEY}&naicsCode=${naics}&limit=${limit}&postedFrom=${dateStr}&active=Yes&setAside=SBA`;
-
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`SAM.gov API error: ${res.status}`);
-    const data = await res.json();
-
-    type SamOpportunity = {
-      noticeId: string;
-      title: string;
-      fullParentPathName?: string;
-      organizationHierarchy?: { name?: string }[];
-      naicsCode?: string;
-      type?: string;
-      postedDate?: string;
-      responseDeadLine?: string;
-      typeOfSetAside?: string;
-      solicitationNumber?: string;
-      description?: string;
-      uiLink?: string;
-    };
-
-    const opportunities = (data.opportunitiesData || []).map((opp: SamOpportunity) => ({
-      id: opp.noticeId,
-      title: opp.title,
-      agency: opp.fullParentPathName || opp.organizationHierarchy?.[0]?.name,
-      naics: opp.naicsCode,
-      type: opp.type,
-      postedDate: opp.postedDate,
-      responseDeadline: opp.responseDeadLine,
-      setAside: opp.typeOfSetAside,
-      solicitationNumber: opp.solicitationNumber,
-      description: opp.description?.substring(0, 300),
-      uiLink: opp.uiLink
-    }));
-
-    return NextResponse.json({ source: "live", total: data.totalRecords, opportunities });
-  } catch (err) {
-    return NextResponse.json({ source: "error", error: String(err), opportunities: DEMO_OPPORTUNITIES });
-  }
+  return NextResponse.json({ source: "live", total: outcome.total, opportunities });
 }
