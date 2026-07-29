@@ -17,14 +17,21 @@ export default function SAMFeedPreview() {
   const [source, setSource] = useState("");
 
   useEffect(() => {
-    fetch("/api/sam?naics=336413&limit=5")
-      .then((r) => r.json())
-      .then((data) => {
-        setOpps(data.opportunities || []);
-        setSource(data.source);
+    // active=1&setAside=SBA are what make the "active small business" caption
+    // below true — the filters must be requested, not assumed.
+    fetch("/api/sam?naics=336413&limit=5&active=1&setAside=SBA")
+      .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
+      .then(({ ok, data }) => {
+        // /api/sam is fail-closed: non-200 means the feed is unavailable and
+        // carries zero rows — render that state, never a substitute list.
+        setOpps(ok ? data.opportunities || [] : []);
+        setSource(ok ? data.source : "error");
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {
+        setSource("error");
+        setLoading(false);
+      });
   }, []);
 
   const daysUntil = (dateStr: string): number | null => {
@@ -46,17 +53,21 @@ export default function SAMFeedPreview() {
             fontSize: "10px",
             padding: "3px 8px",
             borderRadius: "4px",
-            background: source === "live" ? "rgba(16,185,129,.15)" : "rgba(245,158,11,.15)",
-            color: source === "live" ? "#10B981" : "#F59E0B",
+            background: source === "live" ? "rgba(16,185,129,.15)" : "rgba(239,68,68,.15)",
+            color: source === "live" ? "#10B981" : "#FCA5A5",
             fontWeight: 700
           }}
         >
-          {source === "live" ? "● LIVE" : "● DEMO"}
+          {source === "live" ? "● LIVE" : "● UNAVAILABLE"}
         </div>
       </div>
 
       {loading ? (
         <div style={{ color: "#4a6a96", fontSize: "13px" }}>Loading solicitations...</div>
+      ) : source !== "live" ? (
+        <div style={{ color: "#FCA5A5", fontSize: "13px" }}>
+          SAM.gov feed unavailable right now — no substitute data is shown. Try again shortly.
+        </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           {opps.map((opp) => {
@@ -98,7 +109,7 @@ export default function SAMFeedPreview() {
       )}
 
       <div style={{ marginTop: "12px", fontSize: "11px", color: "#4a6a96" }}>
-        {source === "demo" ? "⚠ Demo data shown. Register SAM_API_KEY for live feed." : `Showing ${opps.length} active small business solicitations.`}{" "}
+        {source === "live" ? `Showing ${opps.length} active small business solicitations.` : ""}{" "}
         <a href="/audit" style={{ color: "#B5D4F4" }}>
           Run audit on any solicitation →
         </a>

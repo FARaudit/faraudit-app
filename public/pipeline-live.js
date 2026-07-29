@@ -5,6 +5,17 @@
     '07':'Award','08':'Post-Award'
   };
 
+  // estimated_value is stored as a plain dollar number (so command-center-data
+  // can parseFloat it); format for display here. Legacy rows holding a
+  // pre-formatted string like "$18.4M" are passed through unchanged.
+  function fmtValue(v){
+    var n = typeof v === 'number' ? v : parseFloat(String(v));
+    if (!isFinite(n) || /[^0-9.\-]/.test(String(v).trim())) return v;
+    if (n >= 1e6) { var m = n/1e6; return '$' + (m % 1 === 0 ? m : m.toFixed(1)) + 'M'; }
+    if (n >= 1e3) { var k = n/1e3; return '$' + (k % 1 === 0 ? k : k.toFixed(1)) + 'K'; }
+    return '$' + n.toLocaleString();
+  }
+
   function daysLeft(dateStr){
     if(!dateStr) return null;
     return Math.ceil((new Date(dateStr) - Date.now()) / 864e5);
@@ -39,7 +50,7 @@
       + '<div class="pcard-meta">'
       + '<div class="item"><span class="k">Stage</span><span class="v"><span class="stage-pill">' + stageLabel + '</span></span></div>'
       + '<div class="item"><span class="k">Due</span>' + dueBadge(days) + '</div>'
-      + (c.estimated_value ? '<div class="item"><span class="k">Ceiling</span><span class="v amount">' + c.estimated_value + '</span></div>' : '')
+      + (c.estimated_value ? '<div class="item"><span class="k">Ceiling</span><span class="v amount">' + fmtValue(c.estimated_value) + '</span></div>' : '')
       + (c.naics ? '<div class="item"><span class="k">NAICS</span><span class="v">' + c.naics + '</span></div>' : '')
       + '</div>'
       + (c.notes ? '<p class="pcard-agency" style="margin-top:8px;font-size:11px;opacity:.65;line-height:1.5">' + c.notes + '</p>' : '')
