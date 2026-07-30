@@ -1,15 +1,11 @@
-/* FARaudit · Contracting Officers — Fork B live wiring.
+/* FARaudit · Contracting Officers — live wiring.
    Fetches /api/ko-intelligence (shared route — also serves
    audit/[id]/AuditReport for per-email KO lookups), mutates window.DCO
-   IN PLACE if response is in DCO shape, else no-op (mock preserved).
+   IN PLACE if response is in DCO shape, else no-op.
 
-   Bug B fix: dropped `?live` URL gate that prevented this from ever
-   firing in production.
-
-   TODO: API currently returns flat { kos: [...] } from ko_intelligence
-   table. DCO needs OFFICERS array with computed fit/rel/respDays/timeline,
-   plus REL_META/KIND_META lookups. Needs new fetchKODetail() query that
-   joins ko_intelligence + audits + new ko_interactions table. */
+   The route answers with a flat { kos: [...] }; this file writes the OFFICERS
+   shape (computed fit/rel/respDays/timeline + REL_META/KIND_META), so the
+   no-op path is the live one until the route supplies that shape. */
 (function () {
   'use strict';
 

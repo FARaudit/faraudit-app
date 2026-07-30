@@ -1,13 +1,10 @@
-/* FARaudit · Wage Benchmarks — Fork B live wiring.
+/* FARaudit · Wage Benchmarks — live wiring.
    Fetches /api/labor-rates (shared route — also serves home/HomeClient.tsx
    for per-user wage summary). Mutates window.WAGE IN PLACE if response is
-   in WAGES shape, else no-op (mock preserved).
+   in WAGES shape, else no-op.
 
-   TODO: needs new user_labor_rates table (operator-editable hourly rates
-   per category/site). API currently returns market benchmarks (low/median/
-   high) without the user's "yours" column. Once user_labor_rates ships,
-   add fetchWageBenchmarksFull() that joins user_labor_rates + wage_rate_cache
-   + the existing benchmark REFERENCE to produce WAGES with yours/sca/var/status. */
+   The route answers with market benchmarks (low/median/high) and carries no
+   per-operator "yours" column, so the no-op path is the live one. */
 (function () {
   'use strict';
 

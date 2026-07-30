@@ -16,9 +16,9 @@
 // a second literal key set cannot be introduced without failing here.
 //
 // Falsification (run it both ways — a gate that cannot fail proves nothing):
-//   npx tsx public/_past-audits-filter-reset.test.ts                 → PASS (fixed)
+//   npx tsx test/test/public/_past-audits-filter-reset.test.ts                 → PASS (fixed)
 //   git show HEAD~1:public/dashboard-live.js > /tmp/old.js && \
-//     npx tsx public/_past-audits-filter-reset.test.ts /tmp/old.js   → FAIL (the live bug)
+//     npx tsx test/test/public/_past-audits-filter-reset.test.ts /tmp/old.js   → FAIL (the live bug)
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

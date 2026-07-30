@@ -1,4 +1,4 @@
-/* FARaudit · Defense Spending — Fork B live wiring.
+/* FARaudit · Defense Spending — live wiring.
    Fetches /api/defense-spending, mutates window.DSB IN PLACE, re-renders.
    When API ships `_source: "unwired-mock-preserved"`, this script is a no-op
    and the client-side mock in dsb-data.js continues to display.

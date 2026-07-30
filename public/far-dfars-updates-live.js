@@ -1,4 +1,4 @@
-/* FARaudit · FAR/DFARS Updates — Fork B live wiring.
+/* FARaudit · FAR/DFARS Updates — live wiring.
    Fetches /api/regulatory-updates (real RSS aggregation from acquisition.gov,
    DPC DFARS, and Federal Register, cached server-side). Maps each row to
    the window.FARD.UPDATES shape and re-renders via far-app.js.
@@ -21,9 +21,7 @@
     return 'FAR';
   }
 
-  // Lightweight impact classifier — keyword heuristic on title + summary.
-  // TODO: replace with Claude-side ai_insight + ai_impact in the route's
-  // batch enrichment step (mirror defense-news pattern).
+  // Impact classifier — keyword heuristic over title + summary.
   function classifyImpact(title, summary) {
     const t = (String(title || '') + ' ' + String(summary || '')).toLowerCase();
     if (/cmmc|cyber|cui|safeguard|covered telecom|889|section 889|counterfeit|criminal/.test(t)) return 'HIGH';
@@ -39,7 +37,7 @@
       date:    u.effective_date || u.published_at || '',
       impact:  classifyImpact(u.title, u.summary),
       summary: u.summary || '',
-      insight: '', // TODO: AI insight pass — currently empty
+      insight: '', // no insight pass on this route — stays empty
       affects: Array.isArray(u.affects_clauses) ? u.affects_clauses.length : 0,
       source:  u.source || '',
       link:    u.link || ''

@@ -1,4 +1,4 @@
-/* FARaudit · Defense News — Fork B live wiring.
+/* FARaudit · Defense News — live wiring.
    Fetches /api/defense-news (real RSS aggregation across Defense News,
    DoD News, Federal Register, FedScoop — cached 30min + Claude per-article
    ai_insight via defense_news_insights). Maps items into the LIVE_ARTICLES
@@ -8,11 +8,8 @@
    falls back to MOCK_ARTICLES — so this script enhances when live data
    is rich enough and stays out of the way when it isn't.
 
-   Bug C fix: previous version mutated MOCK_ARTICLES; should target
-   LIVE_ARTICLES per the HTML contract.
-
-   Bug fix: previous version was never loaded by defense-news.html — added
-   <script> tag in this commit. */
+   Targets LIVE_ARTICLES per the HTML contract, and is loaded by
+   defense-news.html via its own <script> tag. */
 (function () {
   'use strict';
 

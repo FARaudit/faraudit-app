@@ -1,5 +1,5 @@
 // The rail's "Live" badge and the Week Ahead calendar must ASSERT ONLY WHAT
-// THEY KNOW. Run: npx tsx public/_rail-live-badge.test.ts
+// THEY KNOW. Run: npx tsx test/public/_rail-live-badge.test.ts
 //
 // Written RED first (2026-07-30):
 //   · src/lib/nav/rail.ts hardcoded badge {text:"Live"} on Opportunities, so
@@ -9,7 +9,7 @@
 //     (live response deadlines) was already in hand, under a subtitle
 //     promising "the GovCon fiscal calendar" that nothing produces.
 //
-// Same family as public/_today-fabrication.test.ts: a claim with no computation
+// Same family as test/public/_today-fabrication.test.ts: a claim with no computation
 // behind it. Part D plants positives so a vacuous pass is impossible.
 
 import { readFileSync } from "node:fs";
@@ -21,7 +21,9 @@ const check = (label: string, ok: boolean, detail = "") => {
   console.log(`${ok ? "✓ PASS" : "✗ FAIL"}  ${label}${ok ? "" : "  — " + detail}`);
 };
 
-const ROOT = join(import.meta.dirname ?? __dirname, "..");
+// test/public/ → repo root. This suite gates public/ assets but must not LIVE in public/:
+// everything under there is served verbatim, and a gate file is not an asset.
+const ROOT = join(import.meta.dirname ?? __dirname, "..", "..");
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
 
 const rail = read("src/lib/nav/rail.ts");
