@@ -1,5 +1,5 @@
 // /today + /command-center must not ship FABRICATED customer-facing data.
-// Run: npx tsx public/_today-fabrication.test.ts
+// Run: npx tsx test/public/_today-fabrication.test.ts
 //
 // Written RED against the pre-fix files (2026-07-29): the served landing page
 // showed a dateline of "June 3, 2026" on July 29, invented figures ($32M
@@ -24,8 +24,10 @@ const check = (label: string, ok: boolean, detail = "") => {
   console.log(`${ok ? "✓ PASS" : "✗ FAIL"}  ${label}${ok ? "" : "  — " + detail}`);
 };
 
-const HERE = join(import.meta.dirname ?? __dirname);
-const read = (f: string) => readFileSync(join(HERE, f), "utf8");
+// This suite gates public/ assets but must not LIVE in public/: everything under
+// there is served verbatim, and a gate file is not an asset. test/public/ → public/.
+const PUBLIC = join(import.meta.dirname ?? __dirname, "..", "..", "public");
+const read = (f: string) => readFileSync(join(PUBLIC, f), "utf8");
 
 // ── The fabricated tokens that actually shipped. Each is a claim about the
 // USER's own business that no query produced.

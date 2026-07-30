@@ -1,12 +1,10 @@
-/* FARaudit · CMMC Readiness — Fork B live wiring.
+/* FARaudit · CMMC Readiness — live wiring.
    Fetches /api/cmmc-readiness (shared route — also serves home/HomeClient.tsx
    for per-user CMMC summary). Mutates window.CMMC IN PLACE if response is
-   in DOMAINS shape, else no-op (mock preserved).
+   in DOMAINS shape, else no-op.
 
-   TODO: NET NEW DOMAIN — needs new cmmc_assessments table (per-user POAM
-   with 14 NIST 800-171 domain rows: total/met/gap/none/priority/insight).
-   Until that ships, the API returns level-distribution (Level 1/2/3) and
-   this live.js bails, leaving the client mock visible. */
+   The route currently answers with a level distribution (Level 1/2/3) rather
+   than the 14-domain shape this file writes, so the no-op path is the live one. */
 (function () {
   'use strict';
 

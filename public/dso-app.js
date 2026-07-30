@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════
    FARaudit · Opportunities — render + viz + interactions.
 
-   NULL-HONESTY CONTRACT (probe: scratchpad probe-page.mjs):
+   NULL-HONESTY CONTRACT:
    - fit === null      → neutral "no score" tile/ring, excluded from Avg Fit,
                          never a 0 and never a TRAP verdict.
    - ceiling === null  → "—", excluded from $ sums (counted as "unpriced").
@@ -45,7 +45,7 @@
     const saElig = ['SB', 'SB-Partial', 'SDVOSB', '8(a)', 'HUBZone', 'WOSB', 'EDWOSB'].includes(o.sa);
     const upstream = o.stage === 'sources' || o.stage === 'presol';
     // Reason-slot rule: a reason states what is true of the NOTICE or BUYER, never
-    // of our pipeline. Gate: public/_opportunities-reason-slot.test.ts.
+    // of our pipeline. Gate: test/public/_opportunities-reason-slot.test.ts.
     if (o.sa === 'SoleSource') {
       return `Sole-source intent published — competition is not open, and a capability challenge inside the response window is the only route in${o.days != null ? ` (${o.days}d left)` : ''}.`;
     }
@@ -107,8 +107,7 @@
       if (S.view === 'hot' && !(o.fit != null && o.fit >= 85 && o.days != null && o.days <= 10)) return false;
       // Set-aside-eligible view now admits the full restricted enumeration.
       // SoleSource is deliberately EXCLUDED: a directed buy is not an eligibility
-      // opportunity, it is a contest-or-assert-capability play (own band, pending
-      // Design card #775).
+      // opportunity, it is a contest-or-assert-capability play (own band).
       if (S.view === 'sb' && !['SB', 'SB-Partial', 'SDVOSB', '8(a)', 'HUBZone', 'WOSB', 'EDWOSB'].includes(o.sa)) return false;
       if (S.view === 'recompete' && o.incumbent == null) return false;
       if (S.view === 'upstream' && !(o.stage === 'presol' || o.stage === 'sources')) return false;
@@ -179,8 +178,8 @@
   }
   function fitTile(f) {
     if (f == null) {
-      // Un-audited rows get a neutral tile — a 0/TRAP here would be a
-      // fabricated verdict (the score was never computed).
+      // Un-audited rows get a neutral tile — a 0/TRAP here would assert a
+      // verdict that nothing has computed.
       return `<div class="fit-tile tone-na" title="Not yet audited"><span class="ft-num">—</span><span class="ft-lbl">NO SCORE</span></div>`;
     }
     const v = fitVerdict(f);
@@ -314,7 +313,7 @@
       const w = o.days == null ? 0 : Math.max(6, (1 - Math.min(o.days, maxDays) / maxDays) * 100);
       // Set-aside chip register. The restricted programs share the 'sa' register;
       // Full & Open and an unrecognised token must NOT wear it — displaying "SB"
-      // on an unrestricted buy was the 42%-of-feed inversion fixed 2026-07-29.
+      // on an unrestricted buy inverts the set-aside signal on that row.
       const SA_RESTRICTED = ['SB', 'SB-Partial', 'SDVOSB', '8(a)', 'HUBZone', 'WOSB', 'EDWOSB'];
       const saCls = (o.sa === 'SoleSource' || o.sa === 'UNKNOWN') ? 'sa full'
         : SA_RESTRICTED.includes(o.sa) ? 'sa' : 'sa full';

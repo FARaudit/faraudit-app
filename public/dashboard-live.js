@@ -26,14 +26,14 @@
 
   // ONE reset writer for the slicer set. Every place that clears filters calls
   // this — the slicer-bar #paClear, the no-match "clear filters" link, and the
-  // STATE initializer below. Card #769 re-keyed the slicers (Status → Window,
+  // STATE initializer below. The slicers are keyed (Status → Window,
   // Recommendation → the verdict rail) and updated #paClear but not the
   // no-match link, which kept resetting the retired rec/status keys and dropped
   // `window`. STATE.f.window became undefined, rowMatchesBar's
   // `f.window !== "all"` then rejected EVERY row, and syncSlicers hid the
   // working clear — so the control offering to rescue you from the empty state
   // emptied the ledger with no way back but a reload. Adding a slicer here
-  // fixes every reset at once. Gated by public/_past-audits-filter-reset.test.ts.
+  // fixes every reset at once. Gated by test/public/_past-audits-filter-reset.test.ts.
   function defaultFilters() {
     return { time: "all", window: "all", agency: "all", type: "all", naics: "all", setAside: "all" };
   }
@@ -48,10 +48,10 @@
     // True when the account has MORE audits than LEDGER_CAP — observed from the
     // probe row, never inferred from rows.length hitting the cap.
     truncated: false,
-    // card #769 — the verdict rail owns the verdict axis (one field, one control)
+    // the verdict rail owns the verdict axis (one field, one control)
     seg: "all",
     f: defaultFilters(),
-    // Default order: most recently audited first (CEO ruling 2026-07-28).
+    // Default order: most recently audited first.
     // 'audited' sorts on age-hours; dir 1 = ascending age = newest first.
     sortKey: "audited",
     sortDir: 1,
@@ -75,7 +75,7 @@
     return { label: Math.round(diffMs / (30 * 24 * 60 * 60 * 1000)) + "mo ago", ageHours: ageHours };
   }
 
-  // Card 366 Phase-1 — agency column. office_display is the buying-office code
+  // Agency column. office_display is the buying-office code
   // (FA4427 60 CONS LGC), NOT the agency; the real agency is the last '·'
   // segment of the raw `agency` field. Normalize the common branches; else
   // Title-Case the cleaned segment.
@@ -110,7 +110,7 @@
     return parent.toLowerCase().replace(/\b\w/g, function (c) { return c.toUpperCase(); }) || "—";
   }
 
-  // Card 366 Phase-1 — due (response_deadline) column, short readable date.
+  // Due (response_deadline) column, short readable date.
   function dueLabel(iso) {
     if (!iso) return "—";
     var ms = new Date(iso).getTime();
@@ -120,7 +120,7 @@
     return MO[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear();
   }
 
-  // SIX-POLE VOCABULARY (ARC #747) — v3_verdict is the AUTHORITATIVE pole, read
+  // SIX-POLE VOCABULARY — v3_verdict is the AUTHORITATIVE pole, read
   // FIRST; the legacy enums are consulted only for rows that predate it. Nothing
   // falls back to a sibling pole, and a score is not a verdict — the retired
   // score-band guess asserted decisions the engine never issued on every
@@ -147,10 +147,10 @@
     return null; // absent, not guessed — renders as an em dash
   }
 
-  // ── card #769: ONE precedence chain owns the partition — verdict first, run
+  // ── ONE precedence chain owns the partition — verdict first, run
   // state second, never two independent fields. And ONE window derivation feeds
   // the row flag, the Deadline-passed tag, the Window slicer AND the Still Open
-  // KPI (R9a) — the F6 bug was two code paths disagreeing on one field.
+  // KPI — two code paths deriving one field will disagree.
   var SEG = [
     { k: "bid", label: "Bid" }, { k: "caution", label: "Bid \u00b7 caution" },
     { k: "nobid", label: "No-bid" }, { k: "inelig", label: "Ineligible" },
@@ -179,13 +179,12 @@
     var ago = relativeAgo(audit.completed_at || audit.created_at);
     var dueTs = audit.response_deadline ? new Date(audit.response_deadline).getTime() : Infinity;
     var st = statusBucket(audit);
-    // Card 366 Phase-2 needs-attention (LOGIC ONLY — visual is Design's): a failed
+    // Needs-attention (logic only): a failed
     // audit OR a live audit whose response deadline has already passed.
-    // WIRE-MAP #456 Ruling 2 — expose the trigger so the row picks the reason:
+    // Expose the trigger so the row picks the reason:
     // failed → red status badge is the reason; deadline → keep truthful badge + amber tag.
-    // card #769 R9a — needs-attention derives from the SAME windowOf/seg chain
-    // as the tag, the Window slicer and the Still Open KPI (Design ruling
-    // supersedes the earlier pending-only narrowing).
+    // Needs-attention derives from the SAME windowOf/seg chain
+    // as the tag, the Window slicer and the Still Open KPI.
     var w = windowOf(dueTs);
     var attn = (st === "failed") || (w === "passed");
     var attnType = (st === "failed") ? "failed" : (w === "passed" ? "deadline" : null);
@@ -203,7 +202,7 @@
       agency: normalizeAgency(audit.agency),
       naics:  audit.naics_code || "—",
       setAside: audit.set_aside || "—",
-      // Audited column shows the real date (CEO ruling 2026-07-28) — the
+      // Audited column shows the real date — the
       // relative "1w ago" label is gone; age survives only for the time filter.
       date:   dueLabel(audit.completed_at || audit.created_at),
       age:    ago.ageHours,
@@ -251,7 +250,7 @@
   function rowMatchesFilter(a) {
     return STATE.seg === "all" || a._s === STATE.seg;
   }
-  // Card 366 Phase-2 filter bar — AND across time / agency / type / rec / status.
+  // Filter bar — AND across time / agency / type / rec / status.
   function rowMatchesBar(a) {
     var f = STATE.f;
     if (f.time !== "all") {
@@ -367,7 +366,7 @@
     return bits;
   }
 
-  // card #769 C1–C5 — computed on every render so a broken port reports itself.
+  // Self-checks C1–C5 — computed on every render so a broken port reports itself.
   function writeSelfCheck(visible) {
     var el = document.getElementById("integ");
     if (!el) return;
@@ -385,8 +384,7 @@
     }
     // C4 \u2014 active states are TINTS over the unchanged card colour, never fills
     // (Design's isTint: low-alpha background OR low-alpha gradient layer over
-    // the card colour). This was the check missing from the first port \u2014 named
-    // in card #771; the count read "4 of 4" because this one wasn't running.
+    // the card colour).
     var c4 = true;
     var inactive = document.querySelector("#poleRail .pole:not(.is-active)");
     if (inactive) {
@@ -511,11 +509,11 @@
         + n + ' record' + (n === 1 ? '' : 's') + '</b>, newest first.';
   }
 
-  // Card #450 — live sidebar badge: replace the rail's hardcoded "15" on the
+  // Live sidebar badge: replace the rail's placeholder count on the
   // Past Audits item with the real OPEN count (response deadline not yet passed)
   // from the loaded audits. Client-side so no shared server-rail change; targets
   // the injectRail markup by href (rail renamed Past Audits → /past-audits).
-  // WIRE-MAP #456 Ruling 3 — keep the neutral `count` badge; disambiguate "open" =
+  // Keep the neutral `count` badge; disambiguate "open" =
   // response-deadline-not-yet-passed, and bind open/total live with explanatory titles.
   function writeSidebarBadge() {
     if (STATE.loadError) return; // markup ships an empty badge — leave it empty, never "0"
@@ -544,7 +542,7 @@
   function writeAll() {
     populateFilterBar();
     writeSidebarBadge();
-    // Card 366 Phase-2 — expose needs-attention count for a later Today rollup
+    // Expose needs-attention count for a later Today rollup
     // (do NOT build Today here). failed OR deadline-passed.
     window.__paNeedsAttention = STATE.rows.filter(function (r) { return r.attn; }).length;
     writeKPIs();
@@ -554,10 +552,9 @@
     writeTable();
   }
 
-  // ── Wires — this script is the page's ONLY writer (the duplicate inline
-  // wiring was removed; two listeners per control meant the last writer won
-  // and the ARC #747 six-pole fix never reached the screen). ──
-  // card #769 R1 — the chip row is deleted; the verdict rail (renderRail) owns
+  // ── Wires — this script is the page's ONLY writer. One listener per control:
+  // two writers on one control means the last one silently wins. ──
+  // The chip row is deleted; the verdict rail (renderRail) owns
   // the verdict axis. No field is filterable from two controls.
 
   function wireSort() {
@@ -667,7 +664,7 @@
     }
   }
 
-  // Card 366 Phase-2 — populate the dynamic filter-bar selects (agency/type)
+  // Populate the dynamic filter-bar selects (agency/type)
   // from the live rows. Rec/Status/Time options are static in the markup.
   function populateFilterBar() {
     function distinct(key) {
@@ -678,7 +675,7 @@
       });
       return out.sort();
     }
-    // WIRE-MAP #456 Ruling 1 — set-aside decode: show the SAM display name, filter on the raw value.
+    // Set-aside decode: show the SAM display name, filter on the raw value.
     var SETASIDE_LABELS = { SBA: "Small Business", "8A": "8(a)", "8AN": "8(a)", HZC: "HUBZone", HZS: "HUBZone", SDVOSBC: "SDVOSB", SDVOSBS: "SDVOSB", WOSBC: "WOSB", WOSBSS: "WOSB", EDWOSBC: "EDWOSB", EDWOSBSS: "EDWOSB", VOSBC: "VOSB", VOSBS: "VOSB" };
     function setAsideLabel(v) { if (v == null || v === "—" || v === "" || v === "NONE" || v === "None" || v === "none") return "—"; return SETASIDE_LABELS[v] || v; }
     function fill(id, values, allLabel, labelFn) {
@@ -704,12 +701,12 @@
     }
     fill("fAgency", distinct("agency"), "All agencies");
     fill("fType", distinct("type"), "All types");
-    // NAICS: bare code — no title in the audits row payload (WIRE-MAP fallback: "no title on file → bare code").
+    // NAICS: bare code — no title in the audits row payload ("no title on file → bare code").
     fill("fNaics", distinct("naics"), "All NAICS");
     fill("fSetAside", distinct("setAside"), "All set-asides", setAsideLabel);
   }
 
-  // WIRE-MAP #456 Ruling 1 — pill "active" state + Clear visibility. A slicer glows
+  // Pill "active" state + Clear visibility. A slicer glows
   // blue when its value ≠ all; Clear appears only when ANY slicer / quick-chip / search
   // is constraining the set. Called from writeTable() so every re-render stays in sync.
   function syncSlicers() {

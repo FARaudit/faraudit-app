@@ -2,27 +2,11 @@
    Fetches /api/command-center-data, mutates window.CC IN PLACE and re-renders
    via cc-app.js.
 
-   The old "no-op unless the response carries ACTIONS/WEEK" gate is GONE. That
-   gate was the fabrication bug: the endpoint never returned those fields, so
-   this file always bailed and cc-app.js's curated mock — invented pursuits,
-   dollar figures, two named contracting officers — rendered as the signed-in
-   user's own data. cc-app.js now ships empty and honest; this file fills in
-   whatever the API genuinely returns. Guarded by
-   public/_today-fabrication.test.ts.
-
-   TODO: new fetchCommandCenterDigest(supabase, userId) query that
-   aggregates from existing tables to populate ACTIONS + WEEK:
-     ACTIONS — top-1 per desk: opportunities (P0 deadline), regulatory
-       (HIGH + close to effective), ko (cold + warm rewarm), wage (FLAG),
-       protest (impacts tracked sols), pipeline (closing soon), cmmc (low %)
-     WEEK   — calendar union: response_deadlines + WD expirations + reg
-       effective dates + protest decision windows + FY fiscal markers
-
-   The 830L command-center-live-brief.js.legacy targets a separate
-   `.brief-head`/`.pulse-bar` Brief layout (Phase 6 design) that is NOT
-   served by the current /command-center route (which serves today.html).
-   The legacy file is left in /public for future Brief-surface reuse but
-   not loaded by today.html. */
+   There is no "bail unless the response carries ACTIONS/WEEK" gate: cc-app.js
+   ships those arrays empty, and this file fills in whatever the API genuinely
+   returns. ACTIONS and WEEK have no per-desk digest behind them on this route,
+   so they stay empty and the panels say so.
+   Guarded by test/public/_today-fabrication.test.ts. */
 (function () {
   'use strict';
 
