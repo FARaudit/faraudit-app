@@ -227,8 +227,22 @@ export async function resolveFeedScope(client: SupabaseClient): Promise<FeedScop
 // 30-minute cache (keyed by the code list, so each distinct profile gets its own
 // entry); the audits cross-ref runs per-request with the caller's Supabase
 // client so AUDIT badges / scores are always current (FA-89f semantics).
-export async function fetchLiveOpportunities(client: SupabaseClient): Promise<OpportunityRow[]> {
+// Callers that must tell "no codes on file" apart from "codes on file, empty
+// window" use this. The two are identical as a row count and must NOT render the
+// same way: one is a profile the customer can fix in place, the other is a real
+// zero-result window.
+export async function fetchLiveOpportunitiesScoped(
+  client: SupabaseClient
+): Promise<{ rows: OpportunityRow[]; scope: FeedScope }> {
   const scope = await resolveFeedScope(client);
+  return { rows: await fetchLiveOpportunities(client, scope), scope };
+}
+
+export async function fetchLiveOpportunities(
+  client: SupabaseClient,
+  preresolved?: FeedScope
+): Promise<OpportunityRow[]> {
+  const scope = preresolved ?? (await resolveFeedScope(client));
   if (scope.codes.length === 0) {
     console.log("[live-opportunities] no NAICS on file for this customer — serving honest-empty, NOT a global fallback");
     return [];

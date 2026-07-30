@@ -205,6 +205,11 @@
       pill.classList.remove('err', 'wait');
       if (state === 'live' || state === 'empty') {
         pill.textContent = 'LIVE';
+      } else if (state === 'no-profile') {
+        // Not an outage and not an empty window — the feed has nothing to scope
+        // ON. Says so rather than claiming LIVE over a blank tab.
+        pill.classList.add('wait');
+        pill.textContent = 'NO NAICS ON FILE';
       } else if (state === 'error') {
         pill.classList.add('err');
         pill.textContent = 'FEED UNAVAILABLE';
@@ -222,6 +227,8 @@
         const ingest = opts && opts.lastIngest ? ' · newest posted ' + opts.lastIngest : '';
         meta.innerHTML = 'Live solicitations read from <b>SAM.gov</b> · ' +
           opts.count + ' notice' + (opts.count === 1 ? '' : 's') + ingest;
+      } else if (state === 'no-profile') {
+        meta.innerHTML = 'No NAICS codes on file — add the codes you sell under and this feed fills from <b>SAM.gov</b>.';
       } else if (state === 'empty') {
         meta.innerHTML = 'Connected to the <b>live SAM.gov feed</b> — no notices in the current window.';
       } else if (state === 'error') {
@@ -263,7 +270,12 @@
 
       window.DSO.OPPS.length = 0;
       window.DSO.OPPS.push(...mapped);
-      window.DSO.FEED_STATE = mapped.length ? 'live' : 'empty';
+      // 'no-profile' is a DISTINCT pole from 'empty'. Both are zero rows, but one
+      // is a profile the customer can fix in place and the other is a real
+      // zero-result window — rendering them alike would hide the fixable one.
+      window.DSO.FEED_SCOPE = data.feedScopeSource || null;
+      window.DSO.FEED_STATE = mapped.length ? 'live'
+        : (data.feedScopeSource === 'no-profile-codes' ? 'no-profile' : 'empty');
 
       // Live NAICS pill set = distinct codes actually present in the feed.
       const counts = {};
