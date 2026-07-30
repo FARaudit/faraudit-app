@@ -986,9 +986,7 @@ function $(id){return document.getElementById(id);}
   try{var s=localStorage.getItem(KEY);if(s==='closed')html.setAttribute('data-sb','closed');else if(!html.hasAttribute('data-sb'))html.setAttribute('data-sb','open');}catch(e){}
   document.addEventListener('click',function(e){var t=e.target&&e.target.closest&&e.target.closest('#sbToggle');if(!t)return;var n=html.getAttribute('data-sb')==='open'?'closed':'open';html.setAttribute('data-sb',n);try{localStorage.setItem(KEY,n);}catch(e){}});})();
 
-/* ── watching badge hydration. The bell — panel, badge and read-state — is
-   owned by /notifications-chrome.js. ── */
-(function(){
+/* ── The bell — panel, badge and read-state — is owned by /notifications-chrome.js. ── */
 
 /* ── submit (redirect-only; report page shows live 3-stage progress) ── */
 var __submitting=false;
