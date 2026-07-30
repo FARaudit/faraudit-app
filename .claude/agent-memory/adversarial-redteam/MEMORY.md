@@ -1,5 +1,7 @@
 # Adversarial red-team memory index
 
+- [Panel 583df921 — 5 of 7 AUTO-Fs died as STALE-RENDER artifacts; F upheld anyway](panel_583df921_phantom_artifact_adjudication.md) — `render-audit.ts` sources `.env.local` (no REPORT-TRUTH flags) so local exports ≠ v5 production; attribute garbles to INGEST before calling fabrication; hunt hallucinated ABSENCE (3 false, PWS+WD physically in the run's own source); Rule 64 checks the excerpt, not the claim
+
 - [#747 verdict-inversion DESIGN Q2 — all 3 moves REJECT](design_verdict_inversion_q2.md) — M1 inverts the polarity of the SHIPPED `importanceOf`; probe: 11/11 disqualifier shapes demote incl. both of M1's OWN allowlist controls; M2's stale cert DELETES the 206-A caution; the "49-record" corpus is faithfully 14 / 6 sols / 0 committal poles
 
 - [root-b: two claims REFUTED at source](project_rootb_two_refutations.md) — SECTION_READ_CAP truncation is NOT silent (`truncated` flag + completeness reads uncapped `sectionFullText`); questions deadlines DO emit (lenses + audit-decide-inquiry-deadline) — the `/question/i` skip is quote-branch-local

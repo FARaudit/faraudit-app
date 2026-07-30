@@ -1,0 +1,24 @@
+---
+name: panel-583df921-phantom-artifact-adjudication
+description: Panel adjudication of audit 583df921 (W9123826QA032) — 5 of 7 seats' AUTO-F died as stale-render artifacts; F upheld on a single surviving root cause (hallucinated ABSENCE); ingest-vs-report attribution rule
+metadata:
+  type: project
+---
+
+Audit 583df921-9cd9-4fd9-b56a-4f49aee62eb2 (W9123826QA032, USACE Sacramento groundskeeping). Seven seats graded F/F/F/F/F/F/D against an export rendered with every REPORT-TRUTH flag OFF on the v4 path. Production serves v5 with four flags armed. I re-tested every finding against the regenerated production artifact.
+
+**Why:** `render-audit.ts` sources `.env.local`, which carries none of the REPORT-TRUTH flags. Any panel run off a locally-rendered export is reviewing a build the customer never sees. Five seats' AUTO-F rested entirely on a "fabricated CLIN 1810" that does not exist in production — 1810 is the street number of 1810 Jefferson Blvd and appears only in place-of-performance prose.
+
+**How to apply:**
+- **Before grading any export, print the flag state the artifact was rendered under.** A panel finding is scoped to a render path. Demand the path (v4/v5) and the flag set in the same breath as the audit id. Half a panel's AUTO-Fs died to this one omission.
+- **Attribute the defect to the right layer before calling it fabrication.** I framed a scrambled §M excerpt as a report-level fabrication; it was already scrambled in the engine's own ingest (`raw.txt`), so the report quoted faithfully. Test: normalize whitespace and substring-check the report's excerpt against the RUN'S source, not against your own `pdftotext`. Faithful-to-ingest + unfaithful-to-document is a real but *different* (lesser) defect than fabrication.
+- **`pdftotext -layout` and the engine's extractor disagree, and the disagreement is the finding.** Here the engine dropped SF-1449 form-field VALUES while keeping labels (`SET ASIDE: 	% FOR:` with the `100` gone; `USD 9,500,000.00` absent entirely) and hoisted `WOMEN-OWNED SMALL BUSINESS (WOSB)` to the FIRST content line of the whole ingest — which is almost certainly what seeded the coordinator's false WOSB tasking premise. Always diff your extraction against the run's source for page 1 of an SF-1449.
+- **Hunt hallucinated ABSENCE, the mirror of hallucinated coverage.** `grep -o "UNVERIFIED ABSENCE — [^·]*"` found 3 instances, all false: the PWS and the Wage Determination were both physically present in the run's own source (document boundaries visible as `==== DOCUMENT: ... ====` markers in `raw.txt`), and "set-aside type is not stated" contradicted the report's OWN masthead. That single root cause — per-lens absence never reconciled against the run's provenance ledger — is what upheld the F after every artifact finding was withdrawn.
+- **Verbatim-grounding checks the EXCERPT, not the CLAIM.** The engine's prose said "Mowing and Edging" (0 occurrences in source across 3 extractors) two lines above its own excerpt reading "Moving and Edging". The Rule 64 substring check confirms the excerpt exists in source; it does not confirm the claim's assertions appear in the excerpt. Probe that seam directly.
+- **Under-call deliberately to keep the floor honest.** I retracted two of my own findings and declined to stack "Mowing" as an AUTO-F (one-letter normalization of an obvious government typo, substantively correct). Say the retractions out loud — a red team that never retracts is not calibrating, it is ratcheting.
+
+- **Absence claims in YOUR OWN seat need a systematic search too.** I asserted "no clearance gate / no unduly restrictive spec" without testing the PWS. Testing it found six missed qualification gates (CA licensed arborist, certified applicator, qualified SHM/APP/IIPP, CQC plan, Army security training, FPCON). Then I overreached the other way — inferred the PWS produced *nothing* — and the citation census refuted me: 4 of ~50 citations ARE Section C/PWS-attributed. Correct finding is the narrow one: **ingested, thinly analyzed (4/~50 citations for ~18% of the corpus), every hard gate missed.** That is `feedback_coverage_measures_ingestion_not_analysis` confirmed live. Enumerate `Found in — ...` and tally by document before claiming a document was or wasn't analyzed.
+
+Calibration floor that HELD: 21 unique FAR/DFARS clause tokens, set-difference empty against both the engine ingest and an independent fresh extraction. Zero fabricated clauses, figures, or dates. Verdict DIRECTION (BID_WITH_CAUTION, 0 show-stoppers, open solicitation) was correct. A report can be badly assembled and still point the right way — grade the claims, not the direction.
+
+Related: [[feedback-coverage-measures-ingestion-not-analysis]], [[feedback-excerpt-start-truncation-fakes-corroboration]], [[panel-d0664ba2-gate4-adjudication]]
