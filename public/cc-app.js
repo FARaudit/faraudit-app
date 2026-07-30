@@ -192,6 +192,21 @@
       <div class="wk-body"><div class="wk-label">${w.label}</div>${tag}</div>
     </a>`;
   }
+  // Per-group display caps. Measured on the live feed 2026-07-29: 197 dated
+  // notices, of which 71 land inside 7 days — so a single flat cap below 71
+  // rendered week one and nothing else, and "This Month" / "Later This Year"
+  // could never appear however high it went. Capping each group separately is
+  // what actually raises the calendar's reach: every designed group gets rows.
+  // Sized to the panel's natural height, NOT to the data volume: .week-list has
+  // no max-height and no internal scroll (computed overflow-y: visible), and the
+  // two panels share a grid row — so every row added here also stretches the
+  // Priority Action Feed beside it. At 20/15/10 the page ran 4,070px with an
+  // empty panel stretched alongside. 12/8/5 doubles the old flat cap of 12,
+  // populates all three groups, and keeps the page near its designed height.
+  // Going higher is a DESIGN decision (give .week-list a max-height + overflow-y:
+  // auto), not a data one — deliberately left to the owner.
+  const WEEK_GROUP_CAPS = { 'This Week': 12, 'This Month': 8, 'Later This Year': 5 };
+
   function renderWeek() {
     const groups = [
       { label: 'This Week', test: w => w.day <= 7 },
@@ -199,14 +214,26 @@
       { label: 'Later This Year', test: w => w.day > 31 }
     ];
     let html = '';
+    let hiddenTotal = 0;
     groups.forEach(g => {
       const items = WEEK.filter(g.test);
       if (!items.length) return;
-      html += `<div class="wk-group"><span>${g.label}</span><b>${items.length}</b></div>` + items.map(wkRow).join('');
+      const cap = WEEK_GROUP_CAPS[g.label] || items.length;
+      const shown = items.slice(0, cap);
+      const hidden = items.length - shown.length;
+      hiddenTotal += hidden;
+      // The group header count is the TRUE total, not the shown count — a
+      // header reading "20" over 20 rows would hide that 51 more exist.
+      html += `<div class="wk-group"><span>${g.label}</span><b>${items.length}</b></div>` + shown.map(wkRow).join('');
+      // Truncation is surfaced INSIDE the group it belongs to, never silent.
+      if (hidden > 0) {
+        html += `<a class="wk-row" href="/opportunities"><div class="wk-date"><span class="wk-d">+${hidden}</span></div>
+          <div class="wk-line"><span class="wk-node" style="background:var(--t40,#64748b)"></span></div>
+          <div class="wk-body"><div class="wk-label">${hidden} more in ${g.label.toLowerCase()} — open Opportunities</div></div></a>`;
+      }
     });
-    // Rows are real response deadlines from the live feed (built in
-    // command-center-live.js). The cap is NEVER silent — a truncated calendar
-    // that looks complete is its own small lie.
+    // Backstop drop from the wiring layer (DOM ceiling), counted separately so
+    // the two truncation reasons are never conflated.
     const dropped = num(window.CC.WEEK_DROPPED) || 0;
     if (html && dropped > 0) {
       html += `<a class="wk-row" href="/opportunities"><div class="wk-date"><span class="wk-d">+${dropped}</span></div>
