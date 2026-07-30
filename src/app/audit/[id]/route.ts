@@ -207,7 +207,60 @@ function disableExport(html: string, subLabel: string): string {
 // while degraded; no auto-refresh (nothing left to stream). Self-contained
 // inject (no _template.html edit); references the report's own tokens so light
 // + dark both resolve correctly.
-function injectDegradedBanner(html: string): string {
+/** REPORT-TRUTH #6 (flag AUDIT_GATE_REASON_NAMED, default OFF ⇒ the legacy banner ⇒ byte-identical).
+ *
+ *  THE DEFECT. The gate banner is V1-era copy written for a TRANSIENT V2 timeout: "Deep analysis unavailable for this
+ *  run · The core report below is complete and accurate · re-run to try again." REPORT-TRUTH #1 began routing a
+ *  DETERMINISTIC, NAMED coverage gap into that same generic path, and on live run 583df921 every clause of it was
+ *  wrong:
+ *    • "Deep analysis unavailable" — false. The analysis ran. One binding document was read but never analyzed.
+ *    • "complete and accurate"     — CONTRADICTS the gate it is explaining. The engine set documents_complete=false
+ *                                     and named the document. Claiming completeness while withholding the export is
+ *                                     the exact confident-wrong class this arc exists to remove — and it is the one
+ *                                     surface still making a false claim after #1-#4 shipped.
+ *    • "re-run to try again"       — invites the customer to SPEND on an identical outcome. The cause is
+ *                                     deterministic: the same document will yield no findings on the next run too.
+ *
+ *  THE FIX. The engine already computes the precise reason (#1 writes documents.unanalyzed[] as {name, reason}).
+ *  Surface THAT. A gate is only honest if it says what is missing and what the reader should do instead — telling
+ *  someone a report is withheld, while telling them it is complete, is worse than saying nothing.
+ *  Falls back to the legacy copy for V1 rows and for any gate whose cause is not named. */
+export function gateCause(audit: Record<string, unknown>): { head: string; body: string } | null {
+  if (process.env.AUDIT_GATE_REASON_NAMED !== "true") return null;
+  const comp = (audit.compliance_json ?? {}) as Record<string, unknown>;
+  if (comp.engine !== "agentic_v3") return null;
+  const v3 = (comp.v3 ?? {}) as Record<string, unknown>;
+  const docs = (v3.documents ?? {}) as Record<string, unknown>;
+  const unanalyzed = Array.isArray(docs.unanalyzed) ? (docs.unanalyzed as Array<{ name?: string; reason?: string }>) : [];
+  const missing = Array.isArray(docs.missing) ? (docs.missing as Array<{ name?: string; reason?: string }>) : [];
+  const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  // Order matters: an UNREAD document is a harder failure than a read-but-unanalyzed one, so it is named first.
+  if (missing.length) {
+    const names = missing.map((m) => esc(String(m.name ?? "a posted document"))).join(", ");
+    return {
+      head: `${missing.length} posted document${missing.length > 1 ? "s were" : " was"} not retrieved`,
+      body: `The audit could not read ${names}. Findings below cover only what was retrieved, so the export is held back rather than shipped as a full picture. Open ${missing.length > 1 ? "those documents" : "that document"} on SAM.gov before relying on this.`,
+    };
+  }
+  if (unanalyzed.length) {
+    const names = unanalyzed.map((u) => esc(String(u.name ?? "a binding document"))).join(", ");
+    const one = unanalyzed.length === 1;
+    return {
+      head: `${unanalyzed.length} document${one ? "" : "s"} read but not analyzed`,
+      body: `${names} ${one ? "was" : "were"} retrieved in full, but the audit produced no grounded finding from ${one ? "it" : "them"} — so nothing below reflects ${one ? "its" : "their"} contents. The export is held back because the report is not a complete picture of this solicitation. Read ${one ? "that document" : "those documents"} directly before pricing or bidding. Re-running will not change this.`,
+    };
+  }
+  if (comp.honest_fail === true) {
+    return {
+      head: `The engine did not reach a confident verdict`,
+      body: `This run returned an honest INCOMPLETE rather than a confident guess, so the export is held back. The findings below are still grounded in the solicitation — treat them as partial coverage, not a decision.`,
+    };
+  }
+  return null;
+}
+
+function injectDegradedBanner(html: string, audit?: Record<string, unknown>): string {
   const style =
     `<style>` +
     `.fa-degraded-banner{display:flex;gap:11px;align-items:flex-start;margin:0 0 18px;` +
@@ -220,15 +273,18 @@ function injectDegradedBanner(html: string): string {
     `[data-theme="dark"] .fa-degraded-banner{background:rgba(214,162,60,.12);border-color:transparent}` +
     `[data-theme="dark"] .fa-degraded-banner svg{color:#fcd34d}` +
     `</style>`;
+  const cause = audit ? gateCause(audit) : null;
   const banner =
     `<div class="fa-degraded-banner" role="status">` +
     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ` +
     `stroke-linecap="round" stroke-linejoin="round">` +
     `<path d="M10.3 4 2 18.2A1.6 1.6 0 0 0 3.4 20.6h17.2A1.6 1.6 0 0 0 22 18.2L13.7 4a1.6 1.6 0 0 0-2.7 0z"/>` +
     `<path d="M12 9.5v4M12 17h.01"/></svg>` +
-    `<span><b>Deep analysis unavailable for this run</b>The core report below is complete ` +
-    `and accurate. Export is disabled until a full analysis succeeds — ` +
-    `<a href="/audit">re-run</a> to try again.</span></div>`;
+    (cause
+      ? `<span><b>${cause.head}</b>${cause.body}</span></div>`
+      : `<span><b>Deep analysis unavailable for this run</b>The core report below is complete ` +
+        `and accurate. Export is disabled until a full analysis succeeds — ` +
+        `<a href="/audit">re-run</a> to try again.</span></div>`);
   let out = html;
   out = out.includes("</head>") ? out.replace("</head>", `${style}</head>`) : `${style}${out}`;
   // Top of the report content column, under the masthead (Design placement).
@@ -459,7 +515,7 @@ export async function GET(
     // status endpoint directly (no slug round-trip needed).
     html = injectFinalizingState(html, String(audit.id ?? id));
   } else if (gateExport) {
-    html = injectDegradedBanner(html);
+    html = injectDegradedBanner(html, audit as Record<string, unknown>);
   }
   // RC6 FIX B — Export PDF spinner. Only on a genuinely COMPLETE report, where
   // the export anchor is a live href. When export is gated, the anchor is
