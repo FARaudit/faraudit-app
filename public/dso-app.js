@@ -47,14 +47,36 @@
     // and 56 rows (28% of the feed) were told to "shape the requirement before
     // the RFP drops" when the RFP WAS the row. Fixed at the classifier.
     const upstream = o.stage === 'sources' || o.stage === 'presol';
-    // Poles that carry a specific, non-templated action come FIRST.
+    // ── THE REASON-SLOT RULE (adjudicated 2026-07-29) ─────────────────────────
+    // A reason must state something that would still be TRUE IF FARAUDIT DID NOT
+    // EXIST. The subject is the NOTICE or the BUYER — never our pipeline.
+    //   A1 · a pole in the reason slot (subject = our processing state) — HARD FAIL.
+    //   A2 · an imperative in the reason slot (no assertion, only an instruction)
+    //        — rewrite: the fact is real, it just wasn't the thing rendered.
+    // Test by counterfactual: "eligibility is unread" survives (that field is absent
+    // or malformed ON THE NOTICE whether or not we look at it); "nothing to audit"
+    // does not (auditing is ours). Gate: public/_opportunities-reason-slot.test.ts.
+    //
+    // Poles that carry a specific, non-templated FACT come first.
     if (o.sa === 'SoleSource') {
-      return `Sole-source intent published — this is not open competition. If you can meet the requirement, assert capability inside the response window; that is what can force it into competition${o.days != null ? ` (${o.days}d left)` : ''}.`;
+      // Was A2 — led with the imperative "assert capability inside the response
+      // window". The FACT is what earns the row (competition is not open; a
+      // capability challenge is the only route in), so it leads and the
+      // instruction follows.
+      return `Sole-source intent published — competition is not open, and a capability challenge inside the response window is the only route in${o.days != null ? ` (${o.days}d left)` : ''}.`;
     }
     if (o.stage === 'notice') {
-      return `Special Notice — often an industry day, amendment or cancellation rather than a solicitation. Read it for signal; there is nothing to audit until a solicitation posts.`;
+      // Was A1, and the worst kind: "nothing to audit until a solicitation posts"
+      // described OUR operation, and in doing so rendered the EARLIEST government
+      // signal as a null. A Special Notice is the upstream half of the thesis and
+      // the part competitors don't reach — telling the customer there is nothing
+      // there is the inverse of the pitch. Same fact, opposite frame.
+      return `Pre-solicitation signal — no solicitation document posted yet. The buyer has moved on this requirement before any RFP exists.`;
     }
     if (o.sa === 'UNKNOWN') {
+      // PASSES the counterfactual, and is the cleanest of the three: unreadability
+      // is a property of the notice's own field. Kept VERBATIM — honest-fail
+      // working as designed, refusing to convert absence into "open".
       return `Set-aside not recognised on this notice — eligibility is unread, not open. Confirm against the notice before committing bid effort.`;
     }
     if (upstream) return `Upstream window — shape the requirement before the RFP drops${saElig ? `, and it's ${esc(o.sa)}-eligible` : ''}.`;
