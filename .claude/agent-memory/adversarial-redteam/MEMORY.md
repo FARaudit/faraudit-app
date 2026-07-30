@@ -1,5 +1,7 @@
 # Adversarial red-team memory index
 
+- [Panel 95698f91 / W9123826QA032 — F UPHELD, 4 AUTO-Fs](panel_95698f91_w9123826qa032.md) — panels are a 4-digit-token scrape over finding PROSE (`1810` = street number) while the findings body enumerates CLINs correctly; grep `/no .* visible/i` vs raw_pdf_text as the fastest AUTO-F detector; coverage stamp measures ingestion (21/71 clauses surfaced under COMPLETE)
+
 - [#747 verdict-inversion DESIGN Q2 — all 3 moves REJECT](design_verdict_inversion_q2.md) — M1 inverts the polarity of the SHIPPED `importanceOf`; probe: 11/11 disqualifier shapes demote incl. both of M1's OWN allowlist controls; M2's stale cert DELETES the 206-A caution; the "49-record" corpus is faithfully 14 / 6 sols / 0 committal poles
 
 - [root-b: two claims REFUTED at source](project_rootb_two_refutations.md) — SECTION_READ_CAP truncation is NOT silent (`truncated` flag + completeness reads uncapped `sectionFullText`); questions deadlines DO emit (lenses + audit-decide-inquiry-deadline) — the `/question/i` skip is quote-branch-local

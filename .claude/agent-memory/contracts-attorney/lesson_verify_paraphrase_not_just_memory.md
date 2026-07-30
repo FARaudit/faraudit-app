@@ -26,9 +26,32 @@ is the exact defect a clause-layer review exists to catch. Also: fetch tools **p
 sometimes echo the prompt back inside quotation marks** (FAR 4.1105 did this). Only text the tool presents as
 a quote counts as verbatim; a tool's numbered list is not the regulation's numbering.
 
+**SECOND OCCURRENCE — audit 95698f91 / W9123826QA032 (2026-07-30).** Same class, twice more, both caught in
+self-check *while I was grading the report for exactly this error*:
+- **FAR 19.507(a)** — I wrote "per 19.507(a), 52.219-6 is the designation." **(a) and (b) are `[Reserved]`;**
+  the 52.219-6 prescription is **(c)**. Watch for RESERVED paragraphs — a plausible-sounding early designator
+  is likelier to be empty than wrong-but-occupied.
+- **Section labels are designators too.** I collapsed 52.240-90/-91/-93 into one cell labeled "`sol.txt:2565`,
+  §I." Line 2565 sits past the §K header — **52.240-90 is a §K PROVISION (offeror rep), -91/-93 are §I
+  CLAUSES.** Verify a section label by the header byte-offsets (`grep -n "^Section [A-M] -"`), never by which
+  table the clause *looks* like it belongs to. The §K/§I split was the load-bearing half of that finding.
+- **Reflowed ≠ verbatim.** Clause titles in a PDF `§I` table wrap across 3–6 lines and `pdftotext` preserves
+  the breaks; attachment tables split a column header ("Provided / Under / Separate / Cover") from its cell
+  value. Assembling those into one string is a faithful *reading*, not a quote — say so, or quote the raw block.
+
+Three passes: pass 1 fixed 6 items, pass 2 fixed 2, **pass 3 found zero.** That is the stop signal. A sweep
+that has stopped finding things must be *closed and said to be closed* — running a fourth to satisfy a
+repeating stop-hook manufactures either ceremony or invented findings.
+
 Environment note: **ecfr.gov and federalregister.gov 302-redirect to an unblock host** from this sandbox.
 Route CFR cites through **govinfo.gov** (`/content/pkg/CFR-YYYY-titleN-volN/xml/CFR-...-secX-Y.xml`), which
 works but serves **annual editions** — flag the edition rather than implying same-day currency.
 acquisition.gov works fine for FAR/DFARS. esd.whs.mil and dla.mil program pages return 403.
+Confirmed again 2026-07-30, plus: **dol.gov/agencies/whd/** returns **403**, and govinfo 404s on
+`FR-YYYY-MM-DD/pdf/` EO paths. For **Executive Order status affecting wage determinations**, the working
+.gov primary is **`sam.gov/announcements/<slug>`** (EO 14236 / EO 14026 revocation confirmed there).
+`acquisition.gov/far-overhaul/far-part-deviation-guide/far-overhaul-part-<N>` serves the model deviation
+text and is the right source when a solicitation cites "(Deviation 2026-O0038)" — that is where §889 moved
+(Part 4 clauses → **52.240-91**, prescribed at 40.205(b); rep **52.240-90** at 40.205(a); §889 at 40.202(d)).
 
 Related: [[747-v2-narrative-registry-ruling]]
