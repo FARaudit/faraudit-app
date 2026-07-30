@@ -35,6 +35,7 @@ import { gateCitationsInText, citationFidelityEnabled } from "./audit-citation-f
 import { buildV3Payload } from "./audit-v3-report";
 import { detectAmendments, findingProvenance, docRegions } from "./audit-orchestrator";
 import { applyNonPresenceHonesty } from "./audit-nonpresence-honesty";
+import { reconcileAbsenceClaims } from "./audit-absence-reconcile";
 import { sweepConstructionManifest } from "./audit-construction-manifest";
 import { detectConstructionOutOfScope } from "./section-boundary-detector";
 import { isHonestFail, billable, decrementAuditQuota, recordAuditCost } from "./audit-billing";
@@ -740,6 +741,19 @@ export async function executeAgenticPrimary(
       console.warn(`[nonpresence] ${r.id}: asserted absence [${r.shape}] wrapped as UNVERIFIED — absence is ungroundable (Rule 64). before="${r.before.slice(0, 120)}"`);
     }
     if (gated.rewrites.length) console.warn(`[nonpresence] ${gated.rewrites.length}/${res.findings.length} finding(s) carried an affirmative non-presence claim`);
+  }
+  // REPORT-TRUTH #7 (flag AUDIT_ABSENCE_RECONCILE, default OFF ⇒ pass-through ⇒ byte-identical).
+  // Runs AFTER #2 deliberately: #2 WRAPS an absence claim, #7 CHECKS it against the run's own ledger and corrects the
+  // premise — including stripping #2's now-false "this audit did not locate it" caveat once the document is proven
+  // present. Order reversed, #2 would re-wrap a corrected finding.
+  if (process.env.AUDIT_ABSENCE_RECONCILE === "true") {
+    const provDocs = new Set(findingProvenance(fullSource, res.findings).map((p) => p.doc).filter((d) => d && d !== "(ungrounded)"));
+    const rec = reconcileAbsenceClaims(reportFindings, fullSource, provDocs, solicitation?.typeOfSetAside ?? null);
+    reportFindings = rec.findings;
+    for (const x of rec.refuted) {
+      console.warn(`[absence-reconcile] ${x.id}: REFUTED by the run's own ledger — "${x.doc}" (${x.kind}). The report claimed it was absent.`);
+    }
+    if (rec.refuted.length) console.warn(`[absence-reconcile] corrected ${rec.refuted.length} hallucinated-absence claim(s)`);
   }
   const payload = buildV3Payload(res.decision, res.coverage, reportFindings, generatedAt);
 
