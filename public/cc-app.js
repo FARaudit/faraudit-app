@@ -194,15 +194,12 @@
   // rendered week one and nothing else, and "This Month" / "Later This Year"
   // could never appear however high it went. Capping each group separately is
   // what actually raises the calendar's reach: every designed group gets rows.
-  // Sized to the panel's natural height, NOT to the data volume: .week-list has
-  // no max-height and no internal scroll (computed overflow-y: visible), and the
-  // two panels share a grid row — so every row added here also stretches the
-  // Priority Action Feed beside it. At 20/15/10 the page ran 4,070px with an
-  // empty panel stretched alongside. 12/8/5 doubles the old flat cap of 12,
-  // populates all three groups, and keeps the page near its designed height.
-  // Going higher is a DESIGN decision (give .week-list a max-height + overflow-y:
-  // auto), not a data one — deliberately left to the owner.
-  const WEEK_GROUP_CAPS = { 'This Week': 12, 'This Month': 8, 'Later This Year': 5 };
+  // .week-list now scrolls internally (max-height + overflow-y in today.html),
+  // so these caps no longer trade against page height — they trade against
+  // scannability. 20/15/10 covers a full quarter of real deadlines on the
+  // measured feed (71/109/17) while every group still reports its true total
+  // and its own remainder.
+  const WEEK_GROUP_CAPS = { 'This Week': 20, 'This Month': 15, 'Later This Year': 10 };
 
   function renderWeek() {
     const groups = [
@@ -311,135 +308,10 @@
 
   function renderAll() { renderDateline(); renderIdentity(); renderSidebarBadges(); renderKPIs(); renderInsight(); renderTabs(); renderFeed(); renderWeek(); renderSignals(); }
 
-  // Structured notifications dropdown, grouped by Today/Earlier,
-  // desk-color dots, unread rows, mark-all-read, Esc/outside-click closes.
-  function initNotifications() {
-    const NDESK = {
-      opp:   { c: '#378ADD', l: 'Opportunities',  href: '/opportunities' },
-      gao:   { c: '#dc2626', l: 'GAO',             href: '/gao-protests' },
-      cmmc:  { c: '#0891b2', l: 'CMMC',            href: '/cmmc' },
-      far:   { c: '#7c3aed', l: 'FAR/DFARS',       href: '/far-dfars-updates' },
-      co:    { c: '#185FA5', l: 'Contracting',     href: '/contracting-officers' },
-      wage:  { c: '#d97706', l: 'Wage',            href: '/wage-benchmarks' },
-      spend: { c: '#2C6CB4', l: 'Spending',        href: '/defense-spending' }
-    };
-    // The tray reads `/api/notifications` (over the notifications table).
-    // Starts empty; filled by load() below — never seeded with placeholder rows.
-    const ITEMS = [];
-    let loaded = false, failed = false;
-    const panel = $('notifPanel'), bell = $('bellBtn'), scroll = $('npScroll');
-    const badge = $('bellBadge'), count = $('npCount'), mark = $('npMark');
-    if (!panel || !bell || !scroll) return;
+  // The notifications tray lives in public/notifications-chrome.js, which every
+  // surface with a bell loads as shared chrome.
 
-    function render() {
-      let html = '', last = '';
-      ITEMS.forEach((n, i) => {
-        if (n.grp !== last) { html += `<div class="np-grp">${n.grp}</div>`; last = n.grp; }
-        const dk = NDESK[n.desk] || { c: '#64748b', l: '', href: null };
-        // The row's own link wins; a desk fallback only when the desk is known.
-        const href = n.href || dk.href || '/command-center';
-        html += `<a class="np-item${n.unread ? ' unread' : ''}" data-i="${i}" href="${href}">
-          <span class="np-dot" style="background:${dk.c}"></span>
-          <div class="np-body"><div class="np-t"><span class="np-desk" style="color:${dk.c}">${dk.l}</span>${n.t}</div><div class="np-d">${n.d}</div></div>
-          <span class="np-time">${n.time}</span>
-        </a>`;
-      });
-      // FOUR distinct states, never conflated — an outage must not read as an
-      // empty inbox ("you're all caught up" would be a false all-clear on data
-      // we failed to fetch), and neither may sit on "Loading…" forever.
-      let emptyT, emptyD;
-      if (failed)      { emptyT = 'Notifications unavailable'; emptyD = 'We could not read them just now — this is not an empty inbox. Retry shortly.'; }
-      else if (loaded) { emptyT = 'No notifications';          emptyD = "You're all caught up."; }
-      else             { emptyT = 'Loading…';                  emptyD = 'Reading your notifications.'; }
-      scroll.innerHTML = html || `<div class="np-item" style="cursor:default"><div class="np-body"><div class="np-t">${emptyT}</div><div class="np-d">${emptyD}</div></div></div>`;
-      const u = ITEMS.filter(n => n.unread).length;
-      if (count) count.textContent = String(u);
-      if (badge) { badge.textContent = u ? String(u) : ''; badge.style.display = u === 0 ? 'none' : ''; }
-      scroll.querySelectorAll('.np-item').forEach(a => {
-        a.addEventListener('click', () => {
-          const i = +a.dataset.i;
-          if (ITEMS[i]) {
-            ITEMS[i].unread = false;
-            markRead(ITEMS[i].id); // persist, so the badge doesn't return on reload
-            render();
-          }
-          // Navigation proceeds — href is real route
-        });
-      });
-    }
-    render();
-
-    // Read-state is PERSISTED. Marking read only in local state would clear the
-    // badge and let it reappear on reload — the UI would be asserting something
-    // the server never recorded.
-    function markRead(id) {
-      if (!id) return;
-      fetch(`/api/notifications/${encodeURIComponent(id)}/read`, {
-        method: 'PATCH', credentials: 'include'
-      }).catch((e) => console.error('[cc-app] mark-read failed:', e));
-    }
-
-    // Real rows from the notifications table. `kind` maps onto a desk only when
-    // it genuinely names one — otherwise the row renders neutral rather than
-    // being attributed to a desk it may not belong to.
-    function relTime(iso) {
-      const ms = new Date(iso).getTime();
-      if (isNaN(ms)) return '';
-      const mins = Math.floor((Date.now() - ms) / 60000);
-      if (mins < 1) return 'now';
-      if (mins < 60) return mins + 'm';
-      const h = Math.floor(mins / 60);
-      if (h < 24) return h + 'h';
-      const d = Math.floor(h / 24);
-      return d < 7 ? d + 'd' : new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    }
-    async function load() {
-      try {
-        const res = await fetch('/api/notifications?limit=20', { credentials: 'include', headers: { accept: 'application/json' } });
-        if (!res.ok) throw new Error('notifications ' + res.status);
-        const data = await res.json();
-        const rows = Array.isArray(data.notifications) ? data.notifications : [];
-        const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
-        ITEMS.length = 0;
-        rows.forEach((n) => {
-          const ts = n.created_at ? new Date(n.created_at).getTime() : NaN;
-          ITEMS.push({
-            id: n.id,
-            grp: !isNaN(ts) && ts >= startOfToday.getTime() ? 'Today' : 'Earlier',
-            desk: Object.prototype.hasOwnProperty.call(NDESK, n.kind) ? n.kind : null,
-            t: n.title || '(untitled)',
-            d: n.body || '',
-            href: n.link || null,
-            time: n.created_at ? relTime(n.created_at) : '',
-            unread: !n.read_at
-          });
-        });
-        loaded = true;
-        render();
-      } catch (e) {
-        console.error('[cc-app] notifications load failed:', e);
-        failed = true; // an outage, NOT an empty inbox
-        render();
-      }
-    }
-    load();
-
-    function open()  { panel.classList.add('open');    bell.classList.add('on');    }
-    function close() { panel.classList.remove('open'); bell.classList.remove('on'); }
-    bell.addEventListener('click', e => { e.stopPropagation(); panel.classList.contains('open') ? close() : open(); });
-    if (mark) mark.addEventListener('click', e => {
-      e.stopPropagation();
-      // Persist each one — there is no bulk endpoint, and a purely local clear
-      // would come back on reload.
-      ITEMS.filter(n => n.unread).forEach(n => markRead(n.id));
-      ITEMS.forEach(n => n.unread = false);
-      render();
-    });
-    document.addEventListener('click', e => { if (!panel.contains(e.target) && !bell.contains(e.target)) close(); });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
-  }
-
-  function init() { renderAll(); bindHdrStatFilters(); initNotifications(); }
+  function init() { renderAll(); bindHdrStatFilters(); }
   window.CC_APP = { render: renderAll, onThemeChange: renderAll };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
