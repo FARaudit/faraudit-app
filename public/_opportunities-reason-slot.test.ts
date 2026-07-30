@@ -54,8 +54,37 @@ function insightStrings(src: string): string[] {
   return [...noComments.matchAll(/return\s+`([^`]+)`/g)].map((m) => m[1]);
 }
 
-const strings = insightStrings(APP);
-ok(strings.length > 0, `extracted ${strings.length} reason strings from the shipped pursuitInsight()`);
+// EVERY customer-visible explanatory string, not just pursuitInsight()'s returns.
+// The first version of this gate read only pursuitInsight, and MISSED a `title=`
+// tooltip on the same rows still carrying the exact A1 string the insight had just
+// been cleaned of — an incomplete fix that the gate certified as complete. Fix all
+// N sites, then make the gate cover all N.
+// SCOPE: the A1 rule governs the REASON slot. A pole living in a POLE surface is
+// correct and must not be "fixed" — the fit tile's "Not yet audited — no fit
+// score" is a pole tooltip on the element whose entire job is to show audit
+// state, so pipeline vocabulary there is honest and correctly placed. The defect
+// A1 names is PLACEMENT, not vocabulary. Pole surfaces are excluded by the
+// element they hang on, and asserted separately below so a future edit cannot
+// quietly reword them.
+const POLE_SURFACES = /fit-ring|fit-tile|pc-fit/;
+function tooltipStrings(src: string): string[] {
+  const noComments = src.replace(/\/\/[^\n]*/g, "");
+  return [...noComments.matchAll(/title="([^"]{25,})"/g)]
+    .filter((m) => !POLE_SURFACES.test(noComments.slice(Math.max(0, m.index! - 140), m.index!)))
+    .map((m) => m[1]);
+}
+function poleTooltips(src: string): string[] {
+  const noComments = src.replace(/\/\/[^\n]*/g, "");
+  return [...noComments.matchAll(/title="([^"]{10,})"/g)]
+    .filter((m) => POLE_SURFACES.test(noComments.slice(Math.max(0, m.index! - 140), m.index!)))
+    .map((m) => m[1]);
+}
+
+const insight = insightStrings(APP);
+const tooltips = tooltipStrings(APP);
+const strings = [...insight, ...tooltips];
+ok(insight.length > 0, `extracted ${insight.length} reason strings from the shipped pursuitInsight()`);
+ok(tooltips.length > 0, `extracted ${tooltips.length} customer-visible title= tooltips (the site the first gate missed)`);
 
 console.log("\n═══ A1 · REGRESSION GUARDS — the exact strings ruled out ═══");
 // "Not yet audited — run the audit…" : is_audited is a fact about OUR QUEUE and
@@ -68,7 +97,16 @@ if (hasNotAudited) {
     "A1, ruled hard-fail. Pending the Test A pass (board row OPPS-REASON-SLOT-ABOUTNESS): those rows should carry the POLE 'Not audited' with the reason column honestly ABSENT. This warning must become a FAIL once that ships.");
 }
 ok(!strings.some((s) => /nothing to audit/i.test(s)),
-  "'nothing to audit' is GONE (was A1 — described our operation, and rendered the earliest government signal as a null)");
+  "'nothing to audit' is GONE from EVERY customer-visible string — insight AND tooltip (was A1: described our operation, and rendered the earliest government signal as a null)");
+ok(!tooltips.some((s) => /nothing to audit|not yet audited|run the audit/i.test(s)),
+  "no NON-POLE tooltip carries pipeline-subject vocabulary",
+  tooltips.filter((s) => /nothing to audit|not yet audited|run the audit/i.test(s)).join(" | "));
+// The complement, asserted so the correct placement is protected rather than
+// merely tolerated: a pole tooltip SHOULD name our audit state — that is its job.
+const poles = poleTooltips(APP);
+ok(poles.some((s) => /not yet audited/i.test(s)),
+  `pole surface still names audit state (${poles.length} pole tooltip(s)) — correct placement, do not reword`,
+  poles.join(" | "));
 ok(strings.some((s) => /pre-solicitation signal/i.test(s)),
   "Special Notice now states the NOTICE's property: 'Pre-solicitation signal — no solicitation document posted yet'");
 
