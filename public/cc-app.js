@@ -192,6 +192,21 @@
       <div class="wk-body"><div class="wk-label">${w.label}</div>${tag}</div>
     </a>`;
   }
+  // Per-group display caps. Measured on the live feed 2026-07-29: 197 dated
+  // notices, of which 71 land inside 7 days — so a single flat cap below 71
+  // rendered week one and nothing else, and "This Month" / "Later This Year"
+  // could never appear however high it went. Capping each group separately is
+  // what actually raises the calendar's reach: every designed group gets rows.
+  // Sized to the panel's natural height, NOT to the data volume: .week-list has
+  // no max-height and no internal scroll (computed overflow-y: visible), and the
+  // two panels share a grid row — so every row added here also stretches the
+  // Priority Action Feed beside it. At 20/15/10 the page ran 4,070px with an
+  // empty panel stretched alongside. 12/8/5 doubles the old flat cap of 12,
+  // populates all three groups, and keeps the page near its designed height.
+  // Going higher is a DESIGN decision (give .week-list a max-height + overflow-y:
+  // auto), not a data one — deliberately left to the owner.
+  const WEEK_GROUP_CAPS = { 'This Week': 12, 'This Month': 8, 'Later This Year': 5 };
+
   function renderWeek() {
     const groups = [
       { label: 'This Week', test: w => w.day <= 7 },
@@ -199,17 +214,40 @@
       { label: 'Later This Year', test: w => w.day > 31 }
     ];
     let html = '';
+    let hiddenTotal = 0;
     groups.forEach(g => {
       const items = WEEK.filter(g.test);
       if (!items.length) return;
-      html += `<div class="wk-group"><span>${g.label}</span><b>${items.length}</b></div>` + items.map(wkRow).join('');
+      const cap = WEEK_GROUP_CAPS[g.label] || items.length;
+      const shown = items.slice(0, cap);
+      const hidden = items.length - shown.length;
+      hiddenTotal += hidden;
+      // The group header count is the TRUE total, not the shown count — a
+      // header reading "20" over 20 rows would hide that 51 more exist.
+      html += `<div class="wk-group"><span>${g.label}</span><b>${items.length}</b></div>` + shown.map(wkRow).join('');
+      // Truncation is surfaced INSIDE the group it belongs to, never silent.
+      if (hidden > 0) {
+        html += `<a class="wk-row" href="/opportunities"><div class="wk-date"><span class="wk-d">+${hidden}</span></div>
+          <div class="wk-line"><span class="wk-node" style="background:var(--t40,#64748b)"></span></div>
+          <div class="wk-body"><div class="wk-label">${hidden} more in ${g.label.toLowerCase()} — open Opportunities</div></div></a>`;
+      }
     });
-    // The old calendar was nine invented dates (a wage determination, a protest
-    // window, fiscal markers) anchored to June. Empty until the calendar union
-    // is built — real solicitation deadlines already live on /opportunities.
-    $('weekList').innerHTML = html || `<div class="feed-clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>
-      <div class="fc-t">Calendar not built yet</div>
-      <div class="fc-d">This will merge solicitation deadlines, wage-determination expirations, regulatory effective dates and fiscal-year markers. Until then, response deadlines are live on <a class="fc-undo" href="/opportunities">Opportunities</a>.</div></div>`;
+    // Backstop drop from the wiring layer (DOM ceiling), counted separately so
+    // the two truncation reasons are never conflated.
+    const dropped = num(window.CC.WEEK_DROPPED) || 0;
+    if (html && dropped > 0) {
+      html += `<a class="wk-row" href="/opportunities"><div class="wk-date"><span class="wk-d">+${dropped}</span></div>
+        <div class="wk-line"><span class="wk-node" style="background:var(--t40,#64748b)"></span></div>
+        <div class="wk-body"><div class="wk-label">${dropped} more deadline${dropped === 1 ? '' : 's'} not shown — open Opportunities</div></div></a>`;
+    }
+    // Three states: outage · feed answered with nothing dated · rows.
+    let empty;
+    if (window.CC.FEED_ERROR || window.CC.WEEK_SOURCED === false) {
+      empty = `<div class="fc-t">Deadlines unavailable</div><div class="fc-d">The feed did not answer, so this calendar is empty rather than illustrative — nothing here is sample data.</div>`;
+    } else {
+      empty = `<div class="fc-t">No dated deadlines</div><div class="fc-d">No live notice in your NAICS carries a future response deadline right now. Only response deadlines are wired — wage-determination, regulatory and fiscal dates are not sourced yet.</div>`;
+    }
+    $('weekList').innerHTML = html || `<div class="feed-clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>${empty}</div>`;
   }
 
   // Was six invented per-desk "signals" — a named CO relationship, a CMMC

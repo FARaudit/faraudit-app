@@ -539,7 +539,7 @@ button{font-family:inherit}
         <section class="widget">
           <header class="widget-head">
             <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>
-              <div class="wh-text"><h3>The Week Ahead</h3><p class="wh-sub">Your deadlines + the GovCon fiscal calendar</p></div></div>
+              <div class="wh-text"><h3>The Week Ahead</h3><p class="wh-sub">Response deadlines from your live SAM.gov feed</p></div></div>
           </header>
           <div class="week-list" id="weekList"></div>
         </section>
@@ -559,6 +559,7 @@ button{font-family:inherit}
 </div>
 
 <script src="/vendor/d3.min.js"></script>
+<script src="rail-live-badge.js"></script>
 <script src="cc-app.js"></script>
 <script src="command-center-live.js"></script>
 <script>
@@ -580,7 +581,6 @@ button{font-family:inherit}
   });
 })();
 </script>
-<script>(function(){if(window.__farWatcherHydratedV2)return;window.__farWatcherHydratedV2=1;function setWatching(n){document.querySelectorAll('[data-sb-watching-count]').forEach(function(e){if(n>0){e.textContent=String(n);e.style.display='';}else{e.textContent='';e.style.display='none';}});}fetch('/api/watched-notices',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(!d)return;setWatching((d.kpi&&d.kpi.watching)||0);}).catch(function(){});})();</script>
 <script src="/notifications-chrome.js" defer></script>
 </body>
 </html>

@@ -11,17 +11,47 @@
 (function () {
   'use strict';
 
-  // SAM set-aside string → DSO sa key. Empty/full-and-open → "Full".
+  // ── SET-ASIDE · EXPLICIT ALLOWLIST, FAILS CLOSED ────────────────────────────
+  // Until 2026-07-29 this ended in a bare `return 'SB'`, so any token it didn't
+  // recognise was ASSERTED as a small-business set-aside. Measured on 200 live
+  // rows: SAM's literal "No Set aside used" (= full and open) matched none of the
+  // tests and fell through, so **83 rows (42%) told a small business that an
+  // unrestricted competition was reserved for them** — the single most
+  // decision-relevant field on the row, inverted in the permissive direction.
+  // A WOSB *sole-source* notice landed on 'SB' too, rendering a directed buy as
+  // competable. Two more collapses: WOSB → SB (WOSB is not SB-wide eligibility)
+  // and Partial → Total (different subcontracting posture).
+  //
+  // Doctrine: shape ALLOWLISTS only, never blocklists, in eligibility logic; an
+  // unrecognisable token goes to the restrictive/honest pole, never a permissive
+  // guess. The default is now 'UNKNOWN', which the render layer shows explicitly
+  // — suppressing the chip would read as "no restriction", the same silent
+  // permissive default in a different costume.
+  //
+  // Order matters: sole-source is tested BEFORE the program tests, because a
+  // "WOSB Program Sole Source" is a directed buy first and a WOSB buy second.
+  var SETASIDE_RULES = [
+    { pole: 'SoleSource', test: function (u) { return u.indexOf('sole source') >= 0 || u.indexOf('sole-source') >= 0; } },
+    { pole: 'SDVOSB',     test: function (u) { return u.indexOf('sdvosb') >= 0 || u.indexOf('service-disabled') >= 0 || u.indexOf('service disabled') >= 0; } },
+    { pole: '8(a)',       test: function (u) { return u.indexOf('8(a)') >= 0 || u === '8a' || u.indexOf('8 a ') >= 0; } },
+    { pole: 'HUBZone',    test: function (u) { return u.indexOf('hubzone') >= 0 || u.indexOf('hub zone') >= 0; } },
+    { pole: 'EDWOSB',     test: function (u) { return u.indexOf('edwosb') >= 0 || u.indexOf('economically disadvantaged women') >= 0; } },
+    { pole: 'WOSB',       test: function (u) { return u.indexOf('wosb') >= 0 || u.indexOf('women-owned') >= 0 || u.indexOf('woman-owned') >= 0 || u.indexOf('women owned') >= 0; } },
+    { pole: 'SB-Partial', test: function (u) { return u.indexOf('partial small business') >= 0 || (u.indexOf('small business') >= 0 && u.indexOf('partial') >= 0); } },
+    { pole: 'SB',         test: function (u) { return u.indexOf('total small business') >= 0 || u.indexOf('small business set aside') >= 0 || u.indexOf('small business set-aside') >= 0 || u === 'sba'; } },
+    // SAM's explicit statement that the buy is unrestricted. This is DATA, not a
+    // default — it was the 83-row inversion.
+    { pole: 'Full',       test: function (u) { return u.indexOf('no set aside') >= 0 || u.indexOf('no set-aside') >= 0 || u.indexOf('full and open') >= 0 || u.indexOf('unrestricted') >= 0; } }
+  ];
   function normSetaside(s) {
-    if (!s) return 'Full';
-    const u = String(s).toLowerCase();
-    if (u.includes('sdvosb') || u.includes('service-disabled')) return 'SDVOSB';
-    if (u.includes('8(a)') || u === '8a' || u.includes('8 a')) return '8(a)';
-    if (u.includes('hubzone') || u.includes('hub zone')) return 'HUBZone';
-    if (u.includes('wosb') || u.includes('woman')) return 'SB';
-    if (u.includes('small business') || u.includes('total small') || u === 'sba') return 'SB';
-    if (u.includes('full') || u.includes('open') || u.includes('unrestricted')) return 'Full';
-    return 'SB';
+    // Absent value = SAM published no set-aside field. Unrestricted is the
+    // correct reading of an absent set-aside on a solicitation.
+    if (s == null || String(s).trim() === '') return 'Full';
+    var u = String(s).toLowerCase();
+    for (var i = 0; i < SETASIDE_RULES.length; i++) {
+      if (SETASIDE_RULES[i].test(u)) return SETASIDE_RULES[i].pole;
+    }
+    return 'UNKNOWN'; // fail CLOSED — never assert an eligibility we did not read
   }
 
   // document_type → DSO stage (presol|sources|rfp|eval).
@@ -32,8 +62,33 @@
   // first is what makes the stage lanes correct; the long-string tests below
   // remain only for rows written before the classifier landed (and for raw SAM
   // `type` strings arriving from other paths).
+  // ── STAGE · EXPLICIT ALLOWLIST, FAILS CLOSED ────────────────────────────────
+  // Two corrections shipped 2026-07-29:
+  //
+  // (1) `combined: 'sources'` was domain-wrong. A Combined Synopsis/Solicitation
+  //     IS the solicitation — FAR 12.603 fuses synopsis and solicitation into one
+  //     posting so the buy can move immediately, making it the most act-now type
+  //     on SAM. It was rendering as "Sources Sought", and because `stage` is the
+  //     sole input to the insight line, all 56 such rows (28% of the feed) read
+  //     "Upstream window — shape the requirement before the RFP drops." The RFP
+  //     had already dropped; it WAS the row. Wrong capture instruction on a
+  //     running clock. Now: an open solicitation. Consequence, accepted and
+  //     honest: the "Upstream — shape it" view shrinks from 88 rows to ~32, and
+  //     those 32 are genuinely upstream.
+  //
+  // (2) `Special` had no entry and fell to the `return 'rfp'` default, so 20
+  //     Special Notices rendered as "Open RFP" with a metered Run Audit CTA —
+  //     inviting a paid audit on notices (industry day, amendment announcement,
+  //     intent-to-sole-source, cancellation) that may carry no solicitation to
+  //     audit. Special now has its own honest stage and the render layer
+  //     suppresses its Run Audit CTA.
+  //
+  // The default is 'UNKNOWN' rather than 'rfp': labelling an unrecognised notice
+  // "Open RFP" is an assertion, and unrecognised must never assert.
   const DOCTYPE_STAGE = {
-    presol: 'presol', srcsght: 'sources', combined: 'sources',
+    presol: 'presol', srcsght: 'sources',
+    combined: 'rfp',                                  // (1) — the solicitation is OUT
+    special: 'notice',                                // (2) — not a solicitation
     award: 'eval', mod: 'eval',
     rfq: 'rfp', idiq: 'rfp', bpa: 'rfp', taskord: 'rfp'
   };
@@ -42,10 +97,14 @@
     const d = raw.toLowerCase();
     const s = String(status || '').toLowerCase();
     if (Object.prototype.hasOwnProperty.call(DOCTYPE_STAGE, d)) return DOCTYPE_STAGE[d];
+    // Long-string tests for raw SAM `type` strings arriving from other paths.
     if (d.includes('pre-sol') || d.includes('presol') || d.includes('synopsis only')) return 'presol';
-    if (d.includes('sources sought') || d.includes('rfi') || d.includes('combined')) return 'sources';
+    if (d.includes('sources sought') || d.includes('rfi')) return 'sources';
+    if (d.includes('combined')) return 'rfp';
+    if (d.includes('special notice')) return 'notice';
     if (d.includes('award') || d.includes('justification') || s.includes('award') || s.includes('eval')) return 'eval';
-    return 'rfp'; // RFP/RFQ/IFB/Solicitation default
+    if (d.includes('solicitation') || d.includes('rfq') || d.includes('rfp') || d.includes('ifb')) return 'rfp';
+    return 'UNKNOWN'; // fail CLOSED — never assert a stage we did not recognise
   }
 
   // null when there is no deadline — NEVER a placeholder number.
@@ -81,6 +140,14 @@
       naics: o.naics_code || '',
       sa: normSetaside(o.set_aside),
       stage: normStage(o.document_type, o.status),
+      // RAW-TOKEN RETENTION. Both the 42% set-aside inversion and the 28% stage
+      // error were unseeable because the normalised pole replaced the source
+      // token at map time — after that no test can tell a correct mapping from a
+      // wrong one, which is exactly why a suite that recomputed 129 and got 129
+      // could not see that 83 of the 129 were inverted. Kept so the raw→rendered
+      // table is assertable and the coverage invariant has something to check.
+      raw_setaside: o.set_aside == null ? null : String(o.set_aside),
+      raw_notice_type: o.document_type == null ? null : String(o.document_type),
       type: o.document_type || 'Notice',
       notice_type: o.document_type || null,
       response_deadline: o.response_deadline || null,
@@ -214,6 +281,11 @@
       }, 0);
       window.DSO.LAST_INGEST = newest ? relTime(new Date(newest).toISOString()) : null;
       setFeedStatus(window.DSO.FEED_STATE, { count: mapped.length, lastIngest: window.DSO.LAST_INGEST });
+      // The rail ships no pill; this page has now MEASURED the feed, so it may
+      // assert one. 'empty' is still a live feed — it answered with zero rows.
+      if (typeof window.setRailLiveBadge === 'function') {
+        window.setRailLiveBadge('live', { count: mapped.length });
+      }
 
       // Watch + pipeline state for visible rows (null = unavailable → the
       // render layer disables those buttons instead of faking "off").
@@ -225,6 +297,9 @@
       window.DSO.OPPS.length = 0;
       window.DSO.FEED_STATE = 'error';
       setFeedStatus('error');
+      if (typeof window.setRailLiveBadge === 'function') {
+        window.setRailLiveBadge('unavailable');
+      }
     }
     if (window.DSO_APP && typeof window.DSO_APP.render === 'function') {
       window.DSO_APP.render();

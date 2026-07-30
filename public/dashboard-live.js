@@ -38,8 +38,16 @@
     return { time: "all", window: "all", agency: "all", type: "all", naics: "all", setAside: "all" };
   }
 
+  // How many rows this ledger renders. The page has no pagination, so this is
+  // also the honesty boundary: past it we must say the view is partial rather
+  // than report the count as a lifetime total (see the fetch in load()).
+  var LEDGER_CAP = 200;
+
   var STATE = {
     rows: [],
+    // True when the account has MORE audits than LEDGER_CAP — observed from the
+    // probe row, never inferred from rows.length hitting the cap.
+    truncated: false,
     // card #769 — the verdict rail owns the verdict axis (one field, one control)
     seg: "all",
     f: defaultFilters(),
@@ -267,17 +275,31 @@
         || (a.naics  && String(a.naics).toLowerCase().indexOf(q) !== -1)
         || (a.agency && a.agency.toLowerCase().indexOf(q) !== -1);
   }
+  // Undated rows carry Infinity (relativeAgo's ageHours, and dueTs when there is
+  // no response_deadline — the Window slicer's "No date" bucket). `Infinity -
+  // Infinity` is NaN, and a comparator returning NaN is non-transitive: Array#sort
+  // then leaves that whole group in an implementation-defined order that can
+  // differ between engines and between calls on the same data. Compare explicitly
+  // and park undated rows at the END in both directions — a row with no date is
+  // not "earliest" or "latest", it is absent, and it should not migrate to the top
+  // of the ledger just because the user reversed the arrow.
+  function cmpNumUndatedLast(xv, yv, dir) {
+    if (xv === yv) return 0;
+    if (!isFinite(xv)) return 1;
+    if (!isFinite(yv)) return -1;
+    return dir * (xv - yv);
+  }
   function sortedRows() {
     var copy = STATE.rows.slice();
     copy.sort(function (x, y) {
       if (STATE.sortKey === "date") {
-        return STATE.sortDir * (x.age - y.age);
+        return cmpNumUndatedLast(x.age, y.age, STATE.sortDir);
       }
       if (STATE.sortKey === "due") {
-        return STATE.sortDir * (x.dueTs - y.dueTs);
+        return cmpNumUndatedLast(x.dueTs, y.dueTs, STATE.sortDir);
       }
       if (STATE.sortKey === "audited") {
-        return STATE.sortDir * (x.age - y.age);
+        return cmpNumUndatedLast(x.age, y.age, STATE.sortDir);
       }
       if (STATE.sortKey === "agency" || STATE.sortKey === "type" || STATE.sortKey === "rec" || STATE.sortKey === "status") {
         var xa = (x[STATE.sortKey] || "").toString().toLowerCase();
@@ -481,8 +503,12 @@
       return;
     }
     var n = STATE.rows.length;
-    sub.innerHTML = 'Every solicitation FARaudit has audited for you — <b>'
-      + n + ' record' + (n === 1 ? '' : 's') + '</b>, newest first.';
+    // "Every solicitation … for you" is a completeness CLAIM. Only make it when
+    // the view is actually complete; past the cap, say what is shown instead.
+    sub.innerHTML = STATE.truncated
+      ? 'Your <b>' + n + ' most recent</b> audits, newest first — older audits are not listed on this page.'
+      : 'Every solicitation FARaudit has audited for you — <b>'
+        + n + ' record' + (n === 1 ? '' : 's') + '</b>, newest first.';
   }
 
   // Card #450 — live sidebar badge: replace the rail's hardcoded "15" on the
@@ -745,7 +771,15 @@
     // page cannot make when the request failed).
     var data;
     try {
-      var r = await fetch("/api/audits?limit=200", { credentials: "include" });
+      // Ask for ONE MORE than we display. The page has no pagination, so a
+      // customer past the ceiling was previously told "200 records" as if that
+      // were their whole history — a silent truncation the ledger presented as
+      // complete. Requesting LEDGER_CAP+1 makes the overflow OBSERVED rather
+      // than guessed: if the extra row comes back there is more history than we
+      // show, and writeHeaderSub says so instead of asserting a total we cannot
+      // stand behind. (Exactly-CAP accounts are NOT flagged — no 201st row, no
+      // claim.) The surplus row is dropped, never rendered.
+      var r = await fetch("/api/audits?limit=" + (LEDGER_CAP + 1), { credentials: "include" });
       if (!r.ok) {
         console.warn("[dashboard-live] /api/audits returned", r.status);
         STATE.loadError = "HTTP " + r.status;
@@ -754,7 +788,8 @@
         data = await r.json();
         var audits = (data && data.audits) || [];
         STATE.loadError = null;
-        STATE.rows = audits.map(mapAuditToRow);
+        STATE.truncated = audits.length > LEDGER_CAP;
+        STATE.rows = audits.slice(0, LEDGER_CAP).map(mapAuditToRow);
       }
     } catch (e) {
       console.warn("[dashboard-live] fetch failed", e);

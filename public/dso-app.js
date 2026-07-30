@@ -42,8 +42,21 @@
   // incumbency claims, no invented win-rate statistics, no scores for
   // un-audited rows.
   function pursuitInsight(o) {
-    const saElig = ['SB', 'SDVOSB', '8(a)', 'HUBZone'].includes(o.sa);
+    const saElig = ['SB', 'SB-Partial', 'SDVOSB', '8(a)', 'HUBZone', 'WOSB', 'EDWOSB'].includes(o.sa);
+    // 'sources'/'presol' only — Combined Synopsis/Solicitation used to land here
+    // and 56 rows (28% of the feed) were told to "shape the requirement before
+    // the RFP drops" when the RFP WAS the row. Fixed at the classifier.
     const upstream = o.stage === 'sources' || o.stage === 'presol';
+    // Poles that carry a specific, non-templated action come FIRST.
+    if (o.sa === 'SoleSource') {
+      return `Sole-source intent published — this is not open competition. If you can meet the requirement, assert capability inside the response window; that is what can force it into competition${o.days != null ? ` (${o.days}d left)` : ''}.`;
+    }
+    if (o.stage === 'notice') {
+      return `Special Notice — often an industry day, amendment or cancellation rather than a solicitation. Read it for signal; there is nothing to audit until a solicitation posts.`;
+    }
+    if (o.sa === 'UNKNOWN') {
+      return `Set-aside not recognised on this notice — eligibility is unread, not open. Confirm against the notice before committing bid effort.`;
+    }
     if (upstream) return `Upstream window — shape the requirement before the RFP drops${saElig ? `, and it's ${esc(o.sa)}-eligible` : ''}.`;
     if (o.incumbent != null && o.fit != null) return `Recompete read: incumbent on record is <em>${esc(o.incumbent)}</em> — lead on your ${o.fit}/100 audited fit and price.`;
     if (o.incumbent != null) return `Incumbent on record: <em>${esc(o.incumbent)}</em> — expect a recompete posture.`;
@@ -94,7 +107,11 @@
       if (S.sa !== 'all' && o.sa !== S.sa) return false;
       if (S.q && !(o.title + ' ' + o.agency + ' ' + o.id + ' ' + o.office).toLowerCase().includes(S.q)) return false;
       if (S.view === 'hot' && !(o.fit != null && o.fit >= 85 && o.days != null && o.days <= 10)) return false;
-      if (S.view === 'sb' && !['SB', 'SDVOSB', '8(a)', 'HUBZone'].includes(o.sa)) return false;
+      // Set-aside-eligible view now admits the full restricted enumeration.
+      // SoleSource is deliberately EXCLUDED: a directed buy is not an eligibility
+      // opportunity, it is a contest-or-assert-capability play (own band, pending
+      // Design card #775).
+      if (S.view === 'sb' && !['SB', 'SB-Partial', 'SDVOSB', '8(a)', 'HUBZone', 'WOSB', 'EDWOSB'].includes(o.sa)) return false;
       if (S.view === 'recompete' && o.incumbent == null) return false;
       if (S.view === 'upstream' && !(o.stage === 'presol' || o.stage === 'sources')) return false;
       return true;
@@ -297,7 +314,22 @@
     $('plist').innerHTML = data.length ? data.map(o => {
       const u = urg(o.days), sm = D.STAGE_META[o.stage];
       const w = o.days == null ? 0 : Math.max(6, (1 - Math.min(o.days, maxDays) / maxDays) * 100);
-      const saCls = ['SB', 'SDVOSB', '8(a)', 'HUBZone'].includes(o.sa) ? 'sa' : 'sa full';
+      // Set-aside chip register. The restricted programs share the 'sa' register;
+      // Full & Open and an unrecognised token must NOT wear it — displaying "SB"
+      // on an unrestricted buy was the 42%-of-feed inversion fixed 2026-07-29.
+      const SA_RESTRICTED = ['SB', 'SB-Partial', 'SDVOSB', '8(a)', 'HUBZone', 'WOSB', 'EDWOSB'];
+      const saCls = (o.sa === 'SoleSource' || o.sa === 'UNKNOWN') ? 'sa full'
+        : SA_RESTRICTED.includes(o.sa) ? 'sa' : 'sa full';
+      const saLabel = o.sa === 'Full' ? 'Full &amp; Open'
+        : o.sa === 'SoleSource' ? 'SOLE SOURCE'
+        : o.sa === 'UNKNOWN' ? 'SET-ASIDE UNKNOWN'
+        : o.sa === 'SB-Partial' ? 'SB (partial)'
+        : o.sa;
+      // A Special Notice is frequently not a solicitation at all (industry day,
+      // amendment announcement, intent-to-sole-source, cancellation). Audits are
+      // METERED, so we do not invite a paid run on a notice that may carry
+      // nothing to audit.
+      const auditable = o.stage !== 'notice';
       const aiTip = pursuitInsight(o);
       const auditRef = o.notice_id || o.id;
       const urgHtml = o.days == null
@@ -316,7 +348,7 @@
           <div class="pc-agy">${esc(o.agency)}${o.office ? ' · ' + esc(o.office) : ''} · <span class="pc-idin">${esc(o.id)}</span></div>
           <div class="pc-chips">
             <span class="chip naics">${esc(o.naics) || 'NAICS —'}</span>
-            <span class="chip ${saCls}">${o.sa === 'Full' ? 'Full &amp; Open' : o.sa}</span>
+            <span class="chip ${saCls}">${saLabel}</span>
             <span class="chip stage" style="background:${sm.color}">${sm.label}</span>
           </div>
         </div>
@@ -325,9 +357,11 @@
           ${urgHtml}
         </div>
         <div class="pc-actions">
-          ${auditRef
-            ? `<a class="btn-open" href="/audit?noticeId=${encodeURIComponent(auditRef)}">Run Audit</a>`
-            : `<a class="btn-open" style="opacity:.5;pointer-events:none" title="No notice reference">Run Audit</a>`}
+          ${!auditable
+            ? `<a class="btn-open" style="opacity:.5;pointer-events:none" title="Special Notice — often not a solicitation (industry day, amendment, intent-to-sole-source, cancellation). Nothing to audit until a solicitation posts.">No solicitation</a>`
+            : auditRef
+              ? `<a class="btn-open" href="/audit?noticeId=${encodeURIComponent(auditRef)}">Run Audit</a>`
+              : `<a class="btn-open" style="opacity:.5;pointer-events:none" title="No notice reference">Run Audit</a>`}
           <button class="btn-save" data-track="${esc(o.id)}"><svg class="ic-add" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg><svg class="ic-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg><span class="bs-add">Pipeline</span><span class="bs-on">In Pipeline</span></button>
           <button class="btn-watch" data-watch-notice="${esc(o.notice_id)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg><span class="bw-off">Track</span><span class="bw-on">Tracking</span></button>
         </div>
