@@ -10,7 +10,7 @@
 
    Mirrors dashboard-live.js writeSidebarBadge(): the served rail renders no
    pill when it has no real value, and the client creates one where the value
-   exists. Guarded by public/_rail-live-badge.test.ts. */
+   exists. Guarded by test/public/_rail-live-badge.test.ts. */
 (function () {
   'use strict';
 

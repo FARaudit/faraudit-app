@@ -11,9 +11,9 @@
 // sort stayed broken.
 //
 // Falsification (run BOTH ways — a gate that cannot fail proves nothing):
-//   npx tsx public/_past-audits-ledger.test.ts                → PASS
+//   npx tsx test/public/_past-audits-ledger.test.ts                → PASS
 //   git show <pre-fix>:public/dashboard-live.js > /tmp/old.js
-//   npx tsx public/_past-audits-ledger.test.ts /tmp/old.js    → FAIL
+//   npx tsx test/public/_past-audits-ledger.test.ts /tmp/old.js    → FAIL
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

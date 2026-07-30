@@ -2,7 +2,7 @@
    Fetches /api/command-center-data and populates window.DSO.OPPS in place,
    then calls window.DSO_APP.render(). dso-app.js is the render layer.
 
-   HONESTY CONTRACT (probe: scratchpad probe-page.mjs, run RED pre-fix):
+   HONESTY CONTRACT:
    - No sample rows exist anywhere; DSO.OPPS starts empty.
    - Fetch failure  → FEED_STATE 'error'  → explicit unavailable state.
    - Zero rows      → FEED_STATE 'empty'  → explicit "feed is empty" state.
@@ -39,8 +39,8 @@
     { pole: 'WOSB',       test: function (u) { return u.indexOf('wosb') >= 0 || u.indexOf('women-owned') >= 0 || u.indexOf('woman-owned') >= 0 || u.indexOf('women owned') >= 0; } },
     { pole: 'SB-Partial', test: function (u) { return u.indexOf('partial small business') >= 0 || (u.indexOf('small business') >= 0 && u.indexOf('partial') >= 0); } },
     { pole: 'SB',         test: function (u) { return u.indexOf('total small business') >= 0 || u.indexOf('small business set aside') >= 0 || u.indexOf('small business set-aside') >= 0 || u === 'sba'; } },
-    // SAM's explicit statement that the buy is unrestricted. This is DATA, not a
-    // default — it was the 83-row inversion.
+    // SAM's explicit statement that the buy is unrestricted. This is DATA, not
+    // a default, and must never be inferred from an absent token.
     { pole: 'Full',       test: function (u) { return u.indexOf('no set aside') >= 0 || u.indexOf('no set-aside') >= 0 || u.indexOf('full and open') >= 0 || u.indexOf('unrestricted') >= 0; } }
   ];
   function normSetaside(s) {
@@ -60,28 +60,21 @@
   // (src/lib/sam.ts / agents/sam-ingest/helpers.ts): SrcSght · PreSol ·
   // Combined · RFQ · IDIQ · BPA · TaskOrd · Mod · Award · Other. Matching those
   // first is what makes the stage lanes correct; the long-string tests below
-  // remain only for rows written before the classifier landed (and for raw SAM
-  // `type` strings arriving from other paths).
+  // cover rows that predate the classifier and raw SAM `type` strings arriving
+  // from other paths.
   // ── STAGE · EXPLICIT ALLOWLIST, FAILS CLOSED ────────────────────────────────
-  // Two corrections shipped 2026-07-29:
+  // Two domain rules decide this table:
   //
-  // (1) `combined: 'sources'` was domain-wrong. A Combined Synopsis/Solicitation
-  //     IS the solicitation — FAR 12.603 fuses synopsis and solicitation into one
-  //     posting so the buy can move immediately, making it the most act-now type
-  //     on SAM. It was rendering as "Sources Sought", and because `stage` is the
-  //     sole input to the insight line, all 56 such rows (28% of the feed) read
-  //     "Upstream window — shape the requirement before the RFP drops." The RFP
-  //     had already dropped; it WAS the row. Wrong capture instruction on a
-  //     running clock. Now: an open solicitation. Consequence, accepted and
-  //     honest: the "Upstream — shape it" view shrinks from 88 rows to ~32, and
-  //     those 32 are genuinely upstream.
+  // (1) `Combined` is an OPEN SOLICITATION, not an upstream notice. FAR 12.603
+  //     fuses synopsis and solicitation into one posting so the buy can move
+  //     immediately, which makes it the most act-now type on SAM. `stage` is the
+  //     sole input to the insight line, so mapping it upstream would tell the
+  //     reader to shape a requirement whose RFP is already out.
   //
-  // (2) `Special` had no entry and fell to the `return 'rfp'` default, so 20
-  //     Special Notices rendered as "Open RFP" with a metered Run Audit CTA —
-  //     inviting a paid audit on notices (industry day, amendment announcement,
-  //     intent-to-sole-source, cancellation) that may carry no solicitation to
-  //     audit. Special now has its own honest stage and the render layer
-  //     suppresses its Run Audit CTA.
+  // (2) `Special` gets its own stage and the render layer suppresses its Run
+  //     Audit CTA. A Special Notice (industry day, amendment announcement,
+  //     intent-to-sole-source, cancellation) may carry no solicitation to audit,
+  //     and audits are metered — so it must not read as an open RFP.
   //
   // The default is 'UNKNOWN' rather than 'rfp': labelling an unrecognised notice
   // "Open RFP" is an assertion, and unrecognised must never assert.
@@ -140,12 +133,12 @@
       naics: o.naics_code || '',
       sa: normSetaside(o.set_aside),
       stage: normStage(o.document_type, o.status),
-      // RAW-TOKEN RETENTION. Both the 42% set-aside inversion and the 28% stage
-      // error were unseeable because the normalised pole replaced the source
-      // token at map time — after that no test can tell a correct mapping from a
-      // wrong one, which is exactly why a suite that recomputed 129 and got 129
-      // could not see that 83 of the 129 were inverted. Kept so the raw→rendered
-      // table is assertable and the coverage invariant has something to check.
+      // RAW-TOKEN RETENTION. If the normalised pole replaces the source token at
+      // map time, the mapping stops being assertable: recomputing a count from
+      // the same mapper under test is self-consistent by construction, so it
+      // cannot distinguish a correct mapping from an inverted one. The raw token
+      // is kept so the raw→rendered table is assertable and the coverage
+      // invariant has something to check.
       raw_setaside: o.set_aside == null ? null : String(o.set_aside),
       raw_notice_type: o.document_type == null ? null : String(o.document_type),
       type: o.document_type || 'Notice',

@@ -1,14 +1,11 @@
-/* FARaudit · GAO Protests — Fork B live wiring.
+/* FARaudit · GAO Protests — live wiring.
    Fetches /api/protest-intel (shared with home/HomeClient.tsx). Maps each
    decision row → window.GAO.PROTESTS shape, maps per-agency stats →
    window.GAO.BY_AGENCY, re-renders.
 
-   Bug B fix: dropped the `?live` URL gate that prevented this from ever
-   firing in production.
-
-   TODO: NATIONAL stats (annual GAO report), GROUNDS taxonomy, SIGNALS
-   (per-user "tracked award protested" alerts) remain mock — need GAO
-   annual stats table + per-user join with pending_audits. */
+   Only the decision rows and per-agency stats are wired; national stats,
+   the grounds taxonomy and per-user protest alerts have no source behind
+   them on this route. */
 (function () {
   'use strict';
 
@@ -41,9 +38,9 @@
       protester: d.protester || '',
       ground:    ground.slice(0, 120),
       filed:     d.decision_date || '',
-      val:       0,   // TODO: not in GAO RSS — needs decision-body fetch
+      val:       0,   // not carried in the GAO RSS feed
       days:      daysSince(d.decision_date),
-      naics:     '',  // TODO: not in GAO RSS
+      naics:     '',  // not carried in the GAO RSS feed
       year:      yearOf(d.decision_date),
       detail:    ground
     };

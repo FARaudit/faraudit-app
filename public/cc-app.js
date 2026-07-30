@@ -17,13 +17,10 @@
       team:  { label: 'Teaming Partners', color: '#059669', href: '/teaming-partners', icon: 'M7 9a3 3 0 100-6 3 3 0 000 6zM17 9a3 3 0 100-6 3 3 0 000 6zM2 20c0-3 2.5-5 5-5M22 20c0-3-2.5-5-5-5' },
       spend: { label: 'Defense Spending', color: '#2C6CB4', href: '/defense-spending', icon: 'M4 19V5M4 19h16M8 16v-4M13 16V9M18 16v-2' }
     },
-    // ACTIONS + WEEK ship EMPTY. They used to hold a curated mock that the
-    // live wiring only replaced when the API returned CC-shape fields — which
-    // it never did, so invented pursuits, dollar figures and named contracting
-    // officers rendered as the signed-in user's own book of business. The
-    // per-desk digest that fills these is command-center-live.js's TODO
-    // (fetchCommandCenterDigest); until it exists these panels say so.
-    // Guarded by public/_today-fabrication.test.ts.
+    // ACTIONS + WEEK ship EMPTY and are filled only from what the API
+    // genuinely returns. Until a per-desk digest exists to populate them,
+    // these panels say so rather than showing anything unearned.
+    // Guarded by test/public/_today-fabrication.test.ts.
     ACTIONS: [],
     WEEK: [],
     // Scalars the /api/command-center-data response already carries. null =
@@ -101,7 +98,7 @@
     $('prioTabs').querySelectorAll('button').forEach(b => b.onclick = () => setFilter(b.dataset.f));
   }
 
-  // Q3 spec: header stat buttons (.hs[data-f]) two-way synced with priority tabs.
+  // Header stat buttons (.hs[data-f]) two-way synced with priority tabs.
   // hsAct → warn filter · hsCrit → crit filter · hsDays = readonly readout.
   function setFilter(f) {
     filter = f || 'all';
@@ -247,9 +244,7 @@
     $('weekList').innerHTML = html || `<div class="feed-clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>${empty}</div>`;
   }
 
-  // Was six invented per-desk "signals" — a named CO relationship, a CMMC
-  // readiness percentage, a protest sustain rate, none of them computed. The
-  // desk registry itself (label / colour / route / icon) is real UI config, so
+  // The desk registry (label / colour / route / icon) is real UI config, so
   // these render as plain NAVIGATION: every desk reachable, zero assertions
   // about what is in it. A desk card makes a claim only once its query exists.
   function renderSignals() {
@@ -266,8 +261,7 @@
 
   function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`; }
 
-  // Dateline was a hardcoded date string, and therefore wrong on every day but
-  // one. Derived from the clock instead.
+  // Derived from the clock — never a literal date string.
   function renderDateline() {
     const el = $('dateline');
     if (!el) return;

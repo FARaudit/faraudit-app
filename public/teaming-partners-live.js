@@ -1,15 +1,12 @@
-/* FARaudit · Teaming Partners — Fork B live wiring.
+/* FARaudit · Teaming Partners — live wiring.
    Fetches /api/teaming-partners?naics=336413 (real SAM.gov entity search,
    SAM_API_KEY-backed). Maps SAM entity records into the window.TEAM.PARTNERS
    shape and re-renders via team-app.js.
 
-   Bug A fix: previous version targeted bare global `PARTNERS`, which is
-   closure-scoped inside team-data.js IIFE and undefined globally — silent
-   no-op. Now writes window.TEAM.PARTNERS correctly.
+   Writes window.TEAM.PARTNERS — not the bare `PARTNERS` global, which is
+   closure-scoped inside team-data.js and undefined from here.
 
-   TODO: pull user's NAICS list from /api/capability-statement, call this
-   route per NAICS, union results. Compute fit/complement against MY profile.
-   Currently defaults fit=75/complement=50 and hard-codes the primary NAICS. */
+   One NAICS is queried, and fit/complement are not computed per user. */
 (function () {
   'use strict';
 
@@ -29,8 +26,8 @@
       certs,
       agencies:   Array.isArray(p.agencies) ? p.agencies : [],
       value:      typeof valueRaw === 'number' ? valueRaw / 1e6 : 0,
-      fit:        75,        // TODO: compute from NAICS overlap with TEAM.MY
-      complement: 50,        // TODO: compute from cert + agency complementarity
+      fit:        75,        // not computed from NAICS overlap
+      complement: 50,        // not computed from cert/agency complementarity
       insight:    p.insight || '',
       cage:       p.cage_code || '',
       uei:        p.uei || ''

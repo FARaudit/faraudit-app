@@ -1,4 +1,4 @@
-/* FARaudit · Defense Agencies — Fork B live wiring.
+/* FARaudit · Defense Agencies — live wiring.
    Fetches /api/agencies, mutates window.DAG IN PLACE, re-renders.
    When API ships `_source: "unwired-mock-preserved"`, this script is a no-op
    and the client-side mock in dag-data.js continues to display.

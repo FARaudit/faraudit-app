@@ -24,7 +24,7 @@
 //       logic, and assert this gate catches it. A gate that cannot fail proves
 //       nothing.
 //
-// Run: npx tsx public/_opportunities-classifier.test.ts
+// Run: npx tsx test/test/public/_opportunities-classifier.test.ts
 // The classifiers live in public/opportunities-live.js (plain browser JS, loaded
 // via <script>), so we EXECUTE that file's functions rather than reimplementing
 // them — a reimplementation would drift and re-create the original blind spot.

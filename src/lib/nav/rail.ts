@@ -89,7 +89,7 @@ export const NAV_GROUPS: RailGroup[] = [
       // renders NO pill (see renderItem); the two pages that actually measure
       // feed state (opportunities-live.js, command-center-live.js) create the
       // pill client-side via public/rail-live-badge.js. Guarded by
-      // public/_rail-live-badge.test.ts.
+      // test/public/_rail-live-badge.test.ts.
       { key: "opportunities", label: "Opportunities", href: "/opportunities", icon: I.opportunities, badge: { text: "", kind: "live" } },
       { key: "capability-statement", label: "Capability Statement", href: "/capability-statement", icon: I.capability },
     ],
