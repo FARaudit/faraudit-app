@@ -4,6 +4,16 @@
 // the classifier puts the audit in data-prelim-mode="fetch" (doc EXISTS on
 // SAM but our original retrieval failed — oversize, network, etc.).
 //
+// ASYNC (2026-07-29) — the armed flag env pushed a real multi-doc engine run
+// past the 200s inline budget (36C25626Q1137 hit 206s → HTTP 500 under
+// Vercel's 300s ceiling), so this route no longer runs the engine. It
+// validates + enqueues a pending_audits row (source='user', audit_id = THIS
+// audit) and the resident audit-worker re-runs executeAudit against the SAME
+// audits row under its own budget. The worker's SAM arm re-assembles the full
+// document set, refreshes the SAM fact columns, and (for refetch-stamped
+// rows) merges last_refetched_at + pdf_source back into compliance_json —
+// the bookkeeping this route used to do inline.
+//
 // Flow:
 //   1. Auth + load the audit row (mirrors /audit/[id] auth — also honors the
 //      curated HERO_AUDIT_ID service-role fallback so the demo audit is
@@ -13,40 +23,45 @@
 //      last 24h, return success without re-running the engine.
 //      BYPASS: a POST body of { "force": true } skips this check so an
 //      explicit user-triggered re-run always re-invokes the current engine.
-//      The auto-watcher tick (POST with no body) still gets the cache.
 //   3. Rate limit (shares the existing audit:<user.id> bucket — 10/hr).
-//   4. fetchSolicitationByNoticeId() + assembleSamDocumentSet() to re-pull the
-//      FULL form-first document set (ingestion meta + attachments), falling back
-//      to a single fetchPdfFromSamUrl() doc. If no resourceLinks → 422.
-//   5. executeAudit() (agentic V3) with the assembled manifest + primary doc.
-//   6. UPDATE the audits row in place (replace, not new row — same id), refreshing
-//      the SAM facts (title/agency/deadline/NAICS/set-aside) the masthead reads.
-//   7. Return JSON the client uses to redirect / reload.
+//   4. In-flight dedupe: an existing pending/processing pending_audits row
+//      for this audit_id returns 202 without a second enqueue (double-click,
+//      stale tab).
+//   5. fetchSolicitationByNoticeId() presence check only (one SAM call — no
+//      document downloads here). If no resourceLinks → 422.
+//   6. Stamp compliance_json.last_refetched_at, flip the audits row to
+//      status='processing' (the report page renders its polling wait state),
+//      insert the pending_audits row, return 202. The [data-fetch] handler
+//      redirects to /audit/[id], which polls GET /api/audit/[id]/status and
+//      reloads on terminal status — same contract as the FA-116 async POST.
+//
+// The worker UPDATEs the audits row in place (executeAudit persists by id —
+// the worker never inserts audits rows), so a refetch can never duplicate a
+// report row.
 
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createServerClient } from "@/lib/supabase-server";
-import { fetchSolicitationByNoticeId, resolveAgency, resolveOfficeLeaf } from "@/lib/sam";
-import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
-import { assembleSamDocumentSet, type AssembledDocumentSet, type IngestionMeta } from "@/lib/sam-attachments";
-import { type PdfSource } from "@/lib/audit-engine"; // type-only (erased) — V1 runAudit is RETIRED here
-import { executeAudit, type AuditExecutionInput } from "@/lib/audit-executor";
-import { uploadPdfToFilesApi } from "@/lib/anthropic-files";
-import { buildBidderProfileFromCapability } from "@/lib/audit-bidder-profile";
-import { MAX_PDF_BYTES } from "@/lib/validators";
+import { fetchSolicitationByNoticeId, resolveAgency } from "@/lib/sam";
 import { checkRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-// runAudit's three-call pipeline is the same 300s budget as the original
-// POST /api/audit handler.
-export const maxDuration = 300;
+// No engine run here anymore — one SAM presence call + two row writes. 60s is
+// generous headroom for a slow SAM endpoint (the fetch itself retries inside).
+export const maxDuration = 60;
 
-const PDF_FILES_API_THRESHOLD_BYTES = 20_000_000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HERO_AUDIT_ID = "7e389f1a-0fc4-4ba2-8299-c86d23adb62a";
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+
+function getAdminClient(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) return null;
+  return createClient(url, serviceKey, { auth: { persistSession: false } });
+}
 
 export async function POST(
   req: Request,
@@ -57,8 +72,8 @@ export async function POST(
     return NextResponse.json({ error: "id required (UUID)" }, { status: 400 });
   }
 
-  // Optional { force?: boolean } body. Body is optional — auto-watcher ticks
-  // POST with no body and inherit force=false. Explicit user re-runs send
+  // Optional { force?: boolean } body. Body is optional — the [data-fetch]
+  // button POSTs with no body and inherits force=false. Explicit re-runs send
   // { "force": true } to bypass the 24h cache and always re-invoke the engine.
   let force = false;
   if ((req.headers.get("content-type") || "").includes("application/json")) {
@@ -80,19 +95,21 @@ export async function POST(
   }
 
   // Load the audit row. Mirror /audit/[id]'s hero service-role fallback so the
-  // curated demo audit is fetchable for any authed user.
+  // curated demo audit is fetchable for any authed user. `db` is whichever
+  // client can actually see (and therefore UPDATE) the row — the RLS session
+  // for owned audits, service-role for the hero row.
   let audit: Record<string, unknown> | null = null;
+  let db: SupabaseClient = supabase;
   {
     const { data } = await supabase.from("audits").select("*").eq("id", id).single();
     audit = data as Record<string, unknown> | null;
   }
   if (!audit && id.toLowerCase() === HERO_AUDIT_ID) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (url && serviceKey) {
-      const adminClient = createClient(url, serviceKey, { auth: { persistSession: false } });
+    const adminClient = getAdminClient();
+    if (adminClient) {
       const { data } = await adminClient.from("audits").select("*").eq("id", HERO_AUDIT_ID).single();
       audit = data as Record<string, unknown> | null;
+      if (audit) db = adminClient;
     }
   }
   if (!audit) return NextResponse.json({ error: "audit not found" }, { status: 404 });
@@ -105,8 +122,13 @@ export async function POST(
   // 24h idempotency: if the row was successfully refetched recently AND now
   // carries a real PDF source, skip the model call. Explicit { force: true }
   // bypasses so a user-triggered re-run always re-invokes the current engine.
+  // status guard: the enqueue stamps last_refetched_at BEFORE the worker runs,
+  // so a terminally-failed re-run leaves a fresh stamp on a 'failed' row — the
+  // cache must never block retrying that row (the failed page's retry CTA
+  // sends force:true anyway; this covers direct no-force POSTs too).
   if (
     !force &&
+    String(audit.status ?? "") === "complete" &&
     currentPdfSource !== "" &&
     currentPdfSource !== "sam_unavailable" &&
     lastRefetchedAt > Date.now() - TWENTY_FOUR_HOURS_MS
@@ -120,6 +142,16 @@ export async function POST(
     });
   }
 
+  // Everything past here needs the service-role client (pending_audits RLS
+  // grants authenticated users READ only — migration 011).
+  const admin = getAdminClient();
+  if (!admin) {
+    return NextResponse.json(
+      { error: "Audit queue is unavailable. Nothing was charged — please try again." },
+      { status: 500 }
+    );
+  }
+
   const noticeId = String(audit.notice_id ?? "");
   if (!noticeId) {
     return NextResponse.json({ error: "audit has no notice_id" }, { status: 422 });
@@ -128,7 +160,7 @@ export async function POST(
     return NextResponse.json({ error: "SAM API key not configured" }, { status: 503 });
   }
 
-  // ━━ Re-pull SAM solicitation ━━
+  // ━━ SAM presence check — one API call, no document downloads ━━
   const solicitation = await fetchSolicitationByNoticeId(noticeId);
   if (!solicitation) {
     return NextResponse.json({ error: "Solicitation not found on SAM.gov" }, { status: 404 });
@@ -137,199 +169,108 @@ export async function POST(
     // Still nothing fetchable. Update last_refetched_at so the user can't
     // hammer the button + return a clear signal the prelim mode should stay.
     const merged = { ...compJson, last_refetched_at: new Date().toISOString() };
-    await supabase.from("audits").update({ compliance_json: merged }).eq("id", audit.id);
+    await db.from("audits").update({ compliance_json: merged }).eq("id", audit.id);
     return NextResponse.json(
       { error: "no document attached to this notice", refetched: false, redirect: `/audit/${audit.id}` },
       { status: 422 }
     );
   }
 
-  // ━━ Re-pull the document SET ━━
-  let pdfBuffer: Buffer | null = null;
-  let pdfBase64: string | null = null;
-  let pdfFileId: string | null = null;
-  let imageBase64: string | null = null;
-  let imageMediaType: "image/jpeg" | "image/png" | null = null;
-  let extractedText: string | null = null;
-  let extractedFormat: "docx" | "xlsx" | "doc" | "txt" | null = null;
-  let pdfSource: PdfSource = "sam_unavailable";
-  let pdfUnavailableReason: string | null = null;
-  // `text` (Brain #624-1) carries the assembler's already-extracted text so buildAgenticDocs
-  // skips a second parse+OCR pass.
-  let attachmentPdfs: Array<{ name: string; base64: string; buffer: Buffer; text?: string }> | null = null;
-  let primaryDocName: string | null = null;
-  let ingestion: IngestionMeta | null = null;
-
-  // R1 — assemble the FULL form-first multi-attachment set, identical to the main
-  // customer POST. Without the manifest the agentic engine has no document set to
-  // reconcile, so it forces documents_complete=false on every SAM refetch and
-  // export-gates an otherwise clean report. Manifest failure / no primary falls
-  // through to the legacy single-doc path below.
-  let assembled: AssembledDocumentSet | null = null; // ROOT-1 — hoisted for the no-silent-degrade guard
-  if (/^[a-f0-9]{32}$/i.test(solicitation.noticeId)) {
-    assembled = await assembleSamDocumentSet(solicitation.noticeId, solicitation.solicitationNumber, solicitation.resourceLinks).catch(() => null); // ROOT-2 #648: independent v2 expected-set for the EXISTS denominator
-    if (assembled?.primary) {
-      pdfBase64 = assembled.primary.base64;
-      pdfBuffer = assembled.primary.buffer;
-      pdfSource = "sam_fetched";
-      attachmentPdfs = assembled.attachments;
-      // Reuse the primary form's already-extracted text (Brain #624-1) so buildAgenticDocs
-      // does not parse+OCR the primary a second time. null when truncated/image-only.
-      extractedText = assembled.primary.text ?? null;
-      primaryDocName = assembled.primary.name;
-      ingestion = assembled.ingestion;
-    } else if (assembled) {
-      ingestion = assembled.ingestion;
+  // In-flight dedupe — a refetch already queued/running for this audit must
+  // not enqueue (and pay for) a second run. force does NOT bypass this: the
+  // queued run IS the current engine invocation the user is asking for.
+  // Checked HERE (after the ~seconds-long SAM call, immediately before the
+  // insert) to keep the check-then-act window at milliseconds — there is no
+  // DB uniqueness constraint on audit_id to backstop a race (migration 011
+  // rescoped the unique index to non-user rows), so concurrent POSTs that
+  // both pass this check would each fund an engine run.
+  {
+    const { data: inflight } = await admin
+      .from("pending_audits")
+      .select("id, status")
+      .eq("audit_id", audit.id)
+      .eq("source", "user")
+      .in("status", ["pending", "processing"])
+      .limit(1);
+    if (inflight && inflight.length > 0) {
+      return NextResponse.json(
+        { auditId: audit.id, status: "queued", alreadyQueued: true, redirect: `/audit/${audit.id}` },
+        { status: 202 }
+      );
     }
   }
 
-  // NO-SILENT-DEGRADE (ROOT-1, Brain #648/#649 finding #4) — assembled===null = manifest UNAVAILABLE for a
-  // MULTI-DOC package; refuse the single-URL degrade (would drop N-1 known docs) → honest-INCOMPLETE.
-  if (!pdfBase64 && !pdfFileId && assembled === null && solicitation.resourceLinks.length > 1 && /^[a-f0-9]{32}$/i.test(solicitation.noticeId)) {
-    pdfUnavailableReason = `multi-doc manifest unavailable (after retries) — ${solicitation.resourceLinks.length} resources expected; refused single-doc degrade`;
-    console.warn(`[refetch] NO-SILENT-DEGRADE: notice=${solicitation.noticeId} resourceLinks=${solicitation.resourceLinks.length} · manifest unavailable → INCOMPLETE`);
-  }
-  // Fallback — single primary doc (mirrors the main route) when assembly yields no primary.
-  else if (!pdfBase64 && !pdfFileId) {
-    try {
-      const fetched = await fetchPdfFromSamUrl(solicitation.resourceLinks[0]);
-      if (fetched.bytes > MAX_PDF_BYTES) {
-        pdfUnavailableReason = `oversize (${(fetched.bytes / 1024 / 1024).toFixed(1)}MB > ${MAX_PDF_BYTES / 1024 / 1024}MB)`;
-      } else if (fetched.kind === "pdf") {
-        if (fetched.fileId) {
-          pdfFileId = fetched.fileId;
-          pdfBuffer = fetched.buffer ?? null;
-          pdfSource = "sam_pdf_via_files_api";
-        } else {
-          pdfBase64 = fetched.base64;
-          pdfSource = "sam_fetched";
-        }
-      } else if (fetched.kind === "image") {
-        imageBase64 = fetched.base64;
-        imageMediaType = fetched.mediaType;
-        pdfSource = fetched.resized ? "sam_image_resized" : "sam_image_extracted";
-      } else {
-        extractedText = fetched.extractedText;
-        extractedFormat = fetched.format;
-        pdfSource = "sam_text_extracted";
-      }
-    } catch (err) {
-      pdfUnavailableReason = err instanceof Error ? err.message.slice(0, 200) : "unknown fetch error";
-    }
-  }
-
-  // If still no usable content, mark and return — the panel stays in fetch
-  // mode but the user has fresh proof we tried.
-  if (!pdfBase64 && !pdfFileId && !imageBase64 && !extractedText) {
-    const merged = {
-      ...compJson,
-      last_refetched_at: new Date().toISOString(),
-      pdf_unavailable_reason: pdfUnavailableReason ?? compJson.pdf_unavailable_reason
-    };
-    await supabase.from("audits").update({ compliance_json: merged }).eq("id", audit.id);
+  // ━━ Enqueue ━━
+  // Stamp last_refetched_at BEFORE the worker runs: the worker reads the
+  // pre-run stamp to recognize a refetch-shaped row (an audits row that
+  // already existed) and re-stamps it after executeAudit replaces
+  // compliance_json. Flip to 'processing' BEFORE the pending insert so the
+  // worker's current_stage writes can never be stomped by this route.
+  const nowIso = new Date().toISOString();
+  const prevStatus = String(audit.status ?? "complete");
+  const { error: flipErr } = await db
+    .from("audits")
+    .update({
+      status: "processing",
+      current_stage: null,
+      stage_updated_at: nowIso,
+      error_message: null,
+      compliance_json: { ...compJson, last_refetched_at: nowIso }
+    })
+    .eq("id", audit.id);
+  if (flipErr) {
     return NextResponse.json(
-      { error: pdfUnavailableReason ?? "fetch failed", refetched: false, redirect: `/audit/${audit.id}` },
-      { status: 422 }
+      { error: `Refetch could not start: ${flipErr.message}. Nothing was charged.` },
+      { status: 500 }
     );
   }
 
-  // If a buffer > 20MB returned, route through the Files API like the main
-  // POST handler does. (fetchPdfFromSamUrl already does that for sam_fetched
-  // text path; uploaded path mirrors POST.)
-  if (pdfBase64) {
-    const buf = Buffer.from(pdfBase64, "base64");
-    if (buf.length > PDF_FILES_API_THRESHOLD_BYTES) {
-      const uploaded = await uploadPdfToFilesApi(buf, `sam-refetch-${noticeId}.pdf`);
-      pdfFileId = uploaded.fileId;
-      pdfBase64 = null;
-      pdfSource = "sam_pdf_via_files_api";
-    }
-  }
-
-  // N5 — the firm's capability profile for the agentic eligibility lane (socioeconomic
-  // certs). Mirrors the main POST so a re-run can't diverge from the original verdict
-  // (e.g. a cert that cleared a set-aside bar must still clear it on refetch). Best-effort:
-  // any error → null (unknown firm, the conservative path). User is the RLS-scoped owner.
-  let bidderProfile = null;
-  try {
-    const { data: capRow } = await supabase
-      .from("capability_statements")
-      .select("certifications, attributes_v2, size_facts")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    bidderProfile = buildBidderProfileFromCapability(capRow, { solicitationNaics: solicitation.naicsCode });
-  } catch { /* unknown firm on any error — never block the re-run */ }
-
-  // ━━ Run the audit — the agentic V3 engine (same path as the main customer POST),
-  // NOT the retired V1 runAudit. executeAudit fills the row in place (verdict +
-  // engine='agentic_v3' marker + honest_fail/documents_complete). A tighter budget
-  // leaves the 300s route headroom for the SAM/PDF prologue above. ━━
-  const input: AuditExecutionInput = {
-    solicitation,
+  const { error: enqueueErr } = await admin.from("pending_audits").insert({
+    notice_id: solicitation.noticeId,
+    solicitation_number: solicitation.solicitationNumber,
+    title: solicitation.title,
     agency: resolveAgency(solicitation) || (audit.agency as string | null),
-    pdfBuffer,
-    pdfBase64,
-    pdfFileId,
-    imageBase64,
-    imageMediaType,
-    extractedText,
-    extractedFormat,
-    pdfSource,
-    pdfUnavailableReason,
-    attachmentPdfs,
-    primaryDocName,
-    ingestion,
-    bidderProfile,
-    agenticBudgetMs: 200_000
-  };
-  let result;
-  try {
-    result = await executeAudit(supabase, audit.id as string, input);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
-
-  // executeAudit replaced compliance_json with the V3 payload — merge back the refetch
-  // bookkeeping the idempotency cache + UI read (last_refetched_at, pdf_source), and
-  // refresh office_leaf (FA-151: keep the prior leaf if SAM omits the full path).
-  {
-    const { data: fresh } = await supabase.from("audits").select("compliance_json").eq("id", audit.id).single();
-    const freshCj = (fresh?.compliance_json as Record<string, unknown> | null) ?? {};
-    // R1 — refresh ONLY the facts the LIVE SAM record actually provides, so an
-    // amendment's new values land WITHOUT clobbering executeAudit's deterministic FACTS
-    // cross-ref (which may have already backfilled a column the live record left sparse)
-    // and never nulling a known-good value. Facts-vs-analysis law: never overwrite a
-    // good fact with a stale/empty one. (Bug found by the pre-deploy gate.)
-    const factRefresh: Record<string, unknown> = {
-      compliance_json: { ...freshCj, last_refetched_at: new Date().toISOString(), pdf_source: pdfSource }
-    };
-    const freshAgency = resolveAgency(solicitation);
-    const freshOffice = resolveOfficeLeaf(solicitation);
-    if (solicitation.title) factRefresh.title = solicitation.title;
-    if (freshAgency) factRefresh.agency = freshAgency;
-    if (solicitation.naicsCode) factRefresh.naics_code = solicitation.naicsCode;
-    if (solicitation.typeOfSetAside) factRefresh.set_aside = solicitation.typeOfSetAside;
-    if (solicitation.postedDate) factRefresh.posted_date = solicitation.postedDate;
-    if (solicitation.responseDeadLine) factRefresh.response_deadline = solicitation.responseDeadLine;
-    if (freshOffice) factRefresh.office_leaf = freshOffice;
-    const { error: mergeErr } = await supabase
-      .from("audits")
-      .update(factRefresh)
-      .eq("id", audit.id);
-    if (mergeErr) {
-      // The audit itself succeeded; only the refetch bookkeeping failed. Surface but
-      // don't fail the request — the report is already correct.
-      console.warn(`[refetch] compliance_json merge-back failed for ${audit.id}: ${mergeErr.message}`);
-    }
-  }
-
-  return NextResponse.json({
-    auditId: audit.id,
-    status: "refetched",
-    pdfSource,
-    recommendation: result.recommendation,
-    score: result.compliance_score,
-    redirect: `/audit/${audit.id}`
+    naics_code: solicitation.naicsCode,
+    set_aside: solicitation.typeOfSetAside,
+    response_deadline: solicitation.responseDeadLine,
+    pdf_url: solicitation.resourceLinks[0] ?? null,
+    source: "user",
+    status: "pending",
+    user_id: user.id,
+    audit_id: audit.id,
+    anthropic_file_id: null,
+    pdf_filename: null,
+    pdf_path: null,
+    upload_docs: null
   });
+
+  if (enqueueErr) {
+    // Restore the pre-flip row — the queue insert failed, so no worker will
+    // ever land a terminal status and the report page would poll forever.
+    // compliance_json goes back too (drops the enqueue stamp — no run
+    // happened, so the 24h cache must not think one did).
+    const { error: restoreErr } = await db
+      .from("audits")
+      .update({ status: prevStatus, error_message: `refetch enqueue failed: ${enqueueErr.message}`, compliance_json: compJson })
+      .eq("id", audit.id);
+    if (restoreErr) {
+      // Row is stranded in 'processing' with no queue row — loud, so it is
+      // findable without log archaeology.
+      console.error(`[refetch] enqueue failed AND status restore failed for ${audit.id} — row stranded in 'processing': ${restoreErr.message}`);
+    }
+    return NextResponse.json(
+      { error: `Refetch could not be queued: ${enqueueErr.message}. Nothing was charged.` },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json(
+    {
+      auditId: audit.id,
+      status: "queued",
+      redirect: `/audit/${audit.id}`,
+      poll: `/api/audit/${audit.id}/status`
+    },
+    { status: 202 }
+  );
 }

@@ -215,11 +215,15 @@
     }
     if (meta) {
       if (state === 'live') {
-        const ingest = opts && opts.lastIngest ? ' · last ingest ' + opts.lastIngest : '';
-        meta.innerHTML = 'Live solicitations from the <b>SAM.gov daily ingest</b> · ' +
+        // LAST_INGEST is the newest row's SAM postedDate — a fact about the
+        // NOTICES, not about our fetch. Label it as such: the live feed itself
+        // is at most 30 minutes old (fetchLiveOpportunities' cache window), so
+        // "refreshed 22h ago" would understate freshness by a day.
+        const ingest = opts && opts.lastIngest ? ' · newest posted ' + opts.lastIngest : '';
+        meta.innerHTML = 'Live solicitations read from <b>SAM.gov</b> · ' +
           opts.count + ' notice' + (opts.count === 1 ? '' : 's') + ingest;
       } else if (state === 'empty') {
-        meta.innerHTML = 'Connected to the <b>SAM.gov daily ingest</b> — no notices in the current window.';
+        meta.innerHTML = 'Connected to the <b>live SAM.gov feed</b> — no notices in the current window.';
       } else if (state === 'error') {
         meta.textContent = 'SAM.gov feed unavailable — nothing shown below is sample data.';
       } else {
@@ -269,13 +273,19 @@
         window.DSO.NAICS.push({ code: code, label: counts[code] + ' in feed' });
       });
 
-      // Newest ingest write among rendered rows = honest "last ingest" time.
+      // Newest postedDate among rendered rows. Live rows carry created_at =
+      // SAM postedDate (date-only), so this dates the NOTICES, not the fetch.
       const newest = mapped.reduce(function (acc, o) {
         const t = o.ingested_at ? new Date(o.ingested_at).getTime() : NaN;
         return !isNaN(t) && t > acc ? t : acc;
       }, 0);
       window.DSO.LAST_INGEST = newest ? relTime(new Date(newest).toISOString()) : null;
       setFeedStatus(window.DSO.FEED_STATE, { count: mapped.length, lastIngest: window.DSO.LAST_INGEST });
+      // The rail ships no pill; this page has now MEASURED the feed, so it may
+      // assert one. 'empty' is still a live feed — it answered with zero rows.
+      if (typeof window.setRailLiveBadge === 'function') {
+        window.setRailLiveBadge('live', { count: mapped.length });
+      }
 
       // Watch + pipeline state for visible rows (null = unavailable → the
       // render layer disables those buttons instead of faking "off").
@@ -287,6 +297,9 @@
       window.DSO.OPPS.length = 0;
       window.DSO.FEED_STATE = 'error';
       setFeedStatus('error');
+      if (typeof window.setRailLiveBadge === 'function') {
+        window.setRailLiveBadge('unavailable');
+      }
     }
     if (window.DSO_APP && typeof window.DSO_APP.render === 'function') {
       window.DSO_APP.render();

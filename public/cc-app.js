@@ -17,27 +17,19 @@
       team:  { label: 'Teaming Partners', color: '#059669', href: '/teaming-partners', icon: 'M7 9a3 3 0 100-6 3 3 0 000 6zM17 9a3 3 0 100-6 3 3 0 000 6zM2 20c0-3 2.5-5 5-5M22 20c0-3-2.5-5-5-5' },
       spend: { label: 'Defense Spending', color: '#2C6CB4', href: '/defense-spending', icon: 'M4 19V5M4 19h16M8 16v-4M13 16V9M18 16v-2' }
     },
-    ACTIONS: [
-      { desk: 'opp', urg: 'crit', days: 6, title: 'SPY-6 Radar Sustainment — submit in 6 days', why: 'Fit 94, SDVOSB set-aside, $18.4M ceiling. Your strongest open pursuit and the clock is running.', cta: 'Open pursuit', val: '$18.4M' },
-      { desk: 'gao', urg: 'crit', days: 0, title: '$5.4M of tracked award value is contestable', why: 'Active AFMC C-17 protest could vacate an award you are tracking. Watch for corrective action this week.', cta: 'Review protest', val: '$5.4M' },
-      { desk: 'cmmc', urg: 'warn', days: 161, title: 'CMMC SSP incomplete — CM & CA domains failing', why: 'You are 78% ready but the System Security Plan is the #1 C3PAO deliverable. 16 controls open before enforcement.', cta: 'Open readiness', val: '78%' },
-      { desk: 'far', urg: 'warn', days: 15, title: 'CMMC clause 252.204-7021 effective in 15 days', why: 'Lowered to >$100K with CUI. 7 of your tracked solicitations now require Level 2 certification to bid.', cta: 'See redline', val: '7 sols' },
-      { desk: 'co', urg: 'warn', days: 47, title: 'Re-warm Greg Bauer (TACOM) — 47 days quiet', why: 'Controls $87M in your codes but has gone cold. A recompete is coming — re-engage before it posts.', cta: 'Open profile', val: '$87M' },
-      { desk: 'wage', urg: 'warn', days: 22, title: 'Aircraft Inspector pay 3.4% below market', why: 'Two inspector categories at JBSA are under market. Adjust before the WD renews in 22 days or risk losing staff.', cta: 'Open benchmarks', val: '−3.4%' },
-      { desk: 'team', urg: 'ok', days: null, title: 'Desert Aerospace unlocks the T-38 sol', why: 'Their SDVOSB cert + C-130J past performance makes the $14.2M T-38 depot IDIQ winnable. Request an intro.', cta: 'Open partners', val: '$14.2M' },
-      { desk: 'spend', urg: 'ok', days: null, title: 'WA, OH, GA are high-spend BD gaps', why: 'Real obligations in your NAICS with no recorded activity from you. Whitespace worth a territory plan.', cta: 'Open map', val: '3 states' }
-    ],
-    WEEK: [
-      { d: 'Jun 5', day: 2, label: 'Field Feeding precision parts — quote due', tag: 'Opportunity', tone: 'crit', desk: 'opp' },
-      { d: 'Jun 9', day: 6, label: 'SPY-6 Radar — proposal due', tag: 'Opportunity', tone: 'crit', desk: 'opp' },
-      { d: 'Jun 18', day: 15, label: 'CMMC §252.204-7021 effective', tag: 'Regulatory', tone: 'warn', desk: 'far' },
-      { d: 'Jun 25', day: 22, label: 'WD 2015-4267 renewal (JBSA)', tag: 'Wage', tone: 'warn', desk: 'wage' },
-      { d: 'Jun 30', day: 27, label: 'FY26 Q3 close — agency obligation push', tag: 'Fiscal Year', tone: 'warn', gov: true },
-      { d: 'Jul 2', day: 29, label: 'AFMC C-17 protest decision window', tag: 'Protest', tone: 'ok', desk: 'gao' },
-      { d: 'Jul 31', day: 58, label: 'FY27 defense budget markups begin', tag: 'Budget', tone: 'ok', gov: true },
-      { d: 'Aug 29', day: 87, label: 'SAM.gov annual registration renewal', tag: 'Registration', tone: 'warn', gov: true },
-      { d: 'Sep 30', day: 119, label: 'FY26 year-end — use-it-or-lose-it surge', tag: 'Fiscal Year', tone: 'crit', gov: true, big: true }
-    ]
+    // ACTIONS + WEEK ship EMPTY. They used to hold a curated mock that the
+    // live wiring only replaced when the API returned CC-shape fields — which
+    // it never did, so invented pursuits, dollar figures and named contracting
+    // officers rendered as the signed-in user's own book of business. The
+    // per-desk digest that fills these is command-center-live.js's TODO
+    // (fetchCommandCenterDigest); until it exists these panels say so.
+    // Guarded by public/_today-fabrication.test.ts.
+    ACTIONS: [],
+    WEEK: [],
+    // Scalars the /api/command-center-data response already carries. null =
+    // not computed; every render site prints an em dash for null and never a
+    // zero standing in for "unknown".
+    LIVE: null
   };
   const DESK = window.CC.DESK;
   const ACTIONS = window.CC.ACTIONS;
@@ -47,25 +39,58 @@
   let filter = 'all';
   const dismissed = new Set(), snoozed = new Set();
 
+  // Em dash for anything not computed. NEVER 0 — a zero asserts "none", which
+  // is a different claim from "we have not computed this".
+  const DASH = '—';
+  function num(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
+  function fmtMoney(v) {
+    const n = num(v);
+    if (n === null || n <= 0) return null;
+    if (n >= 1e9) return '$' + (n / 1e9).toFixed(1) + 'B';
+    if (n >= 1e6) return '$' + (n / 1e6).toFixed(1) + 'M';
+    if (n >= 1e3) return '$' + Math.round(n / 1e3) + 'K';
+    return '$' + n;
+  }
+
   function renderKPIs() {
-    const crit = ACTIONS.filter(a => a.urg === 'crit').length;
+    const L = window.CC.LIVE;
     const arrow = '<span class="kpi-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M7 17L17 7M9 7h8v8"/></svg></span>';
-    // Q1 spec: each KPI drills through to its source surface.
+    // Every tile below is a value /api/command-center-data actually returns
+    // (the previous four were source literals). Unknown → DASH + a foot that
+    // says why, in the same voice /opportunities uses for absent values.
+    const money = L ? fmtMoney(L.pipelineWeightedValue) : null;
     const cards = [
-      { href: '/opportunities',     lbl: 'Closing This Week',  val: '$32M', unit: '',  foot: '2 proposals due ≤ 6 days', tone: 'blue' },
-      { href: '/far-dfars-updates', lbl: 'Compliance Deadline', val: '15',   unit: 'd', foot: 'CMMC clause effective',    tone: 'amber' },
-      { href: '/gao-protests',      lbl: 'Protest Exposure',    val: '$5.4', unit: 'M', foot: 'tracked award contestable', tone: 'red' },
-      { href: '/pipeline',          lbl: 'Pipeline Value',      val: '$212', unit: 'M', foot: '18 active pursuits',        tone: 'green' }
+      { href: '/opportunities', lbl: 'Live Notices',     val: L ? String(num(L.liveCount) ?? DASH) : DASH,    unit: '',  foot: L ? 'matching your NAICS on SAM.gov' : 'feed not loaded', tone: 'blue' },
+      { href: '/opportunities', lbl: 'Closing ≤ 7 Days', val: L ? String(num(L.deadlineSoon) ?? DASH) : DASH, unit: '',  foot: L ? 'live notices with a stated deadline' : 'feed not loaded', tone: 'amber' },
+      { href: '/past-audits',   lbl: 'Audits This Month', val: L ? String(num(L.auditsThisMonth) ?? DASH) : DASH, unit: '', foot: L ? 'completed by you' : 'not loaded', tone: 'red' },
+      { href: '/pipeline',      lbl: 'Pipeline Value',   val: money ?? DASH, unit: '', foot: money ? (num(L.pipelineTotal) || 0) + ' active pursuits' : 'no stated values in your pipeline', tone: 'green' }
     ];
     $('kpiStrip').innerHTML = cards.map(c => `<a class="kpi" data-tone="${c.tone}" href="${c.href}">${arrow}<p class="lbl">${c.lbl}</p><div class="kpi-val">${c.val}<span class="unit">${c.unit}</span></div><div class="foot">${c.foot}</div></a>`).join('');
-    $('hsAct').textContent = ACTIONS.filter(a => a.urg !== 'ok').length;
-    $('hsCrit').textContent = crit;
+    renderHdr();
   }
 
   function renderInsight() {
-    // Q2 spec: the two bold phrases are links — the rest of the sentence is plain.
+    const L = window.CC.LIVE;
     const arrow = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M7 17L17 7M9 7h8v8"/></svg>';
-    $('insightBar').innerHTML = `<span class="ib-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a7 7 0 00-4 12.7V17a1 1 0 001 1h6a1 1 0 001-1v-2.3A7 7 0 0012 2z"/><path d="M9 21h6"/></svg></span><span><span class="ib-label">Start here</span>Two things can't wait: the <a class="ib-link" href="/opportunities">SPY-6 proposal (6 days)${arrow}</a> and the <a class="ib-link" href="/gao-protests">$5.4M protest exposure${arrow}</a> on a tracked award. Everything else has runway — work them top-down.</span>`;
+    const ico = `<span class="ib-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a7 7 0 00-4 12.7V17a1 1 0 001 1h6a1 1 0 001-1v-2.3A7 7 0 0012 2z"/><path d="M9 21h6"/></svg></span>`;
+    // The old copy named a specific pursuit and a dollar exposure, neither of
+    // which any query produced. This states only what the feed actually says.
+    let body;
+    if (!L && window.CC.FEED_ERROR) {
+      body = `<span class="ib-label">Status</span><b>Your desk data is unavailable.</b> Nothing on this page is sample data — the panels stay empty until the feed answers.`;
+    } else if (!L) {
+      body = `<span class="ib-label">Status</span>Loading your desks — nothing on this page is sample data.`;
+    } else {
+      const live = num(L.liveCount) ?? 0;
+      const soon = num(L.deadlineSoon) ?? 0;
+      if (live === 0) {
+        body = `<span class="ib-label">Status</span>No live SAM.gov notices match your NAICS in the current window. <a class="ib-link" href="/opportunities">Open the feed${arrow}</a> to widen it.`;
+      } else {
+        body = `<span class="ib-label">Start here</span><a class="ib-link" href="/opportunities">${live} live notice${live === 1 ? '' : 's'}${arrow}</a> match your NAICS`
+          + (soon > 0 ? `, and <b>${soon}</b> close within 7 days — work those first.` : `. None carry a deadline inside 7 days.`);
+      }
+    }
+    $('insightBar').innerHTML = ico + '<span>' + body + '</span>';
   }
 
   function rankOrder(a) { return a.urg === 'crit' ? 0 : a.urg === 'warn' ? 1 : 2; }
@@ -96,6 +121,20 @@
     });
   }
 
+  // Two DIFFERENT empty states, because they are two different claims:
+  //   · ACTIONS is empty because no ranking is computed → say exactly that.
+  //     "Inbox zero" here would be a false all-clear on unexamined work.
+  //   · ACTIONS had rows and the user cleared/filtered them → inbox zero is true.
+  function emptyFeed() {
+    const tick = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>';
+    if (ACTIONS.length === 0) {
+      return `<div class="feed-clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+        <div class="fc-t">Cross-desk ranking not built yet</div>
+        <div class="fc-d">This panel will rank the single most urgent item from each desk once the digest query ships. It is empty rather than illustrative — nothing here is sample data. Live data you can use today: <a class="fc-undo" href="/opportunities">Opportunities</a> · <a class="fc-undo" href="/past-audits">Past Audits</a> · <a class="fc-undo" href="/pipeline">Pipeline</a></div></div>`;
+    }
+    return `<div class="feed-clear">${tick}<div class="fc-t">Inbox zero</div><div class="fc-d">You've cleared every priority in this filter.${dismissed.size ? ` <button class="fc-undo" id="fcUndo">Restore ${dismissed.size} dismissed</button>` : ''}</div></div>`;
+  }
+
   function renderFeed() {
     let data = ACTIONS.filter(a => !dismissed.has(a.desk));
     data.sort((a, b) => (snoozed.has(a.desk) - snoozed.has(b.desk)) || rankOrder(a) - rankOrder(b) || (a.days ?? 999) - (b.days ?? 999));
@@ -122,15 +161,24 @@
           <button class="act-ctrl" data-dismiss="${a.desk}" title="Dismiss"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
         </div>
       </a>`;
-    }).join('') || `<div class="feed-clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><div class="fc-t">Inbox zero</div><div class="fc-d">You've cleared every priority in this filter.${dismissed.size ? ` <button class="fc-undo" id="fcUndo">Restore ${dismissed.size} dismissed</button>` : ''}</div></div>`;
+    }).join('') || emptyFeed();
     $('actFeed').querySelectorAll('[data-snooze]').forEach(b => b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); const k = b.dataset.snooze; snoozed.has(k) ? snoozed.delete(k) : snoozed.add(k); renderFeed(); renderHdr(); });
     $('actFeed').querySelectorAll('[data-dismiss]').forEach(b => b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); dismissed.add(b.dataset.dismiss); renderFeed(); renderHdr(); });
     const undo = $('fcUndo'); if (undo) undo.onclick = (e) => { e.preventDefault(); dismissed.clear(); renderFeed(); renderHdr(); };
   }
+  // Header stats. With no digest, "Need Action"/"Critical" are UNKNOWN, not 0 —
+  // a 0 would tell the user nothing needs attention, which nothing has checked.
+  // "Next Deadline" is genuinely computable from the live SAM feed.
   function renderHdr() {
+    const L = window.CC.LIVE;
     const live = ACTIONS.filter(a => !dismissed.has(a.desk) && !snoozed.has(a.desk));
-    $('hsAct').textContent = live.filter(a => a.urg !== 'ok').length;
-    $('hsCrit').textContent = live.filter(a => a.urg === 'crit').length;
+    const act = $('hsAct'), crit = $('hsCrit'), days = $('hsDays');
+    if (act)  act.textContent  = ACTIONS.length ? String(live.filter(a => a.urg !== 'ok').length) : DASH;
+    if (crit) crit.textContent = ACTIONS.length ? String(live.filter(a => a.urg === 'crit').length) : DASH;
+    if (days) {
+      const d = L ? num(L.nextDeadlineDays) : null;
+      days.textContent = d === null ? DASH : (d === 0 ? 'today' : d + 'd');
+    }
   }
 
   function fmtIn(day) { return day === 0 ? 'today' : day <= 31 ? 'in ' + day + 'd' : day <= 90 ? 'in ' + Math.round(day / 7) + 'w' : 'in ' + Math.round(day / 30) + 'mo'; }
@@ -144,6 +192,18 @@
       <div class="wk-body"><div class="wk-label">${w.label}</div>${tag}</div>
     </a>`;
   }
+  // Per-group display caps. Measured on the live feed 2026-07-29: 197 dated
+  // notices, of which 71 land inside 7 days — so a single flat cap below 71
+  // rendered week one and nothing else, and "This Month" / "Later This Year"
+  // could never appear however high it went. Capping each group separately is
+  // what actually raises the calendar's reach: every designed group gets rows.
+  // .week-list now scrolls internally (max-height + overflow-y in today.html),
+  // so these caps no longer trade against page height — they trade against
+  // scannability. 20/15/10 covers a full quarter of real deadlines on the
+  // measured feed (71/109/17) while every group still reports its true total
+  // and its own remainder.
+  const WEEK_GROUP_CAPS = { 'This Week': 20, 'This Month': 15, 'Later This Year': 10 };
+
   function renderWeek() {
     const groups = [
       { label: 'This Week', test: w => w.day <= 7 },
@@ -151,35 +211,108 @@
       { label: 'Later This Year', test: w => w.day > 31 }
     ];
     let html = '';
+    let hiddenTotal = 0;
     groups.forEach(g => {
       const items = WEEK.filter(g.test);
       if (!items.length) return;
-      html += `<div class="wk-group"><span>${g.label}</span><b>${items.length}</b></div>` + items.map(wkRow).join('');
+      const cap = WEEK_GROUP_CAPS[g.label] || items.length;
+      const shown = items.slice(0, cap);
+      const hidden = items.length - shown.length;
+      hiddenTotal += hidden;
+      // The group header count is the TRUE total, not the shown count — a
+      // header reading "20" over 20 rows would hide that 51 more exist.
+      html += `<div class="wk-group"><span>${g.label}</span><b>${items.length}</b></div>` + shown.map(wkRow).join('');
+      // Truncation is surfaced INSIDE the group it belongs to, never silent.
+      if (hidden > 0) {
+        html += `<a class="wk-row" href="/opportunities"><div class="wk-date"><span class="wk-d">+${hidden}</span></div>
+          <div class="wk-line"><span class="wk-node" style="background:var(--t40,#64748b)"></span></div>
+          <div class="wk-body"><div class="wk-label">${hidden} more in ${g.label.toLowerCase()} — open Opportunities</div></div></a>`;
+      }
     });
-    $('weekList').innerHTML = html;
+    // Backstop drop from the wiring layer (DOM ceiling), counted separately so
+    // the two truncation reasons are never conflated.
+    const dropped = num(window.CC.WEEK_DROPPED) || 0;
+    if (html && dropped > 0) {
+      html += `<a class="wk-row" href="/opportunities"><div class="wk-date"><span class="wk-d">+${dropped}</span></div>
+        <div class="wk-line"><span class="wk-node" style="background:var(--t40,#64748b)"></span></div>
+        <div class="wk-body"><div class="wk-label">${dropped} more deadline${dropped === 1 ? '' : 's'} not shown — open Opportunities</div></div></a>`;
+    }
+    // Three states: outage · feed answered with nothing dated · rows.
+    let empty;
+    if (window.CC.FEED_ERROR || window.CC.WEEK_SOURCED === false) {
+      empty = `<div class="fc-t">Deadlines unavailable</div><div class="fc-d">The feed did not answer, so this calendar is empty rather than illustrative — nothing here is sample data.</div>`;
+    } else {
+      empty = `<div class="fc-t">No dated deadlines</div><div class="fc-d">No live notice in your NAICS carries a future response deadline right now. Only response deadlines are wired — wage-determination, regulatory and fiscal dates are not sourced yet.</div>`;
+    }
+    $('weekList').innerHTML = html || `<div class="feed-clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>${empty}</div>`;
   }
 
+  // Was six invented per-desk "signals" — a named CO relationship, a CMMC
+  // readiness percentage, a protest sustain rate, none of them computed. The
+  // desk registry itself (label / colour / route / icon) is real UI config, so
+  // these render as plain NAVIGATION: every desk reachable, zero assertions
+  // about what is in it. A desk card makes a claim only once its query exists.
   function renderSignals() {
-    const sigs = [
-      { desk: 'spend', t: 'Virginia +12%, Washington leads growth', d: '3 high-spend states show zero activity from you.' },
-      { desk: 'co', t: '3 warm COs, 2 need re-warming', d: 'Diane Hartwell (NAVSEA) is your top relationship — keep it warm.' },
-      { desk: 'cmmc', t: '78% ready · 16 controls open', d: 'CM and CA domains are dragging your score.' },
-      { desk: 'far', t: '5 high-impact clause changes this month', d: 'CMMC and Section 889 reps need updating.' },
-      { desk: 'gao', t: 'AFMC sustains 24% in your NAICS', d: 'Highest award instability of your agencies.' },
-      { desk: 'team', t: '4 set-aside lanes reachable via teaming', d: 'SDVOSB, 8(a), HUBZone, WOSB — none solo.' }
-    ];
-    $('sigGrid').innerHTML = sigs.map(s => {
-      const d = DESK[s.desk];
+    const order = ['spend', 'co', 'cmmc', 'far', 'gao', 'team'];
+    $('sigGrid').innerHTML = order.map(key => {
+      const d = DESK[key];
+      if (!d) return '';
       return `<a class="sig-card" href="${d.href}">
         <div class="sig-top"><span class="sig-ico" style="background:${hexA(d.color,.13)};color:${d.color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="${d.icon}"/></svg></span><span class="sig-desk">${d.label}</span><span class="sig-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
-        <div class="sig-t">${s.t}</div><div class="sig-d">${s.d}</div>
+        <div class="sig-t">Open ${d.label}</div><div class="sig-d">No cross-desk summary is computed yet — open the desk for its own live data.</div>
       </a>`;
     }).join('');
   }
 
   function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`; }
 
-  function renderAll() { renderKPIs(); renderInsight(); renderTabs(); renderFeed(); renderWeek(); renderSignals(); }
+  // Dateline was a hardcoded date string, and therefore wrong on every day but
+  // one. Derived from the clock instead.
+  function renderDateline() {
+    const el = $('dateline');
+    if (!el) return;
+    el.textContent = new Date().toLocaleDateString('en-US', {
+      weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
+    }).replace(',', ' ·');
+  }
+
+  // Identity came from hardcoded "Jose" / "JR" / "Jose Rodriguez" / a company
+  // name and NAICS list. All four now come from the API, and stay blank until
+  // it answers rather than showing someone else's name.
+  function renderIdentity() {
+    const u = window.CC.LIVE && window.CC.LIVE.user;
+    const greet = $('greeting'), nm = $('userNm'), av = $('userAv'), naics = $('headerSubNaics');
+    const hour = new Date().getHours();
+    const part = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+    if (greet) greet.textContent = u && u.firstName ? `${part}, ${u.firstName}` : part;
+    if (nm) nm.textContent = u && u.fullName ? u.fullName : '';
+    if (av) av.textContent = u && u.initials ? u.initials : '';
+    if (naics) {
+      const codes = window.CC.LIVE && Array.isArray(window.CC.LIVE.feedNaics) ? window.CC.LIVE.feedNaics : null;
+      naics.textContent = codes && codes.length ? ` — NAICS ${codes.join(' · ')}` : '';
+    }
+  }
+
+  // Sidebar badges were three hardcoded counts (past audits, at-risk pipeline,
+  // agencies). All three are real fields on the API response, so they now read
+  // from it — and stay HIDDEN when unknown rather than showing a number nobody
+  // counted. A zero also hides: an empty badge is noise, not information.
+  function renderSidebarBadges() {
+    const L = window.CC.LIVE;
+    const set = (id, v) => {
+      const el = $(id);
+      if (!el) return;
+      const n = num(v);
+      if (n === null || n <= 0) { el.style.display = 'none'; el.textContent = ''; return; }
+      el.textContent = String(n);
+      el.style.display = '';
+    };
+    set('sbAudits',   L ? L.auditTotal : null);
+    set('sbPipeline', L ? L.pipelineAtRisk : null);
+    set('sbAgencies', L ? L.agencyCount : null);
+  }
+
+  function renderAll() { renderDateline(); renderIdentity(); renderSidebarBadges(); renderKPIs(); renderInsight(); renderTabs(); renderFeed(); renderWeek(); renderSignals(); }
 
   // Q5 spec: structured notifications dropdown, grouped by Today/Earlier,
   // desk-color dots, unread rows, mark-all-read, Esc/outside-click closes.
@@ -193,15 +326,13 @@
       wage:  { c: '#d97706', l: 'Wage',            href: '/wage-benchmarks' },
       spend: { c: '#2C6CB4', l: 'Spending',        href: '/defense-spending' }
     };
-    const ITEMS = [
-      { grp: 'Today',   desk: 'gao',   t: 'AFMC corrective action filed',                    d: 'Your tracked $5.4M C-17 award may be re-evaluated.',     time: '18m', unread: true  },
-      { grp: 'Today',   desk: 'opp',   t: 'SPY-6 Radar — amendment 0003 posted',             d: 'Q&A cutoff moved up 2 days. Re-check your timeline.',    time: '1h',  unread: true  },
-      { grp: 'Today',   desk: 'far',   t: 'Clause 252.204-7021 redline published',           d: 'Effective in 15 days — 7 of your sols affected.',        time: '3h',  unread: true  },
-      { grp: 'Today',   desk: 'co',    t: 'Greg Bauer (TACOM) opened your capability brief', d: '47 days quiet — good moment to re-warm.',                time: '5h',  unread: true  },
-      { grp: 'Earlier', desk: 'wage',  t: 'WD 2015-4267 renewal scheduled',                  d: 'JBSA inspector categories renew in 22 days.',            time: 'Tue', unread: false },
-      { grp: 'Earlier', desk: 'cmmc',  t: '2 controls moved to "Met"',                       d: 'You\'re now 78% ready. CM & CA still open.',             time: 'Mon', unread: false },
-      { grp: 'Earlier', desk: 'spend', t: 'New FY26 obligations in NAICS 336413',            d: 'WA, OH, GA show fresh spend, no activity from you.',     time: 'Mon', unread: false }
-    ];
+    // Was seven invented notifications — an amendment that never posted, a
+    // named CO "opening your capability brief", a clause redline. There IS a
+    // real source (`/api/notifications` over the notifications table), so the
+    // tray now reads it instead of either inventing rows or claiming no source
+    // exists. Starts empty; filled by load() below.
+    const ITEMS = [];
+    let loaded = false, failed = false;
     const panel = $('notifPanel'), bell = $('bellBtn'), scroll = $('npScroll');
     const badge = $('bellBadge'), count = $('npCount'), mark = $('npMark');
     if (!panel || !bell || !scroll) return;
@@ -210,31 +341,106 @@
       let html = '', last = '';
       ITEMS.forEach((n, i) => {
         if (n.grp !== last) { html += `<div class="np-grp">${n.grp}</div>`; last = n.grp; }
-        const dk = NDESK[n.desk] || { c: '#64748b', l: '', href: '/command-center' };
-        html += `<a class="np-item${n.unread ? ' unread' : ''}" data-i="${i}" href="${dk.href}">
+        const dk = NDESK[n.desk] || { c: '#64748b', l: '', href: null };
+        // The row's own link wins; a desk fallback only when the desk is known.
+        const href = n.href || dk.href || '/command-center';
+        html += `<a class="np-item${n.unread ? ' unread' : ''}" data-i="${i}" href="${href}">
           <span class="np-dot" style="background:${dk.c}"></span>
           <div class="np-body"><div class="np-t"><span class="np-desk" style="color:${dk.c}">${dk.l}</span>${n.t}</div><div class="np-d">${n.d}</div></div>
           <span class="np-time">${n.time}</span>
         </a>`;
       });
-      scroll.innerHTML = html;
+      // FOUR distinct states, never conflated — an outage must not read as an
+      // empty inbox ("you're all caught up" would be a false all-clear on data
+      // we failed to fetch), and neither may sit on "Loading…" forever.
+      let emptyT, emptyD;
+      if (failed)      { emptyT = 'Notifications unavailable'; emptyD = 'We could not read them just now — this is not an empty inbox. Retry shortly.'; }
+      else if (loaded) { emptyT = 'No notifications';          emptyD = "You're all caught up."; }
+      else             { emptyT = 'Loading…';                  emptyD = 'Reading your notifications.'; }
+      scroll.innerHTML = html || `<div class="np-item" style="cursor:default"><div class="np-body"><div class="np-t">${emptyT}</div><div class="np-d">${emptyD}</div></div></div>`;
       const u = ITEMS.filter(n => n.unread).length;
       if (count) count.textContent = String(u);
       if (badge) { badge.textContent = u ? String(u) : ''; badge.style.display = u === 0 ? 'none' : ''; }
       scroll.querySelectorAll('.np-item').forEach(a => {
         a.addEventListener('click', () => {
           const i = +a.dataset.i;
-          if (ITEMS[i]) { ITEMS[i].unread = false; render(); }
+          if (ITEMS[i]) {
+            ITEMS[i].unread = false;
+            markRead(ITEMS[i].id); // persist, so the badge doesn't return on reload
+            render();
+          }
           // Navigation proceeds — href is real route
         });
       });
     }
     render();
 
+    // Read-state is PERSISTED. Marking read only in local state would clear the
+    // badge and let it reappear on reload — the UI would be asserting something
+    // the server never recorded.
+    function markRead(id) {
+      if (!id) return;
+      fetch(`/api/notifications/${encodeURIComponent(id)}/read`, {
+        method: 'PATCH', credentials: 'include'
+      }).catch((e) => console.error('[cc-app] mark-read failed:', e));
+    }
+
+    // Real rows from the notifications table. `kind` maps onto a desk only when
+    // it genuinely names one — otherwise the row renders neutral rather than
+    // being attributed to a desk it may not belong to.
+    function relTime(iso) {
+      const ms = new Date(iso).getTime();
+      if (isNaN(ms)) return '';
+      const mins = Math.floor((Date.now() - ms) / 60000);
+      if (mins < 1) return 'now';
+      if (mins < 60) return mins + 'm';
+      const h = Math.floor(mins / 60);
+      if (h < 24) return h + 'h';
+      const d = Math.floor(h / 24);
+      return d < 7 ? d + 'd' : new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+    async function load() {
+      try {
+        const res = await fetch('/api/notifications?limit=20', { credentials: 'include', headers: { accept: 'application/json' } });
+        if (!res.ok) throw new Error('notifications ' + res.status);
+        const data = await res.json();
+        const rows = Array.isArray(data.notifications) ? data.notifications : [];
+        const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+        ITEMS.length = 0;
+        rows.forEach((n) => {
+          const ts = n.created_at ? new Date(n.created_at).getTime() : NaN;
+          ITEMS.push({
+            id: n.id,
+            grp: !isNaN(ts) && ts >= startOfToday.getTime() ? 'Today' : 'Earlier',
+            desk: Object.prototype.hasOwnProperty.call(NDESK, n.kind) ? n.kind : null,
+            t: n.title || '(untitled)',
+            d: n.body || '',
+            href: n.link || null,
+            time: n.created_at ? relTime(n.created_at) : '',
+            unread: !n.read_at
+          });
+        });
+        loaded = true;
+        render();
+      } catch (e) {
+        console.error('[cc-app] notifications load failed:', e);
+        failed = true; // an outage, NOT an empty inbox
+        render();
+      }
+    }
+    load();
+
     function open()  { panel.classList.add('open');    bell.classList.add('on');    }
     function close() { panel.classList.remove('open'); bell.classList.remove('on'); }
     bell.addEventListener('click', e => { e.stopPropagation(); panel.classList.contains('open') ? close() : open(); });
-    if (mark) mark.addEventListener('click', e => { e.stopPropagation(); ITEMS.forEach(n => n.unread = false); render(); });
+    if (mark) mark.addEventListener('click', e => {
+      e.stopPropagation();
+      // Persist each one — there is no bulk endpoint, and a purely local clear
+      // would come back on reload.
+      ITEMS.filter(n => n.unread).forEach(n => markRead(n.id));
+      ITEMS.forEach(n => n.unread = false);
+      render();
+    });
     document.addEventListener('click', e => { if (!panel.contains(e.target) && !bell.contains(e.target)) close(); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
   }

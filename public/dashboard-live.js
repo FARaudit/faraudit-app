@@ -24,11 +24,33 @@
   //   - tr click → /audit/{sol}
   // ═══════════════════════════════════════════════════════
 
+  // ONE reset writer for the slicer set. Every place that clears filters calls
+  // this — the slicer-bar #paClear, the no-match "clear filters" link, and the
+  // STATE initializer below. Card #769 re-keyed the slicers (Status → Window,
+  // Recommendation → the verdict rail) and updated #paClear but not the
+  // no-match link, which kept resetting the retired rec/status keys and dropped
+  // `window`. STATE.f.window became undefined, rowMatchesBar's
+  // `f.window !== "all"` then rejected EVERY row, and syncSlicers hid the
+  // working clear — so the control offering to rescue you from the empty state
+  // emptied the ledger with no way back but a reload. Adding a slicer here
+  // fixes every reset at once. Gated by public/_past-audits-filter-reset.test.ts.
+  function defaultFilters() {
+    return { time: "all", window: "all", agency: "all", type: "all", naics: "all", setAside: "all" };
+  }
+
+  // How many rows this ledger renders. The page has no pagination, so this is
+  // also the honesty boundary: past it we must say the view is partial rather
+  // than report the count as a lifetime total (see the fetch in load()).
+  var LEDGER_CAP = 200;
+
   var STATE = {
     rows: [],
+    // True when the account has MORE audits than LEDGER_CAP — observed from the
+    // probe row, never inferred from rows.length hitting the cap.
+    truncated: false,
     // card #769 — the verdict rail owns the verdict axis (one field, one control)
     seg: "all",
-    f: { time: "all", window: "all", agency: "all", type: "all", naics: "all", setAside: "all" },
+    f: defaultFilters(),
     // Default order: most recently audited first (CEO ruling 2026-07-28).
     // 'audited' sorts on age-hours; dir 1 = ascending age = newest first.
     sortKey: "audited",
@@ -172,6 +194,11 @@
       // opens that report, not the newest audit sharing its solicitation number.
       uuid:   String(audit.id || ""),
       id:     audit.solicitation_number || audit.notice_id || audit.id || "—",
+      // Can the failed-state page actually offer a retry? It strips both retry
+      // CTAs when the audit has no SAM notice behind it (upload-sourced,
+      // notice_id "pdf-…") — see _render-states.ts. Mirrored here so a row
+      // never advertises "Re-run" and lands on a page with nothing to click.
+      retryable: !!audit.notice_id && !/^pdf-/i.test(String(audit.notice_id)),
       title:  (audit.title || "Untitled").trim(),
       agency: normalizeAgency(audit.agency),
       naics:  audit.naics_code || "—",
@@ -216,7 +243,7 @@
       + '<td class="cell-date">' + esc(a.date) + '</td>'
       + '<td><span class="vcell" data-pole="' + esc(a._s) + '"><i class="pd ' + esc(a._s) + '"></i>' + esc(SL[a._s]) + '</span></td>'
       + '<td><span class="stcell">' + stInner + '</span></td>'
-      + '<td class="right"><a class="view-link" href="/audit/' + slug + '">' + (failed ? "Re-run" : "View") + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></td>'
+      + '<td class="right"><a class="view-link" href="/audit/' + slug + '">' + (failed && a.retryable ? "Re-run" : "View") + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></td>'
       + '</tr>';
   }
 
@@ -248,17 +275,31 @@
         || (a.naics  && String(a.naics).toLowerCase().indexOf(q) !== -1)
         || (a.agency && a.agency.toLowerCase().indexOf(q) !== -1);
   }
+  // Undated rows carry Infinity (relativeAgo's ageHours, and dueTs when there is
+  // no response_deadline — the Window slicer's "No date" bucket). `Infinity -
+  // Infinity` is NaN, and a comparator returning NaN is non-transitive: Array#sort
+  // then leaves that whole group in an implementation-defined order that can
+  // differ between engines and between calls on the same data. Compare explicitly
+  // and park undated rows at the END in both directions — a row with no date is
+  // not "earliest" or "latest", it is absent, and it should not migrate to the top
+  // of the ledger just because the user reversed the arrow.
+  function cmpNumUndatedLast(xv, yv, dir) {
+    if (xv === yv) return 0;
+    if (!isFinite(xv)) return 1;
+    if (!isFinite(yv)) return -1;
+    return dir * (xv - yv);
+  }
   function sortedRows() {
     var copy = STATE.rows.slice();
     copy.sort(function (x, y) {
       if (STATE.sortKey === "date") {
-        return STATE.sortDir * (x.age - y.age);
+        return cmpNumUndatedLast(x.age, y.age, STATE.sortDir);
       }
       if (STATE.sortKey === "due") {
-        return STATE.sortDir * (x.dueTs - y.dueTs);
+        return cmpNumUndatedLast(x.dueTs, y.dueTs, STATE.sortDir);
       }
       if (STATE.sortKey === "audited") {
-        return STATE.sortDir * (x.age - y.age);
+        return cmpNumUndatedLast(x.age, y.age, STATE.sortDir);
       }
       if (STATE.sortKey === "agency" || STATE.sortKey === "type" || STATE.sortKey === "rec" || STATE.sortKey === "status") {
         var xa = (x[STATE.sortKey] || "").toString().toLowerCase();
@@ -462,8 +503,12 @@
       return;
     }
     var n = STATE.rows.length;
-    sub.innerHTML = 'Every solicitation FARaudit has audited for you — <b>'
-      + n + ' record' + (n === 1 ? '' : 's') + '</b>, newest first.';
+    // "Every solicitation … for you" is a completeness CLAIM. Only make it when
+    // the view is actually complete; past the cap, say what is shown instead.
+    sub.innerHTML = STATE.truncated
+      ? 'Your <b>' + n + ' most recent</b> audits, newest first — older audits are not listed on this page.'
+      : 'Every solicitation FARaudit has audited for you — <b>'
+        + n + ' record' + (n === 1 ? '' : 's') + '</b>, newest first.';
   }
 
   // Card #450 — live sidebar badge: replace the rail's hardcoded "15" on the
@@ -610,7 +655,7 @@
         e.preventDefault();
         STATE.seg = "all";
         STATE.search = "";
-        STATE.f = { time: "all", agency: "all", type: "all", rec: "all", status: "all", naics: "all", setAside: "all" };
+        STATE.f = defaultFilters();
         document.querySelectorAll(".pa-filter").forEach(function (s) { s.value = "all"; });
         document.querySelectorAll(".fbtn").forEach(function (b) {
           b.classList.toggle("active", b.dataset.filter === "all");
@@ -695,7 +740,7 @@
     if (clr && !clr.dataset.ccWired) {
       clr.dataset.ccWired = "1";
       clr.addEventListener("click", function () {
-        STATE.f = { time: "all", window: "all", agency: "all", type: "all", naics: "all", setAside: "all" };
+        STATE.f = defaultFilters();
         STATE.seg = "all";
         STATE.search = "";
         document.querySelectorAll(".pa-filter").forEach(function (s) { s.value = "all"; });
@@ -726,7 +771,15 @@
     // page cannot make when the request failed).
     var data;
     try {
-      var r = await fetch("/api/audits?limit=200", { credentials: "include" });
+      // Ask for ONE MORE than we display. The page has no pagination, so a
+      // customer past the ceiling was previously told "200 records" as if that
+      // were their whole history — a silent truncation the ledger presented as
+      // complete. Requesting LEDGER_CAP+1 makes the overflow OBSERVED rather
+      // than guessed: if the extra row comes back there is more history than we
+      // show, and writeHeaderSub says so instead of asserting a total we cannot
+      // stand behind. (Exactly-CAP accounts are NOT flagged — no 201st row, no
+      // claim.) The surplus row is dropped, never rendered.
+      var r = await fetch("/api/audits?limit=" + (LEDGER_CAP + 1), { credentials: "include" });
       if (!r.ok) {
         console.warn("[dashboard-live] /api/audits returned", r.status);
         STATE.loadError = "HTTP " + r.status;
@@ -735,7 +788,8 @@
         data = await r.json();
         var audits = (data && data.audits) || [];
         STATE.loadError = null;
-        STATE.rows = audits.map(mapAuditToRow);
+        STATE.truncated = audits.length > LEDGER_CAP;
+        STATE.rows = audits.slice(0, LEDGER_CAP).map(mapAuditToRow);
       }
     } catch (e) {
       console.warn("[dashboard-live] fetch failed", e);

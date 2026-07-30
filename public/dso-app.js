@@ -292,7 +292,7 @@
       $('plist').innerHTML = `<div class="empty">${
         D.FEED_STATE === 'loading' ? 'Connecting to the SAM.gov feed…'
         : D.FEED_STATE === 'error' ? 'SAM.gov feed unavailable — no data shown. Nothing on this page is sample data; retry shortly.'
-        : 'The ingest feed is empty right now — nothing matched the daily SAM.gov pull.'}</div>`;
+        : 'The live SAM.gov feed is empty right now — no notices matched in the current window.'}</div>`;
       return;
     }
     let data = filtered().slice();
@@ -483,7 +483,7 @@
     } else if (D.FEED_STATE === 'error') {
       html = `<span class="ib-label">Status</span><b>SAM.gov feed unavailable.</b> Nothing on this page is sample data — the widgets stay empty until the feed answers.`;
     } else if (D.FEED_STATE === 'empty') {
-      html = `<span class="ib-label">Status</span>The ingest feed is empty right now. New notices land with the daily SAM.gov pull.`;
+      html = `<span class="ib-label">Status</span>The live SAM.gov feed is empty right now. It refreshes automatically as new notices post.`;
     } else if (S.sel) {
       const o = D.OPPS.find(x => x.id === S.sel);
       const fitPart = o.fit != null ? `fit <b>${o.fit}/100</b> (${fitTier(o.fit)})` : `<b>not yet audited</b>`;
