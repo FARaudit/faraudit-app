@@ -28,6 +28,13 @@ export interface V4Verdict {
 export interface V4Coverage {
   state: "COMPLETE" | "INCOMPLETE"; lead: string; read: number; indexed: number; total: number;
   core?: { k: string; ok: boolean }[]; missing?: string[]; unreadable?: string[];
+  // REPORT-TRUTH #1 — documents that WERE read but that no grounded finding analyzed. Deliberately NOT folded into
+  // `unreadable`: "could not be parsed" would be a second false statement about a document the engine read in full.
+  // Absent (flag-OFF / legacy rows) ⇒ [] ⇒ renders nothing ⇒ byte-identical.
+  unanalyzed?: string[];
+  // Count of documents a finding is actually grounded in. Emitted ONLY alongside `unanalyzed` (i.e. only when it
+  // differs from `read`), so the legend gains a segment exactly when read and analyzed diverge.
+  analyzed?: number;
 }
 export interface V4Temporal { gateDays: number | null; windowDays: number | null; gateExceedsWindow: boolean; }
 // `keyExcerpt` = the span the ANALYSIS examined (pre head-re-grounding). Identity/dedup keys read this;
@@ -158,15 +165,20 @@ function coverage(c: V4Coverage): string {
     ? `<div class="cov-flag"><span class="cf-h">Core section missing</span><ul>${c.missing!.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : "";
   const unread = (c.unreadable || []).length
     ? `<div class="cov-flag"><span class="cf-h">Could not be parsed (${c.unreadable!.length})</span><ul>${c.unreadable!.map((x) => `<li class="mono">${esc(x)}</li>`).join("")}</ul></div>` : "";
+  // REPORT-TRUTH #1 — its own block, and its own sentence. On run 95698f91 the Wage Determination was read in full and
+  // yielded nothing, and the report both counted it toward "3 read in full" and told the customer its rates were
+  // unknown. Naming it here is what makes the count above checkable by the reader.
+  const unanalyzed = (c.unanalyzed || []).length
+    ? `<div class="cov-flag"><span class="cf-h">Read but not analyzed (${c.unanalyzed!.length})</span><ul>${c.unanalyzed!.map((x) => `<li class="mono">${esc(x)}</li>`).join("")}</ul><p class="cf-note">These documents were retrieved and read in full, but no finding in this report is grounded in them — treat their contents as unreviewed and read them yourself before relying on this audit.</p></div>` : "";
   return `
     <section class="sec" id="coverage" data-sec>
       <div class="sec-head"><span class="sec-n mono">01</span><h2>Coverage</h2>
         <span class="sec-state ${c.state === "COMPLETE" ? "ok" : "part"}">${esc(c.state)}</span></div>
       <p class="sec-lead">${esc(c.lead)}</p>
       <div class="cov-bar"><div class="cov-fill" data-pct="${pct}" style="--pct:${pct}%"></div>
-        <div class="cov-legend"><b class="mono">${c.read}</b> read in full · <b class="mono">${c.indexed}</b> indexed · of <b class="mono">${c.total}</b> documents</div></div>
+        <div class="cov-legend"><b class="mono">${c.read}</b> read in full · ${typeof c.analyzed === "number" ? `<b class="mono">${c.analyzed}</b> analyzed · ` : ""}<b class="mono">${c.indexed}</b> indexed · of <b class="mono">${c.total}</b> documents</div></div>
       ${core ? `<div class="cov-core-row">${core}</div>` : ""}
-      ${missing}${unread}
+      ${missing}${unread}${unanalyzed}
     </section>`;
 }
 

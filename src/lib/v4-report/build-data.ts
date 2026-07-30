@@ -534,7 +534,18 @@ function buildCoverage(p: V3ReportPayload, documentsComplete: boolean, noVerdict
   // alone stamped a green COMPLETE badge (and, via the render `complete` flag, a false "Show-stoppers — None
   // identified") on a withheld-verdict report where a section was uncovered. A no-verdict pole never shows COMPLETE.
   const state = (documentsComplete && missing.length === 0 && !noVerdict) ? "COMPLETE" : "INCOMPLETE";
-  return { state, lead: docs?.note || "", read, indexed: 0, total, core, missing, unreadable } as V4Coverage;
+  // REPORT-TRUTH #1 — documents READ but not ANALYZED, passed straight through from the engine's own coverage answer
+  // (executor-v3 `deriveAnalyzedDocuments` ← orchestrator `uncoveredForGap`). NOT recomputed here: the whole defect was
+  // the display layer deriving its own, weaker version of a fact the engine had already established correctly.
+  // Absent (flag-OFF / legacy rows) ⇒ undefined ⇒ nothing renders ⇒ byte-identical.
+  const unanalyzed = ((docs as { unanalyzed?: Array<{ name: string; reason?: string }> } | undefined)?.unanalyzed || [])
+    .map((u) => (u.reason ? `${u.name} — ${u.reason}` : u.name));
+  const analyzedCount = (docs as { analyzed?: number } | undefined)?.analyzed;
+  return {
+    state, lead: docs?.note || "", read, indexed: 0, total, core, missing, unreadable,
+    ...(unanalyzed.length ? { unanalyzed } : {}),
+    ...(unanalyzed.length && typeof analyzedCount === "number" ? { analyzed: Math.min(analyzedCount, total) } : {}),
+  } as V4Coverage;
 }
 
 // notice/procurement type → masthead badge word. Reads the persisted notice_type column when present

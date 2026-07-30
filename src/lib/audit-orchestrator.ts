@@ -3191,7 +3191,19 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
       (headRepair.changes.length ? ` — ${headRepair.changes.map((c) => c.id ?? c.lens).join(", ")}` : ""));
   }
 
-  return { decision, inputs, findings, coverage: { required, covered, missing, attestations, coreMissing }, perLens, conflict, sectionsRead: [...sectionsRead], trace, ...(withheldAll.length ? { citationsWithheld: withheldAll } : {}), ...(verifierDrops.length ? { verifierDrops } : {}), ...(judgmentLayerEnabled() && (opts.judgmentReason || opts.judgmentEntail) ? { judgmentCost } : {}), ...(_bankDiag ? { diagnostics: _bankDiag } : {}) };
+  // REPORT-TRUTH #1 (flag AUDIT_DOC_ANALYZED_TRUTH, default OFF ⇒ key absent ⇒ byte-identical). The engine ALREADY
+  // computes, correctly, which binding documents were ANALYZED — `documentsCovered` returned uncovered=["WAGE
+  // DETERMINATIONS - 20260513.pdf"] on live run 95698f91 while the report told the customer analyzed:3, complete:true.
+  // The gap list had no consumer outside the verdict cap and a CONSTRUCTION_DEBUG console line, so the report published
+  // a SECOND, weaker number derived from ingestion flags (executor-v3:763) and the engine's own honest answer was lost.
+  // Thread it out so the display layer can read the SAME computation the verdict does — never a re-derivation, which is
+  // precisely how the two drifted apart. `uncoveredForGap` (not raw docCoverage.uncovered) is the list the verdict path
+  // itself uses, so display and verdict cannot disagree. Region-space names throughout (docRegions), the same namespace
+  // findingProvenance reports in — no cross-namespace join with the ingestion manifest.
+  const docAnalyzedTruth = process.env.AUDIT_DOC_ANALYZED_TRUTH === "true"
+    ? { docCoverage: { complete: docCoverage.complete, uncovered: uncoveredForGap ?? [] } }
+    : {};
+  return { decision, inputs, findings, coverage: { required, covered, missing, attestations, coreMissing, ...docAnalyzedTruth }, perLens, conflict, sectionsRead: [...sectionsRead], trace, ...(withheldAll.length ? { citationsWithheld: withheldAll } : {}), ...(verifierDrops.length ? { verifierDrops } : {}), ...(judgmentLayerEnabled() && (opts.judgmentReason || opts.judgmentEntail) ? { judgmentCost } : {}), ...(_bankDiag ? { diagnostics: _bankDiag } : {}) };
 }
 
 /** Every decide-layer reading of a finding that could move on a widened excerpt, collapsed to one string.
