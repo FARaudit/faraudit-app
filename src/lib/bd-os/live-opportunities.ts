@@ -187,13 +187,53 @@ const fetchLiveSamRowsCached = unstable_cache(
   { revalidate: 1800 } // 30 min — ~5 upstream calls per refresh, ~240/day worst case
 );
 
-// The /home server component entry point. SAM rows come from the shared
-// 30-minute cache; the audits cross-ref runs per-request with the caller's
-// Supabase client so AUDIT badges / scores are always current (FA-89f
-// semantics, same as the retired queue path).
+// PIECE A — the feed searches the CUSTOMER's codes, not a global list.
+//
+// Until 2026-07-29 this read `NAICS_CODES` env else a hardcoded five-code list,
+// and never read the signed-in customer at all. Measured consequence on the one
+// populated profile: the hardcoded list queries 332720 (returns ZERO rows) while
+// the customer's actual 332721 was never queried, and the customer is SDVOSB on
+// file while the tab's SDVOSB filter could never match. A NAICS list that was
+// assembled rather than chosen.
+//
+// Failure direction is CLOSED and it is deliberate: a customer with no codes on
+// file gets `codes: []` → an honest-empty feed carrying the reason, NOT a
+// fallback to the global list. Falling back would show a brand-new account 200
+// notices for someone else's business and call it theirs. The env var is kept as
+// an operator override for probes/scripts that run without a user session.
+// `source` is the discriminator; `codes` is empty iff source is "no-profile-codes".
+export type FeedScope = {
+  codes: string[];
+  source: "profile" | "env-override" | "no-profile-codes";
+};
+
+export async function resolveFeedScope(client: SupabaseClient): Promise<FeedScope> {
+  const { data, error } = await client
+    .from("capability_statements")
+    .select("naics_codes")
+    .maybeSingle();
+  const codes = (!error && Array.isArray(data?.naics_codes) ? data!.naics_codes : [])
+    .map((c) => String(c).trim())
+    .filter(Boolean);
+  if (codes.length > 0) return { codes, source: "profile" };
+  // No codes on file. An explicit operator override still works (scripts/probes
+  // with no user session); otherwise honest-empty.
+  const override = (process.env.NAICS_CODES || "").split(",").map((s) => s.trim()).filter(Boolean);
+  if (override.length > 0) return { codes: override, source: "env-override" };
+  return { codes: [], source: "no-profile-codes" };
+}
+
+// The /home + command-center entry point. SAM rows come from the shared
+// 30-minute cache (keyed by the code list, so each distinct profile gets its own
+// entry); the audits cross-ref runs per-request with the caller's Supabase
+// client so AUDIT badges / scores are always current (FA-89f semantics).
 export async function fetchLiveOpportunities(client: SupabaseClient): Promise<OpportunityRow[]> {
-  const naicsCsv = process.env.NAICS_CODES || DEFAULT_NAICS;
-  const rows = await fetchLiveSamRowsCached(naicsCsv);
+  const scope = await resolveFeedScope(client);
+  if (scope.codes.length === 0) {
+    console.log("[live-opportunities] no NAICS on file for this customer — serving honest-empty, NOT a global fallback");
+    return [];
+  }
+  const rows = await fetchLiveSamRowsCached(scope.codes.join(","));
   if (rows.length === 0) return rows;
 
   const { data: completedAudits } = await client
