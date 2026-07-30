@@ -162,12 +162,25 @@ function filtered(){ return base().filter(o=>{
   return true;
 });}
 
-/* ── header ── */
+/* ── header ──
+   INVARIANT: #feedMeta has ONE writer, renderHeader. live.js owns #livePill only.
+   The freshness clause is a fact about the FEED, which this layer cannot derive —
+   it renders only from DSO.LAST_INGEST and is absent when nothing was measured.
+   Every non-live feed state carries its own line: the count sentence asserts a
+   live read, so it must not render unless one happened. */
+function feedMetaHTML(state, shown, codeCount){
+  if(state==='error')      return 'SAM.gov feed unavailable — nothing shown below is sample data.';
+  if(state==='no-profile') return 'No NAICS codes on file — add the codes you sell under and this feed fills from <b>SAM.gov</b>.';
+  if(state==='empty')      return 'Connected to the <b>live SAM.gov feed</b> — no notices in the current window.';
+  if(!state)               return 'Connecting to the SAM.gov ingest…';
+  const ingest = (window.DSO && window.DSO.LAST_INGEST) ? ' · newest posted '+window.DSO.LAST_INGEST : '';
+  return '<b>'+shown+'</b> open notices read live from SAM.gov · '+
+    codeCount+' NAICS code'+(codeCount===1?'':'s')+' on your profile'+ingest;
+}
 function renderHeader(){
   const rows = base();
   const codes = [...new Set(ROWS.map(o=>o.naics).filter(Boolean))].sort();
-  $('feedMeta').innerHTML = '<b>'+rows.length+'</b> open notices read live from SAM.gov · '+
-    codes.length+' NAICS code'+(codes.length===1?'':'s')+' on your profile · newest posted 25h ago';
+  $('feedMeta').innerHTML = feedMetaHTML((window.DSO && window.DSO.FEED_STATE) || null, rows.length, codes.length);
   const counts = {}; ROWS.forEach(o=>{ if(o.naics) counts[o.naics]=(counts[o.naics]||0)+1; });
   $('hdrNaics').innerHTML = codes.map(c=>'<span class="npill'+(S.naics.has(c)?'':' off')+'" data-naics="'+c+'" title="'+counts[c]+' in this read">'+c+'</span>').join('');
   $('hdrNaics').querySelectorAll('[data-naics]').forEach(p=>p.onclick=()=>{
@@ -488,7 +501,9 @@ function renderAll() {
 
 function onThemeChange() { renderAll(); }
 
-window.DSO_APP = { render: renderAll, onThemeChange: onThemeChange };
+/* renderHeader is exported so live.js can refresh the feed line as soon as the
+   fetch answers, without waiting on watch/pipeline hydration. */
+window.DSO_APP = { render: renderAll, renderHeader: renderHeader, onThemeChange: onThemeChange };
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', renderAll);
 else renderAll();
 })();
