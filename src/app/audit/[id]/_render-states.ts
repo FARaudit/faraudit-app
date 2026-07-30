@@ -340,13 +340,26 @@ export function renderAuditTransitionalState(
   const noticeId = str(audit.notice_id);
   const createdAt = str(audit.created_at);
 
+  // RUN START ≠ ROW CREATION. POST /api/audit/[id]/refetch re-runs an EXISTING audits
+  // row — it stamps compliance_json.last_refetched_at at enqueue and flips the row to
+  // 'processing' — so created_at is the ORIGINAL audit's birthday, hours or days stale.
+  // Seeding the elapsed counter from it printed "443:47" over a run 2 minutes old
+  // (live, 2026-07-30), which reads as a runaway job and invites a kill. Prefer the
+  // refetch stamp whenever it parses and is NEWER than created_at; first runs (no
+  // stamp) are unchanged.
+  const compJson = (audit.compliance_json ?? {}) as Record<string, unknown>;
+  const refetchedAt = str(compJson.last_refetched_at);
+  const tCreated = createdAt ? new Date(createdAt).getTime() : NaN;
+  const tRefetched = refetchedAt ? new Date(refetchedAt).getTime() : NaN;
+  const runStartedAt = !isNaN(tRefetched) && (isNaN(tCreated) || tRefetched > tCreated) ? refetchedAt : createdAt;
+
   // ── exactly ONE state per response: strip the other body block + pill ──
   const removeState = state === "progress" ? "failed" : "progress";
   out = removeElementByOpenRe(out, new RegExp(`<div class="body only-${removeState}"[^>]*>`), "div");
   out = out.replace(new RegExp(`\\s*<span class="live-pill (?:running|failed) only-${removeState}">[A-Z]+</span>`), "");
 
   // ── body attrs: state + poll/elapsed hooks ──
-  const startEpoch = createdAt ? new Date(createdAt).getTime() : NaN;
+  const startEpoch = runStartedAt ? new Date(runStartedAt).getTime() : NaN;
   const bodyAttrs = `<body data-state="${state}" data-audit-id="${escapeAttr(auditUuid)}"` +
     (state === "progress" && !isNaN(startEpoch) ? ` data-start="${startEpoch}"` : "") + ">";
   out = out.replace('<body data-state="progress" data-audit-id="" data-start="">', bodyAttrs);
@@ -361,7 +374,7 @@ export function renderAuditTransitionalState(
 
   if (state === "progress") {
     // started_at — seed display server-side; client ticks elapsed from data-start
-    out = createdAt ? replaceFieldText(out, "started_at", formatEt(createdAt)) : removeFieldElement(out, "started_at");
+    out = runStartedAt ? replaceFieldText(out, "started_at", formatEt(runStartedAt)) : removeFieldElement(out, "started_at");
 
     // fact cells — wire or collapse (hide-not-fabricate)
     const sourceFilename = str(audit.pdf_filename);
