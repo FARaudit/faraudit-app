@@ -287,10 +287,7 @@ button{font-family:inherit}
 .act-cta{display:inline-flex;align-items:center;gap:5px;margin-top:4px;font-size:11px;font-weight:700;color:var(--accent-deep)}
 .act-cta svg{width:12px;height:12px}
 [data-theme="dark"] .act-cta{color:var(--accent-light)}
-/* Internal scroll, so calendar reach is a DATA decision and not a page-height
-   one. Without it every row added to the Week Ahead also stretched the panel
-   beside it (both share a grid row) — 45 rows ran the page to 4,070px. Same
-   max-height + overflow-y pattern .np-scroll already uses in this file. */
+/* scrolls internally — matches .np-scroll */
 .week-list{display:flex;flex-direction:column;gap:0;max-height:560px;overflow-y:auto}
 .wk-group{display:flex;align-items:center;gap:10px;padding:12px 0 6px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
 .wk-group::after{content:"";flex:1;height:1px;background:var(--line)}
@@ -309,7 +306,8 @@ button{font-family:inherit}
 .wk-fill{width:2px;flex:1;border-radius:2px;margin-top:-2px}
 .wk-row:last-child .wk-fill{display:none}
 .wk-body{min-width:0;padding-bottom:6px}
-.wk-label{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.3}
+/* wraps unbreakable SAM title tokens */
+.wk-label{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.3;overflow-wrap:anywhere}
 .wk-tag{display:inline-block;margin-top:4px;font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:800;letter-spacing:.04em;padding:2px 7px;border-radius:5px}
 .sig-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 @media(max-width:1080px){.sig-grid{grid-template-columns:1fr 1fr}}
@@ -433,10 +431,7 @@ button{font-family:inherit}
 [data-sb="open"] .sb-icon .sb-badge.live{background:rgba(16,185,129,.18);color:#86efac;gap:4px;padding-left:5px}
 [data-sb="open"] .sb-icon .sb-badge.live::before{content:"";width:5px;height:5px;border-radius:50%;background:#10b981;flex-shrink:0}
 [data-sb="open"] .sb-icon .sb-badge.danger{background:rgba(220,38,38,.18);color:#fca5a5;border:1px solid rgba(220,38,38,.3)}
-/* An empty badge carries no information — hide it. Declared here because the
-   open-sidebar rule above is display:inline-flex!important, which silently beat
-   the inline style="display:none" the render layer was setting: an empty red
-   pill rendered next to Pipeline. Caught by driving the page, not by reading it. */
+/* an empty badge carries no information */
 [data-sb="open"] .sb-icon .sb-badge:empty{display:none!important}
 .sb-icon.sb-signout:hover{color:#fca5a5}
 [data-sb="open"] .sb-icon.sb-signout:hover{color:#fca5a5;background:rgba(220,38,38,.08)}
