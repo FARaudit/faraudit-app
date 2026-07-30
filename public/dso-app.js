@@ -72,7 +72,7 @@
 
 const VERDICTS = {
   READ  : {k:'READ',  word:'READ ONLY', band:'screened', cls:'vd-read',
-           rule:'Special Notice — industry day, amendment or cancellation. No solicitation document has posted for this requirement.'},
+           rule:'Special Notice — industry day, amendment, sole-source intent or cancellation. No solicitation document has posted for this requirement.'},
   ASSERT: {k:'ASSERT',word:'ASSERT',    band:'screened', cls:'vd-assert',
            rule:'Sole-source intent published. Not open competition — the move is to assert capability inside the window.'},
   SHAPE : {k:'SHAPE', word:'SHAPE',     band:'shape',    cls:'vd-shape',
