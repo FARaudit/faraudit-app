@@ -305,7 +305,7 @@ function takesSlide(d: V4Data): Slide | null {
   if (!hasL && !hasDates) return null;
   const vols = hasL && sl ? sl.rows.map((r) => {
     const p = splitMethod(r.req);
-    return `<div class="vol"><div class="vol-v">${esc(r.vol)}</div><div class="vol-b"><div class="vb-t">${esc(p.head)}</div>${r.condition ? `<div class="vb-c">${esc(r.condition)}</div>` : ""}</div></div>`;
+    return `<div class="vol">${r.vol !== undefined ? `<div class="vol-v">${esc(r.vol)}</div>` : ""}<div class="vol-b"><div class="vb-t">${esc(p.head)}</div>${r.condition ? `<div class="vb-c">${esc(r.condition)}</div>` : ""}</div></div>`;
   }).join("") : '<div class="vb-c">Submission volumes were not resolved on this read.</div>';
   const tl = hasDates ? d.dates.map((x) => `<div class="tl-item${x.kind === "gate" ? " gate" : ""}"><div class="tl-dot"></div><div><div class="tl-l">${esc(x.label)}</div><div class="tl-v">${esc(x.value)}</div></div></div>`).join("") : "";
   return {
