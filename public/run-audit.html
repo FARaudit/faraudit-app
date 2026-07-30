@@ -769,7 +769,7 @@ details[open]>summary .chev{transform:rotate(180deg)}
         </button>
         <button class="icon-btn" id="bellBtn" title="Notifications" aria-label="Notifications">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1112 0c0 7 3 8 3 8H3s3-1 3-8z"/><path d="M10 21a2 2 0 004 0"/></svg>
-          <span class="nbadge" id="bellBadge">7</span>
+          <span class="nbadge" id="bellBadge" style="display:none"></span>
         </button>
         <div class="user-chip">
           <div class="av">JR</div>
@@ -986,13 +986,10 @@ function $(id){return document.getElementById(id);}
   try{var s=localStorage.getItem(KEY);if(s==='closed')html.setAttribute('data-sb','closed');else if(!html.hasAttribute('data-sb'))html.setAttribute('data-sb','open');}catch(e){}
   document.addEventListener('click',function(e){var t=e.target&&e.target.closest&&e.target.closest('#sbToggle');if(!t)return;var n=html.getAttribute('data-sb')==='open'?'closed':'open';html.setAttribute('data-sb',n);try{localStorage.setItem(KEY,n);}catch(e){}});})();
 
-/* ── notifications panel + badge hydration (production, real count) ── */
-(function(){var bell=$('bellBtn'),panel=$('notifPanel');
-  if(bell&&panel){bell.addEventListener('click',function(e){e.stopPropagation();panel.classList.toggle('open');bell.classList.toggle('on');});
-    document.addEventListener('click',function(e){if(panel.classList.contains('open')&&!panel.contains(e.target)&&e.target!==bell&&!bell.contains(e.target)){panel.classList.remove('open');bell.classList.remove('on');}});}
-  function setBadge(n){var b=$('bellBadge'),c=$('npCount');if(b){if(n>0){b.textContent=String(n);b.style.display='';}else{b.style.display='none';}}if(c)c.textContent=String(n||0);}
+/* ── watching badge hydration. The bell — panel, badge and read-state — is
+   owned by /notifications-chrome.js. ── */
+(function(){
   function setWatching(n){document.querySelectorAll('[data-sb-watching-count]').forEach(function(e){if(n>0){e.textContent=String(n);e.style.display='';}else{e.style.display='none';}});}
-  fetch('/api/notifications?limit=1',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(d)setBadge(d.unreadCount||0);}).catch(function(){});
   fetch('/api/watched-notices',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(d)setWatching((d.kpi&&d.kpi.watching)||0);}).catch(function(){});})();
 
 /* ── submit (redirect-only; report page shows live 3-stage progress) ── */
@@ -1316,5 +1313,6 @@ var __fdPartialNoticeId=null;
   }catch(e){}
 })();
 </script>
+<script src="/notifications-chrome.js" defer></script>
 </body>
 </html>
