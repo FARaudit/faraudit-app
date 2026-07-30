@@ -99,6 +99,16 @@ console.log("\n── Part C · Week Ahead calendar ──");
     const rule = /\.week-list\{([^}]*)\}/.exec(todayHtml)?.[1] ?? "";
     check("week-list scrolls internally (max-height)", /max-height:\s*\d/.test(rule), "no max-height — page height is unbounded");
     check("week-list scrolls internally (overflow-y)", /overflow-y:\s*auto/.test(rule), "no overflow-y — rows will overflow the panel");
+    // Setting overflow-y:auto makes CSS compute overflow-x to auto as well, so
+    // ONE unbreakable SAM token ("GENERATOR_End_Item_F16_NSN_6…") overflowed the
+    // 519px column by 6px and drew a horizontal scrollbar across the whole
+    // calendar on prod. The label must be able to break mid-token.
+    const labelRules = [...todayHtml.matchAll(/\.wk-label\{([^}]*)\}/g)].map((m) => m[1]).join(";");
+    check(
+      "wk-label can break unbreakable tokens (no h-scrollbar from one long title)",
+      /overflow-wrap:\s*(anywhere|break-word)|word-break:\s*break-all/.test(labelRules),
+      "a single long token will reintroduce the horizontal scrollbar"
+    );
   }
   // The panel subtitle may not promise sources that are not wired.
   check(
