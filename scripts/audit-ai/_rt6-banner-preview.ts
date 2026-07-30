@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 (async () => {
   const a = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   const { data } = await a.from("audits").select("*").eq("id", "583df921-9cd9-4fd9-b56a-4f49aee62eb2").single();
-  const { gateCause } = await import("../../src/app/audit/[id]/route");
+  const { gateCause } = await import("../../src/lib/audit-gate-reason");
   const c = gateCause(data as never)!;
   const wrap = (t: string) => t.replace(/(.{92}\S*)\s/g, "$1\n  ");
   console.log("BEFORE — what the customer saw:\n");

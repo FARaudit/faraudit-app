@@ -18,7 +18,7 @@ const row = (docs: Record<string, unknown>, extra: Record<string, unknown> = {})
 });
 
 (async () => {
-  const { gateCause } = await import("../app/audit/[id]/route");
+  const { gateCause } = await import("./audit-gate-reason");
 
   // ---- 1. THE LIVE CASE (run 583df921, verbatim payload) -------------------------------------------------------
   const live = gateCause(row({ read: 3, analyzed: 2, analyzed_of: 3, complete: false, missing: [],
