@@ -79,6 +79,19 @@ console.log("\n── Part C · Week Ahead calendar ──");
   check("wiring layer computes the dropped count", /dropped/i.test(ccLive), "no cap arithmetic");
   check("wiring layer publishes it to the renderer", /WEEK_DROPPED/.test(ccLive), "count never leaves the fetch");
   check("render layer surfaces the dropped count to the user", /WEEK_DROPPED/.test(ccApp) && /more deadline/i.test(ccApp), "cap is silent on screen");
+
+  // Truncation is PER GROUP (a flat cap below the This-Week volume renders week
+  // one only, and the other two designed groups never appear).
+  check("caps are per group, not flat", /WEEK_GROUP_CAPS/.test(ccApp), "still a single flat cap");
+  check("each truncated group says how many it hid", /more in \$\{g\.label/.test(ccApp), "group truncation is silent");
+  // The trap: showing N rows under a header reading N hides that more exist.
+  // The header must print the group's TRUE total.
+  check(
+    "group header count is the true total, not the shown count",
+    /<b>\$\{items\.length\}<\/b>/.test(ccApp) && /shown\s*=\s*items\.slice/.test(ccApp),
+    "header count derived from the capped slice"
+  );
+  check("wiring-layer ceiling is a DOM backstop, not the display cap", /WEEK_MAX_ROWS/.test(ccLive), "display cap still lives in the fetch layer");
   // The panel subtitle may not promise sources that are not wired.
   check(
     "Week Ahead subtitle does not promise an unwired fiscal calendar",
