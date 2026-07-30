@@ -33,11 +33,11 @@ const ok = (c: boolean, label: string, detail = "") => {
 // red the moment the CEO files the card. The vendored copy is the source of truth;
 // the original is treated as a drift check when it happens to still be there.
 const DESIGN_FILE = path.join(process.cwd(), "test", "fixtures", "design",
-  "card-775-opportunities-LIVE-2026-07-29.html");
+  "card-775-opportunities-LIVE-rev-2026-07-30.html");
 const DESIGN_ORIGINAL = path.join(
   "/Users/josearodriguezjr./faraudit-app/ceo/redesign-final/Communication/Send to Code",
-  "card-775-opportunities-2026-07-29",
-  "Card 775 - Opportunities -LIVE-.html"
+  "card-790-1to1-confirm-2026-07-30",
+  "Card 775 - Opportunities -LIVE- (rev 2026-07-30).html"
 );
 const SHIPPED_FILE = path.join(process.cwd(), "public", "dso-app.js");
 

@@ -110,9 +110,12 @@ button{font-family:inherit}
 .prof-gap button{border:0;background:var(--unread-ink);color:var(--card);font-size:11px;font-weight:800;padding:5px 10px;border-radius:7px;cursor:pointer;white-space:nowrap;flex-shrink:0}
 
 /* ── controls ── */
-.controls{display:flex;flex-direction:column;gap:10px;padding:12px 16px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-sm)}
-.ctl-line{display:flex;align-items:center;gap:13px;flex-wrap:wrap}
-.ctl-label{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--tertiary);white-space:nowrap}
+.controls{display:grid;grid-template-columns:104px minmax(0,1fr);column-gap:16px;row-gap:11px;align-items:center;padding:14px 16px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-sm)}
+.controls > .seg,.controls > .ctl-field{justify-self:stretch;min-width:0}
+.ctl-field{display:flex;align-items:center;gap:12px;row-gap:7px;flex-wrap:wrap}
+.ctl-field > .seg{flex:1 1 100%;min-width:0}
+.ctl-sep{grid-column:1/-1;justify-self:stretch;height:1px;background:var(--line-2)}
+.ctl-label{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--tertiary);white-space:nowrap;text-align:left;align-self:start;margin-top:7px}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;background:var(--card);overflow:hidden;flex-wrap:wrap}
 .seg button{background:transparent;border:0;border-right:1px solid var(--line);cursor:pointer;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--ink-2);padding:6px 11px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .seg button:last-child{border-right:0}
@@ -121,24 +124,35 @@ button{font-family:inherit}
 .seg button.active{background:linear-gradient(0deg,var(--eligible-bg),var(--eligible-bg)),var(--card);color:var(--eligible-ink);box-shadow:inset 0 -2px 0 var(--eligible-ink)}
 .seg button.active .n{color:inherit}
 /* Zero-count buckets stay VISIBLE and muted — deleting one hides that the feed contains none of it. */
-.seg button.zero,.fpill.zero{opacity:.55;font-weight:600}
-.pillset{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.fpill{height:28px;padding:0 11px;border-radius:8px;background:var(--card);border:1px solid var(--line);color:var(--ink-2);font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
-.fpill .n{color:var(--tertiary);font-weight:600}
-.fpill.active{background:linear-gradient(0deg,var(--eligible-bg),var(--eligible-bg)),var(--card);border-color:var(--eligible-line);color:var(--eligible-ink)}
-.fpill.active .n{color:inherit}
-.fpill.more{border-style:dashed;color:var(--tertiary)}
-.ctl-divider{width:1px;height:22px;background:var(--rule)}
+.seg button.zero{opacity:.55;font-weight:600}
+.pillset{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap}
+/* Inside the filter panel both axes are LOOSE CELLS of one module, not joined
+   controls. With no enclosing box to be flush with and no free space to
+   distribute, a dangling seam on wrap, rails of unequal width and a muted
+   zero-count bucket inflated past the real values are impossible rather than
+   merely absent. Row 1's enum is a fixed six values and defines the module; row 2
+   lays five of the same cell and ends one short, which is a true statement about
+   the data. --cell-floor is MEASURED from every declared label (see setCellFloor),
+   never chosen from whichever labels happen to be visible. */
+.controls .seg{display:flex;flex-wrap:wrap;gap:6px;background:transparent;border:0;border-radius:0;overflow:visible}
+.controls .seg button{flex:0 0 max(var(--cell-floor,138px),calc((100% - 30px)/6));min-width:0;border:1px solid var(--line);border-radius:8px;background:var(--card);justify-content:center}
+.controls .seg button.active{border-color:var(--eligible-line)}
+.more-btn{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--tertiary);background:none;border:0;cursor:pointer;white-space:nowrap;padding:0;letter-spacing:.02em;align-self:flex-start}
+.more-btn:hover{color:var(--accent-deep);text-decoration:underline}
 .vr-right{margin-left:auto;display:flex;align-items:center;gap:12px;flex-shrink:0}
 .ctl-search{display:flex;align-items:center;gap:8px;height:30px;width:230px;padding:0 11px;border-radius:8px;background:var(--card-soft);border:1px solid var(--line)}
 .ctl-search svg{width:14px;height:14px;color:var(--tertiary);flex-shrink:0}
 .ctl-search input{border:0;background:transparent;outline:0;font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink);width:100%}
 .reset-btn{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--tertiary);background:none;border:0;cursor:pointer}
 .reset-btn:hover{color:var(--accent-deep);text-decoration:underline}
-.views-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--line-2)}
-.view-chip{display:inline-flex;flex-direction:column;gap:1px;padding:6px 12px;border-radius:9px;background:var(--card);border:1px solid var(--line);cursor:pointer;text-align:left}
-.view-chip .vc-t{font-size:12px;font-weight:700;color:var(--ink);line-height:1.25;white-space:nowrap}
-.view-chip .vc-d{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--tertiary);white-space:nowrap}
+/* Saved views are deliberately NOT the filter cell: they set several axes at once
+   and are a different kind of thing. A stack of title over the axes it sets needs
+   the height — two type sizes on one 29px line crams both against the top. They
+   keep their natural width; stretching three chips only pushes search and Reset
+   onto a second line. */
+.view-chip{display:inline-flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;padding:9px 14px;border-radius:10px;background:var(--card);border:1px solid var(--line);cursor:pointer;text-align:left;white-space:nowrap}
+.view-chip .vc-t{font-size:12px;font-weight:700;color:var(--ink);line-height:1.2;white-space:nowrap}
+.view-chip .vc-d{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--tertiary);line-height:1.25;white-space:nowrap}
 .view-chip.active{background:linear-gradient(0deg,var(--eligible-bg),var(--eligible-bg)),var(--card);border-color:var(--eligible-line)}
 .view-chip.active .vc-t{color:var(--eligible-ink)}
 
@@ -162,7 +176,12 @@ button{font-family:inherit}
   html .profile{align-items:flex-start;max-width:100%}
   html .prof-pills{justify-content:flex-start}
   html .body{padding:20px 20px 48px}
-  html .pcard{grid-template-columns:58px minmax(0,1fr) 118px;grid-template-areas:"when main act" "when state act";row-gap:9px}
+  html .pcard{grid-template-columns:var(--when-w) minmax(0,1fr) 118px;grid-template-areas:"when main act" "when state act";row-gap:9px}
+  /* §7k leaves ONE rail rule at narrow: loose cells need no other. */
+  html .controls{grid-template-columns:minmax(0,1fr);row-gap:5px}
+  html .ctl-label{margin-top:7px}
+  html .more-btn{flex:0 0 auto}
+  html .ctl-sep{margin:6px 0}
   html .pc-state{flex-direction:row;align-items:center;flex-wrap:wrap;gap:6px 10px}
   html .crumbs .sep,html .crumbs>span:last-child{display:none}
   html .tb-search{width:auto;min-width:0;flex:1 1 120px}
@@ -176,7 +195,7 @@ button{font-family:inherit}
 
 /* ── triage bands (the hero) ── */
 .bands{display:flex;flex-direction:column}
-.band{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:14px;align-items:center;padding:13px 12px;border:0;border-bottom:1px solid var(--rule);background:transparent;cursor:pointer;text-align:left;width:100%}
+.band{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:24px;align-items:center;padding:13px 12px;border:0;border-bottom:1px solid var(--rule);background:transparent;cursor:pointer;text-align:left;width:100%}
 .band:last-of-type{border-bottom:0}
 .band.active{background:linear-gradient(0deg,var(--eligible-bg),var(--eligible-bg)),var(--card)}
 .band-n{font-family:"Manrope",sans-serif;font-size:30px;font-weight:800;letter-spacing:-.03em;color:var(--ink);line-height:1;text-align:right}
@@ -185,31 +204,32 @@ button{font-family:inherit}
 .band-r{display:block;font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--tertiary);line-height:1.45;margin-top:3px}
 .band-go{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--tertiary);white-space:nowrap}
 .band.active .band-go{color:var(--eligible-ink)}
-.band-total{display:grid;grid-template-columns:64px minmax(0,1fr);gap:14px;align-items:baseline;padding:11px 12px 13px;border-top:2px solid var(--ink)}
+.band-total{display:grid;grid-template-columns:64px minmax(0,1fr);gap:24px;align-items:baseline;padding:11px 12px 13px;border-top:2px solid var(--ink)}
 .band-total .band-n{font-size:22px}
 /* The funnel is a SECOND ledger and it must not borrow the band ledger's
    numbers: the rows a profile removes never enter a band, so listing them as a
    screen-out reason would put two different 14s side by side (card 771). */
 .funnel{display:flex;flex-direction:column;margin-top:4px;border-top:2px solid var(--ink);padding-top:9px}
-.fn-row{display:grid;grid-template-columns:64px minmax(0,1fr);gap:14px;align-items:baseline;padding:5px 12px}
+.fn-row{display:grid;grid-template-columns:64px minmax(0,1fr);gap:24px;align-items:baseline;padding:5px 12px}
 .fn-n{font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:700;text-align:right;color:var(--ink);font-variant-numeric:tabular-nums}
 .fn-t{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--ink-2);line-height:1.45}
 .fn-row.none .fn-n,.fn-row.none .fn-t{color:var(--tertiary)}
 .fn-row.sum{border-top:1px solid var(--rule);margin-top:4px;padding-top:9px}
 .fn-row.sum .fn-n{font-family:"Manrope",sans-serif;font-size:20px;font-weight:800;letter-spacing:-.03em}
 .fn-row.sum .fn-t{color:var(--ink);font-weight:600}
-.screen-detail{padding:0 12px 12px 90px;display:flex;flex-direction:column;gap:6px}
-.sd-row{display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--ink-2);line-height:1.5}
-.sd-row .sd-n{text-align:right;font-weight:700;color:var(--ink)}
+.screen-detail{padding:0 12px 12px;display:flex;flex-direction:column;gap:6px}
+.sd-row{display:grid;grid-template-columns:64px minmax(0,1fr);gap:24px;font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--ink-2);line-height:1.5}
+.sd-row .sd-n{text-align:right;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
 .sd-row.none .sd-n,.sd-row.none{color:var(--tertiary)}
 .sd-row a{font-weight:700}
 
 /* ── closing-first list ── */
 .act-list{display:flex;flex-direction:column;gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:10px;overflow:hidden}
-.act-row{display:grid;grid-template-columns:46px minmax(0,1fr) auto;gap:12px;align-items:center;padding:9px 11px;background:var(--card);cursor:pointer;border:0;text-align:left;width:100%}
+.act-foot{margin-top:auto;padding-top:11px;border-top:1px solid var(--rule);font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--tertiary);line-height:1.45}
+.act-row{display:grid;grid-template-columns:62px minmax(0,1fr) auto;gap:20px;align-items:center;padding:9px 11px;background:var(--card);cursor:pointer;border:0;text-align:left;width:100%}
 .act-row:hover{background:var(--card-soft)}
-.act-d{font-family:"Manrope",sans-serif;font-size:20px;font-weight:800;letter-spacing:-.03em;color:var(--ink);text-align:right;line-height:1}
-.act-d small{display:block;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--tertiary);letter-spacing:.02em}
+.act-d{font-family:"Manrope",sans-serif;font-size:22px;font-weight:800;letter-spacing:-.03em;color:var(--ink);text-align:right;line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap}
+.act-d small{font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:700;color:var(--tertiary);letter-spacing:.02em;margin-left:2.5px}
 .act-row.far .act-d{color:var(--ink-2);font-weight:700}
 .act-title{display:block;font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .act-agy{display:block;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--tertiary);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -248,16 +268,16 @@ button{font-family:inherit}
 .plist-count{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--tertiary)}
 .plist-count b{color:var(--ink);font-weight:700}
 .plist{display:flex;flex-direction:column;gap:0}
-.grouphd{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:16px 2px 8px;border-bottom:1px solid var(--rule);margin-bottom:9px}
+.grouphd{--when-num:62px;--when-pad:20px;--when-w:calc(var(--when-num) + var(--when-pad) + 1px);--card-inset:16px;display:grid;grid-template-columns:var(--when-w) minmax(0,1fr) auto;gap:20px;align-items:baseline;padding:16px var(--card-inset) 8px;border-bottom:1px solid var(--rule);margin-bottom:9px}
 .plist > .grouphd:first-child{padding-top:2px}
 .grouphd .gh-t{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--ink);white-space:nowrap}
-.grouphd .gh-n{font-family:"Manrope",sans-serif;font-size:15px;font-weight:800;color:var(--ink);letter-spacing:-.02em}
-.grouphd .gh-r{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--tertiary);margin-left:auto;text-align:right}
-.pcard{display:grid;grid-template-columns:66px minmax(0,1fr) 190px 118px;grid-template-areas:"when main state act";gap:16px;align-items:start;padding:13px 15px;background:var(--card);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow-sm);margin-bottom:9px;min-width:0}
+.grouphd .gh-n{font-family:"Manrope",sans-serif;font-size:15px;font-weight:800;color:var(--ink);letter-spacing:-.02em;text-align:right;font-variant-numeric:tabular-nums;margin-right:calc(var(--when-pad) + 1px)}
+.grouphd .gh-r{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--tertiary);text-align:right}
+.pcard{--when-num:62px;--when-pad:20px;--when-w:calc(var(--when-num) + var(--when-pad) + 1px);display:grid;grid-template-columns:var(--when-w) minmax(0,1fr) 190px 118px;grid-template-areas:"when main state act";gap:20px;align-items:start;padding:13px 15px;background:var(--card);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow-sm);margin-bottom:9px;min-width:0}
 .pcard.barred{border-color:var(--barred-line)}
-.pc-when{grid-area:when;text-align:right;display:flex;flex-direction:column;gap:1px;padding-top:1px}
-.pc-d{font-family:"Manrope",sans-serif;font-size:26px;font-weight:800;letter-spacing:-.035em;line-height:.92;color:var(--ink)}
-.pc-d small{font-size:13px;font-weight:700}
+.pc-when{grid-area:when;text-align:right;display:flex;flex-direction:column;justify-content:center;gap:1px;padding-top:1px;align-self:stretch;padding-right:var(--when-pad);border-right:1px solid var(--rule)}
+.pc-d{font-family:"Manrope",sans-serif;font-size:26px;font-weight:800;letter-spacing:-.035em;line-height:.92;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.pc-d small{font-size:13px;font-weight:700;margin-left:3px}
 .pcard.far .pc-d{color:var(--ink-2);font-weight:700}
 .pcard.later .pc-d{color:var(--tertiary);font-weight:700}
 .pc-when .pc-dl{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--tertiary);letter-spacing:.02em}
@@ -385,13 +405,13 @@ button{font-family:inherit}
       </header>
 
       <section class="controls">
-        <div class="ctl-line">
-          <span class="ctl-label">Notice type</span><div class="seg" id="stageSeg"></div>
-          <div class="ctl-divider"></div>
-          <span class="ctl-label">Set-aside</span><div class="pillset" id="saFilters"></div>
-        </div>
-        <div class="views-row">
-          <span class="ctl-label">Saved views</span>
+        <span class="ctl-label">Notice type</span>
+        <div class="seg" id="stageSeg"></div>
+        <span class="ctl-label">Set-aside</span>
+        <div class="ctl-field"><div class="seg" id="saFilters"></div><button class="more-btn" id="saMore" type="button"></button></div>
+        <div class="ctl-sep"></div>
+        <span class="ctl-label">Saved views</span>
+        <div class="ctl-field">
           <div class="pillset" id="savedViews"></div>
           <div class="vr-right">
             <div class="ctl-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input id="searchInput" type="text" placeholder="Filter notices…" /></div>
@@ -416,6 +436,7 @@ button{font-family:inherit}
             <div class="wh-text"><h3>Closing first</h3><p class="wh-sub" id="actSub"></p></div>
           </header>
           <div class="act-list" id="actList"></div>
+          <p class="act-foot" id="actFoot"></p>
         </section>
       </section>
 

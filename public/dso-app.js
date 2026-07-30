@@ -247,16 +247,45 @@ let LAST_BANDS = null;
 
 /* ── closing first ── */
 function renderAct(){
-  const rows = base().filter(o=>o.days!=null && verdict(o).band!=='screened').sort((a,b)=>a.days-b.days).slice(0,7);
+  /* pool is the whole rankable set; rows is the slice shown. The foot states the
+     denominator the widget otherwise never gives — "the 7 soonest" of how many. */
+  const pool = base().filter(o=>o.days!=null && verdict(o).band!=='screened').sort((a,b)=>a.days-b.days);
+  const rows = pool.slice(0,7);
   $('actSub').textContent = 'The 7 soonest deadlines you can still respond to. Ordered by days left — the only fact these notices publish that can rank them.';
   $('actList').innerHTML = rows.map(o=>'<button class="act-row'+(o.days>7?' far':'')+'" data-id="'+esc(o.id)+'">'+
-    '<span class="act-d">'+o.days+'<small>days</small></span>'+
+    '<span class="act-d">'+o.days+'<small>d</small></span>'+
     '<span style="min-width:0"><span class="act-title">'+esc(TITLECASE(o.title))+'</span><span class="act-agy">'+esc(officeName(o.office))+' · '+esc(o.id)+'</span></span>'+
     '<span class="vd '+verdict(o).cls+'">'+verdict(o).word+'</span></button>').join('');
+  $('actFoot').textContent = pool.length > rows.length
+    ? 'showing the '+rows.length+' soonest · '+pool.length+' notices in this read carry a published deadline'
+    : 'showing all '+pool.length+' notices in this read that carry a published deadline';
   $('actList').querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{ S.q=b.dataset.id.toLowerCase(); $('searchInput').value=b.dataset.id; renderAll(); });
 }
 
-/* ── controls ── */
+/* ── controls ──
+   Lays a hidden probe carrying the real cell styles, measures every declared
+   label at max-content, and publishes the widest as --cell-floor. Re-derive it
+   whenever the declared set can change. It is a webfont measurement, so it is
+   re-run on document.fonts.ready. */
+function setCellFloor(labels, worstCount){
+  const panel = document.querySelector('.controls');
+  if(!panel || !labels.length) return;
+  const probe = document.createElement('div');
+  probe.className = 'seg';
+  probe.style.cssText = 'position:absolute;visibility:hidden;width:max-content;flex-wrap:nowrap;pointer-events:none;left:-9999px;top:0';
+  const btn = document.createElement('button');
+  btn.style.flex = '0 0 auto';
+  probe.appendChild(btn);
+  panel.appendChild(probe);
+  let widest = 0;
+  labels.forEach(l=>{
+    btn.innerHTML = esc(String(l))+'<span class="n">'+worstCount+'</span>';
+    widest = Math.max(widest, btn.getBoundingClientRect().width);
+  });
+  probe.remove();
+  if(widest > 0) panel.style.setProperty('--cell-floor', Math.ceil(widest)+'px');
+}
+
 function renderControls(){
   const rows = base();
   const cnt = (f)=>rows.filter(f).length;
@@ -271,16 +300,24 @@ function renderControls(){
   const present = saPoles.filter(k=>k==='all'||cnt(o=>o.sa===k)>0);
   const absent  = saPoles.filter(k=>k!=='all'&&cnt(o=>o.sa===k)===0);
   const label = (k)=>k==='all'?'All':saRender(k).label;
-  let html = present.map(k=>{
-    const c = k==='all'?rows.length:cnt(o=>o.sa===k);
-    return '<button class="fpill'+(k===S.sa?' active':'')+'" data-sa="'+k+'">'+label(k)+'<span class="n">'+c+'</span></button>';
-  }).join('');
-  html += S.saOpen
-    ? absent.map(k=>'<button class="fpill zero" data-sa="'+k+'">'+label(k)+'<span class="n">0</span></button>').join('')+'<button class="fpill more" data-more="0">fewer</button>'
-    : '<button class="fpill more" data-more="1">+'+absent.length+' with none in this read</button>';
+  /* Set-aside is the SAME cell module as notice type — two parallel filter axes
+     should not speak two idioms. The disclosure is not a VALUE of the axis, so it
+     sits beside the control as a text button rather than among the cells. */
+  const saBtn = (k,c,zero)=>'<button data-sa="'+k+'" class="'+(k===S.sa?'active':'')+(zero?' zero':'')+'">'+label(k)+'<span class="n">'+c+'</span></button>';
+  let html = present.map(k=>saBtn(k, k==='all'?rows.length:cnt(o=>o.sa===k), false)).join('');
+  if(S.saOpen) html += absent.map(k=>saBtn(k,0,true)).join('');
   $('saFilters').innerHTML = html;
   $('saFilters').querySelectorAll('[data-sa]').forEach(b=>b.onclick=()=>{S.sa=S.sa===b.dataset.sa?'all':b.dataset.sa;S.view=null;renderAll();});
-  $('saFilters').querySelectorAll('[data-more]').forEach(b=>b.onclick=()=>{S.saOpen=b.dataset.more==='1';renderControls();});
+  $('saMore').textContent = S.saOpen ? 'fewer' : '+'+absent.length+' with none in this read';
+  $('saMore').onclick = ()=>{ S.saOpen = !S.saOpen; renderControls(); };
+
+  /* The floor is MEASURED from every DECLARED label at its worst-case count, not
+     picked from whichever labels happen to be on screen. Flex items carry
+     min-width:auto, so a label wider than the basis grows its own cell past the
+     others — and the widest label is a zero-count pole that only appears once the
+     disclosure is open, which would make a muted bucket the largest cell in the
+     panel. */
+  setCellFloor([...stages.map(s=>s[1]), ...saPoles.map(label)], rows.length);
 
   const views = [
     {k:'week',    t:'Closing this week', d:'open · ≤ 7 days',            n:cnt(o=>verdict(o).k==='ACT')},
@@ -311,7 +348,10 @@ function rowHTML(o) {
   const hasSolicitation = o.stage !== 'notice';
   const auditRef = o.notice_id || o.id;
   return '<div class="pcard' + (far ? ' ' + far : '') + (v.k === 'ASSERT' ? ' barred' : '') + '" data-id="' + esc(o.id) + '">' +
-    '<div class="pc-when"><div class="pc-d">' + (o.days == null ? '—' : o.days + '<small>d</small>') + '</div><div class="pc-dl">' + (o.days == null ? 'NO DEADLINE' : 'LEFT') + '</div></div>' +
+    /* the label states the EXCEPTION, it does not repeat the rule: with LEFT the
+       row said the deadline three times (numeral, word, and the note below). */
+    '<div class="pc-when"><div class="pc-d">' + (o.days == null ? '—' : o.days + '<small>d</small>') + '</div>' +
+      (o.days == null ? '<div class="pc-dl">NO DEADLINE</div>' : '') + '</div>' +
     '<div class="pc-main">' +
       '<div class="pc-title">' + esc(TITLECASE(o.title)) + '</div>' +
       '<div class="pc-buyer">' + (officeName(o.office) === deptName(o.agency) ? '<b>' + esc(officeName(o.office)) + '</b>' : '<b>' + esc(officeName(o.office)) + '</b> · ' + esc(deptName(o.agency))) + '</div>' +
@@ -506,4 +546,7 @@ function onThemeChange() { renderAll(); }
 window.DSO_APP = { render: renderAll, renderHeader: renderHeader, onThemeChange: onThemeChange };
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', renderAll);
 else renderAll();
+/* the cell floor is a webfont measurement — re-derive once the fonts land, or
+   it is computed against fallback metrics and reports a generous number. */
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ renderControls(); });
 })();

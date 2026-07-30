@@ -110,35 +110,87 @@ button{font-family:inherit}
 .prof-gap button{border:0;background:var(--unread-ink);color:var(--card);font-size:11px;font-weight:800;padding:5px 10px;border-radius:7px;cursor:pointer;white-space:nowrap;flex-shrink:0}
 
 /* ── controls ── */
-.controls{display:flex;flex-direction:column;gap:10px;padding:12px 16px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-sm)}
-.ctl-line{display:flex;align-items:center;gap:13px;flex-wrap:wrap}
-.ctl-label{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--tertiary);white-space:nowrap}
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;background:var(--card);overflow:hidden;flex-wrap:wrap}
-.seg button{background:transparent;border:0;border-right:1px solid var(--line);cursor:pointer;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--ink-2);padding:6px 11px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
-.seg button:last-child{border-right:0}
+/* One label gutter, one field column. Every control group shares a left edge and
+   sits on the row of the label that names it. The previous single wrapping flex
+   row parked the SET-ASIDE label 806px from the pills it names and put the three
+   fields on three different left edges (x510 / x414 / x505) — that, not the
+   spacing, was what read as untidy. */
+.controls{display:grid;grid-template-columns:104px minmax(0,1fr);column-gap:16px;row-gap:13px;align-items:baseline;padding:14px 16px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-sm)}
+/* FULL-WIDTH RAILS. Start-aligned at natural width, rows 1 and 2 left ~620px of
+   dead white in a 1422px panel — the panel read as ragged because it was half
+   empty, not because the fields were misaligned. Each rail now divides its own
+   row into equal tracks, so every row reaches the panel edge and the counts fall
+   on a regular rhythm.
+   ⚠ The two rails are SEPARATE grids and do NOT share track sizing: notice type
+   is a fixed 6-value enum, set-aside poles are data-dependent (5 in this read,
+   could be 2 or 11). Cross-row column alignment would be true of today's read
+   only, and a grid that lines up on one day's data is worse than one that never
+   claims to. What IS asserted is that both rails are the same WIDTH. */
+/* ONE MODULAR CELL, shared by both filter axes. Dividing each rail into equal
+   fractions of its own row made the cells 216px on row 1 and 259px on row 2 — six
+   values against five — so no vertical seam agreed with the row above it. The
+   cell is now a CONSTANT: the row-1 enum is a fixed six values, so it defines the
+   module and fills the rail exactly; row 2 lays five of the same cells and ends
+   short, which is a true statement about the data rather than a stretched one.
+   Loose cells also retire the joined-control-that-wraps class of defect outright:
+   there is no enclosing box to be flush with and no free space to distribute, so
+   dangling seams, unequal rails and inflated zero buckets are all impossible. */
+.controls .seg{display:flex;flex-wrap:wrap;gap:6px;background:transparent;border:0;border-radius:0;overflow:visible}
+.controls .seg button{flex:0 0 max(var(--cell-floor,138px),calc((100% - 30px)/6));min-width:0;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+.controls .seg button.active{border-color:var(--eligible-line)}
+.controls > .seg,.controls > .ctl-field{justify-self:stretch;min-width:0}
+.controls > .pillset{justify-self:stretch;min-width:0}
+.ctl-field{display:flex;align-items:center;gap:12px;row-gap:7px;flex-wrap:wrap}
+/* The rail takes the whole row and the disclosure wraps beneath it. Sharing the
+   row would subtract the button's width from the rail — which is exactly how the
+   two rails came to differ by 187px while each was internally flush. */
+.ctl-field > .seg{flex:1 1 100%;min-width:0}
+/* Saved views keep their natural width AND their own shape: they are not an axis
+   being divided, they set several axes at once, and the rule above them says so.
+   Squeezing the pair onto one 29px line to match the filter cells crammed a 12px
+   title and an 11px descriptor against the top of the box — two type sizes on one
+   baseline need the height the stack gives them. */
+#savedViews{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap}
+.ctl-sep{grid-column:1/-1;justify-self:stretch;align-self:stretch;height:1px;background:var(--line-2);margin:1px 0}
+/* Labels LEFT-aligned: a shared left edge makes the three read as a column of
+   headings, which is what the column format is for. Right-aligning them bought a
+   constant 16px label-to-control gap, but that consistency is invisible — caps
+   mono is read by its left edge, and three ragged left starts were the thing that
+   looked unaligned. Vertical alignment is by BASELINE, not a typed offset: the
+   three fields are 29 / 29 / 51px tall, so any fixed margin is right on one row. */
+.ctl-label{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--tertiary);white-space:nowrap;text-align:left}
+/* Seams are GAPS, not per-button borders: a joined control that wraps must not
+   paint a divider after the visually-last button of a row. `:last-child` only
+   knows the DOM-last button, so a wrapped row grew a dangling rule and a band of
+   empty track. gap:1px over the line colour makes every seam exist only between
+   two adjacent buttons, and flex:1 justifies each wrapped row to the full box. */
+.seg{display:flex;flex-wrap:wrap;gap:1px;border:1px solid var(--line);border-radius:8px;background:var(--line);overflow:hidden}
+.seg button{flex:1 0 auto;background:var(--card);border:0;cursor:pointer;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--ink-2);padding:6px 11px;display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
 .seg button .n{font-size:11px;font-weight:600;color:var(--tertiary)}
 /* Active = a TINT over the unchanged card surface, never a solid fill. */
 .seg button.active{background:linear-gradient(0deg,var(--eligible-bg),var(--eligible-bg)),var(--card);color:var(--eligible-ink);box-shadow:inset 0 -2px 0 var(--eligible-ink)}
 .seg button.active .n{color:inherit}
 /* Zero-count buckets stay VISIBLE and muted — deleting one hides that the feed contains none of it. */
-.seg button.zero,.fpill.zero{opacity:.55;font-weight:600}
-.pillset{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.fpill{height:28px;padding:0 11px;border-radius:8px;background:var(--card);border:1px solid var(--line);color:var(--ink-2);font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
-.fpill .n{color:var(--tertiary);font-weight:600}
-.fpill.active{background:linear-gradient(0deg,var(--eligible-bg),var(--eligible-bg)),var(--card);border-color:var(--eligible-line);color:var(--eligible-ink)}
-.fpill.active .n{color:inherit}
-.fpill.more{border-style:dashed;color:var(--tertiary)}
-.ctl-divider{width:1px;height:22px;background:var(--rule)}
+.seg button.zero{opacity:.55;font-weight:600}
+/* The disclosure is an ACTION on the axis, not a value in it. A sentence inside a
+   segmented control reads as a row of text wearing a button's clothes — segments
+   are mutually-exclusive values and this is not one. It sits beside the control.
+   (Reverses the earlier call to put it inside; the earlier call was wrong.) */
+.more-btn{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--tertiary);background:none;border:0;cursor:pointer;white-space:nowrap;padding:0;letter-spacing:.02em;align-self:flex-start}
+.more-btn:hover{color:var(--accent-deep);text-decoration:underline}
+.pillset{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .vr-right{margin-left:auto;display:flex;align-items:center;gap:12px;flex-shrink:0}
 .ctl-search{display:flex;align-items:center;gap:8px;height:30px;width:230px;padding:0 11px;border-radius:8px;background:var(--card-soft);border:1px solid var(--line)}
 .ctl-search svg{width:14px;height:14px;color:var(--tertiary);flex-shrink:0}
 .ctl-search input{border:0;background:transparent;outline:0;font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink);width:100%}
 .reset-btn{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--tertiary);background:none;border:0;cursor:pointer}
 .reset-btn:hover{color:var(--accent-deep);text-decoration:underline}
-.views-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--line-2)}
-.view-chip{display:inline-flex;flex-direction:column;gap:1px;padding:6px 12px;border-radius:9px;background:var(--card);border:1px solid var(--line);cursor:pointer;text-align:left}
-.view-chip .vc-t{font-size:12px;font-weight:700;color:var(--ink);line-height:1.25;white-space:nowrap}
-.view-chip .vc-d{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--tertiary);white-space:nowrap}
+/* The two filter axes share one cell module; the saved views are deliberately a
+   different SHAPE, because they are compound presets rather than values of one
+   field — a stack of title over the axes it sets, not a cell in a rail. */
+.view-chip{display:inline-flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;padding:9px 14px;border-radius:10px;background:var(--card);border:1px solid var(--line);cursor:pointer;text-align:left;white-space:nowrap}
+.view-chip .vc-t{font-size:12px;font-weight:700;color:var(--ink);line-height:1.2}
+.view-chip .vc-d{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--tertiary);line-height:1.25}
 .view-chip.active{background:linear-gradient(0deg,var(--eligible-bg),var(--eligible-bg)),var(--card);border-color:var(--eligible-line)}
 .view-chip.active .vc-t{color:var(--eligible-ink)}
 
@@ -157,12 +209,25 @@ button{font-family:inherit}
    lose on source order and the narrow path would never run. */
 @media(max-width:1320px){html .row.hero{grid-template-columns:1fr}}
 @media(max-width:1180px){
+  /* Below the gutter's usable width the panel stacks: a 104px label column plus a
+     wrapping field is worse than a label sitting on its own line. */
+  html .controls{grid-template-columns:minmax(0,1fr);row-gap:5px}
+  html .ctl-label{margin-top:7px}
+  html .controls > .seg,html .controls > .pillset,html .controls > .ctl-field{justify-self:stretch}
+  /* The rail is the SAME loose-cell module at every width — the cell is a
+     constant, so narrowing the panel only changes how many cells fit per row.
+     Nothing here needs a width-specific rule any more; the three defects that
+     used to live in this block (dangling seams, unequal rails, an inflated zero
+     bucket) were all products of wrapping a JOINED control, and that control no
+     longer exists in the panel. */
+  html .more-btn{flex:0 0 auto}
+  html .ctl-sep{margin:6px 0}
   html .kpi-strip{grid-template-columns:repeat(2,1fr)}
   html .page-header{grid-template-columns:minmax(0,1fr)}
   html .profile{align-items:flex-start;max-width:100%}
   html .prof-pills{justify-content:flex-start}
   html .body{padding:20px 20px 48px}
-  html .pcard{grid-template-columns:58px minmax(0,1fr) 118px;grid-template-areas:"when main act" "when state act";row-gap:9px}
+  html .pcard{grid-template-columns:var(--when-w) minmax(0,1fr) 118px;grid-template-areas:"when main act" "when state act";row-gap:9px}
   html .pc-state{flex-direction:row;align-items:center;flex-wrap:wrap;gap:6px 10px}
   html .crumbs .sep,html .crumbs>span:last-child{display:none}
   html .tb-search{width:auto;min-width:0;flex:1 1 120px}
@@ -176,7 +241,11 @@ button{font-family:inherit}
 
 /* ── triage bands (the hero) ── */
 .bands{display:flex;flex-direction:column}
-.band{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:14px;align-items:center;padding:13px 12px;border:0;border-bottom:1px solid var(--rule);background:transparent;cursor:pointer;text-align:left;width:100%}
+/* A right-aligned numeral in a narrow track ends up hard against the text it
+   labels: the value is 30px of ink and the gap was 14px, so the two read as one
+   crammed lockup. The GAP is the fix, not the alignment — the space between the
+   number and the words has to out-measure the space inside each of them. */
+.band{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:24px;align-items:center;padding:13px 12px;border:0;border-bottom:1px solid var(--rule);background:transparent;cursor:pointer;text-align:left;width:100%}
 .band:last-of-type{border-bottom:0}
 .band.active{background:linear-gradient(0deg,var(--eligible-bg),var(--eligible-bg)),var(--card)}
 .band-n{font-family:"Manrope",sans-serif;font-size:30px;font-weight:800;letter-spacing:-.03em;color:var(--ink);line-height:1;text-align:right}
@@ -185,34 +254,50 @@ button{font-family:inherit}
 .band-r{display:block;font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--tertiary);line-height:1.45;margin-top:3px}
 .band-go{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--tertiary);white-space:nowrap}
 .band.active .band-go{color:var(--eligible-ink)}
-.band-total{display:grid;grid-template-columns:64px minmax(0,1fr);gap:14px;align-items:baseline;padding:11px 12px 13px;border-top:2px solid var(--ink)}
+.band-total{display:grid;grid-template-columns:64px minmax(0,1fr);gap:24px;align-items:baseline;padding:11px 12px 13px;border-top:2px solid var(--ink)}
 .band-total .band-n{font-size:22px}
 /* The funnel is a SECOND ledger and it must not borrow the band ledger's
    numbers: the rows a profile removes never enter a band, so listing them as a
    screen-out reason would put two different 14s side by side (card 771). */
 .funnel{display:flex;flex-direction:column;margin-top:4px;border-top:2px solid var(--ink);padding-top:9px}
-.fn-row{display:grid;grid-template-columns:64px minmax(0,1fr);gap:14px;align-items:baseline;padding:5px 12px}
+.fn-row{display:grid;grid-template-columns:64px minmax(0,1fr);gap:24px;align-items:baseline;padding:5px 12px}
 .fn-n{font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:700;text-align:right;color:var(--ink);font-variant-numeric:tabular-nums}
 .fn-t{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--ink-2);line-height:1.45}
 .fn-row.none .fn-n,.fn-row.none .fn-t{color:var(--tertiary)}
 .fn-row.sum{border-top:1px solid var(--rule);margin-top:4px;padding-top:9px}
 .fn-row.sum .fn-n{font-family:"Manrope",sans-serif;font-size:20px;font-weight:800;letter-spacing:-.03em}
 .fn-row.sum .fn-t{color:var(--ink);font-weight:600}
-.screen-detail{padding:0 12px 12px 90px;display:flex;flex-direction:column;gap:6px}
-.sd-row{display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--ink-2);line-height:1.5}
-.sd-row .sd-n{text-align:right;font-weight:700;color:var(--ink)}
+/* The screen-out reasons sit on the SAME numeric spine as the bands and the
+   funnel — 13 + 1 reading directly under the 14 they sum to. Subordination is
+   carried by ink weight and size, not by an indent that breaks the column. */
+.screen-detail{padding:0 12px 12px;display:flex;flex-direction:column;gap:6px}
+.sd-row{display:grid;grid-template-columns:64px minmax(0,1fr);gap:24px;font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--ink-2);line-height:1.5}
+.sd-row .sd-n{text-align:right;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
 .sd-row.none .sd-n,.sd-row.none{color:var(--tertiary)}
 .sd-row a{font-weight:700}
 
 /* ── closing-first list ── */
 .act-list{display:flex;flex-direction:column;gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:10px;overflow:hidden}
-.act-row{display:grid;grid-template-columns:46px minmax(0,1fr) auto;gap:12px;align-items:center;padding:9px 11px;background:var(--card);cursor:pointer;border:0;text-align:left;width:100%}
+.act-row{display:grid;grid-template-columns:62px minmax(0,1fr) auto;gap:20px;align-items:center;padding:9px 11px;background:var(--card);cursor:pointer;border:0;text-align:left;width:100%}
 .act-row:hover{background:var(--card-soft)}
-.act-d{font-family:"Manrope",sans-serif;font-size:20px;font-weight:800;letter-spacing:-.03em;color:var(--ink);text-align:right;line-height:1}
-.act-d small{display:block;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--tertiary);letter-spacing:.02em}
+/* Numeral and unit on ONE baseline, right-aligned and tabular: the suffix is a
+   constant width, so the digits form a true column at 1d, 12d and 120d alike.
+   The unit was the word "days" on every row — seven repetitions of a fact the
+   subhead already states, and it read "1days" in the singular case. */
+.act-d{font-family:"Manrope",sans-serif;font-size:22px;font-weight:800;letter-spacing:-.03em;color:var(--ink);text-align:right;line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap}
+/* A hair space (~1/8 em), not a word space: a numeral and an abbreviated unit are
+   ONE value (12kg, 5m, 1d), and a full space reads as two things — which is what
+   "1 days" was. Set as a fixed margin rather than a text space, so the suffix
+   keeps a constant width and right-aligning the lockup still aligns the digits. */
+.act-d small{font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:700;color:var(--tertiary);letter-spacing:.02em;margin-left:2.5px}
 .act-row.far .act-d{color:var(--ink-2);font-weight:700}
 .act-title{display:block;font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .act-agy{display:block;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--tertiary);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The list is a fixed 7 and the widget beside it is not, so the box was ending
+   ~92px short. The slack goes to a FOOT rather than to inflated rows: row height
+   must not become a function of the neighbouring widget's height. The foot also
+   supplies the denominator the widget never stated — 7 of how many? */
+.act-foot{margin-top:auto;padding-top:11px;border-top:1px solid var(--rule);font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--tertiary);line-height:1.45}
 
 /* ── verdict + chips ── */
 .vd{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.09em;padding:4px 9px;border-radius:6px;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;border:1px solid transparent}
@@ -248,16 +333,30 @@ button{font-family:inherit}
 .plist-count{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--tertiary)}
 .plist-count b{color:var(--ink);font-weight:700}
 .plist{display:flex;flex-direction:column;gap:0}
-.grouphd{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:16px 2px 8px;border-bottom:1px solid var(--rule);margin-bottom:9px}
+/* The group header sits on the ROW's numeral spine: its count right-aligns in the
+   same track the row deadlines use, so the list has ONE number column instead of
+   two. Left-aligning the count gave the header its own edge 62px inboard of every
+   row beneath it — the header is a summary of those rows and has to read down the
+   same column. Both the track AND the card's own inset (1px border + 15px padding)
+   are consumed here rather than retyped, so the two cannot drift apart. */
+.grouphd{--when-num:62px;--when-pad:20px;--when-w:calc(var(--when-num) + var(--when-pad) + 1px);--card-inset:16px;display:grid;grid-template-columns:var(--when-w) minmax(0,1fr) auto;gap:20px;align-items:baseline;padding:16px var(--card-inset) 8px;border-bottom:1px solid var(--rule);margin-bottom:9px}
 .plist > .grouphd:first-child{padding-top:2px}
 .grouphd .gh-t{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--ink);white-space:nowrap}
-.grouphd .gh-n{font-family:"Manrope",sans-serif;font-size:15px;font-weight:800;color:var(--ink);letter-spacing:-.02em}
-.grouphd .gh-r{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--tertiary);margin-left:auto;text-align:right}
-.pcard{display:grid;grid-template-columns:66px minmax(0,1fr) 190px 118px;grid-template-areas:"when main state act";gap:16px;align-items:start;padding:13px 15px;background:var(--card);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow-sm);margin-bottom:9px;min-width:0}
+.grouphd .gh-n{font-family:"Manrope",sans-serif;font-size:15px;font-weight:800;color:var(--ink);letter-spacing:-.02em;text-align:right;font-variant-numeric:tabular-nums;margin-right:calc(var(--when-pad) + 1px)}
+.grouphd .gh-r{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--tertiary);text-align:right}
+/* The stub's chrome lives INSIDE the track, so the track must be derived from it:
+   a fixed 66px was set when .pc-when had no border and no padding, and this pass
+   put 21px of chrome inside it — leaving 45px of content box for a value that
+   needs ~53px at three digits, which then spilled LEFT onto the card edge because
+   the cell is right-aligned. One declared numeral width plus its own chrome; the
+   two cannot drift apart again. */
+.pcard{--when-num:62px;--when-pad:20px;--when-w:calc(var(--when-num) + var(--when-pad) + 1px);display:grid;grid-template-columns:var(--when-w) minmax(0,1fr) 190px 118px;grid-template-areas:"when main state act";gap:20px;align-items:start;padding:13px 15px;background:var(--card);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow-sm);margin-bottom:9px;min-width:0}
 .pcard.barred{border-color:var(--barred-line)}
-.pc-when{grid-area:when;text-align:right;display:flex;flex-direction:column;gap:1px;padding-top:1px}
-.pc-d{font-family:"Manrope",sans-serif;font-size:26px;font-weight:800;letter-spacing:-.035em;line-height:.92;color:var(--ink)}
-.pc-d small{font-size:13px;font-weight:700}
+/* A ledger stub, and the value sits at the OPTICAL MIDDLE of the entry: top-
+   aligned, a 25px numeral left ~100px of empty column under it on a 132px card. */
+.pc-when{grid-area:when;text-align:right;display:flex;flex-direction:column;justify-content:center;gap:1px;align-self:stretch;padding-right:var(--when-pad);border-right:1px solid var(--rule)}
+.pc-d{font-family:"Manrope",sans-serif;font-size:26px;font-weight:800;letter-spacing:-.035em;line-height:.92;color:var(--ink);font-variant-numeric:tabular-nums}
+.pc-d small{font-size:13px;font-weight:700;margin-left:3px}
 .pcard.far .pc-d{color:var(--ink-2);font-weight:700}
 .pcard.later .pc-d{color:var(--tertiary);font-weight:700}
 .pc-when .pc-dl{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--tertiary);letter-spacing:.02em}
@@ -353,6 +452,9 @@ button{font-family:inherit}
 .chk div{font-family:"IBM Plex Mono",monospace;font-size:12px;line-height:1.55;color:var(--ink-2)}
 .chk b.p{color:var(--verified-ink);font-weight:700}
 .chk b.f{color:var(--barred-ink);font-weight:700}
+/* Not measurable is its own register — neither the green of a proven property nor
+   the red of a broken one. */
+.chk b.na{color:var(--tertiary);font-weight:700}
 .revbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border-radius:9px;background:var(--unread-bg);border:1px dashed var(--unread-line);color:var(--unread-ink);font-size:12px;font-weight:600;line-height:1.45}
 .revbar button{border:1px solid currentColor;background:transparent;color:inherit;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;padding:5px 10px;border-radius:7px;cursor:pointer}
 </style>
@@ -433,13 +535,13 @@ button{font-family:inherit}
       </header>
 
       <section class="controls">
-        <div class="ctl-line">
-          <span class="ctl-label">Notice type</span><div class="seg" id="stageSeg"></div>
-          <div class="ctl-divider"></div>
-          <span class="ctl-label">Set-aside</span><div class="pillset" id="saFilters"></div>
-        </div>
-        <div class="views-row">
-          <span class="ctl-label">Saved views</span>
+        <span class="ctl-label">Notice type</span>
+        <div class="seg" id="stageSeg"></div>
+        <span class="ctl-label">Set-aside</span>
+        <div class="ctl-field"><div class="seg" id="saFilters"></div><button class="more-btn" id="saMore" type="button"></button></div>
+        <div class="ctl-sep"></div>
+        <span class="ctl-label">Saved views</span>
+        <div class="ctl-field">
           <div class="pillset" id="savedViews"></div>
           <div class="vr-right">
             <div class="ctl-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input id="searchInput" type="text" placeholder="Filter notices…" /></div>
@@ -464,6 +566,7 @@ button{font-family:inherit}
             <div class="wh-text"><h3>Closing first</h3><p class="wh-sub" id="actSub"></p></div>
           </header>
           <div class="act-list" id="actList"></div>
+          <p class="act-foot" id="actFoot"></p>
         </section>
       </section>
 
@@ -613,8 +716,13 @@ function filtered(){ return base().filter(o=>{
 function renderHeader(){
   const rows = base();
   const codes = [...new Set(ROWS.map(o=>o.c).filter(Boolean))].sort();
+  /* The freshness clause is a claim about the FEED, and this layer cannot derive
+     it — the rows carry no posted date. So it renders only when the live read has
+     measured one (DSO.LAST_INGEST) and disappears otherwise. A literal here is
+     wrong every hour after the first, on the one page whose premise is "live". */
+  const ingest = (window.DSO && window.DSO.LAST_INGEST) ? ' · newest posted '+window.DSO.LAST_INGEST : '';
   $('feedMeta').innerHTML = '<b>'+rows.length+'</b> open notices read live from SAM.gov · '+
-    codes.length+' NAICS code'+(codes.length===1?'':'s')+' on your profile · newest posted 25h ago';
+    codes.length+' NAICS code'+(codes.length===1?'':'s')+' on your profile'+ingest;
   const counts = {}; ROWS.forEach(o=>{ if(o.c) counts[o.c]=(counts[o.c]||0)+1; });
   $('hdrNaics').innerHTML = codes.map(c=>'<span class="npill'+(S.naics.has(c)?'':' off')+'" data-naics="'+c+'" title="'+counts[c]+' in this read">'+c+'</span>').join('');
   $('hdrNaics').querySelectorAll('[data-naics]').forEach(p=>p.onclick=()=>{
@@ -681,16 +789,41 @@ let LAST_BANDS = null;
 
 /* ── closing first ── */
 function renderAct(){
-  const rows = base().filter(o=>o.y!=null && verdict(o).band!=='screened').sort((a,b)=>a.y-b.y).slice(0,7);
+  const pool = base().filter(o=>o.y!=null && verdict(o).band!=='screened').sort((a,b)=>a.y-b.y);
+  const rows = pool.slice(0,7);
   $('actSub').textContent = 'The 7 soonest deadlines you can still respond to. Ordered by days left — the only fact these notices publish that can rank them.';
   $('actList').innerHTML = rows.map(o=>'<button class="act-row'+(o.y>7?' far':'')+'" data-id="'+esc(o.i)+'">'+
-    '<span class="act-d">'+o.y+'<small>days</small></span>'+
+    '<span class="act-d">'+o.y+'<small>d</small></span>'+
     '<span style="min-width:0"><span class="act-title">'+esc(TITLECASE(o.t))+'</span><span class="act-agy">'+esc(officeName(o.off))+' · '+esc(o.i)+'</span></span>'+
     '<span class="vd '+verdict(o).cls+'">'+verdict(o).word+'</span></button>').join('');
+  $('actFoot').textContent = pool.length>rows.length
+    ? 'showing the '+rows.length+' soonest · '+pool.length+' notices in this read carry a published deadline'
+    : 'showing all '+pool.length+' notices in this read that carry a published deadline';
   $('actList').querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{ S.q=b.dataset.id.toLowerCase(); $('searchInput').value=b.dataset.id; renderAll(); });
 }
 
 /* ── controls ── */
+/* One modular cell, and its floor is MEASURED rather than typed. The probe carries
+   every declared label of both enums at the widest count any bucket could reach,
+   is laid out at `width:max-content` so nothing clamps it, and reports the text
+   width with a Range — a box that fits its container can only ever report "fine". */
+function setCellFloor(labels, maxCount){
+  const host=document.querySelector('.controls'); if(!host) return;
+  const probe=document.createElement('div');
+  probe.className='seg';
+  probe.style.cssText='position:absolute;left:-9999px;top:0;visibility:hidden;flex-wrap:nowrap;width:max-content';
+  probe.innerHTML=labels.map(t=>'<button>'+t+'<span class="n">'+maxCount+'</span></button>').join('');
+  host.appendChild(probe);
+  const btns=[...probe.querySelectorAll('button')];
+  let text=0;
+  btns.forEach(b=>{const r=document.createRange();r.selectNodeContents(b);text=Math.max(text,r.getBoundingClientRect().width);});
+  const cs=getComputedStyle(btns[0]);
+  const chrome=parseFloat(cs.paddingLeft)+parseFloat(cs.paddingRight)+parseFloat(cs.borderLeftWidth)+parseFloat(cs.borderRightWidth);
+  probe.remove();
+  CELL_FLOOR=Math.ceil(text+chrome);
+  host.style.setProperty('--cell-floor', CELL_FLOOR+'px');
+}
+let CELL_FLOOR=0;
 function renderControls(){
   const rows = base();
   const cnt = (f)=>rows.filter(f).length;
@@ -705,16 +838,25 @@ function renderControls(){
   const present = saPoles.filter(k=>k==='all'||cnt(o=>o.s===k)>0);
   const absent  = saPoles.filter(k=>k!=='all'&&cnt(o=>o.s===k)===0);
   const label = (k)=>k==='all'?'All':saRender(k).label;
+  /* The cell floor is derived from EVERY DECLARED label — both enums in full,
+     including the poles with zero instances that stay hidden until the disclosure
+     is opened, and each measured against the largest count it could ever carry
+     (the whole read). A floor computed from the labels that happen to be RENDERED
+     is the same error as a check scoped to what happens to be rendered: opening
+     the disclosure revealed `SET-ASIDE UNREAD 0` needing 142.2px, which grew past
+     a 138px basis and made the MUTED ZERO BUCKET the widest cell in the panel —
+     the exact defect the loose-cell module was adopted to retire. */
+  setCellFloor([...stages.map(s=>s[1]), ...saPoles.map(label)], rows.length);
   let html = present.map(k=>{
     const c = k==='all'?rows.length:cnt(o=>o.s===k);
-    return '<button class="fpill'+(k===S.sa?' active':'')+'" data-sa="'+k+'">'+label(k)+'<span class="n">'+c+'</span></button>';
+    return '<button data-sa="'+k+'" class="'+(k===S.sa?'active':'')+'">'+label(k)+'<span class="n">'+c+'</span></button>';
   }).join('');
-  html += S.saOpen
-    ? absent.map(k=>'<button class="fpill zero" data-sa="'+k+'">'+label(k)+'<span class="n">0</span></button>').join('')+'<button class="fpill more" data-more="0">fewer</button>'
-    : '<button class="fpill more" data-more="1">+'+absent.length+' with none in this read</button>';
+  html += S.saOpen ? absent.map(k=>'<button data-sa="'+k+'" class="zero">'+label(k)+'<span class="n">0</span></button>').join('') : '';
+  $('saMore').textContent = S.saOpen ? 'fewer' : '+'+absent.length+' with none in this read';
+  $('saMore').onclick = ()=>{ S.saOpen=!S.saOpen; renderControls(); runChecks(); };
   $('saFilters').innerHTML = html;
   $('saFilters').querySelectorAll('[data-sa]').forEach(b=>b.onclick=()=>{S.sa=S.sa===b.dataset.sa?'all':b.dataset.sa;S.view=null;renderAll();});
-  $('saFilters').querySelectorAll('[data-more]').forEach(b=>b.onclick=()=>{S.saOpen=b.dataset.more==='1';renderControls();});
+  $('saFilters').querySelectorAll('[data-more]').forEach(b=>b.onclick=()=>{S.saOpen=b.dataset.more==='1';renderControls();runChecks();});
 
   const views = [
     {k:'week',    t:'Closing this week', d:'open · ≤ 7 days',            n:cnt(o=>verdict(o).k==='ACT')},
@@ -743,7 +885,7 @@ function rowHTML(o){
   const far = o.y==null?'later':o.y<=3?'':o.y<=7?'far':'later';
   const hasSolicitation = o.g!=='notice';
   return '<div class="pcard'+(far?' '+far:'')+(v.k==='ASSERT'?' barred':'')+'" data-id="'+esc(o.i)+'">'+
-    '<div class="pc-when"><div class="pc-d">'+(o.y==null?'—':o.y+'<small>d</small>')+'</div><div class="pc-dl">'+(o.y==null?'NO DEADLINE':'LEFT')+'</div></div>'+
+    '<div class="pc-when"><div class="pc-d">'+(o.y==null?'—':o.y+'<small>d</small>')+'</div>'+(o.y==null?'<div class="pc-dl">NO DEADLINE</div>':'')+'</div>'+
     '<div class="pc-main">'+
       '<div class="pc-title">'+esc(TITLECASE(o.t))+'</div>'+
       '<div class="pc-buyer">'+(officeName(o.off)===deptName(o.dep)?'<b>'+esc(officeName(o.off))+'</b>':'<b>'+esc(officeName(o.off))+'</b> · '+esc(deptName(o.dep)))+'</div>'+
@@ -767,7 +909,9 @@ function renderList(){
     (S.sa!=='all'?' · set-aside: '+saRender(S.sa).label:'')+
     (S.view?' · view: '+S.view:'')+
     (S.q?' · matching “'+esc(S.q)+'”':'')+
-    ' · no stated contract value on any of them';
+    /* A property cannot be asserted of an empty set: with nothing shown there is
+       no “any of them” to have no stated value. */
+    (data.length?' · no stated contract value on any of them':'');
   if(!data.length){
     $('plist').innerHTML='<div class="empty">No notice matches this combination.<br>'+
       esc([S.band?'band '+S.band:null,S.stage!=='all'?'type '+STAGE_LABEL[S.stage]:null,S.sa!=='all'?'set-aside '+saRender(S.sa).label:null,S.q?'search “'+S.q+'”':null].filter(Boolean).join(' + ')||'current filters')+
@@ -808,6 +952,11 @@ function renderAll(){
   renderHeader(); renderControls(); renderKPIs(); LAST_BANDS=renderBands(); renderAct(); renderList(); renderBtnStates(); runChecks();
 }
 let rt; addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(runChecks,200);});
+/* Every width in this file is measured, and measuring before the faces land
+   reports fallback-font numbers wearing a webfont's clothes: C10's headroom came
+   back 5px generous (50.7 vs 55.7 on "124d") on the first pass for exactly that
+   reason. Re-run once the faces are in. */
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(()=>{renderControls();runChecks();});
 $('searchInput').addEventListener('input',e=>{S.q=e.target.value.toLowerCase();renderList();});
 $('resetBtn').onclick=reset;
 $('tbSearch').onclick=()=>$('searchInput').focus();
@@ -850,7 +999,20 @@ function runChecks(){
   // C2 · one spine: every rendered band header count equals the verdict count
   const heads=[...document.querySelectorAll('.plist .grouphd')];
   const cardsPerHead=heads.map(h=>{let c=0,e=h.nextElementSibling;while(e&&e.classList.contains('pcard')){c++;e=e.nextElementSibling;}return {n:parseInt(h.querySelector('.gh-n').textContent,10),c};});
-  out.push(['C2 group headers match rows rendered', cardsPerHead.every(x=>x.n===x.c), cardsPerHead.map(x=>x.n+'/'+x.c).join(' · ')||'no groups']);
+  /* The list's number column is one spine: every group-header count right-aligns
+     on the same edge as every row deadline beneath it. Measured on the TEXT with a
+     Range, not on the boxes — the row deadline carries 21px of chrome inside its
+     own track, so box edges agree while the digits sit 21px apart, and the eye
+     aligns on the digits. (Same instrument error as C10's first version.) */
+  const trt=el=>{const r=document.createRange();r.selectNodeContents(el);return r.getBoundingClientRect().right};
+  const ghn=[...document.querySelectorAll('.gh-n')].map(trt);
+  const pcd=[...document.querySelectorAll('.pc-d')].map(trt);
+  const spine=[...ghn,...pcd];
+  const spineSpread=spine.length>1?Math.max(...spine)-Math.min(...spine):0;
+  const spineOK=spineSpread<=1.5;
+  out.push(['C2 group headers match rows rendered', cardsPerHead.every(x=>x.n===x.c)&&spineOK,
+    cardsPerHead.map(x=>x.n+'/'+x.c).join(' · ')+' · numeral spine: '+ghn.length+' header counts + '+pcd.length+
+    ' row deadlines on one right edge at '+(spine.length?Math.round(spine[0]):0)+'px'+(spineOK?'':' ✕ spread '+spineSpread.toFixed(1)+'px — TWO NUMBER COLUMNS')]);
 
   // C3 · no fabricated figure: nothing prints a fit score or a contract value
   const bodyTxt=scope.textContent;
@@ -906,7 +1068,17 @@ function runChecks(){
   // C9 · zero-count buckets stay visible and muted, never deleted
   const zeroBtns=[...document.querySelectorAll('#stageSeg .zero, #saFilters .zero')];
   const zeroOK=zeroBtns.every(b=>b.offsetParent!==null&&parseFloat(getComputedStyle(b).opacity)<1);
-  out.push(['C9 zero-count buckets visible + muted', zeroBtns.length>0&&zeroOK, zeroBtns.length+' zero bucket(s) rendered, all muted and none removed']);
+  /* Muted by ink is undone if the layout hands the bucket dominant AREA. C9 was
+     testing opacity and never size, so a wrap rule inflated a zero bucket to
+     4.25× the widest real value underneath a green check. */
+  const wOf=e=>e.getBoundingClientRect().width;
+  const oversize=zeroBtns.filter(b=>{
+    const sibs=[...b.parentElement.querySelectorAll('button')].filter(x=>!x.classList.contains('zero'));
+    return sibs.length && wOf(b) > Math.max(...sibs.map(wOf))+1;
+  });
+  out.push(['C9 zero-count buckets visible + muted', zeroBtns.length>0&&zeroOK&&oversize.length===0,
+    zeroBtns.length+' zero bucket(s) rendered, all muted and none removed'+
+    (oversize.length?' · ✕ '+oversize.length+' wider than the widest real value ('+Math.round(wOf(oversize[0]))+'px) — muted by ink, emphasised by area':' · none wider than a real value')]);
 
   // C10 · nothing is clipped without a marker (measured, not assumed)
   const clipped=[...scope.querySelectorAll('.pc-title,.pc-note,.act-title,.band-t,.band-r,.gh-r,.kpi .foot')].filter(e=>{
@@ -915,7 +1087,18 @@ function runChecks(){
     if(cs.overflow==='visible'&&cs.webkitLineClamp==='none')return false;
     return e.scrollHeight>e.clientHeight+1||e.scrollWidth>e.clientWidth+1;
   });
-  out.push(['C10 no unflagged truncation', clipped.length===0, clipped.length?clipped.length+' clipped: '+clipped.slice(0,3).map(e=>e.className).join(', '):'0 clipped among titles, clauses, band rules and KPI feet']);
+  /* The deadline lockups are BLOCK elements filling their track, so scrollWidth
+     can never exceed clientWidth on them — an arm of this check that used it
+     would be structurally incapable of firing. Measure the TEXT with a Range and
+     compare it against the declared numeral track. */
+  const tw=el=>{const r=document.createRange();r.selectNodeContents(el);return r.getBoundingClientRect().width};
+  const nums=[...scope.querySelectorAll('.pc-d,.act-d')];
+  const numOver=nums.map(e=>({t:e.textContent,w:tw(e),box:e.clientWidth})).filter(x=>x.w>x.box-1);
+  const widestNum=nums.length?Math.max(...nums.map(tw)):0;
+  out.push(['C10 no unflagged truncation', clipped.length===0&&numOver.length===0,
+    (clipped.length?clipped.length+' clipped: '+clipped.slice(0,3).map(e=>e.className+' '+e.scrollWidth+'>'+e.clientWidth).join(', ')+' · ':'0 clipped among titles, clauses, band rules and KPI feet · ')+
+    'widest deadline lockup measured by Range: '+widestNum.toFixed(1)+'px in a '+(nums[0]?nums[0].clientWidth:0)+'px track'+
+    (numOver.length?' ✕ '+numOver.length+' at or past the edge (“'+numOver[0].t+'”)':' ('+(nums[0]?(nums[0].clientWidth-widestNum).toFixed(1):0)+'px headroom)')]);
 
   // C11 · every buyer name rendered came from the map, never a raw SAM string
   out.push(['C11 buyer names all mapped', UNMAPPED.size===0, UNMAPPED.size?'unmapped: '+[...UNMAPPED].join(' · '):'7 offices + 4 departments in this read, all mapped to display names']);
@@ -928,7 +1111,42 @@ function runChecks(){
   const tracks=card?getComputedStyle(card).gridTemplateColumns.split(' ').length:0;
   const agree = card ? (narrow ? tracks===3 : tracks===4) : false;
   const noHscroll = document.documentElement.scrollWidth <= innerWidth+1;
-  out.push(['C12 responsive path executes', agree&&noHscroll, innerWidth+'px viewport · narrow query '+(narrow?'MATCHES':'does not match')+' · .pcard computes '+tracks+' tracks · page h-scroll '+(noHscroll?'none':'PRESENT')]);
+  /* Flushness applies only to a JOINED control (the sort seg). The two filter
+     rails are loose cells on one shared module, so the standard there is CELL
+     PARITY, not flushness — a short last row is correct once the cell is a
+     constant. Both are asserted, each on the control it is true of. */
+  const segFlush=[...document.querySelectorAll('.seg')].map(s=>{
+    const bs=[...s.querySelectorAll('button')]; if(!bs.length) return null;
+    if(parseFloat(getComputedStyle(s).borderTopWidth)===0) return {id:s.id||'sortSeg', rows:1, bad:0, loose:true};
+    const box=s.getBoundingClientRect(), byRow={};
+    bs.forEach(b=>{const y=Math.round(b.getBoundingClientRect().y);(byRow[y]=byRow[y]||[]).push(b);});
+    const groups=Object.values(byRow);
+    const bad=groups.filter(g=>Math.abs(Math.max(...g.map(b=>b.getBoundingClientRect().right))-(box.right-1))>1.5).length;
+    return {id:s.id||'sortSeg', rows:groups.length, bad};
+  }).filter(Boolean);
+  const flushOK=segFlush.every(x=>x.bad===0);
+  /* Two rails of the same component, stacked, must end on the same edge AND lay
+     the same cell. Rail-width parity alone was satisfied by two rails dividing
+     their own rows into different fractions (216 vs 259px) — exactly the
+     misalignment the panel was reported for — so the CELL is asserted too, and a
+     shared module is the only thing that can satisfy both at once. */
+  const rails=[...document.querySelectorAll('.controls .seg')];
+  const railW=rails.map(s=>Math.round(s.getBoundingClientRect().width));
+  const railParity = railW.length<2 || (Math.max(...railW)-Math.min(...railW))<=1;
+  const cells=rails.flatMap(s=>[...s.querySelectorAll('button')].map(b=>b.getBoundingClientRect().width));
+  const cellSpread = cells.length ? Math.max(...cells)-Math.min(...cells) : 0;
+  const cellParity = cellSpread<=1;
+  /* A constant cell is only honest if the widest label still fits inside it. */
+  const labelFits = rails.flatMap(s=>[...s.querySelectorAll('button')]).every(b=>{
+    const r=document.createRange(); r.selectNodeContents(b);
+    return r.getBoundingClientRect().width <= b.clientWidth+0.5;
+  });
+  out.push(['C12 responsive path executes', agree&&noHscroll&&flushOK&&railParity&&cellParity&&labelFits,
+    innerWidth+'px viewport · narrow query '+(narrow?'MATCHES':'does not match')+' · .pcard computes '+tracks+' tracks · page h-scroll '+(noHscroll?'none':'PRESENT')+
+    ' · segs '+segFlush.map(x=>x.id+' '+(x.loose?'loose cells':x.rows+'-row')+(x.bad?' ✕'+x.bad+' ragged':'')).join(', ')+
+    ' · rail widths '+railW.join(' / ')+(railParity?'':' ✕ RAILS DISAGREE')+
+    ' · '+cells.length+' filter cells at '+(cells.length?cells[0].toFixed(0):0)+'px'+(cellParity?' (one module)':' ✕ spread '+cellSpread.toFixed(1)+'px')+
+    (labelFits?'':' ✕ A LABEL EXCEEDS ITS CELL')]);
 
   // C13 · the two ledgers each sum on their OWN corpus and never share a number
   const B=LAST_BANDS;
@@ -971,7 +1189,8 @@ function runChecks(){
   // downstream assertion passed vacuously on an empty list.
   const SLOTS = [
     ['.pc-note','row clause'], ['.band-r','band rule'], ['.sd-row','screen-out reason'],
-    ['.gh-r','group rule'], ['.btn-open.off','refused CTA'], ['.wh-sub','widget subhead']
+    ['.gh-r','group rule'], ['.btn-open.off','refused CTA'], ['.wh-sub','widget subhead'],
+    ['.act-foot','closing-first foot']
   ];
   const OPERATION = /\b(audit|audits|audited|auditable|auditing|we|our|us|faraudit|ingest|ingested|scan|scanned|crawl|platform|dashboard)\b/i;
   const strings=[], emptySlots=[];
@@ -990,7 +1209,35 @@ function runChecks(){
     (emptySlots.length?' · SLOT MATCHED NOTHING: '+emptySlots.join(', ')+' (a vacuous pass, not a pass)':'')+
     (uniqV.length?' · violations: '+uniqV.join(' | '):' · 0 violations')]);
 
-  const pass=out.filter(o=>o[1]).length;
+  // C18 · no frozen freshness claim. A recency phrase is honest only if it was
+  // measured on this render; a literal is wrong every hour after the first. The
+  // design-parity gate is structurally blind to this — set equality proves a
+  // literal did not CHANGE, never that it was right — so it is asserted here,
+  // against both the rendered header and this file's own source.
+  const REL=/\b(?:\d+\s*(?:h|hr|hrs|hours?|d|days?|min|minutes?|w|weeks?)\s+ago|just now|moments? ago|under an hour ago)\b/i;
+  const metaTxt=$('feedMeta').textContent.trim();
+  const derivedIngest=!!(window.DSO&&window.DSO.LAST_INGEST);
+  // Print the size of the haystack: if toString() ever returns nothing this arm
+  // can only report "clean", which is the vacuous pass C17 was built to refuse.
+  const srcLen=renderHeader.toString().length, frozen=REL.test(renderHeader.toString());
+  const hit=(metaTxt.match(REL)||[])[0];
+  out.push(['C18 no frozen freshness claim', !frozen&&(derivedIngest||!hit),
+    (frozen?'renderHeader() carries a hardcoded relative time — ':'')+
+    (hit&&!derivedIngest?'header claims “'+hit+'” with nothing measured behind it — ':'')+
+    srcLen+' chars of renderHeader swept · header reads “'+metaTxt.slice(0,68)+'” · DSO.LAST_INGEST '+(derivedIngest?'present, so the clause renders from it':'absent in review, so no recency is claimed')]);
+
+  /* Three verdicts, not two. With a filter that matches nothing, C7 cannot rank an
+     empty list, C12 has no .pcard to read tracks from and C17 has no row clause to
+     sweep — those are states in which the property is UNDEFINED, not states in
+     which it is wrong. Reporting them as FAIL cries wolf on a reachable user
+     action; reporting them as PASS is the vacuous pass this file refuses. So they
+     report NOT MEASURABLE, are excluded from the pass count, and say why. */
+  const measurable = base().length>0 && filtered().length>0;
+  const NA = new Set(measurable?[]:['C7 no dead sort control','C12 responsive path executes','C17 A1 · reason subject is the notice, never our operation']);
+  out.forEach(o=>{ if(NA.has(o[0])){ o[1]=null; o[2]='0 notices in view under the current filter — this property is undefined here, not broken. '+o[2]; } });
+  const pass=out.filter(o=>o[1]===true).length;
+  const naCount=out.filter(o=>o[1]===null).length;
+  const scored=out.length-naCount;
 
   /* ── C15 · the SERVED rail, measured on Code's artifact, reported separately.
      The rail markup and CSS in this file are verbatim from
@@ -1027,9 +1274,10 @@ function runChecks(){
   }
   const railFails=railOut.filter(o=>!o[1]).length;
 
-  $('checks').innerHTML='<div style="font-weight:700;color:var(--ink)">Self-check · '+pass+' of '+out.length+' Design-owned checks pass'+
+  $('checks').innerHTML='<div style="font-weight:700;color:var(--ink)">Self-check · '+pass+' of '+scored+' Design-owned checks pass'+
+      (naCount?' · '+naCount+' not measurable in this filter':'')+
       (railOut.length?' · C15: '+railFails+' finding'+(railFails===1?'':'s')+' on the Code-owned rail':'')+'</div>'+
-    out.map(o=>'<div><b class="'+(o[1]?'p':'f')+'">'+(o[1]?'PASS':'FAIL')+'</b> · '+o[0]+' — '+o[2]+'</div>').join('')+
+    out.map(o=>'<div><b class="'+(o[1]===null?'na':o[1]?'p':'f')+'">'+(o[1]===null?'N/A':o[1]?'PASS':'FAIL')+'</b> · '+o[0]+' — '+o[2]+'</div>').join('')+
     (railOut.length?'<div style="margin-top:8px;font-weight:700;color:var(--ink)">C15 · served rail — verbatim from the AS-SERVED reference. Not Design’s to fix; reported so the finding is measured on Code’s artifact, not on a placeholder.</div>'+
       railOut.map(o=>'<div><b class="'+(o[1]?'p':'f')+'">'+(o[1]?'OK':'FINDING')+'</b> · '+o[0]+' — '+o[2]+'</div>').join(''):'');
   $('chkNote').textContent='Every number on this page derives from the 197 rows served to the customer on 2026-07-29 (post PR #346). Nothing is typed. The checks above re-run on every filter change and on every theme switch, so a port that breaks one reports it here rather than waiting for a reviewer.';
