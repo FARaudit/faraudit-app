@@ -6,7 +6,7 @@ import {
   fetchRecentAudits,
   fetchHomeStats,
 } from "@/lib/bd-os/queries";
-import { fetchLiveOpportunities } from "@/lib/bd-os/live-opportunities";
+import { fetchLiveOpportunitiesScoped } from "@/lib/bd-os/live-opportunities";
 import type { OpportunityRow } from "@/lib/bd-os/queries";
 import { poleToRecommendation } from "@/lib/verdict-pole";
 
@@ -72,14 +72,17 @@ export async function GET() {
         ? _useTokens[0][0].toUpperCase()
         : (_useTokens[0][0] + _useTokens[_useTokens.length - 1][0]).toUpperCase();
 
-    const [counters, homeStats, liveOpps, recentAudits, pipelineRows] = await Promise.all([
+    const [counters, homeStats, scoped, recentAudits, pipelineRows] = await Promise.all([
       fetchHeaderCounter(supabase).catch(() => ({ audits: 0, traps: 0 })),
       fetchHomeStats(supabase).catch(() => null),
       // Live SAM feed (CEO 2026-07-29: go live-source; PR #334 library). null —
       // not [] — on failure: the /opportunities page renders a distinct
       // "unavailable" state, and an empty array here would misreport an
       // upstream outage as an honestly-empty feed.
-      fetchLiveOpportunities(supabase).catch(() => null as OpportunityRow[] | null),
+      // Scoped variant so the client can tell "no NAICS on file" (a profile the
+      // customer can fix in place) from "codes on file, empty window" (a real
+      // zero-result window). Identical as a row count; they must not render alike.
+      fetchLiveOpportunitiesScoped(supabase).catch(() => null),
       fetchRecentAudits(supabase, user.id, 200).catch(() => []),
       // Pipeline rows for the user — feeds Active Pursuits funnel, .ps-mid/.ps-right
       // aggregates, sidebar Pipeline danger badge, and since-bar pursuitsAdvanced.
@@ -100,9 +103,12 @@ export async function GET() {
     const weekMs = 7 * dayMs;
     const day2Ms = 2 * dayMs;
 
-    // Derived counts run on [] when the live fetch failed — the response's
-    // `opportunities` field itself stays null so the client can tell
-    // outage from empty.
+    // Three distinguishable states, never collapsed:
+    //   scoped === null              → upstream SAM read FAILED  → opportunities null
+    //   scope.source no-profile-codes→ no NAICS on file          → empty + a fixable reason
+    //   rows === []                  → codes on file, empty window
+    const liveOpps: OpportunityRow[] | null = scoped ? scoped.rows : null;
+    const feedScope = scoped ? scoped.scope : null;
     const opportunities: OpportunityRow[] = liveOpps ?? [];
 
     // ── Brief-head "since you last looked" deltas ──
@@ -227,6 +233,10 @@ export async function GET() {
       auditTotal:       audits.length,
       // null = live fetch failed (client renders "unavailable", not "empty")
       opportunities:    liveOpps,
+      // "no NAICS on file" is a profile the customer can fix in place; "empty
+      // window" is a real zero-result. Identical as a count — must not render alike.
+      feedScopeSource:  feedScope?.source ?? null,
+      feedScopeCodes:   feedScope?.codes ?? [],
       lastSync:         new Date().toISOString(),
 
       // ── Phase 4 additions ──

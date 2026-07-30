@@ -118,6 +118,7 @@
   const stateFoot = () =>
     D.FEED_STATE === 'loading' ? 'connecting to the feed…'
     : D.FEED_STATE === 'error' ? 'feed unavailable — not computed'
+    : D.FEED_STATE === 'no-profile' ? 'no NAICS codes on file — nothing to scope on'
     : 'feed is empty';
 
   /* ─── KPIs ─── */
@@ -286,10 +287,22 @@
   function renderList() {
     if (D.FEED_STATE !== 'live') {
       $('plistCount').innerHTML = stateFoot();
-      $('plist').innerHTML = `<div class="empty">${
-        D.FEED_STATE === 'loading' ? 'Connecting to the SAM.gov feed…'
-        : D.FEED_STATE === 'error' ? 'SAM.gov feed unavailable — no data shown. Nothing on this page is sample data; retry shortly.'
-        : 'The live SAM.gov feed is empty right now — no notices matched in the current window.'}</div>`;
+      if (D.FEED_STATE === 'no-profile') {
+        // Brain's shape: the honest-empty state IS the profile form, not a message
+        // pointing somewhere else. A new account is then never empty for longer
+        // than it takes to type a code, and onboarding needs no separate surface.
+        $('plist').innerHTML = `<div class="empty" id="plistProfile"></div>`;
+        if (window.FAR_PROFILE_EDITOR) {
+          window.FAR_PROFILE_EDITOR.mount($('plistProfile'), {
+            onSaved: function (saved) { if (saved && saved.length) location.reload(); }
+          });
+        }
+      } else {
+        $('plist').innerHTML = `<div class="empty">${
+          D.FEED_STATE === 'loading' ? 'Connecting to the SAM.gov feed…'
+          : D.FEED_STATE === 'error' ? 'SAM.gov feed unavailable — no data shown. Nothing on this page is sample data; retry shortly.'
+          : 'The live SAM.gov feed is empty right now — no notices matched in the current window.'}</div>`;
+      }
       return;
     }
     let data = filtered().slice();
