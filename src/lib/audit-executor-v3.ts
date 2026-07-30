@@ -34,6 +34,7 @@ import { foldPanelReason } from "./panel-findings-bridge";
 import { gateCitationsInText, citationFidelityEnabled } from "./audit-citation-fidelity";
 import { buildV3Payload } from "./audit-v3-report";
 import { detectAmendments, findingProvenance, docRegions } from "./audit-orchestrator";
+import { applyNonPresenceHonesty } from "./audit-nonpresence-honesty";
 import { sweepConstructionManifest } from "./audit-construction-manifest";
 import { detectConstructionOutOfScope } from "./section-boundary-detector";
 import { isHonestFail, billable, decrementAuditQuota, recordAuditCost } from "./audit-billing";
@@ -722,7 +723,25 @@ export async function executeAgenticPrimary(
     }
     res.decision = { ...res.decision, reason: foldGate.text };
   }
-  const payload = buildV3Payload(res.decision, res.coverage, res.findings, generatedAt);
+  // REPORT-TRUTH #2 (flag AUDIT_NONPRESENCE_HONESTY, default OFF ⇒ findings pass through untouched ⇒ byte-identical).
+  // An affirmative non-presence claim ("no escalation clause visible") is structurally ungroundable — no excerpt can
+  // exhibit the non-existence of a thing — so it may not ship as a bare statement about the document. See
+  // audit-nonpresence-honesty.ts for why citation-matching and subject-matching were both rejected on evidence.
+  //
+  // SEAM: applied HERE, after the decision is final and before the payload is built. Deliberately the latest possible
+  // point — `requirement` text is read by decide-layer logic upstream, so rewriting it any earlier could move the
+  // VERDICT. This changes only what the customer reads, never what the engine concluded. `excerpt` is untouched, so
+  // finding_provenance (which matches on excerpts, not requirements) is unaffected.
+  let reportFindings = res.findings;
+  if (process.env.AUDIT_NONPRESENCE_HONESTY === "true") {
+    const gated = applyNonPresenceHonesty(res.findings);
+    reportFindings = gated.findings;
+    for (const r of gated.rewrites) {
+      console.warn(`[nonpresence] ${r.id}: asserted absence [${r.shape}] wrapped as UNVERIFIED — absence is ungroundable (Rule 64). before="${r.before.slice(0, 120)}"`);
+    }
+    if (gated.rewrites.length) console.warn(`[nonpresence] ${gated.rewrites.length}/${res.findings.length} finding(s) carried an affirmative non-presence claim`);
+  }
+  const payload = buildV3Payload(res.decision, res.coverage, reportFindings, generatedAt);
 
   // FAIL-SAFE — reconcile what we READ against SAM's posted manifest (input.ingestion,
   // carried by both the sync route and the worker). The deterministic "all files
