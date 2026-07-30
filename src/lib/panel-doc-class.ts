@@ -33,10 +33,53 @@ export function ucfHeaderCount(fullSource: string): number {
   return keys.size;
 }
 
+// ── STRICT CLASS DISPATCH (flag AUDIT_UCF_CLASS_STRICT, default-OFF) ────────────────────────────────────────
+// Forensic: every UCF-classed record in the banked corpus — 4 of 4 — was a FALSE POSITIVE, and all four are the
+// same two VA solicitations (36C25626Q0947, 36C25626Q1137). Both are SF1449 COMMERCIAL buys: SF1449 + FAR Part 12
+// markers present, SF33 absent, and NEITHER contains a "SECTION L" or "SECTION M" anywhere. The loose count was
+// scoring them ucf on two artifacts:
+//   (1) TABLE-OF-CONTENTS DOT-LEADER LINES — "SECTION A .............................." is a TOC entry, not a
+//       section header. These packages print a contents block, so the same letters are counted twice.
+//   (2) The VA's SF1449 CONTINUATION SCHEME — literally "SECTION B - CONTINUATION OF SF 1449 BLOCKS", plus
+//       C=CONTRACT CLAUSES, D=DOCUMENTS/EXHIBITS, E=SOLICITATION PROVISIONS. That is the commercial form's own
+//       A–E sub-sectioning, which coincidentally uses letters inside A–M. It is NOT the UCF A–M scheme.
+//
+// The discriminator is anchored in what the UCF gate already DEMANDS, not invented for these two files:
+// REQUIRED_PANEL_SECTIONS (agentic-panel.ts) is {C, L, M, B}, so a package with no §L and no §M header can NEVER
+// satisfy checkManifest — dispatching it to the UCF path guarantees INCOMPLETE. Requiring at least one of {L, M}
+// aligns the dispatch with the gate it feeds. §L/§M are the UCF's defining Part IV sections; an SF1449
+// continuation scheme stops at E. Positive SHAPE requirement, never a vocabulary blocklist.
+//
+// FAILURE DIRECTION is deliberately safe: a genuine UCF package whose §L/§M headers were garbled by extraction
+// classifies commercial and takes the commercial path, which HAS a biddable-content gate, content routing and a
+// whole-source fallback. The UCF path's failure mode is blindness (the #SEQ5-ROOTS root). Misrouting toward the
+// path with three fallbacks is strictly better than misrouting toward the path with none.
+const UCF_CLASS_STRICT = () => process.env.AUDIT_UCF_CLASS_STRICT === "true";
+
+// A TOC entry: the header line trails into dot leaders (optionally followed by a page number).
+const TOC_DOT_LEADER = /\.{3,}[\s.]*\d*\s*$/;
+
+/** DISTINCT canonical UCF section keys, optionally discarding table-of-contents dot-leader lines. Pure. */
+export function ucfHeaderKeys(fullSource: string, opts?: { excludeToc?: boolean }): Set<string> {
+  const keys = new Set<string>();
+  for (const raw of (fullSource ?? "").split("\n")) {
+    const m = /^\s*SECTION\s+([A-M])\b/.exec(raw);
+    if (!m) continue;
+    if (opts?.excludeToc && TOC_DOT_LEADER.test(raw.trimEnd())) continue;
+    keys.add(m[1].toUpperCase());
+  }
+  return keys;
+}
+
 /** Deterministic class dispatch by SHAPE: ≥3 distinct canonical uppercase UCF headers ⇒ a real UCF §A–M
  *  solicitation; everything else (SF-1449 commercial, delimited-document packages — the df202699 shape, whose
  *  "Section L/M" are mixed-case content labels) ⇒ commercial. Pure. */
 export function detectDocumentClass(fullSource: string): DocumentClass {
+  if (UCF_CLASS_STRICT()) {
+    const keys = ucfHeaderKeys(fullSource, { excludeToc: true });
+    // ≥3 real (non-TOC) headers AND at least one UCF-defining Part IV section — see the STRICT block above.
+    return keys.size >= 3 && (keys.has("L") || keys.has("M")) ? "ucf" : "commercial";
+  }
   return ucfHeaderCount(fullSource) >= 3 ? "ucf" : "commercial";
 }
 
