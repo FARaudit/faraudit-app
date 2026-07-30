@@ -1,0 +1,351 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - heading "LinkedIn Engagement" [level=1] [ref=e4]
+    - generic [ref=e5]: One year of account data · 27 Jul 2025 → 26 Jul 2026
+    - generic [ref=e6]: ingested 2026-07-26
+  - generic [ref=e7]: Every figure is LinkedIn's, verbatim — nothing here is computed or defaulted. An absent sheet renders as absent, not as zero. Post titles are derived from the URL slug and marked as such; LinkedIn's export contains no title field.
+  - generic [ref=e8]:
+    - generic [ref=e9]:
+      - generic [ref=e11]: Impressions
+      - generic [ref=e12]: 20,579
+      - generic [ref=e13]: the year, all sources
+    - generic [ref=e14]:
+      - generic [ref=e16]: Members reached
+      - generic [ref=e17]: 11,206
+      - generic [ref=e18]: unique people
+    - generic [ref=e19]:
+      - generic [ref=e21]: Followers
+      - generic [ref=e22]: "68"
+      - generic [ref=e23]: total on 26 Jul 2026
+    - generic [ref=e24]:
+      - generic [ref=e26]: Days with any reach
+      - generic [ref=e27]: "96"
+      - generic [ref=e28]: 269 of 365 days silent
+  - generic [ref=e29]:
+    - generic [ref=e30]:
+      - generic [ref=e31]: "01"
+      - generic [ref=e32]: The year in one line
+      - generic [ref=e33]: impressions per day · followers accumulating beneath
+    - paragraph [ref=e34]: Ninety-six days carried any reach at all; 269 were silent. That ratio is the account’s real shape and no table shows it. Zero-reach days draw nothing — the gaps are the data, not a line resting at zero.
+    - generic [ref=e35]:
+      - generic [ref=e36]:
+        - generic [ref=e37]: Impressions per day
+        - generic [ref=e38]: peak 2,372 · 96 of 365 days non-zero
+      - img [ref=e39]:
+        - generic [ref=e182]: Aug
+        - generic [ref=e183]: Sep
+        - generic [ref=e184]: Oct
+        - generic [ref=e185]: Nov
+        - generic [ref=e186]: Dec
+        - generic [ref=e187]: Jan
+        - generic [ref=e188]: Feb
+        - generic [ref=e189]: Mar
+        - generic [ref=e190]: Apr
+        - generic [ref=e191]: May
+        - generic [ref=e192]: Jun
+        - generic [ref=e193]: Jul
+      - generic [ref=e194]:
+        - generic [ref=e195]: Followers, cumulative
+        - generic [ref=e196]: ending 68 · green dot = a day someone followed
+  - generic [ref=e197]:
+    - generic [ref=e198]:
+      - generic [ref=e199]: "02"
+      - generic [ref=e200]: Who is actually being reached
+      - generic [ref=e201]: content demographics · named organisations
+    - paragraph [ref=e202]: "The most strategically loaded data on this tab: LinkedIn names the organisations the content reached. Shares are small and shown verbatim — these are single-digit percentages of a small audience, and the value is which names appear, not how big the slice is. Organisations are listed, not plotted, precisely so 1% is never read as a mountain."
+    - generic [ref=e203]:
+      - generic [ref=e204]:
+        - generic [ref=e205]: Organisations reached
+        - generic [ref=e206]: content demographics · share of impressions, verbatim
+      - generic [ref=e207]:
+        - generic [ref=e208]:
+          - generic [ref=e209]: United States Air Force
+          - generic [ref=e210]: 2%
+        - generic [ref=e211]:
+          - generic [ref=e212]: US Army
+          - generic [ref=e213]: 1%
+        - generic [ref=e214]:
+          - generic [ref=e215]: Lockheed Martin
+          - generic [ref=e216]: 1%
+        - generic [ref=e217]:
+          - generic [ref=e218]: Northrop Grumman
+          - generic [ref=e219]: 1%
+        - generic [ref=e220]:
+          - generic [ref=e221]: Booz Allen Hamilton
+          - generic [ref=e222]: < 1%
+        - generic [ref=e223]:
+          - generic [ref=e224]: Leidos
+          - generic [ref=e225]: < 1%
+        - generic [ref=e226]:
+          - generic [ref=e227]: L3Harris Technologies
+          - generic [ref=e228]: < 1%
+        - generic [ref=e229]:
+          - generic [ref=e230]: Deloitte
+          - generic [ref=e231]: < 1%
+        - generic [ref=e232]:
+          - generic [ref=e233]: Boeing
+          - generic [ref=e234]: < 1%
+      - generic [ref=e235]:
+        - generic [ref=e236]:
+          - generic [ref=e237]: Where the content landed
+          - generic [ref=e238]: content demographics · bars scaled to the top share (28%)
+        - generic [ref=e239]:
+          - generic [ref=e240]:
+            - generic [ref=e241]: Washington DC-Baltimore Area
+            - generic [ref=e244]: 28%
+          - generic [ref=e245]:
+            - generic [ref=e246]: Huntsville-Decatur-Albertville Area
+            - generic [ref=e249]: 3%
+          - generic [ref=e250]:
+            - generic [ref=e251]: Dallas-Fort Worth Metroplex
+            - generic [ref=e254]: 3%
+          - generic [ref=e255]:
+            - generic [ref=e256]: Los Angeles Metropolitan Area
+            - generic [ref=e259]: 2%
+          - generic [ref=e260]:
+            - generic [ref=e261]: Hampton Roads, Virginia Metropolitan Area
+            - generic [ref=e264]: 2%
+          - generic [ref=e265]:
+            - generic [ref=e266]: Greater Boston
+            - generic [ref=e269]: 2%
+          - generic [ref=e270]:
+            - generic [ref=e271]: New York City Metropolitan Area
+            - generic [ref=e274]: 2%
+          - generic [ref=e275]:
+            - generic [ref=e276]: Greater Tampa Bay Area
+            - generic [ref=e279]: 2%
+          - generic [ref=e280]:
+            - generic [ref=e281]: San Diego Metropolitan Area
+            - generic [ref=e284]: 2%
+      - generic [ref=e285]:
+        - generic [ref=e286]:
+          - generic [ref=e287]: Follower company size
+          - generic [ref=e288]: audience demographics · bars scaled to the top share (24%)
+        - generic [ref=e289]:
+          - generic [ref=e290]:
+            - generic [ref=e291]: 10,001+ employees
+            - generic [ref=e294]: 24%
+          - generic [ref=e295]:
+            - generic [ref=e296]: 2-10 employees
+            - generic [ref=e299]: 16%
+          - generic [ref=e300]:
+            - generic [ref=e301]: 11-50 employees
+            - generic [ref=e304]: 13%
+          - generic [ref=e305]:
+            - generic [ref=e306]: 1,001-5,000 employees
+            - generic [ref=e309]: 9%
+      - generic [ref=e310]:
+        - generic [ref=e311]:
+          - generic [ref=e312]: Follower seniority
+          - generic [ref=e313]: audience demographics · bars scaled to the top share (36%)
+        - generic [ref=e314]:
+          - generic [ref=e315]:
+            - generic [ref=e316]: Senior
+            - generic [ref=e319]: 36%
+          - generic [ref=e320]:
+            - generic [ref=e321]: Director
+            - generic [ref=e324]: 21%
+          - generic [ref=e325]:
+            - generic [ref=e326]: Entry
+            - generic [ref=e329]: 12%
+          - generic [ref=e330]:
+            - generic [ref=e331]: Manager
+            - generic [ref=e334]: 9%
+          - generic [ref=e335]:
+            - generic [ref=e336]: CXO
+            - generic [ref=e339]: 9%
+  - generic [ref=e340]:
+    - generic [ref=e341]:
+      - generic [ref=e342]: "03"
+      - generic [ref=e343]: What is missing
+      - generic [ref=e344]: per-post detail behind the totals
+    - paragraph [ref=e345]: The account totals above cover the full year. The per-post detail behind them does not — LinkedIn’s own aggregate lists 28 posts and we hold per-post exports for 12. The 16 below are named, not inferred from absence. A chart that smoothed over this would be lying by omission.
+    - generic [ref=e346]:
+      - generic [ref=e347]:
+        - generic [ref=e348]: 12 held
+        - generic [ref=e349]: 16 missing
+      - generic [ref=e350]:
+        - generic [ref=e351]: Per-post export in hand — full metrics
+        - generic [ref=e353]: Listed by LinkedIn, no per-post export — engagement count only
+        - generic [ref=e355]: 12 + 16 = 28 listed
+      - generic [ref=e356]:
+        - generic [ref=e357]: Missing per-post detail
+        - generic [ref=e358]: named · newest first
+      - generic [ref=e359]:
+        - generic [ref=e360]:
+          - generic [ref=e361]: 3 Jul
+          - 'link "Untitled · 3 Jul #defensecontracting #govcon #federalacquisition" [ref=e363] [cursor=pointer]':
+            - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_defensecontracting-govcon-federalacquisition-share-7477343242032705536-fL4l
+          - generic [ref=e364]: "1"
+        - generic [ref=e365]:
+          - generic [ref=e366]: 30 Jun
+          - 'link "Untitled · 30 Jun #defensecontracting #govcon #federalacquisition" [ref=e368] [cursor=pointer]':
+            - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_defensecontracting-govcon-federalacquisition-share-7477342071113023489-XTyU
+          - generic [ref=e369]: "4"
+        - generic [ref=e370]:
+          - generic [ref=e371]: 26 Jun
+          - 'link "Untitled · 26 Jun #govcon #federalcontracting #defensecontracting" [ref=e373] [cursor=pointer]':
+            - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_govcon-federalcontracting-defensecontracting-share-7476290713358364673-s4ua
+          - generic [ref=e374]: "1"
+        - generic [ref=e375]:
+          - generic [ref=e376]: 23 Jun
+          - 'link "Untitled · 23 Jun #govcon #federalcontracting #defensecontracting" [ref=e378] [cursor=pointer]':
+            - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_govcon-federalcontracting-defensecontracting-share-7475182794332106753-hgZl
+          - generic [ref=e379]: "4"
+        - generic [ref=e380]:
+          - generic [ref=e381]: 19 Jun
+          - 'link "Untitled · 19 Jun #defensecontracting #govcon #smallbusiness" [ref=e383] [cursor=pointer]':
+            - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_defensecontracting-govcon-smallbusiness-share-7473733881028849664-nafg
+          - generic [ref=e384]: "6"
+        - generic [ref=e385]:
+          - generic [ref=e386]: 17 Jun
+          - 'link "Untitled · 17 Jun #govcon #federalcontracting #defensecontracting" [ref=e388] [cursor=pointer]':
+            - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_govcon-federalcontracting-defensecontracting-share-7473004936843337728-oh9T
+          - generic [ref=e389]: "1"
+        - generic [ref=e390]:
+          - generic [ref=e391]: 12 Jun
+          - 'link "Untitled · 12 Jun #defensecontracting #govcon #smallbusiness" [ref=e393] [cursor=pointer]':
+            - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_defensecontracting-govcon-smallbusiness-share-7471201530369581056-xLQW
+          - generic [ref=e394]: "3"
+        - generic [ref=e395]:
+          - generic [ref=e396]: 10 Jun
+          - 'link "Untitled · 10 Jun #defensecontracting #govcon #smallbusiness" [ref=e398] [cursor=pointer]':
+            - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_defensecontracting-govcon-smallbusiness-share-7470471460952817664-CNeD
+          - generic [ref=e399]: "3"
+        - generic [ref=e400]:
+          - generic [ref=e401]: 9 Jun
+          - link "~ Samgov home" [ref=e403] [cursor=pointer]:
+            - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_samgov-home-share-7470117183948263424-z1XL
+          - generic [ref=e404]: "1"
+        - generic [ref=e405]:
+          - generic [ref=e406]: 5 Jun
+          - link "~ You spent 40 hours on a proposal the evaluator" [ref=e408] [cursor=pointer]:
+            - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_you-spent-40-hours-on-a-proposal-the-evaluator-share-7468684159155089408-4RZ6
+          - generic [ref=e409]: "5"
+        - generic [ref=e410]:
+          - generic [ref=e411]: 2 Jun
+          - link "~ The competition started 36 months ago" [ref=e413] [cursor=pointer]:
+            - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_the-competition-started-36-months-ago-ugcPost-7467578681868066816-YR6t
+          - generic [ref=e414]: "6"
+        - generic [ref=e415]:
+          - generic [ref=e416]: 27 May
+          - 'link "Untitled · 27 May #cmmc #defensecontracting #cui" [ref=e418] [cursor=pointer]':
+            - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_cmmc-defensecontracting-cui-share-7465424687330897920-O3Ql
+          - generic [ref=e419]: "3"
+        - generic [ref=e420]:
+          - generic [ref=e421]: 19 May
+          - link "~ Read the solicitation catch every trap" [ref=e423] [cursor=pointer]:
+            - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_read-the-solicitation-catch-every-trap-share-7462529962600726528-A3vg
+          - generic [ref=e424]: "4"
+        - generic [ref=e425]:
+          - generic [ref=e426]: 18 May
+          - link "Untitled · 18 May" [ref=e428] [cursor=pointer]:
+            - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_follow-faraudit-at-httpslnkdind3zkvke-ugcPost-7462323477455392768-O6Yp
+          - generic [ref=e429]: "1"
+        - generic [ref=e430]:
+          - generic [ref=e431]: 30 Apr
+          - 'link "Untitled · 30 Apr #federalcontracting #defensecontracting #far" [ref=e433] [cursor=pointer]':
+            - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_federalcontracting-defensecontracting-far-share-7455619277174378496-ZKcG
+          - generic [ref=e434]: "1"
+        - generic [ref=e435]:
+          - generic [ref=e436]: 24 Apr
+          - 'link "Untitled · 24 Apr #federalcontracting #defensecontracting #far" [ref=e438] [cursor=pointer]':
+            - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_federalcontracting-defensecontracting-far-share-7453445821481631744-bzpR
+          - generic [ref=e439]: "1"
+      - paragraph [ref=e440]: "Caveat: LinkedIn’s aggregate list caps at 50 posts — this bounds coverage, not publication. Measured against aggregate TOP POSTS sheet (LinkedIn caps this list at 50 posts)."
+  - generic [ref=e441]:
+    - generic [ref=e442]:
+      - generic [ref=e443]: "04"
+      - generic [ref=e444]: Top posts by engagement
+      - generic [ref=e445]: 28 ranked · identified by what they said
+    - paragraph [ref=e446]: Ranked on LinkedIn’s own engagement count. Titles are derived from the URL slug and prefixed ~; where a post opened with hashtags the slug identifies nothing, so it is shown as Untitled + date with the tags exposed rather than dressed up as a headline. The dot marks whether we hold the per-post export — so you can see at a glance that some of the best-performing posts have no detail behind them.
+    - generic [ref=e447]:
+      - generic [ref=e448]:
+        - generic [ref=e449]:
+          - generic [ref=e450]: "1"
+          - generic [ref=e451]:
+            - generic "per-post export held" [ref=e452]
+            - 'link "Untitled · 29 Jun #defensecontracting #govcon #federalacquisition" [ref=e453] [cursor=pointer]':
+              - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_defensecontracting-govcon-federalacquisition-ugcPost-7477214479173197827-utoy
+          - generic [ref=e456]: "24"
+        - generic [ref=e457]:
+          - generic [ref=e458]: "2"
+          - generic [ref=e459]:
+            - generic "per-post export held" [ref=e460]
+            - link "~ The biggest rewrite of the federal procurement" [ref=e461] [cursor=pointer]:
+              - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_the-biggest-rewrite-of-the-federal-procurement-ugcPost-7484975865357856768-hBLn
+          - generic [ref=e464]: "14"
+        - generic [ref=e465]:
+          - generic [ref=e466]: "3"
+          - generic [ref=e467]:
+            - generic "per-post export held" [ref=e468]
+            - link "~ 99 of defense contractors are uncertified" [ref=e469] [cursor=pointer]:
+              - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_99-of-defense-contractors-are-uncertified-ugcPost-7474831914336534528-KpmZ
+          - generic [ref=e472]: "8"
+        - generic [ref=e473]:
+          - generic [ref=e474]: "4"
+          - generic [ref=e475]:
+            - generic "no per-post export" [ref=e476]
+            - 'link "Untitled · 19 Jun #defensecontracting #govcon #smallbusiness" [ref=e477] [cursor=pointer]':
+              - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_defensecontracting-govcon-smallbusiness-share-7473733881028849664-nafg
+          - generic [ref=e480]: "6"
+        - generic [ref=e481]:
+          - generic [ref=e482]: "5"
+          - generic [ref=e483]:
+            - generic "no per-post export" [ref=e484]
+            - link "~ The competition started 36 months ago" [ref=e485] [cursor=pointer]:
+              - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_the-competition-started-36-months-ago-ugcPost-7467578681868066816-YR6t
+          - generic [ref=e488]: "6"
+        - generic [ref=e489]:
+          - generic [ref=e490]: "6"
+          - generic [ref=e491]:
+            - generic "no per-post export" [ref=e492]
+            - link "~ You spent 40 hours on a proposal the evaluator" [ref=e493] [cursor=pointer]:
+              - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_you-spent-40-hours-on-a-proposal-the-evaluator-share-7468684159155089408-4RZ6
+          - generic [ref=e496]: "5"
+        - generic [ref=e497]:
+          - generic [ref=e498]: "7"
+          - generic [ref=e499]:
+            - generic "per-post export held" [ref=e500]
+            - 'link "Untitled · 18 May #federalcontracting #cmmc #defenseindustrialbase" [ref=e501] [cursor=pointer]':
+              - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_federalcontracting-cmmc-defenseindustrialbase-ugcPost-7462156773500764160-Kjv1
+          - generic [ref=e504]: "4"
+        - generic [ref=e505]:
+          - generic [ref=e506]: "8"
+          - generic [ref=e507]:
+            - generic "no per-post export" [ref=e508]
+            - 'link "Untitled · 30 Jun #defensecontracting #govcon #federalacquisition" [ref=e509] [cursor=pointer]':
+              - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_defensecontracting-govcon-federalacquisition-share-7477342071113023489-XTyU
+          - generic [ref=e512]: "4"
+        - generic [ref=e513]:
+          - generic [ref=e514]: "9"
+          - generic [ref=e515]:
+            - generic "no per-post export" [ref=e516]
+            - 'link "Untitled · 23 Jun #govcon #federalcontracting #defensecontracting" [ref=e517] [cursor=pointer]':
+              - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_govcon-federalcontracting-defensecontracting-share-7475182794332106753-hgZl
+          - generic [ref=e520]: "4"
+        - generic [ref=e521]:
+          - generic [ref=e522]: "10"
+          - generic [ref=e523]:
+            - generic "no per-post export" [ref=e524]
+            - link "~ Read the solicitation catch every trap" [ref=e525] [cursor=pointer]:
+              - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_read-the-solicitation-catch-every-trap-share-7462529962600726528-A3vg
+          - generic [ref=e528]: "4"
+        - generic [ref=e529]:
+          - generic [ref=e530]: "11"
+          - generic [ref=e531]:
+            - generic "no per-post export" [ref=e532]
+            - 'link "Untitled · 12 Jun #defensecontracting #govcon #smallbusiness" [ref=e533] [cursor=pointer]':
+              - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_defensecontracting-govcon-smallbusiness-share-7471201530369581056-xLQW
+          - generic [ref=e536]: "3"
+        - generic [ref=e537]:
+          - generic [ref=e538]: "12"
+          - generic [ref=e539]:
+            - generic "per-post export held" [ref=e540]
+            - 'link "Untitled · 26 May #defensecontracting #smallbusiness #cmmc" [ref=e541] [cursor=pointer]':
+              - /url: https://www.linkedin.com/posts/jose-rodriguez-faraudit_defensecontracting-smallbusiness-cmmc-ugcPost-7465047836611547136-ji1J
+          - generic [ref=e544]: "3"
+      - group [ref=e545]:
+        - generic "▸ 16 more ranked posts" [ref=e546] [cursor=pointer]
+        - text: ~ ~ ~ ~ ~ ~ ~
+  - generic [ref=e547]: Titles — LinkedIn’s per-post export has no title field. Every title here is derived from the URL slug (LinkedIn’s slugification of the opening line), marked ~, and never presented as authoritative. Posts whose slug is a run of hashtags are shown as Untitled + date.Absent ≠ zero — a missing sheet renders as “not in export”. On the daily chart, zero-reach days draw nothing at all rather than a bar of height zero.Scale — demographic bars are scaled to the top share within their group and the top share is printed beside the group title. Organisations are listed without bars because their shares are 2% and below.Source — ceo/linkedin/exports/ · record ceo/linkedin-analytics.json · schema linkedin-analytics.v2. This page renders entirely from the inlined JSON block; the ingest replaces that block and nothing else.

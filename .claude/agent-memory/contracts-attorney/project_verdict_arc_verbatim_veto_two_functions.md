@@ -1,0 +1,12 @@
+---
+name: verdict-arc-verbatim-veto-two-functions
+description: Attorney-lens ruling on VERDICT-ARC-DESIGN v1 — verbatim veto conflates grounding-quality (retire OK) with source-coverage completeness (must survive); by-reference bar class is the false-BID hole
+metadata:
+  type: project
+---
+
+Ruling (2026-07-22, ceo/VERDICT-ARC-DESIGN.md v1 panel): the ≥4-word verbatim veto performs TWO functions the design treats as one. (a) Grounding QUALITY — noisy, over-fires on boilerplate, safely replaceable by semantic classification. (b) Source-coverage COMPLETENESS — `SectionAttestation.obligations` is a SOURCE-side ledger checked against `citedFindingIds` (audit-orchestrator.ts:293, audit-gate-v2.ts `disqualifierUncovered`); it is the ONLY mechanism that catches a bar present in read content that NO lens emitted as a finding. Moves 1+2 shift the verdict domain to "the panel's reasoned call over the grounded finding set" — an emission gap (proven class: lens-assignment blindness, pricing lens [B,H,J] never saw commercial §C/§I; covered_direct short-circuit #557 hid a co-resident ungrounded disqualifier) then becomes an invisible false BID, and the ZERO-false-BID invariant "on READ content" is unverifiable by construction.
+
+**Named false-BID class:** incorporated-by-reference eligibility bars whose ONLY in-document footprint is a citation line (52.252-2 gives them full force and effect): 52.219-14 limitations on subcontracting, 52.204-24/-25 §889, 52.209-x responsibility, 252.204-7012/7019/7020/7021 + armed conditional fill-ins (7025 Level-N vs the N/A specimen — see [[cmmc-7025-na-instrument-trigger]]). A semantic classifier reads the recital line as boilerplate → bar never enters the disqualifier set → BID. The 14 regex allowlists each fail toward NHR (safe pole); one semantic classifier fails BOTH directions.
+
+**How to apply:** any decide-by-default redesign must (1) keep a source-side obligation ledger as the classifier's input domain (not the finding set), (2) hard-precondition full-text resolution (CLAUSE_SOURCE_FULLTEXT) for bar-bearing by-reference cites or escalate, (3) classify per-instance with fill-in inheritance, never per clause-family, (4) route classifier-ambiguous to escalation never to boilerplate, (5) add adversarial bar-wearing-boilerplate specimens to the gold set (armed 7025, by-ref 52.219-14 on SDVOSB, §889 rep). GAO angle: a confident false BID also burns the customer's pre-close patent-defect protest window (4 CFR 21.2(a)(1)) — escalation was doing rights-preserving diligence.

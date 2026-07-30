@@ -1,0 +1,4 @@
+[      95ms] [LOG] [dashboard-live] rendered 9 audits @ http://localhost:4173/dashboard-live.js:726
+[   24912ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:4173/api/audits?limit=200:0
+[   24912ms] [WARNING] [dashboard-live] /api/audits returned 500 @ http://localhost:4173/dashboard-live.js:709
+[   24913ms] [LOG] [dashboard-live] rendered 0 audits (LOAD ERROR: HTTP 500) @ http://localhost:4173/dashboard-live.js:726

@@ -1,0 +1,12 @@
+import * as fs from "fs";
+import { applyClauseKeyedTypingFloor, applyFindingDedup } from "../../src/lib/audit-decide";
+const cab = JSON.parse(fs.readFileSync("scripts/audit-ai/run-records/_new-cab687da.json","utf8"));
+const findings = cab.result.inputs.findings;
+const is219 = (f:any)=>/52\.219-14/.test(`${f.requirement} ${f.excerpt} ${f.citation}`);
+console.log("=== 52.219-14 findings RAW ===");
+findings.filter(is219).forEach((f:any)=>console.log(`  [${f.kind}/${f.controllability}] cite="${String(f.citation).slice(0,55)}"`));
+const floored = applyClauseKeyedTypingFloor(findings,{enabled:true});
+console.log("=== after FLOOR ===");
+floored.filter(is219).forEach((f:any)=>console.log(`  [${f.kind}/${f.controllability}] cite="${String(f.citation).slice(0,55)}"`));
+const deduped = applyFindingDedup(floored,{enabled:true});
+console.log(`=== after DEDUP (floor→dedup): ${floored.filter(is219).length} → ${deduped.filter(is219).length} rows of 52.219-14 ===`);

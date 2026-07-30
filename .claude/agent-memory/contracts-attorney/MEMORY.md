@@ -1,0 +1,9 @@
+# Memory index
+
+- [CMMC 7025 N/A instrument-trigger ruling](project_cmmc_7025_na_instrument_trigger.md) — #632 cite-string family anchor rejected (FN on own specimen, FP on 7012 bleed); fix = emission-time trigger inheritance + definitions-are-not-bars
+- [VERDICT-ARC verbatim-veto two-functions ruling](project_verdict_arc_verbatim_veto_two_functions.md) — veto = grounding-quality (retirable) + source-coverage backstop (must survive); false-BID hole = by-reference bars (52.219-14/§889/7012-7021) read as boilerplate
+- [Step-4 veto-retirement register ruling](project_step4_veto_retirement_registers.md) — the 4 named registers die at obligationsOf's 8-verb filter not the veto; "ledger owns it" = placebo owner; gate must be verdict-scoped
+- [Retirement-redesign ruling: load-bearing premise VOID](project_retirement_redesign_stale_ledger_void.md) — stale pre-#460 ledger ⇒ 999e909b false-BID vanishes at parity; veto quotes disqualifierUncovered[0] unranked; vote A-minus, keep the flag
+- [MOVE-4 hard-bar floor ruling + PIVOT](project_move4_hardbar_floor_ruling.md) — pivot AMEND: closed-class rule (vehicle/QPL fire anchor-free per 16.505/52.209-1; joinable classes need anchor); H2 grammar claim DIES; H1 shadow-only-safe; enum lists in scope pre-ARM
+- [#747 V2 narrative-registry ruling — R1 D, R2 F](project_747_v2_narrative_registry_ruling.md) — provenance invariant PASSES the founding defect (string-grain < clause-grain); negative/external/structured kinds still untyped; capability-statement entitlement is track- AND edition-conditional (verified FAR cites inside)
+- [Verify your own paraphrase, not just memory](lesson_verify_paraphrase_not_just_memory.md) — 22 CFR 127.1 wrong on merits + a self-invented 4.1102(a)(5) "sharpening"; paragraph designators are where mis-citation hides; ecfr blocked → govinfo

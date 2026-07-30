@@ -1,0 +1,18 @@
+---
+name: unit6-judge2-tiebreak-ctrl-mismatch
+description: JUDGE2 DISSENT D — the requiredAttribute tiebreak fix (7cc5a42) closes the ctrl+kind-TIE clobber face but NOT the ctrl-MISMATCH face; attributed already_satisfied gate vs attr-less bidder_controls plain still flips eligible null→true
+metadata:
+  type: project
+---
+
+Unit 6 dedup `applyFindingDedup` JUDGE2 (independent, B3) @7cc5a42 = **DISSENT / grade D / verdict-safe-by-construction=FALSE**. 1 NEW P0, same false-green class as the prior judge's DISSENT ([[project_unit6-judge-attr-clobber]]).
+
+**Fix under review:** one line at L1919 — `requiredAttribute`-present tiebreak in the `worst` sort, placed AFTER ctrl (fdCtrlRank) and kind (fdKindRank), before curableInWindow/severity. It rescues the clobber ONLY when the attributed member TIES the attr-less worst on ctrl AND kind.
+
+**The hole it misses (P0):** when the attributed forced-primary is LESS conservative on **controllability** than an attr-less same-clause sibling, `fdCtrlRank` picks the attr-less as `worst` on the FIRST comparator → the tiebreak (3rd comparator) never runs → L1944 `requiredAttribute: worst.requiredAttribute`=undefined → survivor drops out of `unverifiedGates` (needs `kind===eligibility_bar && !!requiredAttribute && !mmEvidenceFactor && firmStatus!==satisfies`) → `committalEligible()` null→**true** (false green). Repro: A=eligibility_bar+`setaside:sb`+`already_satisfied`+curable (protected, forced primary, enters clamp→null); B=eligibility_bar+attr-less+`bidder_controls`+curable:false. worst=B (ctrl 2>1) → attr clobbered. Real-shape, no phantom keys, null/ow-empty/cw-empty+src all flip.
+
+**Reachability = LATENT but REAL.** `applySetAsideFirmStatusGate` @2096 (live under AUDIT_ELIGIBLE_TRISTATE, runs BEFORE dedup @2329) re-types a null-profile `already_satisfied` set-aside eligibility_bar → `bidder_controls`+cautionFloor, which WOULD tie the plain worst on ctrl and let the tiebreak save it — BUT ONLY when `SETASIDE_SIZE_RE.test(f.requirement)` matches. That regex is blocklist-shaped and MISSES plausible attributed-set-aside prose ("Offeror qualifies as a small business under NAICS 541611", "Prime must be a qualified small business entity", "verified small business/socioeconomic..."). Any such gate passes firmStatus UNCHANGED as `already_satisfied` → reaches dedup → break. Proven e2e through prod order: HUBZone req (matches regex)→re-typed→tiebreak saves (SAFE); bare "small business" req (misses regex)→not re-typed→null→true (BREAK). Real seq-2 record has 2 `already_satisfied` eligibility_bars (52.219-14) + 2 attributed set-aside eligibility_bars — both ingredients emit, just not fused on one finding in THIS record → real-93 HELD (93→77 invariant), break needs realistic 2-panel disagreement.
+
+**Fix (verified in isolation):** attr fallback to forced primary — `requiredAttribute: worst.requiredAttribute ?? (forced!==null ? findings[forced].requiredAttribute : undefined)` (the prior judge's remedy). Closes BOTH faces (tie + ctrl-mismatch). Does NOT reopen R3 (bars never absorbed, forced=real protected member, restores that member's OWN attr, never cross-product). Tiebreak may stay (harmless, correct for tie case) but insufficient alone.
+
+Prior P0 (tie face) CLOSED: `_judge-unit6-forcedattr2.ts` now survAttr=setaside:sb null→null. All prior judge probes + R1–R4 spot-check 0 breaks; `_rt-unit6-r1-nobid.ts` TypeError is PRE-EXISTING (reproduces on parent 5d29302). tsc clean. Probes: `_judge2-unit6-{tiebreak,order-hardening}.ts`. Report: ceo/redteam-unit6-judge2.md. Continues [[project_unit6-judge-attr-clobber]] / [[project_unit6-r3-requiredattribute-bundle-gap]].

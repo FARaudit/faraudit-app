@@ -1,0 +1,155 @@
+- generic [ref=f1e2]:
+  - generic [ref=f1e3]:
+    - generic [ref=f1e4]: Card 768 · Design · v2
+    - heading "Action Board — the focus panel" [level=1] [ref=f1e5]
+    - button "theme" [ref=f1e6] [cursor=pointer]
+  - generic [ref=f1e9]:
+    - generic [ref=f1e10]:
+      - generic [ref=f1e11]: Action board
+      - generic [ref=f1e12]: 78 items · Jul 28 2026
+      - generic [ref=f1e13]:
+        - button "Focus" [ref=f1e14] [cursor=pointer]
+        - button "Ledger · 78" [ref=f1e15] [cursor=pointer]
+    - generic [ref=f1e17]:
+      - generic [ref=f1e18]:
+        - generic [ref=f1e19]:
+          - generic [ref=f1e20]: Do this now
+          - generic [ref=f1e21]: "1"
+        - generic [ref=f1e22]:
+          - generic [ref=f1e23]:
+            - generic [ref=f1e24]: A customer is affected right now
+            - 'heading "Make sure ''forgot password'' actually works end-to-end: reset email arrives, link works, new password signs you in" [level=3] [ref=f1e26]'
+            - paragraph [ref=f1e27]: "Customer acts as: forgot password → clicks reset → email never arrives → locked out forever. FA-161 (middleware fix cc9f96c) shipped. Remaining: create demo@faraudit.com mailbox in Google Workspace OR alias to jose@faraudit.com. CEO must verify end-to-end: request reset → receive email → click link → land on /auth/update-password → set password → sign in. Not closed until CEO completes this full flow personally."
+            - generic [ref=f1e28]:
+              - generic [ref=f1e29]: under 30m
+              - generic [ref=f1e30]: Platform
+              - generic [ref=f1e31]: P0
+              - generic [ref=f1e32]: FA-162
+            - generic [ref=f1e33]:
+              - generic [ref=f1e34]: First step
+              - generic [ref=f1e35]: Password reset flow broken — demo@faraudit.com has no mailbox, reset emails go nowhere
+          - generic [ref=f1e36]:
+            - generic [ref=f1e37]: Or close something small · under 30 minutes · 3 available
+            - generic [ref=f1e38]:
+              - generic [ref=f1e39]: •
+              - generic [ref=f1e40]: "CEO CLICK — fire SEQ-5 36C24126Q0569 (VA SDVOSB landscaping) through the front door. Pre-fire GREEN (Brain #659); incomplete-by-construction (image-only WEBGIS binding map → honest INCOMPLETE, doc named). ~$1.81 / ~304s. On landing relay verdict + doc-named + cost/wall → seq-5 CERTIFIES. Independent of seq-4."
+      - generic [ref=f1e41]:
+        - generic [ref=f1e42]:
+          - generic [ref=f1e43]: Then, in order
+          - generic [ref=f1e44]: "5"
+          - generic [ref=f1e45]: 2 of 5 truncate · ≈222 chars
+        - generic [ref=f1e46]:
+          - generic [ref=f1e47]:
+            - generic [ref=f1e48]: "2"
+            - generic [ref=f1e49]:
+              - generic [ref=f1e50]: "CEO CLICK — fire SEQ-5 36C24126Q0569 (VA SDVOSB landscaping) through the front door. Pre-fire GREEN (Brain #659); incomplete-by-construction (image-only WEBGIS binding map → honest INCOMPLETE, doc named). ~$1.81 / ~304s. On landing relay verdict + doc-named + cost/wall → seq-5 CERTIFIES. Independent of seq-4."
+              - generic [ref=f1e51]:
+                - generic [ref=f1e52]: YOU
+                - generic [ref=f1e53]: under 30m
+                - generic [ref=f1e54]: Engine
+                - generic [ref=f1e55]: 310ch
+          - generic [ref=f1e56]:
+            - generic [ref=f1e57]: "3"
+            - generic [ref=f1e58]:
+              - generic [ref=f1e59]: Clean up report wording for closed/expired solicitations
+              - generic [ref=f1e60]:
+                - generic [ref=f1e61]: CODE
+                - generic [ref=f1e62]: 30m–2h
+                - generic [ref=f1e63]: Customer Report
+          - generic [ref=f1e64]:
+            - generic [ref=f1e65]: "4"
+            - generic [ref=f1e66]:
+              - generic [ref=f1e67]: Export the Notion workspace to Drive before touching the account
+              - generic [ref=f1e68]:
+                - generic [ref=f1e69]: YOU
+                - generic [ref=f1e70]: 30m–2h
+                - generic [ref=f1e71]: Doctrine
+          - generic [ref=f1e72]:
+            - generic [ref=f1e73]: "5"
+            - generic [ref=f1e74]:
+              - generic [ref=f1e75]: "Build FARaudit into the system every defense contractor works through: find -> audit -> bid -> win -> recompete"
+              - generic [ref=f1e76]:
+                - generic [ref=f1e77]: YOU
+                - generic [ref=f1e78]: 2h+
+                - generic [ref=f1e79]: Platform
+          - generic [ref=f1e80]:
+            - generic [ref=f1e81]: "6"
+            - generic [ref=f1e82]:
+              - generic [ref=f1e83]: "[PRE-v5-FLIP] Gauntlet G2 ultracode P2 — v5 OUT_OF_SCOPE eligibility: web header (render.ts:43 eligInfo) shows an 'Eligibility · Not determined' chip that the PDF covers suppress (coverElig pole rule). Fix core.ts eligInfo/scorecardTiles to add explicit OUT_OF_SCOPE pole rule (match PDFs + §5 doctrine); 'Advisories' fallback tile currently dead code. Flag-gated OFF so no prod impact now; MUST fix before AUDIT_REPORT_V5 flip. Design stamps (customer-facing v5 UI)."
+              - generic [ref=f1e84]:
+                - generic [ref=f1e85]: YOU
+                - generic [ref=f1e86]: under 30m
+                - generic [ref=f1e87]: Engine
+                - generic [ref=f1e88]: 467ch
+      - generic [ref=f1e89]:
+        - generic [ref=f1e90]:
+          - generic [ref=f1e91]: You owe an answer
+          - generic [ref=f1e92]: "10"
+          - generic [ref=f1e93]: 1 of 10 truncate · strip fits ≈85 chars · budget 72
+        - generic [ref=f1e94]:
+          - generic [ref=f1e95] [cursor=pointer]:
+            - generic [ref=f1e96]: "fire SEQ-4 (commercial pathway) — GATED behind #640. After #640 re-arms ROUTING_V2, re-run the seq-4 4-filter screen (clean-routing fanout=1 → ~300K char ceiling) → clean COMPLETE·NHR target appears → present pick → CEO click → CERT-5 CLOSES."
+            - generic [ref=f1e98]:
+              - generic [ref=f1e99]: Engine · P0 · SEQ4-FIRE · releases 1
+              - generic [ref=f1e100]: 242ch
+          - generic [ref=f1e101] [cursor=pointer]:
+            - generic [ref=f1e102]: Ratify the INTENT of Rules 68 and 69?
+            - generic [ref=f1e104]: Doctrine · P0 · SESS-RATIFY-68-69
+          - generic [ref=f1e106] [cursor=pointer]:
+            - generic [ref=f1e107]: Build the 5-expert review directly into the engine so every audit is judged from all angles automatically
+            - generic [ref=f1e109]:
+              - generic [ref=f1e110]: no purpose
+              - generic [ref=f1e111]: Engine · P1 · FA-EXPERT-PANEL-ENGINE
+          - generic [ref=f1e112] [cursor=pointer]:
+            - generic [ref=f1e113]: Render the HTML board as ONE priority-ordered run list instead of grouping by actionability state — CEO wants to see what is being worked on and what is pending that fits a checkpoint, in order.
+            - generic [ref=f1e115]: Internal Ops · P1 · BOARD-PRIORITY-ORDER
+          - generic [ref=f1e117] [cursor=pointer]:
+            - generic [ref=f1e118]: "R1/R3 — served-surface re-grade and render-flag parity. The stranded set is now DERIVED by `scripts/audit-ai/_flag-substrate-derive.ts`, not recorded here. Run it; do not read a number off this row."
+            - generic [ref=f1e120]: Engine · P2 · R1R3-PARITY
+          - generic [ref=f1e122] [cursor=pointer]:
+            - generic [ref=f1e123]: "LinkedIn: send a short DM to each prospect as they accept your connection"
+            - generic [ref=f1e125]: Sales · P2 · FA-4
+          - generic [ref=f1e127] [cursor=pointer]:
+            - generic [ref=f1e128]: "Track-4 find-and-qualify pipeline — DRY RUN only: source, score, print, stop for CEO review. Writes nothing."
+            - generic [ref=f1e130]: Sales · P2 · TRACK4-DRY
+          - generic [ref=f1e132] [cursor=pointer]:
+            - generic [ref=f1e133]: Review email handling and the unused Marketing/Sales AI output?
+            - generic [ref=f1e135]:
+              - generic [ref=f1e136]: no purpose
+              - generic [ref=f1e137]: Sales · P2 · FA-AGENTS-REVIEW
+          - generic [ref=f1e138] [cursor=pointer]:
+            - generic [ref=f1e139]: Evaluate new developer tools (error tracking, database UI, SAM integrations)?
+            - generic [ref=f1e141]:
+              - generic [ref=f1e142]: no purpose
+              - generic [ref=f1e143]: Internal Ops · P2 · FA-TOOLING
+          - generic [ref=f1e144] [cursor=pointer]:
+            - generic [ref=f1e145]: Review the background-agent fleet — what each one does and whether it's still needed?
+            - generic [ref=f1e147]:
+              - generic [ref=f1e148]: no purpose
+              - generic [ref=f1e149]: Internal Ops · P2 · FA-AGENT-ARCH-REVIEW
+    - generic [ref=f1e150]:
+      - generic [ref=f1e151] [cursor=pointer]:
+        - generic [ref=f1e153]: Engine
+        - generic [ref=f1e154]: "24"
+      - generic [ref=f1e155] [cursor=pointer]:
+        - generic [ref=f1e156]: Platform
+        - generic [ref=f1e157]: "21"
+      - generic [ref=f1e158] [cursor=pointer]:
+        - generic [ref=f1e160]: Internal Ops
+        - generic [ref=f1e161]: "10"
+      - generic [ref=f1e162] [cursor=pointer]:
+        - generic [ref=f1e164]: Doctrine
+        - generic [ref=f1e165]: "7"
+      - generic [ref=f1e166] [cursor=pointer]:
+        - generic [ref=f1e168]: Sales
+        - generic [ref=f1e169]: "5"
+      - generic [ref=f1e170] [cursor=pointer]:
+        - generic [ref=f1e171]: Customer Report
+        - generic [ref=f1e172]: "4"
+      - generic [ref=f1e173] [cursor=pointer]:
+        - generic [ref=f1e174]: Money
+        - generic [ref=f1e175]: "4"
+      - generic [ref=f1e176] [cursor=pointer]:
+        - generic [ref=f1e177]: Content
+        - generic [ref=f1e178]: "3"
+      - generic [ref=f1e179]: dot = this area needs a decision from you

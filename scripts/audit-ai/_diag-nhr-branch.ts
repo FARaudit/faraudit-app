@@ -1,0 +1,28 @@
+import { readFileSync } from "fs";
+import { deriveVerdict, emitPerformanceUpkeepCaveats } from "../../src/lib/audit-decide";
+import { gradeCoverageV2, verifyRecitalInSource } from "../../src/lib/audit-gate-v2";
+import { locateObligationContext } from "../../src/lib/audit-orchestrator";
+const rec = JSON.parse(readFileSync("scripts/audit-ai/run-records/_fire-45f9bacd.json","utf8"));
+const src=rec.input.fullSource, atts=rec.result.coverage.attestations;
+const cov2 = gradeCoverageV2(atts,{locate:(o:string)=>locateObligationContext(src,o),verifyRecitalPresence:(o:string)=>verifyRecitalInSource(src,o)});
+let findings = rec.result.inputs.findings;
+if (cov2.caveatRecital?.length) findings = emitPerformanceUpkeepCaveats(findings, cov2.caveatRecital);
+const d = deriveVerdict({ ...rec.result.inputs, findings, coverageV2: cov2 });
+console.log("verdict:", d.verdict);
+console.log("reason:", d.reason);
+console.log("\ninputs that could drive NHR post-coverage:");
+const inp = rec.result.inputs;
+console.log("  detectedUnverifiableEligibilityGate:", inp.detectedUnverifiableEligibilityGate, "· conflict:", inp.conflict, "· verifierSound:", inp.verifierSound);
+console.log("  coverageV2.ungroundedRead:", (cov2.ungroundedRead||[]).length, "· coverageGrade:", cov2.coverageGrade?.toFixed?.(2));
+// APPEND: force verifierSound=true → is BWC otherwise achieved?
+import { deriveVerdict as dv2 } from "../../src/lib/audit-decide";
+import { gradeCoverageV2 as g2, verifyRecitalInSource as vr2 } from "../../src/lib/audit-gate-v2";
+import { locateObligationContext as loc2 } from "../../src/lib/audit-orchestrator";
+import { emitPerformanceUpkeepCaveats as ep2 } from "../../src/lib/audit-decide";
+import { readFileSync as rf2 } from "fs";
+const R = JSON.parse(rf2("scripts/audit-ai/run-records/_fire-45f9bacd.json","utf8"));
+const c2 = g2(R.result.coverage.attestations,{locate:(o:string)=>loc2(R.input.fullSource,o),verifyRecitalPresence:(o:string)=>vr2(R.input.fullSource,o)});
+let f2 = R.result.inputs.findings; if(c2.caveatRecital?.length) f2 = ep2(f2, c2.caveatRecital);
+const withSound = dv2({ ...R.result.inputs, findings:f2, coverageV2:c2, verifierSound:true });
+console.log("\n>>> verifierSound FORCED true + all coverage fixes → verdict:", withSound.verdict);
+console.log(">>> reason:", withSound.reason.slice(0,120));

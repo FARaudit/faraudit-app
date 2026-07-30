@@ -90,7 +90,23 @@
       "mcp__claude_ai_Gmail__search_threads",
       "mcp__claude_ai_Notion__notion-fetch",
       "mcp__playwright__browser_navigate",
-      "mcp__playwright__browser_take_screenshot"
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_console_messages",
+      "mcp__claude_ai_Vercel__list_teams",
+      "Bash(set:*)",
+      "Bash(source:*)",
+      "Bash(export:*)",
+      "Bash(railway variables:*)",
+      "Bash(railway deployment:*)",
+      "Bash(bash ceo/checkpoint.sh:*)",
+      "Bash(bash ceo/update-digest.sh:*)",
+      "Bash(bash ceo/build-board.py:*)",
+      "Bash(python3 ceo/build-board.py:*)",
+      "Bash(git checkout:*)",
+      "Bash(git grep:*)",
+      "Bash(git worktree list:*)",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_network_requests"
     ],
     "deny": [
       "Bash(rm -rf:*)",
@@ -98,6 +114,11 @@
       "Bash(git push --force:*)",
       "Bash(git push -f:*)",
       "Bash(git push --force-with-lease:*)"
+    ],
+    "defaultMode": "acceptEdits",
+    "additionalDirectories": [
+      "/private/tmp/claude-501/",
+      "/Users/josearodriguezjr./.claude/projects/-Users-josearodriguezjr--faraudit-app/memory/"
     ]
   },
   "hooks": {
@@ -123,7 +144,7 @@
           {
             "type": "command",
             "command": "cd \"${CLAUDE_PROJECT_DIR:-$HOME/faraudit-app}\" && python3 ceo/build-board.py >/dev/null 2>&1; bash ceo/update-digest.sh >/dev/null 2>&1",
-            "statusMessage": "Syncing CEO board + digest…",
+            "statusMessage": "Syncing CEO board + digest\u2026",
             "timeout": 60
           }
         ]
@@ -170,13 +191,13 @@
             "type": "command",
             "if": "Edit(*.ts)|Write(*.ts)",
             "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/typecheck.sh",
-            "statusMessage": "Type-checking…",
+            "statusMessage": "Type-checking\u2026",
             "timeout": 120
           },
           {
             "type": "command",
             "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/design-board-sync.sh",
-            "statusMessage": "Syncing design board…",
+            "statusMessage": "Syncing design board\u2026",
             "timeout": 30
           }
         ]

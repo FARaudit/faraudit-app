@@ -33,10 +33,53 @@ export function ucfHeaderCount(fullSource: string): number {
   return keys.size;
 }
 
+// ── STRICT CLASS DISPATCH (flag AUDIT_UCF_CLASS_STRICT, default-OFF) ────────────────────────────────────────
+// Forensic: every UCF-classed record in the banked corpus — 4 of 4 — was a FALSE POSITIVE, and all four are the
+// same two VA solicitations (36C25626Q0947, 36C25626Q1137). Both are SF1449 COMMERCIAL buys: SF1449 + FAR Part 12
+// markers present, SF33 absent, and NEITHER contains a "SECTION L" or "SECTION M" anywhere. The loose count was
+// scoring them ucf on two artifacts:
+//   (1) TABLE-OF-CONTENTS DOT-LEADER LINES — "SECTION A .............................." is a TOC entry, not a
+//       section header. These packages print a contents block, so the same letters are counted twice.
+//   (2) The VA's SF1449 CONTINUATION SCHEME — literally "SECTION B - CONTINUATION OF SF 1449 BLOCKS", plus
+//       C=CONTRACT CLAUSES, D=DOCUMENTS/EXHIBITS, E=SOLICITATION PROVISIONS. That is the commercial form's own
+//       A–E sub-sectioning, which coincidentally uses letters inside A–M. It is NOT the UCF A–M scheme.
+//
+// The discriminator is anchored in what the UCF gate already DEMANDS, not invented for these two files:
+// REQUIRED_PANEL_SECTIONS (agentic-panel.ts) is {C, L, M, B}, so a package with no §L and no §M header can NEVER
+// satisfy checkManifest — dispatching it to the UCF path guarantees INCOMPLETE. Requiring at least one of {L, M}
+// aligns the dispatch with the gate it feeds. §L/§M are the UCF's defining Part IV sections; an SF1449
+// continuation scheme stops at E. Positive SHAPE requirement, never a vocabulary blocklist.
+//
+// FAILURE DIRECTION is deliberately safe: a genuine UCF package whose §L/§M headers were garbled by extraction
+// classifies commercial and takes the commercial path, which HAS a biddable-content gate, content routing and a
+// whole-source fallback. The UCF path's failure mode is blindness (the #SEQ5-ROOTS root). Misrouting toward the
+// path with three fallbacks is strictly better than misrouting toward the path with none.
+const UCF_CLASS_STRICT = () => process.env.AUDIT_UCF_CLASS_STRICT === "true";
+
+// A TOC entry: the header line trails into dot leaders (optionally followed by a page number).
+const TOC_DOT_LEADER = /\.{3,}[\s.]*\d*\s*$/;
+
+/** DISTINCT canonical UCF section keys, optionally discarding table-of-contents dot-leader lines. Pure. */
+export function ucfHeaderKeys(fullSource: string, opts?: { excludeToc?: boolean }): Set<string> {
+  const keys = new Set<string>();
+  for (const raw of (fullSource ?? "").split("\n")) {
+    const m = /^\s*SECTION\s+([A-M])\b/.exec(raw);
+    if (!m) continue;
+    if (opts?.excludeToc && TOC_DOT_LEADER.test(raw.trimEnd())) continue;
+    keys.add(m[1].toUpperCase());
+  }
+  return keys;
+}
+
 /** Deterministic class dispatch by SHAPE: ≥3 distinct canonical uppercase UCF headers ⇒ a real UCF §A–M
  *  solicitation; everything else (SF-1449 commercial, delimited-document packages — the df202699 shape, whose
  *  "Section L/M" are mixed-case content labels) ⇒ commercial. Pure. */
 export function detectDocumentClass(fullSource: string): DocumentClass {
+  if (UCF_CLASS_STRICT()) {
+    const keys = ucfHeaderKeys(fullSource, { excludeToc: true });
+    // ≥3 real (non-TOC) headers AND at least one UCF-defining Part IV section — see the STRICT block above.
+    return keys.size >= 3 && (keys.has("L") || keys.has("M")) ? "ucf" : "commercial";
+  }
   return ucfHeaderCount(fullSource) >= 3 ? "ucf" : "commercial";
 }
 
@@ -99,7 +142,7 @@ const COMMERCIAL_ANCHORS_V2: Array<{ key: string; re: RegExp }> = [
 export function routeCommercialSections(
   fullSource: string,
   opts?: { v2?: boolean }
-): { sectionText: Record<string, string>; routed: boolean; placedKeys: string[] } {
+): { sectionText: Record<string, string>; routed: boolean; placedKeys: string[]; headChars: number; headCovered: boolean } {
   const src = fullSource ?? "";
   const anchors = opts?.v2 ? COMMERCIAL_ANCHORS_V2 : COMMERCIAL_ANCHORS;
   const hits: Array<{ pos: number; key: string }> = [];
@@ -115,10 +158,55 @@ export function routeCommercialSections(
     if (slice.length < 20) continue;
     sectionText[hits[i].key] = sectionText[hits[i].key] ? `${sectionText[hits[i].key]}\n\n${slice}` : slice;
   }
+  // ── HEAD COVERAGE (flag AUDIT_ROUTING_HEAD_COVERAGE, default-OFF) ──────────────────────────────────────────
+  // Slicing runs from the FIRST ANCHOR to EOF, so everything BEFORE that anchor was silently dropped — never
+  // read by any lens, and (unlike a dropped section) never reported. Measured over the banked corpus: 16 of the
+  // 18 distinct commercial packages that ROUTE lose head content — 89%, median ~2.0K chars, worst 9,121 chars
+  // (14.4% of that document). This is the R4a hole in _redteam-pr271-routing-gauntlet.ts.
+  //
+  // It is DOUBLY lost: `computeUnrouted` (panel-adapter) only surfaces lines matching shall/must/furnish/…, and
+  // the canonical casualty — "This acquisition is set aside for small business" — contains none of those verbs,
+  // so the honesty net does not catch it either. R4a recorded exactly that: the set-aside cover statement absent
+  // from every slice AND from unroutedBinding, leaving the small-business lens blind to the set-aside.
+  //
+  // The head of a solicitation is the highest-density binding region in the package: response deadline, questions
+  // deadline, set-aside designation, NAICS, and the submission point of contact. Dropping it is not a cosmetic
+  // coverage gap — it is the region that decides WHO MAY BID and BY WHEN.
+  //
+  // Placement is deliberate, and over-provision is safe by ruling (card #549 — a lens receiving extra text is
+  // benign; chunk-reduce costs a pass, never a dropped section):
+  //   • → "A" (Solicitation/Contract Form) — the UCF-semantic home of cover-page/form content, and the key
+  //     `smallbiz_eligibility_counsel` owns in BOTH lens maps, which is the lens R4a proved went blind.
+  //   • → prepended to "L" — deadlines and submission mechanics are §L-class facts, and L is owned by
+  //     capture_strategist + source_selection_evaluator (+ proposal_compliance on the commercial map), none of
+  //     which own "A". Without this the 0900 questions deadline reaches only the small-business lens.
+  // DECISION ISOLATION — the head is ADDITIVE COVERAGE, never a routing-decision input. `routed` and `placedKeys`
+  // are frozen from the ANCHOR-DERIVED slices BEFORE injection, because injecting an "L" the anchors never placed
+  // would flip the caller's route-vs-fallback test (`routed`, and `commercialRoutingSafe(placedKeys)`) from
+  // FALLBACK to ROUTE — swapping a complete whole-source read for a partial routed one. That would be a coverage
+  // REGRESSION dressed as a coverage fix, on exactly the packages whose anchors are weakest.
+  const anchorPlacedKeys = Object.keys(sectionText);
+  const anchorRouted = !!(sectionText["L"] && sectionText["M"]);
+  // `headChars` is computed on BOTH poles and REPORTED even when the flag is off — the size of the silently
+  // dropped region is exactly the fact that was never measurable before, so the routing-integrity log should
+  // carry it whether or not we are recovering it yet. Reported, never inferred: a caller trying to locate the
+  // first anchor by searching for a slice's opening text latches onto duplicate occurrences (a table-of-contents
+  // entry rather than the body), which is how a 2K head measured as 101K during this fix's own probe run.
+  const head = hits.length > 0 && hits[0].pos > 0 ? src.slice(0, hits[0].pos).trim() : "";
+  const headChars = head.length;
+  // `headCovered` means EXACTLY ONE THING: the head text was injected into slices. It must NOT be pre-set true for
+  // a sub-threshold head — an earlier revision initialized it to `headChars < 20`, and the routing log then printed
+  // "RECOVERED→A,L" for an 18-char head on a flag-OFF run, asserting an injection that never happened. A status
+  // field that reports an action must be set by the action, never by the condition that skipped it.
+  const headCovered = headChars >= 20 && process.env.AUDIT_ROUTING_HEAD_COVERAGE === "true";
+  if (headCovered) {
+    sectionText["A"] = sectionText["A"] ? `${head}\n\n${sectionText["A"]}` : head;
+    sectionText["L"] = sectionText["L"] ? `${head}\n\n${sectionText["L"]}` : head;
+  }
   // `routed` (legacy predicate: §L AND §M placed) kept for back-compat; `placedKeys` lets the caller apply the
   // stronger no-lens-starved predicate (#525 fix — route whenever every lens gets its owned content, fall back to
   // whole-source ONLY when a lens would be starved, which is worse than whole-source per Brain #629).
-  return { sectionText, routed: !!(sectionText["L"] && sectionText["M"]), placedKeys: Object.keys(sectionText) };
+  return { sectionText, routed: anchorRouted, placedKeys: anchorPlacedKeys, headChars, headCovered };
 }
 
 /** The UCF lens keys populated by the whole-source single-bundle fallback (content routing failed). Every lens then

@@ -1,0 +1,47 @@
+- generic [active] [ref=f1e1]:
+  - generic [ref=f1e3]:
+    - complementary [ref=f1e4]:
+      - link "F FARaudit" [ref=f1e6] [cursor=pointer]:
+        - /url: /
+        - generic [ref=f1e7]: F
+        - generic [ref=f1e8]: FARaudit
+      - generic [ref=f1e9]:
+        - generic [ref=f1e10]: Federal Contract Intelligence
+        - heading "Seven of eight acquisition stages. One command center." [level=2] [ref=f1e12]: Seven of eight acquisition stages.One command center.
+        - generic [ref=f1e13]:
+          - generic [ref=f1e14]:
+            - generic [ref=f1e15]: Live Solicitations
+            - generic [ref=f1e20]: Live
+          - generic [ref=f1e21]:
+            - text: "200"
+            - generic [ref=f1e22]: on SAM.gov
+          - generic [ref=f1e23]: Matched against your NAICS & PSCs in the last 24h.
+      - generic [ref=f1e27]: SAM.gov synced 2m ago
+    - main [ref=f1e28]:
+      - generic [ref=f1e29]:
+        - heading "Sign in" [level=1] [ref=f1e30]
+        - paragraph [ref=f1e31]: Welcome back. Pick up where your pipeline left off.
+        - generic [ref=f1e32]:
+          - generic [ref=f1e33]:
+            - generic [ref=f1e34]: Work email
+            - textbox "Work email" [ref=f1e35]:
+              - /placeholder: you@company.com
+          - generic [ref=f1e36]:
+            - generic [ref=f1e37]:
+              - text: Password
+              - link "Forgot?" [ref=f1e38] [cursor=pointer]:
+                - /url: "#"
+            - textbox "Password Forgot?" [ref=f1e39]:
+              - /placeholder: ••••••••••
+          - generic [ref=f1e40] [cursor=pointer]:
+            - checkbox "Keep me signed in on this device" [checked] [ref=f1e41]
+            - generic [ref=f1e42]: Keep me signed in on this device
+          - button "Sign in →" [ref=f1e43] [cursor=pointer]
+          - generic [ref=f1e44]: or
+          - button "Email me a sign-in link" [ref=f1e46] [cursor=pointer]
+        - paragraph [ref=f1e47]:
+          - text: New to FARaudit?
+          - link "Request access →" [ref=f1e48] [cursor=pointer]:
+            - /url: /access
+      - generic [ref=f1e49]: © 2026 FARaudit Inc. · Dover, DE
+  - alert [ref=f1e50]
