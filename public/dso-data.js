@@ -16,20 +16,33 @@ window.DSO = (function () {
   const OPPS = [];   // live rows only — populated by opportunities-live.js
   const NAICS = [];  // live-derived — distinct codes in the current feed
 
+  // Stage vocabulary. 'notice' (Special Notice — industry day, amendment
+  // announcement, intent-to-sole-source, cancellation) and 'UNKNOWN' were added
+  // 2026-07-29 so the classifier can fail CLOSED instead of asserting "Open RFP"
+  // on notices it did not recognise. Every pole normStage() can return MUST have
+  // a STAGE_META entry — the render layer indexes it directly, so a missing pole
+  // is a blank chip, and the coverage test asserts this.
   const STAGES = [
     { key: 'all', label: 'All stages' },
     { key: 'presol', label: 'Pre-Sol' },
     { key: 'sources', label: 'Sources Sought' },
     { key: 'rfp', label: 'Open RFP' },
+    { key: 'notice', label: 'Special Notice' },
     { key: 'eval', label: 'In Evaluation' }
   ];
   const STAGE_META = {
     presol:  { label: 'Pre-Solicitation', color: '#94a3b8' },
     sources: { label: 'Sources Sought',   color: '#d97706' },
     rfp:     { label: 'Open RFP',          color: '#378ADD' },
-    eval:    { label: 'In Evaluation',     color: '#7c3aed' }
+    notice:  { label: 'Special Notice',    color: '#64748b' },
+    eval:    { label: 'In Evaluation',     color: '#7c3aed' },
+    UNKNOWN: { label: 'Type not recognised', color: '#64748b' }
   };
-  const SETASIDES = ['all', 'SB', 'SDVOSB', '8(a)', 'HUBZone', 'Full'];
+  // Set-aside filters. SoleSource / WOSB / EDWOSB / SB-Partial / UNKNOWN were
+  // added 2026-07-29: the old six-value list collapsed SAM's real enumeration
+  // into two poles, which is how an inverted 83-row group and a sole-source
+  // notice hid inside a "correct" count.
+  const SETASIDES = ['all', 'SB', 'SB-Partial', 'SDVOSB', '8(a)', 'HUBZone', 'WOSB', 'EDWOSB', 'SoleSource', 'Full', 'UNKNOWN'];
 
   const SAVED_VIEWS = [
     { key: 'hot', label: '🎯 High-fit & closing', desc: 'audited fit ≥ 85 · ≤ 10 days' },
