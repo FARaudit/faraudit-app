@@ -24,6 +24,14 @@
 //            detectors below are deliberately noisy in the safe direction: a
 //            false flag costs a conversation, a false pass ships a category error.
 //
+// THE SLOT WAS RENAMED, NOT RETIRED. The design port deletes clause() and
+// the "Insight" tag with it — the tag claimed intelligence over a 5-branch template
+// whose top branch covered 78% of rows. The per-row reason survives as clause(),
+// composed from the row's own facts and rendered in .pc-note. So this gate follows
+// the slot to its new name: the doctrine is about what a reason may take as its
+// SUBJECT, and that does not change because the function did. The rename was caught
+// by this gate's own fail-closed check rather than by reading the diff.
+//
 // Run: npx tsx test/public/_opportunities-reason-slot.test.ts
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -39,23 +47,55 @@ const warn = (label: string, detail = "") => { flag++; console.log(`  ⚠ REVIEW
 
 const APP = readFileSync(path.join(process.cwd(), "public", "dso-app.js"), "utf8");
 
-// Extract every string literal returned by pursuitInsight().
+// Extract every string literal returned by clause().
 function insightStrings(src: string): string[] {
-  const start = src.indexOf("function pursuitInsight(");
-  if (start < 0) throw new Error("pursuitInsight not found — gate cannot run (fail closed)");
+  const start = src.indexOf("function clause(");
+  if (start < 0) throw new Error("clause not found — gate cannot run (fail closed)");
   let depth = 0, i = src.indexOf("{", start);
   for (; i < src.length; i++) {
     if (src[i] === "{") depth++;
     else if (src[i] === "}") { depth--; if (depth === 0) break; }
   }
   const body = src.slice(start, i + 1);
-  // template literals returned by the function, comments stripped first
+  // EVERY string literal in the body, in any quote style. The first version read
+  // only `return \`...\`` — template literals — because that is how the previous
+  // slot was written. The ported slot composes its output from single-quoted
+  // fragments joined with `+`, so that regex extracted ZERO strings and every
+  // downstream assertion passed or failed VACUOUSLY on an empty list. A gate whose
+  // subject silently becomes empty is worse than no gate: it reports on nothing and
+  // calls it clean. Fragments shorter than 4 chars (' · ', ' days ') are joiners,
+  // not claims, and are dropped.
   const noComments = body.replace(/\/\/[^\n]*/g, "");
-  return [...noComments.matchAll(/return\s+`([^`]+)`/g)].map((m) => m[1]);
+  const out: string[] = [];
+  for (const m of noComments.matchAll(/'([^']*)'|"([^"]*)"|`([^`]*)`/g)) {
+    const lit = (m[1] ?? m[2] ?? m[3] ?? "");
+    // A literal with no internal space is a COMPARISON OPERAND, not emitted prose:
+    // clause() tests `v.k==='READ'` and `o.sa==='Full'`. Counting those as reason
+    // strings manufactured false findings — 'READ' even trips the imperative
+    // detector. The slot's actual output is always a phrase.
+    if (lit.length >= 6 && /\s/.test(lit.trim() ? lit : "")) out.push(lit);
+  }
+  return out;
 }
 
-// EVERY customer-visible explanatory string, not just pursuitInsight()'s returns.
-// The first version of this gate read only pursuitInsight, and MISSED a `title=`
+// THE FACT MOVED SURFACES. The ported design states a row's governing fact across
+// THREE elements — the verdict word (.vd), the band rule under the hero, and the
+// clause. Assertions pinned to the exact wording of the old single slot were
+// therefore testing a surface that no longer exists, the same staleness the stage
+// rail hit. What the doctrine actually requires is that the FACT reach the
+// customer, not that a particular function emit it, so these now search the row's
+// whole customer-visible corpus. What does NOT relax is A1: a reason may never take
+// our pipeline as its subject, on any surface.
+// Lazy: `strings` is initialised further down, and a corpus that reads it at module
+// load would be empty — the same vacuous-subject trap the extractor just hit.
+function rowCorpus(): string {
+  const v = APP.match(/const VERDICTS = \{[\s\S]*?\n\};/);
+  const b = APP.match(/const BANDS = \[[\s\S]*?\n\];/);
+  return [strings.join(" \u00b7 "), v ? v[0] : "", b ? b[0] : ""].join(" \u00b7 ");
+}
+
+// EVERY customer-visible explanatory string, not just clause()'s returns.
+// The first version of this gate read only clause, and MISSED a `title=`
 // tooltip on the same rows still carrying the exact A1 string the insight had just
 // been cleaned of — an incomplete fix that the gate certified as complete. Fix all
 // N sites, then make the gate cover all N.
@@ -83,7 +123,7 @@ function poleTooltips(src: string): string[] {
 const insight = insightStrings(APP);
 const tooltips = tooltipStrings(APP);
 const strings = [...insight, ...tooltips];
-ok(insight.length > 0, `extracted ${insight.length} reason strings from the shipped pursuitInsight()`);
+ok(insight.length > 0, `extracted ${insight.length} reason strings from the shipped clause()`);
 ok(tooltips.length > 0, `extracted ${tooltips.length} customer-visible title= tooltips (the site the first gate missed)`);
 
 console.log("\n═══ A1 · REGRESSION GUARDS — the exact strings ruled out ═══");
@@ -104,18 +144,22 @@ ok(!tooltips.some((s) => /nothing to audit|not yet audited|run the audit/i.test(
 // The complement, asserted so the correct placement is protected rather than
 // merely tolerated: a pole tooltip SHOULD name our audit state — that is its job.
 const poles = poleTooltips(APP);
-ok(poles.some((s) => /not yet audited/i.test(s)),
-  `pole surface still names audit state (${poles.length} pole tooltip(s)) — correct placement, do not reword`,
+// The fit tile carried this pole, and the ported design deletes the tile (fit is
+// null on 100% of live rows, so it only ever rendered an em dash). The rule was
+// "audit state belongs on the POLE, never in the reason" — with no pole left, the
+// requirement is that it appear in NEITHER place, which A1 above enforces.
+ok(poles.length === 0,
+  `the audit-state pole surface is gone with the fit tile (${poles.length} found) — not half-removed`,
   poles.join(" | "));
-ok(strings.some((s) => /pre-solicitation signal/i.test(s)),
-  "Special Notice now states the NOTICE's property: 'Pre-solicitation signal — no solicitation document posted yet'");
+ok(/industry day|amendment|cancellation/i.test(rowCorpus()),
+  "Special Notice states the NOTICE's property (industry day / amendment / cancellation), not our processing");
 
 console.log("\n═══ A2 · imperative-first — the finding must lead ═══");
 ok(!strings.some((s) => /^\s*(assert|run|confirm|open|click|read it)\b/i.test(s)),
   "no reason string OPENS with an imperative");
 const sole = strings.find((s) => /sole-source/i.test(s));
-ok(!!sole && /competition is not open/i.test(sole),
-  "sole-source leads with the FACT (competition is not open), not the instruction",
+ok(/not open competition|competition is not open/i.test(rowCorpus()),
+  "sole-source states the FACT (competition is not open) somewhere the customer reads it",
   sole ? `"${sole.slice(0, 74)}…"` : "string missing");
 
 console.log("\n═══ COUNTERFACTUAL · would this still be true without FARaudit? ═══");
@@ -136,9 +180,9 @@ for (const s of strings) {
 ok(true, `${strings.length} strings screened for our-pipeline vocabulary`);
 // The one Brain ruled cleanest, asserted explicitly so a future edit can't quietly
 // "fix" it: unreadability is a property of the NOTICE's own field.
-const unknown = strings.find((s) => /eligibility is unread/i.test(s));
-ok(!!unknown && /not open/i.test(unknown),
-  "UNKNOWN set-aside kept VERBATIM — 'eligibility is unread, not open' passes the counterfactual",
+const unknown = rowCorpus();
+ok(/unread/i.test(unknown) && !/no set.?aside|unrestricted/i.test(unknown),
+  "an unread set-aside reads as UNREAD, never as open — the counterfactual holds",
   "the field is absent/malformed ON THE NOTICE whether or not we look");
 
 console.log("\n═══ PLANTED POSITIVES — prove this gate can fail ═══");
@@ -155,7 +199,7 @@ ok(caughtA2 === PLANTED_A2.length, `A2 detector catches ${caughtA2}/${PLANTED_A2
 // and prove the gate fails closed if the function is renamed away
 let closed = false;
 try { insightStrings("function somethingElse(){ return `x`; }"); } catch { closed = true; }
-ok(closed, "gate FAILS CLOSED if pursuitInsight() is renamed or removed (never silently passes)");
+ok(closed, "gate FAILS CLOSED if clause() is renamed or removed (never silently passes)");
 
 console.log(`\n══════ ${pass} passed · ${fail} failed · ${flag} pending-review ══════`);
 if (flag > 0) console.log("PENDING items are ruled defects awaiting a scheduled pass — they are reported, not swallowed.");

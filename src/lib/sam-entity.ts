@@ -85,6 +85,44 @@ function toSamEntity(raw: SamEntityRaw): SamEntity {
   };
 }
 
+/** Look up ONE registered entity by its UEI. This is the customer's own record — the
+ *  authoritative source for which socioeconomic programs SBA has actually registered them
+ *  under, as opposed to what they typed into a capability statement. Returns null on any
+ *  failure (no key, network, non-200, unparseable, no match): the caller must treat null as
+ *  "not verified", never as "not certified" — absence is unknown, never a disqualifier. */
+export async function fetchEntityByUei(uei: string): Promise<SamEntity | null> {
+  const apiKey = process.env.SAM_API_KEY;
+  if (!apiKey) return null;
+  const trimmed = String(uei ?? "").trim();
+  if (!trimmed) return null;
+
+  const params = new URLSearchParams({ api_key: apiKey, ueiSAM: trimmed });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}?${params.toString()}`, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch (err) {
+    console.error("[sam-entity] uei fetch failed:", err);
+    return null;
+  }
+  if (!res.ok) {
+    console.error("[sam-entity] SAM responded", res.status, await res.text().catch(() => ""));
+    return null;
+  }
+  let data: { entityData?: SamEntityRaw[] } = {};
+  try { data = await res.json(); } catch (err) {
+    console.error("[sam-entity] uei JSON parse failed:", err);
+    return null;
+  }
+  const list = data.entityData || [];
+  // Exact-UEI only. A fuzzy or first-result match would attest one firm's certifications
+  // onto another firm's profile — the worst possible failure for this path.
+  const hit = list.map(toSamEntity).find((e) => (e.uei || "").trim().toUpperCase() === trimmed.toUpperCase());
+  return hit ?? null;
+}
+
 export interface TeamingSearch {
   naics: string;
   state?: string | null;

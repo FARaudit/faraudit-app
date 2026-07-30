@@ -1,0 +1,6 @@
+[      82ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://localhost:4321/api/notifications?limit=20:0
+[      82ms] [ERROR] [notif-chrome] load failed: Error: notifications 404
+    at http://localhost:4321/notifications-chrome.js:217:26 @ http://localhost:4321/notifications-chrome.js:238
+[      82ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://localhost:4321/api/command-center-data:0
+[      82ms] [ERROR] [opportunities-live] wire failed: Error: opportunities fetch failed: 404
+    at HTMLDocument.wire (http://localhost:4321/opportunities-live.js:259:26) @ http://localhost:4321/opportunities-live.js:319

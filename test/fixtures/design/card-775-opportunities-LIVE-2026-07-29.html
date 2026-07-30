@@ -1,0 +1,1041 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-sb="open">
+<head>
+<meta charset="utf-8" />
+<title>FARaudit — Opportunities (Card 775)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Fraunces:ital,opsz,wght@1,72,500;1,72,600&display=swap" rel="stylesheet" />
+<style>
+/* ── tokens: copied verbatim from the live tab file, plus ROLE-NAMED additions ── */
+:root{
+  --accent:#378ADD; --accent-deep:#185FA5; --accent-light:#B5D4F4; --accent-pale:#E6F1FB;
+  --navy-900:#050d1a; --navy-800:#0A1628; --navy-700:#142545;
+  --green-50:#ecfdf5; --green-100:#d1fae5; --green-200:#a7f3d0; --green-500:#10b981; --green-600:#059669; --green-700:#047857; --green-800:#065f46;
+  --red-50:#fef2f2; --red-100:#fee2e2; --red-200:#fecaca; --red-500:#ef4444; --red-600:#dc2626; --red-700:#b91c1c;
+  --amber-50:#fffbeb; --amber-100:#fef3c7; --amber-200:#fde68a; --amber-600:#d97706; --amber-700:#b45309; --amber-800:#92400e;
+  --purple-100:#ede9fe; --purple-600:#7c3aed; --purple-700:#6d28d9;
+}
+:root,[data-theme="light"],[data-theme="auto"]{
+  --page-bg:#eef2f7; --bg:#f0f4f8; --card:#ffffff; --card-soft:#fafcfe;
+  --ink:#0A1628; --ink-2:#334155; --mute:#64748b; --mute-2:#94a3b8;
+  --line:#e5e7eb; --line-2:#eef2f6; --line-3:#f1f5f9; --search-bg:#f1f5f9;
+  --shadow:0 1px 2px rgba(15,23,42,.06), 0 8px 24px -12px rgba(15,23,42,.10);
+  --shadow-sm:0 1px 3px rgba(0,0,0,0.06);
+  --shadow-pop:0 24px 60px -22px rgba(15,23,42,.28), 0 6px 16px -6px rgba(15,23,42,.12);
+  /* ROLE tokens added by card 775. Never hue-named: --barred is red today and
+     the name still holds if it stops being red. */
+  --eligible-bg:var(--accent-pale); --eligible-ink:var(--accent-deep); --eligible-line:var(--accent-light);
+  --open-bg:var(--card-soft); --open-ink:#4b5563; --open-line:var(--line);
+  --barred-bg:var(--red-50); --barred-ink:var(--red-700); --barred-line:var(--red-200);
+  --unread-bg:var(--amber-50); --unread-ink:var(--amber-800); --unread-line:var(--amber-200);
+  --verified-bg:var(--green-50); --verified-ink:var(--green-800); --verified-line:var(--green-200);
+  /* --tertiary is NOT --mute: #64748b clears 4.5:1 on --card (4.76) but only
+     reaches 4.31 on --bg, and the page header sits on --bg. A token verified
+     against one ground is not verified. */
+  --rule:var(--line); --tertiary:#5b6a7d;
+}
+[data-theme="dark"]{
+  --page-bg:#02060c; --bg:#050d1a; --card:#0c1b30; --card-soft:#0a1729;
+  --ink:#e8eef6; --ink-2:#b6c2d3; --mute:#7d8ba0; --mute-2:#5b6778;
+  --line:rgba(255,255,255,0.08); --line-2:rgba(255,255,255,0.05); --line-3:rgba(255,255,255,0.04); --search-bg:rgba(255,255,255,0.04);
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px -12px rgba(0,0,0,.6);
+  --shadow-sm:0 1px 3px rgba(0,0,0,0.5);
+  --shadow-pop:0 1px 2px rgba(0,0,0,.5), 0 28px 64px -22px rgba(0,0,0,.85);
+  --eligible-bg:rgba(55,138,221,.16); --eligible-ink:#a9cdf3; --eligible-line:rgba(181,212,244,.34);
+  --open-bg:rgba(255,255,255,.05); --open-ink:#a3b0c2; --open-line:rgba(255,255,255,.12);
+  --barred-bg:rgba(220,38,38,.16); --barred-ink:#fca5a5; --barred-line:rgba(220,38,38,.4);
+  --unread-bg:rgba(217,119,6,.16); --unread-ink:#fcd34d; --unread-line:rgba(252,211,77,.36);
+  --verified-bg:rgba(16,185,129,.16); --verified-ink:#86efac; --verified-line:rgba(16,185,129,.36);
+  --rule:var(--line); --tertiary:var(--mute);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--page-bg);font-family:"Manrope",ui-sans-serif,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+button{font-family:inherit}
+/* Default link colours are declared at ZERO specificity via :where(), so a link
+   that is also a component (.btn-open, .sb-icon) keeps its own colour. Written
+   plainly, `[data-theme="dark"] a` is 0-1-1 and silently repainted the primary
+   button's label to --accent-light: 4.25:1 on the one control the page exists
+   to drive. Fix the selector's reach, never the declaration. */
+:where(a){color:var(--accent-deep);text-decoration:none}
+:where(a:hover){color:var(--accent);text-decoration:underline}
+:where([data-theme="dark"]) :where(a){color:var(--accent-light)}
+:where([data-theme="dark"]) :where(a:hover){color:#fff}
+.mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+.frame{width:100%;max-width:1800px;min-width:0;margin:0 auto;background:var(--bg);display:grid;grid-template-columns:var(--sb-width) 1fr;min-height:100vh;align-items:stretch}
+.main{display:flex;flex-direction:column;min-width:0}
+.topbar{height:60px;background:var(--card);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:18px;padding:0 24px;position:sticky;top:0;z-index:60}
+.crumbs{display:flex;align-items:center;gap:8px;color:var(--tertiary);font-size:13px;font-weight:500;white-space:nowrap}
+.crumbs b{color:var(--ink);font-weight:700}
+.crumbs .sep{color:var(--tertiary)}
+.live-pill{display:inline-flex;align-items:center;gap:7px;height:24px;padding:0 10px;border-radius:999px;background:var(--verified-bg);color:var(--verified-ink);font-size:11.5px;font-weight:700;letter-spacing:.02em;border:1px solid var(--verified-line);white-space:nowrap}
+.live-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green-500);box-shadow:0 0 0 3px rgba(16,185,129,.18);animation:pulse 1.6s ease-out infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(16,185,129,.45)}100%{box-shadow:0 0 0 8px rgba(16,185,129,0)}}
+/* The three feed states are the honest-state affordance this page exists to
+   protect — carried forward from the served stylesheet onto the role tokens.
+   Dropping them would render FEED UNAVAILABLE in the green "live" register. */
+.live-pill.wait{background:var(--open-bg);color:var(--open-ink);border-color:var(--open-line)}
+.live-pill.wait::before{background:currentColor;box-shadow:none;animation:none;opacity:.6}
+.live-pill.err{background:var(--barred-bg);color:var(--barred-ink);border-color:var(--barred-line)}
+.live-pill.err::before{background:currentColor;box-shadow:none;animation:none}
+.tb-search{margin-left:auto;display:flex;align-items:center;gap:10px;height:34px;width:300px;min-width:170px;padding:0 12px;border-radius:9px;background:var(--search-bg);border:1px solid var(--line);color:var(--tertiary);font-size:13px;cursor:pointer;text-align:left;white-space:nowrap}
+.tb-search .kbd{margin-left:auto;font-family:"IBM Plex Mono";font-size:11px;color:var(--tertiary);background:var(--card);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+.top-actions{display:flex;align-items:center;gap:8px}
+.icon-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;color:var(--ink-2);cursor:pointer;position:relative}
+.icon-btn svg{width:16px;height:16px}
+.icon-btn .nbadge{position:absolute;top:-4px;right:-4px;background:var(--red-600);color:#fff;font-size:11px;font-weight:800;height:16px;min-width:16px;border-radius:8px;display:grid;place-items:center;padding:0 4px;border:2px solid var(--card);line-height:1}
+.user-chip{height:34px;padding:0 10px 0 4px;border-radius:9px;border:1px solid var(--line);background:var(--card);display:flex;align-items:center;gap:8px}
+.user-chip .av{width:24px;height:24px;border-radius:6px;background:var(--navy-700);color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700}
+.user-chip .nm{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.1;white-space:nowrap}
+.body{padding:24px 32px 56px;display:flex;flex-direction:column;gap:16px;max-width:1520px;width:100%;margin:0 auto}
+
+/* ── header + profile surface ── */
+.page-header{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:end}
+.heading{display:flex;flex-direction:column;gap:6px;min-width:0}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--accent-deep);margin:0}
+[data-theme="dark"] .eyebrow{color:var(--accent-light)}
+.page-header h1{font-family:"Fraunces","Georgia",serif;font-style:italic;font-weight:600;font-size:34px;letter-spacing:-.02em;color:var(--ink);margin:0;line-height:1.04}
+.sub{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--tertiary);margin:0;line-height:1.5}
+.sub b{color:var(--ink-2);font-weight:600}
+.profile{display:flex;flex-direction:column;align-items:flex-end;gap:7px;flex-shrink:0;max-width:470px}
+.prof-label{font-family:"IBM Plex Mono",monospace;font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--tertiary);font-weight:700;line-height:1.5;white-space:nowrap}
+.prof-label b{color:var(--accent-deep);font-weight:700}
+[data-theme="dark"] .prof-label b{color:var(--accent-light)}
+.prof-pills{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.npill{font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:20px;border:1px solid var(--eligible-line);background:var(--eligible-bg);color:var(--eligible-ink);cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:6px}
+.npill::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+.npill.off{border-color:var(--line);background:transparent;color:var(--tertiary);border-style:dashed}
+.prof-gap{display:flex;align-items:center;gap:9px;padding:7px 11px;border-radius:9px;background:var(--unread-bg);border:1px dashed var(--unread-line);color:var(--unread-ink);font-size:11.5px;font-weight:600;line-height:1.35;max-width:100%}
+.prof-gap button{border:0;background:var(--unread-ink);color:var(--card);font-size:11px;font-weight:800;padding:5px 10px;border-radius:7px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+
+/* ── controls ── */
+.controls{display:flex;flex-direction:column;gap:10px;padding:12px 16px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-sm)}
+.ctl-line{display:flex;align-items:center;gap:13px;flex-wrap:wrap}
+.ctl-label{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--tertiary);white-space:nowrap}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;background:var(--card);overflow:hidden;flex-wrap:wrap}
+.seg button{background:transparent;border:0;border-right:1px solid var(--line);cursor:pointer;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--ink-2);padding:6px 11px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.seg button:last-child{border-right:0}
+.seg button .n{font-size:11px;font-weight:600;color:var(--tertiary)}
+/* Active = a TINT over the unchanged card surface, never a solid fill. */
+.seg button.active{background:linear-gradient(0deg,var(--eligible-bg),var(--eligible-bg)),var(--card);color:var(--eligible-ink);box-shadow:inset 0 -2px 0 var(--eligible-ink)}
+.seg button.active .n{color:inherit}
+/* Zero-count buckets stay VISIBLE and muted — deleting one hides that the feed contains none of it. */
+.seg button.zero,.fpill.zero{opacity:.55;font-weight:600}
+.pillset{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.fpill{height:28px;padding:0 11px;border-radius:8px;background:var(--card);border:1px solid var(--line);color:var(--ink-2);font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.fpill .n{color:var(--tertiary);font-weight:600}
+.fpill.active{background:linear-gradient(0deg,var(--eligible-bg),var(--eligible-bg)),var(--card);border-color:var(--eligible-line);color:var(--eligible-ink)}
+.fpill.active .n{color:inherit}
+.fpill.more{border-style:dashed;color:var(--tertiary)}
+.ctl-divider{width:1px;height:22px;background:var(--rule)}
+.vr-right{margin-left:auto;display:flex;align-items:center;gap:12px;flex-shrink:0}
+.ctl-search{display:flex;align-items:center;gap:8px;height:30px;width:230px;padding:0 11px;border-radius:8px;background:var(--card-soft);border:1px solid var(--line)}
+.ctl-search svg{width:14px;height:14px;color:var(--tertiary);flex-shrink:0}
+.ctl-search input{border:0;background:transparent;outline:0;font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink);width:100%}
+.reset-btn{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--tertiary);background:none;border:0;cursor:pointer}
+.reset-btn:hover{color:var(--accent-deep);text-decoration:underline}
+.views-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--line-2)}
+.view-chip{display:inline-flex;flex-direction:column;gap:1px;padding:6px 12px;border-radius:9px;background:var(--card);border:1px solid var(--line);cursor:pointer;text-align:left}
+.view-chip .vc-t{font-size:12px;font-weight:700;color:var(--ink);line-height:1.25;white-space:nowrap}
+.view-chip .vc-d{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--tertiary);white-space:nowrap}
+.view-chip.active{background:linear-gradient(0deg,var(--eligible-bg),var(--eligible-bg)),var(--card);border-color:var(--eligible-line)}
+.view-chip.active .vc-t{color:var(--eligible-ink)}
+
+/* ── KPI ── */
+.kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-sm);padding:15px 18px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.kpi .lbl{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--tertiary);margin:0}
+.kpi-val{font-family:"Manrope",sans-serif;font-size:34px;font-weight:800;letter-spacing:-.03em;color:var(--ink);line-height:.95;display:flex;align-items:baseline;gap:4px}
+.kpi-val .unit{font-size:15px;font-weight:700;color:var(--tertiary);letter-spacing:0}
+.kpi .foot{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--tertiary);line-height:1.45}
+
+/* ── widgets ── */
+.row{display:grid;gap:16px;align-items:stretch}
+.row.hero{grid-template-columns:1.42fr 1fr}
+/* Media rules OUT-SPECIFY their base rule (html …) — equal specificity would
+   lose on source order and the narrow path would never run. */
+@media(max-width:1320px){html .row.hero{grid-template-columns:1fr}}
+@media(max-width:1180px){
+  html .kpi-strip{grid-template-columns:repeat(2,1fr)}
+  html .page-header{grid-template-columns:minmax(0,1fr)}
+  html .profile{align-items:flex-start;max-width:100%}
+  html .prof-pills{justify-content:flex-start}
+  html .body{padding:20px 20px 48px}
+  html .pcard{grid-template-columns:58px minmax(0,1fr) 118px;grid-template-areas:"when main act" "when state act";row-gap:9px}
+  html .pc-state{flex-direction:row;align-items:center;flex-wrap:wrap;gap:6px 10px}
+  html .crumbs .sep,html .crumbs>span:last-child{display:none}
+  html .tb-search{width:auto;min-width:0;flex:1 1 120px}
+}
+@media(max-width:1000px){html .user-chip .nm{display:none}}
+.widget{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-sm);padding:17px 20px;display:flex;flex-direction:column;gap:13px;min-width:0}
+.widget-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-shrink:0}
+.wh-text h3{font-family:"Manrope",sans-serif;font-size:15px;font-weight:800;letter-spacing:-.01em;color:var(--ink);margin:0;line-height:1.2}
+.wh-text .wh-sub{font-size:12px;color:var(--tertiary);margin:2px 0 0;line-height:1.4}
+.wh-source{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--tertiary);background:var(--card-soft);border:1px solid var(--line);padding:3px 8px;border-radius:5px;white-space:nowrap;flex-shrink:0}
+
+/* ── triage bands (the hero) ── */
+.bands{display:flex;flex-direction:column}
+.band{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:14px;align-items:center;padding:13px 12px;border:0;border-bottom:1px solid var(--rule);background:transparent;cursor:pointer;text-align:left;width:100%}
+.band:last-of-type{border-bottom:0}
+.band.active{background:linear-gradient(0deg,var(--eligible-bg),var(--eligible-bg)),var(--card)}
+.band-n{font-family:"Manrope",sans-serif;font-size:30px;font-weight:800;letter-spacing:-.03em;color:var(--ink);line-height:1;text-align:right}
+.band.dim .band-n{color:var(--tertiary)}
+.band-t{display:block;font-size:14px;font-weight:800;color:var(--ink);letter-spacing:-.005em;line-height:1.25}
+.band-r{display:block;font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--tertiary);line-height:1.45;margin-top:3px}
+.band-go{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--tertiary);white-space:nowrap}
+.band.active .band-go{color:var(--eligible-ink)}
+.band-total{display:grid;grid-template-columns:64px minmax(0,1fr);gap:14px;align-items:baseline;padding:11px 12px 13px;border-top:2px solid var(--ink)}
+.band-total .band-n{font-size:22px}
+/* The funnel is a SECOND ledger and it must not borrow the band ledger's
+   numbers: the rows a profile removes never enter a band, so listing them as a
+   screen-out reason would put two different 14s side by side (card 771). */
+.funnel{display:flex;flex-direction:column;margin-top:4px;border-top:2px solid var(--ink);padding-top:9px}
+.fn-row{display:grid;grid-template-columns:64px minmax(0,1fr);gap:14px;align-items:baseline;padding:5px 12px}
+.fn-n{font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:700;text-align:right;color:var(--ink);font-variant-numeric:tabular-nums}
+.fn-t{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--ink-2);line-height:1.45}
+.fn-row.none .fn-n,.fn-row.none .fn-t{color:var(--tertiary)}
+.fn-row.sum{border-top:1px solid var(--rule);margin-top:4px;padding-top:9px}
+.fn-row.sum .fn-n{font-family:"Manrope",sans-serif;font-size:20px;font-weight:800;letter-spacing:-.03em}
+.fn-row.sum .fn-t{color:var(--ink);font-weight:600}
+.screen-detail{padding:0 12px 12px 90px;display:flex;flex-direction:column;gap:6px}
+.sd-row{display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--ink-2);line-height:1.5}
+.sd-row .sd-n{text-align:right;font-weight:700;color:var(--ink)}
+.sd-row.none .sd-n,.sd-row.none{color:var(--tertiary)}
+.sd-row a{font-weight:700}
+
+/* ── closing-first list ── */
+.act-list{display:flex;flex-direction:column;gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:10px;overflow:hidden}
+.act-row{display:grid;grid-template-columns:46px minmax(0,1fr) auto;gap:12px;align-items:center;padding:9px 11px;background:var(--card);cursor:pointer;border:0;text-align:left;width:100%}
+.act-row:hover{background:var(--card-soft)}
+.act-d{font-family:"Manrope",sans-serif;font-size:20px;font-weight:800;letter-spacing:-.03em;color:var(--ink);text-align:right;line-height:1}
+.act-d small{display:block;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--tertiary);letter-spacing:.02em}
+.act-row.far .act-d{color:var(--ink-2);font-weight:700}
+.act-title{display:block;font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.act-agy{display:block;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--tertiary);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── verdict + chips ── */
+.vd{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.09em;padding:4px 9px;border-radius:6px;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;border:1px solid transparent}
+.vd::before{content:"";width:7px;height:7px;flex-shrink:0}
+.vd-act{background:var(--eligible-bg);color:var(--eligible-ink);border-color:var(--eligible-line)}
+.vd-act::before{background:currentColor;border-radius:50%}
+.vd-queue{background:var(--open-bg);color:var(--open-ink);border-color:var(--open-line)}
+.vd-queue::before{background:currentColor;border-radius:50%;opacity:.5}
+.vd-shape{background:var(--open-bg);color:var(--open-ink);border-color:var(--open-line)}
+.vd-shape::before{border:1.5px solid currentColor;border-radius:50%;background:transparent}
+.vd-assert{background:var(--barred-bg);color:var(--barred-ink);border-color:var(--barred-line)}
+.vd-assert::before{background:currentColor}
+.vd-read{background:var(--open-bg);color:var(--open-ink);border-color:var(--open-line);border-style:dashed}
+.vd-read::before{background:currentColor;opacity:.4}
+.chip{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.02em;padding:3px 8px;border-radius:5px;white-space:nowrap;border:1px solid transparent;display:inline-flex;align-items:center;gap:5px}
+.chip.naics{background:var(--card-soft);color:var(--ink-2);border-color:var(--line)}
+.chip.stage{background:var(--card-soft);color:var(--ink-2);border-color:var(--line)}
+/* Set-aside registers. Hue is backed by SHAPE so the encoding survives greyscale
+   and colour-blindness: restricted = filled square · open = no mark ·
+   sole source = filled square in the barred register · unknown = dashed border. */
+.chip.sa-restricted{background:var(--eligible-bg);color:var(--eligible-ink);border-color:var(--eligible-line)}
+.chip.sa-restricted::before{content:"";width:7px;height:7px;background:currentColor;flex-shrink:0}
+.chip.sa-partial{background:var(--eligible-bg);color:var(--eligible-ink);border-color:var(--eligible-line)}
+.chip.sa-partial::before{content:"";width:7px;height:7px;background:linear-gradient(90deg,currentColor 50%,transparent 50%);box-shadow:inset 0 0 0 1px currentColor;flex-shrink:0}
+.chip.sa-open{background:var(--open-bg);color:var(--open-ink);border-color:var(--open-line)}
+.chip.sa-barred{background:var(--barred-bg);color:var(--barred-ink);border-color:var(--barred-line);font-weight:700}
+.chip.sa-barred::before{content:"";width:7px;height:7px;background:currentColor;flex-shrink:0}
+.chip.sa-unread{background:var(--unread-bg);color:var(--unread-ink);border-color:var(--unread-line);border-style:dashed}
+.chip.sa-unread::before{content:"";width:7px;height:7px;border:1.5px dashed currentColor;flex-shrink:0}
+
+/* ── pursuit list ── */
+.plist-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.plist-count{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--tertiary)}
+.plist-count b{color:var(--ink);font-weight:700}
+.plist{display:flex;flex-direction:column;gap:0}
+.grouphd{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:16px 2px 8px;border-bottom:1px solid var(--rule);margin-bottom:9px}
+.plist > .grouphd:first-child{padding-top:2px}
+.grouphd .gh-t{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--ink);white-space:nowrap}
+.grouphd .gh-n{font-family:"Manrope",sans-serif;font-size:15px;font-weight:800;color:var(--ink);letter-spacing:-.02em}
+.grouphd .gh-r{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--tertiary);margin-left:auto;text-align:right}
+.pcard{display:grid;grid-template-columns:66px minmax(0,1fr) 190px 118px;grid-template-areas:"when main state act";gap:16px;align-items:start;padding:13px 15px;background:var(--card);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow-sm);margin-bottom:9px;min-width:0}
+.pcard.barred{border-color:var(--barred-line)}
+.pc-when{grid-area:when;text-align:right;display:flex;flex-direction:column;gap:1px;padding-top:1px}
+.pc-d{font-family:"Manrope",sans-serif;font-size:26px;font-weight:800;letter-spacing:-.035em;line-height:.92;color:var(--ink)}
+.pc-d small{font-size:13px;font-weight:700}
+.pcard.far .pc-d{color:var(--ink-2);font-weight:700}
+.pcard.later .pc-d{color:var(--tertiary);font-weight:700}
+.pc-when .pc-dl{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--tertiary);letter-spacing:.02em}
+.pc-main{grid-area:main;min-width:0;display:flex;flex-direction:column;gap:5px}
+.pc-title{font-size:14.5px;font-weight:800;color:var(--ink);letter-spacing:-.01em;line-height:1.3}
+.pc-buyer{font-size:12.5px;color:var(--ink-2);line-height:1.35}
+.pc-buyer b{font-weight:700;color:var(--ink)}
+.pc-id{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--tertiary)}
+.pc-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.pc-state{grid-area:state;display:flex;flex-direction:column;gap:7px;align-items:flex-start;min-width:0}
+.pc-note{font-size:12px;color:var(--ink-2);line-height:1.4}
+.pc-actions{grid-area:act;display:flex;flex-direction:column;gap:6px}
+.btn-open{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 12px;border-radius:8px;background:var(--accent-deep);color:#fff;border:0;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;white-space:nowrap}
+.btn-open:hover{background:var(--accent);color:#fff;text-decoration:none}
+.btn-open.off{background:var(--card-soft);color:var(--tertiary);border:1px dashed var(--line);cursor:not-allowed}
+.btn-open.off:hover{background:var(--card-soft);color:var(--tertiary)}
+.btn-2{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:30px;padding:0 11px;border-radius:8px;background:var(--card);color:var(--ink-2);border:1px solid var(--line);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+.btn-2::before{content:"";width:7px;height:7px;border:1.5px solid currentColor;flex-shrink:0}
+.btn-2:hover{border-color:var(--accent);color:var(--accent-deep)}
+/* Four states, three visual registers, separated by SHAPE so no new hue is
+   spent: red still means only "you cannot compete", green only "verified
+   eligibility". On-ness is carried by ink weight over the unchanged surface. */
+.btn-2.on{background:linear-gradient(0deg,rgba(10,22,40,.07),rgba(10,22,40,.07)),var(--card);border-color:var(--ink-2);color:var(--ink);font-weight:800}
+.btn-2.on::before{background:currentColor;border-color:currentColor}
+[data-theme="dark"] .btn-2.on{background:linear-gradient(0deg,rgba(255,255,255,.09),rgba(255,255,255,.09)),var(--card)}
+.btn-2.locked{border-style:dotted;cursor:not-allowed}
+.btn-2.locked::after{content:"";width:9px;height:7px;border:1.5px solid currentColor;border-radius:2px;border-top-width:4px;border-top-color:transparent;box-shadow:inset 0 -1px 0 currentColor;flex-shrink:0;opacity:.75}
+.btn-2.unknown{border-style:dashed;color:var(--tertiary);cursor:not-allowed;background:var(--card)}
+.btn-2.unknown::before{border-style:dashed;background:transparent}
+.btn-2:disabled{opacity:1}
+.btn-2.locked:hover,.btn-2.unknown:hover{border-color:var(--line);color:inherit}
+.empty{padding:44px 20px;text-align:center;color:var(--tertiary);font-family:"IBM Plex Mono",monospace;font-size:12.5px;line-height:1.7}
+.clipmark{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--barred-ink);border-bottom:1px dotted currentColor}
+.folded{display:none}
+
+/* ══ RAIL — copied VERBATIM from opportunities-AS-SERVED-reference-v2-2026-07-29.html
+   (the served rail from rail.ts injectRail, plus its own #sb-phase5 block).
+   Design does not restyle the rail; it is here so the page under review is the
+   page the customer sees. Check C14 measures it and reports, separately. ══ */
+/* sidebar (canonical) */
+:root{--sb-width:56px}
+[data-sb="open"]{--sb-width:232px}
+.sidebar{width:var(--sb-width)!important;background:#0A1628!important;color:rgba(255,255,255,.6);display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 0 18px;position:sticky;top:0;height:100vh;border-right:1px solid rgba(255,255,255,.08);flex-shrink:0;align-self:stretch;overflow:visible;transition:width .22s cubic-bezier(0.16,1,0.3,1)}
+.sb-toggle{position:absolute;top:18px;right:-11px;width:22px;height:22px;border-radius:50%;background:#0A1628;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.6);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;transition:background .14s,color .14s;box-shadow:0 2px 6px rgba(0,0,0,.25);padding:0}
+.sb-toggle:hover{background:rgba(255,255,255,.06);color:#fff}
+.sb-toggle svg{width:11px;height:11px;transition:transform .22s}
+[data-sb="open"] .sb-toggle svg{transform:rotate(180deg)}
+.sb-logo-row{display:flex;align-items:center;justify-content:center;margin-bottom:10px}
+.sb-logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#378ADD,#378ADD 55%,#185FA5);color:#fff;display:grid;place-items:center;font-weight:800;font-size:14px;flex-shrink:0;box-shadow:inset 0 -2px 0 rgba(0,0,0,.18),0 6px 12px -4px rgba(55,138,221,.55)}
+.sb-wordmark{display:none}
+[data-sb="open"] .sb-logo-row{justify-content:flex-start;gap:10px;margin:0 0 8px 4px;align-self:flex-start}
+[data-sb="open"] .sb-wordmark{display:inline-flex;font-family:"Manrope",sans-serif;font-size:16px;font-weight:800;letter-spacing:-.02em;color:#fff}
+[data-sb="open"] .sb-wordmark .wm-au{color:#378ADD}
+.sb-group-label{display:none}
+[data-sb="open"] .sb-group-label{display:block;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.32);padding:14px 12px 6px;align-self:stretch}
+.sb-divider{width:24px;height:1px;background:rgba(255,255,255,.06);margin:6px 0}
+[data-sb="open"] .sb-divider{display:none}
+.sb-icon{width:36px;height:36px;border-radius:9px;display:grid;place-items:center;color:rgba(255,255,255,.6);position:relative;cursor:pointer;transition:all .15s;text-decoration:none;border:0;background:transparent;font:inherit;padding:0}
+.sb-icon:hover{background:rgba(255,255,255,.06);color:#e2e8f0}
+.sb-icon.active{background:rgba(55,138,221,.15);color:#fff;box-shadow:inset 2px 0 0 #378ADD}
+.sb-icon.active::before{content:"";position:absolute;left:-10px;top:6px;bottom:6px;width:2px;background:#378ADD;border-radius:2px}
+.sb-icon > svg{width:18px;height:18px;flex-shrink:0}
+.sb-icon .sb-label,.sb-icon .sb-badge{display:none}
+.sb-tip{position:absolute;left:calc(100% + 12px);top:50%;transform:translateY(-50%);background:#050d1a;color:#fff;padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .14s,transform .14s;box-shadow:0 6px 18px rgba(0,0,0,.3);z-index:300;letter-spacing:.01em}
+.sb-tip::before{content:"";position:absolute;left:-3px;top:50%;transform:translateY(-50%) rotate(45deg);width:6px;height:6px;background:#050d1a}
+.sb-icon:hover .sb-tip{opacity:1;transform:translateY(-50%) translateX(2px)}
+[data-sb="open"] .sb-icon .sb-tip{display:none!important}
+[data-sb="open"] .sidebar{align-items:stretch;padding:14px 10px 14px}
+[data-sb="open"] .sb-icon{display:flex!important;align-items:center!important;justify-content:flex-start!important;width:100%!important;height:36px;gap:11px!important;padding:0 10px!important;border-radius:9px;flex-direction:row!important}
+[data-sb="open"] .sb-icon > svg{flex-shrink:0;width:18px;height:18px}
+[data-sb="open"] .sb-icon .sb-label{display:inline-flex!important;align-items:center;font-size:12.5px;font-weight:500;letter-spacing:.005em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.1;flex:1 1 auto;min-width:0}
+[data-sb="open"] .sb-icon.active{background:rgba(181,212,244,.08);color:#fff;box-shadow:none}
+[data-sb="open"] .sb-icon.active::before{display:none}
+[data-sb="open"] .sb-icon.active svg{color:#378ADD}
+[data-sb="open"] .sb-icon .sb-badge{display:inline-flex!important;align-items:center;justify-content:center;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.02em;padding:2px 7px;border-radius:5px;flex-shrink:0;line-height:1;white-space:nowrap}
+[data-sb="open"] .sb-icon .sb-badge.count{background:rgba(255,255,255,.08);color:rgba(255,255,255,.78)}
+[data-sb="open"] .sb-icon .sb-badge.new{background:#378ADD;color:#fff}
+[data-sb="open"] .sb-icon .sb-badge.live{background:rgba(16,185,129,.18);color:#86efac;gap:4px;padding-left:5px}
+[data-sb="open"] .sb-icon .sb-badge.live::before{content:"";width:5px;height:5px;border-radius:50%;background:#10b981;flex-shrink:0}
+[data-sb="open"] .sb-icon .sb-badge.danger{background:rgba(220,38,38,.18);color:#fca5a5;border:1px solid rgba(220,38,38,.3)}
+.sb-icon.sb-signout:hover{color:#fca5a5}
+[data-sb="open"] .sb-icon.sb-signout:hover{color:#fca5a5;background:rgba(220,38,38,.08)}
+.sb-bottom{margin-top:auto;display:flex;flex-direction:column;gap:6px;align-items:center}
+[data-sb="open"] .sb-bottom{align-items:flex-start;width:100%;padding:0 4px}
+.sb-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#64748b,#334155);display:grid;place-items:center;color:#fff;font-weight:700;font-size:12px;border:1.5px solid rgba(255,255,255,.06)}
+.sb-pin{background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:4px;margin-bottom:2px}.sb-bottom{position:relative;margin-top:auto}.sb-avatar-btn{display:flex;align-items:center;gap:9px;width:100%;padding:7px;border:0;background:rgba(255,255,255,.04);border-radius:9px;cursor:pointer;text-align:left}.sb-avatar-name{font-size:11px;font-weight:600;color:rgba(255,255,255,.7);white-space:nowrap;overflow:hidden}.sb-avatar-chev{width:12px;height:12px;margin-left:auto;color:rgba(255,255,255,.4);flex:none}.sidebar.collapsed .sb-avatar-name,.sidebar.collapsed .sb-avatar-chev{display:none}.sb-avatar-menu{position:absolute;bottom:calc(100% + 6px);left:0;right:0;background:#0f2138;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:5px;box-shadow:0 16px 40px -18px rgba(0,0,0,.7);z-index:40}.sb-avatar-menu[hidden]{display:none}.sb-am-item{display:flex;align-items:center;gap:9px;width:100%;padding:8px 9px;border:0;background:transparent;border-radius:7px;color:rgba(255,255,255,.78);font-size:11.5px;font-weight:500;cursor:pointer;text-align:left;text-decoration:none}.sb-am-item:hover{background:rgba(255,255,255,.06)}.sb-am-item svg{width:14px;height:14px;flex:none}.sb-am-signout{color:#fca5a5}
+
+/* ── review-only apparatus (Code drops this whole block on port) ── */
+.rev{margin-top:34px;background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:20px 22px;display:flex;flex-direction:column;gap:11px}
+.rev h2{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--tertiary);margin:0}
+.rev p{font-size:13px;line-height:1.6;color:var(--ink-2);margin:0;max-width:104ch}
+.chk{display:flex;flex-direction:column;gap:5px}
+.chk div{font-family:"IBM Plex Mono",monospace;font-size:12px;line-height:1.55;color:var(--ink-2)}
+.chk b.p{color:var(--verified-ink);font-weight:700}
+.chk b.f{color:var(--barred-ink);font-weight:700}
+.revbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border-radius:9px;background:var(--unread-bg);border:1px dashed var(--unread-line);color:var(--unread-ink);font-size:12px;font-weight:600;line-height:1.45}
+.revbar button{border:1px solid currentColor;background:transparent;color:inherit;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;padding:5px 10px;border-radius:7px;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="frame">
+  <aside class="sidebar">
+  <button class="sb-toggle" id="sbToggle" type="button" aria-label="Toggle sidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+  <div class="sb-logo-row"><div class="sb-logo">F</div><span class="sb-wordmark">FAR<span class="wm-au">audit</span></span></div>
+  <div class="sb-group-label">Daily</div>
+  <div class="sb-pin">
+  <a class="sb-icon" href="/command-center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="sb-label">Today</span><span class="sb-tip">Today</span></a>
+  <a class="sb-icon" href="/audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg><span class="sb-label">Run Audit</span><span class="sb-badge new">New</span><span class="sb-tip">Run Audit</span></a>
+  <a class="sb-icon" href="/past-audits"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="sb-label">Past Audits</span><span class="sb-tip">Past Audits</span></a>
+  <a class="sb-icon" href="/pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg><span class="sb-label">Pipeline</span><span class="sb-tip">Pipeline</span></a>
+  </div>
+  <div class="sb-divider"></div>
+  <div class="sb-group-label">Find &amp; Track</div>
+  <a class="sb-icon active" href="/opportunities"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">Opportunities</span><span class="sb-badge live">Live</span><span class="sb-tip">Opportunities</span></a>
+  <a class="sb-icon" href="/capability-statement"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span class="sb-label">Capability Statement</span><span class="sb-tip">Capability Statement</span></a>
+  <div class="sb-divider"></div>
+  <div class="sb-group-label">Market Intel</div>
+  <a class="sb-icon" href="/defense-news"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L4 8v8l8 5 8-5V8l-8-5z"/></svg><span class="sb-label">Defense News</span><span class="sb-tip">Defense News</span></a>
+  <a class="sb-icon" href="/defense-spending"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 16v-4"/><path d="M13 16V9"/><path d="M18 16v-2"/></svg><span class="sb-label">Defense Spending</span><span class="sb-tip">Defense Spending</span></a>
+  <a class="sb-icon" href="/agencies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg><span class="sb-label">Defense Agencies</span><span class="sb-tip">Defense Agencies</span></a>
+  <a class="sb-icon" href="/contracting-officers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M21 17c-.5-2-2-3.5-4-3.5"/></svg><span class="sb-label">Contracting Officers</span><span class="sb-tip">Contracting Officers</span></a>
+  <div class="sb-divider"></div>
+  <div class="sb-group-label">Compliance</div>
+  <a class="sb-icon" href="/cmmc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">CMMC Readiness</span><span class="sb-tip">CMMC Readiness</span></a>
+  <a class="sb-icon" href="/teaming-partners"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="9" r="3"/><circle cx="17" cy="9" r="3"/><path d="M2 20c0-3 2.5-5 5-5s5 2 5 5"/><path d="M12 20c0-3 2.5-5 5-5s5 2 5 5"/></svg><span class="sb-label">Teaming Partners</span><span class="sb-badge soon">Soon</span><span class="sb-tip">Teaming Partners</span></a>
+  <div class="sb-divider"></div>
+  <div class="sb-group-label">Reference</div>
+  <a class="sb-icon" href="/naics"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span class="sb-label">NAICS Codes</span><span class="sb-badge new">New</span><span class="sb-tip">NAICS Codes</span></a>
+  <a class="sb-icon" href="/far-dfars-updates"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 8h8M9 12h8M9 16h5"/><circle cx="18" cy="17" r="2.5" fill="#378ADD" stroke="none"/></svg><span class="sb-label">FAR/DFARS Updates</span><span class="sb-tip">FAR/DFARS Updates</span></a>
+  <a class="sb-icon" href="/wage-benchmarks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20h18"/><rect x="5" y="11" width="3" height="9"/><rect x="10.5" y="6" width="3" height="14"/><rect x="16" y="14" width="3" height="6"/></svg><span class="sb-label">Wage Benchmarks</span><span class="sb-tip">Wage Benchmarks</span></a>
+  <div class="sb-bottom">
+    <button class="sb-avatar-btn" id="sbAvatarBtn" type="button" aria-haspopup="true" aria-expanded="false"><span class="sb-avatar"></span><span class="sb-avatar-name"></span><svg class="sb-avatar-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></button>
+    <div class="sb-avatar-menu" id="sbAvatarMenu" role="menu" hidden>
+      <a class="sb-am-item" role="menuitem" href="/settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>Profile &amp; Settings</a>
+      <form action="/api/auth/sign-out" method="post" style="display:contents"><button type="submit" class="sb-am-item sb-am-signout" role="menuitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>Sign out</button></form>
+    </div>
+  </div>
+</aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs"><b>Opportunities</b><span class="sep">/</span><span>Pursuit Intelligence</span></div>
+      <span class="live-pill" id="livePill">LIVE</span>
+      <button class="tb-search" id="tbSearch" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <span>Filter notices…</span><span class="kbd">⌘K</span>
+      </button>
+      <div class="top-actions">
+        <button class="icon-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
+          <svg id="themeSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          <svg id="themeMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
+        </button>
+        <div style="position:relative">
+          <button class="icon-btn" id="bellBtn" title="Notifications" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1112 0c0 7 3 8 3 8H3s3-1 3-8z"/><path d="M10 21a2 2 0 004 0"/></svg><span class="nbadge" style="display:none"></span></button>
+          <div id="bellMenu" hidden style="position:absolute;right:0;top:42px;width:320px;max-height:380px;overflow-y:auto;background:var(--card);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow-pop);z-index:120;padding:6px"></div>
+        </div>
+        <div class="user-chip"><div class="av">RM</div><div class="nm">Ridgeline Mfg</div></div>
+      </div>
+    </div>
+
+    <div class="body">
+      <header class="page-header">
+        <div class="heading">
+          <p class="eyebrow">Live from SAM.gov</p>
+          <h1>Opportunities</h1>
+          <p class="sub" id="feedMeta"></p>
+        </div>
+        <div class="profile">
+          <span class="prof-label" id="hdrNaicsLabel">Your NAICS codes · click to filter</span>
+          <div class="prof-pills" id="hdrNaics"></div>
+          <div class="prof-gap" id="profileGap"></div>
+        </div>
+      </header>
+
+      <section class="controls">
+        <div class="ctl-line">
+          <span class="ctl-label">Notice type</span><div class="seg" id="stageSeg"></div>
+          <div class="ctl-divider"></div>
+          <span class="ctl-label">Set-aside</span><div class="pillset" id="saFilters"></div>
+        </div>
+        <div class="views-row">
+          <span class="ctl-label">Saved views</span>
+          <div class="pillset" id="savedViews"></div>
+          <div class="vr-right">
+            <div class="ctl-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input id="searchInput" type="text" placeholder="Filter notices…" /></div>
+            <button class="reset-btn" id="resetBtn">Reset all</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="kpi-strip" id="kpiStrip"></section>
+
+      <section class="row hero">
+        <section class="widget">
+          <header class="widget-head">
+            <div class="wh-text"><h3 id="triageTitle"></h3><p class="wh-sub">Every notice sits in exactly one band. Each band states the rule that put it there. Click a band to filter the list.</p></div>
+            <span class="wh-source">Derived</span>
+          </header>
+          <div class="bands" id="triageBands"></div>
+        </section>
+
+        <section class="widget">
+          <header class="widget-head">
+            <div class="wh-text"><h3>Closing first</h3><p class="wh-sub" id="actSub"></p></div>
+          </header>
+          <div class="act-list" id="actList"></div>
+        </section>
+      </section>
+
+      <section class="widget">
+        <header class="widget-head plist-head" style="align-items:center">
+          <div class="wh-text"><h3>All notices</h3><p class="wh-sub plist-count" id="plistCount"></p></div>
+          <div class="seg" id="sortSeg"></div>
+        </header>
+        <div class="plist" id="plist"></div>
+      </section>
+
+      <!-- ══ REVIEW-ONLY from here down. Code drops this section on port. ══ -->
+      <section class="rev" id="reviewBlock">
+        <h2>Card 775 · self-check</h2>
+        <div class="revbar">
+          <span>Personalisation preview — <b>no profile on record</b> is the real state of this feed. The example profile below is a <b>review affordance</b>, not live data; the arithmetic under it is real (it filters the same 197 rows).</span>
+          <button id="profBtn">Apply example profile</button>
+        </div>
+        <div class="chk" id="checks"></div>
+        <h2 style="margin-top:6px">Track / Pipeline — the four states (card 787 ruling 2)</h2>
+        <p>The routes are live, so the control is designed for the working state. On-ness is carried by <b>ink weight over the unchanged surface</b> and refusal by <b>shape</b>, so no hue is spent: red still means only “you cannot compete” and green only “verified eligibility”. Each state carries the reason string already in the shipped code.</p>
+        <div id="btnStates" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px"></div>
+        <p><b>In this static review copy the rows render state 1.</b> There is no hydrate call in a file with a baked fixture, so per-row state cannot be known here — in production `hydrateWatchedSet` / `hydratePipelineSet` resolve and each row takes 1, 2 or 3; a failed hydrate gives 4 across the board.</p>
+        <p id="chkNote"></p>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script type="application/json" id="fixture">[{"i":"FA524026Q0024","n":"4be19ba2398e416784723500d8cf604f","t":"506 EARS TOWABLE PASSENGER STAIRS","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"SB","g":"rfp","y":1},{"i":"70Z03826QB0000175","n":"f54493f34dbe477bb37e0e9c984db354","t":"ASSEMBLY FLANGE","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":1},{"i":"70Z03826QB0000174","n":"582ed5e118e64a2e8a39d3ddf9b32b8e","t":"CREW HARNESS ASSEMBLY","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":1},{"i":"70Z03826QJ0000295","n":"fc71259d0e3144e892cbe374997e7b3f","t":"Procurement of Pilot Corner Cir BR","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":1},{"i":"SPE7M226R0016","n":"4f2f347aad7b476494264f5ea10cb438","t":"Hub Body - 5340-01-666-9621","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"sources","y":1},{"i":"W50S8T26RA022","n":"fa9e2da9d2224be0991ea64ed221e63f","t":"OA-1K Travel/Mobility Pods","dep":"DEPT OF DEFENSE","off":"DEPT OF THE ARMY","c":"336413","s":"Full","g":"rfp","y":1},{"i":"SPRPA125RET87","n":"87d8d23cf2dd49a3b91982b512fb31f0","t":"NRP,FLAT PANEL DISP","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":1},{"i":"KC_135_Surge_Suppressor_2","n":"7a74f1dda2104dccb9a6a78b986e1166","t":"The attached Sources Sought Synopsis is to support the repair of the KC_135_Surge_Suppressor","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"Full","g":"sources","y":1},{"i":"FA811026P000X","n":"611c88611ae44d6394acf72aa025889e","t":"B-2 M-LIMIT (Main Landing Gear Integrated Maintenance & Integrity Tester)","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"SB","g":"presol","y":1},{"i":"N0038326RA055","n":"318ecec55cbf43f8836a4feaddb3fc2d","t":"NAVY and FMS 5-Year Basic Ordering Agreement (BOA), Various NIINs","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"336413","s":"Full","g":"presol","y":1},{"i":"70Z03826QH0000061","n":"151ad0fdb050400585d0ace26dc8e5c4","t":"Purchase of DCU Spares","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":1},{"i":"N0017426Q1103","n":"9b4351e335b04eec8fa75297554fb55c","t":"LEAD CUPS","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"332710","s":"Full","g":"rfp","y":1},{"i":"FA811826R0039","n":"bbfeede557e24151a137e7ad60be99f9","t":"REMANUFACTURE OF B-1 YAW TRIM ACTUATOR","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"SB","g":"rfp","y":1},{"i":"70Z03826QJ0000270","n":"e391a5005fa2413d936699ac3d9f17a6","t":"Procurement of Bearing, Ball, Annula","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":1},{"i":"N0038326QA098","n":"75d018bd6a1249f7b0eb8a39c456eced","t":"FMS Canada Repair of NIIN 016868604 | PN 1007101G-40 | QTY 10","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"336413","s":"Full","g":"rfp","y":1},{"i":"SPRTA1-26-R-0214","n":"23550fe32f3c430fb79ddf5a11e00d0e","t":"VALVE, REGULATING, FL","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":1},{"i":"70Z03826QJ0000157","n":"95f3c5ae2c79476cb1079b5aecc699f9","t":"Support Assy and Shim","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"notice","y":2},{"i":"N4523A26Q0004","n":"175c83d69cbd49af92b4c00af4f44b86","t":"Shaft Gun Drilling/Machining Services","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"332710","s":"Full","g":"rfp","y":2},{"i":"FA558726Q0032","n":"d480f932a33748649741989a3fe7b5e9","t":"48 LRS - Modular Approach Shoring Kit","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"Full","g":"rfp","y":2},{"i":"FA930226Q0080","n":"5d8716039c924b1a876721998f59d16d","t":"F-35 HOTAS","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"SB","g":"rfp","y":2},{"i":"SPRTA1-24-R-0127","n":"f155546a8c21462aacd69a8f0c208bf3","t":"CONTROL, ALARM","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":2},{"i":"70Z03826QL0000175","n":"ba85269aaefc4451b985bbe18055de47","t":"Purchase Mask Oxygen-Full Face for U.S. Coast Guard Aircraft HC-144","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":2},{"i":"70Z03826QL0000162","n":"e6702c9dfbe24ed5a27e9a5a743f7d3b","t":"Procurement of Hardware in Support of the HC-130J Aircraft","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":2},{"i":"N0038325RA415","n":"3b123a1302a6496ea8ae7efbffcce2a5","t":"12--DISPLAY UNIT,HELMET - AND OTHER REPLACEMENT PARTS, IN REPAIR/MODIFICATION OF","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"332710","s":"Full","g":"rfp","y":2},{"i":"N0017426Q1099","n":"b6afe0d50ea841989f69a121a14a6e48","t":"LEAD DISC","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"332710","s":"Full","g":"rfp","y":2},{"i":"SPRTA1-26-Q-0182","n":"57db562e31a44a48b52658f5eb495e47","t":"Cylinder Assembly, Actuator","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":2},{"i":"N0038326QA099","n":"3a542da0834d4fc0ad2457a5e1d6414a","t":"FMS Switzerland Repair of NIIN 5821016868604 | PN 1007101G-40 | QTY 3","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"336413","s":"Full","g":"rfp","y":2},{"i":"SPRTA1-26-R-0311","n":"191c544344854695aeda43e5892fdc57","t":"Heat Exchanger, Air","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":2},{"i":"SPRHA1-26-Q-0711","n":"ab37b76f62a347f88c8dbb66bf262287","t":"F-15 SENSOR, ANTI-LOCK BR 1630-01-064-5005","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":2},{"i":"FD20302501972-01","n":"0f9be98eacea44859f17e54706cf227e","t":"COOLER, LUBRICATING_End_Item_C-130_NSN_2935012025339_PN_8427707","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"sources","y":2},{"i":"FD20302600052-02","n":"4697a38245ef48bd99b2e34c6ea35391","t":"CONTROL, ELECTRIC LIGHT_End_Item_B2_NSN_6220012636601FW_PN_710410-3","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"sources","y":2},{"i":"N0038326RE052","n":"223f889b4c684a1fb514e668d05ba88e","t":"Heads-Up Display (HUD) PBL Renewal","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"336413","s":"Full","g":"rfp","y":2},{"i":"70Z03826QJ0000281","n":"0e314d4ce27e4fef81268238aa89ff40","t":"Hose, Non-Metallic","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":3},{"i":"SPRTA1-25-R-0372","n":"c256e0ec64ae4083aa04c38cb6d18f8b","t":"TRANSMITTER, RATE OF FLOW","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":3},{"i":"SPRHA1-26-R-0700","n":"4501820d6ed2471a9fdbcd86ae2153f5","t":"BRAKE, MULTIPLE DISK FOR THE E-3 1630010098475","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":3},{"i":"FA811826R0052","n":"f78dceb9ae354843907d2c5685bced30","t":"FD20302600504 - Remanufacture of E-3 AI Gearbox Assembly, NSN 1680-01-083-2672AW","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"SB","g":"rfp","y":4},{"i":"70Z03826QJ0000308","n":"f7bd461195f14928b62a1650e2b5a702","t":"Procurement of Bushing, Flanged","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":5},{"i":"013485145","n":"e9bfd639ed4548e2a62f27d78a43add1","t":"Adding FMS Radome NIIN 013485145 to Boeing BOA","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"336413","s":"Full","g":"notice","y":5},{"i":"70Z03826QB0000176","n":"4419c4cb9e62442e921488cb9a4f12ab","t":"OVERHAUL OF ENGINE EXTINGUISHERS FOR USE ON MH-65","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":5},{"i":"ff3c781d629d4291868a11640b38ae4f","n":"ff3c781d629d4291868a11640b38ae4f","t":"NSN 1560-01-695-5029, PARTS KIT, FUSELAGE, WSDC: 56F, B-1B BOMBER","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"sources","y":5},{"i":"80NSSC26938003Q","n":"b7d57bb57cd6432bbe113d1801344611","t":"Purchase of Engine Trailer for F414-GE-100","dep":"NATIONAL AERONAUTICS AND SPACE ADMINISTRATION","off":"NATIONAL AERONAUTICS AND SPACE ADMINISTRATION","c":"336413","s":"SB","g":"rfp","y":5},{"i":"70Z03826QB0000154","n":"981e550bb2704268a7b3f747fba0bb05","t":"END FITTING, FUEL","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":5},{"i":"SPE4A726R0726","n":"86839035a0b749ccb89e10ae43a76aea","t":"NSN 1630-00-516-6741, LANDING GEAR WHEEL, WSDC: 04F, AIRCRAFT, STRATOFORTRESS B-52","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"sources","y":5},{"i":"70Z03826QB0000163","n":"0acc6ba698864fcc85ffb78117e4117c","t":"MH-65 Spare Parts","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":5},{"i":"FD20302700054","n":"6f4a32e0b25743af8f754a5b8355533d","t":"INTERFACE UNIT,_B1B_5895015899678EK_544R727G01","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"sources","y":5},{"i":"N68335-26-Q-1124","n":"cb37f4236415404f800f8c5b2777f5c8","t":"V-22 Combo 13","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"332710","s":"SB","g":"rfp","y":5},{"i":"FA466126Q0055","n":"92be794d5c14437ebb1b23933a71a026","t":"Aircraft Recovery Sling CAT IV","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"SB","g":"rfp","y":5},{"i":"W911PT26QA110","n":"761e9241faa04d658b67dd9a64d81c13","t":"HOWITZER CONTROL LEVER PER DRAWING","dep":"DEPT OF DEFENSE","off":"DEPT OF THE ARMY","c":"332710","s":"SB","g":"rfp","y":5},{"i":"FD20302602443","n":"9de125a6b2a04055894c2f7ce6a908b6","t":"Repair of TF33 Turbine Exhaust Case, NSN:2840-01-167-9586RV, 2840-00-967-3951RV","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"Full","g":"sources","y":5},{"i":"70Z03826QL0000144","n":"862a3ddd37d54a8bb188d5973efc323d","t":"Overhaul of Pumps and Valves","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":5},{"i":"N0017426Q1100","n":"8ebaca46918540b1a256751d7c39db73","t":"Thruster Shear Pins","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"332710","s":"Full","g":"rfp","y":5},{"i":"SPRHA426Q0774","n":"2a6b9babbe8f4889853d3d1ada256453","t":"COVER, ACCESS, AIRCRAFT (26-Q-0774)","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":5},{"i":"70Z03826QJ0000166","n":"48c45334d35c49a7a5f93fda97aa73b5","t":"Various Items","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"notice","y":5},{"i":"SPRTA1-26-R-0312","n":"f09ba988870e48d796dd33363302f790","t":"Oxygen Monitor, Acft","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":5},{"i":"FA811726Q0006","n":"35424795165d46f0b8ec14ce6194ef83","t":"Repair of B-1 Motional Transducer","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"Full","g":"rfp","y":5},{"i":"FA8119-26-R-0011","n":"5cc95813b9c841588d586d4e627b6ec4","t":"Repair of B-2 Transponder Set NSN: 5895-01-383-4052 FW P/N: 159000-7","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"Full","g":"rfp","y":5},{"i":"W58RGZ-26-B-0016","n":"9e3e8631f0da457a847082a5c4b01b3d","t":"Overhaul of RADIATOR, GEARBOX","dep":"DEPT OF DEFENSE","off":"DEPT OF THE ARMY","c":"336413","s":"SB","g":"rfp","y":5},{"i":"80NSSC26939433Q","n":"dbbce95dad2a4c398bb6d3356f6c7eed","t":"Lifting table for the G-IV Ground Cart","dep":"NATIONAL AERONAUTICS AND SPACE ADMINISTRATION","off":"NATIONAL AERONAUTICS AND SPACE ADMINISTRATION","c":"336413","s":"SB","g":"rfp","y":6},{"i":"70Z03826QE0000049","n":"53aa605f8a744262bd1a9f19471d8c25","t":"Purchase of ALSE Gear","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":6},{"i":"70Z03826QB0000179","n":"2de881a97a9c4241b9ffa9baa8ceae25","t":"Connecting Link Rig","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":6},{"i":"70Z03826QJ0000304","n":"e626e3410fc245eba866be7b9449cc7b","t":"Procurement of Bladder Assembly","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":6},{"i":"70Z03826QH0000101","n":"9921953805094bcbaf29cae41502ffd8","t":"Purchase of Various Spares","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"notice","y":6},{"i":"70Z03826QJ0000287","n":"3bc7b18e48064d79a650bd8677b8c9ea","t":"Door Assy","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":6},{"i":"70Z03826QJ0000250","n":"5990188f86dc433183d2534f89699809","t":"Pump-Motor, Windshield","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":6},{"i":"70Z03826QJ0000253","n":"17ba8be8c10e4b079d4f1afa3d84ba9f","t":"Arming Unit, Bomb RK","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":6},{"i":"FA8118-26-R-0035","n":"2b2b910c9f554077a3bbf74be4bee2fc","t":"Overhaul of E-3 Electro-Mechanical Actuator","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"SB","g":"rfp","y":6},{"i":"FA442726Q1108","n":"1d81ff75e285463682deca4fba88a22e","t":"60 OG EFB Mounts","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"SB","g":"rfp","y":6},{"i":"N32253-26-930-0023","n":"a0ecb02b3e40468d8f51f5bebd597ca5","t":"Siemens Electronics Preventative Maintenance","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"332710","s":"Full","g":"presol","y":7},{"i":"N6600126Q6264","n":"44056457bc9e4653b18db3f5ec48807f","t":"KVM MOUNT FABRICATION","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"332710","s":"SB","g":"rfp","y":7},{"i":"70Z03826QJ0000225","n":"1e594e881b1643a7b4bb9d7bac598ab1","t":"Valve, Solenoid","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":7},{"i":"SPRTA1-R-26-0382","n":"42ba7edaaa854409ab19d4d6c7bc74ea","t":"New Manufacture of PANEL,CONTROL,ELECT/1680012808653RK/ L5304289-031","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"presol","y":7},{"i":"sprta126R0341-0001","n":"ef1151ac2e894bf785ede1b5b1e3ef09","t":"CYLINDER ASSEMBLY,A","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"SB","g":"rfp","y":7},{"i":"SPRTA126R0358","n":"295c458b8e6a409a84cfcdbb524b6152","t":"CYLINDER ASSEMBLY,A","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"SB","g":"rfp","y":7},{"i":"FD20302700113","n":"7a37778f08a445139803d0cfd4ddb3a4","t":"MODIFICATION KIT_F-15_1650017324239_174-98","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"sources","y":8},{"i":"FD20302600791","n":"248d965b443c4e109d95dac0797a2d03","t":"ELECTRONIC COMPONEN_B1B_5998016319586EK_178K787G02","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"sources","y":8},{"i":"70Z03826QJ0000291","n":"a2eae479ba634cd38fe957dc97d12115","t":"Procurement of Backshell, Elect Con","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":8},{"i":"N6660426Q0201","n":"ceaa235187594323a643c8e593813525","t":"Mechanical Fabrication","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"332710","s":"SB","g":"rfp","y":8},{"i":"N0016426Q0259","n":"0405ec4621e249d7b9a74ce5a765171c","t":"FAIRING CLEARBORE & ANTI-ABRASION PATCHES","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"332710","s":"SB","g":"rfp","y":8},{"i":"N0038326RD060","n":"e69d7590aa704667832f45d52539bb77","t":"Three-Year NGJ Repair BOA","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"336413","s":"Full","g":"rfp","y":8},{"i":"SPRTA126R0347","n":"9df2efefe90c4fffb53c8b70cf1ecad2","t":"B-2 Fuel Pump Unit, Centrifug","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":8},{"i":"SPRTA1-26-Q-0361","n":"6996611ddd074435b9d8d78bfe7fa942","t":"Fairing, Aircraft","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":8},{"i":"N0038326QL075","n":"3317dffca6df4f7bb75f807eb2b35c5c","t":"N0038326PR0R682_FMS","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"336413","s":"Full","g":"rfp","y":8},{"i":"N0038326QF155","n":"14372c530ba74d309db79f1bd39f77f2","t":"Repair of NIIN 012747060; Nomen: RESCUE HOIST CONTROL PANEL","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"336413","s":"Full","g":"rfp","y":8},{"i":"SPRWA1-26-R-0035","n":"79b4da15cd02426aba5ad6364fc4d2e3","t":"Manufacture of Main Input Quill Assembly (TH-1H Helicopter)","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":8},{"i":"FA561326FBU","n":"39d4e2f3a8c74a9da3773d11365a8d78","t":"Fairlead Beam Upgrade","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"Full","g":"notice","y":9},{"i":"70Z03826QJ0000206","n":"1d75a376611d4f8f912657381f504b99","t":"Duct Assembly, Air C","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"notice","y":9},{"i":"FA558726Q0036","n":"442a7ba50c2d45b6ae61d43def4c8e4d","t":"321 STS - ISU 90I","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"Full","g":"rfp","y":9},{"i":"70Z03826QJ0000298","n":"29c0cacd1f8549a1a0308779d0887a6c","t":"Procurement of Detachable DCM","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":9},{"i":"70Z03826QJ0000112","n":"86357984ccf04313a31ed7e8680c6a6b","t":"Overhaul Solenoid Valves","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":9},{"i":"FA811726R0013","n":"e79df3ae3f784902a830c5d41cb54d43","t":"Repair of the C-130 Pressure Altimeter NSN 6610-01-212-6464","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"SB","g":"rfp","y":9},{"i":"FD20302700034","n":"950f717feeef4e80bef707ded24ab475","t":"GENERATOR_End_Item_F16_NSN_6115016333465HY_PN_200330211-1","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"sources","y":9},{"i":"W58RGZ-26-R-0069","n":"6a50042388084058aae66c98a24ea65d","t":"Solicitation for the Overhaul/Upgrade of the Mechanical Transmission for the UH-60 Black Hawk","dep":"DEPT OF DEFENSE","off":"DEPT OF THE ARMY","c":"336413","s":"Full","g":"rfp","y":9},{"i":"SPRTA1-26-R-0302","n":"3b412fdee49e44d9a179c95e9a154802","t":"ServoCylinder","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":9},{"i":"1660014733548BO","n":"22dd7efed915495c8b3adf4caa3828a4","t":"Repair of F-16 Oxygen Monitor","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"Full","g":"sources","y":10},{"i":"SPRWA1-26-Q-0021","n":"fc5b671110a842dea3530cf677eaef11","t":"Surplus: Multiple Gearshaft, NSN: 3040-01-313-6117, PN: 42357-124","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":10},{"i":"SPRHA1-26-Q-0716","n":"f9dd227ba3e24b7bb9ac8b3506fd57c0","t":"C-130 CONTROL UNIT,ANTISK 1630015724812LE","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":10},{"i":"SPRHA1-26-Q-0699","n":"a441e2b5b17a4a5dabe514a19fe4822d","t":"F-15 WHEEL, LANDING GEAR 1630012257451","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":10},{"i":"FD20302601346","n":"aafe6c804cf5441e84ed2578454b928d","t":"OXYGEN MONITOR,ACFT _End_Item_F-16_NSN_1660014733548BO_PN_16VK058-2","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"sources","y":11},{"i":"NSN_1660-01-619-3225BO","n":"00e94e685c3e478ca05fa958ee920238","t":"Repair of A-10 Oxygen Monitor","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"Full","g":"sources","y":12},{"i":"70Z03826QB0000169","n":"db3875b8f4454b8db4a7621fa55ff3db","t":"MH-65 Cap Assembly, Emergency Float","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":13},{"i":"FA8205-26-R-PAO_CARTS","n":"d2c5b55bc2144a5ab7e5f5473ab656eb","t":"TLD LCU-050-USAF Polyalphaolefin (PAO) Coolant Carts","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"Full","g":"sources","y":13},{"i":"N0038326RA057","n":"3d4e77561ee84a28b560208f658c3ba6","t":"NAVY and FMS 5-Year Long Term Contract (LTC), Various NIINs","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"336413","s":"Full","g":"presol","y":13},{"i":"FA811826R0042","n":"9382aa4774044dc38948a2c0322f5e42","t":"Remanufacture of F16 Heat Exchanger","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"SB","g":"rfp","y":13},{"i":"SPRHA1-26-R00435","n":"6eb8ef48c7104ca783c5dae581e2332c","t":"B-52 Hydraulic Brake Valve Assembly","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":13},{"i":"SPRTA1-26-R-0170","n":"4d4650ee17bb4ce3a5bb73e240d377c1","t":"TRAILING EDGE, AIRCRAFT","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":13},{"i":"FA822026RB005","n":"a9182c4f78e3467b8313efa85b2cb6ba","t":"Mexico F-5 Repair and Return / Overhaul","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"Full","g":"rfp","y":14},{"i":"FA822026RB006","n":"772ff88e2e7d4d21965aaa92c61e2d22","t":"Mexico F-5 Manufacture Surplus Parts","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"Full","g":"rfp","y":14},{"i":"15F06726Q0000351","n":"23e9200dd8344ba298e648b49c456ebd","t":"UH-60M Instrument Panel Modification Services","dep":"JUSTICE, DEPARTMENT OF","off":"FEDERAL BUREAU OF INVESTIGATION","c":"336413","s":"Full","g":"sources","y":14},{"i":"FD20302600058","n":"bb0306a56f8e425ba9052935de6a386f","t":"ADAPTER,AUTOPILOT","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":14},{"i":"SPRTA1-26-Q-0400","n":"b87b1fbd285a47f880196c1ba83b0a95","t":"Control Box, Electrical","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":14},{"i":"N0038326QA105","n":"9c283d6b443e4e9e9fed924ff2d91bf3","t":"FMS Kuwait Repair of NIIN 016229568 | PN 1007101G-30 | QTY 4","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"336413","s":"Full","g":"rfp","y":14},{"i":"W91ZRU26QA020","n":"ec4d9d7bd5464c59aa9c4f16e60fb66a","t":"Notice of Intent to Award Sole Source - SEI Industries","dep":"DEPT OF DEFENSE","off":"DEPT OF THE ARMY","c":"336413","s":"Full","g":"notice","y":15},{"i":"70Z03826QJ0000007","n":"88b184ec577141ac99d21629e8c171db","t":"Fittings, Beams, and Fitting Assemblies","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":15},{"i":"SPRTA1-26-Q-0381","n":"21b5c060a2ad49158304e3b81b1087ba","t":"Valve Assembly, Hydr","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"presol","y":15},{"i":"FD2030250181300","n":"37a6aa3fcee14917afde1c5988f41369","t":"Amendment-02 Remanufacture of C-130 Fuel Boost Pump","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"Full","g":"rfp","y":15},{"i":"SPRTA1-26-Q-0399","n":"11fd2bb806c845cc9cdaa95d918e554a","t":"CYLINDER BLOCK UNIT","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":15},{"i":"SPRHA1-26-R-0266","n":"3152291928af4c07991e2d3989d22441","t":"1630-01-678-3355(26-R-0266)","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":16},{"i":"FD20302600725102","n":"8be4ae3f2578424fa3fbfa601df34eec","t":"Amendment-0002  Solicitaton-REMAN F-15 Fuel Tank Safety Relief Valve","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"SB","g":"rfp","y":16},{"i":"N0038326QH075","n":"d5f27c3fe8ed4d48bff0d4d023388cf8","t":"pre-solicitation synopsis for the repair of 3 ea. NSN 7RH 7025 016437221, 4705-01000-15-102, TRANSFER UNIT,PROGR, for Foreign Military Sales Denmark.","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"336413","s":"Full","g":"rfp","y":16},{"i":"SPRTA1-26-R-0082","n":"ce458f933d594006ba82d72598035e9a","t":"VALVE,REGULATING,FL","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":16},{"i":"SPRTA1-26-Q-0398","n":"d8eaf19f0082448e973f74bda904af3f","t":"VALVE, LINEAR, DIRECT","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":16},{"i":"70Z03826QJ0000283","n":"880870eef0a545c383c210950b404b09","t":"Procurement of Various Items","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"notice","y":16},{"i":"SPRWA1-26-Q-0020","n":"971dca3a0ed84b498e323a2f72cb3fe8","t":"F-16 Aircraft Ejection Seat","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":16},{"i":"N0038326QH081","n":"f7857244c83c480f8d524c0e12e67014","t":"PWA, VIPER A","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"336413","s":"Full","g":"rfp","y":17},{"i":"FD20302502107","n":"fd97eeeb1d9c4062aaebd1f6954d0357","t":"CONTROL BOX, ELECTRIC_End_Item_F016_NSN_1660013199517_PN_458-54703-502","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"sources","y":17},{"i":"FD20302602399","n":"8729551442cf4bc9abf1e2b7932f5f7c","t":"TORQUE LIMITER ASSEMBLY_End_Item_B-1_NSN_1680011481999RK_PN_NF53400-01A","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"sources","y":17},{"i":"FD20302602394","n":"85a201582e0c42249a8a4c27204b025f","t":"TRANSMITTER, LIQUID_End_Item_F-16 _NSN_6680010749369RK_PN_16VE002003-3","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"sources","y":17},{"i":"70Z03826QJ0000172","n":"6693332c6e21459fa6429e28daf9c9ce","t":"Skin, Cabin LWR RH A","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"notice","y":19},{"i":"SPRTA126R0288-0001","n":"6d05936cb2864a428789594bb5bd40fe","t":"Valve, Linear Direct","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":19},{"i":"SPRTA126R1060","n":"e639f5f2215d413b9150bc36b6fb7472","t":"New Manufacture (Spares): Control, Power Supply / NSN 6130014164298","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":19},{"i":"SPRTA126R019-3001","n":"d50a8e57afa147c5aa786a75e34c1547","t":"MANIFOLD ASSEMBLY,H","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":19},{"i":"W50S7326QA002","n":"acaa489f6dc54103ad198ec3e8492efc","t":"124th Liquid Nitrogen Generator","dep":"DEPT OF DEFENSE","off":"DEPT OF THE ARMY","c":"336413","s":"SB","g":"rfp","y":19},{"i":"70Z03826QJ0000033","n":"e4322c49cdc2414c8a5c24f48a119c6d","t":"Main and Tail Wheel Assemblies - Purchase","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":20},{"i":"70Z03826QJ0000273","n":"cf839d117f0f42be98f55d156f6910f9","t":"Procurement of Various Items","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"notice","y":20},{"i":"SPRTA1-26-R-0218","n":"ead83df7a94140d19c8bc875e93bba84","t":"Door Aircraft","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":20},{"i":"70Z03826QJ0000278","n":"1bb776982d7c46aea49f0b4c339b2898","t":"Housing, Transmission","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":20},{"i":"15F06726Q0000250","n":"ac248cf3a0ec42f69647956447ae9295","t":"Lycoming Engine Overhaul Services","dep":"JUSTICE, DEPARTMENT OF","off":"FEDERAL BUREAU OF INVESTIGATION","c":"336413","s":"SB","g":"rfp","y":20},{"i":"9733a1ba014c4caf854c5883fe566ab3","n":"9733a1ba014c4caf854c5883fe566ab3","t":"Valve, Fluid Pressure","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":20},{"i":"FA811826Q0005","n":"7d0a06c1370f406d92d3c3e2a0f15864","t":"Remanufacture of B-1 Interlock Assembly, Wing Sweep","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"Full","g":"rfp","y":20},{"i":"FA8118-26-R-0044","n":"9e8548d49e5140cbbd48153097bbbd1c","t":"Tear Down, Test & Evaluation/Repair of B-2 Fuel Level Control Valve Bodies","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"Full","g":"rfp","y":20},{"i":"70Z08026Q16007B00","n":"fb7de07d106f4ebaad5c775e49263b6e","t":"87’ WPB Left-Hand (Port) and Right-Hand (Starboard) Rudder Overhaul","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"332710","s":"SB","g":"rfp","y":21},{"i":"W58RGZ-26-Q-0010","n":"767e66a8298a4d36be939b3993809ecf","t":"AH-64 Apache Spares Buy for the Manifold, Oil Filter - Nose Gearbox","dep":"DEPT OF DEFENSE","off":"DEPT OF THE ARMY","c":"336413","s":"Full","g":"rfp","y":21},{"i":"SPRTA1-26-R-0362","n":"e507de3661c8498f8431935e45f96b14","t":"Tank, Fuel, Aircraft","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":21},{"i":"SPRTA1-26-Q-0403","n":"71f2367336de430ca52e39c09a4a9032","t":"Jettison Unit, Hose","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":21},{"i":"SPRTA1-26-Q-0402","n":"5e738946ec1d4782859ee0563e162caf","t":"MOTOR,ALTERNATING C / 6105004743368HY / R510-4","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":21},{"i":"SPRTA1-26-Q-0404","n":"2402f2dc4c7f421c87a82210c7ea0862","t":"Vane Pump Assembly","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":21},{"i":"FA8538-26-Q-0006","n":"ec5c986846824c1db8dd1d99f726ce55","t":"C-130 Pressure Indicator, NSN 6620-01-394-4019 LG / PN 10401N01P00","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"Full","g":"rfp","y":21},{"i":"W50S9926Q1004","n":"b9c871291afe483fa4edfe284a90de06","t":"DAMAS Kits","dep":"DEPT OF DEFENSE","off":"DEPT OF THE ARMY","c":"336413","s":"SB","g":"rfp","y":21},{"i":"SPRTA1-26-R-0051","n":"a7b9ad800ed946d7b713b9ed201fadef","t":"Valve, Linear, Direct","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":21},{"i":"SPRTA1-26-R-0037","n":"338fbcf3a8a34678be7434f730bb0073","t":"Servovalve, Hydraulic","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":21},{"i":"N6134026R1008","n":"041eda05f3c64b5d940bf768d26ca78a","t":"U.S. Navy (USN) Tactical Combat Training System Increment II (TCTS II) and United States Air Force (USAF) equivalent P6 combat Training System (P6CTS)","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"336413","s":"Full","g":"rfp","y":22},{"i":"SPRWA1-26-R-0034","n":"8bce1828477140dbabfd4e7f5d6958a8","t":"C-5 Rotary Hand Pump (NSN 4320-00-490-7424UC)","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":22},{"i":"N0038326QS106","n":"0952a504d0a8404884eaed85ba894d65","t":"FMS Repair N0038326PR0R414","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"336413","s":"Full","g":"rfp","y":22},{"i":"N00383-26-Q-F156","n":"238c9a3cb16444edbd44dfd7655ac9d2","t":"NIIN: 012422066/ NOMEN: ACTUATOR,ELECTRO-MECHANICAL,ROTARY","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"336413","s":"Full","g":"rfp","y":22},{"i":"70Z02326RAIRA1000","n":"1b59aae8f0c3438782e957b28c90c9c3","t":"USCG and CBP C-130J Missionization Effort (Minotaur Mission Systems+)","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"presol","y":22},{"i":"SPRTA1-26-Q-0219","n":"d2dac9aac13b41b79ba90824624ab88a","t":"Gearbox Assembly, AI","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":23},{"i":"N0038326RD058","n":"8165fc9fd06348f892bd69660976e796","t":"5 Year Repair Basic Ordering Agreement","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"336413","s":"Full","g":"rfp","y":24},{"i":"SPRWA1-26-R-0036","n":"3a10d409d2644e2499c3d344eae22e31","t":"Solicitation for Band 7 Radio Frequency (RF) Amplifier (NSN 5996-01-269-4143EW / PN 443641-4)","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":25},{"i":"N0038326QH082","n":"1ce8ce367c9244bb85b78dd8e4863bea","t":"VALVE ASSEMBLY,FAIL, 287870-1001","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"336413","s":"Full","g":"rfp","y":25},{"i":"SPRTA1-24-Q-0336-0001","n":"a20dbe6ed3a34d9abe032bbfad0c08fd","t":"Noun_Structural Panel_Application_B-002A_NSN_1560-01-313-4178FW_Part_Number_DAA3133D401-009","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":26},{"i":"SPRTA126R0266","n":"3671ccdc069f47508aac3b283863708b","t":"C-130  Butterfly Valve","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":26},{"i":"SPRTA126Q0405","n":"f688d2b6d423435daa735b54415af125","t":"NEW MANUFACTURE OF PISTON,REACTION CYL","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":26},{"i":"70Z03826QJ0000178","n":"6695b9e6ac4149f2822a98d8b1459af2","t":"Fairing, Aircraft","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"notice","y":26},{"i":"0468c83fca5348748cdc03e0c26bec2d","n":"0468c83fca5348748cdc03e0c26bec2d","t":"Overhaul of RADIATOR, GEARBOX","dep":"DEPT OF DEFENSE","off":"DEPT OF THE ARMY","c":"336413","s":"SB","g":"notice","y":26},{"i":"SPRHA1-26-R-0793","n":"71d3734c7dee48a78f965162764a2600","t":"VALVE, BRAKE METERING (26-R-0793)","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":26},{"i":"70Z03826QJ0000147","n":"ae16f4d3a3b94da8b3f6be730004f250","t":"Tail Cone and Tail Rotor Pylon Kit","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"notice","y":26},{"i":"SPRHA1-26-R-0823","n":"38eec753d13e45a9bd520a8567fd14b6","t":"DRAG LINK, LANDING (26-R-0823)","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"SB","g":"rfp","y":26},{"i":"N0038326QA114","n":"d6995f15e5f44351a033d9f78b5cad42","t":"NOMENCLATURE: PANEL,CONTROL,ELECT NSN: 1680013502501 PN: 70600-81826-106","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"336413","s":"Full","g":"rfp","y":27},{"i":"SPRHA1-26-Q-0740","n":"621622905cf241ce9a9c9209f5521aed","t":"C-130 CONTROL UNIT, ANTISK NSN: 1630-01-572-4811","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":27},{"i":"SPRTA126R0233","n":"7d0dc82c90b44642abf7265cb60fbe2a","t":"DAMPENER, FLUTTER","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":27},{"i":"N0038326QA116","n":"62dab531dd864d569c3d6797decb69db","t":"FMS Malaysia Repair of NIIN 014876161 | PN 1007352P-1 | QTY 1","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"336413","s":"Full","g":"rfp","y":28},{"i":"f1aa309fa39040a4929d90a7d88fd091","n":"f1aa309fa39040a4929d90a7d88fd091","t":"Manufacturing & Services Acquisition (MASA) Manufacturing Support","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"332710","s":"SB-Partial","g":"rfp","y":29},{"i":"SPRTA124R0078","n":"58139a79831d4080af226386028dd0bf","t":"Receiver, Countermeasure","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":29},{"i":"N0038326QA117","n":"0f822c73246b4805801b8d0cc99ccd83","t":"FMS France Repair of NIIN 015612490 | PN 1025290G-2 | QTY 1","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"336413","s":"Full","g":"rfp","y":29},{"i":"SPRHA1-26-R-4646","n":"58217c7ba35a483bb5161f77ebd283d0","t":"KC-46 Landing Gear PBL","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"SB","g":"rfp","y":29},{"i":"SPRTA1-26-R-0374","n":"7eb3f33e98e24603b4286a6f7b7fba4e","t":"Shroud, Inflight Refueling","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":30},{"i":"SPRRA2-26-Q-0059","n":"79a9ef01d2c04cd1b0593e717b4e8863","t":"CANOPY, FIXED","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"SoleSource","g":"rfp","y":30},{"i":"FA822826R0006","n":"d93555f2c5594313907bb7087743a6ef","t":"F-16 Wing Skin Milling BPA","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"332710","s":"SB","g":"rfp","y":30},{"i":"SPRTA1-26-Q-0416","n":"1b119d55dead4e1f9890c474286a5401","t":"BODY, VALVE","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":30},{"i":"70Z03826QL0000083","n":"f4aa4baf9eab445f85783115e42914e1","t":"Overhaul of the Wheels, Brakes and associated components to support the HC-144 and HC-27J Aircraft","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":30},{"i":"3bad476c458d4f62951f4f1ad93c0920","n":"3bad476c458d4f62951f4f1ad93c0920","t":"W58RGZ26B0004 Amendment 0003","dep":"DEPT OF DEFENSE","off":"DEPT OF THE ARMY","c":"336413","s":"SB","g":"rfp","y":30},{"i":"SPE4AX26R0027","n":"50ba6225cde04e849f9ed86fb635c686","t":"Collins Aerospace Sole Source Items, Follow-On Contract for Consumable and DLR Support","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"sources","y":32},{"i":"N0038326QN120","n":"6330026f5bfe4eff928287febca4b79c","t":"N0038326PR0R662_FMS REPAIR","dep":"DEPT OF DEFENSE","off":"DEPT OF THE NAVY","c":"336413","s":"Full","g":"rfp","y":33},{"i":"SPRTA1-26-Q-0267","n":"5144984fcfc440768426ecea7272366a","t":"Pump, Fuel, Metering","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":33},{"i":"W58RGZ-26-B-0001","n":"bce49694e6a94bfdbcae91952322cef9","t":"Solicitation for the Overhaul of the Main Rotor Blade for the UH-60 Black Hawk","dep":"DEPT OF DEFENSE","off":"DEPT OF THE ARMY","c":"336413","s":"Full","g":"rfp","y":33},{"i":"SPRRA1-26-R-0069","n":"2341cc6580de4e07923b33e6f8feb87e","t":"Clutch Assembly, Cen","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":33},{"i":"70Z03826RB0000006","n":"f03e2668edfa42af978f3bdee178186e","t":"Procurement for Spare Parts for the Pilot, Co-Pilot, and Mechanic Seats for the MH-65E Aircraft.","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":33},{"i":"FD2030230217806","n":"0f6f9ca4508a46d49729af8c89fadc36","t":"Amendment- 02 Remanufacture/Re-core of the C-130 HX NSN: 1660-01-150-9084/PN 191390-2-2 and F-15 HX NSN:1660-00-273-8669/PN 189320-3-1","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"SB","g":"rfp","y":33},{"i":"FA8628-2X-X-00XX","n":"ea6820f8ca4c46a4949113beae646126","t":"B-52H Cryptographic Modernization Program, Request For Information (RFI) For Producing (Manufacture and Assemble) and Delivering B-52H Cryptographic Modernization Production Kits","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"Full","g":"sources","y":34},{"i":"SPRTA1-26-R-0303","n":"30a8cb65e4a54696a45b49a4b72f3acd","t":"RECEPTACLE ASSEMBLY","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":34},{"i":"FA853826R0012","n":"a6fba30a374244d48f4ca8c7a7dbc950","t":"C-5 Nose Landing Gear Door Actuator Assemblies","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"Full","g":"rfp","y":41},{"i":"FD-2030-26-01861","n":"1847b7ab9b9a4a8c8c666d206ee06725","t":"Repair of the E-3/C-130H Power Supply","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"Full","g":"presol","y":41},{"i":"FA8105_CCR_Rev2","n":"d7d0947a1aeb4d588887217ba6b4ce08","t":"KC-135 Center Console Refresh (CCR) Revision 2","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"Full","g":"sources","y":48},{"i":"SPRTA126R0192","n":"1dd708cf27d74683bda9af2a94f8951b","t":"New Manufacture - RECEIVER-TRANSMITTER - PN 822-3616-001","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":50},{"i":"SPRTA126R0001","n":"4c09622236f742ef88de85186df368c3","t":"DRIVE UNIT,HYDRAULIC","dep":"DEPT OF DEFENSE","off":"DEFENSE LOGISTICS AGENCY","c":"336413","s":"Full","g":"rfp","y":63},{"i":"FA8538260019","n":"534c573ed02648c48f0ad18f5f049991","t":"C-5 MLG Trunnion Bearing","dep":"DEPT OF DEFENSE","off":"DEPT OF THE AIR FORCE","c":"336413","s":"Full","g":"rfp","y":90},{"i":"70Z03826RJ0000001","n":"13904da5215941c4ae45cf446ecfac7e","t":"Overhaul of Rotary Wing and Rotary Rudder Blades","dep":"HOMELAND SECURITY, DEPARTMENT OF","off":"US COAST GUARD","c":"336413","s":"Full","g":"rfp","y":124}]</script>
+<script>
+(function(){
+/* ═══ Card 775 · Opportunities render layer (review build).
+   Data = the 197 rows served to the customer on 2026-07-29, post PR #346,
+   extracted from opportunities-RENDERED-live-v2-2026-07-29.html.
+   NOTHING below is typed: every count, every band total, every KPI is derived
+   from ROWS at render time. ═══ */
+const ROWS = JSON.parse(document.getElementById('fixture').textContent);
+const $ = (id)=>document.getElementById(id);
+const esc = (s)=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
+/* ── ONE SPINE. verdict() is the only classifier on this page; every band,
+   count, rail and subhead reads from it. Two independent classifications is
+   how bands stop summing (card 768). ── */
+const VERDICTS = {
+  READ  : {k:'READ',  word:'READ ONLY', band:'screened', cls:'vd-read',
+           rule:'Special Notice — industry day, amendment, sole-source intent or cancellation. No solicitation document has posted for this requirement.'},
+  ASSERT: {k:'ASSERT',word:'ASSERT',    band:'screened', cls:'vd-assert',
+           rule:'Sole-source intent published. Not open competition — the move is to assert capability inside the window.'},
+  SHAPE : {k:'SHAPE', word:'SHAPE',     band:'shape',    cls:'vd-shape',
+           rule:'Pre-solicitation or Sources Sought. The requirement is not fixed yet.'},
+  ACT   : {k:'ACT',   word:'ACT',       band:'act',      cls:'vd-act',
+           rule:'Open solicitation closing within 7 days.'},
+  QUEUE : {k:'QUEUE', word:'QUEUE',     band:'queue',    cls:'vd-queue',
+           rule:'Open solicitation with more than 7 days left.'}
+};
+function verdict(o){
+  if(o.g==='notice') return VERDICTS.READ;
+  if(o.s==='SoleSource') return VERDICTS.ASSERT;
+  if(o.g==='presol'||o.g==='sources') return VERDICTS.SHAPE;
+  if(o.y!=null&&o.y<=7) return VERDICTS.ACT;
+  return VERDICTS.QUEUE;
+}
+const BANDS = [
+  {k:'act',     t:'Act this week',  rule:'open solicitation · closes within 7 days', go:'these are your bids'},
+  {k:'shape',   t:'Shape upstream', rule:'pre-solicitation + sources sought · requirement not fixed', go:'influence the scope'},
+  {k:'queue',   t:'In the queue',   rule:'open solicitation · more than 7 days left', go:'read when you get to it'},
+  {k:'screened',t:'Screened out',   rule:'nothing here is a bid you can place', go:'stop reading these'}
+];
+
+/* ── set-aside register: 5 poles, each with its own fill AND its own mark, so
+   the encoding survives greyscale. SoleSource must never share a register with
+   Full & Open — one means anyone may compete, the other means you may not. ── */
+const SA_RESTRICTED = ['SB','SDVOSB','8(a)','HUBZone','WOSB','EDWOSB'];
+function saRender(s){
+  if(s==='SoleSource')  return {cls:'sa-barred',    label:'SOLE SOURCE',    reg:'barred'};
+  if(s==='UNKNOWN')     return {cls:'sa-unread',    label:'SET-ASIDE UNREAD',reg:'unread'};
+  if(s==='SB-Partial')  return {cls:'sa-partial',   label:'SB · PARTIAL',   reg:'partial'};
+  if(SA_RESTRICTED.includes(s)) return {cls:'sa-restricted', label:s.toUpperCase(), reg:'restricted'};
+  return {cls:'sa-open', label:'FULL & OPEN', reg:'open'};
+}
+const STAGE_LABEL = {rfp:'Open RFP', sources:'Sources Sought', presol:'Pre-Solicitation', notice:'Special Notice', eval:'In Evaluation', UNKNOWN:'Type not recognised'};
+/* Buyer display names are MAPPED, not heuristically title-cased: a rule that
+   preserves short all-caps tokens turned "DEPT OF THE AIR FORCE" into
+   "AIR Force". Seven offices and four departments exist in this read; an
+   unmapped value falls through to the raw string AND is counted by C11, so a
+   new buying office shows up as a check failure instead of a mangled label. */
+const OFFICE_NAME = {
+  'DEFENSE LOGISTICS AGENCY':'Defense Logistics Agency',
+  'US COAST GUARD':'US Coast Guard',
+  'DEPT OF THE AIR FORCE':'Air Force',
+  'DEPT OF THE NAVY':'Navy',
+  'DEPT OF THE ARMY':'Army',
+  'NATIONAL AERONAUTICS AND SPACE ADMINISTRATION':'NASA',
+  'FEDERAL BUREAU OF INVESTIGATION':'FBI'
+};
+const DEPT_NAME = {
+  'DEPT OF DEFENSE':'Dept of Defense',
+  'HOMELAND SECURITY, DEPARTMENT OF':'Homeland Security',
+  'NATIONAL AERONAUTICS AND SPACE ADMINISTRATION':'NASA',
+  'JUSTICE, DEPARTMENT OF':'Justice'
+};
+const UNMAPPED = new Set();
+const officeName = (o)=>{ if(!o) return '\u2014'; if(OFFICE_NAME[o]) return OFFICE_NAME[o]; UNMAPPED.add(o); return o; };
+const deptName   = (d)=>{ if(DEPT_NAME[d]) return DEPT_NAME[d]; UNMAPPED.add(d); return d; };
+const OFFICE_SHORT = officeName;
+const TITLECASE = (s)=>s.replace(/[A-Za-z][A-Za-z'()./-]*/g,w=>/^[A-Z0-9'()./-]{1,4}$/.test(w)?w:w[0]+w.slice(1).toLowerCase());
+
+/* ── the per-row clause: composed from the row's OWN facts, never a template
+   branch. The live page produced 5 strings for 197 rows, one of them on 78%.
+
+   A1 (ruled, CEO 2026-07-29): a reason must state something that would still be
+   true if FARaudit did not exist. The subject is the NOTICE or the BUYER, never
+   our pipeline. "Nothing to audit" fails it — whether a document can be audited
+   is a fact about our service; whether a solicitation has posted is a fact about
+   the notice, and that is the question the customer is asking. C17 enforces this
+   over every reason slot on the page, so it cannot come back through a port. ── */
+function clause(o){
+  const v = verdict(o), d = o.y;
+  if(v.k==='READ')   return 'Special Notice · no solicitation document posted yet';
+  if(v.k==='ASSERT') return d+' days to assert capability';
+  if(v.k==='SHAPE')  return STAGE_LABEL[o.g]+' · '+d+' days to respond';
+  const sa = o.s==='Full' ? 'full &amp; open' : o.s==='UNKNOWN' ? 'set-aside unread' : esc(o.s)+' set-aside';
+  return (d<=1?'closes tomorrow':'closes in '+d+' days')+' · '+sa;
+}
+
+/* ── state ── */
+const S = {naics:new Set(), init:false, stage:'all', sa:'all', view:null, band:null, q:'', sort:'closing', profile:false};
+const PROFILE = {naics:['336413'], certs:[]};            // review-only example
+const filters = ()=>({stage:S.stage, sa:S.sa, view:S.view, band:S.band, q:S.q});
+
+function readSet(){ return ROWS.filter(o=>!(S.naics.size && o.c && !S.naics.has(o.c))); }
+function base(){ return readSet().filter(o=> !S.profile || PROFILE.naics.includes(o.c) ); }
+function filtered(){ return base().filter(o=>{
+  const v = verdict(o);
+  if(S.stage!=='all' && o.g!==S.stage) return false;
+  if(S.sa!=='all' && o.s!==S.sa) return false;
+  if(S.band && v.band!==S.band) return false;
+  if(S.view==='eligible' && !(SA_RESTRICTED.includes(o.s)||o.s==='SB-Partial')) return false;
+  if(S.view==='upstream' && v.k!=='SHAPE') return false;
+  if(S.view==='week' && v.k!=='ACT') return false;
+  if(S.q && !((o.t+' '+o.dep+' '+(o.off||'')+' '+o.i).toLowerCase().includes(S.q))) return false;
+  return true;
+});}
+
+/* ── header ── */
+function renderHeader(){
+  const rows = base();
+  const codes = [...new Set(ROWS.map(o=>o.c).filter(Boolean))].sort();
+  $('feedMeta').innerHTML = '<b>'+rows.length+'</b> open notices read live from SAM.gov · '+
+    codes.length+' NAICS code'+(codes.length===1?'':'s')+' on your profile · newest posted 25h ago';
+  const counts = {}; ROWS.forEach(o=>{ if(o.c) counts[o.c]=(counts[o.c]||0)+1; });
+  $('hdrNaics').innerHTML = codes.map(c=>'<span class="npill'+(S.naics.has(c)?'':' off')+'" data-naics="'+c+'" title="'+counts[c]+' in this read">'+c+'</span>').join('');
+  $('hdrNaics').querySelectorAll('[data-naics]').forEach(p=>p.onclick=()=>{
+    const c=p.dataset.naics;
+    if(S.naics.has(c)){ if(S.naics.size>1) S.naics.delete(c); } else S.naics.add(c);
+    renderAll();
+  });
+  const active=[...S.naics].length, total=codes.length;
+  $('hdrNaicsLabel').innerHTML = active<total ? 'Your NAICS · <b>'+active+' of '+total+' shown</b>' : 'Your NAICS codes · click to filter';
+  $('profileGap').innerHTML = PROFILE.certs.length
+    ? '<span>Certifications on record: <b>'+PROFILE.certs.join(' · ')+'</b>. Set-aside eligibility is decided per row.</span>'
+    : '<span><b>No certifications on record.</b> Until you add them we cannot tell you which set-asides you qualify for — so nothing is screened out on eligibility.</span><button type="button">Add certifications</button>';
+}
+
+/* ── KPIs: four values, all derived, none permanently em-dash ── */
+function renderKPIs(){
+  const rows = base();
+  const by = k=>rows.filter(o=>verdict(o).band===k).length;
+  const soon3 = rows.filter(o=>o.y!=null&&o.y<=3).length;
+  const screened = by('screened');
+  const noticeN = rows.filter(o=>o.g==='notice').length, soleN = rows.filter(o=>o.s==='SoleSource').length;
+  const offices = new Set(rows.map(o=>OFFICE_SHORT(o.off))).size;
+  const depts = new Set(rows.map(o=>o.dep)).size;
+  const cards = [
+    {lbl:'Open notices', val:rows.length, unit:'', foot:depts+' department'+(depts===1?'':'s')+' · '+offices+' buying office'+(offices===1?'':'s')},
+    {lbl:'Act this week', val:by('act'), unit:'', foot:soon3+' of them close within 3 days'},
+    {lbl:'Screened out', val:screened, unit:' of '+rows.length, foot:noticeN+' with no solicitation · '+soleN+' not open competition'},
+    {lbl:'Audited', val:0, unit:' of '+rows.length, foot:'fit and contract value appear only after an audit'}
+  ];
+  $('kpiStrip').innerHTML = cards.map(c=>'<div class="kpi"><p class="lbl">'+c.lbl+'</p><div class="kpi-val">'+c.val+'<span class="unit">'+c.unit+'</span></div><div class="foot">'+c.foot+'</div></div>').join('');
+}
+
+/* ── triage bands + the funnel. TWO ledgers, each summing on its own corpus. ── */
+function renderBands(){
+  const rows = base(), read = readSet();
+  const n = {}; BANDS.forEach(b=>n[b.k]=0);
+  rows.forEach(o=>n[verdict(o).band]++);
+  $('triageTitle').textContent = rows.length+' notices → what you actually do';
+  // Reasons INSIDE the screened band. These sum to the band, nothing else.
+  const screenReasons = [
+    {n:rows.filter(o=>o.g==='notice').length, t:'Special Notice — no solicitation document posted'},
+    {n:rows.filter(o=>o.s==='SoleSource').length, t:'sole-source intent — not open competition'}
+  ];
+  // The funnel: what never reached a band at all.
+  const outNaics = read.length - rows.length;
+  const ineligible = 0;
+  const funnel = [
+    {n:read.length, t:'notices in this read', cls:''},
+    {n:outNaics, t:S.profile?'outside your NAICS codes':'outside your NAICS codes — no profile on record, so nothing is removed', cls:outNaics?'minus':'minus none', sign:'−'},
+    {n:ineligible, t:'ineligible for the set-aside — no certifications on record', cls:'minus none', sign:'−'},
+    {n:rows.length, t:'sorted into the four bands above', cls:'sum'}
+  ];
+  $('triageBands').innerHTML =
+    BANDS.map(b=>'<button class="band'+(S.band===b.k?' active':'')+(n[b.k]===0?' dim':'')+'" data-band="'+b.k+'">'+
+      '<span class="band-n">'+n[b.k]+'</span>'+
+      '<span><span class="band-t">'+b.t+'</span><span class="band-r">'+b.rule+'</span></span>'+
+      '<span class="band-go">'+(S.band===b.k?'showing ↓':b.go+' →')+'</span></button>').join('') +
+    '<div class="screen-detail" id="screenDetail">'+screenReasons.map(r=>'<div class="sd-row"><span class="sd-n">'+r.n+'</span><span>'+r.t+'</span></div>').join('')+'</div>'+
+    '<div class="funnel" id="funnel">'+funnel.map(f=>'<div class="fn-row '+f.cls+'"><span class="fn-n">'+(f.sign||'')+f.n+'</span><span class="fn-t">'+f.t+'</span></div>').join('')+'</div>';
+  $('triageBands').querySelectorAll('[data-band]').forEach(b=>b.onclick=()=>{ S.band = S.band===b.dataset.band?null:b.dataset.band; S.view=null; renderAll(); });
+  return {n, screenReasons, funnel:{read:read.length, outNaics, ineligible, remaining:rows.length}};
+}
+let LAST_BANDS = null;
+
+/* ── closing first ── */
+function renderAct(){
+  const rows = base().filter(o=>o.y!=null && verdict(o).band!=='screened').sort((a,b)=>a.y-b.y).slice(0,7);
+  $('actSub').textContent = 'The 7 soonest deadlines you can still respond to. Ordered by days left — the only fact these notices publish that can rank them.';
+  $('actList').innerHTML = rows.map(o=>'<button class="act-row'+(o.y>7?' far':'')+'" data-id="'+esc(o.i)+'">'+
+    '<span class="act-d">'+o.y+'<small>days</small></span>'+
+    '<span style="min-width:0"><span class="act-title">'+esc(TITLECASE(o.t))+'</span><span class="act-agy">'+esc(officeName(o.off))+' · '+esc(o.i)+'</span></span>'+
+    '<span class="vd '+verdict(o).cls+'">'+verdict(o).word+'</span></button>').join('');
+  $('actList').querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{ S.q=b.dataset.id.toLowerCase(); $('searchInput').value=b.dataset.id; renderAll(); });
+}
+
+/* ── controls ── */
+function renderControls(){
+  const rows = base();
+  const cnt = (f)=>rows.filter(f).length;
+  const stages = [['all','All types'],['presol','Pre-Sol'],['sources','Sources Sought'],['rfp','Open RFP'],['notice','Special Notice'],['eval','In Evaluation']];
+  $('stageSeg').innerHTML = stages.map(([k,l])=>{
+    const c = k==='all'?rows.length:cnt(o=>o.g===k);
+    return '<button data-stage="'+k+'" class="'+(k===S.stage?'active':'')+(c===0?' zero':'')+'">'+l+'<span class="n">'+c+'</span></button>';
+  }).join('');
+  $('stageSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.stage=b.dataset.stage;S.view=null;renderAll();});
+
+  const saPoles = ['all','SB','SB-Partial','SDVOSB','8(a)','HUBZone','WOSB','EDWOSB','SoleSource','Full','UNKNOWN'];
+  const present = saPoles.filter(k=>k==='all'||cnt(o=>o.s===k)>0);
+  const absent  = saPoles.filter(k=>k!=='all'&&cnt(o=>o.s===k)===0);
+  const label = (k)=>k==='all'?'All':saRender(k).label;
+  let html = present.map(k=>{
+    const c = k==='all'?rows.length:cnt(o=>o.s===k);
+    return '<button class="fpill'+(k===S.sa?' active':'')+'" data-sa="'+k+'">'+label(k)+'<span class="n">'+c+'</span></button>';
+  }).join('');
+  html += S.saOpen
+    ? absent.map(k=>'<button class="fpill zero" data-sa="'+k+'">'+label(k)+'<span class="n">0</span></button>').join('')+'<button class="fpill more" data-more="0">fewer</button>'
+    : '<button class="fpill more" data-more="1">+'+absent.length+' with none in this read</button>';
+  $('saFilters').innerHTML = html;
+  $('saFilters').querySelectorAll('[data-sa]').forEach(b=>b.onclick=()=>{S.sa=S.sa===b.dataset.sa?'all':b.dataset.sa;S.view=null;renderAll();});
+  $('saFilters').querySelectorAll('[data-more]').forEach(b=>b.onclick=()=>{S.saOpen=b.dataset.more==='1';renderControls();});
+
+  const views = [
+    {k:'week',    t:'Closing this week', d:'open · ≤ 7 days',            n:cnt(o=>verdict(o).k==='ACT')},
+    {k:'eligible',t:'Set-aside eligible',d:'restricted to small business',n:cnt(o=>SA_RESTRICTED.includes(o.s)||o.s==='SB-Partial')},
+    {k:'upstream',t:'Upstream',          d:'pre-sol + sources sought',    n:cnt(o=>verdict(o).k==='SHAPE')}
+  ];
+  $('savedViews').innerHTML = views.map(v=>'<button class="view-chip'+(S.view===v.k?' active':'')+(v.n===0?' zero':'')+'" data-view="'+v.k+'"><span class="vc-t">'+v.t+'</span><span class="vc-d">'+v.d+' · '+v.n+'</span></button>').join('');
+  $('savedViews').querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{S.view=S.view===b.dataset.view?null:b.dataset.view;S.stage='all';S.sa='all';S.band=null;renderAll();});
+
+  const sorts=[['closing','Closing first'],['longest','Longest window'],['buyer','Buyer']];
+  $('sortSeg').innerHTML = sorts.map(([k,l])=>'<button data-sort="'+k+'" class="'+(k===S.sort?'active':'')+'">'+l+'</button>').join('');
+  $('sortSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.sort=b.dataset.sort;renderAll();});
+}
+
+function sortRows(data){
+  const d=data.slice();
+  if(S.sort==='closing') d.sort((a,b)=>(a.y??Infinity)-(b.y??Infinity)||a.t.localeCompare(b.t));
+  else if(S.sort==='longest') d.sort((a,b)=>(b.y??-Infinity)-(a.y??-Infinity)||a.t.localeCompare(b.t));
+  else d.sort((a,b)=>OFFICE_SHORT(a.off).localeCompare(OFFICE_SHORT(b.off))||(a.y??Infinity)-(b.y??Infinity));
+  return d;
+}
+
+/* ── the list ── */
+function rowHTML(o){
+  const v=verdict(o), sa=saRender(o.s);
+  const far = o.y==null?'later':o.y<=3?'':o.y<=7?'far':'later';
+  const hasSolicitation = o.g!=='notice';
+  return '<div class="pcard'+(far?' '+far:'')+(v.k==='ASSERT'?' barred':'')+'" data-id="'+esc(o.i)+'">'+
+    '<div class="pc-when"><div class="pc-d">'+(o.y==null?'—':o.y+'<small>d</small>')+'</div><div class="pc-dl">'+(o.y==null?'NO DEADLINE':'LEFT')+'</div></div>'+
+    '<div class="pc-main">'+
+      '<div class="pc-title">'+esc(TITLECASE(o.t))+'</div>'+
+      '<div class="pc-buyer">'+(officeName(o.off)===deptName(o.dep)?'<b>'+esc(officeName(o.off))+'</b>':'<b>'+esc(officeName(o.off))+'</b> · '+esc(deptName(o.dep)))+'</div>'+
+      '<div class="pc-id">'+esc(o.i)+'</div>'+
+      '<div class="pc-chips"><span class="chip naics">'+esc(o.c||'NAICS —')+'</span><span class="chip stage">'+esc(STAGE_LABEL[o.g]||o.g)+'</span><span class="chip '+sa.cls+'">'+sa.label+'</span></div>'+
+    '</div>'+
+    '<div class="pc-state"><span class="vd '+v.cls+'">'+v.word+'</span><span class="pc-note">'+clause(o)+'</span></div>'+
+    '<div class="pc-actions">'+
+      (hasSolicitation?'<a class="btn-open" href="/audit?noticeId='+encodeURIComponent(o.n)+'">Run audit</a>'
+                :'<span class="btn-open off" title="Special Notice — no solicitation document has posted for this requirement yet">No solicitation yet</span>')+
+      '<button class="btn-2" type="button" title="Watch this notice — you are alerted on amendments and deadline changes">Track</button>'+
+      '<button class="btn-2" type="button" title="Add to your pipeline board at capture stage">Pipeline</button>'+
+    '</div></div>';
+}
+function renderList(){
+  const data = filtered();
+  const total = base().length;
+  $('plistCount').innerHTML = '<b>'+data.length+'</b> of '+total+' shown'+
+    (S.band?' · band: '+BANDS.find(b=>b.k===S.band).t:'')+
+    (S.stage!=='all'?' · type: '+STAGE_LABEL[S.stage]:'')+
+    (S.sa!=='all'?' · set-aside: '+saRender(S.sa).label:'')+
+    (S.view?' · view: '+S.view:'')+
+    (S.q?' · matching “'+esc(S.q)+'”':'')+
+    ' · no stated contract value on any of them';
+  if(!data.length){
+    $('plist').innerHTML='<div class="empty">No notice matches this combination.<br>'+
+      esc([S.band?'band '+S.band:null,S.stage!=='all'?'type '+STAGE_LABEL[S.stage]:null,S.sa!=='all'?'set-aside '+saRender(S.sa).label:null,S.q?'search “'+S.q+'”':null].filter(Boolean).join(' + ')||'current filters')+
+      '<br><br><a href="#" id="clearAll">clear filters</a></div>';
+    const c=$('clearAll'); if(c) c.onclick=(e)=>{e.preventDefault();reset();};
+    return;
+  }
+  // Grouped by BAND — the same spine that drives the hero, so header and body
+  // can never tell two stories.
+  let html='';
+  BANDS.forEach(b=>{
+    const g = sortRows(data.filter(o=>verdict(o).band===b.k));
+    if(!g.length) return;
+    html += '<div class="grouphd"><span class="gh-n">'+g.length+'</span><span class="gh-t">'+b.t+'</span><span class="gh-r">'+b.rule+'</span></div>'+g.map(rowHTML).join('');
+  });
+  $('plist').innerHTML = html;
+}
+
+function reset(){ S.stage='all';S.sa='all';S.view=null;S.band=null;S.q='';$('searchInput').value='';S.naics=new Set([...new Set(ROWS.map(o=>o.c).filter(Boolean))]);renderAll(); }
+
+const BTN_STATES = [
+  {cls:'',                lbl:'Track',        t:'1 · available', d:'not watched. Clicking watches the notice.'},
+  {cls:'on',              lbl:'Tracking',     t:'2 · on', d:'already watched. Clicking removes it.'},
+  {cls:'on locked',       lbl:'Tracking',     t:'3 · on, refused', d:'watch advanced to posted / audited and carries audit linkage — “manage it on the Watching page”. Not an error: the toggle would delete history.'},
+  {cls:'unknown',         lbl:'Track',        t:'4 · state unknown', d:'hydrate failed — “Watch state unavailable”. Never rendered as un-tracked; that would be a false negative.'}
+];
+function renderBtnStates(){
+  const el=$('btnStates'); if(!el) return;
+  el.innerHTML=BTN_STATES.map(s=>'<div style="display:flex;flex-direction:column;gap:7px">'+
+    '<span style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tertiary)">'+s.t+'</span>'+
+    '<span><button class="btn-2 '+s.cls+'" type="button" data-state="'+(s.cls||'off')+'">'+s.lbl+'</button></span>'+
+    '<span style="font-size:12px;line-height:1.45;color:var(--ink-2)">'+s.d+'</span></div>').join('');
+}
+
+function renderAll(){
+  if(!S.init){ S.naics = new Set(ROWS.map(o=>o.c).filter(Boolean)); S.init=true; }
+  UNMAPPED.clear();
+  renderHeader(); renderControls(); renderKPIs(); LAST_BANDS=renderBands(); renderAct(); renderList(); renderBtnStates(); runChecks();
+}
+let rt; addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(runChecks,200);});
+$('searchInput').addEventListener('input',e=>{S.q=e.target.value.toLowerCase();renderList();});
+$('resetBtn').onclick=reset;
+$('tbSearch').onclick=()=>$('searchInput').focus();
+document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#sbToggle')){const r=document.documentElement;r.setAttribute('data-sb',r.getAttribute('data-sb')==='open'?'closed':'open');runChecks();}});
+$('profBtn').onclick=()=>{ S.profile=!S.profile; $('profBtn').textContent = S.profile?'Remove example profile':'Apply example profile'; renderAll(); };
+(function(){var r=document.documentElement,sun=$('themeSun'),moon=$('themeMoon');
+  function sync(){var t=r.getAttribute('data-theme');sun.style.display=t==='light'?'none':'';moon.style.display=t==='light'?'':'none';}
+  try{var s=localStorage.getItem('faraudit-theme');if(s)r.setAttribute('data-theme',s);}catch(e){}
+  sync();
+  $('themeToggle').onclick=function(){var n=r.getAttribute('data-theme')==='light'?'dark':'light';r.setAttribute('data-theme',n);try{localStorage.setItem('faraudit-theme',n);}catch(e){}sync();runChecks();};
+})();
+
+/* ═══════════ SELF-CHECKS — each one can fail ═══════════ */
+/* Colour probe. Role tokens are TRANSLUCENT (rgba over the card), so reading
+   backgroundColor raw and computing its luminance measures the un-blended
+   colour and reports a false FAIL — it did, at 2.18:1 on a pair that is
+   actually 9.82:1. Composite the whole stack, then measure. */
+function parseC(c){const m=String(c).match(/[\d.]+/g);if(!m)return null;return {r:+m[0],g:+m[1],b:+m[2],a:m.length>3?+m[3]:1};}
+function over(t,b){return {r:t.r*t.a+b.r*(1-t.a), g:t.g*t.a+b.g*(1-t.a), b:t.b*t.a+b.b*(1-t.a), a:1};}
+function stackBg(el){const layers=[];let n=el;
+  while(n&&n!==document.documentElement){const c=parseC(getComputedStyle(n).backgroundColor);if(c&&c.a>0)layers.push(c);n=n.parentElement;}
+  layers.push(parseC(getComputedStyle(document.documentElement).backgroundColor)||{r:255,g:255,b:255,a:1});
+  let acc=layers[layers.length-1];
+  for(let i=layers.length-2;i>=0;i--) acc=over(layers[i],acc);
+  return acc;}
+function lumC(c){const f=v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4);};return .2126*f(c.r)+.7152*f(c.g)+.0722*f(c.b);}
+function contrastOf(el){const fg=parseC(getComputedStyle(el).color);if(!fg)return null;
+  const bg=stackBg(el); const ink=over(fg,bg);
+  const a=lumC(ink), b=lumC(bg); return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);}
+function runChecks(){
+  const out=[]; const rows=base();
+  const scope=document.querySelector('.main');   /* the surface Design owns — the rail is Code's, and is measured separately by C14 */
+  const inWork=(el)=>!el.closest('.rev');
+
+  // C1 · bands are exclusive and sum to the total
+  const n={}; BANDS.forEach(b=>n[b.k]=0); rows.forEach(o=>n[verdict(o).band]++);
+  const sum=Object.values(n).reduce((a,b)=>a+b,0);
+  out.push(['C1 bands sum to the read', sum===rows.length, Object.entries(n).map(([k,v])=>k+' '+v).join(' + ')+' = '+sum+' · read = '+rows.length]);
+
+  // C2 · one spine: every rendered band header count equals the verdict count
+  const heads=[...document.querySelectorAll('.plist .grouphd')];
+  const cardsPerHead=heads.map(h=>{let c=0,e=h.nextElementSibling;while(e&&e.classList.contains('pcard')){c++;e=e.nextElementSibling;}return {n:parseInt(h.querySelector('.gh-n').textContent,10),c};});
+  out.push(['C2 group headers match rows rendered', cardsPerHead.every(x=>x.n===x.c), cardsPerHead.map(x=>x.n+'/'+x.c).join(' · ')||'no groups']);
+
+  // C3 · no fabricated figure: nothing prints a fit score or a contract value
+  const bodyTxt=scope.textContent;
+  const fab=/\/100|\$\d|CEILING|Avg Fit|Best fit/i.test(bodyTxt.replace(/[\s\S]*Card 775 · self-check/,''));
+  out.push(['C3 no fabricated fit or dollar figure', !fab, fab?'found a score/$ token':'0 fit scores · 0 dollar values on 197 un-audited rows']);
+
+  // C4 · type floor 11px on everything actually read
+  const small=[...scope.querySelectorAll('*')].filter(e=>inWork(e)&&e.offsetParent!==null&&[...e.childNodes].some(c=>c.nodeType===3&&c.textContent.trim())&&parseFloat(getComputedStyle(e).fontSize)<11);
+  out.push(['C4 type floor · 11px (Design-owned surface)', small.length===0, small.length?small.slice(0,4).map(e=>e.className+' '+getComputedStyle(e).fontSize).join(' · '):'0 rendered text nodes below 11px · rail excluded, see C15']);
+
+  // C5 · contrast ≥ 4.5:1 for every distinct text colour, in the CURRENT theme
+  const seen=new Map(); let worst=99, worstSel='';
+  [...scope.querySelectorAll('*')].forEach(e=>{
+    if(!inWork(e)||e.offsetParent===null)return;
+    if(![...e.childNodes].some(c=>c.nodeType===3&&c.textContent.trim()))return;
+    const cs=getComputedStyle(e), key=cs.color+'|'+JSON.stringify(stackBg(e));
+    if(seen.has(key))return;
+    const r=contrastOf(e); if(r==null)return; seen.set(key,r);
+    if(r<worst){worst=r;worstSel=(e.className||e.tagName)+'';}
+  });
+  const fails=[...seen.values()].filter(r=>r<4.5).length;
+  out.push(['C5 contrast ≥ 4.5:1 ('+document.documentElement.getAttribute('data-theme')+')', fails===0, seen.size+' distinct colour pairs on the Design-owned surface · worst '+worst.toFixed(2)+':1 on '+worstSel+' · rail excluded, see C15']);
+
+  // C6 · the repetition finding. Measured over the WHOLE read, never the filtered
+  // view: a reader who filters to one band should see repetition, so measuring
+  // the view would fail a correct design and pass a repetitive one.
+  const norm=(s)=>s.replace(/&amp;/g,'&');
+  const allC = base().map(o=>norm(clause(o)));
+  const tally={}; allC.forEach(c=>tally[c]=(tally[c]||0)+1);
+  const distinct=Object.keys(tally).length, top=Math.max(0,...Object.values(tally));
+  const share=allC.length?Math.round(100*top/allC.length):0;
+  const rendered=[...document.querySelectorAll('.pc-note')].map(e=>e.textContent);
+  const drift=rendered.filter(t=>!(t in tally)).length;
+  out.push(['C6 rows differentiate (whole read)', distinct>=20&&share<=25&&drift===0,
+    distinct+' distinct lines over '+allC.length+' rows · most-repeated '+top+' ('+share+'%) · '+drift+' rendered lines not in the derivation · live page: 5 lines, top 78%']);
+
+  // C7 · every sort control genuinely reorders
+  const ids=(k)=>{const o=S.sort;S.sort=k;const r=sortRows(filtered()).map(x=>x.i).join(',');S.sort=o;return r;};
+  const a=ids('closing'),b=ids('longest'),c=ids('buyer');
+  out.push(['C7 no dead sort control', a!==b&&b!==c&&a!==c, 'closing/longest/buyer produce '+new Set([a,b,c]).size+' distinct orderings']);
+
+  // C8 · the five set-aside registers are visually distinct (fill AND mark)
+  const probe=document.createElement('div'); probe.style.cssText='position:absolute;left:-9999px'; document.body.appendChild(probe);
+  const regs=['sa-restricted','sa-partial','sa-open','sa-barred','sa-unread'].map(cl=>{
+    probe.innerHTML='<span class="chip '+cl+'">x</span>'; const el=probe.firstChild, cs=getComputedStyle(el), mk=getComputedStyle(el,'::before');
+    return {cl, bg:cs.backgroundColor, fg:cs.color, bs:cs.borderStyle, mark:mk.background+'|'+mk.borderStyle};
+  });
+  probe.remove();
+  const uniqFill=new Set(regs.map(r=>r.bg+r.fg)).size, uniqMark=new Set(regs.map(r=>r.mark+r.bs)).size;
+  const soleVsFull = regs.find(r=>r.cl==='sa-barred').bg !== regs.find(r=>r.cl==='sa-open').bg;
+  out.push(['C8 SOLE SOURCE ≠ FULL & OPEN', soleVsFull&&uniqFill>=4, uniqFill+' distinct fills · '+uniqMark+' distinct marks over 5 registers · live page renders both with class "sa full"']);
+
+  // C9 · zero-count buckets stay visible and muted, never deleted
+  const zeroBtns=[...document.querySelectorAll('#stageSeg .zero, #saFilters .zero')];
+  const zeroOK=zeroBtns.every(b=>b.offsetParent!==null&&parseFloat(getComputedStyle(b).opacity)<1);
+  out.push(['C9 zero-count buckets visible + muted', zeroBtns.length>0&&zeroOK, zeroBtns.length+' zero bucket(s) rendered, all muted and none removed']);
+
+  // C10 · nothing is clipped without a marker (measured, not assumed)
+  const clipped=[...scope.querySelectorAll('.pc-title,.pc-note,.act-title,.band-t,.band-r,.gh-r,.kpi .foot')].filter(e=>{
+    if(!inWork(e)||e.offsetParent===null)return false;
+    const cs=getComputedStyle(e);
+    if(cs.overflow==='visible'&&cs.webkitLineClamp==='none')return false;
+    return e.scrollHeight>e.clientHeight+1||e.scrollWidth>e.clientWidth+1;
+  });
+  out.push(['C10 no unflagged truncation', clipped.length===0, clipped.length?clipped.length+' clipped: '+clipped.slice(0,3).map(e=>e.className).join(', '):'0 clipped among titles, clauses, band rules and KPI feet']);
+
+  // C11 · every buyer name rendered came from the map, never a raw SAM string
+  out.push(['C11 buyer names all mapped', UNMAPPED.size===0, UNMAPPED.size?'unmapped: '+[...UNMAPPED].join(' · '):'7 offices + 4 departments in this read, all mapped to display names']);
+
+  // C12 · the narrow path actually RUNS. A media query at equal specificity
+  // loses to source order, so assert the query matches AND the computed value
+  // changed with it (card 770).
+  const narrow=matchMedia('(max-width:1180px)').matches;
+  const card=document.querySelector('.pcard');
+  const tracks=card?getComputedStyle(card).gridTemplateColumns.split(' ').length:0;
+  const agree = card ? (narrow ? tracks===3 : tracks===4) : false;
+  const noHscroll = document.documentElement.scrollWidth <= innerWidth+1;
+  out.push(['C12 responsive path executes', agree&&noHscroll, innerWidth+'px viewport · narrow query '+(narrow?'MATCHES':'does not match')+' · .pcard computes '+tracks+' tracks · page h-scroll '+(noHscroll?'none':'PRESENT')]);
+
+  // C13 · the two ledgers each sum on their OWN corpus and never share a number
+  const B=LAST_BANDS;
+  if(B){
+    const sdSum=B.screenReasons.reduce((a,r)=>a+r.n,0);
+    const fOK=(B.funnel.read-B.funnel.outNaics-B.funnel.ineligible)===B.funnel.remaining;
+    out.push(['C13 both ledgers sum, separately', sdSum===B.n.screened&&fOK,
+      'screen-out reasons '+B.screenReasons.map(r=>r.n).join(' + ')+' = '+sdSum+' = band '+B.n.screened+
+      ' · funnel '+B.funnel.read+' − '+B.funnel.outNaics+' − '+B.funnel.ineligible+' = '+B.funnel.remaining]);
+  }
+
+  // C14 · the three feed states exist and are visually distinct. The page's
+  // whole premise is that it never shows a plausible number it didn't compute,
+  // and the pill is where that is stated — an outage rendering in the green
+  // "live" register would be the one defect nothing else on the page catches.
+  const pp=document.createElement('div'); pp.style.cssText='position:absolute;left:-9999px'; document.body.appendChild(pp);
+  const pillRegs=['','wait','err'].map(c=>{pp.innerHTML='<span class="live-pill '+c+'">x</span>';const el=pp.firstChild,cs=getComputedStyle(el);
+    return {c:c||'live', bg:cs.backgroundColor, fg:cs.color, dot:getComputedStyle(el,'::before').backgroundColor};});
+  pp.remove();
+  const pillUniq=new Set(pillRegs.map(r=>r.bg+'|'+r.fg)).size;
+  out.push(['C14 feed pill has three distinct states', pillUniq===3,
+    pillRegs.map(r=>r.c).join(' / ')+' → '+pillUniq+' distinct fill+ink pairs · err must never share the live register']);
+
+  // C16 · the four Track/Pipeline states are visually distinct, and the two
+  // refusals never read as the available state (card 787 ruling 2).
+  const bp=document.createElement('div'); bp.style.cssText='position:absolute;left:-9999px'; document.body.appendChild(bp);
+  const bs=['','on','on locked','unknown'].map(c=>{bp.innerHTML='<button class="btn-2 '+c+'">x</button>';const el=bp.firstChild,cs=getComputedStyle(el),bf=getComputedStyle(el,'::before'),af=getComputedStyle(el,'::after');
+    return {c:c||'off', sig:cs.backgroundColor+'|'+cs.color+'|'+cs.borderStyle+'|'+cs.fontWeight+'|'+bf.backgroundColor+'|'+bf.borderStyle+'|'+af.content};});
+  bp.remove();
+  const bUniq=new Set(bs.map(x=>x.sig)).size;
+  out.push(['C16 Track/Pipeline has four distinct states', bUniq===4,
+    bs.map(x=>x.c).join(' / ')+' → '+bUniq+' distinct appearances · separated by ink weight and shape, no hue spent']);
+
+  // C17 · A1 · every reason slot takes the NOTICE or the BUYER as its subject.
+  // Ruled CEO 2026-07-29: a reason must state something that would still be true
+  // if FARaudit did not exist. This lived only in a Code-side gate, so it came
+  // back through a port; encoded here it fails on the design surface instead.
+  // The slot list is DECLARED and each selector must match something — Code's
+  // extractor read only template literals, matched zero strings, and every
+  // downstream assertion passed vacuously on an empty list.
+  const SLOTS = [
+    ['.pc-note','row clause'], ['.band-r','band rule'], ['.sd-row','screen-out reason'],
+    ['.gh-r','group rule'], ['.btn-open.off','refused CTA'], ['.wh-sub','widget subhead']
+  ];
+  const OPERATION = /\b(audit|audits|audited|auditable|auditing|we|our|us|faraudit|ingest|ingested|scan|scanned|crawl|platform|dashboard)\b/i;
+  const strings=[], emptySlots=[];
+  SLOTS.forEach(([sel,name])=>{
+    const els=[...scope.querySelectorAll(sel)].filter(inWork);
+    if(!els.length){ emptySlots.push(name+' ('+sel+')'); return; }
+    els.forEach(e=>{ strings.push([name,e.textContent.trim()]);
+      if(e.title) strings.push([name+' title',e.title]); });
+  });
+  Object.values(VERDICTS).forEach(v=>strings.push(['verdict rule',v.rule]));
+  const violations=strings.filter(([,s])=>OPERATION.test(s));
+  const uniqV=[...new Set(violations.map(([n,s])=>n+': “'+s.slice(0,58)+'”'))];
+  out.push(['C17 A1 · reason subject is the notice, never our operation',
+    violations.length===0 && emptySlots.length===0,
+    strings.length+' strings swept over '+SLOTS.length+' declared slots'+
+    (emptySlots.length?' · SLOT MATCHED NOTHING: '+emptySlots.join(', ')+' (a vacuous pass, not a pass)':'')+
+    (uniqV.length?' · violations: '+uniqV.join(' | '):' · 0 violations')]);
+
+  const pass=out.filter(o=>o[1]).length;
+
+  /* ── C15 · the SERVED rail, measured on Code's artifact, reported separately.
+     The rail markup and CSS in this file are verbatim from
+     opportunities-AS-SERVED-reference-v2-2026-07-29.html. Design does not
+     restyle it, so folding it into the checks above would either fail a design
+     Design cannot fix, or — worse — pass because Design had drawn its own. ── */
+  const rail=document.querySelector('.sidebar');
+  const railOut=[];
+  if(rail){
+    const rSmall=[...rail.querySelectorAll('*')].filter(e=>e.offsetParent!==null&&[...e.childNodes].some(c=>c.nodeType===3&&c.textContent.trim())&&parseFloat(getComputedStyle(e).fontSize)<11);
+    const minPx=rSmall.length?Math.min(...rSmall.map(e=>parseFloat(getComputedStyle(e).fontSize))):null;
+    railOut.push(['rail type floor', rSmall.length===0,
+      rSmall.length? rSmall.length+' node(s) below 11px · smallest '+minPx+'px · e.g. .'+(rSmall[0].className+'').split(' ')[0]
+                   : '0 nodes below 11px']);
+    let rw=99, rsel='';
+    [...rail.querySelectorAll('*')].forEach(e=>{
+      if(e.offsetParent===null)return;
+      if(![...e.childNodes].some(c=>c.nodeType===3&&c.textContent.trim()))return;
+      const r=contrastOf(e); if(r==null)return; if(r<rw){rw=r;rsel=(e.className+'').split(' ')[0];}
+    });
+    railOut.push(['rail text contrast', rw>=4.5, 'worst '+rw.toFixed(2)+':1 on .'+rsel]);
+    // .sb-logo paints a GRADIENT, so backgroundColor is transparent and a
+    // stack walk would measure the rail behind it. Read the stops.
+    const logo=rail.querySelector('.sb-logo');
+    if(logo){
+      const img=getComputedStyle(logo).backgroundImage;
+      const stops=(img.match(/rgba?\([^)]+\)/g)||[]).map(parseC);
+      const fg=parseC(getComputedStyle(logo).color);
+      const rs=stops.map(s=>{const a=lumC(over(fg,s)),b=lumC(s);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);});
+      const wr=rs.length?Math.min(...rs):null;
+      railOut.push(['rail logo mark on its gradient', wr!=null&&wr>=4.5,
+        wr==null?'no gradient stops found':stops.length+' stops · worst '+wr.toFixed(2)+':1 (mark colour '+getComputedStyle(logo).color+')']);
+    }
+  }
+  const railFails=railOut.filter(o=>!o[1]).length;
+
+  $('checks').innerHTML='<div style="font-weight:700;color:var(--ink)">Self-check · '+pass+' of '+out.length+' Design-owned checks pass'+
+      (railOut.length?' · C15: '+railFails+' finding'+(railFails===1?'':'s')+' on the Code-owned rail':'')+'</div>'+
+    out.map(o=>'<div><b class="'+(o[1]?'p':'f')+'">'+(o[1]?'PASS':'FAIL')+'</b> · '+o[0]+' — '+o[2]+'</div>').join('')+
+    (railOut.length?'<div style="margin-top:8px;font-weight:700;color:var(--ink)">C15 · served rail — verbatim from the AS-SERVED reference. Not Design’s to fix; reported so the finding is measured on Code’s artifact, not on a placeholder.</div>'+
+      railOut.map(o=>'<div><b class="'+(o[1]?'p':'f')+'">'+(o[1]?'OK':'FINDING')+'</b> · '+o[0]+' — '+o[2]+'</div>').join(''):'');
+  $('chkNote').textContent='Every number on this page derives from the 197 rows served to the customer on 2026-07-29 (post PR #346). Nothing is typed. The checks above re-run on every filter change and on every theme switch, so a port that breaks one reports it here rather than waiting for a reviewer.';
+}
+renderAll();
+})();
+</script>
+</body>
+</html>

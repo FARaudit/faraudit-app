@@ -1,0 +1,168 @@
+- generic [ref=f3e2]:
+  - complementary [ref=f3e3]
+  - main [ref=f3e4]:
+    - generic [ref=f3e5]:
+      - generic [ref=f3e6]:
+        - generic [ref=f3e7]: Opportunities
+        - generic [ref=f3e8]: /
+        - generic [ref=f3e9]: Pursuit Intelligence
+      - generic [ref=f3e10]: FEED UNAVAILABLE
+      - button "Filter notices… ⌘K" [ref=f3e11] [cursor=pointer]:
+        - generic [ref=f3e15]: Filter notices…
+        - generic [ref=f3e16]: ⌘K
+      - generic [ref=f3e17]:
+        - button "Toggle theme" [ref=f3e18] [cursor=pointer]
+        - generic [ref=f3e21]:
+          - button "Notifications" [ref=f3e22] [cursor=pointer]
+          - dialog "Notifications":
+            - generic:
+              - heading "Notifications" [level=3]
+              - generic: "0"
+            - generic:
+              - generic:
+                - generic:
+                  - generic: Notifications unavailable
+                  - generic: We could not read them just now — this is not an empty inbox. Retry shortly.
+            - generic:
+              - link "View all activity":
+                - /url: /dashboard
+    - generic [ref=f3e28]:
+      - generic [ref=f3e29]:
+        - generic [ref=f3e30]:
+          - paragraph [ref=f3e31]: Live from SAM.gov
+          - heading "Opportunities" [level=1] [ref=f3e32]
+          - paragraph [ref=f3e33]: 0 open notices read live from SAM.gov · 0 NAICS codes on your profile · newest posted 25h ago
+        - generic [ref=f3e34]:
+          - generic [ref=f3e35]: Your NAICS codes · click to filter
+          - generic [ref=f3e36]:
+            - generic [ref=f3e37]: No certifications on record. Until you add them we cannot tell you which set-asides you qualify for — so nothing is screened out on eligibility.
+            - button "Add certifications" [ref=f3e38] [cursor=pointer]
+      - generic [ref=f3e39]:
+        - generic [ref=f3e40]:
+          - generic [ref=f3e41]: Notice type
+          - generic [ref=f3e42]:
+            - button "All types 0" [ref=f3e43] [cursor=pointer]:
+              - text: All types
+              - generic [ref=f3e44]: "0"
+            - button "Pre-Sol 0" [ref=f3e45] [cursor=pointer]:
+              - text: Pre-Sol
+              - generic [ref=f3e46]: "0"
+            - button "Sources Sought 0" [ref=f3e47] [cursor=pointer]:
+              - text: Sources Sought
+              - generic [ref=f3e48]: "0"
+            - button "Open RFP 0" [ref=f3e49] [cursor=pointer]:
+              - text: Open RFP
+              - generic [ref=f3e50]: "0"
+            - button "Special Notice 0" [ref=f3e51] [cursor=pointer]:
+              - text: Special Notice
+              - generic [ref=f3e52]: "0"
+            - button "In Evaluation 0" [ref=f3e53] [cursor=pointer]:
+              - text: In Evaluation
+              - generic [ref=f3e54]: "0"
+          - generic [ref=f3e56]: Set-aside
+          - generic [ref=f3e57]:
+            - button "All 0" [ref=f3e58] [cursor=pointer]:
+              - text: All
+              - generic [ref=f3e59]: "0"
+            - button "+10 with none in this read" [ref=f3e60] [cursor=pointer]
+        - generic [ref=f3e61]:
+          - generic [ref=f3e62]: Saved views
+          - generic [ref=f3e63]:
+            - button "Closing this week open · ≤ 7 days · 0" [ref=f3e64] [cursor=pointer]:
+              - generic [ref=f3e65]: Closing this week
+              - generic [ref=f3e66]: open · ≤ 7 days · 0
+            - button "Set-aside eligible restricted to small business · 0" [ref=f3e67] [cursor=pointer]:
+              - generic [ref=f3e68]: Set-aside eligible
+              - generic [ref=f3e69]: restricted to small business · 0
+            - button "Upstream pre-sol + sources sought · 0" [ref=f3e70] [cursor=pointer]:
+              - generic [ref=f3e71]: Upstream
+              - generic [ref=f3e72]: pre-sol + sources sought · 0
+          - generic [ref=f3e73]:
+            - textbox "Filter notices…" [ref=f3e78]
+            - button "Reset all" [ref=f3e79] [cursor=pointer]
+      - generic [ref=f3e80]:
+        - generic [ref=f3e81]:
+          - paragraph [ref=f3e82]: Open notices
+          - generic [ref=f3e83]: "0"
+          - generic [ref=f3e84]: 0 departments · 0 buying offices
+        - generic [ref=f3e85]:
+          - paragraph [ref=f3e86]: Act this week
+          - generic [ref=f3e87]: "0"
+          - generic [ref=f3e88]: 0 of them close within 3 days
+        - generic [ref=f3e89]:
+          - paragraph [ref=f3e90]: Screened out
+          - generic [ref=f3e91]:
+            - text: "0"
+            - generic [ref=f3e92]: of 0
+          - generic [ref=f3e93]: 0 with no solicitation · 0 not open competition
+        - generic [ref=f3e94]:
+          - paragraph [ref=f3e95]: Audited
+          - generic [ref=f3e96]:
+            - text: "0"
+            - generic [ref=f3e97]: of 0
+          - generic [ref=f3e98]: fit and contract value appear only after an audit
+      - generic [ref=f3e99]:
+        - generic [ref=f3e100]:
+          - generic [ref=f3e101]:
+            - generic [ref=f3e102]:
+              - heading "0 notices → what you actually do" [level=3] [ref=f3e103]
+              - paragraph [ref=f3e104]: Every notice sits in exactly one band. Each band states the rule that put it there. Click a band to filter the list.
+            - generic [ref=f3e105]: Derived
+          - generic [ref=f3e106]:
+            - button "0 Act this week open solicitation · closes within 7 days these are your bids →" [ref=f3e107] [cursor=pointer]:
+              - generic [ref=f3e108]: "0"
+              - generic [ref=f3e109]:
+                - generic [ref=f3e110]: Act this week
+                - generic [ref=f3e111]: open solicitation · closes within 7 days
+              - generic [ref=f3e112]: these are your bids →
+            - button "0 Shape upstream pre-solicitation + sources sought · requirement not fixed influence the scope →" [ref=f3e113] [cursor=pointer]:
+              - generic [ref=f3e114]: "0"
+              - generic [ref=f3e115]:
+                - generic [ref=f3e116]: Shape upstream
+                - generic [ref=f3e117]: pre-solicitation + sources sought · requirement not fixed
+              - generic [ref=f3e118]: influence the scope →
+            - button "0 In the queue open solicitation · more than 7 days left read when you get to it →" [ref=f3e119] [cursor=pointer]:
+              - generic [ref=f3e120]: "0"
+              - generic [ref=f3e121]:
+                - generic [ref=f3e122]: In the queue
+                - generic [ref=f3e123]: open solicitation · more than 7 days left
+              - generic [ref=f3e124]: read when you get to it →
+            - button "0 Screened out nothing here is a bid you can place stop reading these →" [ref=f3e125] [cursor=pointer]:
+              - generic [ref=f3e126]: "0"
+              - generic [ref=f3e127]:
+                - generic [ref=f3e128]: Screened out
+                - generic [ref=f3e129]: nothing here is a bid you can place
+              - generic [ref=f3e130]: stop reading these →
+            - generic [ref=f3e131]:
+              - generic [ref=f3e132]:
+                - generic [ref=f3e133]: "0"
+                - generic [ref=f3e134]: Special Notice — no solicitation document posted
+              - generic [ref=f3e135]:
+                - generic [ref=f3e136]: "0"
+                - generic [ref=f3e137]: sole-source intent — not open competition
+            - generic [ref=f3e138]:
+              - generic [ref=f3e139]:
+                - generic [ref=f3e140]: "0"
+                - generic [ref=f3e141]: notices in this read
+              - generic [ref=f3e142]:
+                - generic [ref=f3e143]: −0
+                - generic [ref=f3e144]: outside your NAICS codes — no profile on record, so nothing is removed
+              - generic [ref=f3e145]:
+                - generic [ref=f3e146]: −0
+                - generic [ref=f3e147]: ineligible for the set-aside — no certifications on record
+              - generic [ref=f3e148]:
+                - generic [ref=f3e149]: "0"
+                - generic [ref=f3e150]: sorted into the four bands above
+        - generic [ref=f3e153]:
+          - heading "Closing first" [level=3] [ref=f3e154]
+          - paragraph [ref=f3e155]: The 7 soonest deadlines you can still respond to. Ordered by days left — the only fact these notices publish that can rank them.
+      - generic [ref=f3e157]:
+        - generic [ref=f3e158]:
+          - generic [ref=f3e159]:
+            - heading "All notices" [level=3] [ref=f3e160]
+            - paragraph
+          - generic [ref=f3e161]:
+            - button "Closing first" [ref=f3e162] [cursor=pointer]
+            - button "Longest window" [ref=f3e163] [cursor=pointer]
+            - button "Buyer" [ref=f3e164] [cursor=pointer]
+        - generic [ref=f3e165]: SAM.gov feed unavailable — no data shown. Nothing on this page is sample data; retry shortly.

@@ -119,6 +119,18 @@
     return Math.floor(h / 24) + 'd ago';
   }
 
+  // Split "DEPT · OFFICE" into its two parts. Returns ['',''] for an absent
+  // value and ['<whole>',''] when SAM published only one segment — never a
+  // guess at which half is missing. Only the FIRST separator splits, so an
+  // office name that itself contains " · " stays intact.
+  function agencyParts(s) {
+    var v = String(s == null ? '' : s).trim();
+    if (!v) return ['', ''];
+    var i = v.indexOf(' · ');
+    if (i < 0) return [v, ''];
+    return [v.slice(0, i).trim(), v.slice(i + 3).trim()];
+  }
+
   function mapOpp(o) {
     const ceilingNum = o.award_ceiling != null && !isNaN(Number(o.award_ceiling))
       ? Number(o.award_ceiling) / 1e6
@@ -128,8 +140,15 @@
       // notice_id is the durable SAM identifier the watcher + audit key off.
       notice_id: o.notice_id || '',
       title: o.title || 'Untitled',
-      agency: o.agency || '',
-      office: '',
+      // resolveAgency() joins the department and the buying office with " · "
+      // (it keeps the first two segments of SAM's dotted fullParentPathName).
+      // They arrive as ONE string and `office` was hardcoded empty, so the two
+      // facts could never be addressed separately — a buyer breakdown, an office
+      // filter, or a display map keyed on either name had nothing to key on.
+      // Splitting here changes no rendered output: the row already prints
+      // agency + " · " + office, which recomposes the original string exactly.
+      agency: agencyParts(o.agency)[0],
+      office: agencyParts(o.agency)[1],
       naics: o.naics_code || '',
       sa: normSetaside(o.set_aside),
       stage: normStage(o.document_type, o.status),
