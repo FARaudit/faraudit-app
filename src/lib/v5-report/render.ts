@@ -18,7 +18,7 @@
    Every interpolated field routes through esc() (stored-XSS safe).
    ============================================================================= */
 import type { V4Data, V4Verdict, V4Findings, V4Finding, V4Date, V4Temporal, V4SubmissionL, V4EvalM, V4Clins, V4Provenance, Tone } from "@/lib/v4-report/render";
-import { esc, TONE_LABEL, SEVLAB, eligInfo, eyebrowFor, plur, cap, scorecardTiles, splitCaveatRationale, type EligInfo } from "./core";
+import { esc, hasCol, TONE_LABEL, SEVLAB, eligInfo, eyebrowFor, plur, cap, scorecardTiles, splitCaveatRationale, type EligInfo } from "./core";
 
 // AUDIT_V5_SEAL — "Decision Seal" masthead redesign (flag-gated; default-OFF = byte-identical).
 const V5_SEAL = process.env.AUDIT_V5_SEAL === "true";
@@ -572,7 +572,7 @@ function submissionLBody(s: SubmissionLGrounded): string {
   const rows = s.rows.map((r) => {
     const p = splitMethod(r.req);
     return `<div class="lx-row">
-        <span class="lx-vol mono">${esc(r.vol)}</span>
+        ${r.vol !== undefined ? `<span class="lx-vol mono">${esc(r.vol)}</span>` : ""}
         <div class="lx-b">
           <div class="lx-req"><b>${esc(p.head)}</b>${p.tail ? ` — ${esc(p.tail)}` : ""}</div>
           ${r.condition ? `<div class="lx-cond">${esc(r.condition)}</div>` : ""}
@@ -584,7 +584,9 @@ function submissionLBody(s: SubmissionLGrounded): string {
       ${s.provision ? `<p class="lx-gov"><span class="lx-gov-k">Governed by</span> <span class="lx-gov-v mono">${esc(s.provision)}</span></p>` : ""}
       <div class="lx-list">${rows}</div>`;
 }
-export function splitMethod(basis: string): { head: string; tail: string } {
+// `basis` is optional under REPORT-TRUTH #3 — the panel-level award basis is not computed by anything, so it is now
+// omitted rather than sent as "". The body already coerced falsy input, so widening the signature is the whole change.
+export function splitMethod(basis: string | undefined): { head: string; tail: string } {
   const m = String(basis || "").split(/\s+—\s+/);
   return { head: m[0] || "", tail: m.slice(1).join(" — ") };
 }
@@ -618,10 +620,13 @@ function evalMBody(e: V4EvalM): string {
       <p class="sec-foot">No weights, no total, no score — the Government did not publish one, and neither do we.</p>`;
 }
 function clinsBody(c: V4Clins): string {
-  const rows = c.rows.map((r) => `<tr><td class="cx-clin mono">${esc(r.clin)}</td><td class="cx-title">${esc(r.title)}</td>
-      <td><span class="cx-type mono">${esc(r.type)}</span></td><td class="cx-qty mono">${esc(r.qtyUnit)}</td><td class="cx-period">${esc(r.period)}</td></tr>`).join("");
+  // REPORT-TRUTH #3 — a column renders only if some row computed it. `undefined` everywhere = the engine never typed
+  // the attribute, so the column is dropped whole; `""` = computed-empty and keeps it (flag-OFF byte-identical).
+  const shows = { clin: hasCol(c.rows, (r) => r.clin), type: hasCol(c.rows, (r) => r.type), qty: hasCol(c.rows, (r) => r.qtyUnit), per: hasCol(c.rows, (r) => r.period) };
+  const rows = c.rows.map((r) => `<tr>${shows.clin ? `<td class="cx-clin mono">${esc(r.clin)}</td>` : ""}<td class="cx-title">${esc(r.title)}</td>
+      ${shows.type ? `<td><span class="cx-type mono">${esc(r.type)}</span></td>` : ""}${shows.qty ? `<td class="cx-qty mono">${esc(r.qtyUnit)}</td>` : ""}${shows.per ? `<td class="cx-period">${esc(r.period)}</td>` : ""}</tr>`).join("");
   return `${c.lead ? `<p class="sec-lead">${esc(c.lead)}</p>` : ""}
-      <table class="grid grid-clin"><thead><tr><th>CLIN</th><th>Title</th><th>Type</th><th>Qty / unit</th><th>Period</th></tr></thead><tbody>${rows}</tbody></table>`;
+      <table class="grid grid-clin"><thead><tr>${shows.clin ? "<th>CLIN</th>" : ""}<th>Title</th>${shows.type ? "<th>Type</th>" : ""}${shows.qty ? "<th>Qty / unit</th>" : ""}${shows.per ? "<th>Period</th>" : ""}</tr></thead><tbody>${rows}</tbody></table>`;
 }
 function datesBody(list: V4Date[]): string {
   const items = list.map((d) => {

@@ -22,7 +22,7 @@
         vs the mock's "Eligibility · Not applicable" — doctrine §5 suppresses the
         eligibility chip on OUT_OF_SCOPE, so the advisory count is the honest tile.
    ============================================================================= */
-import { esc, eligInfo, TONE_LABEL, eyebrowFor, scorecardTiles, splitCaveatRationale, type EligInfo } from "@/lib/v5-report/core";
+import { esc, hasCol, eligInfo, TONE_LABEL, eyebrowFor, scorecardTiles, splitCaveatRationale, type EligInfo } from "@/lib/v5-report/core";
 
 // Bottom line — lede + ranked top-5 self-clearable caveats, remainder grouped (card #612-(3c)).
 // SHARED logic (splitCaveatRationale) with the web + deck surfaces so the Executive Brief PDF
@@ -236,13 +236,14 @@ function submissionL(d: V4Data): string {
   const s = d.submissionL;
   if (!s.grounded) return "";
   const provision = (s as { provision?: string }).provision; // optional in the data contract
+  const showVol = hasCol(s.rows, (r) => r.vol);   // REPORT-TRUTH #3 — drop the column the engine never typed
   const rows = s.rows.map((r) => {
     const p = splitMethod(r.req);
-    return `<tr><td class="c-vol">${esc(r.vol)}</td><td><span class="c-strong">${esc(p.head)}</span>${p.tail ? " — " + esc(p.tail) : ""}${r.condition ? `<div class="c-sub">${esc(r.condition)}</div>` : ""}</td><td class="c-mono">${esc(r.cite)}</td></tr>`;
+    return `<tr>${showVol ? `<td class="c-vol">${esc(r.vol)}</td>` : ""}<td><span class="c-strong">${esc(p.head)}</span>${p.tail ? " — " + esc(p.tail) : ""}${r.condition ? `<div class="c-sub">${esc(r.condition)}</div>` : ""}</td><td class="c-mono">${esc(r.cite)}</td></tr>`;
   }).join("");
   return `<div class="gb-sub">Section L · Submission ${provision ? `<span class="gs-cite">${esc(provision)}</span>` : ""}</div>
       ${s.lead ? `<p class="gb-lead">${esc(s.lead)}</p>` : ""}
-      <table class="gb-table"><thead><tr><th>Volume</th><th>Requirement &amp; condition</th><th>Cite</th></tr></thead><tbody>${rows}</tbody></table>`;
+      <table class="gb-table"><thead><tr>${showVol ? "<th>Volume</th>" : ""}<th>Requirement &amp; condition</th><th>Cite</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 function evalM(d: V4Data): string {
   const e = d.evalM;
@@ -261,7 +262,9 @@ function evalM(d: V4Data): string {
 function clins(d: V4Data): string {
   const c = d.clins;
   if (!c.grounded) return "";
-  const rows = c.rows.map((r) => `<tr><td class="c-vol">${esc(r.clin)}</td><td class="c-strong">${esc(r.title)}</td><td class="c-mono">${esc(r.type)}</td><td class="c-mono">${esc(r.qtyUnit)}</td><td class="c-mono">${esc(r.period)}</td></tr>`).join("");
+  // REPORT-TRUTH #3 — same compute-or-absent rule as the web renderer; the PDF must not print columns the web drops.
+  const sh = { clin: hasCol(c.rows, (r) => r.clin), type: hasCol(c.rows, (r) => r.type), qty: hasCol(c.rows, (r) => r.qtyUnit), per: hasCol(c.rows, (r) => r.period) };
+  const rows = c.rows.map((r) => `<tr>${sh.clin ? `<td class="c-vol">${esc(r.clin)}</td>` : ""}<td class="c-strong">${esc(r.title)}</td>${sh.type ? `<td class="c-mono">${esc(r.type)}</td>` : ""}${sh.qty ? `<td class="c-mono">${esc(r.qtyUnit)}</td>` : ""}${sh.per ? `<td class="c-mono">${esc(r.period)}</td>` : ""}</tr>`).join("");
   return `<div class="gb-sub">CLIN structure</div>${c.lead ? `<p class="gb-lead">${esc(c.lead)}</p>` : ""}
       <table class="gb-table"><thead><tr><th>CLIN</th><th>Title</th><th>Type</th><th>Qty / unit</th><th>Period</th></tr></thead><tbody>${rows}</tbody></table>`;
 }

@@ -42,9 +42,15 @@ export interface V4Temporal { gateDays: number | null; windowDays: number | null
 export interface V4Finding { req: string; cite: string; excerpt?: string; keyExcerpt?: string; curability?: string; temporal?: V4Temporal; driver?: boolean; }
 export interface V4Findings { p0: V4Finding[]; p1: V4Finding[]; p2: V4Finding[]; unrated?: V4Finding[]; satisfied?: { req: string; cite: string }[]; }
 export interface V4Grounded<T> { grounded: boolean; } // { grounded:false } sentinel or the full derived shape
-export interface V4SubmissionL { grounded: true; lead?: string; rows: { vol: string; req: string; condition: string; cite: string }[]; }
-export interface V4EvalM { grounded: true; basis: string; factors: { name: string; basis: string; cite: string }[]; }
-export interface V4Clins { grounded: true; lead?: string; rows: { clin: string; title: string; type: string; qtyUnit: string; period: string }[]; }
+// REPORT-TRUTH #3 — COMPUTE-OR-ABSENT. `vol`/`basis`/`type`/`qtyUnit`/`period` are attributes the engine never
+// types (FindingLite carries no field for any of them), yet the panels emitted "" for each and the renderer drew a
+// column header over it. An empty cell under a printed header reads as "we looked and the solicitation says nothing"
+// — a claim the engine never made. The distinction is now carried in the type:
+//   `undefined` = NEVER COMPUTED  → the column is dropped entirely (header and cells)
+//   `""`        = computed-empty  → the column renders (legacy/flag-OFF behaviour, byte-identical)
+export interface V4SubmissionL { grounded: true; lead?: string; rows: { vol?: string; req: string; condition: string; cite: string }[]; }
+export interface V4EvalM { grounded: true; basis?: string; factors: { name: string; basis?: string; cite: string }[]; }
+export interface V4Clins { grounded: true; lead?: string; rows: { clin?: string; title: string; type?: string; qtyUnit?: string; period?: string }[]; }
 export interface V4Date { label: string; value: string; kind?: "gate" | string; sub?: string; }
 export interface V4Provenance { auditDate: string; engine: string; manifest: { name: string; read: "full" | "indexed" | "unread" }[]; }
 export interface V4Data {
@@ -263,38 +269,50 @@ function optional(section: { grounded: boolean } | undefined, coverageState: str
   return { html: renderFn(), present: true };
 }
 
+/** REPORT-TRUTH #3 — a column exists only if SOMETHING computed it. `undefined` on every row means the engine never
+ *  typed that attribute, so the column is dropped WHOLE rather than printed as a header over blanks: an empty cell
+ *  under a printed header reads as "we looked, and the solicitation says nothing", which is a claim the engine never
+ *  made. `""` on any row is a computed-empty and KEEPS the column — which is what makes flag-OFF byte-identical. */
+const hasCol = <T,>(rows: T[], pick: (r: T) => string | undefined): boolean => rows.some((r) => pick(r) !== undefined);
+
 function submissionL(s: V4SubmissionL): string {
+  const showVol = hasCol(s.rows, (r) => r.vol);
   const rows = s.rows.map((r) => `
-      <tr><td class="sl-vol mono">${esc(r.vol)}</td>
+      <tr>${showVol ? `<td class="sl-vol mono">${esc(r.vol ?? "")}</td>` : ""}
       <td class="sl-req">${esc(r.req)}<span class="sl-cond">${esc(r.condition)}</span></td>
       <td class="sl-cite mono">${esc(r.cite)}</td></tr>`).join("");
   return `<section class="sec" id="sec-l" data-sec>
       <div class="sec-head"><span class="sec-n mono">03</span><h2>Section L · Submission</h2></div>
       ${s.lead ? `<p class="sec-lead">${esc(s.lead)}</p>` : ""}
-      <table class="grid-table sl-table"><thead><tr><th>Volume</th><th>What must be submitted</th><th>Cite</th></tr></thead>
+      <table class="grid-table sl-table"><thead><tr>${showVol ? "<th>Volume</th>" : ""}<th>What must be submitted</th><th>Cite</th></tr></thead>
       <tbody>${rows}</tbody></table></section>`;
 }
 function evalM(e: V4EvalM): string {
+  const showBasis = hasCol(e.factors, (f) => f.basis);
   const rows = e.factors.map((f) => `
       <tr><td class="em-name">${esc(f.name)}</td>
-      <td class="em-basis">${esc(f.basis)}</td>
+      ${showBasis ? `<td class="em-basis">${esc(f.basis ?? "")}</td>` : ""}
       <td class="em-cite mono">${esc(f.cite)}</td></tr>`).join("");
   return `<section class="sec" id="sec-m" data-sec>
       <div class="sec-head"><span class="sec-n mono">04</span><h2>Section M · Evaluation</h2></div>
-      <p class="sec-lead">${esc(e.basis)}</p>
-      <table class="grid-table em-table"><thead><tr><th>Factor (descending importance)</th><th>How it is evaluated</th><th>Cite</th></tr></thead>
+      ${e.basis !== undefined ? `<p class="sec-lead">${esc(e.basis)}</p>` : ""}
+      <table class="grid-table em-table"><thead><tr><th>Factor (descending importance)</th>${showBasis ? "<th>How it is evaluated</th>" : ""}<th>Cite</th></tr></thead>
       <tbody>${rows}</tbody></table>
       <p class="sec-foot">No weights, no total, no score — the Government did not publish one, and neither do we.</p></section>`;
 }
 function clins(c: V4Clins): string {
+  const showClin = hasCol(c.rows, (r) => r.clin);
+  const showType = hasCol(c.rows, (r) => r.type);
+  const showQty = hasCol(c.rows, (r) => r.qtyUnit);
+  const showPer = hasCol(c.rows, (r) => r.period);
   const rows = c.rows.map((r) => `
-      <tr><td class="cl-n mono">${esc(r.clin)}</td><td class="cl-t">${esc(r.title)}</td>
-      <td class="cl-type mono">${esc(r.type)}</td><td class="cl-qty mono">${esc(r.qtyUnit)}</td>
-      <td class="cl-per">${esc(r.period)}</td></tr>`).join("");
+      <tr>${showClin ? `<td class="cl-n mono">${esc(r.clin ?? "")}</td>` : ""}<td class="cl-t">${esc(r.title)}</td>
+      ${showType ? `<td class="cl-type mono">${esc(r.type ?? "")}</td>` : ""}${showQty ? `<td class="cl-qty mono">${esc(r.qtyUnit ?? "")}</td>` : ""}
+      ${showPer ? `<td class="cl-per">${esc(r.period ?? "")}</td>` : ""}</tr>`).join("");
   return `<section class="sec" id="clins" data-sec>
       <div class="sec-head"><span class="sec-n mono">05</span><h2>CLIN structure</h2></div>
       ${c.lead ? `<p class="sec-lead">${esc(c.lead)}</p>` : ""}
-      <table class="grid-table cl-table"><thead><tr><th>CLIN</th><th>Title</th><th>Type</th><th>Qty / unit</th><th>Period</th></tr></thead>
+      <table class="grid-table cl-table"><thead><tr>${showClin ? "<th>CLIN</th>" : ""}<th>Title</th>${showType ? "<th>Type</th>" : ""}${showQty ? "<th>Qty / unit</th>" : ""}${showPer ? "<th>Period</th>" : ""}</tr></thead>
       <tbody>${rows}</tbody></table></section>`;
 }
 function dates(list: V4Date[]): string {

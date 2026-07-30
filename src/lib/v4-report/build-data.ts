@@ -67,6 +67,13 @@ export function sanitizeProse(v: unknown): string {
 const RE_L = /§\s*L\b|(?:^|[\s(])L[-.\s]\d/i;
 const RE_M = /§\s*M\b|(?:^|[\s(])M[-.\s]\d/i;
 const RE_CLIN = /\bCLIN\b|§\s*B\b/i;
+// REPORT-TRUTH #3 (flag AUDIT_PANEL_COMPUTE_OR_ABSENT, default OFF ⇒ every panel below keeps its legacy "" fields ⇒
+// byte-identical). Evaluated per call, not frozen at import, so the flag is honoured at render time.
+const panelComputeOrAbsent = (): boolean => process.env.AUDIT_PANEL_COMPUTE_OR_ABSENT === "true";
+// A CLIN number is only a CLIN number when a LINE-ITEM MARKER says so. Anchoring on the marker is what separates
+// "CLIN 0006" from a street number, a year, or the -7012 tail of a DFARS clause. Optional plural ("CLINs 0001-0006"),
+// optional "No.", optional leading zeros, and the A/AA alphanumeric SLIN suffix federal schedules use.
+const ANCHORED_CLIN = /\b(?:CLIN|SLIN|LINE\s+ITEM|ITEM)S?\s*(?:NO\.?|#)?\s*(\d{4}[A-Z]{0,2})\b/i;
 // numeric tail of a citation, for §L ascending sort (L-4.1 before L-4.2)
 const citeTail = (c: string): number => {
   const m = s(c).match(/(\d+(?:\.\d+)?)\s*$/);
@@ -295,8 +302,10 @@ function buildSubmissionL(all: FindingLite[]): V4SubmissionL | { grounded: false
     .slice()
     // ascending by citation numeric tail; NaN (both tail-less → Infinity-Infinity) must not corrupt the sort.
     .sort((a, b) => { const d = citeTail(s(a.citation)) - citeTail(s(b.citation)); return Number.isNaN(d) ? 0 : d; })
-    // Volume column drops (engine does not type a volume grouping) → degrade to req + condition + cite.
-    .map((f) => ({ vol: "", req: s(f.requirement), condition: s(f.excerpt || ""), cite: s(f.citation) }));
+    // REPORT-TRUTH #3 — the engine does not type a volume grouping, so `vol` is OMITTED (undefined) rather than sent
+    // as "": the renderer drops the whole Volume column instead of printing a header over blanks. Flag-OFF keeps ""
+    // so the column still renders ⇒ byte-identical.
+    .map((f) => ({ ...(panelComputeOrAbsent() ? {} : { vol: "" }), req: s(f.requirement), condition: s(f.excerpt || ""), cite: s(f.citation) }));
   return { grounded: true, rows };
 }
 
@@ -304,8 +313,11 @@ function buildSubmissionL(all: FindingLite[]): V4SubmissionL | { grounded: false
 function buildEvalM(all: FindingLite[]): V4EvalM | { grounded: false } {
   const set = all.filter((f) => f.disposition !== "dropped" && (f.kind === "evaluation_factor" || RE_M.test(s(f.citation))));
   if (!set.length) return { grounded: false };
+  // REPORT-TRUTH #3 — a factor's `basis` IS computed (it is the finding's own excerpt/note), so it stays. The PANEL-level
+  // `basis` — the one-line statement of the award basis — is not computed by anything and was emitted as "", rendering
+  // an empty lead paragraph above the grid. Omitted under the flag so the renderer drops the paragraph entirely.
   const factors = set.map((f) => ({ name: s(f.requirement), basis: s(f.excerpt || f.note || ""), cite: s(f.citation) }));
-  return { grounded: true, basis: "", factors };
+  return { grounded: true, ...(panelComputeOrAbsent() ? {} : { basis: "" }), factors };
 }
 
 // ── CLIN structure (derived; degrade to CLIN + Title + Cite when attrs untyped) ──
@@ -313,8 +325,20 @@ function buildClins(all: FindingLite[]): V4Clins | { grounded: false } {
   const set = all.filter((f) => f.disposition !== "dropped" && (f.kind === "clin" || RE_CLIN.test(s(f.citation))));
   if (!set.length) return { grounded: false };
   const rows = set.map((f) => {
-    const clinNo = (s(f.requirement).match(/\b(\d{4})\b/) || s(f.citation).match(/\b(\d{4})\b/) || [])[1] || "";
-    return { clin: clinNo, title: s(f.requirement), type: "", qtyUnit: "", period: "" };
+    // REPORT-TRUTH #3 — the CLIN number must be ANCHORED to a line-item marker, never scraped as "any 4-digit token".
+    // The bare /\b(\d{4})\b/ scrape over finding PROSE is what put CLIN "1810" in the customer's report on run
+    // 95698f91 — the street number of 1810 Jefferson Blvd. Run against that run's real findings it also produced
+    // "2026" from dates, "1984" from a FAR reference, and "7012"/"7008"/"7003"/"7004" — the SUFFIXES OF DFARS CLAUSE
+    // NUMBERS like 252.204-7012 — every one of them rendered to the customer as a contract line item.
+    // Unanchored ⇒ the cell is OMITTED (and if no row anchors, the renderer drops the CLIN column) — never invented.
+    const clinNo = panelComputeOrAbsent()
+      ? (ANCHORED_CLIN.exec(s(f.requirement)) || ANCHORED_CLIN.exec(s(f.citation)) || [])[1]
+      : ((s(f.requirement).match(/\b(\d{4})\b/) || s(f.citation).match(/\b(\d{4})\b/) || [])[1] || "");
+    return panelComputeOrAbsent()
+      // type / qtyUnit / period: FindingLite carries no field for any of them, so they were never computed — omitted,
+      // not emptied, so the renderer cannot draw three permanently-blank columns that imply the source is silent.
+      ? { ...(clinNo ? { clin: clinNo } : {}), title: s(f.requirement) }
+      : { clin: clinNo, title: s(f.requirement), type: "", qtyUnit: "", period: "" };
   });
   return { grounded: true, rows };
 }

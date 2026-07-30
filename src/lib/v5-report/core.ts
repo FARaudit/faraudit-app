@@ -17,6 +17,12 @@
    ============================================================================= */
 import type { Tone, V4Data, V4Verdict } from "@/lib/v4-report/render";
 
+// REPORT-TRUTH #3 — compute-or-absent for panel columns, shared by every v5 surface (web · deck · pdf) so they cannot
+// disagree about which columns exist. `undefined` on every row means the engine never typed that attribute → the
+// column is dropped WHOLE; `""` on any row is a computed-empty → the column renders (flag-OFF byte-identical).
+// An empty cell under a printed header reads as "we looked, and the source says nothing" — never a claim we made.
+export const hasCol = <T,>(rows: T[], pick: (r: T) => string | undefined): boolean => rows.some((r) => pick(r) !== undefined);
+
 export const esc = (s: unknown): string =>
   String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
