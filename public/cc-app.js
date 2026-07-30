@@ -197,15 +197,12 @@
   // rendered week one and nothing else, and "This Month" / "Later This Year"
   // could never appear however high it went. Capping each group separately is
   // what actually raises the calendar's reach: every designed group gets rows.
-  // Sized to the panel's natural height, NOT to the data volume: .week-list has
-  // no max-height and no internal scroll (computed overflow-y: visible), and the
-  // two panels share a grid row — so every row added here also stretches the
-  // Priority Action Feed beside it. At 20/15/10 the page ran 4,070px with an
-  // empty panel stretched alongside. 12/8/5 doubles the old flat cap of 12,
-  // populates all three groups, and keeps the page near its designed height.
-  // Going higher is a DESIGN decision (give .week-list a max-height + overflow-y:
-  // auto), not a data one — deliberately left to the owner.
-  const WEEK_GROUP_CAPS = { 'This Week': 12, 'This Month': 8, 'Later This Year': 5 };
+  // .week-list now scrolls internally (max-height + overflow-y in today.html),
+  // so these caps no longer trade against page height — they trade against
+  // scannability. 20/15/10 covers a full quarter of real deadlines on the
+  // measured feed (71/109/17) while every group still reports its true total
+  // and its own remainder.
+  const WEEK_GROUP_CAPS = { 'This Week': 20, 'This Month': 15, 'Later This Year': 10 };
 
   function renderWeek() {
     const groups = [
