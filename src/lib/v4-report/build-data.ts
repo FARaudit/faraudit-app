@@ -3,6 +3,7 @@
 // Binds per _DATA-CONTRACT.md; derives §L/§M/CLIN/dates per _DERIVATION-SPEC.md (card 225).
 // Reads the SAME inputs as the v3 renderer: audit.compliance_json.v3 (V3ReportPayload) + audit-row columns.
 import type { V3ReportPayload, FindingLite } from "@/lib/audit-v3-report";
+import { extractClinSchedule } from "@/lib/audit-clin-schedule";
 import type {
   V4Data, V4Fact, V4Verdict, V4Coverage, V4Findings, V4Finding,
   V4SubmissionL, V4EvalM, V4Clins, V4Date, V4Provenance, Tone, Pole,
@@ -321,7 +322,16 @@ function buildEvalM(all: FindingLite[]): V4EvalM | { grounded: false } {
 }
 
 // ── CLIN structure (derived; degrade to CLIN + Title + Cite when attrs untyped) ──
-function buildClins(all: FindingLite[]): V4Clins | { grounded: false } {
+function buildClins(all: FindingLite[], rawSource?: string): V4Clins | { grounded: false } {
+  // REPORT-TRUTH #4 (flag AUDIT_CLIN_SCHEDULE_EXTRACT, default OFF ⇒ skipped ⇒ byte-identical). PREFER the schedule
+  // the solicitation actually states. §B of run 95698f91 carries 26 line items with titles, quantities, pricing
+  // arrangement and periods — while this panel was deriving CLINs from finding PROSE a few hundred lines away and
+  // rendering a street number as a line item (#3). Findings are the FALLBACK now, not the source of truth: a stated
+  // schedule beats an inferred one, and when §B states nothing the panel degrades exactly as before.
+  if (process.env.AUDIT_CLIN_SCHEDULE_EXTRACT === "true" && rawSource) {
+    const sched = extractClinSchedule(rawSource);
+    if (sched.length) return { grounded: true, rows: sched.map((r) => ({ clin: r.clin, title: r.title ?? "", ...(r.type ? { type: r.type } : {}), ...(r.qtyUnit ? { qtyUnit: r.qtyUnit } : {}), ...(r.period ? { period: r.period } : {}) })) };
+  }
   const set = all.filter((f) => f.disposition !== "dropped" && (f.kind === "clin" || RE_CLIN.test(s(f.citation))));
   if (!set.length) return { grounded: false };
   const rows = set.map((f) => {
@@ -706,7 +716,7 @@ export function buildV4Data(audit: Record<string, unknown>): V4Data {
     findings,
     submissionL: buildSubmissionL(all),
     evalM: buildEvalM(all),
-    clins: buildClins(all),
+    clins: buildClins(all, s(audit.raw_pdf_text)),
     dates: buildDates(responseDeadline, cj, amended),
     provenance,
   } as V4Data;
