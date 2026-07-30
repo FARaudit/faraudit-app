@@ -72,7 +72,7 @@
 
 const VERDICTS = {
   READ  : {k:'READ',  word:'READ ONLY', band:'screened', cls:'vd-read',
-           rule:'Special Notice — industry day, amendment or cancellation. There is no solicitation to audit.'},
+           rule:'Special Notice — industry day, amendment or cancellation. No solicitation document has posted for this requirement.'},
   ASSERT: {k:'ASSERT',word:'ASSERT',    band:'screened', cls:'vd-assert',
            rule:'Sole-source intent published. Not open competition — the move is to assert capability inside the window.'},
   SHAPE : {k:'SHAPE', word:'SHAPE',     band:'shape',    cls:'vd-shape',
@@ -138,7 +138,7 @@ const TITLECASE = (s)=>s.replace(/[A-Za-z][A-Za-z'()./-]*/g,w=>/^[A-Z0-9'()./-]{
    branch. The live page produced 5 strings for 197 rows, one of them on 78%. ── */
 function clause(o){
   const v = verdict(o), d = o.days;
-  if(v.k==='READ')   return 'Special Notice · nothing to audit yet';
+  if(v.k==='READ')   return 'Special Notice · no solicitation document posted yet';
   if(v.k==='ASSERT') return d+' days to assert capability';
   if(v.k==='SHAPE')  return STAGE_LABEL[o.stage]+' · '+d+' days to respond';
   const sa = o.sa==='Full' ? 'full &amp; open' : o.sa==='UNKNOWN' ? 'set-aside unread' : esc(o.sa)+' set-aside';
@@ -208,7 +208,7 @@ function renderBands(){
   $('triageTitle').textContent = rows.length+' notices → what you actually do';
   // Reasons INSIDE the screened band. These sum to the band, nothing else.
   const screenReasons = [
-    {n:rows.filter(o=>o.stage==='notice').length, t:'Special Notice — no solicitation to audit'},
+    {n:rows.filter(o=>o.stage==='notice').length, t:'Special Notice — no solicitation document posted'},
     {n:rows.filter(o=>o.sa==='SoleSource').length, t:'sole-source intent — not open competition'}
   ];
   // The funnel: what never reached a band at all.
@@ -235,7 +235,7 @@ let LAST_BANDS = null;
 /* ── closing first ── */
 function renderAct(){
   const rows = base().filter(o=>o.days!=null && verdict(o).band!=='screened').sort((a,b)=>a.days-b.days).slice(0,7);
-  $('actSub').textContent = 'The 7 soonest deadlines you can still respond to. Ordered by days left — the only ranking this feed supports until an audit runs.';
+  $('actSub').textContent = 'The 7 soonest deadlines you can still respond to. Ordered by days left — the only fact these notices publish that can rank them.';
   $('actList').innerHTML = rows.map(o=>'<button class="act-row'+(o.days>7?' far':'')+'" data-id="'+esc(o.id)+'">'+
     '<span class="act-d">'+o.days+'<small>days</small></span>'+
     '<span style="min-width:0"><span class="act-title">'+esc(TITLECASE(o.title))+'</span><span class="act-agy">'+esc(officeName(o.office))+' · '+esc(o.id)+'</span></span>'+
@@ -295,7 +295,7 @@ function sortRows(data) {
 function rowHTML(o) {
   const v = verdict(o), sa = saRender(o.sa);
   const far = o.days == null ? 'later' : o.days <= 3 ? '' : o.days <= 7 ? 'far' : 'later';
-  const auditable = o.stage !== 'notice';
+  const hasSolicitation = o.stage !== 'notice';
   const auditRef = o.notice_id || o.id;
   return '<div class="pcard' + (far ? ' ' + far : '') + (v.k === 'ASSERT' ? ' barred' : '') + '" data-id="' + esc(o.id) + '">' +
     '<div class="pc-when"><div class="pc-d">' + (o.days == null ? '—' : o.days + '<small>d</small>') + '</div><div class="pc-dl">' + (o.days == null ? 'NO DEADLINE' : 'LEFT') + '</div></div>' +
@@ -307,9 +307,9 @@ function rowHTML(o) {
     '</div>' +
     '<div class="pc-state"><span class="vd ' + v.cls + '">' + v.word + '</span><span class="pc-note">' + clause(o) + '</span></div>' +
     '<div class="pc-actions">' +
-      (auditable && auditRef
+      (hasSolicitation && auditRef
         ? '<a class="btn-open" href="/audit?noticeId=' + encodeURIComponent(auditRef) + '">Run audit</a>'
-        : '<span class="btn-open off" title="' + (auditable ? 'No notice reference' : 'Special Notice — there is no solicitation to audit until one posts') + '">' + (auditable ? 'Run audit' : 'Nothing to audit') + '</span>') +
+        : '<span class="btn-open off" title="' + (hasSolicitation ? 'No notice reference' : 'Special Notice — no solicitation document has posted for this requirement yet') + '">' + (hasSolicitation ? 'Run audit' : 'No solicitation yet') + '</span>') +
       '<button class="btn-2" type="button" data-watch-notice="' + esc(o.notice_id) + '">Track</button>' +
       '<button class="btn-2" type="button" data-track="' + esc(o.id) + '">Pipeline</button>' +
     '</div></div>';
