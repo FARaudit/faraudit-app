@@ -27,7 +27,14 @@ const ok = (c: boolean, label: string, detail = "") => {
   else { fail++; console.log(`  ✗ FAIL ${label}${detail ? "  — " + detail : ""}`); }
 };
 
-const DESIGN_FILE = path.join(
+// Design's delivered file is VENDORED into the repo. The hand-carried original
+// lives in a CEO comms folder that gets archived once a card is sent, and it is
+// outside the repo entirely — so a gate pointed at it is unrunnable in CI and goes
+// red the moment the CEO files the card. The vendored copy is the source of truth;
+// the original is treated as a drift check when it happens to still be there.
+const DESIGN_FILE = path.join(process.cwd(), "test", "fixtures", "design",
+  "card-775-opportunities-LIVE-2026-07-29.html");
+const DESIGN_ORIGINAL = path.join(
   "/Users/josearodriguezjr./faraudit-app/ceo/redesign-final/Communication/Send to Code",
   "card-775-opportunities-2026-07-29",
   "Card 775 - Opportunities -LIVE-.html"
@@ -75,15 +82,28 @@ function proseLiterals(src: string): string[] {
 }
 
 console.log("═══ 0 · BOTH SOURCES PRESENT ═══");
-ok(existsSync(DESIGN_FILE), "Design's delivered file is on disk", path.basename(DESIGN_FILE));
+ok(existsSync(DESIGN_FILE), "Design's delivered file is vendored in-repo", "test/fixtures/design/");
 if (!existsSync(DESIGN_FILE)) {
-  // Fail loudly rather than skipping. A missing hand-carried file is exactly the
+  // Fail loudly rather than skipping. A missing reference file is exactly the
   // condition that produced the drift this gate exists to catch.
-  console.log("\n✗ Design's file is absent — cannot certify parity. This is a FAIL, not a skip.");
+  console.log("\n✗ Design's vendored file is absent — cannot certify parity. This is a FAIL, not a skip.");
   console.log(`\n══════ ${pass} passed · ${fail + 1} failed ══════`);
   process.exit(1);
 }
 ok(existsSync(SHIPPED_FILE), "the shipped render layer is on disk", "public/dso-app.js");
+
+// Drift check: while the hand-carried original is still on disk, the vendored copy
+// must equal it byte for byte. This is what stops the fixture from quietly becoming
+// a stale snapshot of a file Design has since re-dropped — the vendoring would
+// otherwise just relocate the message-vs-file problem one layer down.
+if (existsSync(DESIGN_ORIGINAL)) {
+  const a = readFileSync(DESIGN_FILE);
+  const b = readFileSync(DESIGN_ORIGINAL);
+  ok(a.equals(b), "the vendored copy is byte-identical to the hand-carried original",
+    a.equals(b) ? `${a.length} bytes` : `vendored ${a.length}B vs original ${b.length}B — RE-VENDOR`);
+} else {
+  console.log("  · hand-carried original not on disk (card archived) — vendored copy stands alone");
+}
 
 const designSrc = readFileSync(DESIGN_FILE, "utf8");
 const shippedSrc = readFileSync(SHIPPED_FILE, "utf8");
