@@ -92,6 +92,14 @@ console.log("\n── Part C · Week Ahead calendar ──");
     "header count derived from the capped slice"
   );
   check("wiring-layer ceiling is a DOM backstop, not the display cap", /WEEK_MAX_ROWS/.test(ccLive), "display cap still lives in the fetch layer");
+  // The caps are only safe to raise BECAUSE the list scrolls internally. If the
+  // scroll is ever removed, 45 rows silently run the page to ~4,000px and drag
+  // the panel beside it — so the two are pinned together here.
+  {
+    const rule = /\.week-list\{([^}]*)\}/.exec(todayHtml)?.[1] ?? "";
+    check("week-list scrolls internally (max-height)", /max-height:\s*\d/.test(rule), "no max-height — page height is unbounded");
+    check("week-list scrolls internally (overflow-y)", /overflow-y:\s*auto/.test(rule), "no overflow-y — rows will overflow the panel");
+  }
   // The panel subtitle may not promise sources that are not wired.
   check(
     "Week Ahead subtitle does not promise an unwired fiscal calendar",

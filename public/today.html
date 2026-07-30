@@ -287,7 +287,11 @@ button{font-family:inherit}
 .act-cta{display:inline-flex;align-items:center;gap:5px;margin-top:4px;font-size:11px;font-weight:700;color:var(--accent-deep)}
 .act-cta svg{width:12px;height:12px}
 [data-theme="dark"] .act-cta{color:var(--accent-light)}
-.week-list{display:flex;flex-direction:column;gap:0}
+/* Internal scroll, so calendar reach is a DATA decision and not a page-height
+   one. Without it every row added to the Week Ahead also stretched the panel
+   beside it (both share a grid row) — 45 rows ran the page to 4,070px. Same
+   max-height + overflow-y pattern .np-scroll already uses in this file. */
+.week-list{display:flex;flex-direction:column;gap:0;max-height:560px;overflow-y:auto}
 .wk-group{display:flex;align-items:center;gap:10px;padding:12px 0 6px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
 .wk-group::after{content:"";flex:1;height:1px;background:var(--line)}
 .wk-group b{color:var(--ink);font-weight:800;background:var(--card-soft);border:1px solid var(--line);border-radius:5px;padding:1px 7px;font-size:9px}
