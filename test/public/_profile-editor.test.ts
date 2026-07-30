@@ -6,7 +6,7 @@
 // down." So this gate exercises the WRITE path the customer actually has, and
 // asserts the round trip: editor → PATCH body → what resolveFeedScope would read.
 //
-// Run: npx tsx public/_profile-editor.test.ts
+// Run: npx tsx test/public/_profile-editor.test.ts
 
 import { readFileSync } from "node:fs";
 import path from "node:path";
