@@ -24,7 +24,9 @@
 // section divider) or it is prose, and sustained prose in a comment is rationale. The marker list is a
 // secondary net for short-but-internal references, never the primary signal.
 export {}; // module scope (harness memory: tsx script-scope redeclare collisions)
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 let failures = 0;
@@ -252,19 +254,88 @@ function findLeaks(src: string, kind: "html" | "js" = "html"): { payload: string
 // here at all — and the gate above cannot help, because it only knows how to read .html and .js. The
 // gate suite itself was living in this directory: /_public-comment-leak.test.ts was fetchable in
 // production, and these files carry the densest rationale in the repo by design.
+//
+// SCOPED TO WHAT GIT WOULD SHIP. This check walked the working tree with readdirSync, which counts
+// files that can never reach production. `public/.DS_Store` — a Finder artifact, gitignored at
+// .gitignore:24 and untracked — turned the gate RED and cost a diversion to diagnose. Deploys build
+// from the repo, so the population that matters is what git carries: tracked files, PLUS untracked
+// files that are not ignored (a stray one `git add -A` away from shipping). Ignored paths are the
+// only thing dropped, because nothing can serve them.
+//
+// The rationale sweep in §1 still walks the real tree deliberately — those .html/.js files are all
+// tracked, and reading bytes off disk is the closer analogue of what the browser receives.
+const ASSET_EXT = /\.(html|js|css|png|jpg|jpeg|svg|gif|webp|ico|woff2?|ttf|eot|txt|json|xml|pdf|map|webmanifest|mjs)$/i;
+
+// tracked ∪ untracked-not-ignored, under public/. Paths come back relative to `root`.
+function shippablePublicFiles(root: string): string[] {
+  const out = execFileSync(
+    "git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", "public"],
+    { cwd: root, encoding: "utf8", maxBuffer: 1 << 26 }
+  );
+  return out.split("\0").filter(Boolean);
+}
+const strayNonAssets = (paths: string[]) => paths.filter(p => !ASSET_EXT.test(p));
+
+// ── 2a. THE SCOPING, PROVED IN BOTH DIRECTIONS ─────────────────────────────────────────────────────
+// Narrowing a gate's population is precisely the move that converts a real RED into a silent pass, so
+// the narrowing is proved rather than asserted, against a throwaway repo. It plants a tracked stray
+// (must fail), an untracked-but-not-ignored stray (must fail — it is one `git add` from production),
+// and a gitignored stray (must NOT fail). And it first proves the OLD raw walk condemns the ignored
+// artifact: without that leg, "the ignored file did not fire" is equally satisfied by a fixture that
+// never contained one.
 {
-  const OK = /\.(html|js|css|png|jpg|jpeg|svg|gif|webp|ico|woff2?|ttf|eot|txt|json|xml|pdf|map|webmanifest|mjs)$/i;
-  const strays: string[] = [];
-  const walk = (dir: string) => {
-    for (const entry of readdirSync(dir)) {
-      const p = join(dir, entry);
-      if (statSync(p).isDirectory()) walk(p);
-      else if (!OK.test(entry)) strays.push(p.replace(process.cwd() + "/", ""));
-    }
-  };
-  walk(PUBLIC_DIR);
-  for (const s of strays) console.log(`   ❌ non-asset file served from public/: ${s}`);
-  assert(strays.length === 0, `public/ contains only servable asset types (${strays.length} stray file(s))`);
+  const tmp = mkdtempSync(join(tmpdir(), "leakgate-scope-"));
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: tmp });
+    writeFileSync(join(tmp, ".gitignore"), ".DS_Store\n");
+    mkdirSync(join(tmp, "public"));
+    writeFileSync(join(tmp, "public", "index.html"), "<!-- nav -->");
+    writeFileSync(join(tmp, "public", "HANDOFF.md"), "internal notes");   // stray, will be tracked
+    writeFileSync(join(tmp, "public", ".DS_Store"), "Bud1");              // stray, gitignored
+    execFileSync("git", ["add", "-A"], { cwd: tmp });
+    writeFileSync(join(tmp, "public", "scratch.md"), "notes");            // stray, untracked, NOT ignored
+
+    const walked: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir)) {
+        const p = join(dir, entry);
+        if (statSync(p).isDirectory()) walk(p); else walked.push(p);
+      }
+    };
+    walk(join(tmp, "public"));
+    assert(strayNonAssets(walked).some(p => p.endsWith(".DS_Store")),
+      "FIXTURE: the old working-tree walk does condemn the gitignored artifact (the bug being fixed)");
+
+    const shipped = shippablePublicFiles(tmp);
+    const found = strayNonAssets(shipped);
+    assert(found.includes("public/HANDOFF.md"),
+      `SCOPE(+): a TRACKED stray non-asset still fails${found.length ? "" : " — nothing flagged"}`);
+    assert(found.includes("public/scratch.md"),
+      "SCOPE(+): an UNTRACKED, un-ignored stray still fails (one `git add -A` from shipping)");
+    assert(!found.some(p => p.endsWith(".DS_Store")),
+      `SCOPE(−): a GITIGNORED stray does not fail${found.length > 2 ? ` — flagged ${found.join(", ")}` : ""}`);
+    assert(shipped.includes("public/index.html"),
+      "SCOPE: legitimate tracked assets are still enumerated");
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+// ── 2b. THE REAL public/ ───────────────────────────────────────────────────────────────────────────
+{
+  let shipped: string[] | null = null;
+  try {
+    shipped = shippablePublicFiles(process.cwd());
+  } catch (e) {
+    // No fail-open: if git cannot enumerate, the check is blind and must say so in red.
+    assert(false, `git could not enumerate public/ — stray check is blind (${String((e as Error).message).split("\n")[0]})`);
+  }
+  // A vacuous empty list would pass the stray assertion for free. Anchor it.
+  assert((shipped?.length ?? 0) > 0, `stray check reached git's view of public/ (${shipped?.length ?? 0} shippable files)`);
+
+  const found = strayNonAssets(shipped ?? []);
+  for (const s of found) console.log(`   ❌ non-asset file served from public/: ${s}`);
+  assert(found.length === 0, `public/ contains only servable asset types (${found.length} stray file(s))`);
 }
 
 console.log(failures === 0 ? "\n✅ ALL PASS" : `\n❌ ${failures} FAILURE(S)`);
