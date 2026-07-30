@@ -696,9 +696,9 @@ function $(id){return document.getElementById(id);}
   if(bell&&panel){bell.addEventListener('click',function(e){e.stopPropagation();panel.classList.toggle('open');bell.classList.toggle('on');});
     document.addEventListener('click',function(e){if(panel.classList.contains('open')&&!panel.contains(e.target)&&e.target!==bell&&!bell.contains(e.target)){panel.classList.remove('open');bell.classList.remove('on');}});}
   function setBadge(n){var b=$('bellBadge'),c=$('npCount');if(b){if(n>0){b.textContent=String(n);b.style.display='';}else b.style.display='none';}if(c)c.textContent=String(n||0);}
-  function setW(n){document.querySelectorAll('[data-sb-watching-count]').forEach(function(e){if(n>0){e.textContent=String(n);e.style.display='';}else e.style.display='none';});}
-  fetch('/api/notifications?limit=1',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(d)setBadge(d.unreadCount||0);}).catch(function(){});
-  fetch('/api/watched-notices',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(d)setW((d.kpi&&d.kpi.watching)||0);}).catch(function(){});})();
+  /* Watching-count hydration removed: injectRail() replaces the static sidebar,
+     so the count element it wrote to never exists in the served page. Bell half kept. */
+  fetch('/api/notifications?limit=1',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(d)setBadge(d.unreadCount||0);}).catch(function(){});})();
 /* NAICS search-to-card */
 (function(){
   var CATS=[{id:'con',label:'Construction',color:'#7c9cc4'},{id:'eng',label:'Engineering',color:'#5bb3a6'},{id:'mfg',label:'Manufacturing',color:'#b08ad0'},{id:'mro',label:'MRO',color:'#d0a45b'},{id:'it',label:'IT & Cyber',color:'#378ADD'}];
