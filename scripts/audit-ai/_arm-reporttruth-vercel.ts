@@ -10,7 +10,7 @@ dotenv.config({ path: ".env.local", quiet: true });
 const TOKEN = process.env.VERCEL_TOKEN!;
 const PROJ = "prj_oqyqfwO0qJmkSAO9Hvt7VxbLUToD";
 const TEAM = "team_4FAowTLgslDBY6aZ0acPaES0";
-const KEYS = ["AUDIT_DOC_ANALYZED_TRUTH", "AUDIT_NONPRESENCE_HONESTY", "AUDIT_PANEL_COMPUTE_OR_ABSENT"];
+const KEYS = ["AUDIT_DOC_ANALYZED_TRUTH", "AUDIT_NONPRESENCE_HONESTY", "AUDIT_PANEL_COMPUTE_OR_ABSENT", "AUDIT_CLIN_SCHEDULE_EXTRACT"];
 
 (async () => {
   let allOk = true;
