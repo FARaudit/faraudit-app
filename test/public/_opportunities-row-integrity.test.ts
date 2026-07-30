@@ -59,10 +59,15 @@ function extractFn(src: string, name: string, file: string): string {
 
 type Cmp = (x: number | null, y: number | null, dir: number) => number;
 let cmpMissingLast: Cmp;
-let sortRows: (data: any[], key: string) => any[];
+let sortRows: (data: any[]) => any[];
+// The sort key moved into module state when the design's three sorts replaced the
+// old key parameter. The gate drives the SHIPPED state object rather than a copy.
+const S: { sort: string } = { sort: "closing" };
 try {
   const sandbox: any = { __out: {}, console };
   vm.createContext(sandbox);
+  sandbox.S = S;
+  sandbox.OFFICE_SHORT = (o: string) => String(o ?? "");
   vm.runInContext(
     extractFn(DSO_JS, "cmpMissingLast", "dso-app.js") + "\n" +
     extractFn(DSO_JS, "sortRows", "dso-app.js"),
@@ -72,7 +77,7 @@ try {
   sortRows = sandbox.__out.sortRows;
 } catch (e: any) {
   console.log(`\n  ✗ FATAL — cannot load the sort seam: ${e.message}`);
-  console.log(`    The comparators must be a top-level cmpMissingLast(x,y,dir) + sortRows(data,key)`);
+  console.log(`    The comparators must be a top-level cmpMissingLast(x,y,dir) + sortRows(data)`);
   console.log(`    in public/dso-app.js. Comparators written inline in .sort() calls are unreachable`);
   console.log(`    to any gate, which is how three invalid sorts shipped.\n`);
   process.exit(1);
@@ -110,7 +115,8 @@ ok(s2.length === 0, `order axioms hold in both directions`, s2.slice(0, 2).join(
 
 // ═══ S3 · missing parks last, and the real sorts are deterministic ═══════════
 console.log("\nS3 · missing values park at the end; the shipped sorts are stable");
-const row = (id: string, fit: number | null, days: number | null, ceiling: number | null) => ({ id, fit, days, ceiling });
+const row = (id: string, fit: number | null, days: number | null, ceiling: number | null) =>
+  ({ id, fit, days, ceiling, title: "row " + id, office: "OFFICE " + id.toUpperCase() });
 // The live shape: every ceiling null (SAM publishes none for open solicitations),
 // every fit null (nothing audited), some rows with no deadline at all.
 const LIVE_SHAPE = [
@@ -121,9 +127,10 @@ const MIXED = [
   row("p", 90, 5, null), row("q", null, 2, 1.5), row("r", 70, null, 0.2),
   row("s", null, null, null), row("t", 85, 9, 12),
 ];
-for (const key of ["fit", "deadline", "value"]) {
-  const missKey = key === "fit" ? "fit" : key === "deadline" ? "days" : "ceiling";
-  const out = sortRows(MIXED.slice(), key) as any[];
+for (const key of ["closing", "longest", "buyer"]) {
+  const missKey = key === "buyer" ? "office" : "days";
+  S.sort = key;
+  const out = sortRows(MIXED.slice()) as any[];
   const idx = out.map(r => r[missKey] == null);
   const firstMissing = idx.indexOf(true);
   const lastPresent = idx.lastIndexOf(false);
@@ -133,47 +140,46 @@ for (const key of ["fit", "deadline", "value"]) {
 }
 // Determinism: the same input must produce the same output on repeated calls.
 // A NaN comparator is free to differ between calls on identical data.
-for (const key of ["fit", "deadline", "value"]) {
-  const a = sortRows(LIVE_SHAPE.slice(), key).map((r: any) => r.id).join("");
-  const b = sortRows(LIVE_SHAPE.slice(), key).map((r: any) => r.id).join("");
-  const c = sortRows(LIVE_SHAPE.slice().reverse(), key).map((r: any) => r.id).join("");
+for (const key of ["closing", "longest", "buyer"]) {
+  S.sort = key;
+  const a = sortRows(LIVE_SHAPE.slice()).map((r: any) => r.id).join("");
+  const b = sortRows(LIVE_SHAPE.slice()).map((r: any) => r.id).join("");
+  const c = sortRows(LIVE_SHAPE.slice().reverse()).map((r: any) => r.id).join("");
   ok(a === b, `${key}: repeated sorts of identical input agree`, `${a} / ${b}`);
   // Permutation-invariance is NOT the property to assert: rows that compare
   // equal keep their input order under a stable sort, so the two undated rows
   // legitimately swap when the input is reversed. The property that a NaN
   // comparator destroys is that the ORDERABLE rows land in the same sequence
   // whatever order they arrived in.
-  if (key === "deadline") {
+  if (key === "closing") {
     const dated = (ids: string) => [...ids].filter(id => LIVE_SHAPE.find(r => r.id === id)!.days != null).join("");
     ok(dated(a) === dated(c), `${key}: rows that can be ordered land in one sequence whatever the input order`, `${dated(a)} vs ${dated(c)}`);
   }
 }
 
-// ═══ S4 · every stage pole has a rail rule, matching STAGE_META ══════════════
-console.log("\nS4 · stage rail coverage — every pole is colour-coded");
-const STYLE = [...HTML.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(m => m[1]).join("\n");
-const stageMeta: Record<string, string> = (() => {
+// ═══ S4 · every stage pole is RENDERABLE ════════════════════════════════════
+// The rail this originally guarded is gone: the ported design drops
+// `.pcard.stage-*` entirely and encodes the notice type as a chip, with the row's
+// treatment driven by verdict() instead. The DEFECT CLASS is unchanged though — a
+// pole added in dso-data.js whose rendering lives in another file — so the gate
+// follows it to where it now lives. A pole with no STAGE_LABEL renders a blank
+// chip: silent, exactly like the missing border colour was.
+console.log("\nS4 · stage rendering coverage — no pole renders blank");
+const stageMeta: string[] = (() => {
   const block = DATA_JS.match(/STAGE_META\s*=\s*\{([\s\S]*?)\n\s*\};/);
   if (!block) throw new Error("STAGE_META not found in dso-data.js");
-  const out: Record<string, string> = {};
-  for (const m of block[1].matchAll(/([\w$]+)\s*:\s*\{[^}]*color:\s*'([^']+)'/g)) out[m[1]] = m[2];
-  return out;
+  return [...block[1].matchAll(/([\w$]+)\s*:\s*\{/g)].map(m => m[1]);
 })();
-function railFailures(css: string): string[] {
-  const bad: string[] = [];
-  for (const [pole, color] of Object.entries(stageMeta)) {
-    const m = css.match(new RegExp(`\\.pcard\\.stage-${pole.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}\\{([^}]*)\\}`));
-    if (!m) { bad.push(`no .pcard.stage-${pole} rule`); continue; }
-    const c = m[1].match(/border-left-color:\s*([^;}]+)/);
-    if (!c) { bad.push(`.pcard.stage-${pole} sets no border-left-color`); continue; }
-    if (c[1].trim().toLowerCase() !== color.toLowerCase())
-      bad.push(`.pcard.stage-${pole} is ${c[1].trim()} but STAGE_META says ${color}`);
-  }
-  return bad;
+function labelFailures(js: string): string[] {
+  const m = js.match(/const STAGE_LABEL = \{([^}]*)\}/);
+  if (!m) return ["STAGE_LABEL not found in dso-app.js"];
+  const keys = [...m[1].matchAll(/([\w$]+)\s*:/g)].map(x => x[1]);
+  return stageMeta.filter(p => !keys.includes(p)).map(p => `pole ${p} has no STAGE_LABEL — renders a blank chip`);
 }
-ok(Object.keys(stageMeta).length >= 6, `STAGE_META poles read from dso-data.js`, Object.keys(stageMeta).join(", "));
-const s4 = railFailures(STYLE);
-ok(s4.length === 0, `every STAGE_META pole has a rail rule at its own colour`, s4.join(" | "));
+ok(stageMeta.length >= 6, `STAGE_META poles read from dso-data.js`, stageMeta.join(", "));
+const s4 = labelFailures(DSO_JS);
+ok(s4.length === 0, `every STAGE_META pole has a rendering label`, s4.join(" | "));
+ok(!/\.pcard\.stage-/.test(HTML), `the superseded stage rail is fully removed, not half-removed`);
 
 // ═══ S5 · planted positives ══════════════════════════════════════════════════
 console.log("\nS5 · planted positives — this gate must be able to fail");
@@ -185,13 +191,13 @@ let legacyNaN = 0;
 for (const dir of [1, -1]) for (const x of VALUES) for (const y of VALUES) if (Number.isNaN(LEGACY_CMP(x, y, dir))) legacyNaN++;
 ok(legacyNaN > 0, `P1b the pre-fix comparator returns NaN on (null, null)`, `${legacyNaN} pairs`);
 
-// P2 · the stylesheet as it shipped, with the notice rail absent.
-const P2_CSS = STYLE.replace(/\.pcard\.stage-notice\{[^}]*\}/, "");
-ok(railFailures(P2_CSS).some(f => f.includes("no .pcard.stage-notice rule")), `P2 a missing rail rule is caught`);
+// P2 · a pole whose label was never added — the D2 defect on today's surface.
+const P2_JS = DSO_JS.replace(/notice:'Special Notice', ?/, "");
+ok(labelFailures(P2_JS).some(f => f.includes("notice")), `P2 a pole with no rendering label is caught`);
 
-// P3 · a rail whose colour drifts from STAGE_META.
-const P3_CSS = STYLE.replace(/\.pcard\.stage-rfp\{[^}]*\}/, ".pcard.stage-rfp{border-left-color:#ff00ff}");
-ok(railFailures(P3_CSS).some(f => f.includes("STAGE_META says")), `P3 a rail colour drifting from STAGE_META is caught`);
+// P3 · a half-removal — the rail deleted from the design but left in the CSS.
+ok(/\.pcard\.stage-/.test(HTML) === false && /\.pcard\.stage-/.test(HTML + ".pcard.stage-rfp{}") === true,
+   `P3 a leftover stage rail would be caught`);
 
 console.log(`\n${fail === 0 ? "✅ PASS" : "❌ FAIL"} — ${pass} passed, ${fail} failed\n`);
 process.exit(fail === 0 ? 0 : 1);

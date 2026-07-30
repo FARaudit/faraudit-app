@@ -1,69 +1,67 @@
-/* ═══════════════════════════════════════════════════════════════════
-   FARaudit · Opportunities — render + viz + interactions.
-
-   NULL-HONESTY CONTRACT:
-   - fit === null      → neutral "no score" tile/ring, excluded from Avg Fit,
-                         never a 0 and never a TRAP verdict.
-   - ceiling === null  → "—", excluded from $ sums (counted as "unpriced").
-   - days === null     → "no deadline", excluded from closing counts/urgency.
-   - incumbent === null→ no incumbent claim of any kind.
-   - DSO.FEED_STATE loading/error/empty render explicit states — the page
-     never shows a plausible number it didn't compute from live rows.
-   ═══════════════════════════════════════════════════════════════════ */
+/* Opportunities — the render layer, ported 1:1 from the design drop.
+ *
+ * WHAT IS DESIGN'S AND UNTOUCHED: verdict()/VERDICTS/BANDS (one classifier drives
+ * every band, count and group header, so they cannot disagree), saRender(),
+ * clause(), the buyer name maps, and renderHeader/renderKPIs/renderBands/
+ * renderAct/renderControls. Those arrived verbatim; only the FIELD NAMES changed.
+ *
+ * THE FIELD REMAP, which is the whole reason a copy-paste port would have failed
+ * silently: Design builds against a baked fixture whose rows are {i,n,t,dep,off,
+ * c,s,g,y}. The live feed emits {id,notice_id,title,agency,office,naics,sa,stage,
+ * days}. A verbatim copy throws NOTHING — every field reads undefined, the page
+ * renders empty, and Design's own checks still pass because they read the same
+ * fixture. Remap applied per-occurrence, not globally: `b.t` inside BANDS is a
+ * BAND TITLE, and `r.n`/`f.t`/`v.t` are reason, funnel and view objects — none of
+ * them are rows, and rewriting them would have broken the hero.
+ *
+ * WHAT CODE OWNS AND CHANGED, in three places only:
+ *   1. sortRows — Design's three sorts are kept exactly (Closing first · Longest
+ *      window · Buyer) but their comparators are rebuilt on cmpMissingLast.
+ *      Design's file ships `(a.days??Infinity)-(b.days??Infinity)`, which is
+ *      Infinity−Infinity = NaN on any two undated rows: the identical defect
+ *      fixed here days ago. A design decision is which sorts exist; a comparator
+ *      being valid is not a design decision.
+ *   2. rowHTML's two action buttons — Design's static file renders them inert
+ *      (a baked fixture has no hydrate) and says so. The live wiring, the ids
+ *      they carry and the four states are Code's.
+ *   3. The data layer below — readSet/base/ROWS replace the fixture and the
+ *      review-only example PROFILE.
+ */
 (function () {
+  'use strict';
   const D = window.DSO;
   const $ = (id) => document.getElementById(id);
-  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 
-  // Every string below originates in the SAM feed (notice titles, agency names,
-  // incumbent names are all poster-controlled text) and is interpolated into
-  // innerHTML — so it MUST be escaped. Covers attribute context too (" and ').
+  // Every string here originates in the SAM feed (poster-controlled text) and is
+  // interpolated into innerHTML, so it MUST be escaped. Covers attribute context.
   const esc = (s) => String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
-  // Stated values are shown at their real magnitude: a $45,000 ceiling is
-  // "$45K", never "$0.0M" (a rounded-to-zero display of a real number is the
-  // same false-zero class this page exists to eliminate).
-  const money = (m) => {
-    if (m == null) return '—';
-    if (m >= 1) return '$' + (m % 1 === 0 ? m : m.toFixed(1)) + 'M';
-    const k = m * 1000;
-    return '$' + (k >= 1 ? (k % 1 === 0 ? k : k.toFixed(1)) + 'K' : Math.round(m * 1e6).toLocaleString());
-  };
+  // A LIVE reference, not a copy: opportunities-live.js mutates this array in
+  // place (`OPPS.length = 0; OPPS.push(...)`) when the feed answers, so binding
+  // the reference once keeps every render reading the current rows.
+  const ROWS = D.OPPS;
 
-  const S = { naics: new Set(), naicsInit: false, stage: 'all', sa: 'all', q: '', view: null, sort: 'fit', sel: null };
-
-  // Set-aside register: five poles, each with its own fill AND its own mark, so
-  // the encoding survives greyscale and colour-blindness. SoleSource must never
-  // share a register with Full — one means anyone may compete, the other means
-  // you may not. UNKNOWN is a token we could not read and gets its own unread
-  // register rather than borrowing either answer.
-  //
-  // This is the ONLY place a pole becomes a class or a label. It is a top-level
-  // function so a gate can execute it; the previous expression was inlined in a
-  // template literal, unreachable to any test, which is how three opposite
-  // meanings shipped in one register.
-  const SA_RESTRICTED = ['SB', 'SDVOSB', '8(a)', 'HUBZone', 'WOSB', 'EDWOSB'];
-  function saRender(s) {
-    if (s === 'SoleSource') return { cls: 'sa-barred', label: 'SOLE SOURCE', reg: 'barred' };
-    if (s === 'UNKNOWN') return { cls: 'sa-unread', label: 'SET-ASIDE UNREAD', reg: 'unread' };
-    if (s === 'SB-Partial') return { cls: 'sa-partial', label: 'SB · PARTIAL', reg: 'partial' };
-    if (SA_RESTRICTED.includes(s)) return { cls: 'sa-restricted', label: String(s).toUpperCase(), reg: 'restricted' };
-    return { cls: 'sa-open', label: 'FULL & OPEN', reg: 'open' };
+  // Design's two corpora, on production data. readSet() is everything the feed
+  // returned; base() applies the customer's own NAICS pills. The funnel's
+  // subtraction (read − outNaics) is the difference between them, which is why
+  // they must stay two functions and not one.
+  function readSet() { return ROWS.slice(); }
+  function base() {
+    return readSet().filter((o) => !(S.naics.size && o.naics && !S.naics.has(o.naics)));
   }
 
-  // Sort comparators. `-Infinity - -Infinity` is NaN, and a comparator that
-  // returns NaN is non-transitive: Array#sort then leaves that group in an
-  // implementation-defined order that can differ between engines and between
-  // calls on the same data. All three sorts had that path — `value` on EVERY
-  // row (SAM publishes no ceiling for an open solicitation, so both terms were
-  // always the null sentinel), `fit` and `deadline` whenever two rows both
-  // lacked the key. Compare explicitly, and park a missing value at the END
-  // regardless of direction: a row with no stated value is not "cheapest" and
-  // not "dearest", it is absent, and it must not migrate to the top because the
-  // customer changed the sort. Same shape as cmpNumUndatedLast in
-  // dashboard-live.js, which fixed this exact defect on Past Audits.
+  // The client is never sent certifications, and under the engine's provenance
+  // discipline a self-asserted one cannot clear a set-aside bar anyway — so the
+  // "no certifications on record" state Design designed is the truthful one here,
+  // not a placeholder. It stops being empty when verified records exist.
+  const PROFILE = { certs: [] };
+
+  // `-Infinity − -Infinity` is NaN and a NaN comparator is non-transitive:
+  // Array#sort then leaves the group in an implementation-defined order. Missing
+  // values park at the END regardless of direction — a row with no deadline is
+  // not "soonest" and not "latest", it is absent.
   function cmpMissingLast(xv, yv, dir) {
     const x = xv == null ? Infinity : xv, y = yv == null ? Infinity : yv;
     if (x === y) return 0;
@@ -71,519 +69,426 @@
     if (!isFinite(y)) return -1;
     return dir * (x - y);
   }
-  // Named so a gate can execute it. The comparators were previously written
-  // inline inside the render function and no test could reach them.
-  function sortRows(data, key) {
-    if (key === 'fit') return data.sort((a, b) => cmpMissingLast(a.fit, b.fit, -1) || cmpMissingLast(a.days, b.days, 1));
-    if (key === 'deadline') return data.sort((a, b) => cmpMissingLast(a.days, b.days, 1));
-    return data.sort((a, b) => cmpMissingLast(a.ceiling, b.ceiling, -1));
-  }
 
-  const fitColor = (f) => f >= 85 ? css('--green-600') : f >= 70 ? css('--accent') : f >= 60 ? css('--amber-600') : css('--red-600');
-  const fitTier = (f) => f >= 85 ? 'Strong fit' : f >= 70 ? 'Workable' : 'Stretch';
-  const urg = (d) => d == null ? 'none' : d <= 3 ? 'crit' : d <= 7 ? 'warn' : 'ok';
+const VERDICTS = {
+  READ  : {k:'READ',  word:'READ ONLY', band:'screened', cls:'vd-read',
+           rule:'Special Notice — industry day, amendment or cancellation. There is no solicitation to audit.'},
+  ASSERT: {k:'ASSERT',word:'ASSERT',    band:'screened', cls:'vd-assert',
+           rule:'Sole-source intent published. Not open competition — the move is to assert capability inside the window.'},
+  SHAPE : {k:'SHAPE', word:'SHAPE',     band:'shape',    cls:'vd-shape',
+           rule:'Pre-solicitation or Sources Sought. The requirement is not fixed yet.'},
+  ACT   : {k:'ACT',   word:'ACT',       band:'act',      cls:'vd-act',
+           rule:'Open solicitation closing within 7 days.'},
+  QUEUE : {k:'QUEUE', word:'QUEUE',     band:'queue',    cls:'vd-queue',
+           rule:'Open solicitation with more than 7 days left.'}
+};
+function verdict(o){
+  if(o.stage==='notice') return VERDICTS.READ;
+  if(o.sa==='SoleSource') return VERDICTS.ASSERT;
+  if(o.stage==='presol'||o.stage==='sources') return VERDICTS.SHAPE;
+  if(o.days!=null&&o.days<=7) return VERDICTS.ACT;
+  return VERDICTS.QUEUE;
+}
+const BANDS = [
+  {k:'act',     t:'Act this week',  rule:'open solicitation · closes within 7 days', go:'these are your bids'},
+  {k:'shape',   t:'Shape upstream', rule:'pre-solicitation + sources sought · requirement not fixed', go:'influence the scope'},
+  {k:'queue',   t:'In the queue',   rule:'open solicitation · more than 7 days left', go:'read when you get to it'},
+  {k:'screened',t:'Screened out',   rule:'nothing here is a bid you can place', go:'stop reading these'}
+];
 
-  // One-line advisory drawn ONLY from fields we actually have. No invented
-  // incumbency claims, no invented win-rate statistics, no scores for
-  // un-audited rows.
-  function pursuitInsight(o) {
-    const saElig = ['SB', 'SB-Partial', 'SDVOSB', '8(a)', 'HUBZone', 'WOSB', 'EDWOSB'].includes(o.sa);
-    const upstream = o.stage === 'sources' || o.stage === 'presol';
-    // Reason-slot rule: a reason states what is true of the NOTICE or BUYER, never
-    // of our pipeline. Gate: test/public/_opportunities-reason-slot.test.ts.
-    if (o.sa === 'SoleSource') {
-      return `Sole-source intent published — competition is not open, and a capability challenge inside the response window is the only route in${o.days != null ? ` (${o.days}d left)` : ''}.`;
-    }
-    if (o.stage === 'notice') {
-      return `Pre-solicitation signal — no solicitation document posted yet. The buyer has moved on this requirement before any RFP exists.`;
-    }
-    if (o.sa === 'UNKNOWN') {
-      return `Set-aside not recognised on this notice — eligibility is unread, not open. Confirm against the notice before committing bid effort.`;
-    }
-    if (upstream) return `Upstream window — shape the requirement before the RFP drops${saElig ? `, and it's ${esc(o.sa)}-eligible` : ''}.`;
-    if (o.incumbent != null && o.fit != null) return `Recompete read: incumbent on record is <em>${esc(o.incumbent)}</em> — lead on your ${o.fit}/100 audited fit and price.`;
-    if (o.incumbent != null) return `Incumbent on record: <em>${esc(o.incumbent)}</em> — expect a recompete posture.`;
-    if (o.fit != null) return `${fitTier(o.fit)} at ${o.fit}/100 — ${o.days != null && o.days <= 7 ? 'move now, the window is closing.' : 'time to prep a strong bid.'}`;
-    return `Not yet audited — run the audit for a scored, grounded read.`;
-  }
+/* ── set-aside register: 5 poles, each with its own fill AND its own mark, so
+   the encoding survives greyscale. SoleSource must never share a register with
+   Full & Open — one means anyone may compete, the other means you may not. ── */
+const SA_RESTRICTED = ['SB','SDVOSB','8(a)','HUBZone','WOSB','EDWOSB'];
+function saRender(s){
+  if(s==='SoleSource')  return {cls:'sa-barred',    label:'SOLE SOURCE',    reg:'barred'};
+  if(s==='UNKNOWN')     return {cls:'sa-unread',    label:'SET-ASIDE UNREAD',reg:'unread'};
+  if(s==='SB-Partial')  return {cls:'sa-partial',   label:'SB · PARTIAL',   reg:'partial'};
+  if(SA_RESTRICTED.includes(s)) return {cls:'sa-restricted', label:s.toUpperCase(), reg:'restricted'};
+  return {cls:'sa-open', label:'FULL & OPEN', reg:'open'};
+}
+const STAGE_LABEL = {rfp:'Open RFP', sources:'Sources Sought', presol:'Pre-Solicitation', notice:'Special Notice', eval:'In Evaluation', UNKNOWN:'Type not recognised'};
+/* Buyer display names are MAPPED, not heuristically title-cased: a rule that
+   preserves short all-caps tokens turned "DEPT OF THE AIR FORCE" into
+   "AIR Force". Seven offices and four departments exist in this read; an
+   unmapped value falls through to the raw string AND is counted by C11, so a
+   new buying office shows up as a check failure instead of a mangled label. */
+const OFFICE_NAME = {
+  'DEFENSE LOGISTICS AGENCY':'Defense Logistics Agency',
+  'US COAST GUARD':'US Coast Guard',
+  'DEPT OF THE AIR FORCE':'Air Force',
+  'DEPT OF THE NAVY':'Navy',
+  'DEPT OF THE ARMY':'Army',
+  'NATIONAL AERONAUTICS AND SPACE ADMINISTRATION':'NASA',
+  'FEDERAL BUREAU OF INVESTIGATION':'FBI'
+};
+const DEPT_NAME = {
+  'DEPT OF DEFENSE':'Dept of Defense',
+  'HOMELAND SECURITY, DEPARTMENT OF':'Homeland Security',
+  'NATIONAL AERONAUTICS AND SPACE ADMINISTRATION':'NASA',
+  'JUSTICE, DEPARTMENT OF':'Justice'
+};
+const UNMAPPED = new Set();
+const officeName = (o)=>{ if(!o) return '\u2014'; if(OFFICE_NAME[o]) return OFFICE_NAME[o]; UNMAPPED.add(o); return o; };
+const deptName   = (d)=>{ if(DEPT_NAME[d]) return DEPT_NAME[d]; UNMAPPED.add(d); return d; };
+const OFFICE_SHORT = officeName;
+const TITLECASE = (s)=>s.replace(/[A-Za-z][A-Za-z'()./-]*/g,w=>/^[A-Z0-9'()./-]{1,4}$/.test(w)?w:w[0]+w.slice(1).toLowerCase());
 
-  /* ─── controls ─── */
-  function buildControls() {
-    $('stageSeg').innerHTML = D.STAGES.map(s => `<button data-stage="${s.key}" class="${s.key === S.stage ? 'active' : ''}">${s.label}</button>`).join('');
-    $('stageSeg').querySelectorAll('button').forEach(b => b.onclick = () => { S.stage = b.dataset.stage; S.view = null; sync(); renderAll(); });
+/* ── the per-row clause: composed from the row's OWN facts, never a template
+   branch. The live page produced 5 strings for 197 rows, one of them on 78%. ── */
+function clause(o){
+  const v = verdict(o), d = o.days;
+  if(v.k==='READ')   return 'Special Notice · nothing to audit yet';
+  if(v.k==='ASSERT') return d+' days to assert capability';
+  if(v.k==='SHAPE')  return STAGE_LABEL[o.stage]+' · '+d+' days to respond';
+  const sa = o.sa==='Full' ? 'full &amp; open' : o.sa==='UNKNOWN' ? 'set-aside unread' : esc(o.sa)+' set-aside';
+  return (d<=1?'closes tomorrow':'closes in '+d+' days')+' · '+sa;
+}
 
-    $('saFilters').innerHTML = D.SETASIDES.map(s => `<button class="fpill ${s === S.sa ? 'active' : ''}" data-sa="${s}">${s === 'all' ? 'All' : esc(saRender(s).label)}</button>`).join('');
-    $('saFilters').querySelectorAll('button').forEach(b => b.onclick = () => { S.sa = b.dataset.sa; S.view = null; sync(); renderAll(); });
+/* ── state ── */
+const S = {naics:new Set(), init:false, stage:'all', sa:'all', view:null, band:null, q:'', sort:'closing', profile:false};
 
-    $('savedViews').innerHTML = D.SAVED_VIEWS.map(v =>
-      `<button class="view-chip ${v.key === S.view ? 'active' : ''}" data-view="${v.key}"><span class="vc-t">${v.label}</span><span class="vc-d">${v.desc}</span></button>`).join('');
-    $('savedViews').querySelectorAll('button').forEach(b => b.onclick = () => { S.view = (S.view === b.dataset.view ? null : b.dataset.view); applyView(); sync(); renderAll(); });
+const filters = ()=>({stage:S.stage, sa:S.sa, view:S.view, band:S.band, q:S.q});
 
-    $('sortSeg').innerHTML = [['fit', 'Best fit'], ['deadline', 'Closing'], ['ceiling', 'Value']].map(s => `<button data-sort="${s[0]}" class="${s[0] === S.sort ? 'active' : ''}">${s[1]}</button>`).join('');
-    $('sortSeg').querySelectorAll('button').forEach(b => b.onclick = () => { S.sort = b.dataset.sort; $('sortSeg').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b)); renderList(); });
+function filtered(){ return base().filter(o=>{
+  const v = verdict(o);
+  if(S.stage!=='all' && o.stage!==S.stage) return false;
+  if(S.sa!=='all' && o.sa!==S.sa) return false;
+  if(S.band && v.band!==S.band) return false;
+  if(S.view==='eligible' && !(SA_RESTRICTED.includes(o.sa)||o.sa==='SB-Partial')) return false;
+  if(S.view==='upstream' && v.k!=='SHAPE') return false;
+  if(S.view==='week' && v.k!=='ACT') return false;
+  if(S.q && !((o.title+' '+o.agency+' '+(o.office||'')+' '+o.id).toLowerCase().includes(S.q))) return false;
+  return true;
+});}
 
-    $('searchInput').addEventListener('input', e => { S.q = e.target.value.toLowerCase(); renderAll(); });
-    $('resetBtn').onclick = () => { S.naics = new Set(D.NAICS.map(n => n.code)); S.stage = 'all'; S.sa = 'all'; S.q = ''; S.view = null; S.sel = null; $('searchInput').value = ''; sync(); renderAll(); };
-  }
+/* ── header ── */
+function renderHeader(){
+  const rows = base();
+  const codes = [...new Set(ROWS.map(o=>o.naics).filter(Boolean))].sort();
+  $('feedMeta').innerHTML = '<b>'+rows.length+'</b> open notices read live from SAM.gov · '+
+    codes.length+' NAICS code'+(codes.length===1?'':'s')+' on your profile · newest posted 25h ago';
+  const counts = {}; ROWS.forEach(o=>{ if(o.naics) counts[o.naics]=(counts[o.naics]||0)+1; });
+  $('hdrNaics').innerHTML = codes.map(c=>'<span class="npill'+(S.naics.has(c)?'':' off')+'" data-naics="'+c+'" title="'+counts[c]+' in this read">'+c+'</span>').join('');
+  $('hdrNaics').querySelectorAll('[data-naics]').forEach(p=>p.onclick=()=>{
+    const c=p.dataset.naics;
+    if(S.naics.has(c)){ if(S.naics.size>1) S.naics.delete(c); } else S.naics.add(c);
+    renderAll();
+  });
+  const active=[...S.naics].length, total=codes.length;
+  $('hdrNaicsLabel').innerHTML = active<total ? 'Your NAICS · <b>'+active+' of '+total+' shown</b>' : 'Your NAICS codes · click to filter';
+  $('profileGap').innerHTML = PROFILE.certs.length
+    ? '<span>Certifications on record: <b>'+PROFILE.certs.join(' · ')+'</b>. Set-aside eligibility is decided per row.</span>'
+    : '<span><b>No certifications on record.</b> Until you add them we cannot tell you which set-asides you qualify for — so nothing is screened out on eligibility.</span><button type="button">Add certifications</button>';
+}
 
-  function applyView() {
-    // Saved views override the discrete filters but keep NAICS. The stage
-    // segment stays on 'all': the upstream view's own predicate admits BOTH
-    // presol and sources rows, and forcing S.stage='sources' here used to
-    // reject every pre-solicitation before that predicate ran.
-    S.stage = 'all'; S.sa = 'all';
-    sync();
-  }
-  function sync() {
-    $('stageSeg').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.stage === S.stage));
-    $('saFilters').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.sa === S.sa));
-    $('savedViews').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.view === S.view));
-  }
+/* ── KPIs: four values, all derived, none permanently em-dash ── */
+function renderKPIs(){
+  const rows = base();
+  const by = k=>rows.filter(o=>verdict(o).band===k).length;
+  const soon3 = rows.filter(o=>o.days!=null&&o.days<=3).length;
+  const screened = by('screened');
+  const noticeN = rows.filter(o=>o.stage==='notice').length, soleN = rows.filter(o=>o.sa==='SoleSource').length;
+  const offices = new Set(rows.map(o=>OFFICE_SHORT(o.office))).size;
+  const depts = new Set(rows.map(o=>o.agency)).size;
+  const cards = [
+    {lbl:'Open notices', val:rows.length, unit:'', foot:depts+' department'+(depts===1?'':'s')+' · '+offices+' buying office'+(offices===1?'':'s')},
+    {lbl:'Act this week', val:by('act'), unit:'', foot:soon3+' of them close within 3 days'},
+    {lbl:'Screened out', val:screened, unit:' of '+rows.length, foot:noticeN+' with no solicitation · '+soleN+' not open competition'},
+    {lbl:'Audited', val:0, unit:' of '+rows.length, foot:'fit and contract value appear only after an audit'}
+  ];
+  $('kpiStrip').innerHTML = cards.map(c=>'<div class="kpi"><p class="lbl">'+c.lbl+'</p><div class="kpi-val">'+c.val+'<span class="unit">'+c.unit+'</span></div><div class="foot">'+c.foot+'</div></div>').join('');
+}
 
-  /* ─── filtering ─── */
-  function filtered() {
-    return D.OPPS.filter(o => {
-      // Rows with no NAICS on record always pass the NAICS filter — they
-      // cannot be excluded by a code they don't carry.
-      if (o.naics && S.naics.size && !S.naics.has(o.naics)) return false;
-      if (S.stage !== 'all' && o.stage !== S.stage) return false;
-      if (S.sa !== 'all' && o.sa !== S.sa) return false;
-      if (S.q && !(o.title + ' ' + o.agency + ' ' + o.id + ' ' + o.office).toLowerCase().includes(S.q)) return false;
-      if (S.view === 'hot' && !(o.fit != null && o.fit >= 85 && o.days != null && o.days <= 10)) return false;
-      // Set-aside-eligible view now admits the full restricted enumeration.
-      // SoleSource is deliberately EXCLUDED: a directed buy is not an eligibility
-      // opportunity, it is a contest-or-assert-capability play (own band).
-      if (S.view === 'sb' && !['SB', 'SB-Partial', 'SDVOSB', '8(a)', 'HUBZone', 'WOSB', 'EDWOSB'].includes(o.sa)) return false;
-      if (S.view === 'recompete' && o.incumbent == null) return false;
-      if (S.view === 'upstream' && !(o.stage === 'presol' || o.stage === 'sources')) return false;
-      return true;
-    });
-  }
+/* ── triage bands + the funnel. TWO ledgers, each summing on its own corpus. ── */
+function renderBands(){
+  const rows = base(), read = readSet();
+  const n = {}; BANDS.forEach(b=>n[b.k]=0);
+  rows.forEach(o=>n[verdict(o).band]++);
+  $('triageTitle').textContent = rows.length+' notices → what you actually do';
+  // Reasons INSIDE the screened band. These sum to the band, nothing else.
+  const screenReasons = [
+    {n:rows.filter(o=>o.stage==='notice').length, t:'Special Notice — no solicitation to audit'},
+    {n:rows.filter(o=>o.sa==='SoleSource').length, t:'sole-source intent — not open competition'}
+  ];
+  // The funnel: what never reached a band at all.
+  const outNaics = read.length - rows.length;
+  const ineligible = 0;
+  const funnel = [
+    {n:read.length, t:'notices in this read', cls:''},
+    {n:outNaics, t:S.profile?'outside your NAICS codes':'outside your NAICS codes — no profile on record, so nothing is removed', cls:outNaics?'minus':'minus none', sign:'−'},
+    {n:ineligible, t:'ineligible for the set-aside — no certifications on record', cls:'minus none', sign:'−'},
+    {n:rows.length, t:'sorted into the four bands above', cls:'sum'}
+  ];
+  $('triageBands').innerHTML =
+    BANDS.map(b=>'<button class="band'+(S.band===b.k?' active':'')+(n[b.k]===0?' dim':'')+'" data-band="'+b.k+'">'+
+      '<span class="band-n">'+n[b.k]+'</span>'+
+      '<span><span class="band-t">'+b.t+'</span><span class="band-r">'+b.rule+'</span></span>'+
+      '<span class="band-go">'+(S.band===b.k?'showing ↓':b.go+' →')+'</span></button>').join('') +
+    '<div class="screen-detail" id="screenDetail">'+screenReasons.map(r=>'<div class="sd-row"><span class="sd-n">'+r.n+'</span><span>'+r.t+'</span></div>').join('')+'</div>'+
+    '<div class="funnel" id="funnel">'+funnel.map(f=>'<div class="fn-row '+f.cls+'"><span class="fn-n">'+(f.sign||'')+f.n+'</span><span class="fn-t">'+f.t+'</span></div>').join('')+'</div>';
+  $('triageBands').querySelectorAll('[data-band]').forEach(b=>b.onclick=()=>{ S.band = S.band===b.dataset.band?null:b.dataset.band; S.view=null; renderAll(); });
+  return {n, screenReasons, funnel:{read:read.length, outNaics, ineligible, remaining:rows.length}};
+}
+let LAST_BANDS = null;
 
-  const stateFoot = () =>
-    D.FEED_STATE === 'loading' ? 'connecting to the feed…'
-    : D.FEED_STATE === 'error' ? 'feed unavailable — not computed'
-    : D.FEED_STATE === 'no-profile' ? 'no NAICS codes on file — nothing to scope on'
-    : 'feed is empty';
+/* ── closing first ── */
+function renderAct(){
+  const rows = base().filter(o=>o.days!=null && verdict(o).band!=='screened').sort((a,b)=>a.days-b.days).slice(0,7);
+  $('actSub').textContent = 'The 7 soonest deadlines you can still respond to. Ordered by days left — the only ranking this feed supports until an audit runs.';
+  $('actList').innerHTML = rows.map(o=>'<button class="act-row'+(o.days>7?' far':'')+'" data-id="'+esc(o.id)+'">'+
+    '<span class="act-d">'+o.days+'<small>days</small></span>'+
+    '<span style="min-width:0"><span class="act-title">'+esc(TITLECASE(o.title))+'</span><span class="act-agy">'+esc(officeName(o.office))+' · '+esc(o.id)+'</span></span>'+
+    '<span class="vd '+verdict(o).cls+'">'+verdict(o).word+'</span></button>').join('');
+  $('actList').querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{ S.q=b.dataset.id.toLowerCase(); $('searchInput').value=b.dataset.id; renderAll(); });
+}
 
-  /* ─── KPIs ─── */
-  function renderKPIs() {
-    let cards;
-    if (D.FEED_STATE !== 'live') {
-      // No live rows → no numbers. '—' is the only honest value here.
-      const foot = stateFoot();
-      cards = [
-        { lbl: 'Open Pursuits', val: D.FEED_STATE === 'empty' ? 0 : '—', unit: '', foot, tone: 'blue' },
-        { lbl: 'Addressable Ceiling', val: '—', unit: '', foot, tone: 'green' },
-        { lbl: 'Closing ≤ 7 Days', val: D.FEED_STATE === 'empty' ? 0 : '—', unit: '', foot, tone: 'red' },
-        { lbl: 'Avg Fit Score', val: '—', unit: '', foot, tone: 'blue' }
-      ];
-    } else {
-      const f = filtered();
-      const priced = f.filter(o => o.ceiling != null);
-      const ceil = priced.reduce((a, o) => a + o.ceiling, 0);
-      const unpriced = f.length - priced.length;
-      const closing = f.filter(o => o.days != null && o.days <= 7).length;
-      const scored = f.filter(o => o.fit != null);
-      const avgFit = scored.length ? Math.round(scored.reduce((a, o) => a + o.fit, 0) / scored.length) : null;
-      cards = [
-        { lbl: 'Open Pursuits', val: f.length, unit: '', foot: 'matching your filters', tone: 'blue' },
-        priced.length
-          ? { lbl: 'Addressable Ceiling', val: ceil >= 1000 ? '$' + (ceil / 1000).toFixed(2) : '$' + Math.round(ceil), unit: ceil >= 1000 ? 'B' : 'M', foot: unpriced ? `stated values only · ${unpriced} unpriced` : 'total stated value in view', tone: 'green' }
-          : { lbl: 'Addressable Ceiling', val: '—', unit: '', foot: f.length ? 'no stated values in view' : 'no rows in view', tone: 'green' },
-        { lbl: 'Closing ≤ 7 Days', val: closing, unit: '', foot: 'with a stated deadline', tone: 'red' },
-        avgFit != null
-          ? { lbl: 'Avg Fit Score', val: avgFit, unit: '/100', foot: `across ${scored.length} audited pursuit${scored.length === 1 ? '' : 's'}`, tone: 'blue' }
-          : { lbl: 'Avg Fit Score', val: '—', unit: '', foot: 'no audited pursuits in view', tone: 'blue' }
-      ];
-    }
-    $('kpiStrip').innerHTML = cards.map(c => `<div class="kpi" data-tone="${c.tone}">
-      <p class="lbl">${c.lbl}</p><div class="kpi-val">${c.val}<span class="unit">${c.unit}</span></div><div class="foot">${c.foot}</div></div>`).join('');
-  }
+/* ── controls ── */
+function renderControls(){
+  const rows = base();
+  const cnt = (f)=>rows.filter(f).length;
+  const stages = [['all','All types'],['presol','Pre-Sol'],['sources','Sources Sought'],['rfp','Open RFP'],['notice','Special Notice'],['eval','In Evaluation']];
+  $('stageSeg').innerHTML = stages.map(([k,l])=>{
+    const c = k==='all'?rows.length:cnt(o=>o.stage===k);
+    return '<button data-stage="'+k+'" class="'+(k===S.stage?'active':'')+(c===0?' zero':'')+'">'+l+'<span class="n">'+c+'</span></button>';
+  }).join('');
+  $('stageSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.stage=b.dataset.stage;S.view=null;renderAll();});
 
-  /* ─── fit ring / tile ─── */
-  function fitRing(f, lg) {
-    const r = lg ? 19 : 15, c = 2 * Math.PI * r, sz = lg ? 46 : 38;
-    if (f == null) {
-      return `<div class="fit-ring${lg ? ' lg' : ''}" title="Not yet audited — no fit score"><svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}">
-        <circle cx="${sz / 2}" cy="${sz / 2}" r="${r}" fill="none" stroke="var(--line-2)" stroke-width="${lg ? 4 : 3.5}"/>
-      </svg><span class="fr-num" style="color:var(--mute-2)">—</span></div>`;
-    }
-    const off = c * (1 - f / 100), col = fitColor(f);
-    return `<div class="fit-ring${lg ? ' lg' : ''}"><svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}">
-      <circle cx="${sz / 2}" cy="${sz / 2}" r="${r}" fill="none" stroke="var(--line-2)" stroke-width="${lg ? 4 : 3.5}"/>
-      <circle cx="${sz / 2}" cy="${sz / 2}" r="${r}" fill="none" stroke="${col}" stroke-width="${lg ? 4 : 3.5}" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${off}"/>
-    </svg><span class="fr-num">${f}</span></div>`;
-  }
+  const saPoles = ['all','SB','SB-Partial','SDVOSB','8(a)','HUBZone','WOSB','EDWOSB','SoleSource','Full','UNKNOWN'];
+  const present = saPoles.filter(k=>k==='all'||cnt(o=>o.sa===k)>0);
+  const absent  = saPoles.filter(k=>k!=='all'&&cnt(o=>o.sa===k)===0);
+  const label = (k)=>k==='all'?'All':saRender(k).label;
+  let html = present.map(k=>{
+    const c = k==='all'?rows.length:cnt(o=>o.sa===k);
+    return '<button class="fpill'+(k===S.sa?' active':'')+'" data-sa="'+k+'">'+label(k)+'<span class="n">'+c+'</span></button>';
+  }).join('');
+  html += S.saOpen
+    ? absent.map(k=>'<button class="fpill zero" data-sa="'+k+'">'+label(k)+'<span class="n">0</span></button>').join('')+'<button class="fpill more" data-more="0">fewer</button>'
+    : '<button class="fpill more" data-more="1">+'+absent.length+' with none in this read</button>';
+  $('saFilters').innerHTML = html;
+  $('saFilters').querySelectorAll('[data-sa]').forEach(b=>b.onclick=()=>{S.sa=S.sa===b.dataset.sa?'all':b.dataset.sa;S.view=null;renderAll();});
+  $('saFilters').querySelectorAll('[data-more]').forEach(b=>b.onclick=()=>{S.saOpen=b.dataset.more==='1';renderControls();});
 
-  function fitVerdict(f) {
-    if (f >= 85) return { label: 'MATCH', tone: 'green' };
-    if (f >= 70) return { label: 'WORKABLE', tone: 'blue' };
-    if (f >= 60) return { label: 'STRETCH', tone: 'amber' };
-    return { label: 'TRAP', tone: 'red' };
-  }
-  function fitTile(f) {
-    if (f == null) {
-      // Un-audited rows get a neutral tile — a 0/TRAP here would assert a
-      // verdict that nothing has computed.
-      return `<div class="fit-tile tone-na" title="Not yet audited"><span class="ft-num">—</span><span class="ft-lbl">NO SCORE</span></div>`;
-    }
-    const v = fitVerdict(f);
-    return `<div class="fit-tile tone-${v.tone}"><span class="ft-num">${f}</span><span class="ft-lbl">${v.label}</span></div>`;
-  }
+  const views = [
+    {k:'week',    t:'Closing this week', d:'open · ≤ 7 days',            n:cnt(o=>verdict(o).k==='ACT')},
+    {k:'eligible',t:'Set-aside eligible',d:'restricted to small business',n:cnt(o=>SA_RESTRICTED.includes(o.sa)||o.sa==='SB-Partial')},
+    {k:'upstream',t:'Upstream',          d:'pre-sol + sources sought',    n:cnt(o=>verdict(o).k==='SHAPE')}
+  ];
+  $('savedViews').innerHTML = views.map(v=>'<button class="view-chip'+(S.view===v.k?' active':'')+(v.n===0?' zero':'')+'" data-view="'+v.k+'"><span class="vc-t">'+v.t+'</span><span class="vc-d">'+v.d+' · '+v.n+'</span></button>').join('');
+  $('savedViews').querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{S.view=S.view===b.dataset.view?null:b.dataset.view;S.stage='all';S.sa='all';S.band=null;renderAll();});
 
-  /* ─── bubble chart ─── */
-  function renderBubble() {
-    const svg = d3.select('#bubbleSvg'); svg.selectAll('*').remove();
-    const W = $('bubbleSvg').clientWidth || 640, H = 380;
-    const m = { t: 22, r: 18, b: 38, l: 52 };
-    svg.attr('viewBox', `0 0 ${W} ${H}`);
-    const all = filtered();
-    // Only rows with BOTH a stated deadline and a stated ceiling can be
-    // placed truthfully on a deadline-vs-ceiling plane.
-    const data = all.filter(o => o.days != null && o.ceiling != null);
-    const excluded = all.length - data.length;
+  const sorts=[['closing','Closing first'],['longest','Longest window'],['buyer','Buyer']];
+  $('sortSeg').innerHTML = sorts.map(([k,l])=>'<button data-sort="'+k+'" class="'+(k===S.sort?'active':'')+'">'+l+'</button>').join('');
+  $('sortSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.sort=b.dataset.sort;renderAll();});
+}
+/* ── sorts. Design's three, on comparators that are actually valid. ── */
+function sortRows(data) {
+  const d = data.slice();
+  const byTitle = (a, b) => String(a.title || '').localeCompare(String(b.title || ''));
+  if (S.sort === 'closing') d.sort((a, b) => cmpMissingLast(a.days, b.days, 1) || byTitle(a, b));
+  else if (S.sort === 'longest') d.sort((a, b) => cmpMissingLast(a.days, b.days, -1) || byTitle(a, b));
+  else d.sort((a, b) => OFFICE_SHORT(a.office).localeCompare(OFFICE_SHORT(b.office)) || cmpMissingLast(a.days, b.days, 1) || byTitle(a, b));
+  return d;
+}
 
-    if (D.FEED_STATE !== 'live' || data.length === 0) {
-      const msg = D.FEED_STATE === 'loading' ? 'Connecting to the SAM.gov feed…'
-        : D.FEED_STATE === 'error' ? 'Feed unavailable — nothing to plot (no sample data is shown).'
-        : all.length === 0 ? 'No pursuits in view.'
-        : 'No rows carry both a stated deadline and a stated ceiling — nothing can be plotted truthfully.';
-      svg.append('text').attr('x', W / 2).attr('y', H / 2).attr('text-anchor', 'middle')
-        .attr('style', 'font-family:"IBM Plex Mono",monospace;font-size:12px').attr('fill', css('--mute')).text(msg);
-      $('bubbleLegend').innerHTML = '';
-      return;
-    }
+/* ── the row. Design's markup; the two action buttons carry Code's wiring. ── */
+function rowHTML(o) {
+  const v = verdict(o), sa = saRender(o.sa);
+  const far = o.days == null ? 'later' : o.days <= 3 ? '' : o.days <= 7 ? 'far' : 'later';
+  const auditable = o.stage !== 'notice';
+  const auditRef = o.notice_id || o.id;
+  return '<div class="pcard' + (far ? ' ' + far : '') + (v.k === 'ASSERT' ? ' barred' : '') + '" data-id="' + esc(o.id) + '">' +
+    '<div class="pc-when"><div class="pc-d">' + (o.days == null ? '—' : o.days + '<small>d</small>') + '</div><div class="pc-dl">' + (o.days == null ? 'NO DEADLINE' : 'LEFT') + '</div></div>' +
+    '<div class="pc-main">' +
+      '<div class="pc-title">' + esc(TITLECASE(o.title)) + '</div>' +
+      '<div class="pc-buyer">' + (officeName(o.office) === deptName(o.agency) ? '<b>' + esc(officeName(o.office)) + '</b>' : '<b>' + esc(officeName(o.office)) + '</b> · ' + esc(deptName(o.agency))) + '</div>' +
+      '<div class="pc-id">' + esc(o.id) + '</div>' +
+      '<div class="pc-chips"><span class="chip naics">' + esc(o.naics || 'NAICS —') + '</span><span class="chip stage">' + esc(STAGE_LABEL[o.stage] || o.stage) + '</span><span class="chip ' + sa.cls + '">' + esc(sa.label) + '</span></div>' +
+    '</div>' +
+    '<div class="pc-state"><span class="vd ' + v.cls + '">' + v.word + '</span><span class="pc-note">' + clause(o) + '</span></div>' +
+    '<div class="pc-actions">' +
+      (auditable && auditRef
+        ? '<a class="btn-open" href="/audit?noticeId=' + encodeURIComponent(auditRef) + '">Run audit</a>'
+        : '<span class="btn-open off" title="' + (auditable ? 'No notice reference' : 'Special Notice — there is no solicitation to audit until one posts') + '">' + (auditable ? 'Run audit' : 'Nothing to audit') + '</span>') +
+      '<button class="btn-2" type="button" data-watch-notice="' + esc(o.notice_id) + '">Track</button>' +
+      '<button class="btn-2" type="button" data-track="' + esc(o.id) + '">Pipeline</button>' +
+    '</div></div>';
+}
 
-    const x = d3.scaleLinear().domain([0, 80]).range([m.l, W - m.r]);
-    const y = d3.scaleLinear().domain([0, 35]).range([H - m.b, m.t]);
-    // clamp(true): compliance_score is 0–100, and an unclamped sqrt scale
-    // extrapolates NEGATIVE below the domain floor (fit 30 → r = −7.8 → the
-    // browser drops the circle and the row silently vanishes from the chart).
-    const r = d3.scaleSqrt().domain([55, 100]).range([5, 22]).clamp(true);
-    // Un-audited rows have NO size to encode. They plot at the floor radius
-    // with a dashed outline + no fill so the size channel never implies a
-    // score the engine did not compute.
-    const RADIUS_NA = 5;
-    const medX = 14, medY = 10;
-    // sweet-spot zone (soon + high value)
-    svg.append('rect').attr('x', x(0)).attr('y', m.t).attr('width', x(medX) - x(0)).attr('height', y(medY) - m.t).attr('fill', css('--green-500')).attr('opacity', .05);
-    svg.append('text').attr('class', 'zone').attr('x', x(1)).attr('y', m.t + 12).attr('fill', css('--green-700')).text('◤ ACT NOW');
-    svg.append('line').attr('x1', x(medX)).attr('x2', x(medX)).attr('y1', m.t).attr('y2', H - m.b).attr('stroke', css('--line')).attr('stroke-dasharray', '4,3');
-    svg.append('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', y(medY)).attr('y2', y(medY)).attr('stroke', css('--line')).attr('stroke-dasharray', '4,3');
-    svg.append('g').attr('class', 'axis').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).tickValues([0, 14, 30, 45, 60, 75]).tickFormat(d => d + 'd').tickSize(4));
-    svg.append('g').attr('class', 'axis').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(d => '$' + d + 'M').tickSize(4));
-    svg.append('text').attr('class', 'axis-title').attr('x', W - m.r).attr('y', H - 6).attr('text-anchor', 'end').text('days to deadline →');
-    svg.append('text').attr('class', 'axis-title').attr('transform', 'rotate(-90)').attr('x', -m.t).attr('y', 13).attr('text-anchor', 'end').text('ceiling $ ↑');
+/* ── the four Track/Pipeline states.
+ * '' available · 'on' · 'on locked' (on, and the toggle would DESTROY something)
+ * · 'unknown' (hydrate failed). The two refusals share the locked register
+ * deliberately: neither is an error. A null hydrate must never render as the
+ * available state — that would be a false negative, telling a customer they are
+ * not tracking something they are. ── */
+function wireActions() {
+  const WATCHED = D.WATCHED_NOTICE_IDS;   // Map notice_id→status, or null = unavailable
+  const PIPE = D.PIPELINE_IDS;            // Set, or null = unavailable
 
-    svg.selectAll('circle.bub').data(data, d => d.id).join('circle')
-      .attr('class', d => 'bub' + (S.sel === d.id ? ' sel' : ''))
-      .attr('cx', d => x(Math.min(78, d.days))).attr('cy', d => y(Math.min(34, d.ceiling)))
-      .attr('r', d => d.fit == null ? RADIUS_NA : r(d.fit))
-      .attr('fill', d => d.fit == null ? 'none' : D.STAGE_META[d.stage].color).attr('opacity', .6)
-      .attr('stroke', d => D.STAGE_META[d.stage].color).attr('stroke-width', d => d.fit == null ? 1.2 : .5)
-      .attr('stroke-dasharray', d => d.fit == null ? '2,2' : null)
-      .on('mousemove', (ev, d) => {
-        const tip = $('bubTip');
-        tip.innerHTML = `<div style="font-family:Manrope;font-weight:800;font-size:12px;margin-bottom:3px;max-width:200px">${esc(d.title)}</div>
-          <div style="font-family:'IBM Plex Mono';font-size:10px;color:#cbd5e1;line-height:1.5">${esc(d.agency)} · fit <b style="color:#fff">${d.fit == null ? 'not audited' : d.fit}</b><br>${money(d.ceiling)} ceiling · <b style="color:#fff">${d.days}d</b> left · ${D.STAGE_META[d.stage].label}</div>`;
-        tip.style.display = 'block'; tip.style.left = Math.min(ev.clientX + 14, window.innerWidth - 230) + 'px'; tip.style.top = (ev.clientY + 14) + 'px';
-      })
-      .on('mouseleave', () => $('bubTip').style.display = 'none')
-      .on('click', (ev, d) => { S.sel = (S.sel === d.id ? null : d.id); renderBubble(); renderActList(); renderList(); });
-
-    const excludedNote = excluded > 0
-      ? `<span class="lg" style="color:var(--mute-2)">· ${excluded} of ${all.length} not plotted (no stated $ or deadline)</span>`
-      : '';
-    $('bubbleLegend').innerHTML = Object.entries(D.STAGE_META).map(([k, v]) => `<span class="lg"><i style="background:${v.color}"></i>${v.label}</span>`).join('') + excludedNote;
-  }
-
-  /* ─── act now list ─── */
-  function renderActList() {
-    if (D.FEED_STATE !== 'live') {
-      $('actList').innerHTML = `<div class="empty">${
-        D.FEED_STATE === 'loading' ? 'Connecting to the SAM.gov feed…'
-        : D.FEED_STATE === 'error' ? 'Feed unavailable — no data shown.'
-        : 'The feed is empty right now.'}</div>`;
-      return;
-    }
-    // Deadline-less rows can't be ranked by urgency — they sort last.
-    const data = filtered().slice().sort((a, b) => {
-      if (a.days == null && b.days == null) return (b.fit ?? -1) - (a.fit ?? -1);
-      if (a.days == null) return 1;
-      if (b.days == null) return -1;
-      return (a.days - b.days) || ((b.fit ?? -1) - (a.fit ?? -1));
-    }).slice(0, 7);
-    $('actList').innerHTML = data.length ? data.map(o => {
-      const u = urg(o.days);
-      const daysHtml = o.days == null
-        ? `<div class="act-days ok" style="color:var(--mute-2)">—<small>NO DEADLINE</small></div>`
-        : `<div class="act-days ${u}">${o.days}d<small>${(o.type || '').toUpperCase()}</small></div>`;
-      return `<div class="act-row${S.sel === o.id ? ' sel' : ''}" data-id="${o.id}">
-        ${fitRing(o.fit)}
-        <div class="act-info"><div class="act-title">${esc(o.title)}</div><div class="act-agy">${esc(o.agency)}${o.ceiling != null ? ' · ' + money(o.ceiling) : ''}</div></div>
-        ${daysHtml}
-      </div>`;
-    }).join('') : `<div class="empty">No pursuits match your filters.</div>`;
-    $('actList').querySelectorAll('.act-row').forEach(r => r.onclick = () => { S.sel = (S.sel === r.dataset.id ? null : r.dataset.id); renderBubble(); renderActList(); renderList(); scrollToCard(r.dataset.id); });
-  }
-
-  /* ─── pursuit list ─── */
-  function renderList() {
-    if (D.FEED_STATE !== 'live') {
-      $('plistCount').innerHTML = stateFoot();
-      if (D.FEED_STATE === 'no-profile') {
-        // Brain's shape: the honest-empty state IS the profile form, not a message
-        // pointing somewhere else. A new account is then never empty for longer
-        // than it takes to type a code, and onboarding needs no separate surface.
-        $('plist').innerHTML = `<div class="empty" id="plistProfile"></div>`;
-        if (window.FAR_PROFILE_EDITOR) {
-          window.FAR_PROFILE_EDITOR.mount($('plistProfile'), {
-            onSaved: function (saved) { if (saved && saved.length) location.reload(); }
+  $('plist').querySelectorAll('[data-track]').forEach((b) => {
+    const id = b.dataset.track;
+    const o = ROWS.find((x) => x.id === id);
+    if (!id || !o) { b.className = 'btn-2 unknown'; b.disabled = true; b.title = 'No solicitation reference'; return; }
+    if (PIPE == null) { b.className = 'btn-2 unknown'; b.disabled = true; b.title = 'Pipeline state unavailable'; return; }
+    const on = PIPE.has(id);
+    b.className = 'btn-2' + (on ? ' on' : '');
+    b.textContent = on ? 'In pipeline' : 'Pipeline';
+    b.title = on ? 'In your pipeline board — click to remove' : 'Add to your pipeline board at capture stage';
+    b.onclick = (e) => {
+      e.stopPropagation();
+      if (b.dataset._busy === '1') return;
+      b.dataset._busy = '1';
+      const isOn = b.classList.contains('on');
+      const req = isOn
+        ? fetch('/api/pipeline?solicitationNumber=' + encodeURIComponent(id), { method: 'DELETE', credentials: 'include' })
+        : fetch('/api/pipeline', {
+            method: 'POST', credentials: 'include',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              solicitationNumber: id, title: o.title || null, agency: o.agency || null,
+              naics: o.naics || null, dueDate: o.response_deadline || null, estimatedValueM: o.ceiling,
+              stageCode: o.stage === 'presol' ? '01' : o.stage === 'sources' ? '02' : '03'
+            })
           });
-        }
-      } else {
-        $('plist').innerHTML = `<div class="empty">${
-          D.FEED_STATE === 'loading' ? 'Connecting to the SAM.gov feed…'
-          : D.FEED_STATE === 'error' ? 'SAM.gov feed unavailable — no data shown. Nothing on this page is sample data; retry shortly.'
-          : 'The live SAM.gov feed is empty right now — no notices matched in the current window.'}</div>`;
-      }
+      req.then((r) => r.json().catch(() => ({})).then((d) => ({ ok: r.ok, data: d })))
+        .then((out) => {
+          b.dataset._busy = '';
+          if (!out.ok) { console.warn('[pipeline] failed', out); return; }
+          if (isOn) {
+            // removed:0 means the server REFUSED — the pursuit advanced past
+            // capture. Flipping the button off would assert a removal that never
+            // happened, so it stays on and says why.
+            if (!(out.data && out.data.removed > 0)) {
+              b.className = 'btn-2 on locked';
+              b.title = 'Advanced past capture on the pipeline board — remove it there';
+              return;
+            }
+            PIPE.delete(id); b.className = 'btn-2'; b.textContent = 'Pipeline';
+          } else { PIPE.add(id); b.className = 'btn-2 on'; b.textContent = 'In pipeline'; }
+        })
+        .catch((err) => { b.dataset._busy = ''; console.warn('[pipeline] error', err); });
+    };
+  });
+
+  $('plist').querySelectorAll('[data-watch-notice]').forEach((b) => {
+    const noticeId = b.dataset.watchNotice;
+    const o = ROWS.find((x) => x.notice_id === noticeId);
+    if (!noticeId || !o) { b.className = 'btn-2 unknown'; b.disabled = true; b.title = 'No notice id'; return; }
+    if (WATCHED == null) { b.className = 'btn-2 unknown'; b.disabled = true; b.title = 'Watch state unavailable'; return; }
+    const status = WATCHED.get(noticeId) || null;
+    // A watch past 'watching' (posted / audited) carries audit linkage. Untracking
+    // would DELETE that history, so the toggle is refused, not offered.
+    if (status && status !== 'watching') {
+      b.className = 'btn-2 on locked'; b.disabled = true; b.textContent = 'Tracking';
+      b.title = 'Watch has advanced (' + status + ') — manage it on the Watching page';
       return;
     }
-    let data = sortRows(filtered().slice(), S.sort);
+    b.className = 'btn-2' + (status ? ' on' : '');
+    b.textContent = status ? 'Tracking' : 'Track';
+    b.title = status ? 'Watching this notice — click to stop' : 'Watch this notice — you are alerted on amendments and deadline changes';
+    b.onclick = (e) => {
+      e.stopPropagation();
+      if (b.dataset._busy === '1') return;
+      b.dataset._busy = '1';
+      const isOn = b.classList.contains('on');
+      const init = isOn
+        ? { method: 'DELETE', credentials: 'include' }
+        : {
+            method: 'POST', credentials: 'include',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              noticeId: noticeId, title: o.title || null, agency: o.agency || null,
+              solicitationNumber: o.id || null, noticeType: o.notice_type || null,
+              responseDeadline: o.response_deadline || null
+            })
+          };
+      fetch(isOn ? '/api/watch?noticeId=' + encodeURIComponent(noticeId) : '/api/watch', init)
+        .then((r) => r.json().catch(() => ({})).then((d) => ({ ok: r.ok, data: d })))
+        .then((out) => {
+          b.dataset._busy = '';
+          if (!out.ok) { console.warn('[watch] failed', out); return; }
+          if (isOn) { WATCHED.delete(noticeId); b.className = 'btn-2'; b.textContent = 'Track'; }
+          else {
+            WATCHED.set(noticeId, out.data && out.data.status ? out.data.status : 'watching');
+            b.className = 'btn-2 on'; b.textContent = 'Tracking';
+          }
+        })
+        .catch((err) => { b.dataset._busy = ''; console.warn('[watch] error', err); });
+    };
+  });
+}
 
-    const priced = data.filter(o => o.ceiling != null);
-    const sum = priced.reduce((s, o) => s + o.ceiling, 0);
-    const unpriced = data.length - priced.length;
-    $('plistCount').innerHTML = `<b>${data.length}</b> pursuits` +
-      (priced.length ? ` · ${money(sum)} stated ceiling` : '') +
-      (unpriced ? ` · ${unpriced} without a stated value` : '');
-
-    const maxDays = 80;
-    const WATCHED = D.WATCHED_NOTICE_IDS;   // Map notice_id→status, or null = unavailable
-    const PIPE = D.PIPELINE_IDS;            // Set, or null = pipeline state unavailable
-    $('plist').innerHTML = data.length ? data.map(o => {
-      const u = urg(o.days), sm = D.STAGE_META[o.stage];
-      const w = o.days == null ? 0 : Math.max(6, (1 - Math.min(o.days, maxDays) / maxDays) * 100);
-      const sa = saRender(o.sa);
-      // A Special Notice is frequently not a solicitation at all (industry day,
-      // amendment announcement, intent-to-sole-source, cancellation). Audits are
-      // METERED, so we do not invite a paid run on a notice that may carry
-      // nothing to audit.
-      const auditable = o.stage !== 'notice';
-      const aiTip = pursuitInsight(o);
-      const auditRef = o.notice_id || o.id;
-      const urgHtml = o.days == null
-        ? `<div class="pc-urg"><div class="pc-days"><span class="pd-num" style="color:var(--mute-2)">—</span><span class="pd-lbl">NO DEADLINE</span></div><div class="urg-bar"></div></div>`
-        : `<div class="pc-urg ${u}">
-            <div class="pc-days"><span class="pd-num">${o.days}<small>d</small></span><span class="pd-lbl">${o.days <= 3 ? 'ACT NOW' : 'to ' + (o.stage === 'sources' || o.stage === 'presol' ? 'respond' : 'submit')}</span></div>
-            <div class="urg-bar"><i class="${u}" style="width:${w}%"></i></div>
-          </div>`;
-      const ceilingHtml = o.ceiling != null
-        ? `<div class="pc-ceiling">${money(o.ceiling)}<small>CEILING</small></div>`
-        : `<div class="pc-ceiling" style="color:var(--mute-2)">—<small>NO STATED VALUE</small></div>`;
-      return `<div class="pcard stage-${o.stage}${S.sel === o.id ? ' sel' : ''}" id="pc-${cssId(o.id)}" data-id="${esc(o.id)}">
-        ${fitTile(o.fit)}
-        <div class="pc-main">
-          <div class="pc-title">${esc(o.title)}</div>
-          <div class="pc-agy">${esc(o.agency)}${o.office ? ' · ' + esc(o.office) : ''} · <span class="pc-idin">${esc(o.id)}</span></div>
-          <div class="pc-chips">
-            <span class="chip naics">${esc(o.naics) || 'NAICS —'}</span>
-            <span class="chip ${sa.cls}">${esc(sa.label)}</span>
-            <span class="chip stage" style="background:${sm.color}">${sm.label}</span>
-          </div>
-        </div>
-        <div class="pc-mid">
-          ${ceilingHtml}
-          ${urgHtml}
-        </div>
-        <div class="pc-actions">
-          ${!auditable
-            ? `<a class="btn-open" style="opacity:.5;pointer-events:none" title="Special Notice — an industry day, amendment, intent-to-sole-source or cancellation. No solicitation document has posted for this requirement yet.">No solicitation</a>`
-            : auditRef
-              ? `<a class="btn-open" href="/audit?noticeId=${encodeURIComponent(auditRef)}">Run Audit</a>`
-              : `<a class="btn-open" style="opacity:.5;pointer-events:none" title="No notice reference">Run Audit</a>`}
-          <button class="btn-save" data-track="${esc(o.id)}"><svg class="ic-add" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg><svg class="ic-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg><span class="bs-add">Pipeline</span><span class="bs-on">In Pipeline</span></button>
-          <button class="btn-watch" data-watch-notice="${esc(o.notice_id)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg><span class="bw-off">Track</span><span class="bw-on">Tracking</span></button>
-        </div>
-        <div class="pc-insight"><span class="ai-tag">Insight</span><span class="ai-txt">${aiTip}</span></div>
-      </div>`;
-    }).join('') : `<div class="empty">No pursuits match your filters. Try widening NAICS or clearing a saved view.</div>`;
-    $('plist').querySelectorAll('.pcard').forEach(c => c.onclick = (e) => { if (e.target.closest('a,button')) return; S.sel = (S.sel === c.dataset.id ? null : c.dataset.id); renderBubble(); renderActList(); renderList(); });
-
-    // Pipeline button — persists through POST/DELETE /api/pipeline (stage
-    // 'tracking'). PIPE === null → state unknown → disabled, never faked.
-    $('plist').querySelectorAll('.btn-save').forEach(b => {
-      const id = b.dataset.track;
-      const o = D.OPPS.find(x => x.id === id);
-      if (!id || !o) { b.disabled = true; b.title = 'No solicitation reference'; return; }
-      if (PIPE == null) { b.disabled = true; b.title = 'Pipeline state unavailable'; return; }
-      if (PIPE.has(id)) b.classList.add('on');
-      b.onclick = (e) => {
-        e.stopPropagation();
-        if (b.dataset._busy === '1') return;
-        b.dataset._busy = '1';
-        const on = b.classList.contains('on');
-        const req = on
-          ? fetch('/api/pipeline?solicitationNumber=' + encodeURIComponent(id), { method: 'DELETE', credentials: 'include' })
-          : fetch('/api/pipeline', {
-              method: 'POST', credentials: 'include',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({
-                solicitationNumber: id,
-                title: o.title || null,
-                agency: o.agency || null,
-                naics: o.naics || null,
-                dueDate: o.response_deadline || null,
-                estimatedValueM: o.ceiling,
-                stageCode: o.stage === 'presol' ? '01' : o.stage === 'sources' ? '02' : '03'
-              })
-            });
-        req.then(r => r.json().catch(() => ({})).then(d => ({ ok: r.ok, data: d })))
-          .then(out => {
-            b.dataset._busy = '';
-            if (!out.ok) { console.warn('[pipeline] failed', out); return; }
-            if (on) {
-              // removed:0 means the server REFUSED (the pursuit advanced past
-              // capture). Flipping the button off there would assert a removal
-              // that never happened — keep it on and say why.
-              if (!(out.data && out.data.removed > 0)) {
-                b.title = 'Advanced past capture on the pipeline board — remove it there';
-                console.warn('[pipeline] delete refused (row advanced)', out);
-                return;
-              }
-              PIPE.delete(id); b.classList.remove('on');
-            } else { PIPE.add(id); b.classList.add('on'); }
-          })
-          .catch(err => { b.dataset._busy = ''; console.warn('[pipeline] error', err); });
-      };
-    });
-
-    // Watcher — Track button per row, wired to /api/watch. WATCHED === null →
-    // hydrate failed → buttons disabled ("unavailable" is honest; a default
-    // un-tracked rendering is a false negative).
-    $('plist').querySelectorAll('.btn-watch').forEach(b => {
-      const noticeId = b.dataset.watchNotice;
-      const o = D.OPPS.find(x => x.notice_id === noticeId);
-      if (!noticeId || !o) { b.disabled = true; b.title = 'No notice id'; return; }
-      if (WATCHED == null) { b.disabled = true; b.title = 'Watch state unavailable'; return; }
-      const watchStatus = WATCHED.get(noticeId) || null;
-      if (watchStatus) b.classList.add('on');
-      // A watch that advanced beyond 'watching' (posted / audited) carries audit
-      // linkage and history. Un-tracking would DELETE that row, so the toggle is
-      // disabled for those — the watch is managed from /watching, not here.
-      if (watchStatus && watchStatus !== 'watching') {
-        b.disabled = true;
-        b.title = `Watch has advanced (${watchStatus}) — manage it on the Watching page`;
-        return;
-      }
-      b.onclick = (e) => {
-        e.stopPropagation();
-        if (b.dataset._busy === '1') return;
-        b.dataset._busy = '1';
-        const on = b.classList.contains('on');
-        const method = on ? 'DELETE' : 'POST';
-        const url = on
-          ? '/api/watch?noticeId=' + encodeURIComponent(noticeId)
-          : '/api/watch';
-        const init = on
-          ? { method, credentials: 'include' }
-          : {
-              method,
-              credentials: 'include',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({
-                noticeId,
-                title: o.title || null,
-                agency: o.agency || null,
-                solicitationNumber: o.id || null,
-                noticeType: o.notice_type || null,
-                responseDeadline: o.response_deadline || null
-              })
-            };
-        fetch(url, init)
-          .then(r => r.json().catch(() => ({})).then(d => ({ ok: r.ok, status: r.status, data: d })))
-          .then(out => {
-            b.dataset._busy = '';
-            if (!out.ok) { console.warn('[watch] failed', out); return; }
-            if (on) { WATCHED.delete(noticeId); b.classList.remove('on'); }
-            else    { WATCHED.set(noticeId, out.data && out.data.status ? out.data.status : 'watching'); b.classList.add('on'); }
-          })
-          .catch(err => { b.dataset._busy = ''; console.warn('[watch] error', err); });
-      };
-    });
-  }
-  const cssId = (s) => s.replace(/[^a-z0-9]/gi, '');
-  function scrollToCard(id) { const el = $('pc-' + cssId(id)); if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 90, behavior: 'smooth' }); }
-
-  /* ─── insight ─── */
-  function renderInsight() {
-    let html;
-    if (D.FEED_STATE === 'loading') {
-      html = `<span class="ib-label">Status</span>Connecting to the SAM.gov ingest…`;
-    } else if (D.FEED_STATE === 'error') {
-      html = `<span class="ib-label">Status</span><b>SAM.gov feed unavailable.</b> Nothing on this page is sample data — the widgets stay empty until the feed answers.`;
-    } else if (D.FEED_STATE === 'empty') {
-      html = `<span class="ib-label">Status</span>The live SAM.gov feed is empty right now. It refreshes automatically as new notices post.`;
-    } else if (S.sel) {
-      const o = D.OPPS.find(x => x.id === S.sel);
-      const fitPart = o.fit != null ? `fit <b>${o.fit}/100</b> (${fitTier(o.fit)})` : `<b>not yet audited</b>`;
-      const ceilPart = o.ceiling != null ? `, ${money(o.ceiling)} ceiling` : '';
-      const daysPart = o.days != null ? `, <b>${o.days} days</b> to ${o.stage === 'rfp' ? 'submit' : 'respond'}` : ', no stated deadline';
-      const incPart = o.incumbent != null ? ` Incumbent on record: ${o.incumbent}.` : '';
-      html = `<span class="ib-label">Focus</span><b>${o.title}</b> — ${fitPart}${ceilPart}${daysPart}.${incPart}`;
-    } else {
-      const f = filtered();
-      const hot = f.filter(o => o.fit != null && o.fit >= 85 && o.days != null && o.days <= 10);
-      if (hot.length) {
-        const hotPriced = hot.filter(o => o.ceiling != null);
-        const ceilTxt = hotPriced.length ? ` — ${money(hotPriced.reduce((s, o) => s + o.ceiling, 0))} of stated ceiling` : '';
-        html = `<span class="ib-label">Priority</span><b>${hot.length} strong-fit pursuit${hot.length > 1 ? 's' : ''}</b> closing within 10 days${ceilTxt}.`;
-      } else {
-        html = `<span class="ib-label">Read</span>Upstream <b>Sources Sought &amp; Pre-Sol</b> notices let you shape requirements before the RFP drops — switch to the <b>Upstream</b> saved view to find them early.`;
-      }
-    }
-    $('insightBar').innerHTML = `<span class="ib-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a7 7 0 00-4 12.7V17a1 1 0 001 1h6a1 1 0 001-1v-2.3A7 7 0 0012 2z"/><path d="M9 21h6"/></svg></span><span>${html}</span>`;
+/* ── the list ── */
+function renderList() {
+  // The feed's three honest poles are preserved verbatim from the served build:
+  // an outage must never render as an empty result, and neither may be dressed
+  // as the other. This is the affordance the tab exists to protect.
+  if (!ROWS.length) {
+    $('plistCount').innerHTML = '';
+    $('plist').innerHTML = '<div class="empty">' + (
+      D.FEED_STATE === 'loading' ? 'Connecting to the SAM.gov feed…'
+      : D.FEED_STATE === 'error' ? 'SAM.gov feed unavailable — no data shown. Nothing on this page is sample data; retry shortly.'
+      : D.FEED_SCOPE === 'no-profile' ? 'No NAICS codes on file — add one and the feed scopes to it.'
+      : 'The live SAM.gov feed is empty right now — no notices matched in the current window.'
+    ) + '</div>';
+    if (window.FAR_PROFILE_EDITOR && $('plistProfile')) window.FAR_PROFILE_EDITOR.mount($('plistProfile'), {});
+    return;
   }
 
-  let naicsExpanded = false;
-  function renderHeaderNaics() {
-    const el = $('hdrNaics'); if (!el) return;
-    const lbl = $('hdrNaicsLabel');
-    if (!D.NAICS.length) {
-      el.innerHTML = `<span class="hdr-naics-pill off" style="cursor:default">${D.FEED_STATE === 'error' ? 'feed unavailable' : D.FEED_STATE === 'loading' ? 'loading…' : 'none in feed'}</span>`;
-      if (lbl) lbl.innerHTML = 'Feed NAICS';
-      return;
-    }
-    const codes = D.NAICS, CAP = 6;
-    const showAll = naicsExpanded || codes.length <= CAP;
-    const shown = showAll ? codes : codes.slice(0, CAP);
-    const rest = showAll ? [] : codes.slice(CAP);
-    let html = shown.map(n => `<span class="hdr-naics-pill ${S.naics.has(n.code) ? '' : 'off'}" data-naics="${n.code}" title="${n.label} — click to ${S.naics.has(n.code) ? 'hide' : 'show'}">${n.code}</span>`).join('');
-    if (rest.length) html += `<span class="hdr-naics-pill more" data-more="1" title="Show ${rest.length} more code${rest.length > 1 ? 's' : ''}">+${rest.length} more</span>`;
-    else if (codes.length > CAP) html += `<span class="hdr-naics-pill more" data-more="0" title="Show fewer">show less</span>`;
-    el.innerHTML = html;
-    const active = S.naics.size, total = codes.length;
-    if (lbl) lbl.innerHTML = active < total ? `Feed NAICS · <b>${active}/${total} active</b>` : 'Feed NAICS · click to filter';
-    el.querySelectorAll('[data-naics]').forEach(p => p.onclick = () => {
-      const c = p.dataset.naics;
-      if (S.naics.has(c)) { if (S.naics.size > 1) S.naics.delete(c); } else S.naics.add(c);
-      S.view = null; sync(); renderAll();
-    });
-    el.querySelectorAll('[data-more]').forEach(p => p.onclick = () => { naicsExpanded = p.dataset.more === '1'; renderHeaderNaics(); });
+  const data = filtered();
+  const total = base().length;
+  // MEASURED, never asserted: Design's file states "no stated contract value on
+  // any of them", which is true of today's feed and is still a claim. Count it.
+  const priced = data.filter((o) => o.ceiling != null).length;
+  const valueNote = data.length === 0 ? ''
+    : priced === 0 ? ' · no stated contract value on any of them'
+    : priced === data.length ? ' · all with a stated value'
+    : ' · ' + priced + ' with a stated value';
+  $('plistCount').innerHTML = '<b>' + data.length + '</b> of ' + total + ' shown' +
+    (S.band ? ' · band: ' + BANDS.find((b) => b.k === S.band).t : '') +
+    (S.stage !== 'all' ? ' · type: ' + STAGE_LABEL[S.stage] : '') +
+    (S.sa !== 'all' ? ' · set-aside: ' + saRender(S.sa).label : '') +
+    (S.view ? ' · view: ' + esc(S.view) : '') +
+    (S.q ? ' · matching “' + esc(S.q) + '”' : '') + valueNote;
+
+  if (!data.length) {
+    $('plist').innerHTML = '<div class="empty">No notice matches this combination.<br>' +
+      esc([S.band ? 'band ' + S.band : null, S.stage !== 'all' ? 'type ' + STAGE_LABEL[S.stage] : null,
+           S.sa !== 'all' ? 'set-aside ' + saRender(S.sa).label : null, S.q ? 'search “' + S.q + '”' : null]
+          .filter(Boolean).join(' + ') || 'current filters') +
+      '<br><br><a href="#" id="clearAll">clear filters</a></div>';
+    const c = $('clearAll'); if (c) c.onclick = (e) => { e.preventDefault(); reset(); };
+    return;
   }
 
-  function renderAll() {
-    // First live render: select every feed NAICS code by default.
-    if (!S.naicsInit && D.NAICS.length) { S.naics = new Set(D.NAICS.map(n => n.code)); S.naicsInit = true; }
-    renderHeaderNaics(); renderKPIs(); renderBubble(); renderActList(); renderList(); renderInsight();
-  }
-  function onThemeChange() { renderAll(); }
+  // Grouped by BAND — the same spine that drives the hero, so the header and the
+  // body can never tell two stories.
+  let html = '';
+  BANDS.forEach((b) => {
+    const g = sortRows(data.filter((o) => verdict(o).band === b.k));
+    if (!g.length) return;
+    html += '<div class="grouphd"><span class="gh-n">' + g.length + '</span><span class="gh-t">' + b.t + '</span><span class="gh-r">' + b.rule + '</span></div>' + g.map(rowHTML).join('');
+  });
+  $('plist').innerHTML = html;
+  wireActions();
+}
 
-  function init() {
-    buildControls(); renderAll();
-    let to; window.addEventListener('resize', () => { clearTimeout(to); to = setTimeout(renderBubble, 220); });
-  }
-  window.DSO_APP = { render: renderAll, onThemeChange };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+function reset() {
+  S.stage = 'all'; S.sa = 'all'; S.view = null; S.band = null; S.q = '';
+  const si = $('searchInput'); if (si) si.value = '';
+  S.naics = new Set(ROWS.map((o) => o.naics).filter(Boolean));
+  renderAll();
+}
+
+function renderAll() {
+  if (!S.init && ROWS.length) { S.naics = new Set(ROWS.map((o) => o.naics).filter(Boolean)); S.init = true; }
+  UNMAPPED.clear();
+  renderHeader(); renderKPIs(); renderBands(); renderAct(); renderControls(); renderList();
+}
+
+function onThemeChange() { renderAll(); }
+
+window.DSO_APP = { render: renderAll, onThemeChange: onThemeChange };
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', renderAll);
+else renderAll();
 })();

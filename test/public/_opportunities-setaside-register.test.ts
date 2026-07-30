@@ -164,9 +164,11 @@ function varsFor(theme: "light" | "dark", css: string): Record<string, string> {
       for (const d of m[1].matchAll(/(--[\w-]+)\s*:\s*([^;}]+)/g)) vars[d[1]] = d[2].trim();
     }
   };
-  take(/(?:^|\})\s*:root\s*\{([^}]*)\}/g);
-  take(/(?:^|\})\s*:root\s*,\s*\[data-theme="light"\][^{]*\{([^}]*)\}/g);
-  if (theme === "dark") take(/\[data-theme="dark"\]\s*\{([^}]*)\}/g);
+  // `m`: a token block may open a line after a comment, where the preceding
+  // character is neither `}` nor the string start.
+  take(/(?:^|\})\s*:root\s*\{([^}]*)\}/gm);
+  take(/(?:^|\})\s*:root\s*,\s*\[data-theme="light"\][^{]*\{([^}]*)\}/gm);
+  if (theme === "dark") take(/\[data-theme="dark"\]\s*\{([^}]*)\}/gm);
   return vars;
 }
 function resolve(v: string, vars: Record<string, string>, depth = 0): string {
