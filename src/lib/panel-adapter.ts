@@ -203,7 +203,21 @@ export function buildPanelInputs(fullSource: string): PanelInputs {
   // intrinsic or bug-inflated (a lens reading the full source pays for content outside its ownership). Never
   // inferable-only again; the AUDIT_COST_PRESCREEN arm-card gates on this line reading "fallback: none".
   const _charsPerLens = Object.entries(sectionText).map(([k, v]) => `${k}:${(v ?? "").length}`).join(",");
-  console.log(`[routing] sections routed: [${Object.keys(sectionText).join(",")}] · chars/lens: [${_charsPerLens}] · fallback: ${routeOk ? "none" : `WHOLE-SOURCE (#525 — a lens would be starved${routingV2 ? "" : "; legacy L&M predicate"}; each lens reads full source; cost-slope INFLATED)`}`);
+  // HEAD DROP visibility — reported on BOTH poles (see routeCommercialSections). Measured over the banked corpus,
+  // 20 of 20 routed commercial packages with a >=100-char head lost it entirely, worst 9,120 chars. That region
+  // carries the deadline, questions deadline, set-aside, NAICS and submission POC, so its size belongs in the
+  // permanent routing line whether or not AUDIT_ROUTING_HEAD_COVERAGE is recovering it yet.
+  // Three distinct states, never collapsed into two: injected · below the 20-char injection threshold · dropped.
+  // Reporting "not injected" as "RECOVERED" (or a negligible head as a loss) would make this line assert something
+  // it did not measure.
+  const _head = routed.headChars === 0
+    ? ""
+    : routed.headCovered
+      ? ` · head(pre-first-anchor): ${routed.headChars} chars RECOVERED→A,L`
+      : routed.headChars < 20
+        ? ` · head(pre-first-anchor): ${routed.headChars} chars (below the 20-char injection threshold; not routed)`
+        : ` · head(pre-first-anchor): ${routed.headChars} chars DROPPED (unread by every lens; AUDIT_ROUTING_HEAD_COVERAGE off)`;
+  console.log(`[routing] sections routed: [${Object.keys(sectionText).join(",")}] · chars/lens: [${_charsPerLens}] · fallback: ${routeOk ? "none" : `WHOLE-SOURCE (#525 — a lens would be starved${routingV2 ? "" : "; legacy L&M predicate"}; each lens reads full source; cost-slope INFLATED)`}${_head}`);
   return {
     sectionText,
     detectedSections,
