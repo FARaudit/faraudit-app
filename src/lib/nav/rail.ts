@@ -83,7 +83,14 @@ export const NAV_GROUPS: RailGroup[] = [
   {
     label: "Find & Track",
     items: [
-      { key: "opportunities", label: "Opportunities", href: "/opportunities", icon: I.opportunities, badge: { text: "Live", kind: "live" } },
+      // No hardcoded "Live". The rail is injected into ~10 routes, most of
+      // which never check SAM feed health — a literal here asserted the feed
+      // was up on every one of them, including during an outage. Empty text
+      // renders NO pill (see renderItem); the two pages that actually measure
+      // feed state (opportunities-live.js, command-center-live.js) create the
+      // pill client-side via public/rail-live-badge.js. Guarded by
+      // public/_rail-live-badge.test.ts.
+      { key: "opportunities", label: "Opportunities", href: "/opportunities", icon: I.opportunities, badge: { text: "", kind: "live" } },
       { key: "capability-statement", label: "Capability Statement", href: "/capability-statement", icon: I.capability },
     ],
   },

@@ -214,6 +214,11 @@
       }, 0);
       window.DSO.LAST_INGEST = newest ? relTime(new Date(newest).toISOString()) : null;
       setFeedStatus(window.DSO.FEED_STATE, { count: mapped.length, lastIngest: window.DSO.LAST_INGEST });
+      // The rail ships no pill; this page has now MEASURED the feed, so it may
+      // assert one. 'empty' is still a live feed — it answered with zero rows.
+      if (typeof window.setRailLiveBadge === 'function') {
+        window.setRailLiveBadge('live', { count: mapped.length });
+      }
 
       // Watch + pipeline state for visible rows (null = unavailable → the
       // render layer disables those buttons instead of faking "off").
@@ -225,6 +230,9 @@
       window.DSO.OPPS.length = 0;
       window.DSO.FEED_STATE = 'error';
       setFeedStatus('error');
+      if (typeof window.setRailLiveBadge === 'function') {
+        window.setRailLiveBadge('unavailable');
+      }
     }
     if (window.DSO_APP && typeof window.DSO_APP.render === 'function') {
       window.DSO_APP.render();
