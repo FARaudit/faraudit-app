@@ -807,8 +807,16 @@ export async function executeAgenticPrimary(
   // The notice body is excluded from the denominator — it is SAM's description field, not a posted document, and must
   // not inflate the count (the same exclusion the posted/read counts make at :729).
   const docCov = (res.coverage as { docCoverage?: { complete: boolean; uncovered: string[] } }).docCoverage;
+  // Hoisted so the PERSISTED `documents_complete` below can fold it in. Setting `payload.documents.complete = false`
+  // alone is NOT enough and looked like it was: buildCoverage reads the TOP-LEVEL `compliance_json.documents_complete`
+  // (v4-report/build-data.ts:593) and only falls back to `p.documents.complete` when that field is UNDEFINED — which it
+  // never is on a real run, since it is persisted from `manifestComplete`. So the coverage badge would have stayed
+  // COMPLETE over a named unanalyzed document. Caught by red-teaming this diff; the render cert had masked it by
+  // setting the top-level field by hand.
+  let docsAnalyzedIncomplete = false;
   if (docCov && payload.documents) {
     const truth = deriveAnalyzedDocuments(fullSource, docCov.uncovered);
+    docsAnalyzedIncomplete = truth.unanalyzed.length > 0;
     payload.documents.analyzed_of = truth.analyzed_of;
     payload.documents.analyzed = truth.analyzed;
     if (truth.unanalyzed.length) {
@@ -867,7 +875,11 @@ export async function executeAgenticPrimary(
       // document could not be ingested (the report flags it loudly). CEO 2026-06-28:
       // a partial package ALSO gates export (shouldGateExport reads this) — a report
       // we couldn't fully ground never leaves as a clean PDF.
-      documents_complete: manifestComplete,
+      // REPORT-TRUTH #1 — a binding document READ but never ANALYZED is the same class of incompleteness as one that
+      // could not be ingested, and belongs in the same field: this is what the coverage badge and the export gate both
+      // read. Retrieval succeeding is not the question the field answers. Flag-OFF ⇒ docsAnalyzedIncomplete stays false
+      // ⇒ `manifestComplete && true` ⇒ byte-identical.
+      documents_complete: manifestComplete && !docsAnalyzedIncomplete,
       generated_at: generatedAt,
       source_chars: fullSource.length,
       doc_count: docs.length,

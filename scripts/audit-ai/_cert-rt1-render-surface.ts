@@ -39,7 +39,13 @@ const ok = (label: string, cond: boolean) => { if (cond) { pass++; console.log(`
   const cov = documentsCovered((row as { raw_pdf_text: string }).raw_pdf_text, cj.v3.findings, undefined);
   const truth = deriveAnalyzedDocuments((row as { raw_pdf_text: string }).raw_pdf_text, cov.uncovered);
   cj.v3.documents = { ...cj.v3.documents, analyzed: truth.analyzed, analyzed_of: truth.analyzed_of, unanalyzed: truth.unanalyzed, complete: false };
-  cj.documents_complete = false;
+  // The TOP-LEVEL field, written exactly as the patched executor writes it: `manifestComplete && !docsAnalyzedIncomplete`.
+  // manifestComplete was true on this run (all 3 posted docs ingested with text), so the flip must come entirely from the
+  // unanalyzed signal. Setting this by hand would make the cert prove the CERT rather than the code — an earlier draft
+  // did exactly that and masked a real defect, since buildCoverage reads this field and only falls back to
+  // v3.documents.complete when it is undefined.
+  const manifestCompleteOnThisRun = true;
+  cj.documents_complete = manifestCompleteOnThisRun && !(truth.unanalyzed.length > 0);
   const fixedRow = { ...(row as Record<string, unknown>), compliance_json: cj };
   const fixed = renderV4ReportFromRow(fixedRow);
 
@@ -51,6 +57,16 @@ const ok = (label: string, cond: boolean) => { if (cond) { pass++; console.log(`
   ok("legend now shows 2 analyzed alongside 3 read", /<b class="mono">3<\/b> read in full · <b class="mono">2<\/b> analyzed/.test(fixed));
   ok("coverage state is INCOMPLETE, not COMPLETE", /class="sec-state part">INCOMPLETE/.test(fixed));
   ok("the WD is NOT mislabelled as a parse failure", !/Could not be parsed[\s\S]{0,400}WAGE DETERMINATIONS/.test(fixed));
+
+  // ---- B2. THE TOP-LEVEL FOLD IS LOAD-BEARING ------------------------------------------------------------------
+  // Same fixed documents card, but documents_complete left at manifestComplete (what the executor wrote BEFORE the
+  // fold was added). If the badge still flips, the fold is dead code and this cert is measuring nothing.
+  const noFold = JSON.parse(JSON.stringify(cj)) as Record<string, any>;
+  noFold.documents_complete = true;
+  const withoutFold = renderV4ReportFromRow({ ...(row as Record<string, unknown>), compliance_json: noFold });
+  console.log("\nB2 · WITHOUT the top-level fold (the defect this cert nearly missed)");
+  ok("badge would have stayed COMPLETE over a named unanalyzed doc", /class="sec-state ok">COMPLETE/.test(withoutFold));
+  ok("so the fold into documents_complete is load-bearing, not decorative", /class="sec-state part">INCOMPLETE/.test(fixed));
 
   console.log("\nC · THE DIFF IS REAL");
   ok("shipped and fixed renders actually differ", shipped !== fixed);
