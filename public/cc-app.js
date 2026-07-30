@@ -204,12 +204,23 @@
       if (!items.length) return;
       html += `<div class="wk-group"><span>${g.label}</span><b>${items.length}</b></div>` + items.map(wkRow).join('');
     });
-    // The old calendar was nine invented dates (a wage determination, a protest
-    // window, fiscal markers) anchored to June. Empty until the calendar union
-    // is built — real solicitation deadlines already live on /opportunities.
-    $('weekList').innerHTML = html || `<div class="feed-clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>
-      <div class="fc-t">Calendar not built yet</div>
-      <div class="fc-d">This will merge solicitation deadlines, wage-determination expirations, regulatory effective dates and fiscal-year markers. Until then, response deadlines are live on <a class="fc-undo" href="/opportunities">Opportunities</a>.</div></div>`;
+    // Rows are real response deadlines from the live feed (built in
+    // command-center-live.js). The cap is NEVER silent — a truncated calendar
+    // that looks complete is its own small lie.
+    const dropped = num(window.CC.WEEK_DROPPED) || 0;
+    if (html && dropped > 0) {
+      html += `<a class="wk-row" href="/opportunities"><div class="wk-date"><span class="wk-d">+${dropped}</span></div>
+        <div class="wk-line"><span class="wk-node" style="background:var(--t40,#64748b)"></span></div>
+        <div class="wk-body"><div class="wk-label">${dropped} more deadline${dropped === 1 ? '' : 's'} not shown — open Opportunities</div></div></a>`;
+    }
+    // Three states: outage · feed answered with nothing dated · rows.
+    let empty;
+    if (window.CC.FEED_ERROR || window.CC.WEEK_SOURCED === false) {
+      empty = `<div class="fc-t">Deadlines unavailable</div><div class="fc-d">The feed did not answer, so this calendar is empty rather than illustrative — nothing here is sample data.</div>`;
+    } else {
+      empty = `<div class="fc-t">No dated deadlines</div><div class="fc-d">No live notice in your NAICS carries a future response deadline right now. Only response deadlines are wired — wage-determination, regulatory and fiscal dates are not sourced yet.</div>`;
+    }
+    $('weekList').innerHTML = html || `<div class="feed-clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>${empty}</div>`;
   }
 
   // Was six invented per-desk "signals" — a named CO relationship, a CMMC
