@@ -55,7 +55,7 @@
     //        — rewrite: the fact is real, it just wasn't the thing rendered.
     // Test by counterfactual: "eligibility is unread" survives (that field is absent
     // or malformed ON THE NOTICE whether or not we look at it); "nothing to audit"
-    // does not (auditing is ours). Gate: public/_opportunities-reason-slot.test.ts.
+    // does not (auditing is ours). Gate: test/public/_opportunities-reason-slot.test.ts.
     //
     // Poles that carry a specific, non-templated FACT come first.
     if (o.sa === 'SoleSource') {

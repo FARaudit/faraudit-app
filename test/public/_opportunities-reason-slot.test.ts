@@ -24,7 +24,7 @@
 //            detectors below are deliberately noisy in the safe direction: a
 //            false flag costs a conversation, a false pass ships a category error.
 //
-// Run: npx tsx public/_opportunities-reason-slot.test.ts
+// Run: npx tsx test/public/_opportunities-reason-slot.test.ts
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { readFileSync } from "node:fs";
