@@ -1,0 +1,14 @@
+import { readFileSync } from "fs";
+const rec = JSON.parse(readFileSync("scripts/audit-ai/run-records/_fire-45f9bacd.json","utf8"));
+const inp = rec.result.inputs; const cov = rec.result.coverage;
+console.log("LIVE fire verdict:", rec.result.verdict, "· recommendation reason:", (rec.result.reason||"").slice(0,90));
+console.log("\ncompleteness inputs (as-run):");
+console.log("  coverageComplete:", inp.coverageComplete);
+console.log("  manifestComplete:", inp.manifestComplete);
+console.log("  documentsComplete:", inp.documentsComplete);
+console.log("  coverage.required:", JSON.stringify(cov.required));
+console.log("  coverage.covered:", JSON.stringify(cov.covered));
+console.log("  coverage.missing:", JSON.stringify(cov.missing));
+console.log("  coverage.coreMissing:", JSON.stringify(cov.coreMissing));
+console.log("  format:", JSON.stringify(rec.format));
+console.log("  sectionsRead:", JSON.stringify(rec.result.sectionsRead));

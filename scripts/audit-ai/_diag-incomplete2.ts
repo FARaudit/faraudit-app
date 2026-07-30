@@ -1,0 +1,15 @@
+import { readFileSync } from "fs";
+import { deriveVerdict, emitPerformanceUpkeepCaveats } from "../../src/lib/audit-decide";
+import { gradeCoverageV2, verifyRecitalInSource } from "../../src/lib/audit-gate-v2";
+import { locateObligationContext } from "../../src/lib/audit-orchestrator";
+const rec = JSON.parse(readFileSync("scripts/audit-ai/run-records/_fire-45f9bacd.json","utf8"));
+const src=rec.input.fullSource, atts=rec.result.coverage.attestations;
+for (const k of ["AUDIT_GATE_V2","AUDIT_AMBIGUOUS_SIGNAL_DEMOTION","AUDIT_PERFORMANCE_UPKEEP_CAVEAT","AUDIT_BENIGN_RECITAL_COVERED","AUDIT_CREDENTIAL_CONDITIONAL_REASON","AUDIT_FABRICATION_INVARIANT","AUDIT_RECITAL_LINEWRAP_BRIDGE","AUDIT_BOND_PAPER_NONBAR"]) process.env[k]="true";
+const cov2 = gradeCoverageV2(atts,{locate:(o:string)=>locateObligationContext(src,o),verifyRecitalPresence:(o:string)=>verifyRecitalInSource(src,o)});
+let findings = rec.result.inputs.findings;
+if (cov2.caveatRecital?.length) findings = emitPerformanceUpkeepCaveats(findings, cov2.caveatRecital);
+console.log("coverageV2: unreadable=",cov2.unreadable?.length,"ungroundedRead=",cov2.ungroundedRead?.length,"disq=",cov2.disqualifierUncovered?.length,"caveat=",cov2.caveatRecital?.length,"grade=",cov2.coverageGrade?.toFixed?.(2));
+const base = { ...rec.result.inputs, findings, coverageV2: cov2 };
+console.log("as-is (coverageComplete="+base.coverageComplete+"):", deriveVerdict(base).verdict);
+console.log("coverageComplete=true:", deriveVerdict({...base, coverageComplete:true}).verdict);
+console.log("coverageComplete=true + coverageGap cleared:", deriveVerdict({...base, coverageComplete:true, coverageGap:false}).verdict);

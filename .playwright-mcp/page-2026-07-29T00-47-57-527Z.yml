@@ -1,0 +1,336 @@
+- generic [ref=f2e2]:
+  - complementary [ref=f2e3]:
+    - button "Toggle sidebar" [ref=f2e4] [cursor=pointer]
+    - generic [ref=f2e7]:
+      - generic [ref=f2e8]: F
+      - generic [ref=f2e9]:
+        - text: FAR
+        - generic [ref=f2e10]: audit
+    - generic [ref=f2e11]: WORKSPACE
+    - link "Today" [ref=f2e12] [cursor=pointer]:
+      - /url: /command-center
+    - link "Run Audit New" [ref=f2e19] [cursor=pointer]:
+      - /url: /audit
+      - generic [ref=f2e24]: Run Audit
+      - generic [ref=f2e25]: New
+    - link "Acquisition Stages" [ref=f2e26] [cursor=pointer]:
+      - /url: /acquisition-stages
+    - link "Past Audits 6" [ref=f2e31] [cursor=pointer]:
+      - /url: /past-audits
+      - generic [ref=f2e35]: Past Audits
+      - generic "6 open — response deadline not yet passed (of 9 total)" [ref=f2e36]: "6"
+    - link "Pipeline 3" [ref=f2e37] [cursor=pointer]:
+      - /url: /pipeline
+      - generic [ref=f2e41]: Pipeline
+      - generic [ref=f2e42]: "3"
+    - link "Capability Statement" [ref=f2e43] [cursor=pointer]:
+      - /url: /capability-statement
+    - generic [ref=f2e48]: INTELLIGENCE
+    - link "Opportunities Live" [ref=f2e49] [cursor=pointer]:
+      - /url: /opportunities
+      - generic [ref=f2e53]: Opportunities
+      - generic [ref=f2e54]: Live
+    - link "Watching" [ref=f2e55] [cursor=pointer]:
+      - /url: /watching
+    - link "Defense News" [ref=f2e61] [cursor=pointer]:
+      - /url: /defense-news
+    - link "Defense Spending" [ref=f2e65] [cursor=pointer]:
+      - /url: /defense-spending
+    - link "Defense Agencies 8" [ref=f2e72] [cursor=pointer]:
+      - /url: /agencies
+      - generic [ref=f2e76]: Defense Agencies
+      - generic [ref=f2e77]: "8"
+    - link "Contracting Officers" [ref=f2e78] [cursor=pointer]:
+      - /url: /contracting-officers
+    - generic [ref=f2e85]: COMPLIANCE & BD
+    - link "FAR/DFARS Updates" [ref=f2e86] [cursor=pointer]:
+      - /url: /far-dfars-updates
+    - link "CMMC Readiness" [ref=f2e92] [cursor=pointer]:
+      - /url: /cmmc
+    - link "Wage Benchmarks" [ref=f2e97] [cursor=pointer]:
+      - /url: /wage-benchmarks
+    - link "Teaming Partners" [ref=f2e103] [cursor=pointer]:
+      - /url: /teaming-partners
+    - link "GAO Protests" [ref=f2e110] [cursor=pointer]:
+      - /url: /gao-protests
+    - generic [ref=f2e115]: ACCOUNT
+    - link "Profile & Settings" [ref=f2e116] [cursor=pointer]:
+      - /url: /settings
+    - button "Sign out" [ref=f2e122] [cursor=pointer]
+  - main [ref=f2e129]:
+    - generic [ref=f2e130]:
+      - generic [ref=f2e131]:
+        - generic [ref=f2e132]: Past Audits
+        - generic [ref=f2e133]: /
+        - generic [ref=f2e134]: Bid Decision Ledger
+      - generic [ref=f2e135]: LIVE
+      - generic [ref=f2e136]:
+        - generic [ref=f2e140]: Search audits, notice IDs, NAICS…
+        - generic [ref=f2e141]: ⌘K
+      - generic [ref=f2e142]:
+        - button "Toggle theme" [ref=f2e143] [cursor=pointer]
+        - button "Notifications" [ref=f2e146] [cursor=pointer]
+    - generic [ref=f2e152]:
+      - generic [ref=f2e153]:
+        - generic [ref=f2e154]:
+          - paragraph [ref=f2e155]: Dashboard · Decision History
+          - heading "Past Audits" [level=1] [ref=f2e156]
+          - paragraph [ref=f2e157]: Every solicitation FARaudit has audited for you — 9 records, newest first.
+        - link "New Audit" [ref=f2e158] [cursor=pointer]:
+          - /url: /audit
+      - generic [ref=f2e161]:
+        - generic [ref=f2e162]:
+          - paragraph [ref=f2e164]: Audits Run
+          - generic [ref=f2e170]: "9"
+          - generic [ref=f2e171]:
+            - generic [ref=f2e172]: "6"
+            - text: in the last 30 days
+        - generic [ref=f2e173]:
+          - paragraph [ref=f2e175]: Bid-Rated
+          - generic [ref=f2e179]: "3"
+          - generic [ref=f2e181]:
+            - generic [ref=f2e182]: Bid 1
+            - generic [ref=f2e184]: +
+            - generic [ref=f2e185]: Bid·caution 2
+            - generic [ref=f2e187]: · of 7 with a verdict
+        - generic [ref=f2e188]:
+          - paragraph [ref=f2e190]: No-Bid / Ineligible
+          - generic [ref=f2e195]: "2"
+          - generic [ref=f2e197]:
+            - generic [ref=f2e198]: No-bid 1
+            - generic [ref=f2e200]: +
+            - generic [ref=f2e201]: Ineligible 1
+            - generic [ref=f2e203]: · committal declines
+        - generic [ref=f2e204]:
+          - paragraph [ref=f2e206]: Still Open
+          - generic [ref=f2e211]: "6"
+          - generic [ref=f2e212]:
+            - text: response window still open —
+            - generic [ref=f2e213]: you can still bid
+      - generic [ref=f2e214]:
+        - generic [ref=f2e215]:
+          - generic [ref=f2e216]:
+            - text: Audit Ledger
+            - generic [ref=f2e217]: 9 of 9
+          - generic [ref=f2e219]:
+            - generic "Bid 1" [ref=f2e220]
+            - generic "Bid · caution 2" [ref=f2e221]
+            - generic "No-bid 1" [ref=f2e222]
+            - generic "Ineligible 1" [ref=f2e223]
+            - generic "Needs review 1" [ref=f2e224]
+            - generic "Incomplete 1" [ref=f2e225]
+            - generic "In flight 1" [ref=f2e226]
+            - generic "Run failed 1" [ref=f2e227]
+        - generic [ref=f2e228]:
+          - group "Verdict" [ref=f2e229]:
+            - button "All 9" [ref=f2e230] [cursor=pointer]:
+              - generic [ref=f2e231]: All
+              - generic [ref=f2e232]: "9"
+            - button "Bid 1" [ref=f2e233] [cursor=pointer]:
+              - generic [ref=f2e235]: Bid
+              - generic [ref=f2e236]: "1"
+            - button "Bid · caution 2" [ref=f2e237] [cursor=pointer]:
+              - generic [ref=f2e239]: Bid · caution
+              - generic [ref=f2e240]: "2"
+            - button "No-bid 1" [ref=f2e241] [cursor=pointer]:
+              - generic [ref=f2e243]: No-bid
+              - generic [ref=f2e244]: "1"
+            - button "Ineligible 1" [ref=f2e245] [cursor=pointer]:
+              - generic [ref=f2e247]: Ineligible
+              - generic [ref=f2e248]: "1"
+            - button "Needs review 1" [ref=f2e249] [cursor=pointer]:
+              - generic [ref=f2e251]: Needs review
+              - generic [ref=f2e252]: "1"
+            - button "Incomplete 1" [ref=f2e253] [cursor=pointer]:
+              - generic [ref=f2e255]: Incomplete
+              - generic [ref=f2e256]: "1"
+            - button "In flight 1" [ref=f2e257] [cursor=pointer]:
+              - generic [ref=f2e259]: In flight
+              - generic [ref=f2e260]: "1"
+            - button "Run failed 1" [ref=f2e261] [cursor=pointer]:
+              - generic [ref=f2e263]: Run failed
+              - generic [ref=f2e264]: "1"
+          - generic [ref=f2e265]:
+            - generic [ref=f2e266]:
+              - generic: Time
+              - combobox "Time aperture" [ref=f2e267] [cursor=pointer]:
+                - option "All time" [selected]
+                - option "Last 30 days"
+                - option "Last quarter"
+                - option "Last year"
+            - generic [ref=f2e268]:
+              - generic: Agency
+              - combobox "Agency" [ref=f2e269] [cursor=pointer]:
+                - option "All agencies" [selected]
+                - option "Air Force"
+                - option "Army"
+                - option "Forest Service"
+                - option "NGA"
+                - option "Navy"
+                - option "VA"
+            - generic [ref=f2e270]:
+              - generic: Type
+              - combobox "Type" [ref=f2e271] [cursor=pointer]:
+                - option "All types" [selected]
+                - option "RFP"
+                - option "RFQ"
+            - generic [ref=f2e272]:
+              - generic: Window
+              - combobox "Window" [ref=f2e273] [cursor=pointer]:
+                - option "All windows" [selected]
+                - option "Still open (6)"
+                - option "Passed (1)"
+                - option "No date (2)"
+            - generic [ref=f2e274]:
+              - generic: NAICS
+              - combobox "NAICS" [ref=f2e275] [cursor=pointer]:
+                - option "All NAICS" [selected]
+                - option "115310"
+                - option "237990"
+                - option "336611"
+                - option "488190"
+                - option "541370"
+                - option "561210"
+                - option "561720"
+                - option "561730"
+                - option "611512"
+            - generic [ref=f2e276]:
+              - generic: Set-aside
+              - combobox "Set-aside" [ref=f2e277] [cursor=pointer]:
+                - option "All set-asides" [selected]
+                - option "8(a)"
+                - option "—"
+                - option "Small Business"
+                - option "SDVOSB"
+          - generic [ref=f2e278]: Control band 984px · one row at ≥984px · one row here · table needs 1292px, has 1292px
+        - table [ref=f2e280]:
+          - rowgroup [ref=f2e281]:
+            - row [ref=f2e282]:
+              - columnheader "Notice ID" [ref=f2e283] [cursor=pointer]
+              - columnheader "Title" [ref=f2e284]
+              - columnheader "Agency" [ref=f2e285] [cursor=pointer]
+              - columnheader "Type" [ref=f2e286] [cursor=pointer]
+              - columnheader "Response Due" [ref=f2e287] [cursor=pointer]
+              - columnheader "Audited ▼" [ref=f2e288] [cursor=pointer]:
+                - text: Audited
+                - generic [ref=f2e289]: ▼
+              - columnheader "Verdict" [ref=f2e290] [cursor=pointer]
+              - columnheader "Status" [ref=f2e291] [cursor=pointer]
+              - columnheader "Report" [ref=f2e292]
+          - rowgroup [ref=f2e293]:
+            - row [ref=f2e294] [cursor=pointer]:
+              - cell "36C10B26Q0339" [ref=f2e295]
+              - cell "In-Flight Audit" [ref=f2e296]
+              - cell "VA" [ref=f2e297]
+              - cell "RFQ" [ref=f2e298]
+              - cell "Aug 6, 2026" [ref=f2e300]
+              - cell "Jul 28, 2026" [ref=f2e301]
+              - cell [ref=f2e302]
+              - cell "running" [ref=f2e305]
+              - cell [ref=f2e307]:
+                - link "View" [ref=f2e308]:
+                  - /url: /audit/aaaaaaaa-0000-0000-0000-000000000008
+            - row [ref=f2e311] [cursor=pointer]:
+              - cell "36C25626Q1137" [ref=f2e312]
+              - cell "Window Cleaning Services — Ozarks" [ref=f2e313]
+              - cell "VA" [ref=f2e314]
+              - cell "RFQ" [ref=f2e315]
+              - cell "Aug 3, 2026" [ref=f2e317]
+              - cell "Jul 27, 2026" [ref=f2e318]
+              - cell [ref=f2e319]
+              - cell "complete" [ref=f2e322]
+              - cell [ref=f2e324]:
+                - link "View" [ref=f2e325]:
+                  - /url: /audit/aaaaaaaa-0000-0000-0000-000000000001
+            - row [ref=f2e328] [cursor=pointer]:
+              - cell [ref=f2e329]:
+                - text: N0018926QZ071
+                - generic "Needs attention" [ref=f2e330]
+              - cell "Failed Ingest Example" [ref=f2e334]
+              - cell "Navy" [ref=f2e335]
+              - cell "RFQ" [ref=f2e336]
+              - cell "Jul 31, 2026" [ref=f2e338]
+              - cell "Jul 26, 2026" [ref=f2e339]
+              - cell [ref=f2e340]
+              - cell "RUN FAILED" [ref=f2e343]
+              - cell [ref=f2e346]:
+                - link "Re-run" [ref=f2e347]:
+                  - /url: /audit/aaaaaaaa-0000-0000-0000-000000000009
+            - row [ref=f2e350] [cursor=pointer]:
+              - cell "FA813726R0033" [ref=f2e351]
+              - cell "Depot Maintenance Support" [ref=f2e352]
+              - cell "Air Force" [ref=f2e353]
+              - cell "RFP" [ref=f2e354]
+              - cell "Aug 9, 2026" [ref=f2e356]
+              - cell "Jul 25, 2026" [ref=f2e357]
+              - cell [ref=f2e358]
+              - cell "complete" [ref=f2e361]
+              - cell [ref=f2e363]:
+                - link "View" [ref=f2e364]:
+                  - /url: /audit/aaaaaaaa-0000-0000-0000-000000000002
+            - row [ref=f2e367] [cursor=pointer]:
+              - cell [ref=f2e368]:
+                - text: W9126G26RA087
+                - generic "Needs attention" [ref=f2e369]
+              - cell "Levee Rehabilitation" [ref=f2e373]
+              - cell "Army" [ref=f2e374]
+              - cell "RFP" [ref=f2e375]
+              - cell "Jul 26, 2026" [ref=f2e377]
+              - cell "Jul 20, 2026" [ref=f2e378]
+              - cell [ref=f2e379]
+              - cell "complete Deadline passed" [ref=f2e382]:
+                - generic [ref=f2e383]:
+                  - text: complete
+                  - generic [ref=f2e384]: Deadline passed
+              - cell [ref=f2e385]:
+                - link "View" [ref=f2e386]:
+                  - /url: /audit/aaaaaaaa-0000-0000-0000-000000000003
+            - row [ref=f2e389] [cursor=pointer]:
+              - cell "FA442726Q1068" [ref=f2e390]
+              - cell "Grounds Maintenance" [ref=f2e391]
+              - cell "Air Force" [ref=f2e392]
+              - cell "RFQ" [ref=f2e393]
+              - cell "Jul 29, 2026" [ref=f2e395]
+              - cell "Jul 13, 2026" [ref=f2e396]
+              - cell [ref=f2e397]
+              - cell "complete" [ref=f2e400]
+              - cell [ref=f2e402]:
+                - link "View" [ref=f2e403]:
+                  - /url: /audit/aaaaaaaa-0000-0000-0000-000000000004
+            - row [ref=f2e406] [cursor=pointer]:
+              - cell "1232SA26Q0007" [ref=f2e407]
+              - cell "Forestry Support Services" [ref=f2e408]
+              - cell "Forest Service" [ref=f2e409]
+              - cell "RFQ" [ref=f2e410]
+              - cell "Aug 17, 2026" [ref=f2e412]
+              - cell "Jun 18, 2026" [ref=f2e413]
+              - cell [ref=f2e414]
+              - cell "complete" [ref=f2e417]
+              - cell [ref=f2e419]:
+                - link "View" [ref=f2e420]:
+                  - /url: /audit/aaaaaaaa-0000-0000-0000-000000000005
+            - row [ref=f2e423] [cursor=pointer]:
+              - cell "HM047626QE010" [ref=f2e424]
+              - cell "Geospatial Data Services" [ref=f2e425]
+              - cell "NGA" [ref=f2e426]
+              - cell "RFQ" [ref=f2e427]
+              - cell "—" [ref=f2e429]
+              - cell "Jun 8, 2026" [ref=f2e430]
+              - cell [ref=f2e431]
+              - cell "complete" [ref=f2e434]
+              - cell [ref=f2e436]:
+                - link "View" [ref=f2e437]:
+                  - /url: /audit/aaaaaaaa-0000-0000-0000-000000000006
+            - row [ref=f2e440] [cursor=pointer]:
+              - cell "FA301626Q0068" [ref=f2e441]
+              - cell "Legacy Row (pre-v3)" [ref=f2e442]
+              - cell "Air Force" [ref=f2e443]
+              - cell "RFQ" [ref=f2e444]
+              - cell "—" [ref=f2e446]
+              - cell "Apr 29, 2026" [ref=f2e447]
+              - cell [ref=f2e448]
+              - cell "complete" [ref=f2e451]
+              - cell [ref=f2e453]:
+                - link "View" [ref=f2e454]:
+                  - /url: /audit/aaaaaaaa-0000-0000-0000-000000000007
+        - generic [ref=f2e457]: Self-check · 4 of 4 computed checks pass — rail sums to the ledger count (9=9), every row in exactly one segment, nothing clipped, every passed deadline flagged (1/1).

@@ -1,0 +1,2 @@
+[      36ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://127.0.0.1:8791/_verify_iso/cockpit-customize.js:0
+[      36ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://127.0.0.1:8791/_verify_iso/digest-data.json?t=1785120109556:0

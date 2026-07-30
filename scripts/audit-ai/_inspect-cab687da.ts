@@ -1,0 +1,17 @@
+import * as fs from "fs";
+const rec = JSON.parse(fs.readFileSync("scripts/audit-ai/run-records/_new-cab687da.json","utf8"));
+const top = Object.keys(rec);
+console.log("TOP KEYS:", top.join(", "));
+console.log("\nresult keys:", Object.keys(rec.result||{}).join(", "));
+console.log("diagnostics keys:", Object.keys(rec.result?.diagnostics||rec.diagnostics||{}).join(", "));
+const diag = rec.result?.diagnostics || rec.diagnostics || {};
+const led = diag.verifierLedger || rec.result?.verifierLedger;
+console.log("\n=== verifierLedger present?", !!led, "===");
+if(led) console.log("ledger keys:", Object.keys(led).join(", "));
+console.log("\n=== flagEnv POSITIVE_VERDICT_POLE at fire time ===");
+const fe = rec.meta?.flagEnv || rec.flagEnv || {};
+console.log("AUDIT_POSITIVE_VERDICT_POLE =", fe.AUDIT_POSITIVE_VERDICT_POLE);
+console.log("AUDIT_BANK_RUN_RECORD =", fe.AUDIT_BANK_RUN_RECORD);
+console.log("\n=== decision ===");
+console.log(JSON.stringify(rec.result?.decision||rec.decision, null, 1)?.slice(0,600));
+console.log("\nfindings count:", rec.result?.findings?.length);

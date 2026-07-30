@@ -1,0 +1,102 @@
+- generic [active] [ref=f6e1]:
+  - banner [ref=f6e2]:
+    - generic [ref=f6e3]: Control Board
+    - generic [ref=f6e4]: Updated Jul 26, 2026 · 9:40 PM
+    - generic [ref=f6e5]: "source: SOURCE UNREADABLE"
+    - generic [ref=f6e6]: 86 shown = 86 in digest in sync
+    - generic [ref=f6e7]:
+      - link "CEO" [ref=f6e8] [cursor=pointer]:
+        - /url: "#yours"
+      - link "Code" [ref=f6e9] [cursor=pointer]:
+        - /url: "#mine"
+      - link "Backlog" [ref=f6e11] [cursor=pointer]:
+        - /url: "#backlog"
+    - link "Communications →" [ref=f6e12] [cursor=pointer]:
+      - /url: file:///Users/josearodriguezjr./faraudit-app/ceo/communications.html
+    - link "Full Digest →" [ref=f6e13] [cursor=pointer]:
+      - /url: file:///Users/josearodriguezjr./faraudit-app/ceo/ceo-digest-canonical.html
+    - button "P0 only · show P1/P2" [ref=f6e14] [cursor=pointer]
+  - generic [ref=f6e15]:
+    - generic [ref=f6e16]:
+      - heading "What has to happen today Today 2" [level=2] [ref=f6e17]:
+        - text: What has to happen today
+        - generic [ref=f6e18]: Today
+        - generic [ref=f6e19]: "2"
+      - list [ref=f6e20]:
+        - listitem [ref=f6e21]:
+          - generic [ref=f6e22]: CEO
+          - generic [ref=f6e23]: Customer
+          - generic [ref=f6e24]: "Make sure 'forgot password' actually works end-to-end: reset email arrives, link works, new password signs you in"
+        - listitem [ref=f6e25]:
+          - generic [ref=f6e26]: CEO
+          - generic [ref=f6e27]: "CEO CLICK — fire SEQ-5 36C24126Q0569 (VA SDVOSB landscaping) through the front door. Pre-fire GREEN (Brain #659); incomplete-by-construction (image-only WEBGIS binding map → honest INCOMPLETE, doc named). ~$1.81 / ~304s. On landing relay verdict + doc-named + cost/wall → seq-5 CERTIFIES. Independent of seq-4."
+    - generic [ref=f6e28]:
+      - generic [ref=f6e29]:
+        - generic [ref=f6e30]: "86"
+        - generic [ref=f6e31]: Total open items
+      - generic [ref=f6e32]:
+        - generic [ref=f6e33]: "6"
+        - generic [ref=f6e34]: P0 · open now
+      - generic [ref=f6e35]:
+        - generic [ref=f6e36]: "1"
+        - generic [ref=f6e37]: Customer blockers
+      - generic [ref=f6e38]:
+        - generic [ref=f6e39]: "17"
+        - generic [ref=f6e40]: Blocked · waiting
+      - generic [ref=f6e41]:
+        - generic [ref=f6e42]: "47"
+        - generic [ref=f6e43]: Actionable now
+    - paragraph [ref=f6e44]: Showing P0 — now work by default. Toggle above to reveal P1/P2.
+    - generic [ref=f6e45]:
+      - heading "YOUR tasks (CEO) — 17" [level=2] [ref=f6e46]
+      - table [ref=f6e47]:
+        - rowgroup [ref=f6e48]:
+          - row [ref=f6e49]:
+            - cell "P0" [ref=f6e50]
+            - cell "today" [ref=f6e51]
+            - cell [ref=f6e52]:
+              - code [ref=f6e53]: SEQ5-FIRE
+            - 'cell "CEO CLICK — fire SEQ-5 36C24126Q0569 (VA SDVOSB landscaping) through the front door. Pre-fire GREEN (Brain #659); incomplete-by-construction (image-only WEBGIS binding map → honest INCOMPLETE, doc named). ~$1.81 / ~304s. On landing relay verdict + doc-named + cost/wall → seq-5 CERTIFIES. Independent of seq-4." [ref=f6e54]'
+          - row [ref=f6e55]:
+            - cell "P0" [ref=f6e56]
+            - cell "blocked_chain" [ref=f6e57]
+            - cell [ref=f6e58]:
+              - code [ref=f6e59]: SEQ4-FIRE
+            - 'cell "CEO CLICK — fire SEQ-4 (commercial pathway) — GATED behind #640. After #640 re-arms ROUTING_V2, re-run the seq-4 4-filter screen (clean-routing fanout=1 → ~300K char ceiling) → clean COMPLETE·NHR target appears → present pick → CEO click → CERT-5 CLOSES." [ref=f6e60]'
+          - row [ref=f6e61]:
+            - cell "P0" [ref=f6e62]
+            - cell "customer_blocker" [ref=f6e63]
+            - cell [ref=f6e64]:
+              - code [ref=f6e65]: FA-162
+            - 'cell "Make sure ''forgot password'' actually works end-to-end: reset email arrives, link works, new password signs you in" [ref=f6e66]'
+    - generic [ref=f6e67]:
+      - heading "MY tasks (Code) — 44" [level=2] [ref=f6e68]
+      - table [ref=f6e69]:
+        - rowgroup [ref=f6e70]:
+          - row [ref=f6e71]:
+            - cell "P0" [ref=f6e72]
+            - cell "actionable_now" [ref=f6e73]
+            - cell [ref=f6e74]:
+              - text: ▶1
+              - code [ref=f6e75]: ARC747-V2
+            - 'cell "ARC #747 · V2 engine narrative may not invent record facts (TIER V). v3.reason introduced an eligibility path with zero source support, inside the sentence telling the reader what to confirm." [ref=f6e76]'
+          - row [ref=f6e77]:
+            - cell "P0" [ref=f6e78]
+            - cell "actionable_now" [ref=f6e79]
+            - cell [ref=f6e80]:
+              - text: ▶2
+              - code [ref=f6e81]: UNWIRED-SURFACE-SWEEP
+            - cell "Sweep every customer-facing surface for assertions it never computed — three found today by accident, not by search." [ref=f6e82]
+          - row [ref=f6e83]:
+            - cell "P0" [ref=f6e84]
+            - cell "actionable_now" [ref=f6e85]
+            - cell [ref=f6e86]:
+              - code [ref=f6e87]: FA-CW9
+            - cell "Stress-test 6 hard, very different real solicitations end-to-end, then stamp 'Run Audit' production-ready" [ref=f6e88]
+    - generic [ref=f6e89]:
+      - heading "Active — needs an owner — 0" [level=2] [ref=f6e90]
+      - paragraph [ref=f6e91]: None — every active item has an owner.
+    - generic [ref=f6e92]:
+      - heading "Backlog / monitoring — 25 (lower priority, all owners)" [level=2] [ref=f6e93]
+      - table:
+        - rowgroup

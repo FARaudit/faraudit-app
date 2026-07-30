@@ -1,0 +1,136 @@
+- generic [ref=f5e5]:
+  - generic [ref=f5e6]:
+    - generic [ref=f5e7]: Action board
+    - generic [ref=f5e8]: 76 items · newest Jul 29 2026
+    - generic [ref=f5e9]:
+      - button "Focus" [ref=f5e10] [cursor=pointer]
+      - button "Ledger · 76" [ref=f5e11] [cursor=pointer]
+    - button "Night" [ref=f5e12] [cursor=pointer]
+  - generic [ref=f5e14]:
+    - generic [ref=f5e15]:
+      - generic [ref=f5e16]:
+        - generic [ref=f5e17]: Do this now
+        - generic [ref=f5e18]: "1"
+      - generic [ref=f5e19]:
+        - generic [ref=f5e20]:
+          - generic [ref=f5e21]: A customer is affected right now
+          - heading "Make 'forgot password' work end-to-end — reset email, link, sign-in" [level=3] [ref=f5e23]
+          - paragraph [ref=f5e24]: "Customer acts as: forgot password → clicks reset → email never arrives → locked out forever. FA-161 (middleware fix cc9f96c) shipped. Remaining: create demo@faraudit.com mailbox in Google Workspace OR alias to jose@faraudit.com. CEO must verify end-to-end: request reset → receive email → click link → land on /auth/update-password → set password → sign in. Not closed until CEO completes this full flow personally."
+          - generic [ref=f5e25]:
+            - generic [ref=f5e26]: under 30m
+            - generic [ref=f5e27]: Platform
+            - generic [ref=f5e28]: P0
+            - generic [ref=f5e29]: FA-162
+          - generic [ref=f5e30]:
+            - generic [ref=f5e31]: First step
+            - generic [ref=f5e32]: Password reset flow broken — demo@faraudit.com has no mailbox, reset emails go nowhere
+        - generic [ref=f5e33]:
+          - generic [ref=f5e34]: Or close something small · under 30 minutes · 3 available
+          - generic [ref=f5e35]:
+            - generic [ref=f5e36]: •
+            - generic [ref=f5e37]: Every bug fix ships with a test that fails before the fix
+    - generic [ref=f5e38]:
+      - generic [ref=f5e39]:
+        - generic [ref=f5e40]: Then, in order
+        - generic [ref=f5e41]: "5"
+        - generic [ref=f5e42]: nothing truncates · ≈128 chars
+      - generic [ref=f5e43]:
+        - generic [ref=f5e44]:
+          - generic [ref=f5e45]: "2"
+          - generic [ref=f5e46]:
+            - generic [ref=f5e47]: Fire SEQ-5 now, or only after the two panel-F engine roots are fixed?
+            - generic [ref=f5e48]:
+              - generic [ref=f5e49]: YOU
+              - generic [ref=f5e50]: under 30m
+              - generic [ref=f5e51]: Engine
+        - generic [ref=f5e52]:
+          - generic [ref=f5e53]: "3"
+          - generic [ref=f5e54]:
+            - generic [ref=f5e55]: Clean up report wording for closed/expired solicitations
+            - generic [ref=f5e56]:
+              - generic [ref=f5e57]: CODE
+              - generic [ref=f5e58]: 30m–2h
+              - generic [ref=f5e59]: Customer Report
+        - generic [ref=f5e60]:
+          - generic [ref=f5e61]: "4"
+          - generic [ref=f5e62]:
+            - generic [ref=f5e63]: "Own the whole workflow: find, audit, bid, win, recompete"
+            - generic [ref=f5e64]:
+              - generic [ref=f5e65]: YOU
+              - generic [ref=f5e66]: 2h+
+              - generic [ref=f5e67]: Platform
+        - generic [ref=f5e68]:
+          - generic [ref=f5e69]: "5"
+          - generic [ref=f5e70]:
+            - generic [ref=f5e71]: Export the Notion workspace to Drive before touching the account
+            - generic [ref=f5e72]:
+              - generic [ref=f5e73]: YOU
+              - generic [ref=f5e74]: 30m–2h
+              - generic [ref=f5e75]: Doctrine
+        - generic [ref=f5e76]:
+          - generic [ref=f5e77]: "6"
+          - generic [ref=f5e78]:
+            - generic [ref=f5e79]: Fix the v5 out-of-scope header showing an eligibility chip the PDF hides
+            - generic [ref=f5e80]:
+              - generic [ref=f5e81]: YOU
+              - generic [ref=f5e82]: under 30m
+              - generic [ref=f5e83]: Engine
+    - generic [ref=f5e84]:
+      - generic [ref=f5e85]:
+        - generic [ref=f5e86]: You owe an answer
+        - generic [ref=f5e87]: "9"
+        - generic [ref=f5e88]: nothing truncates · strip fits ≈54 chars · budget 72
+      - generic [ref=f5e89]:
+        - generic [ref=f5e90] [cursor=pointer]:
+          - generic [ref=f5e91]: Fire SEQ-5 now, or only after the two panel-F engine roots are fixed?
+          - generic [ref=f5e93]: Engine · P0 · SEQ5-FIRE
+        - generic [ref=f5e95] [cursor=pointer]:
+          - generic [ref=f5e96]: SEQ-4's gate (#640) was closed as superseded — re-point or unblock it?
+          - generic [ref=f5e98]: Engine · P0 · SEQ4-FIRE · releases 1
+        - generic [ref=f5e100] [cursor=pointer]:
+          - generic [ref=f5e101]: Build the 9-seat expert panel into the engine itself — approve the arc?
+          - generic [ref=f5e103]: Engine · P1 · FA-EXPERT-PANEL-ENGINE
+        - generic [ref=f5e105] [cursor=pointer]:
+          - generic [ref=f5e106]: Re-run the flag deriver, then rule on the stranded render flags?
+          - generic [ref=f5e108]: Engine · P2 · R1R3-PARITY
+        - generic [ref=f5e110] [cursor=pointer]:
+          - generic [ref=f5e111]: Send the LinkedIn DMs as connections accept?
+          - generic [ref=f5e113]: Sales · P2 · FA-4
+        - generic [ref=f5e115] [cursor=pointer]:
+          - generic [ref=f5e116]: "Rule on card #756: two ICP conflicts plus the dry-run build?"
+          - generic [ref=f5e118]: Sales · P2 · TRACK4-DRY
+        - generic [ref=f5e120] [cursor=pointer]:
+          - generic [ref=f5e121]: Keep or kill the idle Marketing/Sales AI output and email handling?
+          - generic [ref=f5e123]: Sales · P2 · FA-AGENTS-REVIEW
+        - generic [ref=f5e125] [cursor=pointer]:
+          - generic [ref=f5e126]: "Adopt any of: error tracking, database UI, SAM integrations?"
+          - generic [ref=f5e128]: Internal Ops · P2 · FA-TOOLING
+        - generic [ref=f5e130] [cursor=pointer]:
+          - generic [ref=f5e131]: Which background agents stay, and which get retired?
+          - generic [ref=f5e133]: Internal Ops · P2 · FA-AGENT-ARCH-REVIEW
+  - generic [ref=f5e135]:
+    - generic [ref=f5e136] [cursor=pointer]:
+      - generic [ref=f5e138]: Engine
+      - generic [ref=f5e139]: "23"
+    - generic [ref=f5e140] [cursor=pointer]:
+      - generic [ref=f5e141]: Platform
+      - generic [ref=f5e142]: "20"
+    - generic [ref=f5e143] [cursor=pointer]:
+      - generic [ref=f5e145]: Internal Ops
+      - generic [ref=f5e146]: "9"
+    - generic [ref=f5e147] [cursor=pointer]:
+      - generic [ref=f5e148]: Doctrine
+      - generic [ref=f5e149]: "6"
+    - generic [ref=f5e150] [cursor=pointer]:
+      - generic [ref=f5e152]: Sales
+      - generic [ref=f5e153]: "7"
+    - generic [ref=f5e154] [cursor=pointer]:
+      - generic [ref=f5e155]: Customer Report
+      - generic [ref=f5e156]: "4"
+    - generic [ref=f5e157] [cursor=pointer]:
+      - generic [ref=f5e158]: Money
+      - generic [ref=f5e159]: "4"
+    - generic [ref=f5e160] [cursor=pointer]:
+      - generic [ref=f5e161]: Content
+      - generic [ref=f5e162]: "3"
+    - generic [ref=f5e163]: dot = this area needs a decision from you

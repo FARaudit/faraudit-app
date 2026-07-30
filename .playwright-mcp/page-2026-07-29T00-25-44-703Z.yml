@@ -1,0 +1,459 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]: Card 768 · Design · v2
+    - heading "Action Board — the focus panel" [level=1] [ref=e5]
+    - generic [ref=e6]: 78 real items · live data from the 2026-07-28 board
+  - generic [ref=e7]:
+    - generic [ref=e8]:
+      - generic [ref=e9]: "01"
+      - generic [ref=e10]: What v1 got wrong
+      - generic [ref=e11]: "your note: \"reduce the scrolling to figure out what I need to focus on\""
+    - paragraph [ref=e12]:
+      - text: "v1 reorganised the inventory and kept its shape: a stat strip, then rows under group headers. It read better and it still made you scroll to decide — which was the actual complaint. v2 is built to one hard rule:"
+      - emphasis [ref=e13]: the answer to "what do I focus on" is on screen the moment the file opens, and the 78-item ledger is behind a switch, not below a scroll.
+    - generic [ref=e14]:
+      - generic [ref=e15]:
+        - generic [ref=e16]: v1 · what I actually shipped
+        - list [ref=e17]:
+          - listitem [ref=e18]: Stat strip → zones → eight area bands, all in one vertical scroll. Deciding meant scrolling.
+          - listitem [ref=e19]: Every zone used the same row component, so nothing receded — the defect you reported.
+          - listitem [ref=e20]: It opened on seven "do next" items. You can only do one.
+          - listitem [ref=e21]:
+            - text: I used amber for "yours" — inventing a colour when your deployed board already says
+            - code [ref=e22]: "--violet"
+            - text: is you and
+            - code [ref=e23]: "--green"
+            - text: is Code.
+          - listitem [ref=e24]: Areas were eight foldable bands = eight more things to scroll past.
+      - generic [ref=e25]:
+        - generic [ref=e26]: v2 · the focus panel
+        - list [ref=e27]:
+          - listitem [ref=e28]: "One screen, no page scroll. Three columns answer three questions at once: what now, what after, what do I owe."
+          - listitem [ref=e29]: One thing is primary — a card, not a row. Everything else is visibly subordinate.
+          - listitem [ref=e30]:
+            - text: "Your own colour vocabulary: violet = you, green = Code, taken from the deployed board's"
+            - code [ref=e31]: .who-you
+            - text: /
+            - code [ref=e32]: .who-code
+            - text: .
+          - listitem [ref=e33]: The eight areas collapse to one footer strip — orientation in 40px, with a dot where an area needs you.
+          - listitem [ref=e34]: "The 78 live in a Ledger view that swaps in place. Deliberately quiet: no rails, 12px, no second line at rest."
+  - generic [ref=e35]:
+    - generic [ref=e36]:
+      - generic [ref=e37]: "02"
+      - generic [ref=e38]: The panel
+      - generic [ref=e39]: live · real data · switch Focus ⇄ Ledger
+    - generic [ref=e40]:
+      - text: cockpit viewport · 1280 ×760 · nothing below the fold
+      - generic [ref=e41]:
+        - generic [ref=e42]:
+          - generic [ref=e43]: Action board
+          - generic [ref=e44]: 75 items · Jul 28 2026
+          - generic [ref=e45]:
+            - button "Focus" [ref=e46] [cursor=pointer]
+            - button "Ledger · 75" [ref=e47] [cursor=pointer]
+          - button "Night" [ref=e48] [cursor=pointer]
+        - generic [ref=e50]:
+          - generic [ref=e51]:
+            - generic [ref=e52]:
+              - generic [ref=e53]: Do this now
+              - generic [ref=e54]: "1"
+            - generic [ref=e55]:
+              - generic [ref=e56]:
+                - generic [ref=e57]: A customer is affected right now
+                - heading "Make 'forgot password' work end-to-end — reset email, link, sign-in" [level=3] [ref=e59]
+                - paragraph [ref=e60]: "Customer acts as: forgot password → clicks reset → email never arrives → locked out forever. FA-161 (middleware fix cc9f96c) shipped. Remaining: create demo@faraudit.com mailbox in Google Workspace OR alias to jose@faraudit.com. CEO must verify end-to-end: request reset → receive email → click link → land on /auth/update-password → set password → sign in. Not closed until CEO completes this full flow personally."
+                - generic [ref=e61]:
+                  - generic [ref=e62]: under 30m
+                  - generic [ref=e63]: Platform
+                  - generic [ref=e64]: P0
+                  - generic [ref=e65]: FA-162
+                - generic [ref=e66]:
+                  - generic [ref=e67]: First step
+                  - generic [ref=e68]: Password reset flow broken — demo@faraudit.com has no mailbox, reset emails go nowhere
+              - generic [ref=e69]:
+                - generic [ref=e70]: Or close something small · under 30 minutes · 3 available
+                - generic [ref=e71]:
+                  - generic [ref=e72]: •
+                  - generic [ref=e73]: Every bug fix ships with a test that fails before the fix
+          - generic [ref=e74]:
+            - generic [ref=e75]:
+              - generic [ref=e76]: Then, in order
+              - generic [ref=e77]: "5"
+              - generic [ref=e78]: nothing truncates · ≈128 chars
+            - generic [ref=e79]:
+              - generic [ref=e80]:
+                - generic [ref=e81]: "2"
+                - generic [ref=e82]:
+                  - generic [ref=e83]: Fire SEQ-5 now, or only after the two panel-F engine roots are fixed?
+                  - generic [ref=e84]:
+                    - generic [ref=e85]: YOU
+                    - generic [ref=e86]: under 30m
+                    - generic [ref=e87]: Engine
+              - generic [ref=e88]:
+                - generic [ref=e89]: "3"
+                - generic [ref=e90]:
+                  - generic [ref=e91]: Clean up report wording for closed/expired solicitations
+                  - generic [ref=e92]:
+                    - generic [ref=e93]: CODE
+                    - generic [ref=e94]: 30m–2h
+                    - generic [ref=e95]: Customer Report
+              - generic [ref=e96]:
+                - generic [ref=e97]: "4"
+                - generic [ref=e98]:
+                  - generic [ref=e99]: "Own the whole workflow: find, audit, bid, win, recompete"
+                  - generic [ref=e100]:
+                    - generic [ref=e101]: YOU
+                    - generic [ref=e102]: 2h+
+                    - generic [ref=e103]: Platform
+              - generic [ref=e104]:
+                - generic [ref=e105]: "5"
+                - generic [ref=e106]:
+                  - generic [ref=e107]: Export the Notion workspace to Drive before touching the account
+                  - generic [ref=e108]:
+                    - generic [ref=e109]: YOU
+                    - generic [ref=e110]: 30m–2h
+                    - generic [ref=e111]: Doctrine
+              - generic [ref=e112]:
+                - generic [ref=e113]: "6"
+                - generic [ref=e114]:
+                  - generic [ref=e115]: Fix the v5 out-of-scope header showing an eligibility chip the PDF hides
+                  - generic [ref=e116]:
+                    - generic [ref=e117]: YOU
+                    - generic [ref=e118]: under 30m
+                    - generic [ref=e119]: Engine
+          - generic [ref=e120]:
+            - generic [ref=e121]:
+              - generic [ref=e122]: You owe an answer
+              - generic [ref=e123]: "9"
+              - generic [ref=e124]: nothing truncates · strip fits ≈57 chars · budget 72
+            - generic [ref=e125]:
+              - generic [ref=e126] [cursor=pointer]:
+                - generic [ref=e127]: Fire SEQ-5 now, or only after the two panel-F engine roots are fixed?
+                - generic [ref=e129]: Engine · P0 · SEQ5-FIRE
+              - generic [ref=e131] [cursor=pointer]:
+                - generic [ref=e132]: SEQ-4's gate (#640) was closed as superseded — re-point or unblock it?
+                - generic [ref=e134]: Engine · P0 · SEQ4-FIRE · releases 1
+              - generic [ref=e136] [cursor=pointer]:
+                - generic [ref=e137]: Build the 9-seat expert panel into the engine itself — approve the arc?
+                - generic [ref=e139]: Engine · P1 · FA-EXPERT-PANEL-ENGINE
+              - generic [ref=e141] [cursor=pointer]:
+                - generic [ref=e142]: Re-run the flag deriver, then rule on the stranded render flags?
+                - generic [ref=e144]: Engine · P2 · R1R3-PARITY
+              - generic [ref=e146] [cursor=pointer]:
+                - generic [ref=e147]: Send the LinkedIn DMs as connections accept?
+                - generic [ref=e149]: Sales · P2 · FA-4
+              - generic [ref=e151] [cursor=pointer]:
+                - generic [ref=e152]: "Rule on card #756: two ICP conflicts plus the dry-run build?"
+                - generic [ref=e154]: Sales · P2 · TRACK4-DRY
+              - generic [ref=e156] [cursor=pointer]:
+                - generic [ref=e157]: Keep or kill the idle Marketing/Sales AI output and email handling?
+                - generic [ref=e159]: Sales · P2 · FA-AGENTS-REVIEW
+              - generic [ref=e161] [cursor=pointer]:
+                - generic [ref=e162]: "Adopt any of: error tracking, database UI, SAM integrations?"
+                - generic [ref=e164]: Internal Ops · P2 · FA-TOOLING
+              - generic [ref=e166] [cursor=pointer]:
+                - generic [ref=e167]: Which background agents stay, and which get retired?
+                - generic [ref=e169]: Internal Ops · P2 · FA-AGENT-ARCH-REVIEW
+        - generic [ref=e171]:
+          - generic [ref=e172] [cursor=pointer]:
+            - generic [ref=e174]: Engine
+            - generic [ref=e175]: "23"
+          - generic [ref=e176] [cursor=pointer]:
+            - generic [ref=e177]: Platform
+            - generic [ref=e178]: "21"
+          - generic [ref=e179] [cursor=pointer]:
+            - generic [ref=e181]: Internal Ops
+            - generic [ref=e182]: "9"
+          - generic [ref=e183] [cursor=pointer]:
+            - generic [ref=e184]: Doctrine
+            - generic [ref=e185]: "6"
+          - generic [ref=e186] [cursor=pointer]:
+            - generic [ref=e188]: Sales
+            - generic [ref=e189]: "5"
+          - generic [ref=e190] [cursor=pointer]:
+            - generic [ref=e191]: Customer Report
+            - generic [ref=e192]: "4"
+          - generic [ref=e193] [cursor=pointer]:
+            - generic [ref=e194]: Money
+            - generic [ref=e195]: "4"
+          - generic [ref=e196] [cursor=pointer]:
+            - generic [ref=e197]: Content
+            - generic [ref=e198]: "3"
+          - generic [ref=e199]: dot = this area needs a decision from you
+    - paragraph [ref=e200]: Three columns, three questions, zero scrolling to decide. Column 1 is the single next action with what it unblocks and the first step — plus the quick wins you can close in a gap between calls. Column 2 is the ordered run after it. Column 3 is the ten decisions you owe, written as questions, because those are the cheapest work on the board and each one releases someone else's day.
+  - generic [ref=e201]:
+    - generic [ref=e202]:
+      - generic [ref=e203]: "03"
+      - generic [ref=e204]: What the data said
+      - generic [ref=e205]: measured, not asserted
+    - generic [ref=e206]:
+      - generic [ref=e207]:
+        - generic [ref=e208]: The finding under the finding
+        - generic [ref=e209]:
+          - generic [ref=e210]: "18"
+          - generic [ref=e211]: of 78 rows involve you at all
+        - paragraph [ref=e212]: Sixty are Code's to execute, rendered at the same weight. You re-sorted 78 rows every time you opened the file. That is why you were scrolling — the board never separated your work from the ledger.
+      - generic [ref=e213]:
+        - generic [ref=e214]: The most expensive rows on the board
+        - generic [ref=e215]:
+          - generic [ref=e216]: "10"
+          - generic [ref=e217]: items stalled on your answer
+        - paragraph [ref=e218]:
+          - code [ref=e219]: "ready_state: needs_input"
+          - text: . Code cannot move until you decide, and they looked identical to the 48 that need nothing from you. In v2 they get their own column, phrased as questions.
+      - generic [ref=e220]:
+        - generic [ref=e221]: Problem B, quantified
+        - generic [ref=e222]:
+          - generic [ref=e223]: "51"
+          - generic [ref=e224]: titles exceed one readable line
+        - paragraph [ref=e225]: "Median 87 characters, longest 467 — a paragraph in a title field; 15 over 140. That's why they truncate mid-word: the copy was never written to be a title."
+      - generic [ref=e226]:
+        - generic [ref=e227]: The fix already exists in your own data
+        - generic [ref=e228]:
+          - generic [ref=e229]: "38"
+          - generic [ref=e230]: rows already do it correctly
+        - paragraph [ref=e231]:
+          - text: Rows with an
+          - code [ref=e232]: eng_title
+          - text: average 86 characters of plain English; the 40 without average 144 of shorthand. Half the corpus is already solved. Design just makes the working pattern mandatory.
+    - paragraph [ref=e233]:
+      - generic [ref=e234]:
+        - text: 16 rows have no
+        - code [ref=e235]: purpose
+        - text: at all.
+      - text: They are flagged in red everywhere they appear — the focus card, the decision column, and the ledger — and the
+      - emphasis [ref=e236]: No purpose (16)
+      - text: filter isolates them. The flag is how Design verifies the rewrite actually landed, so it is tested on the
+      - code [ref=e237]: purpose
+      - text: "field alone and never shadowed by another branch: a row that is waiting on your answer and has no purpose gets both markers, not just the friendlier one."
+  - generic [ref=e238]:
+    - generic [ref=e239]:
+      - generic [ref=e240]: "04"
+      - generic [ref=e241]: Copy specification
+      - generic [ref=e242]: the shape · Code rewrites all 78
+    - paragraph [ref=e243]: "\"Reads like an old terminal\" is a copy defect — no layout survives a 467-character title. The panel above makes it worse before it makes it better: a focus column with a 300-character title in it is unusable, so the rewrite is not optional polish, it is half this card."
+    - list [ref=e245]:
+      - listitem [ref=e246]:
+        - text: Title = what the work is, in the words you'd say out loud. One line,
+        - code [ref=e247]: ≤ 80 characters
+        - text: ", hard budget. No internal symbols ("
+        - code [ref=e248]: findingProvenance
+        - text: ","
+        - code [ref=e249]: isGrounded
+        - text: ), no card numbers, no
+        - code [ref=e250]: R1/R3
+        - text: ", no"
+        - code [ref=e251]: "[BRACKET]"
+        - text: prefixes. Verb-first for actions.
+      - listitem [ref=e252]:
+        - text: Second line = why it matters, one breath.
+        - code [ref=e253]: ≤ 140 characters
+        - text: ", from"
+        - code [ref=e254]: purpose
+        - text: — which exists on 62 of 78 rows and has never been rendered. Consequence, not mechanism.
+      - listitem [ref=e255]:
+        - text: The engineering line keeps its home. Symbols,
+        - code [ref=e256]: file:line
+        - text: ", card numbers, flag names →"
+        - code [ref=e257]: eng_title
+        - text: ", visible on expansion only. Nothing is lost; it stops being the headline."
+      - listitem [ref=e258]: Never a bare ID. The number is a pointer in the margin, never the identity of the work.
+      - listitem [ref=e259]:
+        - text: Bundles name the outcome, never the pile — with an
+        - code [ref=e260]: n items
+        - text: chip and constituents on expansion.
+      - listitem [ref=e261]:
+        - generic [ref=e262]:
+          - text: A
+          - code [ref=e263]: needs_input
+          - text: row must carry an actual question.
+        - text: v2 renders that column as questions, so the copy has to be interrogative and answerable in a sentence — derived from
+        - code [ref=e264]: purpose
+        - text: /
+        - code [ref=e265]: blocker_reason
+        - text: ", not a status report about being blocked. This is new in v2 and it is the highest-value copy in the corpus."
+    - generic [ref=e266]:
+      - generic [ref=e267]:
+        - generic [ref=e268]:
+          - generic [ref=e269]: Engine
+          - generic [ref=e270]: GROUNDING-DIVERGENCE
+        - generic [ref=e271]:
+          - generic [ref=e272]:
+            - generic [ref=e273]: Today · 74 chars
+            - generic [ref=e274]: Grounding divergence — findingProvenance vs isGrounded, blast-radius recon
+            - generic [ref=e275]: no second line · truncates in the row
+          - generic [ref=e276]:
+            - generic [ref=e277]: To spec · 71 chars
+            - generic [ref=e278]: Find how far the citation-trust mismatch reaches before fixing anything
+            - generic [ref=e279]: Two parts of the engine disagree about whether a finding is backed by the document — we don't yet know how many findings that touches.
+            - generic [ref=e280]: "eng_title: findingProvenance vs isGrounded divergence · blast-radius recon · #300 threading is INERT by design, a precondition not a remedy"
+      - generic [ref=e281]:
+        - generic [ref=e282]:
+          - generic [ref=e283]: Platform
+          - generic [ref=e284]: L44-FLAG-PARITY
+        - generic [ref=e285]:
+          - generic [ref=e286]:
+            - generic [ref=e287]: Today · 79 chars
+            - generic [ref=e288]: Four render flags are armed on Railway but missing on Vercel — no-ops for cust…
+            - generic [ref=e289]: no second line · truncates in the row
+          - generic [ref=e290]:
+            - generic [ref=e291]: To spec · 60 chars
+            - generic [ref=e292]: Four fixes we already shipped are switched off for customers
+            - generic [ref=e293]: The engine has them on and the customer site doesn't, so work already paid for is doing nothing today.
+            - generic [ref=e294]: "eng_title: L44 · AUDIT_COVERAGE_DISPLAY_COHERENT, AUDIT_DEADLINE_RESET_RENDER, AUDIT_MASTHEAD_OFFICE_LEAF, AUDIT_SETASIDE_HEADER_RECONCILE"
+      - generic [ref=e295]:
+        - generic [ref=e296]:
+          - generic [ref=e297]: Engine
+          - generic [ref=e298]: R1R3-PARITY
+        - generic [ref=e299]:
+          - generic [ref=e300]:
+            - generic [ref=e301]: Today · 79 chars
+            - generic [ref=e302]: R1/R3 — served-surface re-grade and render-flag parity. The stranded set is no…
+            - generic [ref=e303]: no second line · truncates in the row
+          - generic [ref=e304]:
+            - generic [ref=e305]: To spec · 59 chars
+            - generic [ref=e306]: Re-check which render flags are actually live for customers
+            - generic [ref=e307]: The count must be derived on every run — three hand counts disagreed, so no number sitting in a row is trustworthy.
+            - generic [ref=e308]: "eng_title: R1/R3 served-surface re-grade · stranded set DERIVED by scripts/audit-ai/_flag-substrate-derive.ts · do not arm off this row"
+      - generic [ref=e309]:
+        - generic [ref=e310]:
+          - generic [ref=e311]: Doctrine
+          - generic [ref=e312]: needs_input → must be a QUESTION (spec §04.6)
+          - generic [ref=e313]: SESS-RATIFY-68-69
+        - generic [ref=e314]:
+          - generic [ref=e315]:
+            - generic [ref=e316]: Today · 36 chars
+            - generic [ref=e317]: Ratify the INTENT of Rules 68 and 69
+            - generic [ref=e318]: no second line · truncates in the row
+          - generic [ref=e319]:
+            - generic [ref=e320]: To spec · 43 chars
+            - generic [ref=e321]: Do Rules 68 and 69 stay, and in what words?
+            - generic [ref=e322]: Both gate real behaviour — paid runs and the engine digest — while existing nowhere but a number in a commit.
+            - generic [ref=e323]: "eng_title: Rule 39 · propose → CEO yes in words → encode · ceo/RULES-AUDIT-2026-07-28.md"
+      - generic [ref=e324]:
+        - generic [ref=e325]:
+          - generic [ref=e326]: Sales
+          - generic [ref=e327]: needs_input → must be a QUESTION (spec §04.6)
+          - generic [ref=e328]: TRACK4-DRY
+        - generic [ref=e329]:
+          - generic [ref=e330]:
+            - generic [ref=e331]: Today · 108 chars
+            - generic [ref=e332]: "Track-4 find-and-qualify pipeline — DRY RUN only: source, score, print, stop for CEO review. Writes nothing."
+            - generic [ref=e333]: no second line · truncates in the row
+          - generic [ref=e334]:
+            - generic [ref=e335]: To spec · 72 chars
+            - generic [ref=e336]: Approve a dry run of the lead finder? It prints a scored list and stops.
+            - generic [ref=e337]: Nothing is sent and nothing is saved — you read the list before anything leaves the building.
+            - generic [ref=e338]: "eng_title: Track-4 find-and-qualify · DRY RUN · source → score → print → halt · STEP 0 done, card #756"
+      - generic [ref=e339]:
+        - generic [ref=e340]:
+          - generic [ref=e341]: Customer Report
+          - generic [ref=e342]: FA-145
+        - generic [ref=e343]:
+          - generic [ref=e344]:
+            - generic [ref=e345]: Today · 56 chars
+            - generic [ref=e346]: Clean up report wording for closed/expired solicitations
+            - generic [ref=e347]: no second line · truncates in the row
+          - generic [ref=e348]:
+            - generic [ref=e349]: To spec · 76 chars
+            - generic [ref=e350]: Stop telling customers to ask questions on solicitations that already closed
+            - generic [ref=e351]: The executive summary says “file clarifications before quoting” on jobs whose deadline has passed — it reads as if we didn't check.
+            - generic [ref=e352]: "eng_title: FA-145 · closed-doc exec copy incoherence · copy must branch on deadline state"
+      - generic [ref=e353]:
+        - generic [ref=e354]:
+          - generic [ref=e355]: Platform
+          - generic [ref=e356]: CARD696
+        - generic [ref=e357]:
+          - generic [ref=e358]:
+            - generic [ref=e359]: Today · 61 chars
+            - generic [ref=e360]: card696 · enumeration-layer overhaul — scope before building.
+            - generic [ref=e361]: no second line · truncates in the row
+          - generic [ref=e362]:
+            - generic [ref=e363]: To spec · 62 chars
+            - generic [ref=e364]: Scope the enumeration-layer rebuild before any code is written
+            - generic [ref=e365]: Sits behind the engine arc unless you move it up; nothing starts until the scope is agreed.
+            - generic [ref=e366]: "eng_title: card696 · enumeration-layer overhaul · received in the Code lane"
+      - generic [ref=e367]:
+        - generic [ref=e368]:
+          - generic [ref=e369]: Money
+          - generic [ref=e370]: already correct — the positive control, this is the standard
+          - generic [ref=e371]: BUNDLE-STRIPE
+        - generic [ref=e372]:
+          - generic [ref=e373]:
+            - generic [ref=e374]: Today · 70 chars
+            - generic [ref=e375]: "Stripe + Mercury: finish the money path so a customer can actually pay"
+            - generic [ref=e376]: no second line · truncates in the row
+          - generic [ref=e377]:
+            - generic [ref=e378]: To spec · 70 chars
+            - generic [ref=e379]: "Stripe + Mercury: finish the money path so a customer can actually pay"
+            - generic [ref=e380]: No customer can pay until this closes, so it gates revenue rather than sitting behind it.
+            - generic [ref=e381]: "eng_title: BUNDLE-STRIPE · bundles FA-8 · FA-9 · FA-10 · FA-11 · FA-72"
+  - generic [ref=e382]:
+    - generic [ref=e383]:
+      - generic [ref=e384]: "05"
+      - generic [ref=e385]: Rulings & open calls
+      - generic [ref=e386]: defaults stated
+    - list [ref=e388]:
+      - listitem [ref=e389]:
+        - text: R1 · Deciding never requires scrolling — and that is measured, not asserted. At 1280×760 all three regions report
+        - code [ref=e390]: scrollHeight === clientHeight
+        - text: and all ten decisions are on screen. Every prose block is clamped so no long row can push a sibling off-screen.
+      - listitem [ref=e391]: "R1b · The layout follows the copy, not the reverse. A question needs its own line; a third of 1280px gives 43 characters. So the decision strip runs full width beneath the other two columns — measured capacity ≈82 characters. The question budget is set to 72, not 80: capacity is derived from a median glyph advance, so a caps-heavy line at 80 would still clip. Leave the margin."
+      - listitem [ref=e392]:
+        - text: R1c · Clip markers are measured from the DOM, never from a guessed character count. Any one-line field whose text does not fit gets a red
+        - code [ref=e393]: nnCH
+        - text: count and a dotted underline, derived from
+        - code [ref=e394]: scrollWidth
+        - text: after layout. A budget chosen independently of the render width lets a row pass the spec and still truncate — a check that goes green while the defect persists.
+      - listitem [ref=e395]: R2 · Two views, one switch. Focus (default) and Ledger swap in place. The 78 items are never a scroll away from the decision — they are a click away.
+      - listitem [ref=e396]:
+        - text: "R3 · One ordering rule, everywhere — and it is stated on screen. “What's next” is not “lowest tier number”: a P0 that is stuck is not next, and a ready P1 is. The run list and every ledger group sort by the same chain — live customer issue → need your answer → ready → stuck → watching — with tier as the tie-break inside each band. Each band carries a subhead, so a P0 sitting low is self-explaining instead of looking like a bug: a board that sorts by something it never names is a board that argues with itself. ⚠ Beware falsy-zero:"
+        - code [ref=e397]: TIER[t] || 9
+        - text: sorted every
+        - code [ref=e398]: P0
+        - text: last, because
+        - code [ref=e399]: P0
+        - text: maps to
+        - code [ref=e400]: "0"
+        - text: .
+      - listitem [ref=e401]:
+        - text: R4 · Text colour is assigned by measured contrast.
+        - code [ref=e402]: "--ink2"
+        - text: (8.6:1 dark / 8.3:1 light) carries every sentence;
+        - code [ref=e403]: "--slate"
+        - text: (7.1 / 5.7) carries tertiary mono labels;
+        - code [ref=e404]: "--mute"
+        - text: (4.2 / 3.6) is retired from body copy — it clears AA only at 18px+ and was carrying the 12px why-line, i.e. the least legible text on the board was the sentence explaining why the row mattered. Never stack
+        - code [ref=e405]: opacity
+        - text: on a text token.
+      - listitem [ref=e406]:
+        - text: R4 · The palette is chosen by job, not by consistency — and the hue count is the real decision. The board carried six semantic hues (violet, green, cyan, amber, rose, slate), but the question this surface answers is not “which of six states is this” — it is
+        - emphasis [ref=e407]: is this mine right now, or not
+        - text: ". Three levels, not six. Default is Paper: 2 hues. A board of 78 rows at 12px is a reading surface, and dark grounds halate around small text — which is precisely where this content lives. Ownership is carried by ink weight (yours is black, Code's is grey) so the 18 rows that involve you are literally darker on the page; red is spent only on exceptions — a customer affected, or work waiting on you — so the ten things that need you are the only colour on a page of 78 and cannot be missed. State is carried by shape: square = customer, hollow ring = stuck. Slate keeps brand blue for “yours” (3 hues) if losing the you/Code hue split feels like too much; Cockpit is the deployed dark theme, kept so the choice is visible rather than winning by default. Text colour is assigned by measured contrast in every palette — no token under"
+        - code [ref=e408]: 4.5:1
+        - text: ever carries a sentence, and
+        - code [ref=e409]: opacity
+        - text: is never stacked on text.
+      - listitem [ref=e410]: R5 · The ledger is quieter than the focus. No rails, 12px type, no second line at rest, a 6px state dot. If the ledger reads as loud as the focus view, the hierarchy has failed and we are back to v1.
+      - listitem [ref=e411]:
+        - text: R6 · Bucket counts are mutually exclusive and sum to their total — one precedence chain (
+        - code [ref=e412]: customer_blocker → needs_input → stuck → monitor → ready
+        - text: ) drives the dot colour and every count. Never derive buckets from two independent fields.
+      - listitem [ref=e413]: R7 · Rules 49 and 53 are superseded — Code amends both in the same turn per Rule 12.
+    - generic [ref=e414]:
+      - generic [ref=e415]:
+        - generic [ref=e416]: Q1 · Is the next action picked correctly?
+        - generic [ref=e417]: "Default order: live customer blocker → today → your P0 → fewest blocked downstream. Today that surfaces the password-reset lockout, which I'd defend: a customer locked out of their account outranks engine work. Tell me if your real order differs and it's a one-line change."
+      - generic [ref=e418]:
+        - generic [ref=e419]: Q2 · Should Focus show Code's work at all?
+        - generic [ref=e420]:
+          - text: "Default: only where it's next. The \"then\" column shows the true run order regardless of owner, marked"
+          - code [ref=e421]: CODE
+          - text: ", so you can see what's moving without you. The other ~55 Code items live in the Ledger only."
+      - generic [ref=e422]:
+        - generic [ref=e423]: Q3 · Ten questions in one column — too many?
+        - generic [ref=e424]:
+          - text: "Default: show all ten, one line each. They fit at 1280×760 with nothing hidden —"
+          - emphasis [ref=e425]: because
+          - text: each question is clamped to one line, which is the copy budget anyway. Six of the ten are still the raw over-budget title and carry a red character count; once Code rewrites them the clamp stops truncating anything. Click any row for its context.

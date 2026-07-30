@@ -1,0 +1,34 @@
+# Adversarial red-team memory index
+
+- [#747 verdict-inversion DESIGN Q2 — all 3 moves REJECT](design_verdict_inversion_q2.md) — M1 inverts the polarity of the SHIPPED `importanceOf`; probe: 11/11 disqualifier shapes demote incl. both of M1's OWN allowlist controls; M2's stale cert DELETES the 206-A caution; the "49-record" corpus is faithfully 14 / 6 sols / 0 committal poles
+
+- [root-b: two claims REFUTED at source](project_rootb_two_refutations.md) — SECTION_READ_CAP truncation is NOT silent (`truncated` flag + completeness reads uncapped `sectionFullText`); questions deadlines DO emit (lenses + audit-decide-inquiry-deadline) — the `/question/i` skip is quote-branch-local
+
+- [ARC #747 E1 head re-grounding — merge flag-off, DO NOT ARM](gauntlet_arc747_e1_head_reground.md) — branch moved 3x mid-review (53556d8→3045948→88c88ce), a corpus stat drifted 70→17→13, and I RETRACTED 3 of my own findings; print the SHA from inside the probe. One P0 survives: excerpt-span widening silences the un-flagged notice eligibility floor
+
+- [Gate-4 panel adjudication d0664ba2 — F upheld](panel_d0664ba2_gate4_adjudication.md) — 2 AUTO-Fs re-verified (DFARS 215-2 mis-cite w/ excerpt-truncation masking; stale-deadline conclusion vs live SAM + own read); C3 downgraded AUTO-F→FAIL; C5 needs JCP/capability caveat
+
+- [VETO-NARROW END-GAUNTLET — 17 breaks, worst P0; do not arm](gauntlet_veto_narrow_endround.md) — SECOND_CLAUSE_RE "invariant" = 5-modal blocklist (shared-modal "and furnish" evades); responsibility path guard-free; FAR 9.104-2 special standards refute the charter premise; B3 ranking CLEAN; B3+B4 trailer contradiction
+
+- [RETIREMENT-REDESIGN panel — D, not survivable as ordered](design_retirement_redesign_review.md) — frozen-ledger falsification STANDS (unbreakable in 3 attacks) but proves too much (voids the flag-OFF 28/28 baseline too); #682 REJECT survives on substrate-independent FAIL-2; both seats' "veto has no true positives" refuted by a bank blind to §{B–H}; coordinator's own D3 "confirmation" was STALE
+
+- [STEP-4 veto-retirement DESIGN review — D, NO as ordered](design_step4_veto_retirement_review.md) — fails its OWN gold-set gate flag-ON (25/28, 2 false-BIDs); silently co-retires ARMED covered_direct bar floor; Railway worker env is the only flag authority (not the Vercel flip script); counter under-counts by category string
+
+- [hardbar PIVOT V3 DESIGN review — D, REJECT+Q3](design_hardbar_pivot_v3_review.md) — anchor unbound+not-scarce (deadline clauses re-arm B1-1/B2-1); inverted selector kills banked true-fires; H1 dies at governance metric; H2 dies both axes
+- [hardbar POST-FIX ultra-B1 — D](gauntlet_hardbar_ultra_b1_fixround.md) — all 4 fix claims broken (21/28): comma-smuggle past object span; "limited to a single BPA" establishment clone; "period of performance" FLOWDOWN gap thru anchor-free frames; title-case rejoin glue + list-format inertness
+- [hardbar BUILT gauntlet R1 — F](gauntlet_hardbar_r1.md) — 5 P0 over-fires: "Only one BPA will be awarded" vehicle-NHR; 52.219-citation classOfFinding hijack kills suppression over MET bars; personnel-clearance subject miss; at-award negation; fulltext-boilerplate guards HELD
+- [MOVE-4 hard-bar floor DESIGN review — D](design_move4_hardbar_floor_review.md) — class-vs-instance suppression conflation (trapSweep = dead code OR benign-class-mate false-BID); fulltext arming injects possession-frame boilerplate (7019/7021/52.204-7); shadow-only
+- [ROOT-1 no-silent-degrade FIX review — F](sweep_root1_no_silent_degrade.md) — guard dead code in prod (async 202 pre-empts route); worker/refetch unguarded; seq-4 real mechanism = degraded-200 1-entry manifest on WORKER; card-648 ingestion=NONE inference void (field never persisted)
+- [ROOT-2 EXISTS-denominator DESIGN review — grade C](design_root2_coverage_exists_review.md) — P0: denominator sourced from the degraded v3 endpoint it audits (v2 resourceLinks is the only independent source); near-dup double-posts false-INCOMPLETE; chars/byte floor unsound — bytes-vs-manifest-size is the real stub invariant; budget-drop-must-gate premise REFUTED by C-1
+- [#271 effective-map DESIGN review — HOLES](design_271_effective_map_review.md) — predicate coupling sound; P0: FALLBACK_BUNDLE_KEYS starves proposal_compliance under INTEGRITY=off (armed combo) — the remedy re-opens the hole; overlay shrinks fallback; .some() too weak
+- [Invariants A+B round-3 PIVOT gauntlet — grade F](gauntlet_ab_round3.md) — 12 breaks, 2 critical e2e NHR→BID: last-assignment parser hijack (pivot's own seam) + N7 pool-noun vocab never implemented; in-code menu-win comment is FALSE
+- [Invariants A+B round-2 gauntlet — grade F again](gauntlet_ab_round2.md) — 9 prior classes CLOSED but 9 NEW (6 critical NHR→BID e2e): every fix = vocab list one axis wider; F9 OR-fields + bare "X means" branch are new false-BID vectors
+- [Invariants A+B built gauntlet — grade F](gauntlet_ab_built.md) — 9 BREAK classes: pool/consequence vocab-blocklist releases NHR cap (false-BID); all 3 tripwires S3/S5/S7 defeated; corpus S1 "definition dropped" = no such code
+- [PR #271 routing gauntlet — grade F](sweep_pr271_routing_gauntlet.md) — armed V2+INTEGRITY-unset IS the live hole combo (worker env dumped); §L anchors still fragment mid-content; head-drop silent
+- [PR #269 double-ext/census sweep](sweep_pr269_doubleext_census.md) — both claims FAIL: sub-50-char carry band injects PDF_EXTRACTION_FAILED placeholder into fullSource (live); script census 0-chars truncated docs; grade D
+- [PR #268 cost-gate sweep](sweep_pr268_cost_gate.md) — refuse-path holds; ADMIT dodgeable: incomplete-census BYPASS ($40 run un-gated), upload ≤1MB classifier gap, token-density; grade C+
+- [N0016 CMMC off-schema N/A](project_n0016_na_fillin_schema.md) — fill-in SCHEMA is ground truth (off-schema N/A = patent defect not MET); never anchor a guard on a mis-typed finding; positive anchors need negative gates
+
+- [Routing-V2 predicate/reader divergence](project_routing_v2_predicate_reader_divergence.md) — safety predicate must check the EFFECTIVE map under all flag combos; constants added beside a doctrine comment must obey it; check anchor-slicer head-drop
+- [Unit6-CF R3 composite-identity break](project_unit6cf_r3_composite_identity.md) — independent-max merges forge kind-x-ctrl pairs no member had; scan the verdict CALL GRAPH; truthy-vs-strict laundering; sweep flag combos
+- [Unit6-CF R2 value-domain probe](project_unit6cf_r2_value_domain_probe.md) — field-level structural guards miss value-domain holes; probe off-enum values + symbol-only distinguishers at every gate boundary

@@ -1,0 +1,7 @@
+[     231ms] [LOG] [dashboard-live] rendered 9 audits @ http://localhost:4173/dashboard-live.js:685
+[     240ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:4173/favicon.ico:0
+[   40753ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:4173/api/audits?limit=200:0
+[   40753ms] [WARNING] [dashboard-live] /api/audits returned 500 @ http://localhost:4173/dashboard-live.js:668
+[   40753ms] [LOG] [dashboard-live] rendered 0 audits (LOAD ERROR: HTTP 500) @ http://localhost:4173/dashboard-live.js:685
+[   51606ms] [LOG] [dashboard-live] rendered 0 audits @ http://localhost:4173/dashboard-live.js:685
+[   64385ms] [LOG] [dashboard-live] rendered 9 audits @ http://localhost:4173/dashboard-live.js:685

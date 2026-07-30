@@ -1,0 +1,10 @@
+import { createClient } from "@supabase/supabase-js";
+import { writeFileSync } from "node:fs";
+import dotenv from "dotenv";
+dotenv.config({ path: ".env.local", quiet: true });
+const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const { data } = await admin.from("audits").select("raw_pdf_text,compliance_json").eq("id","496a9a21-8391-41b4-9e24-cff212971fd3").single();
+writeFileSync("/tmp/fa0033-source-496a9a21.txt", data.raw_pdf_text || "");
+writeFileSync("/tmp/fa0033-compliance-496a9a21.json", JSON.stringify(data.compliance_json?.v3 ?? data.compliance_json, null, 1));
+console.log("source dumped:", (data.raw_pdf_text||"").length, "chars → /tmp/fa0033-source-496a9a21.txt");
+console.log("v3 payload → /tmp/fa0033-compliance-496a9a21.json");
