@@ -23,6 +23,11 @@
   --shadow:0 1px 2px rgba(15,23,42,.06), 0 8px 24px -12px rgba(15,23,42,.10);
   --shadow-sm:0 1px 3px rgba(0,0,0,0.06);
   --shadow-pop:0 24px 60px -22px rgba(15,23,42,.28), 0 6px 16px -6px rgba(15,23,42,.12);
+  /* Role tokens: never hue-named — --barred is red today and the name holds if it stops being. */
+  --eligible-bg:var(--accent-pale); --eligible-ink:var(--accent-deep); --eligible-line:var(--accent-light);
+  --open-bg:var(--card-soft); --open-ink:#4b5563; --open-line:var(--line);
+  --barred-bg:var(--red-50); --barred-ink:var(--red-700); --barred-line:var(--red-200);
+  --unread-bg:var(--amber-50); --unread-ink:var(--amber-800); --unread-line:var(--amber-200);
 }
 [data-theme="dark"]{
   --page-bg:#02060c; --bg:#050d1a; --card:#0c1b30; --card-soft:#0a1729;
@@ -31,6 +36,10 @@
   --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px -12px rgba(0,0,0,.6);
   --shadow-sm:0 1px 3px rgba(0,0,0,0.5);
   --shadow-pop:0 1px 2px rgba(0,0,0,.5), 0 28px 64px -22px rgba(0,0,0,.85);
+  --eligible-bg:rgba(55,138,221,.16); --eligible-ink:#a9cdf3; --eligible-line:rgba(181,212,244,.34);
+  --open-bg:rgba(255,255,255,.05); --open-ink:#a3b0c2; --open-line:rgba(255,255,255,.12);
+  --barred-bg:rgba(220,38,38,.16); --barred-ink:#fca5a5; --barred-line:rgba(220,38,38,.4);
+  --unread-bg:rgba(217,119,6,.16); --unread-ink:#fcd34d; --unread-line:rgba(252,211,77,.36);
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:var(--page-bg);font-family:"Manrope",ui-sans-serif,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;transition:background-color .25s ease,color .25s ease}
@@ -232,11 +241,18 @@ button{font-family:inherit}
 .pc-insight .ai-tag svg{opacity:.95}
 .pc-insight em{font-style:normal;color:var(--ink);font-weight:700}
 .pc-insight .ai-txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-.chip{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.04em;padding:3px 8px;border-radius:5px;white-space:nowrap}
-.chip.naics{background:var(--card-soft);color:var(--ink-2);border:1px solid var(--line)}
-.chip.sa{background:var(--green-100);color:var(--green-800)}
-.chip.sa.full{background:var(--line-3);color:var(--mute)}
-[data-theme="dark"] .chip.sa{background:rgba(16,185,129,.2);color:#86efac}
+.chip{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.04em;padding:3px 8px;border-radius:5px;white-space:nowrap;border:1px solid transparent;display:inline-flex;align-items:center;gap:5px}
+.chip.naics{background:var(--card-soft);color:var(--ink-2);border-color:var(--line)}
+/* Set-aside registers: each carries a fill AND a mark, so hue is never load-bearing. */
+.chip.sa-restricted{background:var(--eligible-bg);color:var(--eligible-ink);border-color:var(--eligible-line)}
+.chip.sa-restricted::before{content:"";width:7px;height:7px;background:currentColor;flex-shrink:0}
+.chip.sa-partial{background:var(--eligible-bg);color:var(--eligible-ink);border-color:var(--eligible-line)}
+.chip.sa-partial::before{content:"";width:7px;height:7px;background:linear-gradient(90deg,currentColor 50%,transparent 50%);box-shadow:inset 0 0 0 1px currentColor;flex-shrink:0}
+.chip.sa-open{background:var(--open-bg);color:var(--open-ink);border-color:var(--open-line)}
+.chip.sa-barred{background:var(--barred-bg);color:var(--barred-ink);border-color:var(--barred-line);font-weight:700}
+.chip.sa-barred::before{content:"";width:7px;height:7px;background:currentColor;flex-shrink:0}
+.chip.sa-unread{background:var(--unread-bg);color:var(--unread-ink);border-color:var(--unread-line);border-style:dashed}
+.chip.sa-unread::before{content:"";width:7px;height:7px;border:1.5px dashed currentColor;flex-shrink:0}
 .chip.stage{color:#fff}
 .pc-mid{display:flex;flex-direction:column;gap:6px;min-width:0}
 .pc-ceiling{font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:700;color:var(--mute)}

@@ -34,6 +34,25 @@
 
   const S = { naics: new Set(), naicsInit: false, stage: 'all', sa: 'all', q: '', view: null, sort: 'fit', sel: null };
 
+  // Set-aside register: five poles, each with its own fill AND its own mark, so
+  // the encoding survives greyscale and colour-blindness. SoleSource must never
+  // share a register with Full — one means anyone may compete, the other means
+  // you may not. UNKNOWN is a token we could not read and gets its own unread
+  // register rather than borrowing either answer.
+  //
+  // This is the ONLY place a pole becomes a class or a label. It is a top-level
+  // function so a gate can execute it; the previous expression was inlined in a
+  // template literal, unreachable to any test, which is how three opposite
+  // meanings shipped in one register.
+  const SA_RESTRICTED = ['SB', 'SDVOSB', '8(a)', 'HUBZone', 'WOSB', 'EDWOSB'];
+  function saRender(s) {
+    if (s === 'SoleSource') return { cls: 'sa-barred', label: 'SOLE SOURCE', reg: 'barred' };
+    if (s === 'UNKNOWN') return { cls: 'sa-unread', label: 'SET-ASIDE UNREAD', reg: 'unread' };
+    if (s === 'SB-Partial') return { cls: 'sa-partial', label: 'SB · PARTIAL', reg: 'partial' };
+    if (SA_RESTRICTED.includes(s)) return { cls: 'sa-restricted', label: String(s).toUpperCase(), reg: 'restricted' };
+    return { cls: 'sa-open', label: 'FULL & OPEN', reg: 'open' };
+  }
+
   const fitColor = (f) => f >= 85 ? css('--green-600') : f >= 70 ? css('--accent') : f >= 60 ? css('--amber-600') : css('--red-600');
   const fitTier = (f) => f >= 85 ? 'Strong fit' : f >= 70 ? 'Workable' : 'Stretch';
   const urg = (d) => d == null ? 'none' : d <= 3 ? 'crit' : d <= 7 ? 'warn' : 'ok';
@@ -67,7 +86,7 @@
     $('stageSeg').innerHTML = D.STAGES.map(s => `<button data-stage="${s.key}" class="${s.key === S.stage ? 'active' : ''}">${s.label}</button>`).join('');
     $('stageSeg').querySelectorAll('button').forEach(b => b.onclick = () => { S.stage = b.dataset.stage; S.view = null; sync(); renderAll(); });
 
-    $('saFilters').innerHTML = D.SETASIDES.map(s => `<button class="fpill ${s === S.sa ? 'active' : ''}" data-sa="${s}">${s === 'all' ? 'All' : s}</button>`).join('');
+    $('saFilters').innerHTML = D.SETASIDES.map(s => `<button class="fpill ${s === S.sa ? 'active' : ''}" data-sa="${s}">${s === 'all' ? 'All' : esc(saRender(s).label)}</button>`).join('');
     $('saFilters').querySelectorAll('button').forEach(b => b.onclick = () => { S.sa = b.dataset.sa; S.view = null; sync(); renderAll(); });
 
     $('savedViews').innerHTML = D.SAVED_VIEWS.map(v =>
@@ -324,17 +343,7 @@
     $('plist').innerHTML = data.length ? data.map(o => {
       const u = urg(o.days), sm = D.STAGE_META[o.stage];
       const w = o.days == null ? 0 : Math.max(6, (1 - Math.min(o.days, maxDays) / maxDays) * 100);
-      // Set-aside chip register. The restricted programs share the 'sa' register;
-      // Full & Open and an unrecognised token must NOT wear it — displaying "SB"
-      // on an unrestricted buy inverts the set-aside signal on that row.
-      const SA_RESTRICTED = ['SB', 'SB-Partial', 'SDVOSB', '8(a)', 'HUBZone', 'WOSB', 'EDWOSB'];
-      const saCls = (o.sa === 'SoleSource' || o.sa === 'UNKNOWN') ? 'sa full'
-        : SA_RESTRICTED.includes(o.sa) ? 'sa' : 'sa full';
-      const saLabel = o.sa === 'Full' ? 'Full &amp; Open'
-        : o.sa === 'SoleSource' ? 'SOLE SOURCE'
-        : o.sa === 'UNKNOWN' ? 'SET-ASIDE UNKNOWN'
-        : o.sa === 'SB-Partial' ? 'SB (partial)'
-        : o.sa;
+      const sa = saRender(o.sa);
       // A Special Notice is frequently not a solicitation at all (industry day,
       // amendment announcement, intent-to-sole-source, cancellation). Audits are
       // METERED, so we do not invite a paid run on a notice that may carry
@@ -358,7 +367,7 @@
           <div class="pc-agy">${esc(o.agency)}${o.office ? ' · ' + esc(o.office) : ''} · <span class="pc-idin">${esc(o.id)}</span></div>
           <div class="pc-chips">
             <span class="chip naics">${esc(o.naics) || 'NAICS —'}</span>
-            <span class="chip ${saCls}">${saLabel}</span>
+            <span class="chip ${sa.cls}">${esc(sa.label)}</span>
             <span class="chip stage" style="background:${sm.color}">${sm.label}</span>
           </div>
         </div>
