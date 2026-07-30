@@ -33,7 +33,7 @@ import { buildPanelInputs } from "./panel-adapter";
 import { foldPanelReason } from "./panel-findings-bridge";
 import { gateCitationsInText, citationFidelityEnabled } from "./audit-citation-fidelity";
 import { buildV3Payload } from "./audit-v3-report";
-import { detectAmendments, findingProvenance } from "./audit-orchestrator";
+import { detectAmendments, findingProvenance, docRegions } from "./audit-orchestrator";
 import { sweepConstructionManifest } from "./audit-construction-manifest";
 import { detectConstructionOutOfScope } from "./section-boundary-detector";
 import { isHonestFail, billable, decrementAuditQuota, recordAuditCost } from "./audit-billing";
@@ -88,6 +88,39 @@ export function agenticManifestComplete(
   if (truncated) return false;
   if (ingestion) return ingestion.files_total > 0 && ingestion.files_ingested >= ingestion.files_total && !ingestion.overflow && !hasBindingContentLoss(ingestion);
   return !isSamSol;
+}
+
+/** REPORT-TRUTH #1 — the honest ANALYZED figure for the documents card (flag AUDIT_DOC_ANALYZED_TRUTH; the caller
+ *  only reaches this when the orchestrator threaded `coverage.docCoverage`, which is itself flag-gated).
+ *
+ *  `uncovered` is the verdict path's OWN gap list (audit-orchestrator `uncoveredForGap`) — binding documents present in
+ *  the source that no grounded, decision-bearing finding analyzed. This function does NOT re-derive that judgement; a
+ *  second computation of the same fact is exactly what let the display say analyzed:3/complete:true on live run
+ *  95698f91 while `documentsCovered` had already named the Wage Determination uncovered.
+ *
+ *  Both figures are REGION-space (docRegions of the assembled source) — the same namespace `uncovered` and
+ *  findingProvenance report in — so the pair is internally coherent with no join against the ingestion manifest, whose
+ *  filenames are produced by a different path. The notice body is excluded from BOTH sides: it is SAM's description
+ *  field, not a posted document, and must not inflate the denominator (mirrors the posted/read exclusion at ~:729).
+ *  Pure; model-free; no I/O. */
+export function deriveAnalyzedDocuments(
+  fullSource: string,
+  uncovered: string[],
+): { analyzed: number; analyzed_of: number; unanalyzed: Array<{ name: string; reason: string }> } {
+  const analyzableRegions = docRegions(fullSource).filter((r) => r.name !== NOTICE_BODY_DOC_NAME);
+  const regionNames = new Set(analyzableRegions.map((r) => r.name));
+  // Intersect with the region set rather than merely filtering the notice body out. `uncovered` is built by iterating
+  // these same regions so it is a subset by construction TODAY; keying on the set makes that a checked property instead
+  // of an assumption, so a future divergence under-reports the gap rather than driving `analyzed` negative.
+  const unanalyzedNames = uncovered.filter((n) => regionNames.has(n));
+  return {
+    analyzed: Math.max(0, analyzableRegions.length - unanalyzedNames.length),
+    analyzed_of: analyzableRegions.length,
+    unanalyzed: unanalyzedNames.map((name) => ({
+      name,
+      reason: "read in full, but no finding was grounded in it — content NOT analyzed",
+    })),
+  };
 }
 
 /** Silent-partial guard (Brain card 224 fork 2). A BINDING doc whose bytes arrived (`ingested`) but whose
@@ -762,6 +795,39 @@ export async function executeAgenticPrimary(
   if (ing && payload.documents) {
     payload.documents.analyzed = (ing.files ?? []).filter((f) => f.ingested && f.has_text !== false).length;
   }
+  // REPORT-TRUTH #1 (flag AUDIT_DOC_ANALYZED_TRUTH, default OFF ⇒ block never runs ⇒ byte-identical). The count above
+  // is RETRIEVED-WITH-TEXT wearing the name ANALYZED — it consults ingestion flags and never a finding, so a document
+  // the engine read in full and drew NOTHING from counts as analyzed. That is what published analyzed:3, complete:true
+  // on live run 95698f91 while `documentsCovered` had independently returned uncovered=["WAGE DETERMINATIONS -
+  // 20260513.pdf"]. Replace it with the verdict path's OWN answer (threaded on res.coverage.docCoverage) rather than a
+  // third re-derivation — two computations of the same fact is the defect, not the cure.
+  //
+  // REGION-space throughout: `uncovered` names come from docRegions(fullSource), the namespace findingProvenance also
+  // reports in, so the pair (analyzed, analyzed_of) is internally coherent with no join against the ingestion manifest.
+  // The notice body is excluded from the denominator — it is SAM's description field, not a posted document, and must
+  // not inflate the count (the same exclusion the posted/read counts make at :729).
+  const docCov = (res.coverage as { docCoverage?: { complete: boolean; uncovered: string[] } }).docCoverage;
+  // Hoisted so the PERSISTED `documents_complete` below can fold it in. Setting `payload.documents.complete = false`
+  // alone is NOT enough and looked like it was: buildCoverage reads the TOP-LEVEL `compliance_json.documents_complete`
+  // (v4-report/build-data.ts:593) and only falls back to `p.documents.complete` when that field is UNDEFINED — which it
+  // never is on a real run, since it is persisted from `manifestComplete`. So the coverage badge would have stayed
+  // COMPLETE over a named unanalyzed document. Caught by red-teaming this diff; the render cert had masked it by
+  // setting the top-level field by hand.
+  let docsAnalyzedIncomplete = false;
+  if (docCov && payload.documents) {
+    const truth = deriveAnalyzedDocuments(fullSource, docCov.uncovered);
+    docsAnalyzedIncomplete = truth.unanalyzed.length > 0;
+    payload.documents.analyzed_of = truth.analyzed_of;
+    payload.documents.analyzed = truth.analyzed;
+    if (truth.unanalyzed.length) {
+      // Rule 61 — honest-fail is product-wide: a document that was read but yielded no grounded finding gets a VISIBLE
+      // failure state and is NAMED. Per Rule 70 this CAPS the result (the verdict path already caps on the same signal
+      // via coverageGap); it does not mute it, and it is never reported as a green count.
+      payload.documents.complete = false;
+      payload.documents.unanalyzed = truth.unanalyzed;
+      console.warn(`[documents] ANALYZED<READ: ${truth.unanalyzed.length} binding document(s) read but not analyzed → named + documents_complete=false: ${truth.unanalyzed.map((u) => u.name).join(", ")}`);
+    }
+  }
   // C-1 (Brain C.e) — ONE completeness computation. `manifestComplete` (agenticManifestComplete: truncation +
   // reconciliation + binding-content-loss, line 145) is the SINGLE truth: it was threaded into deriveVerdict
   // (VerdictInputs.documentsComplete → the committal INCOMPLETE cap) AND is persisted here as documents_complete
@@ -809,7 +875,11 @@ export async function executeAgenticPrimary(
       // document could not be ingested (the report flags it loudly). CEO 2026-06-28:
       // a partial package ALSO gates export (shouldGateExport reads this) — a report
       // we couldn't fully ground never leaves as a clean PDF.
-      documents_complete: manifestComplete,
+      // REPORT-TRUTH #1 — a binding document READ but never ANALYZED is the same class of incompleteness as one that
+      // could not be ingested, and belongs in the same field: this is what the coverage badge and the export gate both
+      // read. Retrieval succeeding is not the question the field answers. Flag-OFF ⇒ docsAnalyzedIncomplete stays false
+      // ⇒ `manifestComplete && true` ⇒ byte-identical.
+      documents_complete: manifestComplete && !docsAnalyzedIncomplete,
       generated_at: generatedAt,
       source_chars: fullSource.length,
       doc_count: docs.length,

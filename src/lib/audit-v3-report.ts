@@ -82,6 +82,16 @@ export interface V3ReportPayload {
     // so `read` alone reads "8/8" over un-analyzed content. `analyzed` (≤ read) makes the surface honest. Additive/optional
     // ⇒ absent on legacy rows (renderer falls back to `read`), byte-identical for consumers that don't read it.
     analyzed?: number;
+    // REPORT-TRUTH #1 (flag AUDIT_DOC_ANALYZED_TRUTH) — `analyzed` above was still an INGESTION count
+    // (`ingested && has_text !== false`, executor-v3:763): it never consulted a single finding, so a document read in
+    // full that produced ZERO grounded findings counted as analyzed. Live run 95698f91 published analyzed:3/complete:true
+    // while the engine's own documentsCovered said the Wage Determination was uncovered — and the report then told the
+    // customer the SCA rates were "unknown" over a 29,427-char WD carrying all 21 of them. Under the flag, `analyzed`
+    // and `analyzed_of` are REGION-space and derive from the verdict path's own coverage answer, and `unanalyzed` NAMES
+    // the documents that were read but not analyzed (Rule 61 — a failed dependency gets a visible failure state, never a
+    // green count). All three optional ⇒ absent flag-OFF and on legacy rows ⇒ byte-identical for every consumer.
+    analyzed_of?: number;
+    unanalyzed?: Array<{ name: string; reason: string }>;
     complete: boolean;
     missing: Array<{ name: string; reason?: string }>;
     // OCR-HELD REGISTER (Brain card #471 ruling A, flag AUDIT_OCR_HELD_REGISTER) — docs whose OCR recovered text but
