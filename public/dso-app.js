@@ -53,6 +53,32 @@
     return { cls: 'sa-open', label: 'FULL & OPEN', reg: 'open' };
   }
 
+  // Sort comparators. `-Infinity - -Infinity` is NaN, and a comparator that
+  // returns NaN is non-transitive: Array#sort then leaves that group in an
+  // implementation-defined order that can differ between engines and between
+  // calls on the same data. All three sorts had that path — `value` on EVERY
+  // row (SAM publishes no ceiling for an open solicitation, so both terms were
+  // always the null sentinel), `fit` and `deadline` whenever two rows both
+  // lacked the key. Compare explicitly, and park a missing value at the END
+  // regardless of direction: a row with no stated value is not "cheapest" and
+  // not "dearest", it is absent, and it must not migrate to the top because the
+  // customer changed the sort. Same shape as cmpNumUndatedLast in
+  // dashboard-live.js, which fixed this exact defect on Past Audits.
+  function cmpMissingLast(xv, yv, dir) {
+    const x = xv == null ? Infinity : xv, y = yv == null ? Infinity : yv;
+    if (x === y) return 0;
+    if (!isFinite(x)) return 1;
+    if (!isFinite(y)) return -1;
+    return dir * (x - y);
+  }
+  // Named so a gate can execute it. The comparators were previously written
+  // inline inside the render function and no test could reach them.
+  function sortRows(data, key) {
+    if (key === 'fit') return data.sort((a, b) => cmpMissingLast(a.fit, b.fit, -1) || cmpMissingLast(a.days, b.days, 1));
+    if (key === 'deadline') return data.sort((a, b) => cmpMissingLast(a.days, b.days, 1));
+    return data.sort((a, b) => cmpMissingLast(a.ceiling, b.ceiling, -1));
+  }
+
   const fitColor = (f) => f >= 85 ? css('--green-600') : f >= 70 ? css('--accent') : f >= 60 ? css('--amber-600') : css('--red-600');
   const fitTier = (f) => f >= 85 ? 'Strong fit' : f >= 70 ? 'Workable' : 'Stretch';
   const urg = (d) => d == null ? 'none' : d <= 3 ? 'crit' : d <= 7 ? 'warn' : 'ok';
@@ -324,11 +350,7 @@
       }
       return;
     }
-    let data = filtered().slice();
-    const last = (v) => v == null ? -Infinity : v;
-    if (S.sort === 'fit') data.sort((a, b) => last(b.fit) - last(a.fit) || (a.days ?? Infinity) - (b.days ?? Infinity));
-    else if (S.sort === 'deadline') data.sort((a, b) => (a.days ?? Infinity) - (b.days ?? Infinity));
-    else data.sort((a, b) => last(b.ceiling) - last(a.ceiling));
+    let data = sortRows(filtered().slice(), S.sort);
 
     const priced = data.filter(o => o.ceiling != null);
     const sum = priced.reduce((s, o) => s + o.ceiling, 0);
