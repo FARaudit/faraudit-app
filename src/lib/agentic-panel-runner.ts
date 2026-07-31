@@ -163,7 +163,11 @@ export function formatClaimSectionTags(tags: ClaimSectionTag[]): string {
 // future option ([[reference_glm_5_2]]) once we're off a single-vendor stack.
 function modelFor(tier: PanelTier, override?: Partial<Record<PanelTier, string>>): string {
   if (override?.[tier]) return override[tier]!;
-  if (tier === "opus") return process.env.AUDIT_JUDGE_MODEL || "claude-opus-4-8";
+  // OPUS 5 (2026-07-31) — same $5/$25 per MTok as Opus 4.8, so this is capability at zero marginal cost. The two
+  // seats on this tier are the Ex-KO Evaluator (highest misread risk) and the Adversarial Verifier (the single
+  // truth choke-point) — precisely where Opus 5's documented gain, high precision AND high recall on adversarial
+  // review, lands. The env override still wins, so pinning back costs no deploy.
+  if (tier === "opus") return process.env.AUDIT_JUDGE_MODEL || "claude-opus-5";
   if (tier === "haiku") return process.env.AUDIT_PANEL_HAIKU || "claude-haiku-4-5";
   return process.env.AUDIT_PANEL_SONNET || "claude-sonnet-4-6";
 }

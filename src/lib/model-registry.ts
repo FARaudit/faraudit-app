@@ -19,8 +19,13 @@ export type ModelRole = "extractor" | "lens" | "crossdoc" | "judge" | "finder";
 const DEFAULTS: Record<ModelRole, string> = {
   extractor: "claude-haiku-4-5", // per-doc MAP — factual extraction, runs once/doc → cheap
   lens: "claude-sonnet-4-6",     // Stage 2 — overview/compliance/risk lenses over the compact matrix
-  crossdoc: "claude-opus-4-8",   // Stage 2.5 — cross-doc reasoning over the binding-doc subset
-  judge: "claude-opus-4-8",      // final judgment over compact facts (the already-correct call 4)
+  // OPUS 5 (2026-07-31). Same price as Opus 4.8 — $5/$25 per MTok, verified against the live pricing table —
+  // so this buys capability at zero marginal cost. Opus 5 is documented strongest on exactly these two jobs:
+  // deep reasoning, long-horizon agentic work, and high-precision/high-recall adversarial review. It also halves
+  // the prompt-cache minimum (1024 → 512 tokens), which the compact-matrix cached prefix benefits from directly.
+  // Per this file's own contract, a swap is a config change HERE plus a gold-set re-run — never scattered edits.
+  crossdoc: "claude-opus-5",     // Stage 2.5 — cross-doc reasoning over the binding-doc subset
+  judge: "claude-opus-5",        // final judgment over compact facts (the already-correct call 4)
   // L3 (Brain card 265/267) — grounded agentic section-finder. LOCATE-only (returns a verbatim anchor,
   // never a summary) + deterministic offset-string-match gate ⇒ a wrong locate is REJECTED, fails SAFE to
   // INCOMPLETE. Sonnet by "max capability, not max model": the gate — not the model — guarantees correctness.

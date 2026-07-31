@@ -1174,6 +1174,9 @@ type ContentBlock =
 // Per-model context window (input+output). Opus 4.8 = 1M. Keyed by model so the
 // guard is model-agnostic (Sonnet/Haiku route through here too on quality gates).
 const MODEL_CONTEXT_LIMIT: Record<string, number> = {
+  // Explicit rather than riding DEFAULT_CONTEXT_LIMIT — a newly-introduced model silently inheriting a default is
+  // how a wrong window ships unnoticed. 1M verified against the live Models API (max_input_tokens), not assumed.
+  "claude-opus-5": 1_000_000,
   "claude-opus-4-8": 1_000_000,
   "claude-opus-4-7": 1_000_000,
   "claude-opus-4-6": 1_000_000,
