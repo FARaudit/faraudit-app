@@ -36,6 +36,7 @@ import { buildV3Payload } from "./audit-v3-report";
 import { detectAmendments, findingProvenance, docRegions } from "./audit-orchestrator";
 import { applyNonPresenceHonesty } from "./audit-nonpresence-honesty";
 import { reconcileAbsenceClaims } from "./audit-absence-reconcile";
+import { groundModalForce } from "./audit-force-grounding";
 import { sweepConstructionManifest } from "./audit-construction-manifest";
 import { detectConstructionOutOfScope } from "./section-boundary-detector";
 import { isHonestFail, billable, decrementAuditQuota, recordAuditCost } from "./audit-billing";
@@ -754,6 +755,18 @@ export async function executeAgenticPrimary(
       console.warn(`[absence-reconcile] ${x.id}: REFUTED by the run's own ledger — "${x.doc}" (${x.kind}). The report claimed it was absent.`);
     }
     if (rec.refuted.length) console.warn(`[absence-reconcile] corrected ${rec.refuted.length} hallucinated-absence claim(s)`);
+  }
+  // REPORT-TRUTH #8 (flag AUDIT_FORCE_GROUNDING, default OFF ⇒ pass-through ⇒ byte-identical).
+  // The mirror of #7: #7 corrects an asserted ABSENCE the ledger refutes, #8 corrects an asserted modal FORCE the
+  // source never establishes ("Mandatory site visit" on a source whose only words are "Site visit will be held").
+  // Runs LAST so it sees the final report text, and it skips anything #7 already rebuilt (shared CORRECTED prefix).
+  if (process.env.AUDIT_FORCE_GROUNDING === "true") {
+    const fg = groundModalForce(reportFindings, fullSource);
+    reportFindings = fg.findings;
+    for (const c of fg.corrected) {
+      console.warn(`[force-grounding] ${c.id}: asserted "${c.force}" of "${c.subject}" — the word is absent from the source and no sentence naming that subject imposes an obligation. before="${c.before.slice(0, 120)}"`);
+    }
+    if (fg.corrected.length) console.warn(`[force-grounding] corrected ${fg.corrected.length} fabricated-qualifier claim(s)`);
   }
   const payload = buildV3Payload(res.decision, res.coverage, reportFindings, generatedAt);
 

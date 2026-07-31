@@ -29,8 +29,36 @@ import { docRegions } from "./audit-orchestrator";
 export interface AbsenceReconcileResult<T> { findings: T[]; refuted: Array<{ id: string; doc: string; kind: "present_and_analyzed" | "present_not_analyzed"; before: string; after: string }>; }
 
 /** Absence predicates asserted OF A DOCUMENT — "not provided", "not reproduced", "not attached", "not included",
- *  "not furnished", "was not located". Shape only; none names a procurement concept. */
-const DOC_ABSENCE = /\b(?:is|are|was|were)\s+(?:referenced\s+but\s+)?not\s+(?:provided|reproduced|attached|included|furnished|supplied|present|available|located)\b/i;
+ *  "not furnished", "was not located". Shape only; none names a procurement concept.
+ *
+ *  THE CONNECTIVE SLOT IS QUANTIFIED, NOT ENUMERATED. v1 permitted exactly one interjection — `referenced\s+but` —
+ *  and live run 61aaaa95 wrote "PWS (Attachment 0001) IS LISTED BUT not reproduced", which walked straight through
+ *  the rule written to stop it. One hardcoded connective is a blocklist with better branding: "listed but", "cited
+ *  but", "referenced yet", "identified however" are all phrasings a competent writer reaches for, and every one of
+ *  them defeated v1 (probe `_rt8-absence-shape.ts` LEG 2: 12/84 matched pre-fix). So the slot now admits ANY run of
+ *  words — no word is named.
+ *
+ *  WHAT BOUNDS IT IS GRAMMATICAL RELATION, NOT WORD COUNT. The danger of a loose gap is reaching a DIFFERENT
+ *  subject: in "the PWS is complete and the drawings are not provided", a purely length-bounded gap lets the match
+ *  start at the PWS copula, so the 60-char subject window sees "PWS" and a claim about the DRAWINGS gets refuted —
+ *  deleting a possibly-true warning, the dangerous direction. A word cap cannot separate those two cases; a cap
+ *  loose enough for "incorporated by reference but" (4 words) is already loose enough to leak. The discriminator is
+ *  that a second subject needs a SECOND COPULA, so the gap forbids one. Two structural bounds, zero vocabulary:
+ *    (1) `[A-Za-z]+,?` matches no period, semicolon or colon — the gap cannot cross a clause boundary.
+ *        A comma is allowed, because "is listed, but not reproduced" keeps the same subject.
+ *    (2) no `is|are|was|were` inside the gap — the gap cannot span into a coordinate clause's own subject.
+ *  The remaining `{0,5}` is a runaway backstop, not the safety property.
+ *
+ *  FAILURE DIRECTION of the right-hand participle list: it fails SAFE. An unenumerated verb means no refutation,
+ *  which leaves the status quo (a false claim ships) — it never deletes a true warning. It is widened here to the
+ *  clear presence/provision class only. Verbs about the GOVERNMENT'S ACT rather than presence — "incorporated",
+ *  "released", "published", "posted" — are deliberately excluded: those claims can be true even when the document's
+ *  text is sitting in the source, so refuting them from region presence would delete a real warning. */
+const DOC_ABSENCE = /\b(?:is|are|was|were)\s+(?:(?!(?:is|are|was|were)\b)[A-Za-z]+,?\s+){0,5}not\s+(?:provided|reproduced|attached|included|furnished|supplied|present|available|located|given|delivered|enclosed|appended)\b/i;
+
+/** Exported for the falsification probe only — the probe must measure the SHIPPED rule, not a copy of it that can
+ *  silently drift from it. Not part of the module's behavioural surface. */
+export const DOC_ABSENCE_FOR_TEST = DOC_ABSENCE;
 
 /** Distinctive tokens for a document, derived from its own name at runtime. Drops extensions, dates, pure numbers and
  *  short/common words, so "PWS KO Appropved - 20260720.pdf" yields ["pws"] and "WAGE DETERMINATIONS - 20260513.pdf"
@@ -73,11 +101,33 @@ function consequenceOf(claim: string): string {
   const tail = body.slice(dash).replace(/^\s[—–-]\s/, "").trim();
   return tail.length > 20 ? tail : "";
 }
+/** A SECOND subject between the document token and the predicate means the predicate is not about the document.
+ *  Another copula opens a new clause with its own subject ("the PWS is complete and THE DRAWINGS are not provided");
+ *  a sentence terminator ends the claim entirely ("the PWS is in the source. The drawings are not provided.").
+ *  Both are grammatical relations, not vocabulary. */
+const INTERVENING_SUBJECT = /\b(?:is|are|was|were)\b|[.;:]/i;
+
 function assertsDocAbsent(claim: string, tokens: string[]): boolean {
   const m = DOC_ABSENCE.exec(claim);
   if (!m) return false;
-  const lead = claim.slice(Math.max(0, m.index - MAX_GAP), m.index).toLowerCase();
-  return tokens.some((t) => lead.includes(t));
+  const lead = claim.slice(Math.max(0, m.index - MAX_GAP), m.index);
+  const lower = lead.toLowerCase();
+  // PROXIMITY IS NOT SUBJECT POSITION. v1 asked only whether the token appeared in the 60-char window, which this
+  // function's own contract called "SUBJECT position" — it is not the same thing, and the gap is an over-refute:
+  // in "The PWS is complete and the drawings are not provided", the window before "are not provided" still contains
+  // "PWS", so a claim about the DRAWINGS was refuted from the PWS's presence, deleting a possibly-true warning.
+  // Falsification probe `_rt8-absence-shape.ts` LEG 4 planted five such sentences; the shipped rule leaked 4 of 5.
+  // The token must therefore be the NEAREST subject: nothing that opens a new clause may sit between it and the
+  // predicate. A parenthetical ("PWS (Attachment 0001) is listed but not reproduced") passes; a coordinate clause
+  // does not. Failure direction is safe — "PWS, which is Attachment 0001, is not provided" is now missed, which
+  // leaves a false claim standing rather than deleting a true one.
+  for (const t of tokens) {
+    const at = lower.lastIndexOf(t);
+    if (at < 0) continue;
+    if (INTERVENING_SUBJECT.test(lead.slice(at + t.length))) continue;
+    return true;
+  }
+  return false;
 }
 
 /** SECOND ARM — a RESOLVED-FACT absence claim. The third AUTO-F component on run 583df921 was not about a document:
