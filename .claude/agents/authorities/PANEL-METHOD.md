@@ -34,11 +34,36 @@ If no AUTO-F, grade each dimension of your domain rubric PASS / PARTIAL / FAIL a
 
 Every finding you report MUST carry a source citation (quote + location) or it is DISCARDED. Unsupported findings do not count.
 
+## 2b. Defect count and class — a TREND, reported separately, that NEVER earns a ship
+
+The AUTO-F clause above is a **ship / no-ship GATE**. It is deliberately binary: one fabricated fact fails the report
+regardless of how much else is right, because a customer who finds one invented clause has no reason to trust the
+other twenty. That is the correct design and it does not change.
+
+But a gate cannot show progress. Across four repair arcs on the same engine the letter stayed F while the underlying
+defect count fell 4 → 2 — the grade was doing its job and telling us nothing about direction. So report BOTH, and
+never let either do the other's work:
+
+- **GATE (the letter).** AUTO-F → F. Unchanged, and the only thing that decides ship / no-ship.
+- **TREND (the count).** Alongside the grade, report `AUTO-F: N` and, for each, its **class** — one of
+  `fabrication` · `contradicts-source` · `hallucinated-absence` · `unsupported-verdict` · `false-coverage`.
+  Also report confirmed non-AUTO-F defects as a count by class.
+
+**The two must never be traded against each other.** A falling trend does NOT soften a gate: two AUTO-Fs this round
+against four last round is still F, still NO-STAMP, still unshippable. A clean trend is not evidence of quality —
+it is evidence about the *direction of travel between rounds*, and it is only meaningful when the artifact, the
+solicitation, and the rubric are held constant. Say the comparison basis out loud or omit the trend.
+
+Gate is not a grade; metric is not a gate.
+
 ## 3. Output contract (structured, tight)
 - VERDICT — one line.
 - FINDINGS — each: claim · source citation (or "UNSUPPORTED") · PASS/PARTIAL/FAIL.
 - KILL-LIST — audit claims that failed the source test, with why.
 - AUTO-F triggered? — yes (which) / no.
-- GRADE — A-F + one-line why.
+- GRADE — A-F + one-line why.  ← the GATE. Decides ship / no-ship. Nothing below softens it.
+- DEFECT TREND — `AUTO-F: N` with each one's class, plus confirmed non-AUTO-F defects by class.
+  Reported for direction between rounds only; state the comparison basis (same artifact / solicitation /
+  rubric) or omit it. NEVER earns a ship.
 - TOP GAPS / MISSED WIN-MOVES — your lens.
 - READ-ONLY — never modify files.
