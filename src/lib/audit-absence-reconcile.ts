@@ -109,6 +109,18 @@ function consequenceOf(claim: string): string {
  *  Both are grammatical relations, not vocabulary. */
 const INTERVENING_SUBJECT = /\b(?:is|are|was|were)\b|[.;:]/i;
 
+/** A COORDINATED subject — a comma or a conjunction between the token and the predicate means the predicate has more
+ *  than one subject, and the document we matched is only one of them. "The PWS, the QASP and the bonding certificate
+ *  are not provided" was refuted off the PWS alone, which silently deleted the warnings about the other two. There is
+ *  no safe partial refutation here: the claim is true of the artifacts we did not match, so we stand down entirely. */
+const COORDINATED_SUBJECT = /,|\b(?:and|or)\b/i;
+
+/** The token is the OBJECT OF A MODIFIER, not the head of the subject. "Appendix C to the PWS is not attached" is a
+ *  claim about Appendix C; the PWS is only telling you which appendix. Refuting it from the PWS's presence deletes a
+ *  true warning about a document that really is missing. Tested against the text immediately preceding the token, so
+ *  it fires on "... to the PWS", "... of the PWS", "... attached to PWS" and leaves a bare subject alone. */
+const MODIFIER_OBJECT = /\b(?:to|of|in|for|under|within|from|with|per|via|by|about|regarding|accompanying|attached)\s+(?:the\s+|a\s+|an\s+|this\s+|that\s+)?$/i;
+
 function assertsDocAbsent(claim: string, tokens: string[]): boolean {
   const m = DOC_ABSENCE.exec(claim);
   if (!m) return false;
@@ -123,10 +135,20 @@ function assertsDocAbsent(claim: string, tokens: string[]): boolean {
   // predicate. A parenthetical ("PWS (Attachment 0001) is listed but not reproduced") passes; a coordinate clause
   // does not. Failure direction is safe — "PWS, which is Attachment 0001, is not provided" is now missed, which
   // leaves a false claim standing rather than deleting a true one.
+  // NEAREST SUBJECT IS STILL NOT ENOUGH — the adversarial pass on 810c5fd8 found two shapes where the token is the
+  // nearest noun and the claim is nonetheless about something else, both of which DELETE A TRUE WARNING:
+  //   "Appendix C to the PWS is not attached"                        → head is Appendix C; the PWS only qualifies it
+  //   "The PWS, the QASP and the bonding certificate are not provided" → three subjects; refuting one refutes none
+  // Both are checked below. Both stand the refutation down entirely rather than refuting partially, because a
+  // partial refutation of a coordinated claim publishes a correction that is false for the artifacts it did not
+  // match — the precise failure this module exists to prevent, inverted.
   for (const t of tokens) {
     const at = lower.lastIndexOf(t);
     if (at < 0) continue;
-    if (INTERVENING_SUBJECT.test(lead.slice(at + t.length))) continue;
+    const between = lead.slice(at + t.length);
+    if (INTERVENING_SUBJECT.test(between)) continue;
+    if (COORDINATED_SUBJECT.test(between)) continue;
+    if (MODIFIER_OBJECT.test(lead.slice(0, at))) continue;
     return true;
   }
   return false;

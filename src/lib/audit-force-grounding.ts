@@ -52,8 +52,19 @@ const FORCE_QUALIFIER = /\b(mandatory|compulsory|obligatory)\b/i;
  *  need not be modal-anchored ("attendance is a prerequisite", "failure to attend will render the offer ineligible"). */
 const OBLIGATION_MARKER = /\b(?:shall|must|mandatory|compulsory|obligatory|require[sd]?|requirement|prerequisite|precondition|condition\s+of|obligated|ineligible|disqualif\w*|nonresponsive|non-?responsive|barred|precluded|will\s+not\s+be\s+(?:considered|evaluated|accepted)|may\s+not\s+(?:bid|submit|propose))\b/i;
 
-/** Words carrying no subject identity — dropped before the subject phrase is matched against the source. */
-const SUBJECT_STOP = new Set(["a", "an", "the", "this", "that", "these", "those", "at", "for", "during", "of", "to", "in", "on", "any", "all", "its", "their"]);
+/** Words carrying no subject identity — dropped before the subject phrase is matched against the source.
+ *  CONJUNCTIONS AND PRONOUNS ARE HERE FOR A REASON. Tracing why a corpus audit stopped correcting revealed that its
+ *  correction had been firing on the subject "but": the force word sat mid-sentence and the words following it were
+ *  a connective, which the attributive read happily returned as a noun phrase. It only stood down later by luck —
+ *  the segment that happened to contain "but" also happened to contain an obligation marker. A function word can
+ *  never be the thing a qualifier is asserted OF, so it is filtered out; a subject that reduces to nothing then
+ *  fails the empty-subject bail, and the gate does not fire. No length heuristic: "PWS" is three characters and is a
+ *  perfectly good subject. */
+const SUBJECT_STOP = new Set([
+  "a", "an", "the", "this", "that", "these", "those", "at", "for", "during", "of", "to", "in", "on", "any", "all", "its", "their",
+  "but", "and", "or", "nor", "yet", "so", "if", "as", "than", "then", "when", "while", "which", "who", "whom", "whose",
+  "it", "they", "them", "he", "she", "we", "you", "not", "no", "be", "been", "being",
+]);
 
 /** The report renders `requirement` through `truncateOnWord(..., 400)` (src/app/audit/[id]/_view-model.ts, both the
  *  routed-row and matrix-title paths). Anything past that is silently dropped on the page while looking complete in
@@ -96,6 +107,34 @@ function qualifiedSubject(text: string, forceIdx: number, forceWord: string): st
   return preWords.length ? preWords.join(" ") : "";
 }
 
+/** A HEADING governs the line beneath it, and PDF extraction puts a newline between them. Splitting on that newline
+ *  turned "SITE VISIT\nOfferors must attend on 13 August" into two unrelated segments: the first names the subject
+ *  and carries no obligation, the second carries the obligation and never names the subject — so the subject-scoped
+ *  scan saw no obligation anywhere and the gate SOFTENED A REAL ATTENDANCE REQUIREMENT. Found by the adversarial
+ *  pass on 810c5fd8; it is the dangerous direction, and the most common shape in extracted federal PDFs.
+ *
+ *  A distance window was the obvious alternative and is WRONG — measured on the real source (`_rt8-window-probe.ts`),
+ *  a ±250-character window around "site visit" reaches "Require" in an adjacent clause-table title and "must" in
+ *  unrelated body text, so the gate would never fire on the specimen it was built for. The defect is structural, not
+ *  metric: merge the heading into the line it introduces and leave everything else alone.
+ *
+ *  Heading = at most six words and no sentence-terminal punctuation. A colon still counts as a heading ("SITE
+ *  VISIT:"). Merging only ever makes a segment longer, so it can only make the gate stand down MORE often. */
+const isHeadingLike = (s: string): boolean => {
+  const t = s.trim();
+  return t.length > 0 && t.split(/\s+/).length <= 6 && !/[.!?]$/.test(t);
+};
+function sourceSegments(source: string): string[] {
+  const raw = source.split(/(?<=[.!?])\s+|\n+/);
+  const out: string[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    let s = raw[i];
+    while (isHeadingLike(s) && i + 1 < raw.length) s = `${s} ${raw[++i]}`;
+    if (s.trim()) out.push(s);
+  }
+  return out;
+}
+
 /** Every source sentence naming this subject. The subject's content words must appear in order, allowing small gaps
  *  ("site visit" also matches "site inspection visit"), so a rephrasing in the source still counts as naming it. */
 function sentencesNaming(source: string, subject: string): string[] {
@@ -105,7 +144,7 @@ function sentencesNaming(source: string, subject: string): string[] {
   // cancelled", so sentences that never discuss the subject counted as naming it — and one could then be selected as
   // the verbatim proof quote and attributed to a subject it never mentions.
   const re = new RegExp("\\b" + words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+(?:\\w+\\s+){0,2}") + "\\b", "i");
-  return source.split(/(?<=[.!?])\s+|\n+/).filter((s) => re.test(s));
+  return sourceSegments(source).filter((s) => re.test(s));
 }
 
 /**

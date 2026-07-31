@@ -98,5 +98,26 @@ ok("longer noun phrase keeps its head noun", I.qualifiedSubject("Mandatory atten
   ok("correction survives ahead of the expendable tail", /does not state that this site visit is mandatory/.test(String(r.findings[0].requirement ?? "")));
 }
 
+console.log("-- adversarial P0 regressions (2026-07-31) --");
+// P0-B: a heading and the line it introduces are split by PDF extraction, so the obligating line never lexically
+// named the subject and the gate softened a REAL attendance requirement. Dangerous direction.
+ok("line-broken heading + obligation stands the gate down",
+   !fires({ id: "lb", requirement: "Mandatory site visit on 13 August 2026.", excerpt: "SITE VISIT" },
+          "SITE VISIT\nOfferors must attend on 13 August 2026.\nSubmit offers by 20 August."));
+ok("heading is merged into the line it introduces",
+   I.sentencesNaming("SITE VISIT\nOfferors must attend on 13 August 2026.", "site visit")
+     .some((s) => /must attend/.test(s)));
+// ...without making the gate inert: a terminated clause-table row is NOT a heading and must not absorb its neighbour.
+ok("a terminated clause row is not treated as a heading",
+   I.sentencesNaming("52.237-1 Site Visit.\n52.203-18 Prohibition on Contracting with Entities that Require Certain Agreements.", "site visit")
+     .every((s) => !/Require/.test(s)));
+// A function word can never be the thing a qualifier is asserted of.
+{ // A function word can never be the thing a qualifier is asserted of. Before this, the attributive read returned
+  // the connective itself as the subject ("but"), and the gate fired on it — standing down later only by the luck
+  // of which segment happened to contain that word.
+  const T = "Attendance mandatory but not the";
+  ok("a connective is rejected as a subject", I.qualifiedSubject(T, T.indexOf("mandatory"), "mandatory") === "");
+}
+
 console.log(`\nREPORT-TRUTH #8 · modal force grounded against the source: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
