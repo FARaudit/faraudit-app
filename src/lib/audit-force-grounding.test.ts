@@ -119,5 +119,16 @@ ok("a terminated clause row is not treated as a heading",
   ok("a connective is rejected as a subject", I.qualifiedSubject(T, T.indexOf("mandatory"), "mandatory") === "");
 }
 
+{ // GROUNDING LOCK — anything published under "What the source says is:" must really be in the source. The
+  // heading-merge that closes P0-B joins a heading to the next line with a space, so a merged segment is NOT
+  // contiguous in the document; quoting one would put a constructed string behind a verbatim claim.
+  const S = "SITE VISIT\nA site visit will be held on 13 August 2026 at the Valley Resident Office.\nSubmit offers by 20 August.";
+  const r = run({ id: "v", requirement: "Mandatory site visit.", excerpt: "" }, S);
+  const q = (String(r.findings[0].requirement ?? "").match(/What the source says is: "([^"]+)"/) || [])[1] ?? "";
+  ok("a quote is emitted at all", q.length > 0);
+  ok("the quote is a verbatim substring of the source", q.length > 0 && S.includes(q));
+  ok("the quote is not a heading glued to its body line", !/^SITE VISIT A site visit/.test(q));
+}
+
 console.log(`\nREPORT-TRUTH #8 · modal force grounded against the source: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

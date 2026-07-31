@@ -137,14 +137,20 @@ function sourceSegments(source: string): string[] {
 
 /** Every source sentence naming this subject. The subject's content words must appear in order, allowing small gaps
  *  ("site visit" also matches "site inspection visit"), so a rephrasing in the source still counts as naming it. */
-function sentencesNaming(source: string, subject: string): string[] {
+/** `merge` is TRUE for DETECTION and FALSE for QUOTATION, and the split matters for a reason worth stating.
+ *  A merged segment is the right unit to ask "does anything here impose an obligation" — that is what closes P0-B.
+ *  It is the WRONG unit to quote back to the customer: the merge joins a heading to the line beneath it with a
+ *  space, so the segment reads as one sentence and is not contiguous in the document. Publishing it under
+ *  "What the source says is:" would put a constructed string behind a verbatim claim — the exact defect this arc
+ *  exists to remove, reintroduced by the fix for the previous one. Detect on merged text; quote only real lines. */
+function sentencesNaming(source: string, subject: string, merge = true): string[] {
   const words = subject.split(/\s+/).filter(Boolean).map((w) => w.replace(/[^A-Za-z-]/g, "")).filter(Boolean);
   if (!words.length) return [];
   // \b at both ends: without them "bond" matched inside "Bonding is waived" and "visit" inside "The revisit was
   // cancelled", so sentences that never discuss the subject counted as naming it — and one could then be selected as
   // the verbatim proof quote and attributed to a subject it never mentions.
   const re = new RegExp("\\b" + words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+(?:\\w+\\s+){0,2}") + "\\b", "i");
-  return sourceSegments(source).filter((s) => re.test(s));
+  return (merge ? sourceSegments(source) : source.split(/(?<=[.!?])\s+|\n+/)).filter((s) => re.test(s));
 }
 
 /**
@@ -227,7 +233,11 @@ export function groundModalForce<T extends { id?: string; requirement?: string; 
     // "52.237-1 Site Visit.", a row from the incorporated-by-reference table, which proves nothing to a reader.
     const norm = (s: string) => s.replace(/\s+/g, " ").trim();
     const excerptNames = excerpt && sentencesNaming(excerpt, subject).length > 0;
-    const best = excerptNames ? norm(excerpt) : norm([...named].sort((x, y) => y.length - x.length)[0]);
+    // Quote from UNMERGED lines only — see sentencesNaming. Fall back to the merged pool only if the subject is
+    // named nowhere except across a merge boundary, which would otherwise leave the correction with no evidence.
+    const quotable = sentencesNaming(source, subject, false);
+    const pool = quotable.length ? quotable : named;
+    const best = excerptNames ? norm(excerpt) : norm([...pool].sort((x, y) => y.length - x.length)[0]);
     // Suppress the quote when the head already carries it — otherwise the correction spends its budget saying the
     // same thing twice and the head's genuinely additional detail (clause refs, dates) is what falls off the end.
     // Compared by OPENING WORDS, not by a raw character window: a 60-char prefix compare called two sentences
