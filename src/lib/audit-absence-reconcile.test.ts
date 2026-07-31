@@ -87,6 +87,36 @@ const SRC = [
   const FAR_APART = "The PWS describes mowing, edging, weeding, pruning, fertilizing and preventive maintenance across the base year and all four option periods, and a separate bonding certificate is not provided";
   ok("a doc token far from the predicate does not refute", run([FAR_APART], "SBA").refuted.length === 0);
 
+  // ---- 2b. THE CONNECTIVE SLOT IS QUANTIFIED, NOT ENUMERATED (REPORT-TRUTH #8) --------------------------------
+  // v1 permitted exactly one interjection, `referenced\s+but`. Live run 61aaaa95 wrote "is LISTED BUT not
+  // reproduced" and the false PWS claim shipped — the defect walked through the rule written to stop it. These
+  // lock the shape: no single connective may be load-bearing. Mutation-checked (narrowing the slot back to the v1
+  // literal must turn this section red).
+  const CONNECTIVES = ["", "referenced but", "listed but", "cited but", "named but", "mentioned but",
+                       "identified but", "listed, but", "referenced yet", "listed though", "identified however",
+                       "incorporated by reference but", "identified in the notice but"];
+  const missed = CONNECTIVES.filter((c) =>
+    run([`PWS (Attachment 0001) is ${c ? c + " " : ""}not reproduced in the source`], "SBA").refuted.length !== 1);
+  ok(`every connective phrasing is refuted (missed: ${JSON.stringify(missed)})`, missed.length === 0);
+  ok("the live 61aaaa95 phrasing specifically", run(["PWS (Attachment 0001) is listed but not reproduced in the source — SOW obligations are unknown"], "SBA").refuted.length === 1);
+
+  // ---- 2c. PROXIMITY IS NOT SUBJECT POSITION ------------------------------------------------------------------
+  // Each names the PWS (present) then asserts absence of a DIFFERENT document in a coordinate clause. Refuting any
+  // of them would delete a possibly-true warning about that other document. v1 checked only that the token sat
+  // within 60 characters of the predicate and leaked 4 of these 5. Mutation-checked.
+  const SECOND_SUBJECT = [
+    "The PWS is complete and the drawings are not provided in the source.",
+    "PWS (Attachment 0001) is present, but the past performance questionnaire is not attached.",
+    "The PWS is thorough although the site visit details are not furnished.",
+    "PWS is analyzed; the pricing schedule is not included.",
+    "The PWS is in the source. The drawings are not provided.",
+  ];
+  const leaked = SECOND_SUBJECT.filter((s) => run([s], "SBA").refuted.length > 0);
+  ok(`a coordinate clause's subject owns its own predicate (leaked: ${leaked.length})`, leaked.length === 0);
+  // …and the guard must not cost the true positive: a parenthetical is not a second subject.
+  ok("a parenthetical between subject and predicate still refutes",
+     run(["PWS (Attachment 0001) is listed but not reproduced in the source"], "SBA").refuted.length === 1);
+
   // ---- 3. STRUCTURAL ------------------------------------------------------------------------------------------
   ok("no regions ⇒ untouched", reconcileAbsenceClaims([{ id: "a", requirement: PWS }], "", PROV, "SBA").refuted.length === 0);
   ok("empty findings ⇒ no crash", reconcileAbsenceClaims([], SRC, PROV, "SBA").findings.length === 0);

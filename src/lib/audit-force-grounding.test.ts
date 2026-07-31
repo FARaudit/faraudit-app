@@ -47,6 +47,23 @@ ok("source uses the force word anywhere at all", !fires({ id: "f", requirement: 
 ok("subject never discussed in the source", !fires({ id: "g", requirement: "Mandatory bid bond.", excerpt: "No bond language located." }, "This solicitation is for lawn maintenance services."));
 ok("no force qualifier at all", !fires({ id: "h", requirement: "Site visit attendance (FAR 52.237-1 incorporated by reference).", excerpt: SPEC_EXCERPT }, SPEC_SOURCE));
 ok("'required' alone is not treated as an absolute qualifier", !fires({ id: "i", requirement: "Registration in SAM is required before award.", excerpt: "Offerors shall be registered in SAM." }, "Offerors shall be registered in SAM."));
+// SCOPE LOCK on the qualifier set. Every other condition is satisfied here — the subject reads cleanly, the excerpt
+// carries no obligation, and "required" appears nowhere in the source — so the ONLY thing keeping the gate off is
+// that "required" is not in FORCE_QUALIFIER. This is not a correctness claim ("required" can be as fabricated as
+// "mandatory"); it is a deliberate v1 blast-radius decision. "Required" is an ordinary paraphrase of "shall" and
+// appears in legitimately grounded findings constantly, so admitting it puts this gate in the path of far more
+// real obligations, each one a chance to soften something true. Widening the set is a decision to take on purpose,
+// with its own negatives — not a drive-by regex edit. Mutation-checked: adding "required" must turn this red.
+ok("'required' is out of scope for v1 even when every other condition is met",
+   !fires({ id: "i2", requirement: "Required site visit on 13 August 2026.", excerpt: "Site visit will be held on 13 August 2026." },
+          "Site visit will be held on 13 August 2026 at the Valley Resident Office."));
+
+// ISOLATES THE EXCERPT CHECK. The excerpt obligates ("shall attend") but names no subject, so the subject-scoped
+// sentence scan sees only the non-obligating scheduling sentence and would fire. Only the finding's own grounding
+// prevents it. This is the real shape of a repaired/trimmed excerpt. Mutation-checked.
+ok("the finding's own excerpt alone can stand the gate down",
+   !fires({ id: "j", requirement: "Mandatory site visit on 13 August.", excerpt: "Offerors shall attend." },
+          "Site visit will be held on 13 August 2026 at the Valley Resident Office."));
 
 console.log("-- structural properties --");
 ok("empty findings ⇒ no crash", groundModalForce([], SPEC_SOURCE).findings.length === 0);
