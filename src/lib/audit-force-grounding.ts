@@ -1,3 +1,25 @@
+// ┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+// │ PARKED 2026-07-31 (CEO decision) — NOT WIRED, NOT SHIPPING. Kept as the record of what was learned.           │
+// │                                                                                                              │
+// │ The executor seam was DELETED, not flag-gated: AUDIT_FORCE_GROUNDING now does nothing at all. Do not revive   │
+// │ this by restoring the call — it needs a redesign first, for the reason below.                                 │
+// │                                                                                                              │
+// │ WHY. Condition 4 must decide "does the source impose an obligation on this subject" from text alone, and the  │
+// │ real corpus makes that undecidable lexically: a federal clause table is dense with the word "Require", so     │
+// │ every widening (character window, segment lookahead, heading merge) either reaches that noise and stands the  │
+// │ gate down on the very specimen it was built for, or misses a line-broken obligation and SOFTENS A REAL        │
+// │ REQUIREMENT. Three adversarial rounds, three fixes, each defeated by the next paraphrase:                     │
+// │   sentence-scoped       → "SITE VISIT\nOfferors must attend"    (the newline hides the obligation)            │
+// │   heading-merge         → "SITE VISIT.\nOfferors must attend"   (one added period defeats it)                 │
+// │   4-token subject cap   → "Mandatory attendance at the site visit" yields the subject "attendance site"       │
+// │ It kills exactly one AUTO-F. That is not worth a gate that can under-warn a bidder.                           │
+// │                                                                                                              │
+// │ TO REVIVE: decide obligation STRUCTURALLY (document structure, section ownership), not by scanning for modal  │
+// │ words near a lexical subject match. Another guard is not the answer — see the harness memory note             │
+// │ feedback_negative_recognizers_leak_on_paraphrase. The suite in audit-force-grounding.test.ts is the           │
+// │ specification any replacement must satisfy: it carries every counterexample that defeated this one.           │
+// └──────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+//
 // REPORT-TRUTH #8 — A FABRICATED MODAL QUALIFIER (flag AUDIT_FORCE_GROUNDING, default OFF).
 //
 // THE DEFECT, from live run 61aaaa95 (W9123826QA032). Two findings told the customer:
@@ -34,6 +56,7 @@
 // machinery for it (AUDIT_SITEVISIT_MANDATORY_GROUNDED, card #703). Deterministic, $0, no model call.
 
 import { SITE_VISIT_MANDATORY_ATTENDANCE_RE } from "./audit-site-visit-patterns";
+import { fitToRender } from "./audit-absence-reconcile";
 
 export const FORCE_CORRECTED_PREFIX = "CORRECTED — ";
 
@@ -65,22 +88,6 @@ const SUBJECT_STOP = new Set([
   "but", "and", "or", "nor", "yet", "so", "if", "as", "than", "then", "when", "while", "which", "who", "whom", "whose",
   "it", "they", "them", "he", "she", "we", "you", "not", "no", "be", "been", "being",
 ]);
-
-/** The report renders `requirement` through `truncateOnWord(..., 400)` (src/app/audit/[id]/_view-model.ts, both the
- *  routed-row and matrix-title paths). Anything past that is silently dropped on the page while looking complete in
- *  the engine — which is how a correction can verify perfectly here and reach the customer with its evidence missing.
- *  So the module truncates to the SAME budget itself: what is persisted is then exactly what renders, and any loss is
- *  a deliberate, word-boundary one we chose rather than a silent tail-cut. Keep in step with the renderer. */
-export const RENDER_BUDGET = 400;
-export function fitToRender(s: string, budget = RENDER_BUDGET): string {
-  if (s.length <= budget) return s;
-  // The ellipsis counts against the budget. Slicing to `budget` and THEN appending it returned budget+1 characters,
-  // so the renderer would still shave the tail — the exact silent divergence this function exists to prevent.
-  const room = budget - 1;
-  const cut = s.slice(0, room);
-  const sp = cut.lastIndexOf(" ");
-  return (sp > room * 0.6 ? cut.slice(0, sp) : cut).replace(/[\s,;:—–-]+$/, "") + "…";
-}
 
 /** The noun phrase the force qualifier modifies, read out of the finding at runtime — never from a list, so this
  *  cannot become a site-visit special case. Two shapes:
