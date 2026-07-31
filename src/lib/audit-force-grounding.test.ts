@@ -3,7 +3,7 @@
 // The MUST-NOT set carries the weight. Stripping force from a real obligation softens a live requirement and
 // under-warns the bidder; failing to strip a fabricated one merely leaves today's behaviour in place. So the
 // negatives are exhaustive and the positives are few.
-import { groundModalForce, FORCE_CORRECTED_PREFIX } from "./audit-force-grounding";
+import { groundModalForce, FORCE_CORRECTED_PREFIX, FORCE_GROUNDING_INTERNALS_FOR_TEST as I } from "./audit-force-grounding";
 
 let pass = 0, fail = 0;
 const ok = (l: string, c: boolean) => { if (c) pass++; else { fail++; console.log(`  ✗ ${l}`); } };
@@ -80,6 +80,23 @@ ok("no double CORRECTED prefix on re-entry", (() => {
   const p2 = groundModalForce(p1.findings, SPEC_SOURCE);
   return !/CORRECTED — CORRECTED/.test(String(p2.findings[0].requirement));
 })());
+
+console.log("-- code-review regressions (5 findings, 2026-07-31) --");
+{ // predicative form must not leave a dangling copula
+  const r = run({ id: "p", requirement: "The site visit is optional. Separate registration is mandatory.", excerpt: "Site visit will be held 13 Aug." },
+                "Site visit will be held 13 Aug. Separate registration opens in July.");
+  const t = String(r.findings[0].requirement ?? "");
+  ok("predicative strip leaves no dangling copula", r.corrected.length === 1 && !/\bis\s*\./.test(t));
+  ok("subject reads naturally mid-sentence", !/this Separate/.test(t));
+}
+ok("sentencesNaming anchors on word boundaries (bond ≠ Bonding)", I.sentencesNaming("Bonding is waived for this acquisition.", "bond").length === 0);
+ok("sentencesNaming anchors on word boundaries (visit ≠ revisit)", I.sentencesNaming("The revisit was cancelled.", "visit").length === 0);
+ok("longer noun phrase keeps its head noun", I.qualifiedSubject("Mandatory attendance at the site visit on 13 Aug.", 0, "Mandatory") === "attendance site visit");
+{ // every emitted correction must fit the renderer's own budget
+  const r = run({ id: "b", requirement: "A mandatory site visit is scheduled at US Army Corps of Engineers-Valley Resident Office, 1810 Jefferson Blvd, Old West Sacramento, CA on 13 August 2026 at 11:00am PDT. FAR 52.237-1 (Site Visit) is incorporated by reference in Section L.", excerpt: SPEC_EXCERPT }, SPEC_SOURCE);
+  ok("correction fits the 400-char render budget", String(r.findings[0].requirement ?? "").length <= 400);
+  ok("correction survives ahead of the expendable tail", /does not state that this site visit is mandatory/.test(String(r.findings[0].requirement ?? "")));
+}
 
 console.log(`\nREPORT-TRUTH #8 · modal force grounded against the source: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

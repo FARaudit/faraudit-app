@@ -55,6 +55,22 @@ const OBLIGATION_MARKER = /\b(?:shall|must|mandatory|compulsory|obligatory|requi
 /** Words carrying no subject identity — dropped before the subject phrase is matched against the source. */
 const SUBJECT_STOP = new Set(["a", "an", "the", "this", "that", "these", "those", "at", "for", "during", "of", "to", "in", "on", "any", "all", "its", "their"]);
 
+/** The report renders `requirement` through `truncateOnWord(..., 400)` (src/app/audit/[id]/_view-model.ts, both the
+ *  routed-row and matrix-title paths). Anything past that is silently dropped on the page while looking complete in
+ *  the engine — which is how a correction can verify perfectly here and reach the customer with its evidence missing.
+ *  So the module truncates to the SAME budget itself: what is persisted is then exactly what renders, and any loss is
+ *  a deliberate, word-boundary one we chose rather than a silent tail-cut. Keep in step with the renderer. */
+export const RENDER_BUDGET = 400;
+export function fitToRender(s: string, budget = RENDER_BUDGET): string {
+  if (s.length <= budget) return s;
+  // The ellipsis counts against the budget. Slicing to `budget` and THEN appending it returned budget+1 characters,
+  // so the renderer would still shave the tail — the exact silent divergence this function exists to prevent.
+  const room = budget - 1;
+  const cut = s.slice(0, room);
+  const sp = cut.lastIndexOf(" ");
+  return (sp > room * 0.6 ? cut.slice(0, sp) : cut).replace(/[\s,;:—–-]+$/, "") + "…";
+}
+
 /** The noun phrase the force qualifier modifies, read out of the finding at runtime — never from a list, so this
  *  cannot become a site-visit special case. Two shapes:
  *    attributive  "Mandatory SITE VISIT: …"          → words after the qualifier
@@ -62,7 +78,11 @@ const SUBJECT_STOP = new Set(["a", "an", "the", "this", "that", "these", "those"
  *  Returns "" when no confident subject can be read, and an unreadable subject means the gate does not fire. */
 function qualifiedSubject(text: string, forceIdx: number, forceWord: string): string {
   const after = text.slice(forceIdx + forceWord.length);
-  const attributive = (after.match(/^[\s,]*((?:[A-Za-z][A-Za-z-]*\s+){0,3}[A-Za-z][A-Za-z-]*)/) || [])[1] || "";
+  // The cap was {0,3} — four tokens total — which silently decapitated longer phrases: "Mandatory attendance at the
+  // site visit" yielded "attendance site", losing the head noun and printing that nonsense back to the customer in
+  // the correction sentence. The stop-word filter and the copula cut below are what actually bound the phrase, so
+  // the token cap only needs to be a runaway guard, not a shaping rule.
+  const attributive = (after.match(/^[\s,]*((?:[A-Za-z][A-Za-z-]*\s+){0,6}[A-Za-z][A-Za-z-]*)/) || [])[1] || "";
   const attrWords = attributive.split(/\s+/).filter(Boolean);
   // Stop at a copula or auxiliary — past it we are in the predicate, not the subject.
   const cut = attrWords.findIndex((w) => /^(?:is|are|was|were|will|shall|has|have|had|may|can)$/i.test(w));
@@ -81,7 +101,10 @@ function qualifiedSubject(text: string, forceIdx: number, forceWord: string): st
 function sentencesNaming(source: string, subject: string): string[] {
   const words = subject.split(/\s+/).filter(Boolean).map((w) => w.replace(/[^A-Za-z-]/g, "")).filter(Boolean);
   if (!words.length) return [];
-  const re = new RegExp(words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+(?:\\w+\\s+){0,2}"), "i");
+  // \b at both ends: without them "bond" matched inside "Bonding is waived" and "visit" inside "The revisit was
+  // cancelled", so sentences that never discuss the subject counted as naming it — and one could then be selected as
+  // the verbatim proof quote and attributed to a subject it never mentions.
+  const re = new RegExp("\\b" + words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+(?:\\w+\\s+){0,2}") + "\\b", "i");
   return source.split(/(?<=[.!?])\s+|\n+/).filter((s) => re.test(s));
 }
 
@@ -139,7 +162,17 @@ export function groundModalForce<T extends { id?: string; requirement?: string; 
     // Strip the fabricated qualifier, keep the substance the lens actually reported (dates, places, clause refs —
     // all of it real and useful), then state the correction. SUBSTANCE LEADS: the customer needs the site visit
     // details first and the provenance note second, not a correction notice with the facts buried behind it.
+    // PREDICATIVE FORM FIRST. The strip below assumes the qualifier is ATTRIBUTIVE ("mandatory site visit"); when it
+    // is the predicate complement ("Separate registration is mandatory."), deleting the word leaves a dangling copula
+    // and an orphan period — "Separate registration is ." — published to the customer. There is nothing to salvage in
+    // such a sentence: its entire assertion IS the fabricated force, and the correction sentence below states the
+    // truth in its place. So drop the whole sentence rather than mutilate it. Sentences making some OTHER point are
+    // untouched, which is why this is a per-sentence filter and not a whole-text bail.
+    const predicative = new RegExp(`\\b(?:is|are|was|were|will\\s+be|shall\\s+be)\\s+${forceWord}\\b`, "i");
     const stripped = before
+      .split(/(?<=[.!?])\s+/)
+      .filter((s) => !predicative.test(s))
+      .join(" ")
       .replace(new RegExp(`\\b(?:a|an|the)\\s+${forceWord}\\b`, "gi"), "the")
       .replace(new RegExp(`\\b${forceWord}\\s*:?\\s*`, "gi"), "")
       .replace(/\s{2,}/g, " ")
@@ -156,14 +189,31 @@ export function groundModalForce<T extends { id?: string; requirement?: string; 
     const norm = (s: string) => s.replace(/\s+/g, " ").trim();
     const excerptNames = excerpt && sentencesNaming(excerpt, subject).length > 0;
     const best = excerptNames ? norm(excerpt) : norm([...named].sort((x, y) => y.length - x.length)[0]);
-    // Suppress the quote when the head already carries it — otherwise the correction repeats itself verbatim.
+    // Suppress the quote when the head already carries it — otherwise the correction spends its budget saying the
+    // same thing twice and the head's genuinely additional detail (clause refs, dates) is what falls off the end.
+    // Compared by OPENING WORDS, not by a raw character window: a 60-char prefix compare called two sentences
+    // different because the lens wrote "at the Valley Resident Office" where the source wrote "at US Army Corps of
+    // Engineers-Valley Resident Office", so the quote was kept and the FAR clause reference was pushed past the cut.
     const headNorm = norm(head).toLowerCase();
-    const redundant = best.length > 0 && headNorm.includes(best.slice(0, Math.min(60, best.length)).toLowerCase());
-    const proof = redundant ? "" : ` What the source says is: "${best.slice(0, 220)}"`;
+    const opening = norm(best).toLowerCase().split(" ").slice(0, 6).join(" ");
+    const redundant = opening.length > 0 && headNorm.includes(opening);
+    const proof = redundant ? "" : ` What the source says is: "${best.slice(0, 140)}"`;
 
-    const after = `${FORCE_CORRECTED_PREFIX}${head ? head.replace(/\s*$/, "").replace(/([^.!?])$/, "$1.") + " " : ""}` +
-      `This audit found no statement that it is ${forceWord.toLowerCase()}: the word appears nowhere in the source, ` +
-      `and no sentence about "${subject}" imposes attendance or eligibility consequences.${proof}`;
+    // ORDER IS A BUDGET DECISION, not a style one. Substance used to lead, which read better but put the correction
+    // and its proof quote LAST — and on the live specimen the whole quote fell past the 400-character render cut, so
+    // the customer was told a claim had been corrected and shown no evidence for it. Under a hard budget the two
+    // things that must survive are the correction and the source quote that lets the reader check it; the lens's
+    // restatement of the details is the expendable part, and much of it is inside the quote anyway. The subject is
+    // named up front so the sentence has an antecedent when it leads.
+    // The subject now sits mid-sentence, so a sentence-initial capital carried over from the finding reads as a
+    // typo ("this Separate registration"). Lower only a leading capital followed by lowercase — an all-caps token
+    // is an acronym and keeps its case.
+    const subjectInline = /^[A-Z][a-z]/.test(subject) ? subject.charAt(0).toLowerCase() + subject.slice(1) : subject;
+    const after = fitToRender(
+      `${FORCE_CORRECTED_PREFIX}the source does not state that this ${subjectInline} is ${forceWord.toLowerCase()}: ` +
+      `the word appears nowhere in it, and no sentence naming it imposes attendance or eligibility consequences.` +
+      `${proof}${head ? ` ${head.replace(/\s*$/, "").replace(/([^.!?])$/, "$1.")}` : ""}`,
+    );
 
     corrected.push({ id: f.id ?? "(unidentified)", force: forceWord, subject, before, after });
     return { ...f, requirement: after };

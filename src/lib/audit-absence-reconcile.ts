@@ -25,6 +25,8 @@
 // not analyzed". The customer ends up with a true statement instead of a false one, never with silence.
 
 import { docRegions } from "./audit-orchestrator";
+// Shared with REPORT-TRUTH #8 so both correctors hold the SAME budget as the renderer — one definition, one number.
+import { fitToRender } from "./audit-force-grounding";
 
 export interface AbsenceReconcileResult<T> { findings: T[]; refuted: Array<{ id: string; doc: string; kind: "present_and_analyzed" | "present_not_analyzed"; before: string; after: string }>; }
 
@@ -180,11 +182,17 @@ export function reconcileAbsenceClaims<T extends { id?: string; requirement?: st
     const analyzed = provenanceDocs.has(hit.name);
     // Replace the ASSERTION, keep the consequence the lens reasoned about — the risk it raised may still be real,
     // it was simply attached to a false premise.
+    // BUDGET. The report renders `requirement` through truncateOnWord(..., 400), so on the live specimen this text
+    // grew to 443 characters and the renderer silently cut the tail — which is precisely the CONSEQUENCE this module
+    // exists to carry forward ("...cannot build a compliant compliance matrix without it."). The correction survived
+    // and the risk it was preserving did not. Two changes hold the budget: the boilerplate loses its generic
+    // read-the-findings pointer (guidance is worth less than the actual risk), and the join is shortened. fitToRender
+    // is the backstop, so what is persisted equals what renders instead of diverging silently.
     const truth = analyzed
-      ? `${CORRECTED_PREFIX}"${hit.name}" IS in the analyzed source (${hit.chars.toLocaleString()} characters) and this audit drew findings from it; an earlier statement that it was missing was wrong. Read the findings citing that document.`
+      ? `${CORRECTED_PREFIX}"${hit.name}" IS in the analyzed source (${hit.chars.toLocaleString()} characters) and this audit drew findings from it; an earlier statement that it was missing was wrong.`
       : `${UNANALYZED_PREFIX}"${hit.name}" IS in the retrieved source (${hit.chars.toLocaleString()} characters), but this audit produced no grounded finding from it, so nothing here reflects its contents. It is not missing; it is unanalyzed. Read it directly.`;
     const conseq = consequenceOf(before);
-    const after = conseq ? `${truth} The risk raised against that document still stands: ${conseq}` : truth;
+    const after = fitToRender(conseq ? `${truth} Risk still raised: ${conseq}` : truth);
     refuted.push({ id: f.id ?? "(unidentified)", doc: hit.name, kind: analyzed ? "present_and_analyzed" : "present_not_analyzed", before, after });
     return { ...f, requirement: after };
   });
