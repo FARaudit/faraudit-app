@@ -16,6 +16,7 @@ import { renderV4ReportFromRow } from "@/lib/v4-report/report";
 import { renderV5ReportFromRow } from "@/lib/v5-report/report";
 import { renderAuditTransitionalState } from "./_render-states";
 import { isV2Finalizing, shouldGateExport } from "@/lib/audit-display";
+import { gateCause } from "@/lib/audit-gate-reason";
 import { injectRail } from "@/lib/nav/rail";
 
 export const dynamic = "force-dynamic";
@@ -207,7 +208,8 @@ function disableExport(html: string, subLabel: string): string {
 // while degraded; no auto-refresh (nothing left to stream). Self-contained
 // inject (no _template.html edit); references the report's own tokens so light
 // + dark both resolve correctly.
-function injectDegradedBanner(html: string): string {
+
+function injectDegradedBanner(html: string, audit?: Record<string, unknown>): string {
   const style =
     `<style>` +
     `.fa-degraded-banner{display:flex;gap:11px;align-items:flex-start;margin:0 0 18px;` +
@@ -220,15 +222,18 @@ function injectDegradedBanner(html: string): string {
     `[data-theme="dark"] .fa-degraded-banner{background:rgba(214,162,60,.12);border-color:transparent}` +
     `[data-theme="dark"] .fa-degraded-banner svg{color:#fcd34d}` +
     `</style>`;
+  const cause = audit ? gateCause(audit) : null;
   const banner =
     `<div class="fa-degraded-banner" role="status">` +
     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ` +
     `stroke-linecap="round" stroke-linejoin="round">` +
     `<path d="M10.3 4 2 18.2A1.6 1.6 0 0 0 3.4 20.6h17.2A1.6 1.6 0 0 0 22 18.2L13.7 4a1.6 1.6 0 0 0-2.7 0z"/>` +
     `<path d="M12 9.5v4M12 17h.01"/></svg>` +
-    `<span><b>Deep analysis unavailable for this run</b>The core report below is complete ` +
-    `and accurate. Export is disabled until a full analysis succeeds — ` +
-    `<a href="/audit">re-run</a> to try again.</span></div>`;
+    (cause
+      ? `<span><b>${cause.head}</b>${cause.body}</span></div>`
+      : `<span><b>Deep analysis unavailable for this run</b>The core report below is complete ` +
+        `and accurate. Export is disabled until a full analysis succeeds — ` +
+        `<a href="/audit">re-run</a> to try again.</span></div>`);
   let out = html;
   out = out.includes("</head>") ? out.replace("</head>", `${style}</head>`) : `${style}${out}`;
   // Top of the report content column, under the masthead (Design placement).
@@ -459,7 +464,7 @@ export async function GET(
     // status endpoint directly (no slug round-trip needed).
     html = injectFinalizingState(html, String(audit.id ?? id));
   } else if (gateExport) {
-    html = injectDegradedBanner(html);
+    html = injectDegradedBanner(html, audit as Record<string, unknown>);
   }
   // RC6 FIX B — Export PDF spinner. Only on a genuinely COMPLETE report, where
   // the export anchor is a live href. When export is gated, the anchor is
