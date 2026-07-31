@@ -173,6 +173,25 @@ export async function runAgenticExpert(
   return { findings: [], turns: maxTurns, dropped: 0, droppedInReadSource: 0, converged: false, sectionsRead: [...sectionsRead], docsRead: [...docsRead], attestations: [], trace };
 }
 
+/** STRUCTURAL STEP 1 (flag AUDIT_STRICT_FINDINGS_TOOL, default OFF ⇒ byte-identical tool definition).
+ *
+ *  The comment below has called this a "strict tool" since it was written, and it was not one: `strict: true`
+ *  appeared ZERO times anywhere in src/. The schema shape was enforced only by our own parse — the API guaranteed
+ *  nothing, so a malformed `input` stayed ours to catch, every run, forever.
+ *
+ *  `strict: true` makes the API guarantee `tool_use.input` validates against the schema exactly. It requires
+ *  `additionalProperties: false` + `required` at every level, which this schema already has throughout — so the
+ *  schema itself does not change. Only who enforces it does.
+ *
+ *  VERIFIED AT THE SURFACE, not from the documentation: the published support table omits Opus 4.6, which is the
+ *  model this engine actually runs. `_strict-probe.ts` sent THIS tool, with and without `strict`, to Opus 4.6 and
+ *  Opus 5 — all four accepted. A capability flag is not the same as the API accepting the parameter on your schema.
+ *
+ *  WHY IT IS FLAG-GATED. Tool definitions render at prompt position 0, so changing one invalidates the prompt cache
+ *  and moves the schema off prod-today — the same byte-identity constraint the attestations property below is bound
+ *  by (Gauntlet #349 F3). Flag-OFF returns the definition unchanged. */
+export const strictFindingsToolEnabled = () => process.env.AUDIT_STRICT_FINDINGS_TOOL === "true";
+
 /** The `submit_findings` tool — its input_schema FORCES a typed findings array (structured output via a
  *  strict tool). The expert calls it to terminate its loop; the harness parses the validated input. */
 export const SUBMIT_FINDINGS_TOOL = {
@@ -196,9 +215,12 @@ const ATTESTATIONS_PROP = { type: "array", items: { type: "string" }, descriptio
 /** submit_findings, with the attestations property added ONLY when attachment coverage is on. Flag-OFF ⇒ returns the
  *  base SUBMIT_FINDINGS_TOOL unchanged (byte-identical schema + prompt-cache prefix). */
 export function submitFindingsToolFor(enabled: boolean = ATTACHMENT_COVERAGE_ENABLED) {
-  if (!enabled) return SUBMIT_FINDINGS_TOOL;
-  const s = SUBMIT_FINDINGS_TOOL;
-  return { ...s, input_schema: { ...s.input_schema, properties: { ...s.input_schema.properties, attestations: ATTESTATIONS_PROP } } };
+  const base = enabled
+    ? (() => { const s = SUBMIT_FINDINGS_TOOL; return { ...s, input_schema: { ...s.input_schema, properties: { ...s.input_schema.properties, attestations: ATTESTATIONS_PROP } } }; })()
+    : SUBMIT_FINDINGS_TOOL;
+  // `strict` is applied LAST and only when armed, so flag-OFF returns the object identity above unchanged and the
+  // rendered tool bytes — and therefore the prompt-cache prefix — are exactly prod-today's.
+  return strictFindingsToolEnabled() ? { ...base, strict: true as const } : base;
 }
 
 type SdkBlock = { type: string; id?: string; name?: string; input?: Record<string, unknown> };
