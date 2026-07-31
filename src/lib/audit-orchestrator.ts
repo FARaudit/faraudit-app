@@ -386,7 +386,21 @@ function obligationsOf(text: string): { obligations: string[]; truncated: boolea
 // "for/program/concern" after) so a construction "SET ASIDE for re-use" is not read as a socioeconomic set-aside — the
 // specific program tokens (hubzone/sdvosb/8(a)/cmmc/clearance/debarred) stay standalone (no construction homograph). All
 // ELIGIBILITY_BAR_RE consumers are flag-ON only, so both the narrowing and the additions are flag-OFF byte-identical.
-const ELIGIBILITY_BAR_RE = /\b(?:shall|must|required to) (?:hold|possess|maintain|have) [\w /:.\-]{0,40}?(?:clearance|certif|accredit|licens|registration|registered|eligib)\b|\b(?:shall|must|required to) be (?:(?!\bby\b)[\w /:.\-]){0,40}?(?:certified|registered|accredited|licensed)\b|\bcleared (?:to|at|for)\s(?:the\s)?(?:secret|top[\s-]?secret|ts[\s/]?sci|sci|confidential|interim)\b|\bregistered in sam\b|\bactive sam(?:\.gov)? registration\b|\b(?:facility|security|personnel) clearance\b|\btop secret\b|\bsecret\b.{0,20}\bclearance\b|\bcmmc\b|\bas9100\b|\biso\s?9001\b|\bsize standard\b|\bdebarr?ed\b|\bexcluded part(?:y|ies)\b|\bsam exclusion\b|\beligib(?:le|ility)\b|\bineligible\b|\b(?:small[\s-]?business|total|competitive|partial|hubzone|sdvosb|wosb|edwosb|service[\s-]?disabled|women[\s-]?owned|veteran[\s-]?owned|8\s?\(?a\)?)[\s\w%,\-]{0,20}?set[\s-]?aside\b|\bset[\s-]?aside[\s\w%,\-]{0,20}?(?:small[\s-]?business|concern|program)\b|\brestricted to\s[\w,\- ]{0,30}?(?:small[\s-]?business|concern|offeror|firm|8\s?\(?a\)?|hubzone|sdvosb|wosb|edwosb|women[\s-]?owned|veteran[\s-]?owned|service[\s-]?disabled|certified|eligib)\b|\blimited to\s[\w,\- ]{0,30}?(?:small[\s-]?business|concern|offeror|firm|8\s?\(?a\)?|hubzone|sdvosb|wosb|edwosb|women[\s-]?owned|veteran[\s-]?owned|service[\s-]?disabled)\b|\b8\s?\(?a\)?\b|\bsdvosb\b|\bhubzone\b|\bwosb\b|\bedwosb\b|\bservice[\s-]?disabled\b|\bonly[^.!?]{0,55}?attend(?:ed|ing|ance)?[^.!?]{0,55}?(?:move forward|will be able|may (?:submit|propose|bid|participate)|proceed with the propos|eligible to (?:propose|bid))\b|\b(?:mandatory|required)[^.!?]{0,25}?(?:pre[\s-]?proposal |pre[\s-]?bid )?(?:site[\s-]?visit|conference)\b[^.!?]{0,55}?(?:attend|eligib|to (?:propose|bid|submit))\b/i;
+// NEGATION-PREFIX GUARD — 4th consumer of the `\bmandatory\b` leak (flag AUDIT_MANDATORY_NEGATION_GUARD,
+// default-OFF ⇒ the SAME object as prod-today, by identity, not merely by value). The mandatory-site-visit arm
+// below inherits the identical defect as SITE_VISIT_MANDATORY_ATTENDANCE_RE b1: a hyphen is a non-word
+// character, so `\bmandatory\b` matches inside "NON-MANDATORY" and a solicitation that says in terms the visit
+// is NOT mandatory is read here as an eligibility bar. This site is UPSTREAM of every guard the design panel
+// counted, so fixing only the pattern file would have left the leak live.
+const ELIGIBILITY_BAR_RE_BASE = /\b(?:shall|must|required to) (?:hold|possess|maintain|have) [\w /:.\-]{0,40}?(?:clearance|certif|accredit|licens|registration|registered|eligib)\b|\b(?:shall|must|required to) be (?:(?!\bby\b)[\w /:.\-]){0,40}?(?:certified|registered|accredited|licensed)\b|\bcleared (?:to|at|for)\s(?:the\s)?(?:secret|top[\s-]?secret|ts[\s/]?sci|sci|confidential|interim)\b|\bregistered in sam\b|\bactive sam(?:\.gov)? registration\b|\b(?:facility|security|personnel) clearance\b|\btop secret\b|\bsecret\b.{0,20}\bclearance\b|\bcmmc\b|\bas9100\b|\biso\s?9001\b|\bsize standard\b|\bdebarr?ed\b|\bexcluded part(?:y|ies)\b|\bsam exclusion\b|\beligib(?:le|ility)\b|\bineligible\b|\b(?:small[\s-]?business|total|competitive|partial|hubzone|sdvosb|wosb|edwosb|service[\s-]?disabled|women[\s-]?owned|veteran[\s-]?owned|8\s?\(?a\)?)[\s\w%,\-]{0,20}?set[\s-]?aside\b|\bset[\s-]?aside[\s\w%,\-]{0,20}?(?:small[\s-]?business|concern|program)\b|\brestricted to\s[\w,\- ]{0,30}?(?:small[\s-]?business|concern|offeror|firm|8\s?\(?a\)?|hubzone|sdvosb|wosb|edwosb|women[\s-]?owned|veteran[\s-]?owned|service[\s-]?disabled|certified|eligib)\b|\blimited to\s[\w,\- ]{0,30}?(?:small[\s-]?business|concern|offeror|firm|8\s?\(?a\)?|hubzone|sdvosb|wosb|edwosb|women[\s-]?owned|veteran[\s-]?owned|service[\s-]?disabled)\b|\b8\s?\(?a\)?\b|\bsdvosb\b|\bhubzone\b|\bwosb\b|\bedwosb\b|\bservice[\s-]?disabled\b|\bonly[^.!?]{0,55}?attend(?:ed|ing|ance)?[^.!?]{0,55}?(?:move forward|will be able|may (?:submit|propose|bid|participate)|proceed with the propos|eligible to (?:propose|bid))\b|\b(?:mandatory|required)[^.!?]{0,25}?(?:pre[\s-]?proposal |pre[\s-]?bid )?(?:site[\s-]?visit|conference)\b[^.!?]{0,55}?(?:attend|eligib|to (?:propose|bid|submit))\b/i;
+const ELIGIBILITY_BAR_RE = (() => {
+  if (process.env.AUDIT_MANDATORY_NEGATION_GUARD !== "true") return ELIGIBILITY_BAR_RE_BASE;  // identity — byte-identical
+  const NEEDLE = "\\b(?:mandatory|required)";
+  const src = ELIGIBILITY_BAR_RE_BASE.source;
+  // A silent no-op replace would ship an inert guard that reads as a fix — fail loudly instead.
+  if (!src.includes(NEEDLE)) throw new Error("ELIGIBILITY_BAR_RE: mandatory arm not found — negation guard would be inert");
+  return new RegExp(src.replace(NEEDLE, "(?<!non[-\\s])(?<!not\\s)" + NEEDLE), "i");
+})();
 
 // ── Commercial §L false-INCOMPLETE fix (ENGINE-5-ROOT #1, clears P0 S3-1 + S6-1) ──────────────
 // On a FAR Part-12 commercial (SF1449) buy, §L (Instructions to Offerors) is the INCORPORATED
@@ -1356,7 +1370,34 @@ export function emitNoticeBodyEligBarFindings(fullSource: string, findings: Type
       }
       // The requirement ALWAYS carries a CONCLUDED_RE-matchable frame ("site visit … was held/concluded"), with or
       // without a parseable date — the guard keys promotion off this frame, so it must match even when eventDate="".
-      requirement = `Mandatory site visit stated in the SAM notice body was held/concluded${eventDate ? ` ${eventDate}` : " (date not stated in the notice)"}; attendance is non-retroactive — this BARS AWARD unless the firm's attendance at the concluded site visit is confirmed (conditional-concluded, not a live gate): "${concludedSentence.slice(0, 200)}"`;
+      // ── HONEST CONCLUDED-VISIT LITERAL (flag AUDIT_SITEVISIT_LITERAL_HONEST, default-OFF ⇒ byte-identical) ──
+      // The legacy string below asserts two things the source does not support, flagged by the attorney seat of
+      // the 2026-07-31 design panel and confirmed against primary authority:
+      //   · "this BARS AWARD" — a legal conclusion. No FAR provision conditions eligibility on site-visit
+      //     attendance; 52.236-27 / 52.237-1 say offerors are "urged and expected to inspect the site". Whether a
+      //     non-attendee is excluded is agency discretion, not a rule we may state as fact.
+      //   · "attendance is non-retroactive" — our own invention, and false in practice: agencies have extended
+      //     closing dates specifically to let offerors attend (B-412198.2).
+      // It also called the visit "Mandatory" unconditionally, on a path that never tested mandatoriness.
+      // The replacement ATTRIBUTES rather than asserts, names the artifact that actually resolves it, and keeps
+      // the SITE_VISIT_CONCLUDED_RE-matchable frame the promotion guard keys on (asserted by cert).
+      if (process.env.AUDIT_SITEVISIT_LITERAL_HONEST === "true") {
+        // "Mandatory" only when mandatory-attendance is grounded in the notice — never as a default adjective.
+        const mandatoryGrounded = new RegExp(SITE_VISIT_MANDATORY_ATTENDANCE_RE.source, "i").test(concludedSentence)
+          || new RegExp(SITE_VISIT_MANDATORY_ATTENDANCE_RE.source, "i").test(outExcerpt);
+        // Name the attendance record ONLY if the notice itself says one was posted — otherwise pointing at an
+        // attachment we cannot see would be the same class of invention this fix exists to remove.
+        const rosterPosted = /sign[\s-]?in\s*sheet|attendance\s*(?:roster|sheet|record|list)/i.test(nNotice);
+        requirement = `${mandatoryGrounded ? "Mandatory site visit" : "Site visit"} stated in the SAM notice body was held/concluded${eventDate ? ` ${eventDate}` : " (date not stated in the notice)"}. `
+          + `${mandatoryGrounded
+              ? "The notice states attendance conditions eligibility, but whether a non-attendee is excluded is the Contracting Officer's call, not a rule the notice establishes. "
+              : "The notice does not state that attendance conditions eligibility. "}`
+          + `Confirm with the Contracting Officer whether your firm attended${rosterPosted ? ", against the site-visit attendance record the notice lists among the posted attachments" : " and ask for the site-visit attendance record"}. `
+          + `Raise it before the proposal due date — a challenge to a solicitation term is untimely once the closing time passes. `
+          + `Quoted: "${concludedSentence.slice(0, 200)}"`;
+      } else {
+        requirement = `Mandatory site visit stated in the SAM notice body was held/concluded${eventDate ? ` ${eventDate}` : " (date not stated in the notice)"}; attendance is non-retroactive — this BARS AWARD unless the firm's attendance at the concluded site visit is confirmed (conditional-concluded, not a live gate): "${concludedSentence.slice(0, 200)}"`;
+      }
     } else if (NOTICE_SITE_VISIT_RE.test(excerpt)) {
       requirement = `Mandatory site visit / pre-proposal conference stated in the SAM notice body — attendance gates eligibility to propose; verify and plan to attend: "${excerpt}"`;
     } else if (NOTICE_CLEARANCE_RE.test(excerpt)) {

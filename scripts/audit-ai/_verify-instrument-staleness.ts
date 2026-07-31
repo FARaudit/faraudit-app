@@ -14,7 +14,9 @@ const live = new Map<string, string>();
 for (const line of raw.split("\n")) { const m = /^(AUDIT_[A-Z0-9_]+)=(.*)$/.exec(line.trim()); if (m) live.set(m[1], m[2]); }
 if (!live.size) { console.log("could not read worker vars — cannot verify"); process.exit(2); }
 console.log(`stamped "live" config: ${stamped.size} AUDIT_* keys · worker: ${live.size} AUDIT_* keys\n`);
-const norm = (v: string | undefined) => (v === "true" ? "true" : v === undefined ? "(unset)" : v === "false" ? "false" : v);
+// Railway emits "True"/"False" for some keys; normalise BOTH sides or the comparator reports a phantom
+// disagreement that is pure capitalisation (it did, on AUDIT_AGENTIC_PRIMARY, after the re-capture).
+const norm = (v: string | undefined) => { if (v === undefined) return "(unset)"; const t = v.trim().toLowerCase(); return t === "true" ? "true" : t === "false" ? "false" : v; };
 const disagree: string[] = [];
 for (const [k, lv] of live) {
   const sv = stamped.get(k);
