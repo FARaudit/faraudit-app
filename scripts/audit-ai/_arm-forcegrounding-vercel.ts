@@ -1,16 +1,21 @@
-// ARM — AUDIT_DOC_ANALYZED_TRUTH + AUDIT_NONPRESENCE_HONESTY = true on VERCEL PRODUCTION (Rule 17 parity with the
-// audit-worker). CEO authorized in words 2026-07-30: "arm both then keep going".
+// ARM — AUDIT_FORCE_GROUNDING = true on VERCEL PRODUCTION (Rule 17 parity with the audit-worker: audit-executor-v3
+// runs on BOTH src/app/api/audit/route.ts and agents/audit-worker/worker.ts, so a flag set on one platform only
+// produces a seam that fires or stays dark depending on which door the customer came through).
 //
-// Step 1: POST each env var (plain, target=production). Step 2: read back from the live list and assert
-// value==="true" AND target includes production. Does NOT redeploy — that is a separate explicit step after read-back
-// verifies (Vercel env-snapshot trap: a running build carries the OLD snapshot, so a fresh GIT build is required).
-// Secrets are never echoed (Rules 32/46) — these are booleans, and only the boolean-ness is printed.
+// CEO authorized the arm in words 2026-07-30 ("arm"). DO NOT RUN BEFORE PR #380 IS MERGED AND DEPLOYED — setting the
+// variable while the deployed bundle has no seam reading it is a placebo arm, and worse, it would activate silently
+// at whatever unrelated deploy happens next rather than under a deliberate, verified arm. Order: merge → deploy →
+// arm → prove.
+//
+// Step 1: POST (plain, target=production). Step 2: read back from the live list and assert value==="true" AND target
+// includes production. Does NOT redeploy — that is a separate explicit step, because a running build carries the OLD
+// env snapshot and only a FRESH GIT BUILD picks the new value up. Booleans only; no secret is echoed (Rules 32/46).
 import dotenv from "dotenv";
 dotenv.config({ path: ".env.local", quiet: true });
 const TOKEN = process.env.VERCEL_TOKEN!;
 const PROJ = "prj_oqyqfwO0qJmkSAO9Hvt7VxbLUToD";
 const TEAM = "team_4FAowTLgslDBY6aZ0acPaES0";
-const KEYS = ["AUDIT_DOC_ANALYZED_TRUTH", "AUDIT_NONPRESENCE_HONESTY", "AUDIT_PANEL_COMPUTE_OR_ABSENT", "AUDIT_CLIN_SCHEDULE_EXTRACT", "AUDIT_ABSENCE_RECONCILE", "AUDIT_GATE_REASON_NAMED"];
+const KEYS = ["AUDIT_FORCE_GROUNDING"];
 
 (async () => {
   let allOk = true;
@@ -21,10 +26,8 @@ const KEYS = ["AUDIT_DOC_ANALYZED_TRUTH", "AUDIT_NONPRESENCE_HONESTY", "AUDIT_PA
       body: JSON.stringify({ key: KEY, value: "true", type: "plain", target: ["production"] }),
     });
     const pj = await post.json() as { error?: { code?: string } };
-    // ALREADY-EXISTS is not a failure, and Vercel does not signal it with 409 — it returns 400 carrying
-    // code ENV_CONFLICT (batch semantics, with the detail repeated in a `failed[]` array). Keying on the status alone
-    // marked a correctly-armed flag as FAIL. The READ-BACK below is the sole authority on the live value; a POST
-    // outcome is advisory only.
+    // ALREADY-EXISTS is not a failure, and Vercel signals it with 400 + ENV_CONFLICT, not 409. The READ-BACK below
+    // is the sole authority on the live value; a POST outcome is advisory only.
     const conflict = pj?.error?.code === "ENV_CONFLICT";
     console.log(`POST ${KEY} → HTTP ${post.status}${conflict ? " (already present — read-back decides)" : ""}`);
     if (!post.ok && !conflict) { console.log(`  body: ${JSON.stringify(pj).slice(0, 300)}`); allOk = false; }
@@ -43,6 +46,6 @@ const KEYS = ["AUDIT_DOC_ANALYZED_TRUTH", "AUDIT_NONPRESENCE_HONESTY", "AUDIT_PA
     if (!ok) allOk = false;
     console.log(`READ-BACK ${KEY}: type=${hit.type} value_is_true=${hit.value === "true"} target=${JSON.stringify(hit.target)} → ${ok ? "OK" : "FAIL"}`);
   }
-  console.log(`\nVERCEL ARM ${allOk ? "VERIFIED — both plain 'true' on production. Next: a FRESH GIT BUILD (env-snapshot trap: a redeploy of an existing build carries the OLD env)." : "FAIL"}`);
+  console.log(`\nVERCEL ARM ${allOk ? "VERIFIED — plain 'true' on production. Next: a FRESH GIT BUILD (env-snapshot trap), then _redeploy-prod.ts and poll READY." : "FAIL"}`);
   process.exit(allOk ? 0 : 1);
 })();
