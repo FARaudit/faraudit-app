@@ -1,5 +1,13 @@
 # Adversarial red-team memory index
 
+- [SITE-VISIT TYPING calibration — design F, panel D](gauntlet_sitevisit_typing_calibration.md) — **`live-flags.snapshot.json` is 32 flags STALE vs Railway and `_instrument` hard-pins 6 LIVE flags off while calling itself "live"**; `\bmandatory\b` matches inside `NON-MANDATORY` at 4 sites incl. `ELIGIBILITY_BAR_RE`, and PRODUCTION writes "Mandatory … BARS AWARD" over a non-mandatory excerpt; evidence table is n=2 sols; acceptance case has 0 candidates; VETcorp B-412198.2 — "the rule in Kocharian does not apply to negotiated procurements"
+
+- [RT8 ROUND 3 (9333902) — affirmative rule beat the treadmill, still over-refutes 4 ways; grade D](gauntlet_rt8_round3_affirmative_rule.md) — identity is name-token SUBSET (a superset filename refutes, on UNMUTATED prod data) and the residue test counts only `[A-Za-z]`, so digits/`§` read as "nothing else"; **my own proposed fix was REFUTED — token-equality kills 2 of 4 banked true positives on a filename typo (`Appropved`)**; falsify YOUR remediation against the true positives before you offer it
+
+- [RT8 ROUND 2 (0dfbcdd) — both "closed" P0s reopen; grade F, do not arm](gauntlet_rt8_round2_p0s_not_closed.md) — `MODIFIER_OBJECT` only looks LEFT of the token (possessive/noun-compound/hyphen still refute); `COORDINATED_SUBJECT` leaves the FINAL conjunct unguarded; heading-merge dies on a period, >6 words, or one intervening line; **the supplied diff was STALE by one revision** — regenerate `git diff main...HEAD` and md5 vs HEAD before tracing
+
+- [REPORT-TRUTH #7/#8 red-team 810c5fd8 — grade D, both flags ARMED](gauntlet_rt8_absence_force_grounding.md) — `\n+` sentence split hides "Offerors must attend." from condition (4); `INTERVENING_SUBJECT` lets a trailing prep phrase refute artifact B from doc A; requirement text IS re-parsed downstream (`PAST_RE` badge flip, `has_data_rights_finding`); `NOT ANALYZED — ` is not skipped by the force gate
+
 - [Panel 583df921 — 5 of 7 AUTO-Fs died as STALE-RENDER artifacts; F upheld anyway](panel_583df921_phantom_artifact_adjudication.md) — `render-audit.ts` sources `.env.local` (no REPORT-TRUTH flags) so local exports ≠ v5 production; attribute garbles to INGEST before calling fabrication; hunt hallucinated ABSENCE (3 false, PWS+WD physically in the run's own source); Rule 64 checks the excerpt, not the claim
 
 - [#747 verdict-inversion DESIGN Q2 — all 3 moves REJECT](design_verdict_inversion_q2.md) — M1 inverts the polarity of the SHIPPED `importanceOf`; probe: 11/11 disqualifier shapes demote incl. both of M1's OWN allowlist controls; M2's stale cert DELETES the 206-A caution; the "49-record" corpus is faithfully 14 / 6 sols / 0 committal poles
