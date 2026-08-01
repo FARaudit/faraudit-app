@@ -27,10 +27,41 @@ export const SITE_VISIT_CONCLUDED_RE = /\bsite[\s-]?(?:visit|tour|inspection)\b[
 // ("recommended but not required", "encouraged to attend", "attendance is optional", "registration is required to
 // obtain the drawings" [N6], "attendance at the optional site visit is not required" [N5]) stays UNMATCHED — the
 // tight no-`;`/`.` windows + the (?!not) guard on b3b prevent gap-swallow over-match. Verified match/no-match, 8 miss
-// + 7 must-not. Array-join form (sibling BOA_HOLDER_ONLY_EMIT_RE idiom) — tune the individual branches HERE, once.
+// + 7 must-not — EXTENDED 2026-07-31 with three NON-MANDATORY negation cases the original must-not set never
+// contained (see MANDATORY_NEGATION_LOOKBEHIND below and `_cert-mandatory-negation.ts`); the "7 must-not" figure
+// describes the pre-2026-07-31 battery only. Array-join form (sibling BOA_HOLDER_ONLY_EMIT_RE idiom) — tune the
+// individual branches HERE, once.
+/** NEGATION-PREFIX GUARD (flag AUDIT_MANDATORY_NEGATION_GUARD, default-OFF ⇒ empty string ⇒ the branch below is
+ *  byte-identical to prod-today).
+ *
+ *  `\bmandatory\b` matches INSIDE "NON-MANDATORY": a hyphen is a non-word character, so the word boundary the
+ *  branch relies on sits between "NON-" and "MANDATORY". A solicitation stating in terms that the site visit is
+ *  NOT mandatory therefore reads as mandatory, permissively, at every consumer of this regex.
+ *
+ *  Found by the TIER-V design panel 2026-07-31 and reproduced independently three ways. This file's own header
+ *  claims the pattern was "Verified match/no-match, 8 miss + 7 must-not" — the must-not set never contained a
+ *  NON-MANDATORY case, so the battery certified its author's imagination rather than the recognizer.
+ *
+ *  Lookbehind rather than a negated character class: the offending token is a PREFIX on the word we already match,
+ *  so the guard belongs where the prefix is, and every other branch keeps its exact shape.
+ *
+ *  SHARED, NOT COPIED — this file's own contract ("both sides MUST test the SAME regex … tune the branches HERE,
+ *  once"). `ELIGIBILITY_BAR_RE` in audit-orchestrator carries the identical defect on its own mandatory arm and
+ *  imports this constant rather than restating the lookbehind. The first version of this fix DID restate it, and
+ *  the two copies had already drifted before either shipped — one carried a redundant third lookbehind the other
+ *  lacked. That is the two-file drift this module exists to prevent. */
+export const MANDATORY_NEGATION_LOOKBEHIND = "(?<!non[-\\s])(?<!not\\s)";
+/** True when the negation guard should apply. `AUDIT_SITEVISIT_LITERAL_HONEST` IMPLIES it: that flag's honest
+ *  literal decides whether to print the word "Mandatory" by testing this very regex, so arming it against an
+ *  UNGUARDED pattern would make it assert "the notice states attendance conditions eligibility" on a notice that
+ *  says the opposite — a NEW fabrication the legacy string never made. The two flags are therefore not
+ *  independent, and the dependency is enforced here rather than left to whoever arms them. */
+export const mandatoryNegationGuardOn = (): boolean =>
+  process.env.AUDIT_MANDATORY_NEGATION_GUARD === "true" || process.env.AUDIT_SITEVISIT_LITERAL_HONEST === "true";
+const NEG = mandatoryNegationGuardOn() ? MANDATORY_NEGATION_LOOKBEHIND : "";
 export const SITE_VISIT_MANDATORY_ATTENDANCE_RE = new RegExp([
   // b1 — "mandatory" ADJ before an event noun ("mandatory site visit", "mandatory job walk")
-  "\\bmandatory\\b[^.\\n]{0,40}\\b(?:site[\\s-]?visit|attend|walk|tour|conference|job[\\s-]?walk)\\b",
+  NEG + "\\bmandatory\\b[^.\\n]{0,40}\\b(?:site[\\s-]?visit|attend|walk|tour|conference|job[\\s-]?walk)\\b",
   // b2 — event noun … is/are/will-be/shall-be mandatory
   "\\b(?:site[\\s-]?visit|walk[\\s-]?through|job[\\s-]?walk|tour|attendance|conference)\\b[^.\\n]{0,40}\\b(?:is|are|will\\s+be|shall\\s+be)\\s+mandatory\\b",
   // b2b — event NOUN + "is/are required | a prerequisite/precondition/condition" (tight no-;/. window blocks N6)

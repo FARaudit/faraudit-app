@@ -50,6 +50,9 @@ export type ConfigName = "live" | "flag-off-baseline";
 /** Arc flags — the ones this build introduces. They do NOT exist on the live worker, so live parity says
  *  nothing about them; each configuration must state them EXPLICITLY or they would be silently absent. */
 const ARC_FLAGS = [
+  // 2026-07-31 arc — omitted from the first cut, which is exactly the D-3 silent-absence this list prevents.
+  "AUDIT_MANDATORY_NEGATION_GUARD",
+  "AUDIT_SITEVISIT_LITERAL_HONEST",
   "AUDIT_TEMPORAL_VERDICT",
   "AUDIT_INCOMPLETE_PRECEDENCE",
   "AUDIT_SETASIDE_BACKSTOP",
@@ -191,6 +194,31 @@ const COMMIT = new Set(["BID", "BID_WITH_CAUTION"]);
  *  specimen in a new category can never silently escape the counter. */
 export const isFalseBid = (expected: string[], got: string) => COMMIT.has(got) && !expected.some((e) => COMMIT.has(e));
 export const isCommittal = (v: string) => COMMIT.has(v);
+
+// ── THE MISSING HALF OF THE RULER (2026-07-31) ───────────────────────────────────────────────────────────────
+//
+// Until now this file measured exactly ONE error direction. `isFalseBid` fires when we committed and should not
+// have; there was no counterpart anywhere in the repo — `falseNhr`, `missedBid`, `isFalseNoBid` all returned zero
+// search hits. Every gate, flag and guard in the verdict layer was therefore tuned against a ruler on which
+// adding a decline scored perfectly and cost nothing, forever.
+//
+// The consequence is measurable: deriveVerdict carries 17 NEEDS_HUMAN_REVIEW exits and 7 INCOMPLETE exits against
+// 2 BID exits — twelve ways to decline, two ways to commit. That is not accumulated cruft; it is the rational
+// response to half a ruler. A system optimised against one error direction drifts into the other one.
+//
+// FAILURE DIRECTION, stated plainly so this is never read as licence to loosen: a false BID can cost a bidder real
+// money and remains the cardinal sin. A false DECLINE is not free either — it is the product declining to do the
+// one job it exists for. Both are reported side by side, neither is traded off silently, and adding this counter
+// does not make it a gate. Gate is not a grade; metric is not a gate.
+export const isFalseDecline = (expected: string[], got: string) => !COMMIT.has(got) && expected.some((e) => COMMIT.has(e));
+
+/** Both directions in one pass, so a report can never quote one without the other. */
+export function verdictErrors(specimens: Array<{ exp: string[]; got: string }>) {
+  const falseBids = specimens.filter((s) => isFalseBid(s.exp, s.got)).length;
+  const falseDeclines = specimens.filter((s) => isFalseDecline(s.exp, s.got)).length;
+  const committal = specimens.filter((s) => isCommittal(s.got)).length;
+  return { n: specimens.length, falseBids, falseDeclines, committal, declineRate: specimens.length ? (specimens.length - committal) / specimens.length : 0 };
+}
 
 // ── BOTH-GUARD-STATE MEASUREMENT (D-4) ──────────────────────────────────────────────────────────────────────
 
