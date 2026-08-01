@@ -33,7 +33,7 @@ import { repairClippedExcerpts, repairHeadClippedExcerpts, applyHeadRepairsTo, a
 // swallowing a Top Secret facility-clearance bar and retiring the floor that should have fired.
 // `analyzedExcerptOf` returns the model's own excerpt when a repair widened it, and the excerpt itself
 // otherwise — so with the flag off, or on a finding no pass touched, every one of these is unchanged.
-import { SITE_VISIT_CONCLUDED_RE, BOA_HOLDER_ONLY_EMIT_RE, SITE_VISIT_MANDATORY_ATTENDANCE_RE } from "./audit-site-visit-patterns";
+import { SITE_VISIT_CONCLUDED_RE, BOA_HOLDER_ONLY_EMIT_RE, SITE_VISIT_MANDATORY_ATTENDANCE_RE, MANDATORY_NEGATION_LOOKBEHIND, mandatoryNegationGuardOn } from "./audit-site-visit-patterns";
 import { isPositiveSetAside, isInquiryDeadlineBenign, hasOperativeEligibilityLanguage, ELIGIBILITY_AUTHORITY_RE, deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyCyberRfiReconciliation, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyNmrNaicsDormancy, applyCheckboxStateFidelity, applyPerfObligationInsuranceTyping, applyClauseKeyedTypingFloor, applyStructuralAssertionFidelity, applyQuantityAmbiguityFidelity, applyFindingDedup, applyCrossFleetDedup, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, applyInquiryDeadlineBenignGuard, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, emitPerformanceUpkeepCaveats, deriveShadowVerdict, EngineInvariantError, type Decision, type ShadowVerdict } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
 import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type ReasonCaller, type EntailmentCaller, type JudgmentCost, zeroCost } from "./audit-judgment-layer";
@@ -394,12 +394,14 @@ function obligationsOf(text: string): { obligations: string[]; truncated: boolea
 // counted, so fixing only the pattern file would have left the leak live.
 const ELIGIBILITY_BAR_RE_BASE = /\b(?:shall|must|required to) (?:hold|possess|maintain|have) [\w /:.\-]{0,40}?(?:clearance|certif|accredit|licens|registration|registered|eligib)\b|\b(?:shall|must|required to) be (?:(?!\bby\b)[\w /:.\-]){0,40}?(?:certified|registered|accredited|licensed)\b|\bcleared (?:to|at|for)\s(?:the\s)?(?:secret|top[\s-]?secret|ts[\s/]?sci|sci|confidential|interim)\b|\bregistered in sam\b|\bactive sam(?:\.gov)? registration\b|\b(?:facility|security|personnel) clearance\b|\btop secret\b|\bsecret\b.{0,20}\bclearance\b|\bcmmc\b|\bas9100\b|\biso\s?9001\b|\bsize standard\b|\bdebarr?ed\b|\bexcluded part(?:y|ies)\b|\bsam exclusion\b|\beligib(?:le|ility)\b|\bineligible\b|\b(?:small[\s-]?business|total|competitive|partial|hubzone|sdvosb|wosb|edwosb|service[\s-]?disabled|women[\s-]?owned|veteran[\s-]?owned|8\s?\(?a\)?)[\s\w%,\-]{0,20}?set[\s-]?aside\b|\bset[\s-]?aside[\s\w%,\-]{0,20}?(?:small[\s-]?business|concern|program)\b|\brestricted to\s[\w,\- ]{0,30}?(?:small[\s-]?business|concern|offeror|firm|8\s?\(?a\)?|hubzone|sdvosb|wosb|edwosb|women[\s-]?owned|veteran[\s-]?owned|service[\s-]?disabled|certified|eligib)\b|\blimited to\s[\w,\- ]{0,30}?(?:small[\s-]?business|concern|offeror|firm|8\s?\(?a\)?|hubzone|sdvosb|wosb|edwosb|women[\s-]?owned|veteran[\s-]?owned|service[\s-]?disabled)\b|\b8\s?\(?a\)?\b|\bsdvosb\b|\bhubzone\b|\bwosb\b|\bedwosb\b|\bservice[\s-]?disabled\b|\bonly[^.!?]{0,55}?attend(?:ed|ing|ance)?[^.!?]{0,55}?(?:move forward|will be able|may (?:submit|propose|bid|participate)|proceed with the propos|eligible to (?:propose|bid))\b|\b(?:mandatory|required)[^.!?]{0,25}?(?:pre[\s-]?proposal |pre[\s-]?bid )?(?:site[\s-]?visit|conference)\b[^.!?]{0,55}?(?:attend|eligib|to (?:propose|bid|submit))\b/i;
 const ELIGIBILITY_BAR_RE = (() => {
-  if (process.env.AUDIT_MANDATORY_NEGATION_GUARD !== "true") return ELIGIBILITY_BAR_RE_BASE;  // identity — byte-identical
+  if (!mandatoryNegationGuardOn()) return ELIGIBILITY_BAR_RE_BASE;  // identity — byte-identical
   const NEEDLE = "\\b(?:mandatory|required)";
   const src = ELIGIBILITY_BAR_RE_BASE.source;
   // A silent no-op replace would ship an inert guard that reads as a fix — fail loudly instead.
   if (!src.includes(NEEDLE)) throw new Error("ELIGIBILITY_BAR_RE: mandatory arm not found — negation guard would be inert");
-  return new RegExp(src.replace(NEEDLE, "(?<!non[-\\s])(?<!not\\s)" + NEEDLE), "i");
+  // MANDATORY_NEGATION_LOOKBEHIND is IMPORTED, never restated: the first cut of this fix hand-copied the
+  // lookbehind here and the two copies drifted before either shipped. One constant, two consumers.
+  return new RegExp(src.replace(NEEDLE, MANDATORY_NEGATION_LOOKBEHIND + NEEDLE), "i");
 })();
 
 // ── Commercial §L false-INCOMPLETE fix (ENGINE-5-ROOT #1, clears P0 S3-1 + S6-1) ──────────────

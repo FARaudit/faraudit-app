@@ -50,6 +50,9 @@ export type ConfigName = "live" | "flag-off-baseline";
 /** Arc flags — the ones this build introduces. They do NOT exist on the live worker, so live parity says
  *  nothing about them; each configuration must state them EXPLICITLY or they would be silently absent. */
 const ARC_FLAGS = [
+  // 2026-07-31 arc — omitted from the first cut, which is exactly the D-3 silent-absence this list prevents.
+  "AUDIT_MANDATORY_NEGATION_GUARD",
+  "AUDIT_SITEVISIT_LITERAL_HONEST",
   "AUDIT_TEMPORAL_VERDICT",
   "AUDIT_INCOMPLETE_PRECEDENCE",
   "AUDIT_SETASIDE_BACKSTOP",
