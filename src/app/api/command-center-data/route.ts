@@ -6,7 +6,7 @@ import {
   fetchRecentAudits,
   fetchHomeStats,
 } from "@/lib/bd-os/queries";
-import { fetchLiveOpportunitiesScoped } from "@/lib/bd-os/live-opportunities";
+import { fetchLiveOpportunitiesScoped, WINDOW_DAYS } from "@/lib/bd-os/live-opportunities";
 import type { OpportunityRow } from "@/lib/bd-os/queries";
 import { poleToRecommendation } from "@/lib/verdict-pole";
 
@@ -237,6 +237,9 @@ export async function GET() {
       // window" is a real zero-result. Identical as a count — must not render alike.
       feedScopeSource:  feedScope?.source ?? null,
       feedScopeCodes:   feedScope?.codes ?? [],
+      // The posted-date window the live read actually used. Sent so the empty
+      // state can state it instead of hardcoding a number that would rot.
+      feedWindowDays:   WINDOW_DAYS,
       lastSync:         new Date().toISOString(),
 
       // ── Phase 4 additions ──

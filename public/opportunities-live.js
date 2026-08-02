@@ -267,6 +267,9 @@
       // is a profile the customer can fix in place and the other is a real
       // zero-result window — rendering them alike would hide the fixable one.
       window.DSO.FEED_SCOPE = data.feedScopeSource || null;
+      // null when the server did not say — the copy then omits the number
+      // rather than inventing one.
+      window.DSO.FEED_WINDOW_DAYS = Number.isFinite(data.feedWindowDays) ? data.feedWindowDays : null;
       window.DSO.FEED_STATE = mapped.length ? 'live'
         : (data.feedScopeSource === 'no-profile-codes' ? 'no-profile' : 'empty');
 

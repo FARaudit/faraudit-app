@@ -168,19 +168,70 @@ function filtered(){ return base().filter(o=>{
    it renders only from DSO.LAST_INGEST and is absent when nothing was measured.
    Every non-live feed state carries its own line: the count sentence asserts a
    live read, so it must not render unless one happened. */
+/* ── feed status copy: ONE SOURCE, two lengths ──
+   The header and the empty list state the same four facts. Authored separately
+   they drifted: the page said "Connecting" in one place and "Reading" in the
+   other about the same request, and named the window in one and not the other.
+   The two surfaces may differ in LENGTH; they may not disagree. */
+function windowPhrase(){
+  /* derived — the server sends feedWindowDays. Typing the number is the frozen
+     clock again. Absent → say less rather than guess. */
+  const w = (window.DSO && window.DSO.FEED_WINDOW_DAYS);
+  return w ? 'in the last '+w+' days' : 'in the window read';
+}
+const FEED_COPY = {
+  error: {
+    header: 'SAM.gov feed unavailable — no notices were read, so the counts below are empty, not zero.',
+    list:   'SAM.gov feed unavailable — no notices were read. This list is empty because the read failed.'
+  },
+  'no-profile': {
+    header: 'No NAICS codes on file — add the codes you sell under and this feed fills from <b>SAM.gov</b>.',
+    list:   'No NAICS codes on file — add the codes you sell under and this list fills from <b>SAM.gov</b>.'
+  },
+  empty: {
+    header: ()=>'Connected to the <b>live SAM.gov feed</b> — no notices under your NAICS codes '+windowPhrase()+'.',
+    /* the header two inches above already said "Connected" — the list's job is
+       the result, not the connection. */
+    list:   ()=>'No notices under your NAICS codes '+windowPhrase()+'.'
+  },
+  reading: { header: 'Reading the live SAM.gov feed…', list: 'Reading the live SAM.gov feed…' }
+};
+/* Anything not one of the three named states — including the initial 'loading'
+   and any state added later — resolves to READING. The neutral line is the only
+   safe default: on this page every surface that states feed status has had the
+   CONFIDENT branch as its fallback, and that is the shape being retired. */
+function feedCopy(state, surface){
+  const k = (state==='error'||state==='no-profile'||state==='empty') ? state : 'reading';
+  const v = FEED_COPY[k][surface];
+  return typeof v === 'function' ? v() : v;
+}
 function feedMetaHTML(state, shown, codeCount){
-  if(state==='error')      return 'SAM.gov feed unavailable — nothing shown below is sample data.';
-  if(state==='no-profile') return 'No NAICS codes on file — add the codes you sell under and this feed fills from <b>SAM.gov</b>.';
-  if(state==='empty')      return 'Connected to the <b>live SAM.gov feed</b> — no notices in the current window.';
-  if(!state)               return 'Connecting to the SAM.gov ingest…';
-  const ingest = (window.DSO && window.DSO.LAST_INGEST) ? ' · newest posted '+window.DSO.LAST_INGEST : '';
-  return '<b>'+shown+'</b> open notices read live from SAM.gov · '+
-    codeCount+' NAICS code'+(codeCount===1?'':'s')+' on your profile'+ingest;
+  if(state==='no-profile') return feedCopy(state,'header')+
+    '<button type="button" id="addNaicsBtn">Add NAICS codes</button>';
+  if(state==='error' || state==='empty') return feedCopy(state,'header');
+  if(state==='live'){
+    const ingest = (window.DSO && window.DSO.LAST_INGEST) ? ' · newest posted '+window.DSO.LAST_INGEST : '';
+    return '<b>'+shown+'</b> open notices read live from SAM.gov · '+
+      codeCount+' NAICS code'+(codeCount===1?'':'s')+' on your profile'+ingest;
+  }
+  return feedCopy(state,'header');
 }
 function renderHeader(){
   const rows = base();
   const codes = [...new Set(ROWS.map(o=>o.naics).filter(Boolean))].sort();
   $('feedMeta').innerHTML = feedMetaHTML((window.DSO && window.DSO.FEED_STATE) || null, rows.length, codes.length);
+  /* no-profile is the one state whose entire content is a required action, so it
+     gets a real control rather than prose — matching the certifications banner one
+     line below it. The editor is already mounted in the empty list, so send them
+     there instead of inventing a second surface. */
+  const naicsBtn = $('addNaicsBtn');
+  if(naicsBtn) naicsBtn.onclick = ()=>{
+    const target = $('plistProfile') || $('plist');
+    if(!target) return;
+    target.scrollIntoView({behavior:'smooth', block:'center'});
+    const field = target.querySelector('input,select,textarea');
+    if(field) field.focus({preventScroll:true});
+  };
   const counts = {}; ROWS.forEach(o=>{ if(o.naics) counts[o.naics]=(counts[o.naics]||0)+1; });
   $('hdrNaics').innerHTML = codes.map(c=>'<span class="npill'+(S.naics.has(c)?'':' off')+'" data-naics="'+c+'" title="'+counts[c]+' in this read">'+c+'</span>').join('');
   $('hdrNaics').querySelectorAll('[data-naics]').forEach(p=>p.onclick=()=>{
@@ -478,13 +529,16 @@ function renderList() {
   // as the other. This is the affordance the tab exists to protect.
   if (!ROWS.length) {
     $('plistCount').innerHTML = '';
-    $('plist').innerHTML = '<div class="empty">' + (
-      D.FEED_STATE === 'loading' ? 'Connecting to the SAM.gov feed…'
-      : D.FEED_STATE === 'error' ? 'SAM.gov feed unavailable — no data shown. Nothing on this page is sample data; retry shortly.'
-      : D.FEED_SCOPE === 'no-profile' ? 'No NAICS codes on file — add one and the feed scopes to it.'
-      : 'The live SAM.gov feed is empty right now — no notices matched in the current window.'
-    ) + '</div>';
-    if (window.FAR_PROFILE_EDITOR && $('plistProfile')) window.FAR_PROFILE_EDITOR.mount($('plistProfile'), {});
+    /* keyed on FEED_STATE, never FEED_SCOPE: feedScopeSource's value is
+       'no-profile-codes', so `FEED_SCOPE === 'no-profile'` could never match and
+       the fixable case fell through to "the feed is empty" — hiding exactly the
+       distinction live.js sets that field to protect. */
+    const noProfile = D.FEED_STATE === 'no-profile';
+    $('plist').innerHTML = '<div class="empty">' + feedCopy(D.FEED_STATE, 'list') + '</div>' +
+      (noProfile ? '<div id="plistProfile"></div>' : '');
+    /* the container is rendered HERE, in the only state that needs it. Without it
+       this mount never ran and the Add NAICS codes control had nothing to reach. */
+    if (noProfile && window.FAR_PROFILE_EDITOR && $('plistProfile')) window.FAR_PROFILE_EDITOR.mount($('plistProfile'), {});
     return;
   }
 
