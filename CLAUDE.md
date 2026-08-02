@@ -1,56 +1,59 @@
 @AGENTS.md
 @ceo/CLAUDE.md
 
-## SESSION UPDATE — May 2 2026
+## ⚠ `ceo/` IS GITIGNORED — the import above does NOT resolve everywhere
 
-### What shipped today:
-- home-s05: thin JSX shell · live Supabase data · commit 2603134
-- audit-intelligence-v1: full /audit/[id] report · PDF · KO email · commit 5c9860c
-- track1-full-execution-v1: outcome tracking · KO intelligence · recompete · agency · pre-sol · commit 49fecec
-- track1-tier1-intelligence-v1: incumbent · teaming · capability · kanban · live news · budget · commit 0675c39
-- track1-full-platform-v1: protest · CMMC · win probability · labor · subcontract · Stripe · Newsletter #3 · commit 31382b5
-- bullrize-full-signal-intelligence-v1: UW 6-feed · FRED · four-factor model · commit e469c17
-- faraudit-api-v2: FPDS-NG · Congress · Regulatory AI · SAM wages · commit 6f7862f
-- fix(email-ai): googleapis root fix · v3 OAuth Desktop app · all credentials rotated · commit 0d02d3c + 6ef36bf
+`.gitignore:45` ignores `ceo/`. That directory exists **only in the primary checkout**
+(`~/faraudit-app`). It is absent in every git worktree, on every other machine, and in CI — so
+**`@ceo/CLAUDE.md` silently loads nothing there.** The import is kept because it is correct where the
+directory exists; it is documented here because a silently-absent instruction file is worse than a
+missing one.
 
-### Railway fleet (9 services — all green):
-FARaudit: sam-ingest · Audit-AI · Recompete-AI · Regulatory-AI
-Bullrize: bullrize-cron · bullrize daily-pipeline
-Both: QA-AI
-CEO: apex-intel-pipeline · Email-AI
+That file holds the standing operating rules (response format, rule-number reservations, tool
+priority, trigger words). **If you are in a worktree and have not seen those rules, you are running
+without them** — say so rather than improvising a substitute.
 
-### Supabase migrations applied today:
-003_intelligence_layer.sql ✅
-004_incumbent_capability.sql ✅
-005_platform_intelligence.sql ✅
-006_apex_intelligence_apis.sql ✅
-bullrize/002_signal_intelligence_layer.sql ✅
-Total tables: apex-production 24 · bullrize-production 6
+`git worktree list` names the primary checkout first and marks every worktree with its branch. Use
+it rather than a relative path: worktrees live under the **primary checkout's**
+`.claude/worktrees/`, so that path does not resolve from inside one.
 
-### APIs wired today:
-FARaudit: FPDS-NG · GovInfo RSS · Federal Register · Congress.gov · SAM Wages
-Bullrize: Unusual Whales 6-feed · SEC EDGAR Form4+13D · FRED macro · Polygon.io hook
-Cross-platform: Four-factor signal model (FARaudit award → Bullrize ticker)
+**The primary checkout is usually NOT on `main`** — it sits on whatever branch was last worked. Check
+before running anything that uploads or deploys a working tree from it.
 
-### New env vars added:
-FRED_API_KEY · CONGRESS_API_KEY → Vercel + Railway shared variables
+## What this file is for
 
-### Email-AI resolution:
-Root cause: inactive OAuth client + credential mismatch
-Fix: created email-ai-v3 Desktop app in Google Cloud Console
-Old clients deleted: email-ai-v2 · faraudit-gmail-oauth
-New credentials: saved to 1Password as Email-AI OAuth v3
-Railway: GMAIL_CLIENT_ID · GMAIL_CLIENT_SECRET · GMAIL_REFRESH_TOKEN updated
+Durable, verified orientation. **Not** a status log: session state rots, and a stale fact here is
+read as current by every future session. Ship state lives in git history and the CEO digest.
 
-### Notion databases created today:
-API Tracker: https://www.notion.so/c69bc028f89a41578b29b04a713ca1e2
-25 APIs logged · 3 views (P0 · By Platform · Not Wired)
+## Deploys
 
-### PENDING — carry to next session:
-- home.html tab review (T1-1) — first thing tomorrow
-- Email-AI inbox verification — check cron logs
-- Digest overhaul visual review — open file:// link
-- Accountant AI build — expense tracking automation
-- Stripe env vars — complete billing setup
-- Newsletter #3 publish — Monday May 9 08:30 CT
-- Migration 005 note: subscriptions table now live — Stripe webhook ready
+One push fans out to two providers. On a commit to `main`, these report status and gate it:
+
+- **Vercel** — the Next.js app (`src/`) and every served asset in `public/`.
+- **Railway** — `audit-worker`, `Recompete-AI`, `Regulatory-AI`, `QA-AI`, `PDF Service`,
+  `email-ai-v3`. Project `responsible-perfection`.
+
+Railway services build only when a commit touches their **watch paths**, so a service showing no
+build for a frontend-only change is expected, not drift. A green Railway build is not proof the
+service is running your code — check the deployed sha (`railway ssh printenv
+RAILWAY_GIT_COMMIT_SHA`).
+
+`agents/sam-ingest/` is still in the tree, but **the Railway service was deleted**. Do not recreate
+it from the directory's existence.
+
+## Served assets have their own gates
+
+`public/*.html` and `public/*.js` are shipped verbatim to the browser — no bundler, no minifier, so
+**comments in them are public**. The gates in `test/public/` cover that surface and run with
+`npx tsx test/public/<name>.test.ts`. The two that apply to any served-asset change:
+
+- `_public-comment-leak.test.ts` — rationale and internal references must not ship. Explanation of
+  *why* a change was made belongs in the commit message.
+- `_inline-script-syntax.test.ts` — every inline `<script>` must parse.
+
+The rest are per-surface. Run the ones your diff touches before merging, not after.
+
+## Before merging a long-lived branch
+
+`main` moves daily. A branch proven against an older `main` is not proven — trial-merge it and re-run
+the affected gates on the **merged** result.
