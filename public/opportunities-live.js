@@ -208,11 +208,11 @@
     }
   }
 
-  // Topbar status pill + header feed-meta line — bound to the REAL fetch
-  // outcome, never a hardcoded "LIVE".
-  function setFeedStatus(state, opts) {
+  // Topbar status pill — bound to the REAL fetch outcome, never a hardcoded
+  // "LIVE". Owns #livePill ONLY; #feedMeta belongs to renderHeader in dso-app.js,
+  // which renders every feed state from feedMetaHTML().
+  function setFeedStatus(state) {
     const pill = document.getElementById('livePill');
-    const meta = document.getElementById('feedMeta');
     if (pill) {
       pill.classList.remove('err', 'wait');
       if (state === 'live' || state === 'empty') {
@@ -228,25 +228,6 @@
       } else {
         pill.classList.add('wait');
         pill.textContent = 'CONNECTING…';
-      }
-    }
-    if (meta) {
-      if (state === 'live') {
-        // LAST_INGEST is the newest row's SAM postedDate — a fact about the
-        // NOTICES, not about our fetch. Label it as such: the live feed itself
-        // is at most 30 minutes old (fetchLiveOpportunities' cache window), so
-        // "refreshed 22h ago" would understate freshness by a day.
-        const ingest = opts && opts.lastIngest ? ' · newest posted ' + opts.lastIngest : '';
-        meta.innerHTML = 'Live solicitations read from <b>SAM.gov</b> · ' +
-          opts.count + ' notice' + (opts.count === 1 ? '' : 's') + ingest;
-      } else if (state === 'no-profile') {
-        meta.innerHTML = 'No NAICS codes on file — add the codes you sell under and this feed fills from <b>SAM.gov</b>.';
-      } else if (state === 'empty') {
-        meta.innerHTML = 'Connected to the <b>live SAM.gov feed</b> — no notices in the current window.';
-      } else if (state === 'error') {
-        meta.textContent = 'SAM.gov feed unavailable — nothing shown below is sample data.';
-      } else {
-        meta.textContent = 'Connecting to the SAM.gov ingest…';
       }
     }
   }
@@ -304,7 +285,14 @@
         return !isNaN(t) && t > acc ? t : acc;
       }, 0);
       window.DSO.LAST_INGEST = newest ? relTime(new Date(newest).toISOString()) : null;
-      setFeedStatus(window.DSO.FEED_STATE, { count: mapped.length, lastIngest: window.DSO.LAST_INGEST });
+      setFeedStatus(window.DSO.FEED_STATE);
+      // Refresh the header NOW that FEED_STATE and LAST_INGEST are known, rather
+      // than waiting on the watch/pipeline hydration below. renderHeader owns
+      // #feedMeta, so without this the line would sit on "Connecting to the
+      // SAM.gov ingest…" for the length of two more round trips.
+      if (window.DSO_APP && typeof window.DSO_APP.renderHeader === 'function') {
+        window.DSO_APP.renderHeader();
+      }
       // The rail ships no pill; this page has now MEASURED the feed, so it may
       // assert one. 'empty' is still a live feed — it answered with zero rows.
       if (typeof window.setRailLiveBadge === 'function') {
