@@ -163,6 +163,18 @@ export interface IngestionFileMeta {
   bytes: number | null;
   ingested: boolean;
   reason?: string;
+  // DENOMINATOR RECONCILIATION (flag AUDIT_INGEST_DENOMINATOR_RECONCILE). HTTP status of the download attempt,
+  // recorded ONLY on failure, so a definitively-ABSENT document (404/410 — SAM no longer serves it) is
+  // distinguishable from an UNKNOWN failure (timeout, 5xx, network). Before this field every failure collapsed
+  // into one reason string, so the two could not be told apart and the safe reading — "count it as unretrieved"
+  // — had to be applied to both, which is what manufactured the phantom gap.
+  http_status?: number;
+  // TRUE only when SAM's own error body said "The resource has been deleted." — the server asserting absence,
+  // never an inference of ours. This, not the status code, is the evidence the denominator reconciliation keys on.
+  sam_deleted?: boolean;
+  // Set when the entry was PROVEN absent from the current posted set and excluded from the completeness
+  // denominator. Never set on an unknown failure. See supersededManifestEntries.
+  superseded?: boolean;
   // Silent-partial guard (Brain card 224 fork 2). `ingested` means the BYTES arrived; `has_text` means the
   // TEXT-ONLY agentic engine actually received machine-readable content (meaningfulCharCount ≥ the text-block
   // floor). A scanned/image binding doc is ingested:true yet has_text:false — bytes rode as a vision block the
@@ -949,13 +961,32 @@ async function normalizeToPdf(name: string, raw: Buffer): Promise<{ buf: Buffer;
   return null;
 }
 
-async function downloadPdf(url: string, name = ""): Promise<{ buf: Buffer; sourceTruncated: boolean } | null> {
+// `statusOut` receives the HTTP status of the attempt so the CALLER can tell a definitively-absent document
+// (404/410) from an unknown failure. It is an out-param rather than a changed return type deliberately: the
+// success path stays byte-identical, and a caller that does not pass it behaves exactly as before.
+// SAM's OWN STATEMENT that a resource is gone. Probed live 2026-08-02 on W50S6U26QA019: a superseded attachment
+// answers HTTP **400** (not 404/410) with an application/json body:
+//   {"errors":{"status":"BAD_REQUEST","code":"BAD_REQUEST","message":"The resource has been deleted.", …}}
+// The STATUS alone is unusable as evidence — 400 is equally the shape of a malformed request for a document that
+// very much exists, and treating that as "absent" is the false-COMPLETE direction. The BODY is unambiguous, and it
+// is the server asserting deletion rather than us inferring it from arithmetic. So the marker is the sentence.
+const SAM_DELETED_RESOURCE_RE = /resource has been deleted/i;
+async function downloadPdf(url: string, name = "", statusOut?: { status: number | null; deleted?: boolean }): Promise<{ buf: Buffer; sourceTruncated: boolean } | null> {
   try {
     if (!SAM_API_KEY) return null;
     // SSRF + key-leak guard (shared with sam-pdf.ts): host-allowlist the untrusted
     // attachment URL before the key is appended; manual redirect with revalidation.
     const res = await samFetchWithKey(url, SAM_API_KEY, FETCH_TIMEOUT_MS);
-    if (!res.ok) return null;
+    if (statusOut) statusOut.status = res.status;
+    if (!res.ok) {
+      // Read the error body ONLY on failure, and only far enough to see the marker. A body that cannot be read,
+      // or that does not carry SAM's deletion sentence, leaves `deleted` unset ⇒ the entry keeps counting as
+      // unretrieved ⇒ today's conservative behaviour is preserved for every ambiguous failure.
+      if (statusOut) {
+        try { statusOut.deleted = SAM_DELETED_RESOURCE_RE.test((await res.text()).slice(0, 2000)); } catch { /* unreadable body ⇒ not evidence of deletion */ }
+      }
+      return null;
+    }
     const buf = Buffer.from(await res.arrayBuffer());
     // %PDF magic byte → native PDF; else route .docx/.xlsx through extraction.
     return await normalizeToPdf(name, buf);
@@ -1123,6 +1154,43 @@ export function applyTokenBudget<T extends { role: DocumentPlanEntry["role"]; to
  *  unretrieved doc so files_total reflects what EXISTS. `resourceLinksLen` 0 (uploads, v2-lag watcher) ⇒ [] ⇒
  *  byte-identical. Never REDUCES the total: v3-enumerated-more (resourceLinks < manifest) ⇒ [] (fail-safe, trust
  *  the larger in-hand count). Pure — $0 gauntlet-testable. */
+// DENOMINATOR RECONCILIATION (flag AUDIT_INGEST_DENOMINATOR_RECONCILE, default OFF ⇒ returns 0 ⇒ byte-identical).
+//
+// THE DEFECT. SAM exposes TWO enumerations of a notice's documents: the v3 attachments manifest
+// (`_embedded.opportunityAttachmentList`) and the v2 opportunity's `resourceLinks`. On an AMENDED solicitation the
+// v3 manifest RETAINS superseded versions that SAM no longer serves. Proven live on W50S6U26QA019 (2026-08-02):
+// v3 enumerated 12, v2 published 10, all 10 v2 links returned HTTP 200 and all 10 ingested — and the 2 extras were
+// `Solicitation - …0001.pdf` and `Attachment_0001_…_20260428.pdf`, whose `…0002` / `…_v2` successors ingested fine.
+// Those 2 were counted as unretrieved, which flips BOTH `files_ingested >= files_total` AND `overflow` in
+// agenticManifestComplete → documents_complete=false → the verdict caps to INCOMPLETE. A guaranteed FALSE DECLINE
+// on any solicitation whose v3 manifest keeps old versions — i.e. precisely the amended ones.
+//
+// WHY THIS IS NOT "TRUST THE SMALLER ENUMERATION". ROOT-2 deliberately never reduces the total, and that stance is
+// RIGHT: if v2 lags and two REAL documents fail to download, trusting v2 would manufacture a false COMPLETE — the
+// catastrophic direction. So a counting argument alone ("all 10 posted docs arrived, so the 2 extras must be
+// stale") is NOT sufficient, and is not what this does.
+//
+// THE RULE IS SAM'S OWN STATEMENT, NOT ARITHMETIC AND NOT A STATUS CODE. An entry is excluded ONLY IF SAM's error
+// body said "The resource has been deleted." (`sam_deleted`). The first cut of this fix keyed on 404/410 and was
+// INERT on the very package it was written for — the live probe showed SAM answers **HTTP 400** for a superseded
+// attachment. Widening to "400 means gone" would have been the false-COMPLETE direction, since 400 is equally the
+// shape of a malformed request for a document that exists. The body is unambiguous and is the server asserting
+// deletion. A timeout, a 5xx, an unreadable body or any 4xx WITHOUT that sentence leaves `sam_deleted` unset and
+// the entry KEEPS counting as unretrieved, exactly as today. Two further guards, both required:
+//   • `resourceLinksLen > 0` — with no independent v2 enumeration there is nothing to reconcile against, so do nothing.
+//   • `ingestedCount >= resourceLinksLen` — every currently-posted document must already be in hand. If even one
+//     posted doc is missing, this is a real retrieval gap and NOTHING is excluded.
+// Fails toward counting: every uncertain case keeps the old, conservative behaviour.
+export function supersededManifestEntries(
+  files: IngestionFileMeta[],
+  resourceLinksLen: number,
+  ingestedCount: number,
+): IngestionFileMeta[] {
+  if (resourceLinksLen <= 0) return [];                 // no independent enumeration → nothing to reconcile against
+  if (ingestedCount < resourceLinksLen) return [];      // a currently-posted doc is missing → a REAL gap; exclude nothing
+  return files.filter((f) => !f.ingested && f.sam_deleted === true);
+}
+
 export function existsShortfallEntries(manifestLen: number, resourceLinksLen: number): IngestionFileMeta[] {
   const shortfall = Math.max(0, resourceLinksLen - manifestLen);
   const out: IngestionFileMeta[] = [];
@@ -1169,9 +1237,10 @@ export async function assembleSamDocumentSet(
       files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: skip?.reason ?? "not planned" });
       continue;
     }
-    const dl = await downloadPdf(e.url, e.name);
+    const st: { status: number | null; deleted?: boolean } = { status: null };
+    const dl = await downloadPdf(e.url, e.name, st);
     if (!dl) {
-      files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: nonPdfKind(e.name) ? "text extraction failed (.docx/.xlsx/.txt)" : "download failed or not a PDF" });
+      files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: nonPdfKind(e.name) ? "text extraction failed (.docx/.xlsx/.txt)" : "download failed or not a PDF", ...(st.status != null ? { http_status: st.status } : {}), ...(st.deleted ? { sam_deleted: true } : {}) });
       continue;
     }
     const buf = dl.buf;
@@ -1262,8 +1331,21 @@ export async function assembleSamDocumentSet(
   const nearDupCount = reconcileNearDuplicates(files);
   // skippedCount is the BUDGET/planning-skip denominator for the overflow message — computed BEFORE the ROOT-2
   // degraded-retrieval placeholders below, so a manifest blip is never mislabeled as a budget overflow.
-  const skippedCount = files.filter((f) => !f.ingested).length;
-  const distinctTotal = plan.length - nearDupCount;
+  // DENOMINATOR RECONCILIATION (flag AUDIT_INGEST_DENOMINATOR_RECONCILE, default OFF ⇒ empty ⇒ byte-identical).
+  // Entries SAM answered 404/410 for, when every currently-posted document is already in hand, are superseded
+  // versions the v3 manifest kept — not unretrieved documents. Removed from BOTH the denominator and the skipped
+  // count, so neither `files_ingested >= files_total` nor `overflow` reports a gap that does not exist. They stay
+  // LISTED (never silently dropped), re-labelled with what actually happened.
+  const superseded = process.env.AUDIT_INGEST_DENOMINATOR_RECONCILE === "true"
+    ? supersededManifestEntries(files, resourceLinks?.length ?? 0, ingestedCount)
+    : [];
+  for (const f of superseded) {
+    f.superseded = true;
+    f.reason = `no longer posted on SAM (HTTP ${f.http_status}) — a superseded version retained in the v3 attachments manifest; excluded from the completeness denominator`;
+  }
+  if (superseded.length) console.warn(`[ingest] denominator reconciled: ${superseded.length} superseded manifest entr${superseded.length === 1 ? "y" : "ies"} excluded (all ${resourceLinks?.length ?? 0} currently-posted documents retrieved): ${superseded.map((f) => f.name).join(", ")}`);
+  const skippedCount = files.filter((f) => !f.ingested && !f.superseded).length;
+  const distinctTotal = plan.length - nearDupCount - superseded.length;
   // ROOT-2 (Brain #648) — EXISTS denominator. When the v3 manifest enumerated FEWER attachments than the v2 notice
   // advertised (resourceLinks), known docs were never retrieved (seq-4: v3 degraded to 1 entry, the route held 6
   // v2 links, never cross-checked → a 3KB stub of a 180K package was ratified docs_complete=true). Each missing
