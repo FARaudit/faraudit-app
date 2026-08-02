@@ -169,18 +169,48 @@ function filtered(){ return base().filter(o=>{
    Every non-live feed state carries its own line: the count sentence asserts a
    live read, so it must not render unless one happened. */
 function feedMetaHTML(state, shown, codeCount){
-  if(state==='error')      return 'SAM.gov feed unavailable — nothing shown below is sample data.';
-  if(state==='no-profile') return 'No NAICS codes on file — add the codes you sell under and this feed fills from <b>SAM.gov</b>.';
-  if(state==='empty')      return 'Connected to the <b>live SAM.gov feed</b> — no notices in the current window.';
-  if(!state)               return 'Connecting to the SAM.gov ingest…';
-  const ingest = (window.DSO && window.DSO.LAST_INGEST) ? ' · newest posted '+window.DSO.LAST_INGEST : '';
-  return '<b>'+shown+'</b> open notices read live from SAM.gov · '+
-    codeCount+' NAICS code'+(codeCount===1?'':'s')+' on your profile'+ingest;
+  /* One verb — READ — across all five states, and ONLY the live state states a
+     count. During an outage the tiles all show 0, and on this page a zero is a
+     finding: the funnel's two −0 rows mean "we looked and removed nothing". Those
+     zeros are not results here, and this line is the only thing positioned to say
+     so. */
+  if(state==='error')      return 'SAM.gov feed unavailable — no notices were read, so the counts below are empty, not zero.';
+  if(state==='no-profile') return 'No NAICS codes on file — add the codes you sell under and this feed fills from <b>SAM.gov</b>.'+
+                                  '<button type="button" id="addNaicsBtn">Add NAICS codes</button>';
+  if(state==='empty'){
+    /* The window is DERIVED (server sends feedWindowDays). Typing the number here
+       would be the frozen-clock defect again — right today, silently wrong the day
+       WINDOW_DAYS changes. Absent → say less rather than guess. */
+    const w = (window.DSO && window.DSO.FEED_WINDOW_DAYS);
+    return 'Connected to the <b>live SAM.gov feed</b> — no notices under your NAICS codes'+
+      (w ? ' in the last '+w+' days.' : ' in the window read.');
+  }
+  if(state==='live'){
+    const ingest = (window.DSO && window.DSO.LAST_INGEST) ? ' · newest posted '+window.DSO.LAST_INGEST : '';
+    return '<b>'+shown+'</b> open notices read live from SAM.gov · '+
+      codeCount+' NAICS code'+(codeCount===1?'':'s')+' on your profile'+ingest;
+  }
+  /* Not yet measured, or a state this function does not recognise. The count
+     sentence must be REACHED, never fallen into: as a default branch it would
+     assert a live read for any state added later. */
+  return 'Reading the live SAM.gov feed…';
 }
 function renderHeader(){
   const rows = base();
   const codes = [...new Set(ROWS.map(o=>o.naics).filter(Boolean))].sort();
   $('feedMeta').innerHTML = feedMetaHTML((window.DSO && window.DSO.FEED_STATE) || null, rows.length, codes.length);
+  /* no-profile is the one state whose entire content is a required action, so it
+     gets a real control rather than prose — matching the certifications banner one
+     line below it. The editor is already mounted in the empty list, so send them
+     there instead of inventing a second surface. */
+  const naicsBtn = $('addNaicsBtn');
+  if(naicsBtn) naicsBtn.onclick = ()=>{
+    const target = $('plistProfile') || $('plist');
+    if(!target) return;
+    target.scrollIntoView({behavior:'smooth', block:'center'});
+    const field = target.querySelector('input,select,textarea');
+    if(field) field.focus({preventScroll:true});
+  };
   const counts = {}; ROWS.forEach(o=>{ if(o.naics) counts[o.naics]=(counts[o.naics]||0)+1; });
   $('hdrNaics').innerHTML = codes.map(c=>'<span class="npill'+(S.naics.has(c)?'':' off')+'" data-naics="'+c+'" title="'+counts[c]+' in this read">'+c+'</span>').join('');
   $('hdrNaics').querySelectorAll('[data-naics]').forEach(p=>p.onclick=()=>{

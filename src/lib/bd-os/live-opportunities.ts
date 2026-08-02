@@ -35,7 +35,10 @@ const DEFAULT_NAICS = "336413,332710,332720,332999,334511";
 // manufacturing NAICS, so 1000 (SAM's per-call max) never truncates in
 // practice; if it ever does we log the shortfall instead of hiding it.
 const PAGE_LIMIT = 1000;
-const WINDOW_DAYS = 30;
+// EXPORTED because the client STATES this number in the empty-feed line.
+// Typing "30" into the copy would be the frozen-clock defect again: correct
+// the day it was written, silently wrong the day this changes.
+export const WINDOW_DAYS = 30;
 const FEED_CAP = 200; // parity with the old fetchOpportunities({ limit: 200 })
 
 function fmtSamDate(d: Date): string {

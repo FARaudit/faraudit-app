@@ -104,12 +104,36 @@ console.log("\n═══ 5 · THE NON-LIVE STATES SURVIVED THE MOVE ═══");
 for (const [state, needle] of [
   ["error", "feed unavailable"],
   ["no-profile", "No NAICS codes on file"],
-  ["empty", "no notices in the current window"],
-  ["loading", "Connecting to the SAM.gov ingest"],
+  ["empty", "no notices under your NAICS codes"],
+  ["loading/unknown", "Reading the live SAM.gov feed"],
 ] as const) {
   ok(metaFn.includes(needle), `the ${state} state still has its own copy`, `"${needle}"`);
 }
-ok(/state\s*===\s*['"]error['"]/.test(metaFn), "and the live line is gated behind the state branch");
+
+console.log("\n═══ 5b · THE COUNT SENTENCE IS REACHED, NEVER FALLEN INTO ═══");
+// Design's finding on card 792: the count line used to be the DEFAULT branch, so
+// any state added later — stale, cached, partial, a typo — would print "N open
+// notices read live from SAM.gov" with no live read behind it. The honesty
+// contract has to hold by construction, not by the state list staying short.
+ok(/if\s*\(\s*state\s*===\s*['"]live['"]\s*\)/.test(metaFn),
+  "the count sentence requires state==='live' explicitly");
+{
+  const returns = metaFn.match(/return\s+[^;]+;/g) || [];
+  const last = returns[returns.length - 1] || "";
+  ok(returns.length > 3, "the return set was actually extracted", `${returns.length} returns`);
+  ok(!/open notices read live/.test(last),
+    "the fall-through return is NOT the count sentence", last.slice(0, 52).replace(/\s+/g, " "));
+  ok(/Reading the live SAM\.gov feed/.test(last), "…it is the neutral reading line");
+}
+
+console.log("\n═══ 5c · THE WINDOW IS DERIVED, NOT TYPED ═══");
+// Same class as the frozen clock: "30 days" typed into copy is correct today and
+// silently wrong the day WINDOW_DAYS changes.
+ok(/FEED_WINDOW_DAYS/.test(metaFn), "the empty line reads DSO.FEED_WINDOW_DAYS");
+ok(!/last\s+\d+\s+days/.test(metaFn), "no window length is hardcoded in the copy",
+  (metaFn.match(/last\s+\d+\s+days/) || ["none hardcoded"])[0]);
+ok(/FEED_WINDOW_DAYS/.test(liveSrc), "live.js publishes it from the server response");
+ok(/in the window read/.test(metaFn), "and the number is omitted when the server did not send one");
 
 console.log("\n═══ 6 · PLANTED POSITIVES — prove this gate can fail ═══");
 {
@@ -129,6 +153,16 @@ console.log("\n═══ 6 · PLANTED POSITIVES — prove this gate can fail ═
 
   // P7 a missing function must report zero, never pass silently
   ok(fnSource("nothing here", "renderHeader") === "", "P7 a missing function extracts to empty, so §1 fails loudly");
+
+  // P8 the fall-through defect Design found — restore it and §5b must fire
+  const fellThrough = metaFn.replace(/if\s*\(\s*state\s*===\s*['"]live['"]\s*\)\s*\{/, "{");
+  ok(fellThrough !== metaFn, "P8a the planted fall-through applied");
+  ok(!/if\s*\(\s*state\s*===\s*['"]live['"]\s*\)/.test(fellThrough),
+    "P8b removing the live guard IS caught");
+
+  // P9 a hardcoded window must be caught
+  const typedWindow = "return 'no notices under your NAICS codes in the last 30 days.';";
+  ok(/last\s+\d+\s+days/.test(typedWindow), "P9 a typed window length IS caught");
 }
 
 console.log(`\n══════ ${pass} passed · ${fail} failed ══════`);
