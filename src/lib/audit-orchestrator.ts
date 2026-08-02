@@ -819,8 +819,40 @@ export function documentsCovered(
       // (not the capped obligationsOf list), mirroring the attestation floor at ELIGIBILITY_BAR_RE.exec below. Flag-gated
       // on crossAttGate (opts present) ⇒ flag-OFF byte-identical. Card #370 R2: floor is ELIGIBILITY-only — a verb-less
       // performance "shall not" no longer fires here (routes to Gate-4), only a true eligibility/disqualifier bar does.
-      if (!(crossAttGate && ELIGIBILITY_BAR_RE.test(r.text))) continue;         // no eligibility-bar (or flag off) ⇒ genuinely-read thin binding attachment is covered
-      console.warn(`[coverage] read_no_obligation valve REJECTED for "${r.name}" — ELIGIBILITY-BAR language present though obligationsOf found no obligation SENTENCE (verb-less bar); requires a grounded finding → uncovered`);
+      // BINDING-DOC ANALYSIS FLOOR (flag AUDIT_BINDING_DOC_ANALYSIS_FLOOR, default OFF ⇒ byte-identical). The valve
+      // above reads "a binding attachment with no obligation SENTENCE is genuinely thin, so silence covers it". That
+      // holds for a SECTION of a solicitation; it is false for a whole posted BINDING DOCUMENT, because obligationsOf
+      // is a DUTY-VERB detector (shall|must|provide|submit|furnish|required|quote|deliver) and an amendment states its
+      // operative content in the INDICATIVE, never the imperative. Observed, not theorised — 6 specimens opened from
+      // banked runs (_census-read-not-analyzed.ts), 5 of them decisive:
+      //   • "The purpose of this amendment is to extend the close date from 07/01/2026 @ 10am to 07/21/2026 @ 10am."
+      //     (36C24126Q0569 0003.docx — 0 obligation sentences, free pass, counted ANALYZED)
+      //   • AMD 001 on SPRRA2-26-R-0034: due date 29 JAN → 30 APRIL **and** line-1 quantity 75 → 45 — the pricing basis.
+      // A deadline and a quantity are the two facts a bidder cannot get wrong, and both rode the valve into a green
+      // coverage count. So this is NOT widened vocabulary (a duty-verb blocklist leaks on the next paraphrase — the
+      // amendments above defeat it with ordinary English): the FREE PASS ITSELF is withdrawn for binding attachments.
+      // A binding document is covered only by a grounded finding or a provably-read attestation, per the standing rule
+      // that a document read in full with zero attributed findings is a defect, always — fail loudly or exclude it from
+      // the coverage claim, never both ingest it and count it as covered.
+      //
+      // NOT gated on crossAttGate. The ELIGIBILITY_BAR_RE floor beside it is, and AUDIT_ATTACHMENT_COVERAGE reads FALSE
+      // on the live worker — so that floor has never once fired in production. A new guard inheriting that gate would
+      // ship inert and pass its own tests (the placebo shape). This one is armed by its own flag or not at all.
+      //
+      // Direction: falling through can only ADD to `uncovered` — it never certifies a doc covered. Consequence is a
+      // NAMED unanalyzed document (Rule 61 visible failure state) which CAPS the verdict at BID_WITH_CAUTION with the
+      // document named (Rule 70 cap-not-mute), never a silent green count.
+      // NOTICE BODY EXCLUDED — caught by the OFF→ON delta on the banked corpus (_floor-delta.ts), which showed this
+      // floor newly naming "SAM Notice Body" on 3 runs. It is SAM's description FIELD, not a posted document: it is
+      // already excluded from both sides of the customer-facing count (deriveAnalyzedDocuments), so naming it here
+      // would put a document in the completeness veto that can never appear in the card explaining it — and on a run
+      // where nothing else is uncovered it would force incompleteness by itself, a false decline sourced entirely to
+      // a synopsis blurb. It is NOT left unguarded: the notice body carries its own dedicated deterministic
+      // eligibility-bar floor (card #421 Fork-3, ~line 1223) which is the purpose-built path for it.
+      const bindingDocAnalysisFloor = process.env.AUDIT_BINDING_DOC_ANALYSIS_FLOOR === "true" && r.name !== NOTICE_BODY_DOC_NAME;
+      if (!bindingDocAnalysisFloor && !(crossAttGate && ELIGIBILITY_BAR_RE.test(r.text))) continue;         // no eligibility-bar (or flag off) ⇒ genuinely-read thin binding attachment is covered
+      if (bindingDocAnalysisFloor) console.warn(`[coverage] read_no_obligation valve WITHDRAWN for "${r.name}" — binding document with no obligation SENTENCE must still be covered by a grounded finding (indicative-voice amendments carry deadline/quantity changes no duty-verb detector sees) → falling through to the grounded-finding check`);
+      else console.warn(`[coverage] read_no_obligation valve REJECTED for "${r.name}" — ELIGIBILITY-BAR language present though obligationsOf found no obligation SENTENCE (verb-less bar); requires a grounded finding → uncovered`);
     }
     const nRegion = norm(r.text);
     // A finding proves this attachment was ANALYZED only if its excerpt is grounded IN the attachment AND is not a
