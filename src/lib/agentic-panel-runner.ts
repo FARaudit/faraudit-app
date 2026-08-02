@@ -161,7 +161,10 @@ export function formatClaimSectionTags(tags: ClaimSectionTag[]): string {
 // tier → model id (env-overridable). Tier MIX (not all one tier) reduces same-family
 // correlation per the Apple "Nine Judges" finding; true cross-provider diversity is a
 // future option ([[reference_glm_5_2]]) once we're off a single-vendor stack.
-function modelFor(tier: PanelTier, override?: Partial<Record<PanelTier, string>>): string {
+// EXPORTED (2026-08-02) so the worker's boot banner reports the panel tier from THIS function instead of
+// re-declaring the default. The banner used to print a dead V1 constant; the fix must not swap one duplicated
+// literal for another — a second copy of "claude-opus-5" would drift the moment this line changes.
+export function modelFor(tier: PanelTier, override?: Partial<Record<PanelTier, string>>): string {
   if (override?.[tier]) return override[tier]!;
   // OPUS 5 (2026-07-31) — same $5/$25 per MTok as Opus 4.8, so this is capability at zero marginal cost. The two
   // seats on this tier are the Ex-KO Evaluator (highest misread risk) and the Adversarial Verifier (the single

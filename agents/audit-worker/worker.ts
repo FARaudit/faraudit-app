@@ -28,7 +28,12 @@ import { fetchSolicitationByNoticeId, resolveAgency, resolveOfficeLeaf, type Sol
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
 import { assembleSamDocumentSet, assembleUploadedDocumentSet, deriveSolTokenFromFilenames, type AssembledDocumentSet } from "@/lib/sam-attachments";
 import { MAX_PDF_BYTES } from "@/lib/validators";
-import { type PdfSource, CLAUDE_MODEL } from "@/lib/audit-engine";
+import { type PdfSource } from "@/lib/audit-engine";
+// The boot banner reports the models the LIVE engine resolves, so it reads the SAME registry the engine reads —
+// never a module constant. `CLAUDE_MODEL` was imported here for exactly that line; it is a leftover from the
+// DELETED V1 engine and V3 never consults it. See the banner below.
+import { modelFor, type ModelRole } from "@/lib/model-registry";
+import { modelFor as panelModelFor } from "@/lib/agentic-panel-runner";
 
 const POLL_MS = Number(process.env.WORKER_POLL_MS || 10_000);
 const STALE_PROCESSING_MS = 30 * 60 * 1000;
@@ -167,13 +172,27 @@ export async function runWorker(): Promise<never> {
   process.once("SIGINT", () => { void drainAndExit("SIGINT"); });
   await probeFa149Columns();
   console.log(`[audit-worker] up · poll=${POLL_MS}ms · stale_cutoff=${STALE_PROCESSING_MS / 60000}min · drain handler registered · reclaim=${fa149Columns ? `ACTIVE (stale>${RECLAIM_STALE_MS / 1000}s, cap ${MAX_ATTEMPTS})` : "inactive (migration pending)"}`);
-  // Deploy self-verification (2026-06-19 · T2-1 truth fix 2026-07-07): print the live
-  // engine at startup so a deploy proves which model+engine it runs from the logs alone
-  // — no audit run, no metered tokens, no guessing from the DB default placeholder.
-  // The live engine is AGENTIC V3 (the SOLE engine; V1/V2 were deleted — no fallback);
-  // extraction + judgment both ride this one model. The old "(V1 extraction + V2
-  // judgment)" tag lied to the operator about a runtime that no longer exists.
-  console.log(`[audit-worker] ENGINE MODEL = ${CLAUDE_MODEL} · deploy=${process.env.RAILWAY_DEPLOYMENT_ID?.slice(0, 8) ?? "?"} · sha=${process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) ?? "local"} (agentic V3 — sole engine, V1/V2 deleted)`);
+  // Deploy self-verification (2026-06-19 · T2-1 truth fix 2026-07-07 · MODEL truth fix 2026-08-02): print the
+  // live engine at startup so a deploy proves which models+engine it runs from the logs alone — no audit run,
+  // no metered tokens, no guessing from the DB default placeholder.
+  //
+  // 2026-08-02 — THE BANNER WAS LYING, and in the same breath as naming V3. It printed
+  // `ENGINE MODEL = ${CLAUDE_MODEL}` → "claude-opus-4-8", a constant belonging to the DELETED V1 engine and
+  // consulted by nothing in V3; the surrounding comment claimed "extraction + judgment both ride this one
+  // model", which stopped being true when the model REGISTRY landed and split the engine into roles. Anyone
+  // answering "what model is the engine on?" from these logs got a model V3 never calls.
+  //
+  // V3 binds a MODEL PER ROLE through `model-registry.modelFor`, each with its own env override, so there is no
+  // single "engine model" to print — printing one is what made the old line wrong. Resolve the real map here,
+  // from the same function the engine calls, and mark any role whose value came from an env OVERRIDE with `*`
+  // so a pinned-in-Railway role is visible at a glance instead of hiding behind a familiar-looking default.
+  const ROLES: ModelRole[] = ["extractor", "lens", "crossdoc", "judge", "finder"];
+  const ENV_KNOB: Record<ModelRole, string> = { extractor: "AUDIT_MAP_MODEL", lens: "AUDIT_LENS_MODEL", crossdoc: "AUDIT_CROSSDOC_MODEL", judge: "AUDIT_MODEL", finder: "AUDIT_FINDER_MODEL" };
+  const roleMap = ROLES.map((r) => `${r}=${modelFor(r)}${process.env[ENV_KNOB[r]]?.trim() ? "*" : ""}`).join(" · ");
+  // The panel tier comes from the panel runner's OWN resolver, not a second copy of its default — restating
+  // "claude-opus-5" here would be the same duplication defect this banner is being fixed for.
+  const panelOpus = `${panelModelFor("opus")}${process.env.AUDIT_JUDGE_MODEL?.trim() ? "*" : ""}`;
+  console.log(`[audit-worker] ENGINE MODELS (per role, * = env override) ${roleMap} · panel-opus=${panelOpus} · deploy=${process.env.RAILWAY_DEPLOYMENT_ID?.slice(0, 8) ?? "?"} · sha=${process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) ?? "local"} (agentic V3 — sole engine, V1/V2 deleted)`);
   // Boot reclaim pass — a redeploy replaced a container that may have died
   // holding a claim; reclaim it before the first poll.
   await reclaimOrphans().catch((err) => console.error("[audit-worker] boot reclaim error:", err instanceof Error ? err.message : err));
