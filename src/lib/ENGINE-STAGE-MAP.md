@@ -9,6 +9,8 @@ a single "Model (live)" column is what let an unmerged branch read as shipped.
 
 | # | Stage | Role / tier | Model on MAIN (live) | Model on branch (unmerged) |
 |---|---|---|---|---|
+| 0a | OCR residual confirm — VISION (`makeVisionConfirmer`) | `crossdoc` | `claude-opus-5` | — |
+| 0b | OCR rate-table confirm — VISION (`makeTableVisionConfirmer`) | `crossdoc` | `claude-opus-5` | — |
 | 1 | MAP — per-doc extraction | `extractor` | `claude-haiku-4-5` | — |
 | — | `buildCompactMatrix` | deterministic | none · $0 | — |
 | 2 | Lenses — overview / compliance / risk | `lens` | `claude-sonnet-4-6` | — |
@@ -25,7 +27,36 @@ a single "Model (live)" column is what let an unmerged branch read as shipped.
 | 7 | `deriveVerdict` | **none — pure TypeScript** | **no model · no tools** | — |
 
 No `AUDIT_*_MODEL` override variables are set on `audit-worker`, so the deployed code is the
-whole story — there is no env layer to check separately.
+whole story — there is no env layer to check separately. Re-confirmed in-container 2026-08-02 by resolving
+`modelFor(role)` inside the deployed worker, and the boot banner now prints that same resolved map (#392).
+
+**Stages 0a/0b were MISSING from this table until 2026-08-02.** Both are real, paid `claude-opus-5` calls on
+the customer path, and both are **live**: `AUDIT_WORKER_OCR=true` and `AUDIT_OCR_TABLE_CONFIRM=true` on
+`audit-worker`. They are CONDITIONAL — 0a fires only for residual (scanned / OCR-held) documents, 0b only for
+documents a deterministic scan marks `isRateTable` — which is precisely why they were easy to omit: a package
+of clean text PDFs never triggers them, so they are invisible in the common case and appear only on the
+scanned-document runs where cost and correctness are already hardest. A stage map that omits a paid stage
+under-states both spend and the model surface being reviewed.
+
+**Two registries, not one.** `model-registry.ts` says it is "the ONE place a role binds to a concrete model
+ID"; it is not. The panel tiers (rows 6/6b/6c) resolve through a SECOND `modelFor` in
+`agentic-panel-runner.ts` with its own defaults and its own env knobs (`AUDIT_JUDGE_MODEL`,
+`AUDIT_PANEL_SONNET`, `AUDIT_PANEL_HAIKU`). A model swap made "in the registry, per the contract" silently
+misses every panel seat — including the Adversarial Verifier, the single truth choke-point. See
+`ENGINE-MODEL-FIT-REVIEW.md` D1.
+
+## Model surface at a glance
+
+| model | stages |
+|---|---|
+| `claude-opus-5` | 0a · 0b · 2.5 · 4b · 5 · 5b · one panel seat (Ex-KO, id 3) · 6b Adversarial Verifier |
+| `claude-sonnet-4-6` | 2 · L3 · **3 (expert loop)** · 4 · three panel seats (ids 1, 2, 4) · 6c Chief Judge |
+| `claude-haiku-4-5` | **1 (per-doc extraction)** · one panel seat (Small-Business counsel, id 6) |
+| none — deterministic | `buildCompactMatrix` · 7 `deriveVerdict` |
+
+The two **highest-volume** stages — per-doc extraction (runs once per document) and the expert loop (N lenses
+× up to 8 turns) — are the two NOT on Opus 5. "The engine is on Opus 5" is not an accurate summary of this
+table; Opus 5 owns the reasoning and adversarial-verification stages, not the reading stages.
 
 ## Stage 7 — the exit census
 
