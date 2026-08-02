@@ -633,7 +633,17 @@ async function buildInput(row: UserPendingRow): Promise<AuditExecutionInput> {
       // the "retrieval" phase, OUTSIDE the 270s engine budget. Timing it proves whether retrieval (vs the in-budget
       // engine) drives wall-clock, and whether upload-direct — which skips this — would complete under budget. Log-only.
       const _tSamDl = Date.now();
-      assembled = await assembleSamDocumentSet(row.notice_id, row.solicitation_number).catch((err) => {
+      // `resourceLinks` (the v2 opportunity's INDEPENDENT expected-set) was never threaded here, while both other
+      // call sites — watcher-tick.ts:129 and api/audit/route.ts:426 — pass it. Two guards that key on it were
+      // therefore INERT on the worker, which is the path every queued audit takes:
+      //   • ROOT-2's EXISTS denominator (existsShortfallEntries) — built after seq-4 precisely to catch WORKER-side
+      //     retrieval degradation ("worker got 1 doc, local got 7"). It received 0 here and has never fired.
+      //   • the denominator reconciliation (#395) — its `resourceLinksLen > 0` safety guard returned empty, so the
+      //     phantom-document false INCOMPLETE it fixes was still live on the worker. Caught on run eab43ada, whose
+      //     log read `sam-retrieval … 10/12 docs` with no reconciliation line.
+      // `solicitation` is already fetched above (~:515) and its resourceLinks are read below (~:665), so this
+      // threads a value the function already holds — no extra fetch.
+      assembled = await assembleSamDocumentSet(row.notice_id, row.solicitation_number, solicitation?.resourceLinks).catch((err) => {
         console.warn(`[audit-worker] FA-136: document-set assembly failed for ${row.notice_id} — legacy single-URL path: ${err instanceof Error ? err.message : err}`);
         return null;
       });
