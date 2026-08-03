@@ -7,6 +7,7 @@
 // the 1:1 visual port renders without demo strings or blank sections.
 
 import { displaySolicitationId, auditDisplayName } from "@/lib/audit-display";
+import { DEADLINE_DEAD_DATE_RE } from "@/lib/audit-deadline-extract";
 import { isActionableSubmissionItem, looksLikeOrgName, looksLikeSetAsideValue } from "@/lib/section-extractors";
 import { poleToRecommendation } from "@/lib/verdict-pole";
 import { suppressContradictedConfidenceNotes } from "./_v2-render-surfaces";
@@ -570,7 +571,8 @@ const DEADLINE_AMEND_UPDATED_RE = /amendment|amended|revised|updated|supersed/i;
 // Treating it as the controlling "amended" date narrowed the pool to a stale
 // 17-Feb date and reported a live (Aug-27) solicitation CLOSED. These labels
 // must NEVER be allowed to drive open/closed or the masthead deadline.
-const DEADLINE_DEAD_DATE_RE = /superseded|prior\s+proposal|previous|cancell?ed|replaced\s+by/i;
+// Imported, not re-declared (engine audit pass 1): this file was one of FOUR definitions of "is this date dead",
+// and audit-engine.ts carried a comment naming THIS one as the thing it must mirror. It had drifted from both.
 // RC4 (2026-06-19) — deadline-string normalizer. Byte-identical to the copy in
 // src/lib/audit-engine.ts (normalizeDeadlineString). `new Date()` returns
 // Invalid Date on the real SAM/SF-1449/SF-1442 formats (military "1700 CT";

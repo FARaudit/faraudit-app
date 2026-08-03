@@ -36,7 +36,22 @@ const DEADLINE_BLOCK8_RE = /block\s*8|offers?\s+due|sf[\s-]?1449|sf[\s-]?1442/i;
 const DEADLINE_AMEND_UPDATED_RE = /amendment|amended|revised|updated|supersed/i;
 // A DEAD date — "Prior proposal due date (superseded by Amendment 0005)" — must NEVER be the controlling date or drive
 // open/closed. Excluded from the candidate pool entirely (parsing as the lone survivor closed live solicitations).
-const DEADLINE_DEAD_DATE_RE = /superseded|prior\s+proposal|prior\s+offer|previous|cancell?ed|replaced\s+by|\bvoid(?:ed)?\b/i;
+// SINGLE SOURCE (engine audit pass 1, CEO queue #4). This decision used to be made in FOUR places with THREE
+// different definitions — here, audit-engine.ts:2407, _view-model.ts:573 and v4-report/build-data.ts:505 — and
+// audit-engine carried a comment reading "MUST mirror _view-model.ts DEADLINE_DEAD_DATE_RE", which is an invariant a
+// comment cannot enforce. It had drifted from two of the three. Both error directions were live on the DEADLINE path,
+// which is disqualifier class: the narrow copies missed "VOIDED - offer due date" (a dead date survives into the
+// controlling-deadline pool — the exact P0 audit-engine's own comment says was already fixed once), and the loose copy
+// had NO word boundaries, so bare `void` matched inside "aVOID" and bare `prior` inside "PRIORity", dropping a LIVE
+// deadline as dead on the report render path. Exported so the other three import it instead of re-declaring it.
+export const DEADLINE_DEAD_DATE_RE = /superseded|prior\s+proposal|prior\s+offer|previous|cancell?ed|replaced\s+by|\bvoid(?:ed)?\b/i;
+
+/** Is this deadline LABEL a dead/superseded date that must never be the controlling deadline? The one home for the
+ *  question. Prefer this over touching the regex directly — a shared /i regex has no lastIndex hazard, but a helper
+ *  keeps every caller on the same semantics even if the pattern later needs flags. */
+export function isDeadDateLabel(label: string): boolean {
+  return DEADLINE_DEAD_DATE_RE.test(label || "");
+}
 
 /** First ISO (YYYY-MM-DD) or US (M/D/YYYY, M-D-YYYY) date in the text, normalized to YYYY-MM-DD. Null if none/invalid. */
 function firstDate(text: string): string | null {

@@ -6,6 +6,7 @@
 // FA-2 cleanup helper · @/lib/anthropic-files re-exports from the canonical
 // agents/audit-ai/anthropic-files.ts.
 import { deletePdfFromFilesApi } from "@/lib/anthropic-files";
+import { DEADLINE_DEAD_DATE_RE } from "./audit-deadline-extract";
 import { isEnvOn } from "@/lib/env-flags";
 import { sizeStandardFor, formatSizeStandard } from "@/lib/sba-size-standards";
 
@@ -2404,7 +2405,7 @@ export function parseDocDeadline(deadlines: unknown): Date | null {
   // pool and (as the lone parseable survivor) reported a live solicitation
   // CLOSED. Drop these labels entirely — they are never the operative deadline.
   // MUST mirror _view-model.ts DEADLINE_DEAD_DATE_RE.
-  const deadDateRe = /superseded|prior\s+proposal|previous|cancell?ed|replaced\s+by/i;
+  const deadDateRe = DEADLINE_DEAD_DATE_RE;   // one shared recognizer — the "MUST mirror" comment above is now enforced by import, not by hope
   const valid = entries
     .map((e) => ({ ...e, d: tryParse(e.date) }))
     .filter((e): e is { label: string; date: string; d: Date } => e.d !== null);
