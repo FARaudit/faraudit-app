@@ -161,3 +161,32 @@ button{font-family:inherit;cursor:pointer}
   .form-panel{min-height:100vh}
   .brand-sm{display:flex}
 }
+
+/* ── Auth state banners ───────────────────────────────────────────────
+   .auth-error / .auth-success / .auth-info were referenced by the sign-in
+   markup with no rule anywhere, so a failed sign-in and both confirmations
+   rendered as unstyled body text. */
+.auth-error,.auth-success,.auth-info{
+  padding:11px 13px;border-radius:8px;font-size:13px;line-height:1.55;
+  margin-bottom:16px;border:1px solid transparent
+}
+.auth-error{background:rgba(239,68,68,.09);border-color:rgba(239,68,68,.28);color:#fca5a5}
+.auth-success{background:rgba(16,185,129,.09);border-color:rgba(16,185,129,.28);color:#6ee7b7}
+.auth-info{background:rgba(55,138,221,.09);border-color:rgba(55,138,221,.28);color:var(--accent-light)}
+.auth-error strong,.auth-success strong,.auth-info strong{font-weight:700;color:var(--ink)}
+
+/* Recovery escape hatches. The old success state replaced the whole form, so a
+   reset that never arrived left nothing to press. */
+.auth-recovery-actions{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.auth-alt-btn{
+  flex:1 1 auto;min-width:150px;height:42px;padding:0 16px;border-radius:9px;
+  font-family:inherit;font-weight:600;font-size:13px;cursor:pointer;
+  color:var(--ink);background:rgba(255,255,255,.04);border:1px solid var(--line);
+  transition:border-color .15s, background .15s
+}
+.auth-alt-btn:hover:not(:disabled){border-color:var(--mute-2);background:rgba(255,255,255,.07)}
+.auth-alt-btn:disabled{opacity:.55;cursor:not-allowed}
+.auth-alt-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.auth-recovery-help{font-size:12px;line-height:1.6;color:var(--mute)}
+.auth-recovery-help a{color:var(--accent);font-weight:600}
+.auth-recovery-help a:hover{color:var(--accent-light)}
