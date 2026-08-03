@@ -78,7 +78,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
   // FA-89 Opportunities tab filters
   const [oppSearch, setOppSearch] = useState("");
   const [oppSetAside, setOppSetAside] = useState<string>("All");
-  const [oppDeadline, setOppDeadline] = useState<"active" | "all" | "<=3" | "<=7" | "<=30" | "expired" | "saved">("active");
+  const [oppDeadline, setOppDeadline] = useState<"active" | "all" | "<=3" | "<=7" | "<=30" | "expired">("active");
   const [oppValue, setOppValue] = useState<string>("all");
   const [oppSort, setOppSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "signal", dir: "asc" });
   // FA-89i: collapsible filter bar + per-row hover state for action overflow.
@@ -89,12 +89,6 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
   // in Pipeline →" link for ~2s after a successful pin, then revert to the
   // normal "Pinned" label.
   const [pinConfirmedAt, setPinConfirmedAt] = useState<Record<string, number>>({});
-  // Phase 5 item 3: one-shot flag set by the hash-apply effect when arriving via
-  // the /watching → /home#opportunities=saved redirect (or a #saved deep link).
-  // The Opportunities reset-on-tab effect consumes it once to land on the Saved
-  // filter instead of the default "active" filter, then clears it so subsequent
-  // tab visits behave normally.
-  const savedDeepLinkRef = useRef(false);
   // Mount-gate: SSR + first client paint both render null, then hydration completes
   // and the real UI mounts. Eliminates React hydration mismatch from bare `new Date()`
   // / `Date.now()` calls in render path (enrichRow, hoursUntilNextSamIngest, and the
@@ -120,8 +114,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
   // prior visit (which often hid the seeded demo rows behind a forgotten chip).
   useEffect(() => {
     if (tab === "opportunities") {
-      setOppDeadline(savedDeepLinkRef.current ? "saved" : "active");
-      savedDeepLinkRef.current = false;
+      setOppDeadline("active");
       setOppSearch("");
       setOppSetAside("All");
       setOppValue("all");
@@ -149,11 +142,13 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
     if (typeof window === "undefined") return;
     const apply = () => {
       const raw = window.location.hash.replace("#", "");
-      // Phase 5 item 3: /watching redirects here. "opportunities=saved" (and the
-      // bare "saved" alias) open the Opportunities tab pre-filtered to Saved.
+      // Saved ☆ was RETIRED 2026-08-03: the feed went live-source on 2026-07-29 and
+      // live rows carry no pending_audits backing, so no visible row could be saved
+      // and the view could only ever render empty. Its deep links stay honoured as a
+      // silent rewrite to the plain feed — same contract as LEGACY_HASH_MAP below —
+      // so existing bookmarks and the /watching redirect land somewhere real.
       if (raw === "opportunities=saved" || raw === "saved") {
-        savedDeepLinkRef.current = true;
-        window.history.replaceState(null, "", "#opportunities=saved");
+        window.history.replaceState(null, "", "#opportunities");
         setTabState("opportunities");
         return;
       }
@@ -311,7 +306,6 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
     if (oppDeadline === "<=7")     rows = rows.filter((r) => r.daysNum != null && r.daysNum >= 0 && r.daysNum <= 7);
     if (oppDeadline === "<=30")    rows = rows.filter((r) => r.daysNum != null && r.daysNum >= 0 && r.daysNum <= 30);
     if (oppDeadline === "expired") rows = rows.filter((r) => r.daysNum != null && r.daysNum < 0);
-    if (oppDeadline === "saved")   rows = rows.filter((r) => r.row.watched === true);
     if (oppValue === "<100k")     rows = rows.filter((r) => r.row.award_ceiling != null && r.row.award_ceiling < 100000);
     if (oppValue === "100k-500k") rows = rows.filter((r) => r.row.award_ceiling != null && r.row.award_ceiling >= 100000 && r.row.award_ceiling <= 500000);
     if (oppValue === "500k-1m")   rows = rows.filter((r) => r.row.award_ceiling != null && r.row.award_ceiling > 500000 && r.row.award_ceiling <= 1000000);
@@ -880,8 +874,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                         ["<=3", "≤ 3 Days"],
                         ["<=7", "≤ 7 Days"],
                         ["<=30", "≤ 30 Days"],
-                        ["expired", "Expired"],
-                        ["saved", "Saved"]
+                        ["expired", "Expired"]
                       ] as const).map(([val, lbl]) => {
                         const active = oppDeadline === val;
                         return (
@@ -1014,7 +1007,11 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                         setTab("audit");
                       };
 
-                      const togglePatch = async (field: "in_pipeline" | "watched"): Promise<boolean> => {
+                      // Saved ☆ retired 2026-08-03, so "in_pipeline" is now the only field this
+                      // flips. The `field === "in_pipeline"` guards below are consequently always
+                      // true; they are left in place deliberately so the live pin/unpin saga stays
+                      // byte-identical rather than being rewritten for tidiness.
+                      const togglePatch = async (field: "in_pipeline"): Promise<boolean> => {
                         const next = !r.row[field];
                         updateOpportunity(r.row.notice_id, { [field]: next });
                         // FA-89h: in_pipeline now routes through dedicated pin/unpin
@@ -1078,20 +1075,6 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                           return false;
                         }
                       };
-                      // Phase 5 item 3 — "Move to Pipeline" for a Saved row. Reuses the
-                      // EXISTING pin saga (togglePatch("in_pipeline") → POST /api/opportunities/
-                      // [notice_id]/pin, which flips pending_audits.in_pipeline and creates the
-                      // stub audits row the Pipeline Kanban renders), then drops the Saved flag
-                      // so the item "moves" out of Saved into the Pipeline. Only un-saves if the
-                      // pin actually stuck; on a failed pin togglePatch rolls its own optimistic
-                      // state back and we leave the row in Saved untouched.
-                      const moveSavedToPipeline = async () => {
-                        if (r.row.in_pipeline === true) return;
-                        const pinned = await togglePatch("in_pipeline");
-                        if (pinned && r.row.watched === true) {
-                          await togglePatch("watched");
-                        }
-                      };
                       const isJustPinned = pinConfirmedAt[r.row.notice_id] != null && Date.now() - pinConfirmedAt[r.row.notice_id] < 2000;
 
                       const isHovered = hoveredRowId === r.row.notice_id;
@@ -1105,7 +1088,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                           style={{
                             display: "grid", gridTemplateColumns: "130px 1fr 150px 90px 110px 100px 180px", gap: 8,
                             padding: "8px 10px", borderBottom: "1px solid var(--border)", alignItems: "center",
-                            background: r.row.in_pipeline ? "rgba(96,165,250,.06)" : r.row.watched ? "rgba(245,158,11,.04)" : "transparent",
+                            background: r.row.in_pipeline ? "rgba(96,165,250,.06)" : "transparent",
                             transition: "background .15s"
                           }}
                         >
@@ -1134,12 +1117,10 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                             <span style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 2, background: rb, color: rc, border: `1px solid ${rc}40`, lineHeight: 1, letterSpacing: ".06em" }}>{r.riskLabel || "—"}</span>
                           </div>
                           <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: auC.bg, color: auC.fg, textAlign: "center", justifySelf: "center", display: "inline-flex", justifyContent: "center", alignItems: "center" }}>{r.auditStatusLabel}</span>
-                          {/* FA-89i CHANGE 3 + Phase 7: Audit always-visible primary. Save is now an
-                              always-visible quiet star bookmark (Treatment 2) — hover-gating removed so it's
-                              discoverable at rest + on touch. Pipeline still reveals on hover but stays
-                              visible when active so the row reflects state. */}
+                          {/* FA-89i CHANGE 3: Audit always-visible primary. Pipeline reveals on hover but
+                              stays visible when active so the row reflects state. (The Save ☆ bookmark was
+                              retired 2026-08-03 — see below.) */}
                           {(() => {
-                            const watched = r.row.watched === true;
                             const pinned  = r.row.in_pipeline === true;
                             // Live SAM rows (source='sam_live') have no pending_audits
                             // backing row — the Save/Pipeline mutations PATCH/POST that
@@ -1159,28 +1140,10 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                                 >
                                   Audit →
                                 </button>
-                                {/* Phase 7 — Save = always-visible quiet star bookmark. Presentation only;
-                                    the togglePatch("watched") mutation (#55) is unchanged. */}
-                                {!liveRow && <button
-                                  type="button"
-                                  className={`opp-save${watched ? " is-saved" : ""}`}
-                                  onClick={(e) => { e.stopPropagation(); togglePatch("watched"); }}
-                                  aria-label="Save opportunity"
-                                  aria-pressed={watched}
-                                  title="Save — still deciding"
-                                >
-                                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" /></svg>
-                                </button>}
-                                {!liveRow && watched && !pinned && !isJustPinned && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); moveSavedToPipeline(); }}
-                                    style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".06em", padding: "3px 8px", borderRadius: 2, cursor: "pointer", background: "transparent", color: "var(--blue)", border: "1px solid rgba(96,165,250,.5)", opacity: isHovered || watched ? 1 : 0, pointerEvents: isHovered || watched ? "auto" : "none", transition: "opacity .15s", whiteSpace: "nowrap" }}
-                                    title="Move this saved opportunity into the Pipeline"
-                                  >
-                                    → Pipeline
-                                  </button>
-                                )}
+                                {/* Save ☆ and its "→ Pipeline" companion were REMOVED 2026-08-03.
+                                    Both were already unreachable — every feed row is source='sam_live'
+                                    and both were gated behind !liveRow — so Pipeline is now the single
+                                    "I'm tracking this" affordance. */}
                                 {!liveRow && (isJustPinned ? (
                                   <a
                                     href="/home#pipeline"
