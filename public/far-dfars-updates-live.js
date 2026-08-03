@@ -81,16 +81,15 @@
 
       // The route reports which sources answered. All of them failing is an outage,
       // not an empty result, even though both arrive as [].
-      if (data.degraded && Array.isArray(data.sources)) {
-        const dead = data.sources.filter(function (s) { return !s.ok; });
-        if (dead.length === data.sources.length) {
-          renderUnavailable('None of the ' + data.sources.length + ' regulatory sources responded.');
-          return;
-        }
-        setStatus('ok', '', data.sources);
-      } else {
-        setStatus('ok', '', Array.isArray(data.sources) ? data.sources : []);
+      const srcs = Array.isArray(data.sources) ? data.sources : [];
+      const dead = srcs.filter(function (s) { return !s.ok; });
+      if (srcs.length && dead.length === srcs.length) {
+        renderUnavailable('None of the ' + srcs.length + ' regulatory sources responded.');
+        return;
       }
+      // Partial outage stays 'ok' for the records that DID arrive; far-app.js reads
+      // sources[] and names the shortfall rather than printing a bare count.
+      setStatus('ok', '', srcs);
 
       if (!window.FARD || !Array.isArray(window.FARD.UPDATES)) return;
 

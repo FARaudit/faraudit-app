@@ -24,7 +24,14 @@
   const DASH = '—';
   const isDown = () => D.STATUS && D.STATUS.state === 'unavailable';
   const isPending = () => D.STATUS && D.STATUS.state === 'loading';
-  const num = (n) => (isDown() || isPending() ? DASH : n);
+  /* Some-but-not-all sources answered. A count is real for what came back and
+     silent about what did not, so it is reported WITH the shortfall named — never
+     as a plain number, and never as "the feeds reported no changes". */
+  const deadSources = () => ((D.STATUS && D.STATUS.sources) || []).filter(s => !s.ok);
+  const isPartial = () => !isDown() && !isPending() && deadSources().length > 0;
+  // A partial outage dashes too: a bare 0 at the top of the page reads as "no rule
+  // changes this month", which is a claim the surviving source cannot support.
+  const num = (n) => (isDown() || isPending() || isPartial() ? DASH : n);
   function emptyBlock(title, detail) {
     return `<div class="cop-empty"><div class="t">${title}</div><div class="d">${detail}</div></div>`;
   }
@@ -33,6 +40,13 @@
   function blankReason() {
     if (isPending()) return ['Loading', 'Fetching FAR, DFARS and Federal Register updates.'];
     if (isDown()) return ['Updates unavailable', (D.STATUS.reason || 'The regulatory feeds could not be reached.') + ' Nothing is shown rather than showing stale or sample data.'];
+    if (isPartial()) {
+      const dead = deadSources(), all = D.STATUS.sources.length;
+      return ['Sources unavailable',
+        (all - dead.length) + ' of ' + all + ' sources responded. Unavailable: '
+        + dead.map(s => s.name + (s.reason ? ' (' + s.reason + ')' : '')).join(', ')
+        + '. Changes published to those sources are not represented here.'];
+    }
     return ['No updates', 'The feeds returned no published changes for this view.'];
   }
 
@@ -66,7 +80,10 @@
     const high = f.filter(u => u.impact === 'HIGH').length;
     const soon = D.EFFECTIVE.filter(e => e.days <= 30).length;
     const affected = D.AFFECTED.length;
-    const foot = isDown() ? 'source unavailable' : isPending() ? 'loading' : null;
+    const foot = isDown() ? 'source unavailable'
+      : isPending() ? 'loading'
+      : isPartial() ? (deadSources().length + ' of ' + D.STATUS.sources.length + ' sources down')
+      : null;
     const cards = [
       { lbl: 'Updates in View', val: num(f.length), unit: '', foot: foot || 'matching your filters', tone: 'blue' },
       { lbl: 'High Impact', val: num(high), unit: '', foot: foot || 'act before bidding', tone: 'red' },
@@ -77,6 +94,12 @@
     $('hsTotal').textContent = num(D.UPDATES.length);
     $('hsHigh').textContent = num(D.UPDATES.filter(u => u.impact === 'HIGH').length);
     $('hsSoon').textContent = num(D.EFFECTIVE.filter(e => e.days <= 30).length);
+    // The pill claims a live connection. It must not stay green through an outage.
+    const pill = $('livePill');
+    if (pill) {
+      pill.textContent = isDown() ? 'OFFLINE' : isPending() ? 'LOADING' : isPartial() ? 'DEGRADED' : 'LIVE';
+      pill.dataset.state = isDown() ? 'offline' : isPending() ? 'loading' : isPartial() ? 'degraded' : 'live';
+    }
   }
 
   /* timeline: x = date, y-jitter by impact band, dot size = affects */
