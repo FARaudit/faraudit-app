@@ -594,8 +594,16 @@ function evalMSummary(e: V4EvalM): string {
   const head = splitMethod(e.basis).head;
   return `<b>${esc(head)}</b><span class="sum-sep">·</span>${plur(e.factors.length, "factor", "factors")}`;
 }
-function evalMBody(e: V4EvalM): string {
+export function evalMBody(e: V4EvalM): string {
   const sp = splitMethod(e.basis);
+  // ORDER-OF-IMPORTANCE (2026-08-03) — this panel used to assert two things the engine never computed:
+  // it badged factor[0] "Most important" purely on array position, and titled itself "in the Government's
+  // stated order of importance" unconditionally. On W50S6U26QA019 that ladder ranked SEVEN items over a
+  // §M stating exactly two factors "approximately equal in importance" — and contradicted its own closing
+  // line three rows below. The array is FINDING-EMISSION order, which is not an order of importance and
+  // never was. Both claims are now sourced: the badge renders only from `f.importance` (what the document
+  // literally says), and the heading claims an order only when at least one factor carries one.
+  const anyImportance = e.factors.some((f) => !!f.importance);
   const ladder = e.factors.map((f, i) => {
     const mm = String(f.name).match(/^Factor\s+(\d+)\s*[—-]\s*(.+)$/);
     const rank = mm ? mm[1] : String(i + 1);
@@ -603,7 +611,7 @@ function evalMBody(e: V4EvalM): string {
     return `<div class="mx-f${i === 0 ? " lead" : ""}">
         <span class="mx-rank mono">${esc(rank)}</span>
         <div class="mx-f-b">
-          <div class="mx-f-name">${esc(title)}${i === 0 ? '<span class="mx-most">Most important</span>' : ""}</div>
+          <div class="mx-f-name">${esc(title)}${f.importance ? `<span class="mx-most">${esc(f.importance)}</span>` : ""}</div>
           <div class="mx-f-basis">${esc(f.basis)}</div>
         </div>
         <span class="mx-cite mono">${esc(f.cite)}</span>
@@ -615,7 +623,7 @@ function evalMBody(e: V4EvalM): string {
         <div class="mx-award-method">${esc(sp.head)}</div>
         ${sp.tail ? `<p class="mx-award-tail"><span class="mx-award-dash">—</span>${esc(sp.tail)}</p>` : ""}
       </div>
-      <div class="mx-h">Evaluation factors — in the Government’s stated order of importance</div>
+      <div class="mx-h">${anyImportance ? "Evaluation factors — in the Government’s stated order of importance" : "Evaluation factors"}</div>
       <div class="mx-ladder">${ladder}</div>
       <p class="sec-foot">No weights, no total, no score — the Government did not publish one, and neither do we.</p>`;
 }
