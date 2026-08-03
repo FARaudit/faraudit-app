@@ -8,7 +8,7 @@ import type {
   V4Data, V4Fact, V4Verdict, V4Coverage, V4Findings, V4Finding,
   V4SubmissionL, V4EvalM, V4Clins, V4Date, V4Provenance, Tone, Pole,
 } from "@/lib/v4-report/render";
-import { reconcileOfferDueDeadlines } from "@/lib/audit-deadline-extract";
+import { reconcileOfferDueDeadlines, isDeadDateLabel } from "@/lib/audit-deadline-extract";
 
 // ── pole → display word + tone (Brain doctrine; honest-fail poles carry noVerdict + noCharge) ──
 const POLE_BAND: Record<string, string> = {
@@ -502,7 +502,9 @@ export function offerDueFact(responseDeadline: string, cj: Record<string, unknow
   if (samKnown && Math.abs(sam - ctrlMs) <= DAY) return prior;        // doc controlling ≈ SAM (agree) → SAM shown cleanly
   const samDiffers = !Number.isNaN(sam) && Math.abs(sam - ctrlMs) > DAY;
   // Controlling doc date WINS the masthead; SAM (if it differs) + every demoted/superseded date drop to a labeled note.
-  const isDead = (l: string) => /superseded|prior|previous|cancell?ed|replaced|void/i.test(l);
+  // Was a LOCAL regex with no word boundaries: bare `void` matched inside "aVOID" and bare `prior` inside
+  // "PRIORity", so a LIVE deadline was rendered as superseded. Now the one shared recognizer (engine audit pass 1).
+  const isDead = isDeadDateLabel;
   const priors = [
     samDiffers ? `SAM metadata ${fmtDeadline(responseDeadline)} (prior)` : null,
     ...r.demoted.map((d) => `${fmtDeadline(d.date)}${isDead(d.label) ? " (superseded)" : " (prior)"}`),
