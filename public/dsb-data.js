@@ -8,14 +8,7 @@ window.DSB = (function () {
   const FYS = ['FY2022', 'FY2023', 'FY2024', 'FY2025', 'FY2026'];
 
   /* ─── KPI headline metrics per FY (value + 5yr spark + delta) ─── */
-  const KPIS = {
-    FY2026: {
-      addressable: { val: 2.41, unit: 'B', label: 'Addressable Spend', sub: 'your NAICS · all agencies', spark: [1.74, 1.93, 2.05, 2.22, 2.41], delta: '+8.6%', tone: 'blue' },
-      recompete:   { val: 23,   unit: '',  label: 'Recompetes Due',    sub: 'FY27 expiry · $1.1B ceiling', spark: [31, 29, 27, 25, 23], delta: '−2 vs FY25', tone: 'amber' },
-      sbshare:     { val: 34,   unit: '%', label: 'SB Win Share',      sub: 'of awards in your NAICS', spark: [29, 30, 31, 32, 34], delta: '+2.0 pts', tone: 'green' },
-      cycle:       { val: 68,   unit: 'd', label: 'Synopsis → Award',  sub: 'avg cycle · your NAICS', spark: [76, 74, 72, 70, 68], delta: '−4 days', tone: 'blue' }
-    }
-  };
+  const KPIS = {};
 
   /* ─── State spend (your NAICS, FY2026 $M) — fips key for d3 choropleth ───
      gap = high spend, no recorded activity from your firm (BD opportunity). */
@@ -74,30 +67,10 @@ window.DSB = (function () {
   };
 
   /* ─── Agency breakdown — FY values ($M, your NAICS) + SB share + 5yr spark + child NAICS for treemap ─── */
-  const AGENCIES = [
-    { key: 'navy',     name: 'U.S. Navy / NAVSEA',  short: 'NAVY',   val: 890, sb: 32, trend: 'up',   spark: [690, 740, 820, 855, 890], naics: { '336413': 470, '332710': 250, '332721': 170 } },
-    { key: 'airforce', name: 'U.S. Air Force',      short: 'USAF',   val: 680, sb: 38, trend: 'up',   spark: [520, 560, 630, 655, 680], naics: { '336413': 410, '332710': 160, '332721': 110 } },
-    { key: 'army',     name: 'U.S. Army',           short: 'ARMY',   val: 340, sb: 41, trend: 'flat', spark: [340, 355, 310, 328, 340], naics: { '336413': 150, '332710': 120, '332721': 70 } },
-    { key: 'dla',      name: 'Defense Logistics',   short: 'DLA',    val: 125, sb: 52, trend: 'up',   spark: [92, 100, 108, 117, 125], naics: { '336413': 55, '332710': 45, '332721': 25 } },
-    { key: 'navair',   name: 'NAVAIR',              short: 'NAVAIR', val: 97,  sb: 44, trend: 'up',   spark: [70, 80, 88, 92, 97],     naics: { '336413': 60, '332710': 22, '332721': 15 } },
-    { key: 'aflcmc',   name: 'AFLCMC',              short: 'AFLCMC', val: 79,  sb: 40, trend: 'up',   spark: [92, 84, 76, 76, 79],     naics: { '336413': 48, '332710': 18, '332721': 13 } },
-    { key: 'tacom',    name: 'TACOM',               short: 'TACOM',  val: 65,  sb: 48, trend: 'up',   spark: [48, 55, 58, 62, 65],     naics: { '336413': 20, '332710': 30, '332721': 15 } },
-    { key: 'ssc',      name: 'Space Systems Cmd',   short: 'SSC',    val: 58,  sb: 34, trend: 'up',   spark: [22, 34, 44, 51, 58],     naics: { '336413': 30, '332710': 16, '332721': 12 } }
-  ];
+  const AGENCIES = [];
 
   /* ─── Competition matrix (scatter): per NAICS-segment, # firms vs $/firm, total $, fit ─── */
-  const COMPETITION = [
-    { code: '336413', label: 'Aircraft parts (broad)',        firms: 142, total: 1650, perFirm: 11.6, fit: 'core' },
-    { code: '336413-N', label: 'Aircraft parts · NAVAIR',     firms: 38,  total: 420,  perFirm: 11.1, fit: 'core' },
-    { code: '332710', label: 'Machine shops (broad)',         firms: 540, total: 360,  perFirm: 0.67, fit: 'core' },
-    { code: '332710-D', label: 'Machine shops · DLA',         firms: 96,  total: 145,  perFirm: 1.51, fit: 'core' },
-    { code: '332721', label: 'Precision turning',             firms: 54,  total: 245,  perFirm: 4.54, fit: 'core' },
-    { code: '336412', label: 'Aircraft engine parts',         firms: 88,  total: 510,  perFirm: 5.80, fit: 'adjacent' },
-    { code: '332722', label: 'Bolts/nuts/screws',             firms: 210, total: 180,  perFirm: 0.86, fit: 'adjacent' },
-    { code: '334511', label: 'Search/nav instruments',        firms: 64,  total: 690,  perFirm: 10.8, fit: 'stretch' },
-    { code: '336419', label: 'Other space/aux equip',         firms: 22,  total: 130,  perFirm: 5.91, fit: 'adjacent' },
-    { code: '332912', label: 'Fluid power valves',            firms: 118, total: 96,   perFirm: 0.81, fit: 'stretch' }
-  ];
+  const COMPETITION = [];
 
   /* ─── Market trend per NAICS (FY22–FY27, last is projected) ─── */
   const MARKET_TREND = {
@@ -110,50 +83,19 @@ window.DSB = (function () {
   };
 
   /* ─── DoD topline budget ($B) with status ─── */
-  const BUDGET = [
-    { fy: 'FY22', val: 742, status: 'enacted' },
-    { fy: 'FY23', val: 797, status: 'enacted' },
-    { fy: 'FY24', val: 825, status: 'cr' },
-    { fy: 'FY25', val: 831, status: 'shutdown' },
-    { fy: 'FY26', val: 839, status: 'enacted' }
-  ];
+  const BUDGET = [];
 
   /* ─── Recompete radar (timeline by FY27 quarter) ─── */
-  const RECOMPETES = [
-    { name: 'F-35 GSE Support IDIQ',      incumbent: 'DRS Technologies', val: 500, agency: 'AFLCMC', q: 2, naics: '336413' },
-    { name: 'NAVAIR Depot Maintenance',   incumbent: 'Vertex Aerospace', val: 180, agency: 'NAVAIR', q: 3, naics: '336413' },
-    { name: 'DLA Aviation Parts BOA',     incumbent: 'Aviall Services',  val: 90,  agency: 'DLA',    q: 1, naics: '336413' },
-    { name: 'Army TACOM Components',      incumbent: 'AM General',       val: 67,  agency: 'TACOM',  q: 4, naics: '332710' },
-    { name: 'NSWC Test Equipment',        incumbent: 'SAIC',             val: 45,  agency: 'NAVY',   q: 2, naics: '332721' },
-    { name: 'Hill AFB Tooling IDIQ',      incumbent: 'StandardAero',     val: 38,  agency: 'AFLCMC', q: 3, naics: '332710' },
-    { name: 'Tinker Engine Hardware',     incumbent: 'Heico Corp',       val: 52,  agency: 'AFLCMC', q: 1, naics: '332721' }
-  ];
+  const RECOMPETES = [];
 
   /* ─── Incumbent intelligence (recent awards = teaming targets) ─── */
-  const INCUMBENTS = [
-    { awd: 'Raytheon Intel & Space', agy: 'NAVSEA',  val: 54.2, naics: '336413', sa: 'lp',  date: 'May 26' },
-    { awd: 'Ducommun Inc',           agy: 'AFLCMC',  val: 32.1, naics: '336413', sa: 'sb',  date: 'May 25' },
-    { awd: 'General Dynamics Land',  agy: 'TACOM',   val: 87.5, naics: '332710', sa: 'lp',  date: 'May 24' },
-    { awd: 'Magellan Aerospace',     agy: 'DLA',     val: 12.4, naics: '336413', sa: 'sb',  date: 'May 24' },
-    { awd: 'TransDigm Group',        agy: 'NAVAIR',  val: 8.9,  naics: '332710', sa: 'sb',  date: 'May 23' },
-    { awd: 'Boeing IDS',             agy: 'AFLCMC',  val: 44.7, naics: '336413', sa: 'lp',  date: 'May 23' },
-    { awd: 'Astronics Test',         agy: 'NAVAIR',  val: 15.8, naics: '336413', sa: 'sb',  date: 'May 22' },
-    { awd: 'Parker Hannifin',        agy: 'DLA',     val: 6.3,  naics: '332721', sa: 'lp',  date: 'May 21' }
-  ];
+  const INCUMBENTS = [];
 
   /* ─── Pricing intelligence ($K per contract) ─── */
-  const PRICING = [
-    { code: '336413', median: 28, range: [8, 340], avg: 47, top: 'NAVAIR $62K' },
-    { code: '332710', median: 11, range: [2, 180], avg: 18, top: 'DLA $24K' },
-    { code: '332721', median: 34, range: [12, 420], avg: 52, top: 'AFLCMC $71K' }
-  ];
+  const PRICING = [];
 
   /* ─── NDAA highlights ─── */
-  const NDAA = [
-    { tone: 'amber', tag: 'Action Required', title: 'CMMC Phase 2 · Nov 10, 2026', body: 'Mandatory C3PAO certification for CUI contracts. 158 days to enforcement.' },
-    { tone: 'green', tag: 'Favorable',       title: 'TINA threshold → $5M · §815', body: 'Contracts under $5M now exempt from certified cost or pricing data.' },
-    { tone: 'blue',  tag: 'Monitor',         title: 'DFARS 252.204-7018 · Telecom', body: 'Covered-telecom prohibition active across all contracts. Rep required at offer.' }
-  ];
+  const NDAA = [];
 
   const AGENCY_FILTERS = [
     { key: 'all', label: 'All' },
@@ -165,3 +107,8 @@ window.DSB = (function () {
 
   return { FYS, KPIS, STATES, AGENCIES, COMPETITION, MARKET_TREND, BUDGET, RECOMPETES, INCUMBENTS, PRICING, NDAA, AGENCY_FILTERS };
 })();
+
+/* Feed state. 'unwired' until /api/defense-spending returns real records:
+   this page has no live data source yet, and says so rather than drawing
+   figures nobody counted. */
+if (window.DSB) { window.DSB.STATUS = { state: 'unwired', reason: '' }; }
