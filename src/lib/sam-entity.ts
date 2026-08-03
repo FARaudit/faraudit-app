@@ -85,16 +85,31 @@ function toSamEntity(raw: SamEntityRaw): SamEntity {
   };
 }
 
-/** Look up ONE registered entity by its UEI. This is the customer's own record — the
- *  authoritative source for which socioeconomic programs SBA has actually registered them
- *  under, as opposed to what they typed into a capability statement. Returns null on any
- *  failure (no key, network, non-200, unparseable, no match): the caller must treat null as
- *  "not verified", never as "not certified" — absence is unknown, never a disqualifier. */
-export async function fetchEntityByUei(uei: string): Promise<SamEntity | null> {
+/** WHY THIS IS NOT JUST A NULLABLE FETCH. "No entity came back" has two causes that call for
+ *  OPPOSITE actions from the customer: SAM was unreachable (wait — nothing is wrong with your
+ *  profile) versus SAM answered and nothing is registered under that UEI (check the UEI you
+ *  entered). Collapsing them tells the second customer to wait out an outage that is not
+ *  happening, while their profile carries a UEI SAM has never heard of.
+ *
+ *  Measured on the demo profile: UEI APXDF5339KL2 returns HTTP 200 with `totalRecords: 0`.
+ *  That is the SECOND case, and the collapsed version of this function reported it as the first.
+ *
+ *  `not-registered` covers both "SAM returned zero rows" and "SAM returned rows but none match
+ *  this UEI exactly" — in both, SAM has spoken and the answer is that this UEI is not a
+ *  registered entity. Exact-UEI only: a fuzzy or first-result match would attest one firm's
+ *  certifications onto another firm's profile, the worst failure available on this path. */
+export type EntityLookup =
+  | { outcome: "found"; entity: SamEntity }
+  | { outcome: "not-registered"; entity: null }
+  | { outcome: "unreachable"; entity: null };
+
+export async function lookupEntityByUei(uei: string): Promise<EntityLookup> {
+  const unreachable = { outcome: "unreachable", entity: null } as const;
   const apiKey = process.env.SAM_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey) return unreachable;
   const trimmed = String(uei ?? "").trim();
-  if (!trimmed) return null;
+  // An absent UEI is the caller's own state to report, not a SAM answer about one.
+  if (!trimmed) return unreachable;
 
   const params = new URLSearchParams({ api_key: apiKey, ueiSAM: trimmed });
   let res: Response;
@@ -105,22 +120,32 @@ export async function fetchEntityByUei(uei: string): Promise<SamEntity | null> {
     });
   } catch (err) {
     console.error("[sam-entity] uei fetch failed:", err);
-    return null;
+    return unreachable;
   }
   if (!res.ok) {
     console.error("[sam-entity] SAM responded", res.status, await res.text().catch(() => ""));
-    return null;
+    return unreachable;
   }
   let data: { entityData?: SamEntityRaw[] } = {};
   try { data = await res.json(); } catch (err) {
     console.error("[sam-entity] uei JSON parse failed:", err);
-    return null;
+    return unreachable;
   }
   const list = data.entityData || [];
-  // Exact-UEI only. A fuzzy or first-result match would attest one firm's certifications
-  // onto another firm's profile — the worst possible failure for this path.
   const hit = list.map(toSamEntity).find((e) => (e.uei || "").trim().toUpperCase() === trimmed.toUpperCase());
-  return hit ?? null;
+  return hit ? { outcome: "found", entity: hit } : { outcome: "not-registered", entity: null };
+}
+
+/** Look up ONE registered entity by its UEI. This is the customer's own record — the
+ *  authoritative source for which socioeconomic programs SBA has actually registered them
+ *  under, as opposed to what they typed into a capability statement. Returns null on any
+ *  failure (no key, network, non-200, unparseable, no match): the caller must treat null as
+ *  "not verified", never as "not certified" — absence is unknown, never a disqualifier.
+ *
+ *  Callers that need to tell "SAM was down" from "that UEI is not registered" want
+ *  lookupEntityByUei above; this wrapper deliberately discards that distinction. */
+export async function fetchEntityByUei(uei: string): Promise<SamEntity | null> {
+  return (await lookupEntityByUei(uei)).entity;
 }
 
 export interface TeamingSearch {

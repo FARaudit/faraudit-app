@@ -17,12 +17,15 @@
 //   C3  SIZE POLES ARE UNTOUCHABLE — SB and SB-Partial survive every state,
 //       including a verified registration carrying zero programs. Size is a
 //       per-solicitation determination and no registration record settles it.
-//   C4  UNKNOWN NEVER NARROWS — loading / no-uei / unverified /
+//   C4  UNKNOWN NEVER NARROWS — loading / no-uei / uei-not-found / unverified /
 //       registration-inactive each keep every pole on screen.
 //   C5  PARTITION — the two funnel subtractions are disjoint and exhaustive, so
 //       read − outNaics − ineligible === sorted, arithmetically.
-//   C6  BANNER — five states, five distinct lines, and no non-verified state
-//       asserts anything about what the firm holds.
+//   C6  BANNER — six states, six distinct lines, and no non-verified state
+//       asserts anything about what the firm holds. uei-not-found and unverified
+//       BOTH render zero programs but are opposite instructions: one is the
+//       customer's UEI to correct, the other is our outage to wait out. The demo
+//       profile hits the first, and the collapsed version told it the second.
 //   C7  COVERAGE — every pole normSetaside() can emit is decided explicitly, and
 //       every program a pole is gated on is one the canonicaliser can emit.
 //   C8  PLANTED POSITIVES — the filter must be shown to FIRE, the containment
@@ -41,6 +44,7 @@ import path from "node:path";
 import vm from "node:vm";
 import { establishedPrograms, PROGRAM_LABEL } from "../../src/lib/cert-verification";
 import { canonicalizeEligibilityAttr } from "../../src/lib/audit-decide";
+import { lookupEntityByUei } from "../../src/lib/sam-entity";
 import type { ProfileAttributeRecord } from "../../src/lib/audit-findings";
 
 let pass = 0, fail = 0;
@@ -204,7 +208,7 @@ console.log("\nC3 · small-business poles are never screened on certifications")
 console.log("\nC4 · every non-verified state keeps every pole");
 {
   const POLES = ["SB", "SB-Partial", "SDVOSB", "8(a)", "HUBZone", "WOSB", "EDWOSB", "SoleSource", "Full", "UNKNOWN"];
-  for (const state of ["loading", "no-uei", "unverified", "registration-inactive"]) {
+  for (const state of ["loading", "no-uei", "uei-not-found", "unverified", "registration-inactive"]) {
     SH.setCerts({ state, records: [], establishedPrograms: [] });
     const removed = POLES.filter((sa) => !SH.certEligible({ sa }));
     ok(removed.length === 0, `state '${state}' removes nothing`, removed.join(","));
@@ -258,7 +262,7 @@ console.log("\nC6 · the banner says something different in each state");
   const lines = new Map<string, string>();
   const say = (c: { pre: string; strong: string; post: string }) => (c.pre + c.strong + c.post).replace(/\s+/g, " ").trim();
 
-  for (const state of ["loading", "no-uei", "unverified", "registration-inactive"]) {
+  for (const state of ["loading", "no-uei", "uei-not-found", "unverified", "registration-inactive"]) {
     SH.setCerts({ state, records: [], establishedPrograms: [] });
     lines.set(state, say(SH.certBannerCopy()));
   }
@@ -273,19 +277,21 @@ console.log("\nC6 · the banner says something different in each state");
   // The claim each state may NOT make. Only a verified read may say anything
   // about what the firm does or does not hold.
   const HOLDS_CLAIM = /lists no socioeconomic|no certifications|you do not qualify|not eligible/i;
-  for (const state of ["loading", "no-uei", "unverified", "registration-inactive"])
+  for (const state of ["loading", "no-uei", "uei-not-found", "unverified", "registration-inactive"])
     ok(!HOLDS_CLAIM.test(lines.get(state)!), `'${state}' asserts nothing about what the firm holds`, lines.get(state));
 
   // And each unknown state must say the page is not removing anything, because
   // it is not — a silent unknown reads as a screened list.
-  for (const state of ["no-uei", "unverified", "registration-inactive"])
+  for (const state of ["no-uei", "uei-not-found", "unverified", "registration-inactive"])
     ok(/nothing is screened out/i.test(lines.get(state)!),
       `'${state}' states that nothing is screened out`, lines.get(state));
 
   SH.setCerts(VERIFIED(["se:sdvosb"], ["SDVOSB"]));
   ok(SH.certBannerCopy().strong.includes("SDVOSB"), "a verified registration names the programs it carries");
-  SH.setCerts({ state: "no-uei", records: [], establishedPrograms: [] });
-  ok(SH.certBannerCopy().btn !== null, "the only state with a fixable cause carries a control");
+  for (const state of ["no-uei", "uei-not-found"]) {
+    SH.setCerts({ state, records: [], establishedPrograms: [] });
+    ok(SH.certBannerCopy().btn !== null, `'${state}' carries a control — the cause is the customer's to fix`);
+  }
   for (const state of ["loading", "unverified", "registration-inactive"]) {
     SH.setCerts({ state, records: [], establishedPrograms: [] });
     ok(SH.certBannerCopy().btn === null, `'${state}' offers no control — there is nothing for the customer to fix`);
@@ -437,5 +443,65 @@ console.log("\nC9 · renderCertBanner builds the nodes it is supposed to");
   ok(text(host).length > 0, "the loading state still says something rather than rendering blank");
 }
 
+// tsx compiles this suite to CJS, where top-level await is unavailable, so the
+// one async section runs inside an IIFE and owns the exit.
+(async () => {
+// ── C10 · THE SOURCE OF THE SPLIT ────────────────────────────────────────────
+console.log("\nC10 · lookupEntityByUei tells 'SAM said no' from 'SAM said nothing'");
+{
+  // The banner copy is only as honest as the discriminant behind it. Asserting
+  // the two lines differ (C6) would still pass if the route could never produce
+  // one of them, so drive the lookup itself. The 200/totalRecords-0 case is the
+  // one measured against the real API on the demo profile's UEI.
+  const realFetch = globalThis.fetch;
+  const realKey = process.env.SAM_API_KEY;
+  process.env.SAM_API_KEY = "test-key-not-a-real-credential";
+  const stub = (impl: () => Promise<Response> | never) => { (globalThis as any).fetch = impl; };
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+
+  try {
+    stub(async () => json({ totalRecords: 0, entityData: [] }));
+    let r = await lookupEntityByUei("APXDF5339KL2");
+    ok(r.outcome === "not-registered",
+      "HTTP 200 + totalRecords 0 → not-registered (the demo profile's real answer)", r.outcome);
+
+    stub(async () => json({ totalRecords: 1, entityData: [{ entityRegistration: { ueiSAM: "SOMEOTHERUEI" } }] }));
+    r = await lookupEntityByUei("APXDF5339KL2");
+    ok(r.outcome === "not-registered",
+      "rows that do not match the UEI exactly → not-registered, never a fuzzy attach", r.outcome);
+
+    stub(async () => { throw new Error("network down"); });
+    r = await lookupEntityByUei("APXDF5339KL2");
+    ok(r.outcome === "unreachable", "a network failure → unreachable, NOT not-registered", r.outcome);
+
+    stub(async () => json({ error: "rate limited" }, 429));
+    r = await lookupEntityByUei("APXDF5339KL2");
+    ok(r.outcome === "unreachable", "a non-200 → unreachable — an outage is never the customer's UEI", r.outcome);
+
+    stub(async () => new Response("<html>not json</html>", { status: 200 }));
+    r = await lookupEntityByUei("APXDF5339KL2");
+    ok(r.outcome === "unreachable", "unparseable body → unreachable", r.outcome);
+
+    delete process.env.SAM_API_KEY;
+    stub(async () => json({ totalRecords: 0, entityData: [] }));
+    r = await lookupEntityByUei("APXDF5339KL2");
+    ok(r.outcome === "unreachable",
+      "no API key → unreachable — OUR missing config must never read as their bad UEI", r.outcome);
+    process.env.SAM_API_KEY = "test-key-not-a-real-credential";
+
+    const match = { entityRegistration: { ueiSAM: "APXDF5339KL2", registrationStatus: "Active", registrationExpirationDate: "2027-06-01" },
+                    socioeconomic: { sbaBusinessTypeList: [{ sbaBusinessTypeDesc: "Service Disabled Veteran Owned Small Business" }] } };
+    stub(async () => json({ totalRecords: 1, entityData: [match] }));
+    r = await lookupEntityByUei("apxdf5339kl2");
+    ok(r.outcome === "found" && r.entity?.uei === "APXDF5339KL2",
+      "an exact match (case-insensitive) → found — proving the not-registered legs are not vacuous", r.outcome);
+  } finally {
+    (globalThis as any).fetch = realFetch;
+    if (realKey === undefined) delete process.env.SAM_API_KEY; else process.env.SAM_API_KEY = realKey;
+  }
+}
+
 console.log(`\n${fail === 0 ? "✅" : "❌"} ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);
+})();

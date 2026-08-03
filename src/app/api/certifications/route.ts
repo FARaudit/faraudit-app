@@ -6,11 +6,17 @@
 // customer typed; it is deliberately NOT read here, because a typed "SDVOSB" is byte-identical to
 // a registered one and must never clear a set-aside bar.
 //
-// FOUR STATES, NOT TWO. "no records" has four different causes and they are not interchangeable on
-// screen: a missing UEI is a profile the customer can fix, a failed lookup is our outage, a lapsed
-// registration is their renewal, and an active registration carrying no socioeconomic program is a
-// real zero. Collapsing them would tell three of those four customers something untrue, so the
-// state is carried out of here rather than inferred from an empty array.
+// FIVE STATES, NOT TWO. "no records" has five different causes and they are not interchangeable on
+// screen: a missing UEI is a profile the customer can fix, a UEI SAM has never registered is a
+// DIFFERENT profile fix, a failed lookup is our outage, a lapsed registration is their renewal, and
+// an active registration carrying no socioeconomic program is a real zero. Collapsing them would
+// tell four of those five customers something untrue, so the state is carried out of here rather
+// than inferred from an empty array.
+//
+// The uei-not-found / unverified split was not theoretical. The demo profile carries a UEI that SAM
+// answers for with HTTP 200 and totalRecords 0, and the collapsed version of this route told that
+// customer to wait out an outage that was not happening, while their profile sat on a UEI SAM has
+// never heard of. Only driving the signed-in page surfaced it.
 //
 // Eligibility is only ever NARROWED by this route's answer, and only on the five programs SAM can
 // attest. Size-based pools (Total / Partial Small Business) are absent by construction: size is
@@ -18,7 +24,7 @@
 // set-aside out, and the page must not either.
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
-import { fetchEntityByUei } from "@/lib/sam-entity";
+import { lookupEntityByUei } from "@/lib/sam-entity";
 import {
   verifiedCertRecords,
   establishedPrograms,
@@ -27,7 +33,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-type CertState = "no-uei" | "unverified" | "registration-inactive" | "verified";
+type CertState = "no-uei" | "uei-not-found" | "unverified" | "registration-inactive" | "verified";
 
 interface CertPayload {
   state: CertState;
@@ -91,16 +97,27 @@ export async function GET() {
     });
   }
 
-  const entity = await fetchEntityByUei(uei);
+  const lookup = await lookupEntityByUei(uei);
 
-  // null covers no API key, network failure, non-200, unparseable JSON and no exact-UEI match.
-  // Every one of them means "we did not read it", which is not "they do not hold it".
-  if (!entity) {
+  // SAM ANSWERED, and the answer is that nothing is registered under this UEI. That is a fixable
+  // profile problem — almost always a mistyped or stale UEI — and it must not wear the outage copy.
+  if (lookup.outcome === "not-registered") {
+    return NextResponse.json({
+      state: "uei-not-found", uei, legalName: null, registrationExpires: null,
+      records: [], establishedPrograms: [], checkedAt: nowIso,
+    } satisfies CertPayload);
+  }
+
+  // We did not read it: no API key, network failure, non-200, unparseable JSON. None of these is
+  // "they do not hold it", and none of them is the customer's to fix.
+  if (lookup.outcome === "unreachable") {
     return NextResponse.json({
       state: "unverified", uei, legalName: null, registrationExpires: null,
       records: [], establishedPrograms: [], checkedAt: nowIso,
     } satisfies CertPayload);
   }
+
+  const entity = lookup.entity;
 
   if (!registrationIsActive(entity.registration_status)) {
     return NextResponse.json({

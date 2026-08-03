@@ -281,21 +281,31 @@ function renderHeader(){
   renderCertBanner($('profileGap'));
 }
 
-/* ── the certifications banner: FIVE states, and the four that are not
+/* ── the certifications banner: SIX states, and the five that are not
    'verified' say something different from each other.
 
-   "No records" has four causes and they call for four different actions — add a
-   UEI, renew a registration, wait out an outage, or nothing at all because the
-   firm genuinely holds no socioeconomic program. One shared line would hand
-   three of those four customers an instruction that does not apply to them.
+   "No records" has five causes calling for five different actions — add a UEI,
+   correct a UEI SAM does not recognise, renew a registration, wait out an
+   outage, or nothing at all because the firm genuinely holds no socioeconomic
+   program. One shared line would hand four of those five customers an
+   instruction that does not apply to them.
 
-   Copy is DATA, not markup, so a gate can assert the five states directly. ── */
+   The uei-not-found / unverified pair is the one that has already gone wrong:
+   both render zero programs, but one is ours to fix and the other is theirs, and
+   the outage wording on a bad UEI leaves a customer waiting for nothing.
+
+   Copy is DATA, not markup, so a gate can assert the six states directly. ── */
 function certBannerCopy(){
   const p = PROFILE_CERTS();
   if(p.state === 'no-uei') return {
     pre:'', strong:'No UEI on your profile.',
     post:' Add it and your set-aside eligibility is read straight from your SAM registration — until then nothing is screened out on eligibility.',
     btn:'Add your UEI'
+  };
+  if(p.state === 'uei-not-found') return {
+    pre:'', strong:'SAM has no active registration under the UEI on your profile.',
+    post:' Check the UEI — until it matches a registration we cannot read your set-aside eligibility, so nothing is screened out on eligibility.',
+    btn:'Check your UEI'
   };
   if(p.state === 'registration-inactive') return {
     pre:'', strong:'Your SAM registration is not active,',
