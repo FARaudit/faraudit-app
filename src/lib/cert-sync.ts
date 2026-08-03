@@ -120,14 +120,25 @@ export async function syncCertifications(
 
   const write = async (records: StoredCertRecord[]) => {
     if (columnEquals(data?.attributes_v2, records)) return "unchanged" as const;
-    const { error: wErr } = await supabase
+    // `.select()` IS THE CONTROL, not a convenience. PostgREST reports no error when an UPDATE matches
+    // ZERO rows — an RLS policy that filters the row out of the update returns exactly what a successful
+    // write returns. Without the returned row this function would report "written" while the column was
+    // untouched, and the engine would keep scoring the firm on records nobody could correct. Asking for
+    // the row back turns a silent no-op into something we can see and say.
+    const { data: rows, error: wErr } = await supabase
       .from("capability_statements")
       .update({ attributes_v2: records })
-      .eq("user_id", userId);
-    // A failed write is not a failed verification — report what SAM said, and let the next load retry.
-    // Silently reporting "written" would be the more dangerous lie.
-    if (wErr) console.error("[cert-sync] attributes_v2 write failed:", wErr.message);
-    return wErr ? ("preserved" as const) : ("written" as const);
+      .eq("user_id", userId)
+      .select("user_id");
+    if (wErr) {
+      console.error("[cert-sync] attributes_v2 write failed:", wErr.message);
+      return "preserved" as const;
+    }
+    if (!Array.isArray(rows) || rows.length === 0) {
+      console.error("[cert-sync] attributes_v2 update matched ZERO rows (RLS or missing row) — not written");
+      return "preserved" as const;
+    }
+    return "written" as const;
   };
 
   if (!uei) {

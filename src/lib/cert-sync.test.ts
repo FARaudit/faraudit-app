@@ -19,7 +19,9 @@
 //       INCLUDING when SAM is unreachable. One firm attesting for another is the
 //       worst failure available here.
 //   S4  NO-OP DETECTION — an unchanged record set does not rewrite the row.
-//   S5  A FAILED WRITE IS NOT REPORTED AS A WRITE.
+//   S5  A FAILED WRITE IS NOT REPORTED AS A WRITE — including the silent kind:
+//       PostgREST reports SUCCESS on an UPDATE that matched zero rows, so the
+//       writer asks for the row back and treats an empty result as not-written.
 //   S6  PLANTED POSITIVES — the stub must be shown able to observe a write, and
 //       the engine leg must be shown able to return `unknown`.
 //
@@ -58,7 +60,10 @@ const samRow = (uei: string, over: Record<string, unknown> = {}) => ({
 });
 
 // ── a supabase stub that RECORDS what was written ────────────────────────────
-function makeDb(row: { uei: string | null; attributes_v2: unknown }, opts: { writeFails?: boolean } = {}) {
+function makeDb(
+  row: { uei: string | null; attributes_v2: unknown },
+  opts: { writeFails?: boolean; zeroRows?: boolean } = {},
+) {
   const state = { row, writes: [] as unknown[], updateCalls: 0 };
   const client = {
     from() {
@@ -69,8 +74,18 @@ function makeDb(row: { uei: string | null; attributes_v2: unknown }, opts: { wri
         update(patch: Record<string, unknown>) {
           state.updateCalls++;
           state.writes.push(patch.attributes_v2);
-          if (!opts.writeFails) state.row = { ...state.row, attributes_v2: patch.attributes_v2 };
-          return { eq: async () => ({ error: opts.writeFails ? { message: "denied" } : null }) };
+          const blocked = opts.writeFails || opts.zeroRows;
+          if (!blocked) state.row = { ...state.row, attributes_v2: patch.attributes_v2 };
+          return {
+            // `.eq()` no longer resolves on its own — the writer asks for the row back, because
+            // PostgREST reports success on an UPDATE that matched zero rows.
+            eq: () => ({
+              select: async () => ({
+                data: opts.writeFails ? null : (opts.zeroRows ? [] : [{ user_id: "u" }]),
+                error: opts.writeFails ? { message: "denied" } : null,
+              }),
+            }),
+          };
         },
       };
     },
@@ -214,6 +229,22 @@ async function main() {
     const r = await syncCertifications(db.client, "u");
     ok(!("error" in r) && r.persisted === "preserved",
       "a denied write reports `preserved`, never `written`", !("error" in r) ? r.persisted : "");
+  }
+
+  // ── S5b · A ZERO-ROW UPDATE IS NOT A WRITE ─────────────────────────────────
+  console.log("\nS5b · an UPDATE that matched nothing is not reported as written");
+  {
+    // The trap this exists for: PostgREST returns NO ERROR when an UPDATE matches zero rows, so an RLS
+    // policy that filters the row out is byte-indistinguishable from a successful write at the error
+    // level. Reporting "written" there would mean the engine keeps scoring a firm on records that no
+    // page visit can ever correct.
+    const U = nextUei();
+    const db = makeDb({ uei: U, attributes_v2: null }, { zeroRows: true });
+    stubSam(async () => samJson({ totalRecords: 1, entityData: [samRow(U)] }));
+    const r = await syncCertifications(db.client, "u");
+    ok(db.state.updateCalls === 1, "the update WAS attempted", `${db.state.updateCalls}`);
+    ok(!("error" in r) && r.persisted === "preserved",
+      "zero rows matched → `preserved`, never `written`", !("error" in r) ? r.persisted : "");
   }
 
   // ── S6 · PLANTED POSITIVES ─────────────────────────────────────────────────
