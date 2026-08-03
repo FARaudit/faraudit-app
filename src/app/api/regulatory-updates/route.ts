@@ -1,84 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
+import { federalRegisterUrl, parseFederalRegister, type RegRow } from "@/lib/federal-register";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-interface RegRow {
-  source: string;
-  clause: string | null;
-  title: string;
-  summary: string | null;
-  effective_date: string | null;
-  link: string;
-  published_at: string | null;
-  affects_clauses: string[];
-}
-
-const FEEDS: { source: "far" | "dfars" | "federal_register"; url: string }[] = [
-  // acquisition.gov publishes FAR rule-update RSS
-  { source: "far",   url: "https://www.acquisition.gov/rss-feed/farsite-update" },
-  // DFARS PGI updates from DPC
-  { source: "dfars", url: "https://www.acq.osd.mil/dpap/rss-dfars.xml" },
-  // Federal Register defense-acquisition documents
-  { source: "federal_register", url: "https://www.federalregister.gov/documents/search.rss?conditions%5Btopics%5D%5B%5D=federal-acquisition-regulation" }
+// One live source. The two RSS hosts this route used are dead with no replacement —
+// see src/lib/federal-register.ts for what was measured on each.
+const FEEDS: { source: "federal_register"; url: string }[] = [
+  { source: "federal_register", url: federalRegisterUrl() }
 ];
-
-function stripCdataAndTags(s: string): string {
-  return s.replace(/<!\[CDATA\[/g, "").replace(/\]\]>/g, "").replace(/<[^>]+>/g, "");
-}
-function decodeEntities(s: string): string {
-  return s
-    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ");
-}
-
-function extractClauses(text: string): string[] {
-  const out = new Set<string>();
-  const rx = /((?:FAR|DFARS|PGI)\s*\d+\.\d+(?:-\d+)?)/gi;
-  let m: RegExpExecArray | null;
-  while ((m = rx.exec(text)) !== null) {
-    out.add(m[1].toUpperCase().replace(/\s+/g, " "));
-  }
-  return Array.from(out);
-}
-
-function parse(xml: string, source: RegRow["source"]): RegRow[] {
-  const items: RegRow[] = [];
-  const blocks = xml.match(/<(item|entry)[\s\S]*?<\/(item|entry)>/g) || [];
-  for (const b of blocks.slice(0, 25)) {
-    const title = decodeEntities(stripCdataAndTags((b.match(/<title[^>]*>([\s\S]*?)<\/title>/) || [])[1] || "")).trim();
-    const link =
-      ((b.match(/<link[^>]*href="([^"]+)"/) || [])[1] ||
-       (b.match(/<link>([\s\S]*?)<\/link>/) || [])[1] ||
-       "").trim();
-    const desc = decodeEntities(stripCdataAndTags(
-      (b.match(/<description>([\s\S]*?)<\/description>/) || [])[1] ||
-      (b.match(/<summary[^>]*>([\s\S]*?)<\/summary>/) || [])[1] ||
-      ""
-    )).trim();
-    const pub =
-      ((b.match(/<pubDate>([\s\S]*?)<\/pubDate>/) || [])[1] ||
-       (b.match(/<published>([\s\S]*?)<\/published>/) || [])[1] ||
-       (b.match(/<updated>([\s\S]*?)<\/updated>/) || [])[1] ||
-       "").trim();
-    if (!title || !link) continue;
-
-    const affects = extractClauses(title + " " + desc);
-    items.push({
-      source,
-      clause: affects[0] || null,
-      title,
-      summary: desc.slice(0, 600) || null,
-      effective_date: null,
-      link,
-      published_at: pub ? new Date(pub).toISOString() : null,
-      affects_clauses: affects
-    });
-  }
-  return items;
-}
 
 export async function GET(req: NextRequest) {
   const supabase = await createServerClient();
@@ -115,7 +47,7 @@ export async function GET(req: NextRequest) {
       FEEDS.map(async (f) => {
         try {
           const res = await fetch(f.url, {
-            headers: { Accept: "application/rss+xml,application/atom+xml,application/xml,text/xml" },
+            headers: { Accept: "application/json" },
             signal: AbortSignal.timeout(10000),
             next: { revalidate: 21600 }
           });
@@ -123,7 +55,34 @@ export async function GET(req: NextRequest) {
             console.error("[regulatory-updates] feed non-OK", { source: f.source, url: f.url, status: res.status });
             return { source: f.source, ok: false, rows: [] as RegRow[], reason: `HTTP ${res.status}` };
           }
-          return { source: f.source, ok: true, rows: parse(await res.text(), f.source) };
+
+          // A 200 is not evidence of data. The old Federal Register URL answered 200
+          // with an HTML "Request Access" page, and the XML parser found no <item> in
+          // HTML and reported zero — indistinguishable from a quiet week. Check the
+          // content type before trusting the body.
+          const contentType = res.headers.get("content-type") || "";
+          if (!contentType.includes("json")) {
+            console.error("[regulatory-updates] feed non-JSON", { source: f.source, url: f.url, contentType });
+            return {
+              source: f.source, ok: false, rows: [] as RegRow[],
+              reason: `HTTP 200 but content-type was "${contentType || "absent"}", not JSON`
+            };
+          }
+
+          const rows = parseFederalRegister(await res.text());
+
+          // 48 CFR is never empty over any real window — 5557 documents are on file and
+          // the query is unbounded in time. Zero rows means the query stopped matching
+          // (a renamed condition, a changed slug), not that no rule was published. This
+          // is the calc-rates trap; see src/lib/calc-rates.ts. Fail LOUD, not empty.
+          if (rows.length === 0) {
+            console.error("[regulatory-updates] feed parsed to zero documents", { source: f.source, url: f.url });
+            return {
+              source: f.source, ok: false, rows,
+              reason: "responded 200 with zero documents — query no longer matches"
+            };
+          }
+          return { source: f.source, ok: true, rows };
         } catch (err) {
           const reason = err instanceof Error ? err.message : String(err);
           console.error("[regulatory-updates] feed threw", { source: f.source, url: f.url, reason });
