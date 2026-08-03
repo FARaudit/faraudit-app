@@ -1,32 +1,16 @@
-// Poll a Vercel deployment to READY + report its production aliases. Node timers (not shell sleep).
-import dotenv from "dotenv";
-dotenv.config({ path: ".env.local", quiet: true });
-const TOKEN = process.env.VERCEL_TOKEN!;
-const TEAM = "team_4FAowTLgslDBY6aZ0acPaES0";
-const ID = process.argv[2] || "dpl_7avPbXb9x5cGMpGYwuCRPXt2XDAM";
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
+// One-off: poll a Vercel deployment to a terminal state. Env pre-injected by `npx dotenv -e .env.local --`.
+const T = process.env.VERCEL_TOKEN!, TEAM = "team_4FAowTLgslDBY6aZ0acPaES0";
+const ID = process.argv[2];
 (async () => {
-  for (let i = 0; i < 30; i++) {
-    const res = await fetch(`https://api.vercel.com/v13/deployments/${ID}?teamId=${TEAM}`, {
-      headers: { Authorization: `Bearer ${TOKEN}` },
-    });
-    const j = await res.json();
-    const state = j.readyState || j.status;
-    console.log(`[${i}] state=${state} sha=${j.meta?.githubCommitSha?.slice(0,7) ?? "?"}`);
-    if (state === "READY") {
-      const aliases = j.alias || [];
-      console.log(`READY. aliases: ${JSON.stringify(aliases)}`);
-      // confirm faraudit.com points here
-      const a = await fetch(`https://api.vercel.com/v9/aliases?teamId=${TEAM}&limit=50`, { headers: { Authorization: `Bearer ${TOKEN}` } });
-      const aj = await a.json();
-      const fara = (aj.aliases || []).find((x: any) => x.alias === "faraudit.com");
-      console.log(`faraudit.com → deploymentId=${fara?.deploymentId ?? "?"} (this dpl=${ID}) match=${fara?.deploymentId === ID}`);
-      process.exit(0);
-    }
-    if (state === "ERROR" || state === "CANCELED") { console.log("BUILD FAILED"); process.exit(1); }
-    await sleep(15000);
+  if (!T) { console.log("VERCEL_TOKEN absent"); process.exit(1); }
+  for (let i = 1; i <= 45; i++) {
+    const r = await fetch(`https://api.vercel.com/v13/deployments/${ID}?teamId=${TEAM}`, { headers: { Authorization: `Bearer ${T}` } });
+    const j: any = await r.json();
+    const st = j.readyState ?? j.status;
+    console.log(`[${i}] ${st}`);
+    if (st === "READY") { console.log("SHA:", j.meta?.githubCommitSha?.slice(0, 7)); console.log("ALIASES:", JSON.stringify(j.alias ?? []).slice(0, 400)); process.exit(0); }
+    if (st === "ERROR" || st === "CANCELED") { console.log("FAILED:", JSON.stringify(j.errorMessage ?? "").slice(0, 300)); process.exit(1); }
+    await new Promise((s) => setTimeout(s, 20000));
   }
-  console.log("timeout waiting for READY");
-  process.exit(2);
+  console.log("timed out still building"); process.exit(2);
 })();

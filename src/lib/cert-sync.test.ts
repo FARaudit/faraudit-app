@@ -48,14 +48,27 @@ const EXPIRY = "2027-06-01";
 let ueiSeq = 0;
 const nextUei = () => `UEI${String(++ueiSeq).padStart(9, "0")}`;
 
+// THE REAL v3 PAYLOAD SHAPE, transcribed from a live sam.gov/api/prod response — not from what the
+// mapper expected. The previous fixture put sbaBusinessTypeList under a top-level `socioeconomic` key,
+// which does not exist in any real response; it mirrored the code's assumption, so it certified a
+// mapping that could never read a live record. SBA rows live under coreData.businessTypes, and the
+// descriptions are SAM's own strings (5 codes exist: A6 · JT · XX · A9 · A0 — no SDVOSB).
 const samRow = (uei: string, over: Record<string, unknown> = {}) => ({
   entityRegistration: {
     ueiSAM: uei, registrationStatus: "Active", registrationExpirationDate: EXPIRY,
     legalBusinessName: "Ridgeline Mfg", ...(over.reg as object ?? {}),
   },
-  socioeconomic: {
-    sbaBusinessTypeList: (over.types as string[] ?? ["Service Disabled Veteran Owned Small Business"])
-      .map((d) => ({ sbaBusinessTypeDesc: d })),
+  coreData: {
+    businessTypes: {
+      // Self-certified list — present on every real payload and deliberately NOT read as certification.
+      businessTypeList: [{ businessTypeCode: "2X", businessTypeDesc: "For Profit Organization" }],
+      sbaBusinessTypeList: (over.types as string[] ?? ["SBA Certified HUBZone Firm"]).map((d) => ({
+        sbaBusinessTypeCode: d.includes("HUBZone") ? "XX" : d.includes("8(a)") ? "A6" : "A9",
+        sbaBusinessTypeDesc: d,
+        certificationEntryDate: "2024-01-01",
+        certificationExitDate: (over.certExit as string) ?? null,
+      })),
+    },
   },
 });
 
@@ -101,11 +114,13 @@ const realFetch = globalThis.fetch;
 const realKey = process.env.SAM_API_KEY;
 const realV2 = process.env.AUDIT_PROFILE_SCHEMA_V2;
 
-// The engine bar every leg is measured against.
-const SDVOSB_BAR = {
-  requiredAttribute: "se:sdvosb",
-  requirement: "This acquisition is a total SDVOSB set-aside; offerors must be SDVOSB.",
-  excerpt: "total SDVOSB set-aside",
+// The engine bar every leg is measured against. HUBZone, not SDVOSB: SAM's SBA list carries no
+// service-disabled veteran code at all, so an SDVOSB bar could never be cleared from this source and
+// an end-to-end leg built on one would assert something the producer cannot do.
+const HUBZONE_BAR = {
+  requiredAttribute: "se:hubzone",
+  requirement: "This acquisition is a total HUBZone set-aside; offerors must be a certified HUBZone firm.",
+  excerpt: "total HUBZone set-aside",
 } as never;
 
 async function main() {
@@ -117,10 +132,10 @@ async function main() {
   // ── S1 · END TO END ────────────────────────────────────────────────────────
   console.log("\nS1 · the engine's verdict actually moves");
   {
-    const typedOnly = { certifications: ["SDVOSB"], attributes_v2: null, size_facts: null };
-    const before = firmStatus(SDVOSB_BAR, buildBidderProfileFromCapability(typedOnly as never));
+    const typedOnly = { certifications: ["HUBZone"], attributes_v2: null, size_facts: null };
+    const before = firmStatus(HUBZONE_BAR, buildBidderProfileFromCapability(typedOnly as never));
     ok(before === "unknown",
-      "BEFORE sync: a typed cert on an SDVOSB bar is `unknown` (the shipped defect, reproduced)", before);
+      "BEFORE sync: a typed cert on a HUBZone bar is `unknown` (the shipped defect, reproduced)", before);
 
     const U = nextUei();
     const { client, state } = makeDb({ uei: U, attributes_v2: null });
@@ -129,7 +144,7 @@ async function main() {
     ok(!("error" in r) && r.state === "verified", "sync reports verified", JSON.stringify(r).slice(0, 60));
 
     const after = firmStatus(
-      SDVOSB_BAR,
+      HUBZONE_BAR,
       buildBidderProfileFromCapability({ ...typedOnly, attributes_v2: state.row.attributes_v2 } as never),
     );
     ok(after === "satisfies",
@@ -142,7 +157,7 @@ async function main() {
     // verified → records, tagged with the UEI they came from
     const U1 = nextUei();
     let db = makeDb({ uei: U1, attributes_v2: null });
-    stubSam(async () => samJson({ totalRecords: 1, entityData: [samRow(U1, { types: ["HUBZone Program"] })] }));
+    stubSam(async () => samJson({ totalRecords: 1, entityData: [samRow(U1, { types: ["SBA Certified HUBZone Firm"] })] }));
     let r = await syncCertifications(db.client, "u");
     const written = db.state.writes[0] as Record<string, unknown>[];
     ok(!("error" in r) && r.persisted === "written", "verified → written", !("error" in r) ? r.persisted : "");
@@ -212,7 +227,7 @@ async function main() {
   console.log("\nS4 · an unchanged answer does not rewrite the row");
   {
     const U = nextUei();
-    const existing = [{ attr: "se:sdvosb", source: "sam_api", verifiedAt: "2026-01-01", expiresAt: EXPIRY, uei: U }];
+    const existing = [{ attr: "se:hubzone", source: "sam_api", verifiedAt: "2026-01-01", expiresAt: EXPIRY, uei: U }];
     const db = makeDb({ uei: U, attributes_v2: existing });
     stubSam(async () => samJson({ totalRecords: 1, entityData: [samRow(U)] }));
     const r = await syncCertifications(db.client, "u");
@@ -260,16 +275,16 @@ async function main() {
       `${db.state.updateCalls}`);
 
     // The engine leg must be able to return `unknown`, or S1's `satisfies` is free.
-    const none = firmStatus(SDVOSB_BAR, buildBidderProfileFromCapability({ certifications: [], attributes_v2: null, size_facts: null } as never));
+    const none = firmStatus(HUBZONE_BAR, buildBidderProfileFromCapability({ certifications: [], attributes_v2: null, size_facts: null } as never));
     ok(none === "unknown", "PLANTED: an empty profile still yields `unknown` (S1's contrast is real)", none);
 
     // And a HUBZone-only registration must NOT clear an SDVOSB bar.
-    const hz = firmStatus(SDVOSB_BAR, buildBidderProfileFromCapability({
-      certifications: ["SDVOSB"], size_facts: null,
-      attributes_v2: [{ attr: "se:hubzone", source: "sam_api", verifiedAt: "2026-01-01", expiresAt: EXPIRY, uei: nextUei() }],
+    const other = firmStatus(HUBZONE_BAR, buildBidderProfileFromCapability({
+      certifications: ["HUBZone"], size_facts: null,
+      attributes_v2: [{ attr: "se:8a", source: "sam_api", verifiedAt: "2026-01-01", expiresAt: EXPIRY, uei: nextUei() }],
     } as never));
-    ok(hz !== "satisfies",
-      "PLANTED: a verified HUBZone record does NOT clear an SDVOSB bar — the write is not a blanket pass", hz);
+    ok(other !== "satisfies",
+      "PLANTED: a verified 8(a) record does NOT clear a HUBZone bar — the write is not a blanket pass", other);
   }
 
   (globalThis as never as { fetch: unknown }).fetch = realFetch;

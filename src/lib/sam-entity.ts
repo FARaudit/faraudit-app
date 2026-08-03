@@ -10,6 +10,15 @@
 // sam-ingest client.
 const BASE = "https://sam.gov/api/prod/entity-information/v3/entities";
 
+/** One SBA certification as SAM publishes it. `certifiedUntil` is the CERTIFICATION's own expiry
+ *  (certificationExitDate) — a different and usually earlier clock than the registration expiry. */
+export interface SbaCertification {
+  code: string | null;
+  description: string;
+  certifiedFrom: string | null;
+  certifiedUntil: string | null;
+}
+
 export interface SamEntity {
   uei: string | null;
   legal_business_name: string | null;
@@ -20,6 +29,8 @@ export interface SamEntity {
   zip: string | null;
   business_types: string[];
   certifications: string[];
+  /** The SBA rows with their own certification dates. business_types keeps only the descriptions. */
+  sba_certifications: SbaCertification[];
   poc_name: string | null;
   poc_email: string | null;
   poc_phone: string | null;
@@ -37,6 +48,25 @@ interface SamEntityRaw {
   };
   coreData?: {
     physicalAddress?: { stateOrProvinceCode?: string; zipCode?: string };
+    // THE REAL LOCATION of SBA certification data. `sbaBusinessTypeList` sits HERE, under coreData
+    // .businessTypes — NOT under a top-level `socioeconomic` key. Measured against sam.gov/api/prod
+    // 2026-08-03: a v3 entity payload's top-level keys are entityRegistration, coreData, assertions,
+    // pointsOfContact. There is no `socioeconomic`.
+    //
+    // `businessTypeList` is the SELF-CERTIFIED list the firm ticks in its own registration
+    // ("A5 = Veteran-Owned Business"). It is deliberately NOT read as certification: self-asserted is
+    // exactly what the eligibility floor exists to refuse. Only sbaBusinessTypeList is authoritative.
+    //
+    // Rows arrive with all-null fields when the firm holds no SBA certification, so nulls are filtered.
+    businessTypes?: {
+      businessTypeList?: Array<{ businessTypeCode?: string; businessTypeDesc?: string }>;
+      sbaBusinessTypeList?: Array<{
+        sbaBusinessTypeCode?: string | null;
+        sbaBusinessTypeDesc?: string | null;
+        certificationEntryDate?: string | null;
+        certificationExitDate?: string | null;
+      }>;
+    };
   };
   assertions?: {
     goodsAndServices?: { primaryNaics?: string; naicsList?: Array<{ naicsCode?: string }> };
@@ -63,10 +93,17 @@ function toSamEntity(raw: SamEntityRaw): SamEntity {
   const naicsList = Array.isArray(a.goodsAndServices?.naicsList)
     ? (a.goodsAndServices?.naicsList || []).map((n) => n.naicsCode || "").filter(Boolean)
     : [];
-  const socio = Array.isArray(raw.socioeconomic?.sbaBusinessTypeList)
-    ? (raw.socioeconomic?.sbaBusinessTypeList || []).map((b) => b.sbaBusinessTypeDesc || "").filter(Boolean)
-    : [];
-  const businessTypes: string[] = socio;
+  // Read the path the API actually serves. The previous read was `raw.socioeconomic.sbaBusinessTypeList`,
+  // a key that does not exist in a v3 payload, so business_types was ALWAYS [] and every downstream
+  // certification derivation was structurally unable to emit a record.
+  const sbaRows = (cd.businessTypes?.sbaBusinessTypeList || []).filter((b) => (b?.sbaBusinessTypeDesc || "").trim());
+  const businessTypes: string[] = sbaRows.map((b) => String(b.sbaBusinessTypeDesc).trim());
+  const sbaCertifications: SbaCertification[] = sbaRows.map((b) => ({
+    code: (b.sbaBusinessTypeCode || "").trim() || null,
+    description: String(b.sbaBusinessTypeDesc).trim(),
+    certifiedFrom: (b.certificationEntryDate || "").trim() || null,
+    certifiedUntil: (b.certificationExitDate || "").trim() || null,
+  }));
   return {
     uei: er.ueiSAM || null,
     legal_business_name: er.legalBusinessName || null,
@@ -77,6 +114,7 @@ function toSamEntity(raw: SamEntityRaw): SamEntity {
     zip: cd.physicalAddress?.zipCode || null,
     business_types: businessTypes,
     certifications: businessTypes, // SBA business types double as certifications in our UI
+    sba_certifications: sbaCertifications,
     poc_name: [poc.firstName, poc.lastName].filter(Boolean).join(" ") || null,
     poc_email: poc.email || null,
     poc_phone: poc.phoneNumber || null,

@@ -41,7 +41,7 @@ const PAST = "2026-01-01T00:00:00.000Z";
 const entity = (over: Partial<SamEntity>): SamEntity => ({
   uei: "ABC123DEF456", legal_business_name: "Ridgeline Mfg", cage_code: "1A2B3",
   primary_naics: "336413", naics_codes: ["336413"], state: "TX", zip: "75001",
-  business_types: [], certifications: [], poc_name: null, poc_email: null, poc_phone: null,
+  business_types: [], certifications: [], sba_certifications: [], poc_name: null, poc_email: null, poc_phone: null,
   registration_status: "Active", registration_expiration: FUTURE, ...over,
 });
 
