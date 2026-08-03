@@ -583,6 +583,48 @@ const _DL_MONTHS: Record<string, number> = {
   jan: 0, feb: 1, mar: 2, apr: 3, jun: 5, jul: 6, aug: 7, sep: 8, sept: 8,
   oct: 9, nov: 10, dec: 11,
 };
+// TIMEZONE (2026-08-03) — mirrors the engine copy. A deadline that NAMES its zone had
+// that token stripped, leaving a zone-NAIVE string that new Date() resolved in the HOST's
+// timezone: correct on a UTC-5 dev machine, 4-5 hours EARLY on the UTC worker.
+const _DL_FIXED_OFFSET: Record<string, number> = {
+  EST: -300, EDT: -240, CST: -360, CDT: -300, MST: -420, MDT: -360,
+  PST: -480, PDT: -420, AKST: -540, AKDT: -480, HST: -600,
+  AST: -240, ADT: -180, UTC: 0, GMT: 0,
+};
+const _DL_IANA_ZONE: Record<string, string> = {
+  ET: "America/New_York", EASTERN: "America/New_York",
+  CT: "America/Chicago", CENTRAL: "America/Chicago",
+  MT: "America/Denver", MOUNTAIN: "America/Denver",
+  PT: "America/Los_Angeles", PACIFIC: "America/Los_Angeles",
+  ARIZONA: "America/Phoenix", ALASKA: "America/Anchorage", HAWAII: "Pacific/Honolulu",
+};
+function _dlZone(s: string): { fixed?: number; iana?: string } | null {
+  const fx = s.match(/\b(AKDT|AKST|ADT|AST|HST|[CEMP][DS]T|UTC|GMT)\b/);
+  if (fx && _DL_FIXED_OFFSET[fx[1].toUpperCase()] !== undefined) return { fixed: _DL_FIXED_OFFSET[fx[1].toUpperCase()] };
+  const named = s.match(/\b(Eastern|Central|Mountain|Pacific|Arizona|Alaska|Hawaii)\b/i);
+  if (named) return { iana: _DL_IANA_ZONE[named[1].toUpperCase()] };
+  const bare = s.match(/\b([CEMP]T)\b/);
+  if (bare) return { iana: _DL_IANA_ZONE[bare[1].toUpperCase()] };
+  return null;
+}
+function _dlOffsetMinutesAt(iana: string, y: number, mo: number, d: number, h: number, mi: number): number {
+  const asUTC = Date.UTC(y, mo, d, h, mi);
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: iana, hour12: false,
+    year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+  });
+  const read = (t: number) => {
+    const p: Record<string, string> = Object.fromEntries(fmt.formatToParts(new Date(t)).map((x) => [x.type, x.value]));
+    return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute);
+  };
+  let off = (read(asUTC) - asUTC) / 60000;
+  off = (read(asUTC - off * 60000) - (asUTC - off * 60000)) / 60000;
+  return off;
+}
+const _dlFmtOffset = (m: number) => {
+  const a = Math.abs(m);
+  return `${m < 0 ? "-" : "+"}${String(Math.floor(a / 60)).padStart(2, "0")}:${String(a % 60).padStart(2, "0")}`;
+};
 function normalizeDeadlineString(input: string): string {
   let s = String(input ?? "");
   const proseMonth = s.match(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})\b/i);
@@ -609,7 +651,12 @@ function normalizeDeadlineString(input: string): string {
     const day = parseInt(proseMonth[2], 10);
     const year = parseInt(proseMonth[3], 10);
     const pad = (n: number) => String(n).padStart(2, "0");
-    return `${year}-${pad(monthIdx + 1)}-${pad(day)}T${haveTime ? `${pad(hh)}:${pad(mm)}` : "00:00"}:00`;
+    const base = `${year}-${pad(monthIdx + 1)}-${pad(day)}T${haveTime ? `${pad(hh)}:${pad(mm)}` : "00:00"}:00`;
+    // Carry the stated zone (mirrors engine normalizeDeadlineString — see the TIMEZONE
+    // note there). Only meaningful alongside a time; a bare date has no zone to speak of.
+    const z = haveTime ? _dlZone(input) : null;
+    if (!z) return base;
+    return base + _dlFmtOffset(z.fixed ?? _dlOffsetMinutesAt(z.iana!, year, monthIdx, day, hh, mm));
   }
   s = s.replace(/\b(Arizona|Hawaii|Alaska|Mountain|Eastern|Central|Pacific|Atlantic|Aleutian|Samoa|Chamorro)\s+(?:Standard\s+|Daylight\s+)?(?:Time|Local\s+Time)\b/gi, " ");
   s = s.replace(/\b[A-Z][a-z]+\s+Local\s+Time\b/g, " ");
