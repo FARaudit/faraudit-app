@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
+import { syncCertifications } from "@/lib/cert-sync";
 
 export const dynamic = "force-dynamic";
 
@@ -260,5 +261,28 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
-  return NextResponse.json({ statement: data, savedAt: update.updated_at });
+  // A UEI edit is the moment the firm's verified eligibility can change, so re-derive it HERE rather
+  // than waiting for the next Opportunities load. Two reasons this is the right seam:
+  //   1. the customer finds out immediately whether SAM recognises what they typed — until now a bad
+  //      UEI saved silently and only surfaced later, on a different page, as a banner;
+  //   2. `attributes_v2` is what the AUDIT engine reads for set-aside eligibility. Leaving it to a page
+  //      visit would mean an audit run between the save and that visit scores the firm on stale records.
+  // Records are UEI-bound, so a changed UEI drops the previous firm's programs even if SAM is down.
+  //
+  // NEVER fails the save. The statement is already persisted and the customer's edit is not contingent
+  // on SAM being reachable; `certSync` is reported so the caller can say what happened.
+  let certSync: unknown = null;
+  if ("uei" in body) {
+    try {
+      const r = await syncCertifications(supabase, user.id);
+      certSync = "error" in r
+        ? { state: "unverified", error: r.error }
+        : { state: r.state, persisted: r.persisted, programs: r.records.map((x) => x.attr) };
+    } catch (e) {
+      console.error("[capability-statement] cert sync failed:", e);
+      certSync = { state: "unverified", error: "sync failed" };
+    }
+  }
+
+  return NextResponse.json({ statement: data, savedAt: update.updated_at, certSync });
 }
