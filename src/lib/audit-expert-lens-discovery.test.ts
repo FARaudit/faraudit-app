@@ -1,7 +1,7 @@
 // $0 regression lock for LENS DISCOVERY (flag AUDIT_LENS_DISCOVERY).
 // Run: npx tsx src/lib/audit-expert-lens-discovery.test.ts
 //
-// WHAT IS BROKEN. Nine of ten lenses have no way to learn that a binding attachment exists. The three base tools
+// WHAT IS BROKEN. Four of the five audit lenses have no way to learn that a binding attachment exists. The base tools
 // cannot enumerate: read_section reads UCF A-M only; lookup_clause needs a clause number; find_in_source searches the
 // WHOLE package but only for a phrase the lens already thought of. The one function that DOES enumerate,
 // listBindingDocuments(), is $0, is NOT a tool, and has a single call site (audit-expert.ts:71) reached only when
@@ -96,7 +96,7 @@ const CHILD = process.argv[2] === "--child-both-on";
   // ---- 7 (CHILD). BOTH FLAGS ON -- the coverage lens must not receive BOTH mandates -------------------------------
   // The coverage lens already gets a seeded full-text read plus a mandatory read-or-attest checklist. Stacking the
   // discovery notice on top would re-announce documents whose text it was just handed, reviving the token cost this
-  // design exists to avoid. The OTHER nine lenses must still get discovery -- that is the point of the feature.
+  // design exists to avoid. The OTHER four lenses must still get discovery -- that is the point of the feature.
   if (CHILD) {
     const cov = await runLens("contracts_attorney", PKG);   // == COVERAGE_LENS_KEY default
     const other = await runLens("pricing_analyst", PKG);
@@ -108,6 +108,16 @@ const CHILD = process.argv[2] === "--child-both-on";
     console.log(`child: ${pass} passed, ${fail} failed`);
     process.exit(fail > 0 ? 1 : 0);
   }
+
+  // ---- 0. THE COUNT THIS ARC'S PROSE DEPENDS ON ------------------------------------------------------------------
+  // The arc originally shipped saying "nine of ten lenses". The panel is FIVE. "Nine" was a DOCUMENT statistic (63 of
+  // 70 findings grounded in the primary, zero in the other nine DOCUMENTS) read as a lens statistic. Re-reading the
+  // comment would never have caught that -- only asserting the number against the roster does. Pinned here so the
+  // next person to write "N lenses" in a comment has to be right.
+  const { AUDIT_LENSES } = await import("./audit-lenses");
+  ok("the lens panel is FIVE seats", AUDIT_LENSES.length === 5);
+  ok("exactly one of them is the coverage lens, so FOUR are blind without discovery",
+    AUDIT_LENSES.filter((l) => l.key === "contracts_attorney").length === 1);
 
   // ---- 1. CONTROL, both flags OFF -- this is prod-today and must stay byte-identical ------------------------------
   const off = await withDiscovery(false, () => runLens("pricing_analyst", PKG));

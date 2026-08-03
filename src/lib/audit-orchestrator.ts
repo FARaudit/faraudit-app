@@ -760,7 +760,7 @@ export function docRegions(fullSource: string): Array<{ name: string; text: stri
  *  only by running a whole audit, and that is precisely why lens discovery could start consuming resolvePrimary
  *  WITHOUT this guard travelling with it. The guard is not decoration on identity resolution — it is the half that
  *  keeps `resolvePrimary`'s best-effort fallback (firstNonAmend, when nothing scores ≥25) from silently deciding which
- *  document the ten lenses are never told about. Whenever a capability consumes the identity pick, it must also see
+ *  document the lens panel is never told about. Whenever a capability consumes the identity pick, it must also see
  *  the indeterminacy. Flag-OFF ⇒ false ⇒ byte-identical to prod-today. */
 export function primaryIndeterminateFor(fullSource: string): boolean {
   if (!(ATTACHMENT_COVERAGE_ENABLED || lensDiscoveryEnabled())) return false;

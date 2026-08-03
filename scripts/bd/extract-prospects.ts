@@ -55,7 +55,7 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const SAM_API_KEY_PRESENT = !!process.env.SAM_API_KEY; // not used at runtime; just env-discipline check
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.error("ENV MISSING — need SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (Rule 23)");
+  console.error("ENV MISSING — need SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (Rule 42)");
   process.exit(2);
 }
 

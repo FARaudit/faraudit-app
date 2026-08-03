@@ -243,10 +243,14 @@ export const ATTACHMENT_COVERAGE_ENABLED = isEnvOn(process.env.AUDIT_ATTACHMENT_
 // ROOT: the base toolset cannot ENUMERATE. read_section reads UCF A-M; lookup_clause needs a clause number;
 // find_in_source searches the whole package but only for a phrase the lens already thought of. So a lens can REACH an
 // attachment's text and still never learn the attachment exists. listBindingDocuments() is the enumerator, it is $0,
-// and it is not a tool -- its single call site is gated to ONE lens behind ATTACHMENT_COVERAGE. Nine of ten lenses are
-// therefore blind by construction, which is why "wage" appears in no lens prompt and the wage determination produced
+// and it is not a tool -- its single call site is gated to ONE lens (contracts_attorney) behind ATTACHMENT_COVERAGE.
+// AUDIT_LENSES has FIVE seats, so FOUR of the five are blind by construction, which is why "wage" appears in no lens prompt and the wage determination produced
 // zero findings on four of four measured runs. Measured over 111 banked packages, 105 carry at least one binding
-// attachment the other nine lenses were never told about (`scripts/audit-ai/_lens-02-discovery-live-inertness.ts`).
+// attachment the other four lenses were never told about (`scripts/audit-ai/_lens-02-discovery-live-inertness.ts`).
+// COUNT CORRECTED 2026-08-03: the arc shipped saying "nine of ten lenses". The panel is FIVE (audit-lenses.ts,
+// asserted below). "Nine" came from misreading a DOCUMENT statistic — 63 of 70 findings grounded in the primary,
+// zero in the other nine DOCUMENTS — as a lens statistic. The fix and every token measurement were computed over
+// five lenses and are unaffected; only the sentence was wrong.
 //
 // SEPARATE FLAG, deliberately (CEO ruling 2026-08-03). Folding this into AUDIT_ATTACHMENT_COVERAGE would mean one arm
 // ships two independent bets: this one (tell every lens what is in the package) and the coverage sweep (seeded
