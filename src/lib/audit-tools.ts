@@ -239,6 +239,24 @@ export function phrasePresentInNormalized(normedSource: string, phrase: string):
 // the lens that path. Flag-gated: the tool is exposed ONLY when the flag is on ⇒ flag-OFF tool list is byte-identical.
 export const ATTACHMENT_COVERAGE_ENABLED = isEnvOn(process.env.AUDIT_ATTACHMENT_COVERAGE);
 
+// ── LENS DISCOVERY (flag AUDIT_LENS_DISCOVERY) ──────────────────────────────────────────────────────────────
+// ROOT: the base toolset cannot ENUMERATE. read_section reads UCF A-M; lookup_clause needs a clause number;
+// find_in_source searches the whole package but only for a phrase the lens already thought of. So a lens can REACH an
+// attachment's text and still never learn the attachment exists. listBindingDocuments() is the enumerator, it is $0,
+// and it is not a tool -- its single call site is gated to ONE lens behind ATTACHMENT_COVERAGE. Nine of ten lenses are
+// therefore blind by construction, which is why "wage" appears in no lens prompt and the wage determination produced
+// zero findings on four of four measured runs. Measured over 111 banked packages, 105 carry at least one binding
+// attachment the other nine lenses were never told about (`scripts/audit-ai/_lens-02-discovery-live-inertness.ts`).
+//
+// SEPARATE FLAG, deliberately (CEO ruling 2026-08-03). Folding this into AUDIT_ATTACHMENT_COVERAGE would mean one arm
+// ships two independent bets: this one (tell every lens what is in the package) and the coverage sweep (seeded
+// full-text read + mandatory read-or-attest + the attestations schema property). They fail in different ways and
+// deserve to be armed and reverted independently.
+//
+// Read at CALL time, not module load, so the two states are reachable in one process and the behaviour is testable
+// without a subprocess -- the shape strictFindingsToolEnabled already uses.
+export const lensDiscoveryEnabled = () => isEnvOn(process.env.AUDIT_LENS_DISCOVERY);
+
 // parseDocRegions + resolvePrimary moved VERBATIM to primary-doc-resolve.ts (root-b U1, 2026-07-29) so the
 // section detector can consult the SAME Card #370 election without an import cycle. Re-exported here so every
 // existing consumer's import path is unchanged.
@@ -256,7 +274,13 @@ function docRegionsOf(ctx: AuditToolContext): Array<{ name: string; text: string
   const src = ctx.fullSource ?? "";
   const regions = parseDocRegions(src);
   if (regions.length === 0) return [{ name: "(primary solicitation)", text: src, isPrimary: true }];
-  const primaryIdx = ATTACHMENT_COVERAGE_ENABLED ? resolvePrimary(regions).index : 0;
+  // Identity-based primary pick under EITHER capability. Write-order `i === 0` is not merely imprecise here, it is
+  // silently destructive in both directions: if the solicitation is not written first, the doc that IS first gets
+  // mistaken for the primary and drops off listBindingDocuments entirely (unreachable by read_document too, since it
+  // filters the same set), while the real solicitation is announced to every lens as an attachment. A wage
+  // determination vanishing from the enumeration is precisely the failure lens discovery exists to fix, so the
+  // feature cannot inherit a primary rule that can cause it.
+  const primaryIdx = (ATTACHMENT_COVERAGE_ENABLED || lensDiscoveryEnabled()) ? resolvePrimary(regions).index : 0;
   return regions.map((r, i) => ({ ...r, isPrimary: i === primaryIdx }));
 }
 
@@ -276,13 +300,23 @@ export const DOC_READ_CAP = Number(process.env.AGENTIC_DOC_READ_CAP) || 40000;
 /** Tool (A) — read a binding ATTACHMENT's text by name (fuzzy: case-insensitive substring, min 4 chars, either
  *  direction), so the lens can ground obligations that live outside the UCF sections read_section covers. `truncated`
  *  = the doc exceeds DOC_READ_CAP (a partial read — NOT provably-read-whole). Deterministic, $0. */
-export function readDocument(ctx: AuditToolContext, name: string): { name: string; present: boolean; text: string; truncated: boolean } {
+export function readDocument(ctx: AuditToolContext, name: string): { name: string; present: boolean; text: string; truncated: boolean; ambiguous?: boolean; candidates?: string[] } {
   const q = (name || "").toLowerCase().replace(/\s+/g, " ").trim();
   const regions = docRegionsOf(ctx).filter((r) => !r.isPrimary);
   // Match on exact, or substring EITHER direction but only for a query of real length (a 1–3 char query must not
   // fuzzy-match every doc → wrong-doc read). Exact match always wins if present.
-  const hit = regions.find((r) => r.name.toLowerCase() === q)
-    ?? (q.length >= 4 ? regions.find((r) => { const n = r.name.toLowerCase(); return n.includes(q) || q.includes(n); }) : undefined);
+  const exact = regions.find((r) => r.name.toLowerCase() === q);
+  if (exact) return { name: exact.name, present: true, text: exact.text.slice(0, DOC_READ_CAP), truncated: exact.text.length > DOC_READ_CAP };
+  const fuzzy = q.length >= 4 ? regions.filter((r) => { const n = r.name.toLowerCase(); return n.includes(q) || q.includes(n); }) : [];
+  // AMBIGUITY IS NOT A TIE TO BREAK (review of #413). This used to `.find()` — take the FIRST fuzzy match and say
+  // nothing — which turns a name the model could not have known was ambiguous into a confidently wrong read. The
+  // announced names are truncated to 120 chars by the caller, so two attachments sharing a long prefix ("… Wage
+  // Determination … Part 1 of 2" / "Part 2 of 2") render as the SAME label; a lens asking for the second silently got
+  // the first, and because the excerpt genuinely is in fullSource the Rule 64 grounding backstop passes it. Return the
+  // candidates instead and let the lens re-ask: honest-fail (Rule 61) applies to a tool result exactly as it applies
+  // to a verdict. An EXACT name still wins above, so the coverage path's seeded reads are unaffected.
+  if (fuzzy.length > 1) return { name, present: false, text: "", truncated: false, ambiguous: true, candidates: fuzzy.map((r) => r.name) };
+  const hit = fuzzy[0];
   if (!hit) return { name, present: false, text: "", truncated: false };
   return { name: hit.name, present: true, text: hit.text.slice(0, DOC_READ_CAP), truncated: hit.text.length > DOC_READ_CAP };
 }
@@ -298,10 +332,15 @@ export const AUDIT_TOOLS = [
 /** The read_document tool (A) — appended to the tool list ONLY when AUDIT_ATTACHMENT_COVERAGE is on. */
 export const READ_DOCUMENT_TOOL = { name: "read_document", description: "Read the full text of a named binding ATTACHMENT (e.g. a Statement of Work, Security Requirements, answered RFI, wage determination) that is NOT a UCF section. Use to ground obligations that live in attachments. An absent result means no such document is in the package.", input_schema: { type: "object", additionalProperties: false, required: ["name"], properties: { name: { type: "string", description: "The attachment name or a distinctive substring of it" } } } } as const;
 
-/** The tool list for a lens run — base tools, plus read_document when attachment coverage is enabled. Flag-OFF ⇒
- *  identical to AUDIT_TOOLS (byte-for-byte), so prod is unchanged until the capability is Gauntleted on. */
-export function auditToolsFor(enabled: boolean = ATTACHMENT_COVERAGE_ENABLED): ReadonlyArray<typeof AUDIT_TOOLS[number] | typeof READ_DOCUMENT_TOOL> {
-  return enabled ? [...AUDIT_TOOLS, READ_DOCUMENT_TOOL] : AUDIT_TOOLS;
+/** The tool list for a lens run — base tools, plus read_document when EITHER attachment coverage or lens discovery is
+ *  enabled. Discovery hands every lens the attachment NAME LIST, so it must also hand them the tool that opens one:
+ *  naming a document a lens cannot then read is a worse prompt than saying nothing. BOTH flags OFF ⇒ returns
+ *  AUDIT_TOOLS by identity (byte-for-byte, same prompt-cache prefix), so prod is unchanged until one is armed. */
+export function auditToolsFor(
+  enabled: boolean = ATTACHMENT_COVERAGE_ENABLED,
+  discovery: boolean = lensDiscoveryEnabled(),
+): ReadonlyArray<typeof AUDIT_TOOLS[number] | typeof READ_DOCUMENT_TOOL> {
+  return (enabled || discovery) ? [...AUDIT_TOOLS, READ_DOCUMENT_TOOL] : AUDIT_TOOLS;
 }
 
 /** Dispatch a tool call from the expert loop to its deterministic executor. Pure, $0. */
