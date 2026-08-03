@@ -20,6 +20,7 @@ import { detectFormat, procurementPart, requiresProposalSections, type AuditTool
 import { deriveVerdict, applyFindingDedup, applyCrossFleetDedup } from "./audit-decide";
 import { consequenceTailsAfter, gradeCoverageV2, verifyRecitalInSource, type CoverageV2 } from "./audit-gate-v2";
 import type { TypedFinding, VerdictInputs, BidderProfile } from "./audit-findings";
+import type { UsageCall } from "./audit-cost";
 
 export const RUN_RECORD_SCHEMA = "run-record/v1" as const;
 
@@ -136,6 +137,15 @@ export interface RunRecord {
     sectionsRead: string[];
     perLens: Record<string, number>;
     diagnostics?: RunDiagnostics;                // card #582 — pre-dedup finding snapshot + stage counts for the coverage-stage replay. Optional ⇒ pre-#582 records still load.
+    // STAGE LEDGER (2026-08-03) — every model call this run made: stage label, model, tokens, cache split and
+    // wall-clock. The engine ALREADY produced this on every paid run and threw it away: `usageCalls` was
+    // aggregated into a dollar figure for billing (`aggregate()` reads model+tokens only) and then dropped.
+    // Measured across 113 banked records, ONE carried any `wall_ms` and TWO any `cost_usd` — which is why
+    // "where does the wall-clock and the token spend go" was unanswerable by replay at $0. Capturing the array
+    // costs one assignment and makes every FUTURE run answer it permanently.
+    // Optional ⇒ every pre-existing record still loads, and replay never reads it: this is EVIDENCE, not input,
+    // so adding it cannot change a replayed verdict.
+    usage?: UsageCall[];
   };
   billing: { honestFail: boolean; billable: boolean };
 }
@@ -143,6 +153,8 @@ export interface RunRecord {
 export interface BuildRunRecordArgs {
   meta: RunRecordMeta;
   input: RunRecordInput;
+  /** The run's per-call cost/latency ledger, verbatim. See RunRecord.result.usage. */
+  usage?: UsageCall[];
   result: AuditResult;
   billing: { honestFail: boolean; billable: boolean };
   commercialHonestFail?: boolean;               // the coreMissing flag state the run used (AUDIT_PROCUREMENT_TYPE_SECTIONS)
@@ -189,6 +201,10 @@ export function buildRunRecord(args: BuildRunRecordArgs): RunRecord {
       sectionsRead: args.result.sectionsRead,
       perLens: args.result.perLens,
       ...(args.result.diagnostics ? { diagnostics: args.result.diagnostics } : {}),   // card #582 — capture-only, present iff the run banked it
+      // Spread-conditional like its siblings: a run that supplied no ledger omits the key entirely rather than
+      // banking an empty array, so "this run predates the ledger" stays distinguishable from "this run made
+      // zero model calls". Those are different facts and only one of them is alarming.
+      ...(args.usage && args.usage.length ? { usage: args.usage } : {}),
     },
     billing: args.billing,
   };

@@ -81,6 +81,9 @@ async function main() {
       note: `${totals.calls} calls, token-derived $${totals.usd.toFixed(4)}`,
     },
     input: { fullSource: src, bidderProfile: null, naics: null, setAside: null, manifestComplete: null },
+    // The per-call ledger this entry already collected to price the run — banked instead of discarded, so a
+    // $0 replay can answer where the wall-clock and the tokens went.
+    ...(usageCalls.length ? { usage: usageCalls } : {}),
     result: res,
     billing: { honestFail, billable: bill },
     commercialHonestFail: process.env.AUDIT_PROCUREMENT_TYPE_SECTIONS === "true",
