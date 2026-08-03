@@ -152,6 +152,25 @@ function findLeaks(src: string, kind: "html" | "js" = "html"): { payload: string
 
   if (kind === "html") {
     for (const m of src.matchAll(COMMENT)) judgeHtml(m[1]);
+    // SCOPE WIDENED AGAIN — an .html file serves THREE comment syntaxes, and this
+    // gate read one. `<!-- -->` was swept; the `/* */` inside <style> and the
+    // `/* */` + `//` inside an inline <script> were not, though every byte of all
+    // three reaches View-Source identically. Census on the real tree: 356 CSS
+    // comments across 24 files and 109 inline-script comments across 14.
+    //
+    // They take the .js rule, not the .html one. The prose ceiling is an HTML-
+    // comment shape ("a divider label or it is rationale") and does not transfer:
+    // a stylesheet's long note explaining WHY a token is not --mute is
+    // documentation, and 22 such comments would have failed on length alone. What
+    // does transfer is what a comment POINTS AT — an internal reference of any
+    // length is a leak, and so is a confession.
+    for (const st of src.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi))
+      for (const c of st[1].matchAll(JS_BLOCK)) judgeJs(c[1]);
+    // Inline scripts only. A <script src> ships its own file, already swept as kind "js".
+    for (const sc of src.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)) {
+      for (const c of sc[1].matchAll(JS_BLOCK)) judgeJs(c[1].replace(/^\s*\*/gm, " "));
+      for (const c of sc[1].matchAll(JS_LINE_RUN)) judgeJs(c[0].replace(/^[ \t]*\/\//gm, " "));
+    }
   } else {
     for (const m of src.matchAll(JS_BLOCK)) judgeJs(m[1].replace(/^\s*\*/gm, " "));
     for (const m of src.matchAll(JS_LINE_RUN)) judgeJs(m[0].replace(/^[ \t]*\/\//gm, " "));
@@ -171,6 +190,33 @@ function findLeaks(src: string, kind: "html" | "js" = "html"): { payload: string
   assert(findLeaks(plantedProse).length === 1, "KNOWN-POSITIVE: a planted rationale comment is caught (prose ceiling)");
   assert(findLeaks(plantedMarker).length === 1, "KNOWN-POSITIVE: a planted internal card reference is caught (marker net)");
   assert(findLeaks(clean).length === 0, "KNOWN-NEGATIVE: structural dividers and short labels pass");
+
+  // ── the widened .html surface: <style> and inline <script> ──────────────────────────────────────
+  // A widening without planted positives is a placebo: the passing output of a gate that sweeps one
+  // syntax is identical to one that sweeps three.
+  const cssRef   = `<style>/* the calm wash for needs-attention rows (Design WIRE-MAP #456) */\n.x{color:red}</style>`;
+  const cssConf  = `<style>/* this token was previously --mute, which was wrong on --bg */\n.y{color:blue}</style>`;
+  const cssClean = `<style>/* --tertiary is NOT --mute: #64748b clears 4.5:1 on --card (4.76) but only reaches 4.31 on --bg, and the page header sits on --bg. A token verified against one ground is not verified. */\n.z{color:#5b6a7d}</style>`;
+  assert(findLeaks(cssRef).length === 1,   "KNOWN-POSITIVE(css): an internal reference inside <style> is caught");
+  assert(findLeaks(cssConf).length === 1,  "KNOWN-POSITIVE(css): a confession inside <style> is caught");
+  assert(findLeaks(cssClean).length === 0, "KNOWN-NEGATIVE(css): a long legitimate token note survives (no prose ceiling on CSS)");
+
+  const inlineRef  = `<script>\n// Phase 9 — live "Due in" off the close date\nvar a=1;\n</script>`;
+  const inlineConf = `<script>/* the map used to end on a terminal CAUTION, so three poles rendered wrong */\nvar b=2;</script>`;
+  const inlineOk   = `<script>\n// Recomputed every render; NO-BID suppresses the countdown to an em dash.\nvar c=3;\n</script>`;
+  assert(findLeaks(inlineRef).length === 1,  "KNOWN-POSITIVE(inline js): a phase reference inside <script> is caught");
+  assert(findLeaks(inlineConf).length === 1, "KNOWN-POSITIVE(inline js): a confession inside <script> is caught");
+  assert(findLeaks(inlineOk).length === 0,   "KNOWN-NEGATIVE(inline js): current-behaviour documentation survives");
+
+  // A <script src> ships its own file and is swept as kind "js". Sweeping it here too would double-count
+  // every external script's comments against the wrong file.
+  const external = `<script src="dso-app.js"></script>`;
+  assert(findLeaks(external).length === 0, "KNOWN-NEGATIVE: a <script src> is not swept as inline");
+
+  // The three syntaxes must be judged by their OWN rule. An HTML comment keeps the prose ceiling; a CSS
+  // one does not — proving the ceiling did not leak across when the scope widened.
+  const longHtml = `<!-- ${"This paragraph explains at length why a decision was taken and is exactly the rationale the ceiling exists to stop shipping to a customer's View-Source. ".repeat(2)} -->`;
+  assert(findLeaks(longHtml).length === 1, "KNOWN-POSITIVE: the HTML prose ceiling still applies to <!-- -->");
 
   // The .js path is a SEPARATE scanner with a SEPARATE rule. Inheriting the .html known-positives
   // would certify a code path that never ran, so plant against every alternative that carries a real

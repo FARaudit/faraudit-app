@@ -343,9 +343,9 @@ details[open]>summary .chev{transform:rotate(180deg)}
 .rac.is-proceed{--v:#1f8a5b;--vt:#e7f4ed;--vl:#bfe3cf;--vi:#15623f}
 .rac.is-caution{--v:#c2861a;--vt:#fbf1dc;--vl:#ecd5a3;--vi:#8a5d11}
 .rac.is-nobid{--v:#c0352b;--vt:#fbeae8;--vl:#eec4bf;--vi:#9a261d}
-/* F2-LIVE (ARC #747) — the non-committal poles. Graphite bodies: red asserts a decline the engine did not
-   issue, amber asserts a caution it did not issue. Tokens taken from Design card #663 R2 so the parked row
-   rebuild inherits the same register rather than re-deciding it. */
+/* The non-committal poles. Graphite bodies: red would assert a decline the
+   engine did not issue, amber a caution it did not issue. Any later row rebuild
+   inherits this register rather than re-deciding it. */
 .rac.is-review{--v:#64748b;--vt:#f1f5f9;--vl:#dbe2ea;--vi:#475569}
 .rac.is-review::before{background:#c2861a}                      /* graphite body, one warm rail — referred, not judged */
 .rac.is-incomplete{--v:#64748b;--vt:#fafcfe;--vl:#cbd5e1;--vi:#475569}
@@ -652,7 +652,7 @@ details[open]>summary .chev{transform:rotate(180deg)}
 .sb-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#64748b,#334155);display:grid;place-items:center;color:#fff;font-weight:700;font-size:12px;border:1.5px solid rgba(255,255,255,.06)}
 /* ── /canonical toggle sidebar ── */
 
-/* ===== PHASE 9 — Run Audit content redesign (builds on Phases 6/8) ===== */
+/* ===== Run Audit content ===== */
 /* 1 · one consistent 1080 width — center via the CONTAINER, not per-block auto-margins */
 #view-audit.on{ align-items:center; }
 .page-h, .page-sub, .ra-cols, .body-stack, .prep-wrap{ width:100%; max-width:1080px; }
@@ -713,7 +713,7 @@ details[open]>summary .chev{transform:rotate(180deg)}
   .pipe .pstep + .pstep{border-left:0;border-top:1px solid var(--line-2)}
   .pipe .pstep.pdeliver{margin:0;border-radius:12px}
 }
-/* ===== /PHASE 9 ===== */
+/* ===== /Run Audit content ===== */
 </style>
 </head>
 <body>
@@ -967,8 +967,8 @@ details[open]>summary .chev{transform:rotate(180deg)}
 </div>
 
 <script>
-/* FARaudit — Run Audit (Phase 1 relayout). Design body + production plumbing.
-   API contracts preserved: POST /api/audit (FormData noticeId + pdf[]) ; GET /api/audits?limit=20. */
+/* FARaudit — Run Audit. Design body + production plumbing.
+   API contracts: POST /api/audit (FormData noticeId + pdf[]) ; GET /api/audits?limit=20. */
 (function(){
 "use strict";
 function escapeHtml(s){if(s==null)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
@@ -1094,9 +1094,9 @@ var __fdPartialNoticeId=null;
     // set complete → start the audit automatically (the COMPLETE card says so).
     submitAudit({noticeId:data.noticeId,btn:go,onErr:function(m){showError(m);}});
   }
-  // drive the PARTIAL state — Fix #4 (Brain card 39): THREE HONEST STATES. A section we never read
+  // drive the PARTIAL state — THREE HONEST STATES. A section we never read
   // (unverified) is NEVER shown as "missing" — only a section we read-and-confirmed-absent is. The
-  // door is best-effort; the full audit (the MAP) is the authoritative read and confirms the rest.
+  // door is best-effort; the full audit is the authoritative read and confirms the rest.
   function drivePartial(data){
     var sub=$('fdPartialSub'),missBox=$('fdPartialMiss');
     var LBL={MAIN:'Main solicitation (SF-1449 / 1442)',C:'§C — Statement of Work / PWS',L:'§L — Instructions to offerors',M:'§M — Evaluation factors'};
@@ -1136,7 +1136,7 @@ var __fdPartialNoticeId=null;
         // the full agentic audit reads §C/§L/§M inside the combined solicitation. Only
         // a CONFIRMED-absent core section (door read the body, section genuinely not
         // there) or a missing main solicitation is a real gap that should pause. Every
-        // other case proceeds confidently (combined RFQs no longer show a false "partial").
+        // other case proceeds.
         var absentCore=(d.absentCore||[]).slice();
         if(!absentCore.length && !(d.unverifiedCore||[]).length && (d.missingCore||[]).length){
           (d.missingCore||[]).forEach(function(k){ if(k!=='MAIN') absentCore.push(k); }); // back-compat: pre-3-state API
@@ -1217,7 +1217,7 @@ var __fdPartialNoticeId=null;
   var allLink=document.querySelector('.blk-recent .all');if(allLink)allLink.setAttribute('href','/dashboard');
   if(!list)return;
   function ago(iso){if(!iso)return '';var d=new Date(iso),s=(Date.now()-d.getTime())/1000;if(isNaN(s))return '';if(s<3600)return Math.max(1,Math.floor(s/60))+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
-  // Phase 9 — live "Due in" off the solicitation close date (response_deadline).
+  // live "Due in" off the solicitation close date (response_deadline).
   // Recomputed every render; NO-BID suppresses the countdown to "—" (decided, no action).
   function dueIn(a,verdictLabel){
     if(verdictLabel==='NO-BID')return{cls:'closed',txt:'—'};
@@ -1229,15 +1229,13 @@ var __fdPartialNoticeId=null;
     if(days===0)return{cls:'due',txt:'Due today'};
     return{cls:'closed',txt:'Closed'};
   }
-  // ── VERDICT POLE → ROW (F2-LIVE, ARC #747) ───────────────────────────────────────────────────────
+  // ── VERDICT POLE → ROW ───────────────────────────────────────────────────────────────────────────
   // The engine issues SIX poles (audit-decide.ts: BID | BID_WITH_CAUTION | NO_BID | INELIGIBLE |
-  // NEEDS_HUMAN_REVIEW | INCOMPLETE). This list used to map THREE and end on a terminal
-  // `return {label:'CAUTION'}`, so INELIGIBLE / NEEDS_HUMAN_REVIEW / INCOMPLETE were all painted — and
-  // LABELLED — "CAUTION": the surface asserting a decision the engine never issued. Measured before the
-  // fix: 54 of 101 recent audits carried a pole the map could not represent, and every one rendered
-  // CAUTION. That is the dominant case, not an edge case.
+  // NEEDS_HUMAN_REVIEW | INCOMPLETE). Every one of them must map EXPLICITLY. There is no terminal
+  // fallback label: a pole this map cannot represent must not inherit a neighbour's word, because the
+  // surface would then assert a decision the engine never issued.
   //
-  // Rules (Design card #663 R2, and the ARC #747 class rule):
+  // Rules:
   //  · v3_verdict is the AUTHORITATIVE pole and is read FIRST. The legacy vocabularies are consulted only
   //    for rows that predate it (v3_verdict absent), never as an override.
   //  · Red is reserved for COMMITTAL declines. NEEDS_HUMAN_REVIEW / INCOMPLETE never take verdict-red —
@@ -1281,14 +1279,14 @@ var __fdPartialNoticeId=null;
     var badge=(score!=null)?'<span class="rac-score">'+escapeHtml(String(score))+'</span><span class="rac-of">/ 100</span>':'<span class="rac-score">—</span>';
     var dl=dueIn(a,v.label);
     return '<a class="rac '+v.cls+'" href="/audit/'+slug+'"><div class="rac-badge">'+badge+'</div><div class="rac-main"><div class="rac-title">'+escapeHtml(titleLine)+'</div><div class="rac-sub">'+(office?'<span class="rac-office">'+escapeHtml(office)+'</span>':'')+'<span class="rac-insight"><span class="rac-spark"></span>'+escapeHtml(ins)+'</span></div></div><div class="rac-dl"><span class="lbl">Due in</span><span class="val '+dl.cls+'">'+escapeHtml(dl.txt)+'</span></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>'+escapeHtml(v.label)+'</span><span class="rac-ago">'+escapeHtml(when)+'</span><span class="rac-chev">→</span></div></a>';}
-  // Phase 9 — first-run vs returning: flip section order + expand the "what runs" teaching pipeline for first-run.
+  // first-run vs returning: flip section order + expand the "what runs" teaching pipeline for first-run.
   function flip(n){var firstRun=(n===0);if(stack)stack.classList.toggle('flip',firstRun);var stages=document.querySelector('.blk-stages');if(stages&&stages.tagName==='DETAILS'){if(firstRun)stages.setAttribute('open','');else stages.removeAttribute('open');}}
   function renderCards(audits){if(!audits||!audits.length){list.innerHTML='<div class="ra-empty"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg></div><div class="h">No audits yet</div><div class="s">Upload a solicitation above and your first ranked report lands here — a bid / no-bid call with the KO clarification email drafted and ready.</div></div>';flip(0);return;}list.innerHTML=audits.map(cell).join('');flip(audits.length);}
   fetch('/api/audits?limit=20',{credentials:'include'}).then(function(r){return r.ok?r.json():{audits:[]};}).then(function(d){renderCards((d&&d.audits)||[]);}).catch(function(){renderCards([]);});})();
 
 /* ── state-driven order: first-run (no audits) sees the pipeline strip first ── */
 (function(){var stack=$('bodyStack');var firstRun=document.querySelectorAll('.blk-recent .rac').length===0;if(stack)stack.classList.toggle('flip',firstRun);var stages=document.querySelector('.blk-stages');if(stages&&stages.tagName==='DETAILS'&&firstRun)stages.setAttribute('open','');})();
-/* ── recently-audited overflow fade toggle (Phase 6) ── */
+/* ── recently-audited overflow fade toggle ── */
 (function(){var region=document.querySelector('.blk-recent .ra-region');if(!region)return;var sc=region.querySelector('.ra-scroll');if(!sc)return;function sync(){region.classList.toggle('is-overflowing',sc.scrollHeight>sc.clientHeight+1);}sync();if(typeof ResizeObserver!=='undefined'){new ResizeObserver(sync).observe(sc);}})();
 })();
 </script>
