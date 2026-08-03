@@ -53,7 +53,7 @@ const pct = (a: number[], p: number) => a.length ? [...a].sort((x, y) => x - y)[
     if (names.length === 0) { inert++; inertSols.push(sol); continue; }
     fired++;
     // The notice as actually rendered: the bracketed name list plus the fixed prose around it.
-    noticeTokens.push(Math.ceil((names.join("; ").length + 330) / CHARS_PER_TOKEN));
+    noticeTokens.push(Math.ceil((names.join("; ").length + 583) / CHARS_PER_TOKEN));
     // The REJECTED design, for the same package: every binding doc's full text, injected per lens.
     const regions = [...src.matchAll(/^====\s*DOCUMENT:\s*(.+?)\s*====$/gm)];
     let bytes = 0;

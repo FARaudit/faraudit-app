@@ -10,9 +10,9 @@
 // package, so it never searches for one, so the WD produced 0 findings on 4 of 4 measured runs.
 //
 // WHY NAMES AND NOT TEXT. Measured by `scripts/audit-ai/_lens-02-discovery-live-inertness.ts` over 111 BANKED
-// packages, through the production listBindingDocuments: the rendered notice is p50 170 / max 289 tokens per lens,
-// 850 across five. Pre-injecting attachment FULL TEXT -- the rejected design -- is p50 35,219 / max 332,310 per lens,
-// 176,095 across five, and it is what blew the 270s budget on live runs 6cbabeae and e63a9b2d. 207x at the median.
+// packages, through the production listBindingDocuments: the rendered notice is p50 243 / max 361 tokens per lens,
+// 1,215 across five. Pre-injecting attachment FULL TEXT -- the rejected design -- is p50 35,219 / max 332,310 per lens,
+// 176,095 across five, and it is what blew the 270s budget on live runs 6cbabeae and e63a9b2d. 145x at the median.
 // Test 3 below is what keeps them apart: a discovery lens must receive NO seeded tool results.
 //
 // THAT SAME PROBE ANSWERS INERTNESS, which a green suite cannot: the notice fires on 105 of 111 real banked packages.
@@ -133,8 +133,11 @@ const CHILD = process.argv[2] === "--child-both-on";
   // ---- 3. THE PERF INVARIANT -- names, never text. This is what separates the shipped design from the rejected one.
   ok("flag ON: NO full text is pre-injected -- zero seeded read_document results", on.seededDocs === 0);
   ok("flag ON: no prior tool-result batch at all before turn 1", on.priorBatches === 0);
-  ok("flag ON: the notice stays small -- under 600 chars for a 2-attachment package",
-    on.userTask.length - off.userTask.length < 600);
+  // The fixed prose is 583 chars (measured, not guessed); this 2-attachment fixture adds ~64 chars of names. The bound
+  // is deliberately close to that sum: it is here to catch someone re-introducing document TEXT into the notice, and a
+  // slack bound would not. If the wording legitimately grows, re-measure with _lens-02 and move this with it.
+  ok("flag ON: the notice stays small -- under 800 chars for a 2-attachment package",
+    on.userTask.length - off.userTask.length < 800);
   ok("flag ON: the attachment BODY text never appears in the prompt",
     !/minimum monetary wages listed/i.test(on.userTask) && !/DD Form 254/i.test(on.userTask));
 

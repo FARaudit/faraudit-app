@@ -300,13 +300,23 @@ export const DOC_READ_CAP = Number(process.env.AGENTIC_DOC_READ_CAP) || 40000;
 /** Tool (A) — read a binding ATTACHMENT's text by name (fuzzy: case-insensitive substring, min 4 chars, either
  *  direction), so the lens can ground obligations that live outside the UCF sections read_section covers. `truncated`
  *  = the doc exceeds DOC_READ_CAP (a partial read — NOT provably-read-whole). Deterministic, $0. */
-export function readDocument(ctx: AuditToolContext, name: string): { name: string; present: boolean; text: string; truncated: boolean } {
+export function readDocument(ctx: AuditToolContext, name: string): { name: string; present: boolean; text: string; truncated: boolean; ambiguous?: boolean; candidates?: string[] } {
   const q = (name || "").toLowerCase().replace(/\s+/g, " ").trim();
   const regions = docRegionsOf(ctx).filter((r) => !r.isPrimary);
   // Match on exact, or substring EITHER direction but only for a query of real length (a 1–3 char query must not
   // fuzzy-match every doc → wrong-doc read). Exact match always wins if present.
-  const hit = regions.find((r) => r.name.toLowerCase() === q)
-    ?? (q.length >= 4 ? regions.find((r) => { const n = r.name.toLowerCase(); return n.includes(q) || q.includes(n); }) : undefined);
+  const exact = regions.find((r) => r.name.toLowerCase() === q);
+  if (exact) return { name: exact.name, present: true, text: exact.text.slice(0, DOC_READ_CAP), truncated: exact.text.length > DOC_READ_CAP };
+  const fuzzy = q.length >= 4 ? regions.filter((r) => { const n = r.name.toLowerCase(); return n.includes(q) || q.includes(n); }) : [];
+  // AMBIGUITY IS NOT A TIE TO BREAK (review of #413). This used to `.find()` — take the FIRST fuzzy match and say
+  // nothing — which turns a name the model could not have known was ambiguous into a confidently wrong read. The
+  // announced names are truncated to 120 chars by the caller, so two attachments sharing a long prefix ("… Wage
+  // Determination … Part 1 of 2" / "Part 2 of 2") render as the SAME label; a lens asking for the second silently got
+  // the first, and because the excerpt genuinely is in fullSource the Rule 64 grounding backstop passes it. Return the
+  // candidates instead and let the lens re-ask: honest-fail (Rule 61) applies to a tool result exactly as it applies
+  // to a verdict. An EXACT name still wins above, so the coverage path's seeded reads are unaffected.
+  if (fuzzy.length > 1) return { name, present: false, text: "", truncated: false, ambiguous: true, candidates: fuzzy.map((r) => r.name) };
+  const hit = fuzzy[0];
   if (!hit) return { name, present: false, text: "", truncated: false };
   return { name: hit.name, present: true, text: hit.text.slice(0, DOC_READ_CAP), truncated: hit.text.length > DOC_READ_CAP };
 }

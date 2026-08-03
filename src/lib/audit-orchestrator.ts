@@ -13,7 +13,7 @@
 // callModel + verify are INJECTED → the whole cycle is unit-testable with stubs ($0). The real run is PAID.
 
 import { runAgenticExpert, isGrounded, type CallModel, type ExpertSpec } from "./audit-expert";
-import { readSection, sectionFullText, procurementPart, requiresProposalSections, materializeSections, parseDocRegions, resolvePrimary, normalizeForSearch, phrasePresentInNormalized, ATTACHMENT_COVERAGE_ENABLED, type AuditToolContext } from "./audit-tools";
+import { readSection, sectionFullText, procurementPart, requiresProposalSections, materializeSections, parseDocRegions, resolvePrimary, normalizeForSearch, phrasePresentInNormalized, ATTACHMENT_COVERAGE_ENABLED, lensDiscoveryEnabled, type AuditToolContext } from "./audit-tools";
 import { constructionRequired, constructionCoreMissing, constructionCoverage } from "./audit-construction-manifest";
 import { recomputeGrounding } from "./audit-grounding-recompute";
 import { detectSoleSourceLock } from "./audit-sole-source-lock";
@@ -744,8 +744,28 @@ export function docRegions(fullSource: string): Array<{ name: string; text: stri
   // reachable in prod today via any attachment body). Byte-identical regions on well-formed input.
   const regions = parseDocRegions(fullSource ?? "");
   if (regions.length === 0) return [{ name: "(primary solicitation)", text: fullSource ?? "", isPrimary: true }];
-  const primaryIdx = ATTACHMENT_COVERAGE_ENABLED ? resolvePrimary(regions).index : 0;
+  // Identity-based pick under EITHER capability. This function is the SECOND copy of the primary rule (the first is
+  // docRegionsOf in audit-tools, which feeds listBindingDocuments and read_document), and the two must agree: one half
+  // announcing a document to the lenses while the other half calls it the solicitation is not a smaller version of the
+  // bug, it is a different one. Under lens discovery the halves diverged — the wage determination was announced as an
+  // attachment while documentsCovered (:805 `if (r.isPrimary) continue`) exempted it from the coverage ledger as the
+  // primary, and simultaneously required the real solicitation to be covered as an attachment. Found by review of #413.
+  const primaryIdx = (ATTACHMENT_COVERAGE_ENABLED || lensDiscoveryEnabled()) ? resolvePrimary(regions).index : 0;
   return regions.map((r, i) => ({ ...r, isPrimary: i === primaryIdx }));
+}
+
+/** Card #370 R1 — can identity detection confidently name the base solicitation in this package?
+ *
+ *  Exported so the condition is assertable on its own: it used to be three inline terms inside runFullAudit, reachable
+ *  only by running a whole audit, and that is precisely why lens discovery could start consuming resolvePrimary
+ *  WITHOUT this guard travelling with it. The guard is not decoration on identity resolution — it is the half that
+ *  keeps `resolvePrimary`'s best-effort fallback (firstNonAmend, when nothing scores ≥25) from silently deciding which
+ *  document the ten lenses are never told about. Whenever a capability consumes the identity pick, it must also see
+ *  the indeterminacy. Flag-OFF ⇒ false ⇒ byte-identical to prod-today. */
+export function primaryIndeterminateFor(fullSource: string): boolean {
+  if (!(ATTACHMENT_COVERAGE_ENABLED || lensDiscoveryEnabled())) return false;
+  const regions = parseDocRegions(fullSource ?? "");
+  return regions.length > 1 && !resolvePrimary(regions).confident;
 }
 
 // ── Vehicle A–E · item B (flag AUDIT_COVERAGE_COUNTER_SPLIT, default-OFF) — READ vs GROUNDED are distinct axes. ──────
@@ -3025,8 +3045,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     : undefined;
   // Card #370 R1 — PRIMARY INDETERMINATE (flag-gated): a multi-doc package where identity detection cannot confidently
   // name the base solicitation → NHR fail-toward (never a silent first-doc default). Flag OFF ⇒ undefined ⇒ byte-identical.
-  const _primaryRegions = ATTACHMENT_COVERAGE_ENABLED ? docRegions(ctx.fullSource) : [];
-  const primaryIndeterminate = ATTACHMENT_COVERAGE_ENABLED && _primaryRegions.length > 1 && !resolvePrimary(_primaryRegions).confident;
+  const primaryIndeterminate = primaryIndeterminateFor(ctx.fullSource);
   // D2-B (Brain card 441, flag AUDIT_NOTICE_BODY_ELIG_FLOOR) — the detector (:977) routed NHR on an ungrounded notice-body
   // eligibility bar but emitted NO finding; emit it NOW so the in-branch B3-severity floor has a disqualifier in
   // dispositions[] to promote. Placed AFTER every re-typing guard (so the eligibility_bar is not softened off the
