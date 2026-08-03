@@ -15,6 +15,7 @@ export interface PageText {
 import { ocrPdfToText, looksGarbled } from "./pdf-ocr";
 import { isEnvOn } from "./env-flags";
 import { scanOcrExcerpt, type ExcerptScan } from "./ocr-token-validation";
+import { repairDisplacedRuns } from "./pdf-displaced-run-repair";
 
 export interface ExtractedDocument {
   pages: PageText[];
@@ -247,6 +248,18 @@ export async function extractText(pdfBuffer: Buffer): Promise<ExtractedDocument>
         const withText = pages.filter((p) => meaningfulCharCount(p.text) >= MIN_PAGE_MEANINGFUL_CHARS).length;
         warnings.push(`PARTIAL_PAGE_TEXT: extractable text on only ${withText}/${pages.length} pages — likely a mixed cover+scanned PDF; the image-only body was not recovered (OCR unavailable) and is treated as content loss.`);
       }
+      // DISPLACED-RUN REPAIR (flag AUDIT_INGEST_DISPLACED_RUN, default OFF ⇒ byte-identical). pdf-parse emits a
+      // styled run that is horizontally far from its neighbour AFTER the text it interrupts, marking the gap with
+      // its `cellSeparator` ("\t"). On FAR clause PDFs that interpolates the paragraph heading into the middle of
+      // the sentence it introduces, severing subject from predicate across a newline — measured 49 times in one
+      // region of run eab43ada, and the reason a Government debriefing duty was published as a bidder gate. See
+      // pdf-displaced-run-repair.ts for the mechanism and for why the run is relocated rather than re-inserted.
+      //
+      // Applied PER PAGE as well as to rawText: a displacement never spans a page boundary, and repairing only
+      // rawText would leave pages[] disagreeing with it — the two are read by different downstream stages.
+      // NOT applied on the OCR path above: OCR text has no cell separators and a different failure mode entirely.
+      rawText = healDisplacedRuns(pages, rawText, warnings);
+
       // [PDF-DIAG] (#157) — the live worker success probe; keep it after the partial-page
       // warning so the log line carries that warning too.
       console.error(`[PDF-DIAG] extractText OK: method=pdf-parse pages=${pageCount} rawLen=${rawText.length} meaningful=${meaningfulLength}${warnings.length ? ` warnings=[${warnings.join(" | ")}]` : ""}`);
@@ -270,6 +283,36 @@ export async function extractText(pdfBuffer: Buffer): Promise<ExtractedDocument>
     extractionMethod: "fallback",
     warnings,
   };
+}
+
+/**
+ * The displaced-run seam, EXPORTED so a suite can exercise the production path rather than a copy of it.
+ *
+ * A module-level unit test of `repairDisplacedRuns` proves the recogniser is right and proves NOTHING about
+ * whether the extractor ever calls it — that is the placebo shape this codebase keeps re-learning: an inert
+ * guard reads exactly like a passing one. `extractText` calls this function and no other, so a test against
+ * this function is a test of what production does. It mutates `pages` in place (matching the caller's shape)
+ * and returns the repaired `rawText`.
+ *
+ * Flag OFF ⇒ returns `rawText` unchanged, leaves `pages` untouched, pushes no warning: byte-identical.
+ */
+export function healDisplacedRuns(pages: PageText[], rawText: string, warnings: string[]): string {
+  if (!isEnvOn(process.env.AUDIT_INGEST_DISPLACED_RUN)) return rawText;
+  let repaired = 0, refusals = 0;
+  const heal = (s: string): string => {
+    const r = repairDisplacedRuns(s);
+    if (r.refused) { refusals++; return s; }
+    repaired += r.repairs.length;
+    return r.text;
+  };
+  const healedRaw = heal(rawText);
+  for (const p of pages) {
+    const t = heal(p.text);
+    if (t !== p.text) { p.text = t; p.lines = t.split("\n").map((l) => l.trim()).filter((l) => l.length > 0); }
+  }
+  if (repaired > 0) warnings.push(`DISPLACED_RUN_REPAIR: relocated ${repaired} interpolated styled run(s) out of the sentences they severed.`);
+  if (refusals > 0) warnings.push(`DISPLACED_RUN_REPAIR: ${refusals} pass(es) failed the conservation check and were left unmodified.`);
+  return healedRaw;
 }
 
 function buildPageStructure(rawText: string, pageCount: number): PageText[] {
