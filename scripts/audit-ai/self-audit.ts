@@ -32,12 +32,16 @@ if (want("suites")) {
   add("suites", failed.length === 0, `${files.length - failed.length}/${files.length} passed${failed.length ? ` · FAILING: ${failed.join(", ")}` : ""}`);
 }
 
-/** 2 · GOLD INTEGRITY — the frozen judgment fixtures. */
+/** 2 · GOLD INTEGRITY — a DRIFT CHECK, not a quality gate. It is 18 sha256 comparisons proving each
+ *  frozen artifact still hashes to the value stamped into it. It never invokes the engine, and a green
+ *  line here says NOTHING about whether an audit is correct. It was printed as bare `gold` beside
+ *  `suites` and `coverage`, which read as a quality result — a 2026-08-03 investigation found it had
+ *  been cited that way in five ceo/ docs. The label now states what the check is. */
 if (want("gold")) {
   try {
     const out = execFileSync("npx", ["tsx", "scripts/audit-ai/verify-gold-integrity.ts"], { cwd: ROOT, encoding: "utf8", stdio: "pipe" });
-    add("gold", /ALL PASS/.test(out), (out.trim().split("\n").pop() || "").slice(0, 120));
-  } catch (e) { add("gold", false, `threw: ${String((e as Error).message).slice(0, 100)}`); }
+    add("gold-integrity", /ALL PASS/.test(out), `${(out.trim().split("\n").pop() || "").slice(0, 96)} · hashes only — NOT an engine-quality result`);
+  } catch (e) { add("gold-integrity", false, `threw: ${String((e as Error).message).slice(0, 100)}`); }
 }
 
 /** 3 · FLAG CENSUS — production flags that no code reads, using the ENGINE'S OWN tolerant parser.
@@ -153,6 +157,6 @@ function grepAll(re: RegExp, dirs: string[]): string[] {
 
 const failed = results.filter((r) => !r.ok);
 console.log("\n══ ENGINE SELF-AUDIT ══");
-for (const r of results) console.log(`  ${r.skipped ? "○" : r.ok ? "✓" : "✗"} ${r.name.padEnd(10)} ${r.detail}`);
+for (const r of results) console.log(`  ${r.skipped ? "○" : r.ok ? "✓" : "✗"} ${r.name.padEnd(15)} ${r.detail}`);
 console.log(failed.length ? `\n✗ ${failed.length} CHECK(S) FAILED` : "\n✓ ALL CHECKS PASS — no silent regression detected (this is a floor, not a substitute for the review battery)");
 process.exit(failed.length ? 1 : 0);
