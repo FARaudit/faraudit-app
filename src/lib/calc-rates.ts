@@ -58,9 +58,17 @@ export async function fetchCalcRates(laborCategory: string, opts?: { pageSize?: 
   const url = `${CALC_V3}?keyword=${encodeURIComponent(cat)}&page=1&page_size=${opts?.pageSize ?? 100}`;
   try {
     const res = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(15000) });
-    if (!res.ok) return [];
+    // Every exit from here was a silent []. That is why the wrong query parameter
+    // above survived: the caller could not tell "CALC has no rates for this
+    // category" from "CALC did not answer", and used its static fallback either
+    // way. The return shape is unchanged; only the silence is.
+    if (!res.ok) {
+      console.error("[calc-rates] non-OK", { category: cat, status: res.status });
+      return [];
+    }
     const d = (await res.json()) as { hits?: { hits?: Array<{ _source?: Record<string, unknown> }> } };
     const hits = d?.hits?.hits ?? [];
+    if (hits.length === 0) console.warn("[calc-rates] zero hits", { category: cat });
     return hits
       .map((h) => {
         const s = h._source ?? {};
@@ -73,7 +81,8 @@ export async function fetchCalcRates(laborCategory: string, opts?: { pageSize?: 
         } as CalcRate;
       })
       .filter((r) => r.labor_category.length > 0);
-  } catch {
+  } catch (err) {
+    console.error("[calc-rates] fetch threw", { category: cat, error: err instanceof Error ? err.message : String(err) });
     return [];
   }
 }

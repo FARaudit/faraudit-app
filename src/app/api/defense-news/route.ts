@@ -128,6 +128,8 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
+  // Per-feed outcome, so the page can tell "every source is down" from "no news
+  // today" — both of which arrive as an empty array once the catches swallow them.
   const results = await Promise.all(
     FEEDS.map(async (f) => {
       try {
@@ -136,17 +138,38 @@ export async function GET() {
           signal: AbortSignal.timeout(10000),
           next: { revalidate: 1800 } // 30-min CDN cache
         });
-        if (!res.ok) return [];
+        if (!res.ok) {
+          console.error("[defense-news] feed non-OK", { source: f.source, url: f.url, status: res.status });
+          return { source: f.source, ok: false, rows: [] as NewsItem[], reason: `HTTP ${res.status}` };
+        }
         const xml = await res.text();
-        return parseItems(xml, f.source, f.tag);
-      } catch {
-        return [];
+        return { source: f.source, ok: true, rows: parseItems(xml, f.source, f.tag) };
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        console.error("[defense-news] feed threw", { source: f.source, url: f.url, reason });
+        return { source: f.source, ok: false, rows: [] as NewsItem[], reason };
       }
     })
   );
 
+  const sources = results.map((r) => ({ name: r.source, ok: r.ok, count: r.rows.length, reason: r.reason }));
+
+  // Rule 61: every source failing is an outage, not an empty result.
+  if (sources.every((s) => !s.ok)) {
+    return NextResponse.json(
+      {
+        error: `None of the ${sources.length} news sources responded.`,
+        items: [],
+        sources,
+        degraded: true,
+        fetched_at: new Date().toISOString()
+      },
+      { status: 503 }
+    );
+  }
+
   const items = results
-    .flat()
+    .flatMap((r) => r.rows)
     .sort((a, b) => new Date(b.pub_date || 0).getTime() - new Date(a.pub_date || 0).getTime());
 
   // ━━ Layer in Claude insights (cached by article URL) ━━
@@ -203,5 +226,10 @@ export async function GET() {
     ai_insight: it.link ? insightMap.get(it.link) ?? null : null
   }));
 
-  return NextResponse.json({ items: enriched, fetched_at: new Date().toISOString() });
+  return NextResponse.json({
+    items: enriched,
+    sources,
+    degraded: sources.some((s) => !s.ok),
+    fetched_at: new Date().toISOString()
+  });
 }

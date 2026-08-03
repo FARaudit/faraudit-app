@@ -47,7 +47,9 @@ function classify(title: string | undefined): { is_ndaa: boolean; is_appropriati
   };
 }
 
-async function fetchBills(congress: number, billType: string, apiKey: string): Promise<CongressBillRow[]> {
+interface FeedResult { name: string; ok: boolean; rows: CongressBillRow[]; reason?: string }
+
+async function fetchBills(congress: number, billType: string, apiKey: string): Promise<FeedResult> {
   const params = new URLSearchParams({
     api_key: apiKey,
     format: "json",
@@ -61,14 +63,25 @@ async function fetchBills(congress: number, billType: string, apiKey: string): P
       headers: { Accept: "application/json" },
       signal: AbortSignal.timeout(15000)
     });
-  } catch { return []; }
-  if (!res.ok) return [];
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error("[congress] fetch threw", { billType, reason });
+    return { name: billType, ok: false, rows: [], reason };
+  }
+  if (!res.ok) {
+    console.error("[congress] non-OK", { billType, status: res.status });
+    return { name: billType, ok: false, rows: [], reason: `HTTP ${res.status}` };
+  }
 
   let data: { bills?: CongressBillRaw[] } = {};
-  try { data = await res.json(); } catch { return []; }
+  try { data = await res.json(); } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error("[congress] body not JSON", { billType, reason });
+    return { name: billType, ok: false, rows: [], reason };
+  }
   const list = data.bills || [];
 
-  return list
+  const rows = list
     .map((b) => {
       const tags = classify(b.title);
       const number = typeof b.number === "number" ? b.number : parseInt(String(b.number), 10);
@@ -88,6 +101,7 @@ async function fetchBills(congress: number, billType: string, apiKey: string): P
       } satisfies CongressBillRow;
     })
     .filter((r): r is CongressBillRow => r !== null);
+  return { name: billType, ok: true, rows };
 }
 
 export async function GET(req: NextRequest) {
@@ -130,7 +144,17 @@ export async function GET(req: NextRequest) {
     fetchBills(congress, "hr", apiKey),
     fetchBills(congress, "s",  apiKey)
   ]);
-  const bills = [...hr, ...s];
+  const sources = [hr, s].map((f) => ({ name: f.name, ok: f.ok, count: f.rows.length, reason: f.reason }));
+  const bills = [...hr.rows, ...s.rows];
+
+  // Rule 61: both requests failing is an outage. Answering 200 {bills: []} makes it
+  // indistinguishable from a Congress that introduced no defense bills.
+  if (sources.every((f) => !f.ok)) {
+    return NextResponse.json(
+      { error: "Congress.gov did not respond.", bills: cached || [], sources, degraded: true },
+      { status: 503 }
+    );
+  }
 
   if (bills.length > 0) {
     await supabase
@@ -152,6 +176,8 @@ export async function GET(req: NextRequest) {
     bills: visible.sort((a, b) =>
       new Date(b.latest_action_date || 0).getTime() - new Date(a.latest_action_date || 0).getTime()
     ),
-    cached: false
+    cached: false,
+    sources,
+    degraded: sources.some((f) => !f.ok)
   });
 }

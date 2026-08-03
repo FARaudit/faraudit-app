@@ -60,7 +60,8 @@ async function fetchCommits(org: string, name: string, limit = 3): Promise<Commi
       author: c.commit?.author?.name ?? "—",
       ts: c.commit?.author?.date ?? new Date().toISOString()
     }));
-  } catch {
+  } catch (err) {
+    console.error("[daily-digest] commits fetch threw", { repo: `${org}/${name}`, error: err instanceof Error ? err.message : String(err) });
     return [];
   }
 }
@@ -81,8 +82,12 @@ async function countSecurityAlerts(): Promise<number> {
       .eq("resolved", false)
       .gte("created_at", new Date(Date.now() - 24 * 3600_000).toISOString());
     return count ?? 0;
-  } catch {
-    return 0;
+  } catch (err) {
+    // A zero here reads as "no unresolved security alerts in 24h". Returning it on
+    // a failed query is the same class this sweep is about; -1 lets the caller say
+    // "unknown" instead of asserting a clean board nobody checked.
+    console.error("[daily-digest] security alert count failed", { error: err instanceof Error ? err.message : String(err) });
+    return -1;
   }
 }
 
@@ -151,7 +156,7 @@ function renderHtml(opts: {
     <p style="margin:0 0 6px;color:#A32D2D;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;">1. Critical</p>
     <p style="margin:0;font-family:'JetBrains Mono',monospace;font-size:13px;">
       83(b) filing window: <span style="color:${daysTo83b <= 7 ? "#A32D2D" : "#F59E0B"};font-weight:500;">${daysTo83b} days</span> &nbsp;·&nbsp;
-      Open security alerts (24h): <span style="color:${securityAlerts > 0 ? "#A32D2D" : "#10B981"};">${securityAlerts}</span>
+      Open security alerts (24h): <span style="color:${securityAlerts < 0 ? "#A16207" : securityAlerts > 0 ? "#A32D2D" : "#10B981"};">${securityAlerts < 0 ? "unknown — the query failed" : securityAlerts}</span>
     </p>
   </div>
 
@@ -311,7 +316,7 @@ async function run(req: NextRequest) {
 CEO Executive Digest
 
 83(b) days remaining: ${daysTo83b}
-Open security alerts (24h): ${securityAlerts}
+Open security alerts (24h): ${securityAlerts < 0 ? "unknown — the query failed" : securityAlerts}
 
 THE ONE THING: ${oneThing}
 
@@ -344,7 +349,7 @@ THE ONE THING: ${oneThing}
   const notionResults: Record<string, boolean> = {};
   if (notion) {
     const title = `CEO Digest — ${today}`;
-    const body = `Days to 83(b): ${daysTo83b}\nOpen alerts: ${securityAlerts}\n\nTHE ONE THING: ${oneThing}`;
+    const body = `Days to 83(b): ${daysTo83b}\nOpen alerts: ${securityAlerts < 0 ? "unknown — the query failed" : securityAlerts}\n\nTHE ONE THING: ${oneThing}`;
     notionResults.ceo = await logToNotion(notion.pages.ceo, title, body);
     notionResults.fa = await logToNotion(notion.pages.fa, title, body);
     notionResults.br = await logToNotion(notion.pages.br, title, body);
@@ -355,7 +360,7 @@ THE ONE THING: ${oneThing}
     ok: true,
     date: today,
     days_to_83b: daysTo83b,
-    security_alerts: securityAlerts,
+    security_alerts: securityAlerts < 0 ? null : securityAlerts,
     one_thing: oneThing,
     email_sent: !!emailMessageId,
     email_message_id: emailMessageId,
