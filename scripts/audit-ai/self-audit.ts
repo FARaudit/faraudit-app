@@ -21,15 +21,27 @@ const add = (name: string, ok: boolean, detail: string, skipped = false) => resu
 const only = process.argv.slice(2).filter((a) => !a.startsWith("-"));
 const want = (k: string) => only.length === 0 || only.includes(k);
 
-/** 1 · SUITES — the 127 unit suites. This is the check that would have caught a regression between sessions. */
+/** 1 · SUITES — every unit suite in src/lib. The check that would catch a regression between sessions.
+ *  EXIT CODE 3 = "this suite needs banked run-records that are not in the repository" (corpus-fixture.ts).
+ *  It is reported as a NAMED SKIP, never folded into the pass count — because three suites spent months
+ *  passing only on the author's machine, against 74 MB of untracked data, and that green was being counted.
+ *  Every other non-zero exit is still a hard failure. The skip cannot spread quietly: a suite has to call
+ *  requireCorpus() to earn it. */
 if (want("suites")) {
   const files = readdirSync(LIB).filter((f) => f.endsWith(".test.ts")).sort();
-  const failed: string[] = [];
+  const failed: string[] = [], skipped: string[] = [];
   for (const f of files) {
     try { execFileSync("npx", ["tsx", join(LIB, f)], { stdio: "pipe", cwd: ROOT }); }
-    catch { failed.push(f); }
+    catch (e) {
+      if ((e as { status?: number }).status === 3) skipped.push(f.replace(/\.test\.ts$/, ""));
+      else failed.push(f);
+    }
   }
-  add("suites", failed.length === 0, `${files.length - failed.length}/${files.length} passed${failed.length ? ` · FAILING: ${failed.join(", ")}` : ""}`);
+  const ran = files.length - failed.length - skipped.length;
+  add("suites", failed.length === 0,
+    `${ran}/${files.length - skipped.length} passed`
+    + (skipped.length ? ` · ${skipped.length} SKIPPED (no banked corpus): ${skipped.join(", ")}` : "")
+    + (failed.length ? ` · FAILING: ${failed.join(", ")}` : ""));
 }
 
 /** 2 · GOLD INTEGRITY — the frozen judgment fixtures. */

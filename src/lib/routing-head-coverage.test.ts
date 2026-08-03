@@ -11,6 +11,11 @@
 import { readFileSync, readdirSync, statSync, existsSync } from "fs";
 import { join } from "path";
 import { routeCommercialSections, detectDocumentClass } from "./panel-doc-class";
+import { requireCorpus } from "./corpus-fixture";
+
+// This suite asserts against BANKED RUN RECORDS, which are intentionally untracked (public repo,
+// government email addresses in the data). Absent ⇒ named SKIP, never a silent pass. See corpus-fixture.ts.
+requireCorpus("routing-head-coverage");
 
 let failures = 0;
 const assert = (c: boolean, m: string) => { console.log(`${c ? "✅" : "❌"} ${m}`); if (!c) failures++; };

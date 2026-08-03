@@ -49,7 +49,13 @@ export interface V4Grounded<T> { grounded: boolean; } // { grounded:false } sent
 //   `undefined` = NEVER COMPUTED  → the column is dropped entirely (header and cells)
 //   `""`        = computed-empty  → the column renders (legacy/flag-OFF behaviour, byte-identical)
 export interface V4SubmissionL { grounded: true; lead?: string; rows: { vol?: string; req: string; condition: string; cite: string }[]; }
-export interface V4EvalM { grounded: true; basis?: string; factors: { name: string; basis?: string; cite: string }[]; }
+// `importance` is what the SOURCE literally says about a factor's weight ("Most important", "Equal
+// weight"). It is OPTIONAL and usually absent, and that is the point: the renderer used to stamp
+// "Most important" on whichever factor happened to be emitted first, and title the panel "in the
+// Government's stated order of importance" — both unconditional, on a §M that said the two factors were
+// "approximately equal in importance". A label about the source may only come FROM the source; absent
+// this field the ranking claim is not rendered at all. (2026-08-03)
+export interface V4EvalM { grounded: true; basis?: string; factors: { name: string; basis?: string; cite: string; importance?: string }[]; }
 export interface V4Clins { grounded: true; lead?: string; rows: { clin?: string; title: string; type?: string; qtyUnit?: string; period?: string }[]; }
 export interface V4Date { label: string; value: string; kind?: "gate" | string; sub?: string; }
 export interface V4Provenance { auditDate: string; engine: string; manifest: { name: string; read: "full" | "indexed" | "unread" }[]; }

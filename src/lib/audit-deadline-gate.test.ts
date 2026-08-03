@@ -86,5 +86,30 @@ t("one uncurable gate → DECLINE", aggregateGateRecommendation([uncurable("SPRS
 // Mixed (a curable gate present) → CAUTION, NOT decline → score not crushed.
 t("curable + uncurable → PROCEED_WITH_CAUTION (not crushed)", aggregateGateRecommendation([curable("SOLE_SOURCE"), uncurable("SPRS")]), "PROCEED_WITH_CAUTION");
 
+// ── TIMEZONE INVARIANT (2026-08-03) ──────────────────────────────────────────
+// Every assertion above passed on a UTC-5 dev machine and FAILED on the UTC production
+// worker, because normalizeDeadlineString discarded the zone the document stated and
+// new Date() filled in the host's. A deadline suite that runs in ONE timezone certifies
+// the author's laptop. Re-run the zone-bearing cases under fixed offsets so the answer
+// must be host-independent. Deterministic, $0.
+console.log("\n── host-timezone independence (the bug this suite missed) ──");
+{
+  const cases: Array<[string, string]> = [
+    ["July 9, 2026 2:00 PM EST", "2026-07-09T19:00:00.000Z"],
+    ["1:00 p.m. Eastern Time on June 16, 2026", "2026-06-16T17:00:00.000Z"],
+    ["June 16, 2026 1700 CT", "2026-06-16T22:00:00.000Z"],
+    ["February 17, 2026 2:00 PM EST", "2026-02-17T19:00:00.000Z"],
+    ["June 11, 2026 10:00 AM Arizona Local Time", "2026-06-11T17:00:00.000Z"],
+  ];
+  for (const [input, want] of cases) {
+    const got = new Date(normalizeDeadlineString(input)).toISOString();
+    t(`zone carried: ${input}`, got, want);
+  }
+  // A stated zone must survive; an UNSTATED one stays naive (unchanged behaviour —
+  // stamping an offset there would invent precision the document never gave).
+  t("no zone stated → still naive", normalizeDeadlineString("July 9, 2026 2:00 PM"), "2026-07-09T14:00:00");
+  t("bare date → no offset invented", normalizeDeadlineString("July 9, 2026"), "2026-07-09T00:00:00");
+}
+
 console.log(`\n──────────────  ${pass} pass · ${fail} fail`);
 process.exit(fail === 0 ? 0 : 1);
