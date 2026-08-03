@@ -117,6 +117,19 @@ const SRC = [
   ok("a parenthetical between subject and predicate still refutes",
      run(["PWS (Attachment 0001) is listed but not reproduced in the source"], "SBA").refuted.length === 1);
 
+  // ---- 2d. ADVERSARIAL P0 (2026-07-31) — the token is NOT the thing being claimed absent -----------------------
+  // Two shapes where the doc token is the nearest noun and the claim is nonetheless about something else. Refuting
+  // either DELETES A TRUE WARNING about a document that really is missing — the dangerous direction, and the exact
+  // failure this module exists to prevent, inverted.
+  ok("modifier object does not refute (\"Appendix C to the PWS is not attached\")",
+     run(["Appendix C to the PWS is not attached — the inspection checklist is unavailable to bidders."], "SBA").refuted.length === 0);
+  ok("coordinated subject does not refute (three artifacts, one matched)",
+     run(["The PWS, the QASP and the bonding certificate are not provided — pricing cannot be built."], "SBA").refuted.length === 0);
+  ok("a conjunction alone is enough to stand down",
+     run(["The PWS and the bonding certificate are not provided."], "SBA").refuted.length === 0);
+  // ...and none of that costs the true positive, which has a parenthetical rather than a modifier or a list.
+  ok("the real PWS claim still refutes", run([PWS], "SBA").refuted.length === 1);
+
   // ---- 3. STRUCTURAL ------------------------------------------------------------------------------------------
   ok("no regions ⇒ untouched", reconcileAbsenceClaims([{ id: "a", requirement: PWS }], "", PROV, "SBA").refuted.length === 0);
   ok("empty findings ⇒ no crash", reconcileAbsenceClaims([], SRC, PROV, "SBA").findings.length === 0);

@@ -26,6 +26,24 @@
 
 import { docRegions } from "./audit-orchestrator";
 
+/** The report renders `requirement` through `truncateOnWord(..., 400)` (src/app/audit/[id]/_view-model.ts, both the
+ *  routed-row and matrix-title paths). Anything past that is silently dropped on the page while looking complete in
+ *  the engine — which is how a correction verified perfectly here and reached the customer with its evidence
+ *  missing. So this module truncates to the SAME budget itself: what is persisted is then exactly what renders, and
+ *  any loss is a deliberate, word-boundary one. Keep in step with the renderer.
+ *
+ *  Lives here rather than in audit-force-grounding because #8 is PARKED and a shipping module must not depend on a
+ *  parked one. The ellipsis counts against the budget — slicing to `budget` and THEN appending it returned
+ *  budget+1, so the renderer still shaved the tail, the exact divergence this exists to prevent. */
+export const RENDER_BUDGET = 400;
+export function fitToRender(s: string, budget = RENDER_BUDGET): string {
+  if (s.length <= budget) return s;
+  const room = budget - 1;
+  const cut = s.slice(0, room);
+  const sp = cut.lastIndexOf(" ");
+  return (sp > room * 0.6 ? cut.slice(0, sp) : cut).replace(/[\s,;:—–-]+$/, "") + "…";
+}
+
 export interface AbsenceReconcileResult<T> { findings: T[]; refuted: Array<{ id: string; doc: string; kind: "present_and_analyzed" | "present_not_analyzed"; before: string; after: string }>; }
 
 /** Absence predicates asserted OF A DOCUMENT — "not provided", "not reproduced", "not attached", "not included",
@@ -101,33 +119,54 @@ function consequenceOf(claim: string): string {
   const tail = body.slice(dash).replace(/^\s[—–-]\s/, "").trim();
   return tail.length > 20 ? tail : "";
 }
-/** A SECOND subject between the document token and the predicate means the predicate is not about the document.
- *  Another copula opens a new clause with its own subject ("the PWS is complete and THE DRAWINGS are not provided");
- *  a sentence terminator ends the claim entirely ("the PWS is in the source. The drawings are not provided.").
- *  Both are grammatical relations, not vocabulary. */
-const INTERVENING_SUBJECT = /\b(?:is|are|was|were)\b|[.;:]/i;
+/** A clause boundary — where this claim's subject can start. The em/en dash is included because REPORT-TRUTH #2
+ *  prefixes claims with "UNVERIFIED ABSENCE — " and lenses habitually write "<assertion> — <consequence>". */
+const CLAUSE_BOUNDARY = /[.;:—–]/g;
+/** Filler that may sit inside a subject without making it a subject about something ELSE. Determiners only. */
+const SUBJECT_FILLER = /\b(?:the|a|an|this|that|these|those|its|their)\b/gi;
+const MAX_SPAN = 200;
 
+/**
+ * Does this claim assert that THIS DOCUMENT is absent — as opposed to something merely NEAR the document's name?
+ *
+ * AFFIRMATIVE SHAPE, and the history is the reason. Four successive NEGATIVE guards were written here and each one
+ * was defeated by the next paraphrase, always toward deleting a true warning:
+ *   proximity-only              → "The PWS is complete and the drawings are not provided"
+ *   nearest-subject (copula)    → "Appendix C to the PWS is not attached"
+ *   MODIFIER_OBJECT (left only) → "The PWS's appendix is not attached"          (possessive sits on the RIGHT)
+ *   COORDINATED_SUBJECT (right) → "The drawings and the PWS are not provided"   (final conjunct is unguarded)
+ * The space of unsafe phrasings is open, so any enumeration of it leaves a residual — this is the card #515
+ * treadmill, and the doctrine's answer is to recognise the SAFE case and keep nothing else.
+ *
+ * The safe case is small and stateable: the subject of the absence predicate is the document AND NOTHING ELSE.
+ * So take the span from the last clause boundary to the predicate, remove parentheticals, the document's own name
+ * tokens and bare determiners — and require what remains to contain no letters at all. Every counterexample above
+ * leaves a residual noun ("appendix", "drawings and", "Appendix C to") and therefore stands down, while
+ * "PWS (Attachment 0001) is listed but not reproduced" reduces to nothing and fires.
+ *
+ * Failure direction is safe by construction: an unrecognised phrasing has residue, so it stands down and leaves a
+ * false claim standing rather than deleting a true one.
+ */
 function assertsDocAbsent(claim: string, tokens: string[]): boolean {
   const m = DOC_ABSENCE.exec(claim);
   if (!m) return false;
-  const lead = claim.slice(Math.max(0, m.index - MAX_GAP), m.index);
-  const lower = lead.toLowerCase();
-  // PROXIMITY IS NOT SUBJECT POSITION. v1 asked only whether the token appeared in the 60-char window, which this
-  // function's own contract called "SUBJECT position" — it is not the same thing, and the gap is an over-refute:
-  // in "The PWS is complete and the drawings are not provided", the window before "are not provided" still contains
-  // "PWS", so a claim about the DRAWINGS was refuted from the PWS's presence, deleting a possibly-true warning.
-  // Falsification probe `_rt8-absence-shape.ts` LEG 4 planted five such sentences; the shipped rule leaked 4 of 5.
-  // The token must therefore be the NEAREST subject: nothing that opens a new clause may sit between it and the
-  // predicate. A parenthetical ("PWS (Attachment 0001) is listed but not reproduced") passes; a coordinate clause
-  // does not. Failure direction is safe — "PWS, which is Attachment 0001, is not provided" is now missed, which
-  // leaves a false claim standing rather than deleting a true one.
-  for (const t of tokens) {
-    const at = lower.lastIndexOf(t);
-    if (at < 0) continue;
-    if (INTERVENING_SUBJECT.test(lead.slice(at + t.length))) continue;
-    return true;
-  }
-  return false;
+
+  // Subject span: from the last clause boundary before the predicate, up to the predicate.
+  const upto = claim.slice(Math.max(0, m.index - MAX_SPAN), m.index);
+  let start = 0;
+  CLAUSE_BOUNDARY.lastIndex = 0;
+  for (let b = CLAUSE_BOUNDARY.exec(upto); b; b = CLAUSE_BOUNDARY.exec(upto)) start = b.index + 1;
+  const span = upto.slice(start);
+  const lower = span.toLowerCase();
+
+  // The span must actually name this document...
+  if (!tokens.some((t) => lower.includes(t))) return false;
+
+  // ...and, once the document's own name and ordinary determiners are removed, nothing else may remain.
+  let residue = span.replace(/\([^)]*\)/g, " ").replace(/\[[^\]]*\]/g, " "); // parentheticals are not a second subject
+  for (const t of tokens) residue = residue.replace(new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), " ");
+  residue = residue.replace(SUBJECT_FILLER, " ");
+  return !/[A-Za-z]/.test(residue);
 }
 
 /** SECOND ARM — a RESOLVED-FACT absence claim. The third AUTO-F component on run 583df921 was not about a document:
@@ -180,11 +219,17 @@ export function reconcileAbsenceClaims<T extends { id?: string; requirement?: st
     const analyzed = provenanceDocs.has(hit.name);
     // Replace the ASSERTION, keep the consequence the lens reasoned about — the risk it raised may still be real,
     // it was simply attached to a false premise.
+    // BUDGET. The report renders `requirement` through truncateOnWord(..., 400), so on the live specimen this text
+    // grew to 443 characters and the renderer silently cut the tail — which is precisely the CONSEQUENCE this module
+    // exists to carry forward ("...cannot build a compliant compliance matrix without it."). The correction survived
+    // and the risk it was preserving did not. Two changes hold the budget: the boilerplate loses its generic
+    // read-the-findings pointer (guidance is worth less than the actual risk), and the join is shortened. fitToRender
+    // is the backstop, so what is persisted equals what renders instead of diverging silently.
     const truth = analyzed
-      ? `${CORRECTED_PREFIX}"${hit.name}" IS in the analyzed source (${hit.chars.toLocaleString()} characters) and this audit drew findings from it; an earlier statement that it was missing was wrong. Read the findings citing that document.`
+      ? `${CORRECTED_PREFIX}"${hit.name}" IS in the analyzed source (${hit.chars.toLocaleString()} characters) and this audit drew findings from it; an earlier statement that it was missing was wrong.`
       : `${UNANALYZED_PREFIX}"${hit.name}" IS in the retrieved source (${hit.chars.toLocaleString()} characters), but this audit produced no grounded finding from it, so nothing here reflects its contents. It is not missing; it is unanalyzed. Read it directly.`;
     const conseq = consequenceOf(before);
-    const after = conseq ? `${truth} The risk raised against that document still stands: ${conseq}` : truth;
+    const after = fitToRender(conseq ? `${truth} Risk still raised: ${conseq}` : truth);
     refuted.push({ id: f.id ?? "(unidentified)", doc: hit.name, kind: analyzed ? "present_and_analyzed" : "present_not_analyzed", before, after });
     return { ...f, requirement: after };
   });
