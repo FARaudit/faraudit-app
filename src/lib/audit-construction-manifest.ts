@@ -21,6 +21,7 @@
 
 import { createHash } from "crypto";
 import { hasEngineText } from "./sam-attachments";
+import { SF1442_HEADER_RE, DAVIS_BACON_RE, OFFER_STRUCTURE_RE } from "./construction-recognizers";
 
 const sha256 = (s: string): string => createHash("sha256").update(s, "utf8").digest("hex");
 const norm = (s: string): string => s.replace(/[‐-―]/g, "-").replace(/\s+/g, " ").toLowerCase().trim();
@@ -84,11 +85,11 @@ const ELEMENT_DEFS: Array<{ key: ConstructionElementKey; re: RegExp }> = [
   // wage determination — Davis-Bacon CONSTRUCTION wage standard (52.222-6 family) ONLY. The generic "wage determination"
   // / "WD NN-NNNN" alternates were REMOVED — they match SCA SERVICE wage determinations (52.222-41), a different, in-scope
   // case, and would false-satisfy the construction core off service boilerplate (adversarial-review finding).
-  { key: "wage_determination", re: /\b52\.222-6\b|davis[\s-]?bacon|construction\s+wage\s+rate/i },
+  { key: "wage_determination", re: DAVIS_BACON_RE },
   // offer/submission MECHANICS — bid schedule / offer-due / receipt-of-offers. The bare "SF-1442" token was REMOVED: it
   // is the SAME token that classifies isConstruction, so keying the submission CORE on it made the element a tautology
   // (every header-classified buy trivially "present"). The core now requires REAL submission mechanics.
-  { key: "submission", re: /bid\s+schedule|offers?\s+(?:are\s+)?due|offer\s+due\s+date|receipt\s+of\s+offers|bid\s+opening/i },
+  { key: "submission", re: OFFER_STRUCTURE_RE },
   // scope of work — SOW or CSI MasterFormat spec codes (distinctive). Bare "specifications" was removed (too generic).
   { key: "scope", re: /statement\s+of\s+work|\bscope\s+of\s+work\b|\bSECTION\s+\d{2}\s+\d{2}\s+\d{2}\b/i },
   // set-aside / eligibility — the who-can-win gate the null profile cannot verify.
@@ -104,7 +105,6 @@ const ELEMENT_DEFS: Array<{ key: ConstructionElementKey; re: RegExp }> = [
 const ELEMENT_RE: Record<ConstructionElementKey, RegExp> = Object.fromEntries(ELEMENT_DEFS.map((d) => [d.key, d.re])) as Record<ConstructionElementKey, RegExp>;
 
 // SF-1442 header — the construction counterpart to SF-1449 (commercial). Classification signal, PRIMARY-region only.
-const SF1442_HEADER_RE = /\bSF[-\s]?1442\b|STANDARD\s+FORM\s+1442|SOLICITATION[\/,\s]+OFFER[\/,\s]+(?:AND\s+)?AWARD\s*\(?\s*CONSTRUCTION/i;
 
 /**
  * Sweep the binding construction elements over each document's FULL text (PRE-compression), sealed + anchor-bound.

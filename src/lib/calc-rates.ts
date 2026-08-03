@@ -43,7 +43,19 @@ function toNum(v: unknown): number | null {
 export async function fetchCalcRates(laborCategory: string, opts?: { pageSize?: number }): Promise<CalcRate[]> {
   const cat = (laborCategory || "").trim();
   if (!cat) return [];
-  const url = `${CALC_V3}?search=${encodeURIComponent(`labor_category:${cat}`)}&page=1&page_size=${opts?.pageSize ?? 100}`;
+  // `keyword` is the filtering parameter. MEASURED against the live endpoint 2026-08-03:
+  //   search=labor_category:engineer  -> HTTP 200, hits.total.value = 0      (silent, forever)
+  //   search=engineer                 -> HTTP 500
+  //   q / query / term / text / labor_category  -> HTTP 200 but IGNORED: identical unfiltered rows
+  //     for every term ("Asset Tagging Service" came back as the top hit for "electrical engineer")
+  //   keyword=welder -> 103 results, all welders · keyword=nurse -> 107, all nurses
+  //
+  // The parser below was always correct — `hits.hits[]._source` is the real shape. Only the query
+  // parameter was wrong, so every call returned [] on a 200 with no error and the caller quietly
+  // kept its static fallback. NOTE the near-miss: swapping to `q` makes this return plenty of rows
+  // that are not the category asked for, which is worse than empty. Non-emptiness is NOT the test;
+  // RELEVANCE is, which is what the gate asserts.
+  const url = `${CALC_V3}?keyword=${encodeURIComponent(cat)}&page=1&page_size=${opts?.pageSize ?? 100}`;
   try {
     const res = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(15000) });
     if (!res.ok) return [];

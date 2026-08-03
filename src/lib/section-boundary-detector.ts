@@ -20,6 +20,9 @@
 // confidently-wrong deterministic parse.
 
 import { parseDelimiterName, resolvePrimary } from "./primary-doc-resolve";
+// Construction recognizers live in ONE leaf module: this file decides OUT_OF_SCOPE/"hard" off them while
+// audit-construction-manifest runs the Rule 69 completeness carrier off byte-identical copies (engine audit pass 2).
+import { SF1442_HEADER_RE, DAVIS_BACON_RE, OFFER_STRUCTURE_RE } from "./construction-recognizers";
 import type { ExtractedDocument } from "./pdf-text-extractor";
 
 export type SectionConfidence = "high" | "medium" | "low" | "missing";
@@ -435,10 +438,6 @@ export interface ConstructionDetection {
 
 // SF-1442 = "Solicitation, Offer and Award (Construction, Alteration, or Repair)" — the construction
 // counterpart to SF-1449 (commercial). Anchored to the form id / its construction title.
-const SF1442_HEADER_RE = /\bSF[-\s]?1442\b|STANDARD\s+FORM\s+1442|SOLICITATION[\/,\s]+OFFER[\/,\s]+(?:AND\s+)?AWARD\s*\(?\s*CONSTRUCTION/i;
-// Davis-Bacon CONSTRUCTION wage standard (FAR 52.222-6 family) — deliberately NOT matching SCA service
-// wages (52.222-41), which are the in-scope-services case.
-const DAVIS_BACON_RE = /\b52\.222-6\b|davis[\s-]?bacon|construction\s+wage\s+rate/i;
 // CSI MasterFormat section codes ("NN NN NN") — only construction specs/drawings use these.
 const CSI_SECTION_RE = /\bSECTION\s+\d{2}\s+\d{2}\s+\d{2}\b/gi;
 
@@ -455,7 +454,6 @@ const CSI_SECTION_RE = /\bSECTION\s+\d{2}\s+\d{2}\s+\d{2}\b/gi;
 // way to submit an offer must still fall to OOS. Keyed on SUBMISSION MECHANICS only — the SF-1442 form token is the
 // CLASSIFIER, not proof of biddability (Rule-69 re-review): an SF-1442 design-build with NO bid schedule must still
 // fall to OOS, not escape on the bare form name. W9126 (bid schedule + offers-due) has real offer structure.
-const OFFER_STRUCTURE_RE = /bid\s+schedule|offers?\s+(?:are\s+)?due|offer\s+due\s+date|receipt\s+of\s+offers|bid\s+opening/i;
 
 export function detectConstructionOutOfScope(opts: {
   naicsCode?: string | null;

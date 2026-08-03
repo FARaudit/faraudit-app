@@ -87,6 +87,33 @@ function ok(label: string, cond: boolean) { if (cond) pass++; else { fail++; con
       && !p.endsWith("audit-deadline-extract.ts");
   });
   ok(`exactly ONE definition in the tree — found inline copies in: ${inlined.join(", ") || "(none)"}`, inlined.length === 0);
+
+  // ── THE WHOLE FAMILY, not just the member that drifted ──────────────────────────────────────────────────────────
+  // audit-engine.ts implements the SAME controlling-deadline selection as reconcileOfferDueDeadlines, and used to
+  // re-declare FIVE recognizers locally. Only one of the five had drifted when this was found — locking just that one
+  // would leave four loaded guns and a test that reads like the problem is solved. The other four were byte-identical
+  // at consolidation; this asserts they stay that way by having only one definition to stay identical to.
+  const FAMILY: Array<[string, RegExp]> = [
+    ["exclude (interim milestones)", /site\s\*visit|site\\s\*visit/],
+    ["submission", /offer\|proposal\|quote/],
+    ["block-8", /block\\s\*8|block\s\*8/],
+    ["amendment-updated", /amendment\|amended\|revised/],
+  ];
+  const extractSrc = readFileSync("src/lib/audit-deadline-extract.ts", "utf8");
+  const engineSrc = readFileSync("src/lib/audit-engine.ts", "utf8");
+  const exported = ["DEADLINE_EXCLUDE_RE", "DEADLINE_SUBMISSION_RE", "DEADLINE_BLOCK8_RE", "DEADLINE_AMEND_UPDATED_RE", "DEADLINE_DEAD_DATE_RE"];
+  for (const name of exported) {
+    ok(`${name} has exactly ONE definition (exported from audit-deadline-extract)`,
+      new RegExp(`export const ${name} = /`).test(extractSrc));
+    ok(`${name} is IMPORTED by audit-engine, not re-declared`,
+      new RegExp(`\\b${name}\\b`).test(engineSrc) && !new RegExp(`const ${name} = /`).test(engineSrc));
+  }
+  // audit-engine must hold NO local deadline regex literal any more — the whole point.
+  const engineBody = engineSrc.replace(/\/\*[\s\S]*?\*\//g, "").split("\n").filter((l) => !/^\s*(\/\/|\*)/.test(l)).join("\n");
+  const localDeadlineLits = (engineBody.match(/const (excludeRe|submissionRe|block8Re|amendUpdatedRe|deadDateRe) = \/[^\n]+/g) || []);
+  ok(`audit-engine declares no local deadline regex literal — found: ${localDeadlineLits.join(" | ") || "(none)"}`,
+    localDeadlineLits.length === 0);
+  void FAMILY;
   ok("the one home exports it so the others can import rather than re-declare", DEADLINE_DEAD_DATE_RE instanceof RegExp);
 
   console.log(`\naudit-dead-date-single-source: ${pass} passed, ${fail} failed`);
