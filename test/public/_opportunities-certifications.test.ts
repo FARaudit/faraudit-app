@@ -171,8 +171,9 @@ console.log("\nC2 · pole → program table");
 {
   // Written from the poles saRender() draws as `restricted`, NOT read back out
   // of POLE_PROGRAM. SB is deliberately absent — see C3.
+  // SDVOSB is deliberately ABSENT — see C3. SB is absent too.
   const EXPECTED: Record<string, string> = {
-    "8(a)": "se:8a", "HUBZone": "se:hubzone", "SDVOSB": "se:sdvosb",
+    "8(a)": "se:8a", "HUBZone": "se:hubzone",
     "EDWOSB": "se:edwosb", "WOSB": "se:wosb",
   };
   const actual = SH.POLE_PROGRAM;
@@ -198,6 +199,8 @@ console.log("\nC3 · small-business poles are never screened on certifications")
     const p = (certs.establishedPrograms || []).join(",") || "none";
     ok(SH.certEligible({ sa: "SB" }), `SB survives a verified registration holding [${p}]`);
     ok(SH.certEligible({ sa: "SB-Partial" }), `SB-Partial survives a verified registration holding [${p}]`);
+    // The source cannot attest SDVOSB (no such SBA code exists), so its absence is not evidence.
+    ok(SH.certEligible({ sa: "SDVOSB" }), `SDVOSB survives [${p}] — SAM's SBA list cannot attest it`);
     ok(SH.certEligible({ sa: "Full" }), `Full & Open survives [${p}]`);
     ok(SH.certEligible({ sa: "UNKNOWN" }), `an UNREAD set-aside survives [${p}] — unread is not a restriction`);
     ok(SH.certEligible({ sa: "SoleSource" }), `SoleSource survives [${p}] — its band already screens it`);
@@ -244,7 +247,11 @@ console.log("\nC5 · the two subtractions are disjoint and exhaustive");
   // the FIRST subtraction. That is the disjointness this section exists to prove
   // — a row removed twice would break the sum above while leaving both counts
   // looking individually plausible.
-  ok(ineligible === 2, "SDVOSB + 8(a) are the only in-scope eligibility removals", String(ineligible));
+  // 1, not 2: the SDVOSB row is in scope and NOT established, yet survives — SDVOSB is never screened,
+  // because SAM's SBA list cannot attest it. 8(a) is the only in-scope removal.
+  ok(ineligible === 1, "8(a) is the only in-scope eligibility removal", String(ineligible));
+  ok(SH.certEligible({ sa: "SDVOSB", naics: "336413" }),
+    "the in-scope SDVOSB row SURVIVES a verified registration that does not list it");
   ok(!SH.inNaics({ sa: "HUBZone", naics: "999999" }), "the HUBZone row is claimed by the NAICS subtraction, not counted twice");
 
   // The EDWOSB registration must clear the WOSB row as well as the EDWOSB one —
@@ -268,7 +275,7 @@ console.log("\nC6 · the banner says something different in each state");
   }
   SH.setCerts(VERIFIED([]));
   lines.set("verified-zero", say(SH.certBannerCopy()));
-  SH.setCerts(VERIFIED(["se:sdvosb", "se:vosb"], ["SDVOSB"]));
+  SH.setCerts(VERIFIED(["se:hubzone"], ["HUBZone"]));
   lines.set("verified-some", say(SH.certBannerCopy()));
 
   ok(new Set(lines.values()).size === lines.size, `all ${lines.size} states render distinct copy`,
@@ -286,8 +293,8 @@ console.log("\nC6 · the banner says something different in each state");
     ok(/nothing is screened out/i.test(lines.get(state)!),
       `'${state}' states that nothing is screened out`, lines.get(state));
 
-  SH.setCerts(VERIFIED(["se:sdvosb"], ["SDVOSB"]));
-  ok(SH.certBannerCopy().strong.includes("SDVOSB"), "a verified registration names the programs it carries");
+  SH.setCerts(VERIFIED(["se:hubzone"], ["HUBZone"]));
+  ok(SH.certBannerCopy().strong.includes("HUBZone"), "a verified registration names the programs it carries");
   for (const state of ["no-uei", "uei-not-found"]) {
     SH.setCerts({ state, records: [], establishedPrograms: [] });
     ok(SH.certBannerCopy().btn !== null, `'${state}' carries a control — the cause is the customer's to fix`);
@@ -313,6 +320,7 @@ console.log("\nC7 · every pole normSetaside() emits is decided explicitly");
   const NEVER_SCREEN: Record<string, string> = {
     "SB": "size is determined per solicitation, not by registration",
     "SB-Partial": "size is determined per solicitation, not by registration",
+    "SDVOSB": "SAM's SBA list does not carry SDVOSB at all — it is certified via VA VetCert",
     "Full": "unrestricted — restricts nobody",
     "UNKNOWN": "the set-aside was not read; unread is not a restriction",
     "SoleSource": "already screened by its verdict band, not by eligibility",
@@ -333,9 +341,9 @@ console.log("\nC8 · the gate can fail");
   // P1 — the subtraction must FIRE. C3/C4 are satisfied for free by a filter
   // that never removes anything, which is exactly the state before this wiring.
   SH.setCerts(VERIFIED([]));
-  const fires = ["SDVOSB", "8(a)", "HUBZone", "WOSB", "EDWOSB"].filter((sa) => !SH.certEligible({ sa }));
-  ok(fires.length === 5,
-    "PLANTED: a verified registration with no programs removes all five program poles", fires.join(","));
+  const fires = ["8(a)", "HUBZone", "WOSB", "EDWOSB"].filter((sa) => !SH.certEligible({ sa }));
+  ok(fires.length === 4,
+    "PLANTED: a verified registration with no programs removes all four attestable poles", fires.join(","));
 
   // P2 — a hardcoded empty cert set (the pre-wiring shape) must NOT read as
   // verified. If PROFILE_CERTS ever defaults to 'verified', C3/C4 stay green

@@ -121,10 +121,20 @@ const SA_RESTRICTED = ['SB','SDVOSB','8(a)','HUBZone','WOSB','EDWOSB'];
    zero socioeconomic programs is very often small, so gating those two poles on
    a program record would hide the largest slice of what it may actually bid.
 
+   SDVOSB is absent for a different reason, and it is the one most likely to be
+   "fixed" by someone who does not know it: SAM's SBA certification list does not
+   carry service-disabled veteran status AT ALL. That certification is issued
+   through VA VetCert. Measured on the live API, the SBA vocabulary is exactly
+   five codes and none of them is SDVOSB. So a firm's SDVOSB status can never be
+   established from this source, and its absence here is not evidence the firm
+   lacks it. Gating SDVOSB rows on it would hide real bids from the very firms
+   the pool exists for. Adding SDVOSB to the map above requires a NEW source, not
+   a new line.
+
    SoleSource, Full and UNKNOWN are absent for their own reasons: a sole-source
    notice is already screened by its band, full-and-open restricts nobody, and
    UNKNOWN means the set-aside was not read — which is not a restriction. ── */
-const POLE_PROGRAM = {'8(a)':'se:8a', 'HUBZone':'se:hubzone', 'SDVOSB':'se:sdvosb', 'EDWOSB':'se:edwosb', 'WOSB':'se:wosb'};
+const POLE_PROGRAM = {'8(a)':'se:8a', 'HUBZone':'se:hubzone', 'EDWOSB':'se:edwosb', 'WOSB':'se:wosb'};
 
 /* Removed only when SAM has ANSWERED and the answer does not carry the program.
    'loading', 'no-uei', 'unverified' and 'registration-inactive' all keep the row:

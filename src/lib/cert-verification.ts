@@ -7,10 +7,22 @@
 // (AUTHORITATIVE_ONLY_NS: se/setaside/sb/naics/size/…), but nothing was WRITING the authoritative
 // alternative, so switching that discipline on would have made every certification inert.
 //
-// This is the producer. SAM's Entity Management record carries `socioeconomic.sbaBusinessTypeList` —
-// the programs SBA has actually registered the firm under. That is the authoritative fact, and it
-// arrives with its own time anchor (`registrationExpirationDate`), which is what the engine's
-// expiry-vs-asOf veto needs to re-impose caution when a registration lapses.
+// This is the producer. SAM's Entity Management record carries the programs SBA has actually certified
+// the firm under at `coreData.businessTypes.sbaBusinessTypeList`. Measured against sam.gov/api/prod on
+// 2026-08-03, the vocabulary is exactly FIVE codes — an exhaustive sweep of all 1,296 two-character
+// combinations returned no others:
+//     A6  SBA Certified 8(a) Program Participant                          (4,933 firms)
+//     JT  SBA Certified 8(a) Joint Venture                                  (773)
+//     XX  SBA Certified HUBZone Firm                                      (4,586)
+//     A9  SBA-Certified Women-Owned Small Business                       (13,386)
+//     A0  SBA-Certified Economically Disadvantaged Women-Owned Small Business (4,089)
+//
+// THERE IS NO SDVOSB CODE. Service-disabled veteran status is certified through VA VetCert, not SBA,
+// and does not appear in this list at all. So this source can NEVER establish se:sdvosb or se:vosb —
+// which means no consumer may treat their absence here as evidence a firm lacks them.
+//
+// Each row carries its own `certificationExitDate`, a different and usually earlier clock than the
+// registration expiry, and the record takes the EARLIER of the two.
 //
 // FAIL-CLOSED, in three places, because every failure here would be a false CLEAR:
 //   1. the registration must be ACTIVE — a lapsed registration attests nothing;
@@ -49,6 +61,15 @@ export function verifiedCertRecords(
   const expiresAt = String(entity.registration_expiration ?? "").trim();
   if (!expiresAt || Number.isNaN(Date.parse(expiresAt))) return [];
 
+  // TWO CLOCKS, AND THE RECORD EXPIRES ON THE EARLIER. The registration expiry bounds the whole
+  // registration; `certificationExitDate` bounds THIS certification, and it is usually the earlier of
+  // the two (an 8(a) term runs nine years, a HUBZone certification three, on their own cycles). Taking
+  // only the registration date would keep asserting a program whose certification had already lapsed —
+  // an over-claim in the one direction that clears a set-aside bar.
+  const rows = entity.sba_certifications ?? [];
+  const byDescription = new Map<string, string | null>();
+  for (const c of rows) byDescription.set(c.description, c.certifiedUntil);
+
   const out: ProfileAttributeRecord[] = [];
   const seen = new Set<string>();
   for (const raw of entity.business_types ?? []) {
@@ -56,8 +77,19 @@ export function verifiedCertRecords(
     const attr = canonicalizeEligibilityAttr(raw);
     if (attr === null) continue;              // unrecognized SBA type — assert nothing
     if (seen.has(attr)) continue;
+
+    const certUntil = byDescription.get(raw.trim()) ?? null;
+    let effective = expiresAt;
+    if (certUntil) {
+      const c = Date.parse(certUntil);
+      // An unparseable certification date is not a licence to fall back to the longer clock — it is a
+      // determination with no time anchor, and those emit nothing (the same rule as a missing
+      // registration expiry, one paragraph up).
+      if (Number.isNaN(c)) continue;
+      if (c < Date.parse(expiresAt)) effective = certUntil;
+    }
     seen.add(attr);
-    out.push({ attr, source: "sam_api", verifiedAt: nowIso, expiresAt });
+    out.push({ attr, source: "sam_api", verifiedAt: nowIso, expiresAt: effective });
   }
   return out;
 }
