@@ -14,5 +14,6 @@ export async function GET(req: Request) {
     return new NextResponse("Access denied", { status: 401 });
   }
 
-  return NextResponse.redirect(new URL("/home.html", req.url));
+  // Pointed at /home.html until 2026-08-03 — a legacy shell, now deleted.
+  return NextResponse.redirect(new URL("/today", req.url));
 }
