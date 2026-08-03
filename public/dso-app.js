@@ -48,15 +48,24 @@
   // subtraction (read − outNaics) is the difference between them, which is why
   // they must stay two functions and not one.
   function readSet() { return ROWS.slice(); }
-  function base() {
-    return readSet().filter((o) => !(S.naics.size && o.naics && !S.naics.has(o.naics)));
-  }
+  // The two subtractions the funnel reports, as two predicates. Keeping them
+  // separate is what lets read − outNaics − ineligible equal the sorted total
+  // exactly, instead of a single filter reporting one number for two causes.
+  function inNaics(o) { return !(S.naics.size && o.naics && !S.naics.has(o.naics)); }
+  function base() { return readSet().filter((o) => inNaics(o) && certEligible(o)); }
 
-  // The client is never sent certifications, and under the engine's provenance
-  // discipline a self-asserted one cannot clear a set-aside bar anyway — so the
-  // "no certifications on record" state Design designed is the truthful one here,
-  // not a placeholder. It stops being empty when verified records exist.
-  const PROFILE = { certs: [] };
+  // Certifications come from the customer's SAM registration via
+  // opportunities-live.js. A self-asserted certification is never read here: it
+  // cannot clear a set-aside bar, so treating one as eligibility would tell a
+  // firm it may compete for a pool it is not registered under.
+  function PROFILE_CERTS() {
+    const c = (window.DSO && window.DSO.CERTS) || null;
+    return {
+      state: (c && c.state) || 'loading',
+      labels: (c && Array.isArray(c.records) ? c.records : []).map(function (r) { return r.label || r.attr; }),
+      programs: new Set(c && Array.isArray(c.establishedPrograms) ? c.establishedPrograms : [])
+    };
+  }
 
   // `-Infinity − -Infinity` is NaN and a NaN comparator is non-transitive:
   // Array#sort then leaves the group in an implementation-defined order. Missing
@@ -100,6 +109,34 @@ const BANDS = [
    the encoding survives greyscale. SoleSource must never share a register with
    Full & Open — one means anyone may compete, the other means you may not. ── */
 const SA_RESTRICTED = ['SB','SDVOSB','8(a)','HUBZone','WOSB','EDWOSB'];
+
+/* ── SET-ASIDE ELIGIBILITY — the ONE place the page removes a row for a reason
+   other than the customer's own filters, so every exclusion has to be one SAM
+   can attest.
+
+   POLE → the canonical program that gates it. SB and SB-Partial are absent BY
+   CONSTRUCTION and this is the load-bearing part of the map: small-business
+   status is a size determination made per solicitation against that NAICS
+   standard, and no registration record can settle it. A firm registered under
+   zero socioeconomic programs is very often small, so gating those two poles on
+   a program record would hide the largest slice of what it may actually bid.
+
+   SoleSource, Full and UNKNOWN are absent for their own reasons: a sole-source
+   notice is already screened by its band, full-and-open restricts nobody, and
+   UNKNOWN means the set-aside was not read — which is not a restriction. ── */
+const POLE_PROGRAM = {'8(a)':'se:8a', 'HUBZone':'se:hubzone', 'SDVOSB':'se:sdvosb', 'EDWOSB':'se:edwosb', 'WOSB':'se:wosb'};
+
+/* Removed only when SAM has ANSWERED and the answer does not carry the program.
+   'loading', 'no-uei', 'unverified' and 'registration-inactive' all keep the row:
+   an unread registration is unknown, and unknown is never a disqualifier. */
+function certEligible(o){
+  const prog = POLE_PROGRAM[o.sa];
+  if(!prog) return true;
+  const p = PROFILE_CERTS();
+  if(p.state !== 'verified') return true;
+  return p.programs.has(prog);
+}
+
 function saRender(s){
   if(s==='SoleSource')  return {cls:'sa-barred',    label:'SOLE SOURCE',    reg:'barred'};
   if(s==='UNKNOWN')     return {cls:'sa-unread',    label:'SET-ASIDE UNREAD',reg:'unread'};
@@ -241,9 +278,80 @@ function renderHeader(){
   });
   const active=[...S.naics].length, total=codes.length;
   $('hdrNaicsLabel').innerHTML = active<total ? 'Your NAICS · <b>'+active+' of '+total+' shown</b>' : 'Your NAICS codes · click to filter';
-  $('profileGap').innerHTML = PROFILE.certs.length
-    ? '<span>Certifications on record: <b>'+PROFILE.certs.join(' · ')+'</b>. Set-aside eligibility is decided per row.</span>'
-    : '<span><b>No certifications on record.</b> Until you add them we cannot tell you which set-asides you qualify for — so nothing is screened out on eligibility.</span><button type="button">Add certifications</button>';
+  renderCertBanner($('profileGap'));
+}
+
+/* ── the certifications banner: SIX states, and the five that are not
+   'verified' say something different from each other.
+
+   "No records" has five causes calling for five different actions — add a UEI,
+   correct a UEI SAM does not recognise, renew a registration, wait out an
+   outage, or nothing at all because the firm genuinely holds no socioeconomic
+   program. One shared line would hand four of those five customers an
+   instruction that does not apply to them.
+
+   The uei-not-found / unverified pair is the one that has already gone wrong:
+   both render zero programs, but one is ours to fix and the other is theirs, and
+   the outage wording on a bad UEI leaves a customer waiting for nothing.
+
+   Copy is DATA, not markup, so a gate can assert the six states directly. ── */
+function certBannerCopy(){
+  const p = PROFILE_CERTS();
+  if(p.state === 'no-uei') return {
+    pre:'', strong:'No UEI on your profile.',
+    post:' Add it and your set-aside eligibility is read straight from your SAM registration — until then nothing is screened out on eligibility.',
+    btn:'Add your UEI'
+  };
+  if(p.state === 'uei-not-found') return {
+    pre:'', strong:'SAM has no active registration under the UEI on your profile.',
+    post:' Check the UEI — until it matches a registration we cannot read your set-aside eligibility, so nothing is screened out on eligibility.',
+    btn:'Check your UEI'
+  };
+  if(p.state === 'registration-inactive') return {
+    pre:'', strong:'Your SAM registration is not active,',
+    post:' so it attests no set-aside eligibility. Nothing is screened out on eligibility while it is lapsed.', btn:null
+  };
+  if(p.state === 'unverified') return {
+    pre:'', strong:'We could not read your SAM registration just now,',
+    post:' so nothing is screened out on eligibility. Every set-aside notice in this read is still listed below.', btn:null
+  };
+  if(p.state === 'verified' && p.labels.length) return {
+    pre:'SAM-verified: ', strong:p.labels.join(' · '),
+    post:'. Set-aside pools your registration does not cover are removed below; small-business set-asides are decided per row, by size.', btn:null
+  };
+  if(p.state === 'verified') return {
+    pre:'', strong:'Your SAM registration lists no socioeconomic programs.',
+    post:' Set-asides reserved for those programs are removed below; small-business set-asides are decided per row, by size.', btn:null
+  };
+  return { pre:'', strong:'', post:'Reading your SAM registration for set-aside eligibility…', btn:null };
+}
+
+/* Built from nodes rather than a markup string: the only variable part is the
+   program list, and as a text node it cannot carry markup at all. */
+function renderCertBanner(host){
+  if(!host) return;
+  while(host.firstChild) host.removeChild(host.firstChild);
+  const c = certBannerCopy();
+  const span = document.createElement('span');
+  if(c.pre) span.appendChild(document.createTextNode(c.pre));
+  if(c.strong){
+    const b = document.createElement('b');
+    b.textContent = c.strong;
+    span.appendChild(b);
+  }
+  span.appendChild(document.createTextNode(c.post));
+  host.appendChild(span);
+  if(c.btn){
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'addUeiBtn';
+    btn.textContent = c.btn;
+    // The UEI field lives in the capability statement, which the hash routing on
+    // /home opens directly. The in-page editor below handles NAICS codes only, so
+    // sending them there would be sending them to a form without the field.
+    btn.onclick = ()=>{ window.location.href = '/home#capability'; };
+    host.appendChild(btn);
+  }
 }
 
 /* ── KPIs: four values, all derived, none permanently em-dash ── */
@@ -275,13 +383,21 @@ function renderBands(){
     {n:rows.filter(o=>o.stage==='notice').length, t:'Special Notice — no solicitation document posted'},
     {n:rows.filter(o=>o.sa==='SoleSource').length, t:'sole-source intent — not open competition'}
   ];
-  // The funnel: what never reached a band at all.
-  const outNaics = read.length - rows.length;
-  const ineligible = 0;
+  // The funnel: what never reached a band at all. Each line is counted on its own
+  // predicate over the full read, in order, so the two subtractions never claim
+  // the same notice twice and read − outNaics − ineligible === rows exactly.
+  const outNaics = read.filter(o=>!inNaics(o)).length;
+  const ineligible = read.filter(o=>inNaics(o) && !certEligible(o)).length;
+  const certs = PROFILE_CERTS();
+  const eligLabel = ineligible
+    ? 'set-asides your SAM registration does not cover'
+    : certs.state==='verified'
+      ? 'ineligible for the set-aside — none in this read are outside your registered programs'
+      : 'ineligible for the set-aside — your SAM-registered programs are not known, so nothing is removed';
   const funnel = [
     {n:read.length, t:'notices in this read', cls:''},
     {n:outNaics, t:S.profile?'outside your NAICS codes':'outside your NAICS codes — no profile on record, so nothing is removed', cls:outNaics?'minus':'minus none', sign:'−'},
-    {n:ineligible, t:'ineligible for the set-aside — no certifications on record', cls:'minus none', sign:'−'},
+    {n:ineligible, t:eligLabel, cls:ineligible?'minus':'minus none', sign:'−'},
     {n:rows.length, t:'sorted into the four bands above', cls:'sum'}
   ];
   $('triageBands').innerHTML =
