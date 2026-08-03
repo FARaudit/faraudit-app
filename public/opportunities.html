@@ -24,8 +24,8 @@
   --shadow:0 1px 2px rgba(15,23,42,.06), 0 8px 24px -12px rgba(15,23,42,.10);
   --shadow-sm:0 1px 3px rgba(0,0,0,0.06);
   --shadow-pop:0 24px 60px -22px rgba(15,23,42,.28), 0 6px 16px -6px rgba(15,23,42,.12);
-  /* ROLE tokens added by card 775. Never hue-named: --barred is red today and
-     the name still holds if it stops being red. */
+  /* ROLE tokens. Never hue-named: --barred is red today and the name still
+     holds if it stops being red. */
   --eligible-bg:var(--accent-pale); --eligible-ink:var(--accent-deep); --eligible-line:var(--accent-light);
   --open-bg:var(--card-soft); --open-ink:#4b5563; --open-line:var(--line);
   --barred-bg:var(--red-50); --barred-ink:var(--red-700); --barred-line:var(--red-200);
@@ -213,7 +213,7 @@ button{font-family:inherit}
 .band-total .band-n{font-size:22px}
 /* The funnel is a SECOND ledger and it must not borrow the band ledger's
    numbers: the rows a profile removes never enter a band, so listing them as a
-   screen-out reason would put two different 14s side by side (card 771). */
+   screen-out reason would put two different totals side by side. */
 .funnel{display:flex;flex-direction:column;margin-top:4px;border-top:2px solid var(--ink);padding-top:9px}
 .fn-row{display:grid;grid-template-columns:64px minmax(0,1fr);gap:24px;align-items:baseline;padding:5px 12px}
 .fn-n{font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:700;text-align:right;color:var(--ink);font-variant-numeric:tabular-nums}

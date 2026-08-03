@@ -167,9 +167,9 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;ali
    same glance that reads the rows. */
 .feed-illustrative{font-size:11px;font-weight:600;font-family:var(--serif);color:rgba(245,240,232,.82);letter-spacing:.01em;}
 .feed-illustrative em{font-style:normal;color:var(--gold);font-weight:700;}
-/* 4, not 6 — matched to the counters that actually exist. Two were removed with the fabricated
-   live numbers and two more were the "0 competitors / 0 rivals" claims; the grid kept declaring six
-   and rendered a third of the strip blank. Counters are never invented to fill this row. */
+/* Four columns, matched to the number of counters that exist. The grid must
+   declare exactly what it renders — a counter is never invented to fill the row,
+   and the column count follows the data rather than the layout. */
 .feed-counters{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-bottom:1px solid rgba(201,168,76,.08);width:100%;}
 .fc{padding:11px 0 11px 20px;border-right:1px solid rgba(201,168,76,.07);display:flex;flex-direction:column;gap:3px;min-width:0;}
 .fc:last-child{border-right:none;}
