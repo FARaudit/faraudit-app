@@ -62,14 +62,35 @@ function arrayIsEmpty(src: string, name: string): boolean {
 }
 
 // ── Part A · far-data.js carries no fabricated regulatory records ────────────────
+// ENUMERATED FROM THE FILE, not from a name list. The first cut of this gate checked
+// UPDATES and passed everything else — and far-data.js also shipped EFFECTIVE (a
+// `days: 15` countdown to an invented deadline) and AFFECTED (four real-shaped
+// solicitation numbers, FA3016-26-Q-0068 among them, presented as the signed-in
+// user's own affected pursuits with per-solicitation compliance actions). Naming the
+// defect "the UPDATES mock" produced a recognizer exactly that size.
+//
+// So: every array the module EXPORTS must hold no object literals, and the only
+// exemptions are the render templates named here — a name this gate has never seen
+// must be empty. Fail-closed, and the exemptions are printed rather than implied.
 console.log("── Part A · far-data.js holds no invented FAR/DFARS records ──");
 const farData = read("far-data.js");
 
-check(
-  "far-data.js · UPDATES holds no record literals",
-  !declared(farData, "UPDATES") || arrayIsEmpty(farData, "UPDATES"),
-  "still contains object literals — invented clause changes",
-);
+// Presentation templates: labels, colours, sort keys. No business facts.
+const FAR_TEMPLATES = new Set(["TYPES", "IMPACTS", "IMPACT_META", "TYPE_COLOR", "SORTS"]);
+console.log(`   exempt as render templates: ${[...FAR_TEMPLATES].join(", ")}`);
+
+const exported = (farData.match(/return\s*\{([^}]*)\}\s*;?\s*\}\)\(\)/)?.[1] ?? "")
+  .split(",").map((s) => s.trim()).filter(Boolean);
+check("far-data.js · export list is readable", exported.length > 0, "could not parse the module's return object");
+
+for (const name of exported) {
+  if (FAR_TEMPLATES.has(name)) continue;
+  check(
+    `far-data.js · ${name} holds no record literals`,
+    !declared(farData, name) || arrayIsEmpty(farData, name),
+    "still contains object literals — invented business data",
+  );
+}
 
 // The single most damaging field: quoted BEFORE/AFTER regulation text. A contractor
 // reading this believes the clause language actually changed as printed.
@@ -98,10 +119,32 @@ check(
 console.log("\n── Part B · defense-news.html holds no mock articles ──");
 const dnHtml = read("defense-news.html");
 
+// Same fail-closed enumeration as Part A. Checking MOCK_ARTICLES alone passed while
+// the page still shipped TICKER_ITEMS (eight invented awards scrolling as a live
+// ticker), REG_ITEMS (six invented regulatory headlines with compliance advice) and
+// AWARDS (six more, under the heading "RECENT AWARDS · YOUR NAICS").
+const DN_TEMPLATES = new Set(["DN_NAV", "SOURCES", "TOPIC_COLORS", "DN_CAT"]);
+console.log(`   exempt as render templates: ${[...DN_TEMPLATES].join(", ")}`);
+
+const dnArrays = [...dnHtml.matchAll(/(?:^|\n)\s*(?:var|const)\s+([A-Z_][A-Z0-9_]*)\s*=\s*\[/g)]
+  .map((m) => m[1]);
+check("defense-news.html · array declarations are readable", dnArrays.length > 0, "found none");
+
+for (const name of dnArrays) {
+  if (DN_TEMPLATES.has(name)) continue;
+  check(
+    `defense-news.html · ${name} holds no record literals`,
+    arrayIsEmpty(dnHtml, name),
+    "still contains object literals — invented business data",
+  );
+}
+
+// A generated series rendered as measured history. The old volumeSeries() built 14
+// days of "news volume" from sin/cos over a topic count.
 check(
-  "defense-news.html · MOCK_ARTICLES holds no record literals",
-  !declared(dnHtml, "MOCK_ARTICLES") || arrayIsEmpty(dnHtml, "MOCK_ARTICLES"),
-  "still contains article literals",
+  "defense-news.html · no synthesized time series",
+  !/Math\.(sin|cos)\s*\(/.test(dnHtml),
+  "a trigonometric data generator is present",
 );
 
 // mergeArticles() must not have a fabricated branch to fall back to.

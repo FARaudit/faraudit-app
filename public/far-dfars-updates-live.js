@@ -44,26 +44,63 @@
     };
   }
 
+  function setStatus(state, reason, sources) {
+    if (!window.FARD) return;
+    window.FARD.STATUS = { state: state, reason: reason || '', sources: sources || [] };
+  }
+  function repaint() {
+    if (window.FAR_APP && typeof window.FAR_APP.render === 'function') window.FAR_APP.render();
+  }
+
+  /* The page must never be left showing what it showed before. An unreachable feed
+     and a feed with nothing new produce the same empty array, so the state is what
+     separates them, and both are stated on screen rather than left blank. */
+  function renderUnavailable(reason) {
+    if (window.FARD && Array.isArray(window.FARD.UPDATES)) {
+      window.FARD.UPDATES.length = 0;
+      if (Array.isArray(window.FARD.EFFECTIVE)) window.FARD.EFFECTIVE.length = 0;
+      if (Array.isArray(window.FARD.AFFECTED)) window.FARD.AFFECTED.length = 0;
+    }
+    setStatus('unavailable', reason);
+    repaint();
+  }
+
   async function wire() {
     try {
       const res = await fetch('/api/regulatory-updates', { credentials: 'include' });
-      if (!res.ok) throw new Error('regulatory-updates fetch failed: ' + res.status);
+      if (!res.ok) {
+        let why = 'The regulatory feeds could not be reached (HTTP ' + res.status + ').';
+        try { const b = await res.json(); if (b && b.error) why = String(b.error); } catch (_) {}
+        renderUnavailable(why);
+        return;
+      }
       const data = await res.json();
       const items = Array.isArray(data.updates) ? data.updates
                   : Array.isArray(data.items)   ? data.items
                   : [];
-      if (!items.length) return;
+
+      // The route reports which sources answered. All of them failing is an outage,
+      // not an empty result, even though both arrive as [].
+      if (data.degraded && Array.isArray(data.sources)) {
+        const dead = data.sources.filter(function (s) { return !s.ok; });
+        if (dead.length === data.sources.length) {
+          renderUnavailable('None of the ' + data.sources.length + ' regulatory sources responded.');
+          return;
+        }
+        setStatus('ok', '', data.sources);
+      } else {
+        setStatus('ok', '', Array.isArray(data.sources) ? data.sources : []);
+      }
+
       if (!window.FARD || !Array.isArray(window.FARD.UPDATES)) return;
 
       const mapped = items.map(mapUpdate);
       window.FARD.UPDATES.length = 0;
-      window.FARD.UPDATES.push(...mapped);
-
-      if (window.FAR_APP && typeof window.FAR_APP.render === 'function') {
-        window.FAR_APP.render();
-      }
+      window.FARD.UPDATES.push.apply(window.FARD.UPDATES, mapped);
+      repaint();
     } catch (e) {
       console.error('[far-dfars-updates-live] wire failed:', e);
+      renderUnavailable('The regulatory feeds could not be reached.');
     }
   }
 

@@ -100,8 +100,16 @@ export async function GET(req: NextRequest) {
   const { data: cached } = await cacheQ;
 
   let rows: RegRow[] = [];
+  // Per-feed outcome. A feed that 504s and a feed with nothing new both contribute
+  // [] to the flat list, so without this the caller cannot tell an outage from a
+  // quiet week — and the page kept its seeded content on the strength of that
+  // ambiguity. Measured 2026-08-03: acquisition.gov 504, DPC DFARS 404, Federal
+  // Register 200-with-zero-items. All three, silently, for an unknown period.
+  let sources: Array<{ name: string; ok: boolean; count: number; reason?: string }> = [];
+
   if (cached && cached.length > 5) {
     rows = cached as unknown as RegRow[];
+    sources = FEEDS.map((f) => ({ name: f.source, ok: true, count: 0, reason: "served from cache" }));
   } else {
     const fetched = await Promise.all(
       FEEDS.map(async (f) => {
@@ -111,12 +119,21 @@ export async function GET(req: NextRequest) {
             signal: AbortSignal.timeout(10000),
             next: { revalidate: 21600 }
           });
-          if (!res.ok) return [];
-          return parse(await res.text(), f.source);
-        } catch { return []; }
+          if (!res.ok) {
+            console.error("[regulatory-updates] feed non-OK", { source: f.source, url: f.url, status: res.status });
+            return { source: f.source, ok: false, rows: [] as RegRow[], reason: `HTTP ${res.status}` };
+          }
+          return { source: f.source, ok: true, rows: parse(await res.text(), f.source) };
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : String(err);
+          console.error("[regulatory-updates] feed threw", { source: f.source, url: f.url, reason });
+          return { source: f.source, ok: false, rows: [] as RegRow[], reason };
+        }
       })
     );
-    rows = fetched.flat().sort((a, b) => new Date(b.published_at || 0).getTime() - new Date(a.published_at || 0).getTime());
+    sources = fetched.map((f) => ({ name: f.source, ok: f.ok, count: f.rows.length, reason: f.reason }));
+    rows = fetched.flatMap((f) => f.rows)
+      .sort((a, b) => new Date(b.published_at || 0).getTime() - new Date(a.published_at || 0).getTime());
 
     if (rows.length > 0) {
       await supabase
@@ -129,5 +146,28 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ updates: rows.slice(0, 60), fetched_at: new Date().toISOString() });
+  // Rule 61: a failed dependency yields a visible failure state. Every source down
+  // with nothing to show is an outage, and answering 200 {updates: []} makes it
+  // indistinguishable from a week with no rule changes.
+  const liveSources = sources.filter((s) => s.reason !== "served from cache");
+  const allDown = liveSources.length > 0 && liveSources.every((s) => !s.ok);
+  if (allDown && rows.length === 0) {
+    return NextResponse.json(
+      {
+        error: `None of the ${liveSources.length} regulatory sources responded.`,
+        updates: [],
+        sources,
+        degraded: true,
+        fetched_at: new Date().toISOString()
+      },
+      { status: 503 }
+    );
+  }
+
+  return NextResponse.json({
+    updates: rows.slice(0, 60),
+    sources,
+    degraded: sources.some((s) => !s.ok),
+    fetched_at: new Date().toISOString()
+  });
 }

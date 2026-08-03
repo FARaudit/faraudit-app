@@ -553,21 +553,12 @@ function buildImg(url, alt){
   return '<img class="dn-card-img" src="' + esc(url) + '" alt="' + esc(safe) + '" loading="lazy" onerror="this.style.display=\'none\'">';
 }
 
-/* ─── Mock fallback (used when LIVE_ARTICLES has fewer than 4 entries) ─── */
-var MOCK_ARTICLES = [
-  {title:'CMMC Phase 2: 167 days until mandatory C3PAO certification — fewer than 1,100 of 76,000 contractors ready', description:'DoD DFARS 252.204-7021 is live. Phase 2 ends self-attestation November 10, 2026. Third-party C3PAO assessments become mandatory for all CUI contracts. Lockheed, Boeing, Northrop already demanding compliance from suppliers.', urlToImage:'https://upload.wikimedia.org/wikipedia/commons/thumb/3/38/US_Navy_100407-N-7526B-207_Sailors_work_at_computer_terminals.jpg/640px-US_Navy_100407-N-7526B-207_Sailors_work_at_computer_terminals.jpg', url:'https://www.ridgeit.com/cmmc-phase-2-deadline-november-2026/', sourceName:'RidgeIT / DFARS', publishedAt:'2026-03-28'},
-  {title:'Pentagon finalizes $3.8B F135 engine contract with Pratt & Whitney for 148 Lot 18 engines', description:'Pratt & Whitney receives $3.8B modification for F135 Lot 18 engines powering F-35 deliveries in 2026-2027. Supply chain window now open for NAICS 336413 precision parts manufacturers.', urlToImage:'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c9/F-35A_flight_%28cropped%29.jpg/640px-F-35A_flight_%28cropped%29.jpg', url:'https://www.americanmachinist.com', sourceName:'American Machinist', publishedAt:'2026-04-01'},
-  {title:'FY2026 NDAA signed: $900.6B authorized — CAS threshold raised, small business competition expanded', description:'President Trump signed the FY2026 NDAA Dec 18. CAS compliance threshold raised under §1806, small business competition provisions expanded under §1823.', urlToImage:'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Pentagon_satellite_photo.jpg/640px-Pentagon_satellite_photo.jpg', url:'https://www.pilieromazza.com/fiscal-year-2026-ndaa-signed-into-law-6-key-takeaways-for-defense-contractors/', sourceName:'PilieroMazza', publishedAt:'2025-12-18'},
-  {title:'DoJ recovered $52M in cybersecurity FCA settlements FY2025 — first subcontractor enforcement included', description:'The Department of Justice is prosecuting CMMC misrepresentation, not data breaches. FY2025 saw the first enforcement action against a subcontractor.', urlToImage:'https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/F-16_June_2008.jpg/640px-F-16_June_2008.jpg', url:'https://www.ridgeit.com', sourceName:'DoJ Civil Cyber-Fraud', publishedAt:'2026-01-15'},
-  {title:'Pentagon awards $1.09B to Pratt & Whitney for F100 engine consumable parts — F-15/F-16 fleet', description:'RTX subsidiary wins $1.09B for consumable and depot-level parts supporting 7,000+ F100 engines in USAF and allied service.', urlToImage:'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/US_Navy_031017-N-6967M-001_Ordnance_handlers_assigned_to_the_%22Jolly_Rogers%22.jpg/640px-US_Navy_031017-N-6967M-001_Ordnance_handlers_assigned_to_the_%22Jolly_Rogers%22.jpg', url:'https://www.americanmachinist.com', sourceName:'American Machinist', publishedAt:'2025-11-16'},
-  {title:'NDAA §866: DoD must harmonize DFARS cybersecurity requirements — reduce duplicative contract clauses by June 1 2026', description:'Section 866 mandates DoD harmonize cybersecurity requirements across the DIB and reduce contract-specific requirements. Implementation reports due June 2026.', urlToImage:'https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/US_Air_Force_F-22_Raptor.jpg/640px-US_Air_Force_F-22_Raptor.jpg', url:'https://www.gtlaw.com/en/insights/2026/2/fy2026ndaa', sourceName:'Greenberg Traurig', publishedAt:'2026-02-10'},
-  {title:'DoD earns "A" on SBA scorecard — $4.9B increase in small business contract awards in FY2024', description:'The Department of Defense awarded $4.9B more to small businesses year-over-year in FY2024, earning an "A" rating from SBA.', urlToImage:'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Pentagon_satellite_photo.jpg/640px-Pentagon_satellite_photo.jpg', url:'https://business.defense.gov', sourceName:'DoD OSBP', publishedAt:'2025-10-01'},
-  {title:'FY2026 NDAA §1823: Commercial solutions openings expanded — NAICS 336413/332710 manufacturers now eligible', description:'2026 NDAA revises 10 U.S.C. §3458 to allow DoD to use commercial solutions openings for standard commercial products. No innovative classification required.', urlToImage:'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c9/F-35A_flight_%28cropped%29.jpg/640px-F-35A_flight_%28cropped%29.jpg', url:'https://www.nextgov.com/ideas/2026/01/ndaa-massive-expansion-commercial-solutions-openings', sourceName:'Nextgov/FCW', publishedAt:'2026-01-05'}
-];
+/* Articles arrive at runtime from /api/defense-news. Nothing is seeded here:
+   an unreachable feed renders as unavailable, never as content. */
+var MOCK_ARTICLES = [];
 
 function mergeArticles(){
-  if (LIVE_ARTICLES && LIVE_ARTICLES.length >= 4) return LIVE_ARTICLES;
-  return MOCK_ARTICLES;
+  return (LIVE_ARTICLES && LIVE_ARTICLES.length) ? LIVE_ARTICLES : [];
 }
 
 /* ─── Modern news-outlet rendering ─── */
@@ -650,23 +641,16 @@ function renderSidebar(){
   var now = new Date();
   var days = Math.max(0, Math.ceil((target - now) / 86400000));
   var pct = Math.min(100, ((365 - days) / 365) * 100);
-  var AWARDS = [
-    {agency:'P&W / USAF', val:'$3.8B',  label:'F135 Lot 18 Engines'},
-    {agency:'P&W / USAF', val:'$1.09B', label:'F100 Engine Parts'},
-    {agency:'AFLCMC',     val:'$44.7M', label:'Boeing IDS'},
-    {agency:'NAVAIR',     val:'$15.8M', label:'Astronics Test'},
-    {agency:'TACOM',      val:'$6.2M',  label:'Heico Corp'},
-    {agency:'DLA',        val:'$6.3M',  label:'Parker Hannifin'}
-  ];
+  // Award records require a live source. None is wired to this panel, so it
+  // states that rather than listing awards nobody looked up.
+  var AWARDS = [];
+  // The four feeds /api/defense-news actually requests. Listing a source we do
+  // not read would claim coverage we do not have.
   var SOURCES = [
-    {n:'Defense News',       c:'#185FA5'},
-    {n:'Breaking Defense',   c:'#0A1628'},
-    {n:'JANES',              c:'#134e4a'},
-    {n:'Federal Register',   c:'#92400e'},
-    {n:'SAM.gov',            c:'#378ADD'},
-    {n:'DFARS Updates',      c:'#991b1b'},
-    {n:'GovExec',            c:'#6b7280'},
-    {n:'American Machinist', c:'#0d9488'}
+    {n:'Defense News',     c:'#185FA5'},
+    {n:'DoD News',         c:'#0A1628'},
+    {n:'Federal Register', c:'#92400e'},
+    {n:'FedScoop',         c:'#378ADD'}
   ];
   var el = document.getElementById('dn-sidebar-col');
   if (!el) return;
@@ -687,6 +671,7 @@ function renderSidebar(){
     + '</div>'
     + '<div class="dn-sw">'
     +   '<div class="dn-sw-title">RECENT AWARDS · YOUR NAICS</div>'
+    +   (AWARDS.length ? '' : '<div style="font-size:11px;color:var(--mute);padding:6px 0">Award feed unavailable — no live award source is connected.</div>')
     +   AWARDS.map(function(a){
         return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:0.5px solid var(--line-2)">'
           + '<div style="min-width:0">'
@@ -709,16 +694,10 @@ function renderSidebar(){
 }
 
 
-var TICKER_ITEMS = [
-  {agency:'P&W / USAF', val:'$3.8B',  company:'F135 Lot 18 Engines', naics:'336413'},
-  {agency:'P&W / USAF', val:'$1.09B', company:'F100 Engine Parts',   naics:'336413'},
-  {agency:'AFLCMC',     val:'$44.7M', company:'Boeing IDS',          naics:'336413'},
-  {agency:'NAVAIR',     val:'$15.8M', company:'Astronics Test',      naics:'336413'},
-  {agency:'TACOM',      val:'$6.2M',  company:'Heico Corp',          naics:'332710'},
-  {agency:'DLA',        val:'$6.3M',  company:'Parker Hannifin',     naics:'332721'},
-  {agency:'NAVAIR',     val:'$8.9M',  company:'TransDigm Group',     naics:'332710'},
-  {agency:'AFLCMC',     val:'$22.4M', company:'Precision Castparts', naics:'332721'}
-];
+// Award ticker requires a live award source. None is wired, so it stays empty.
+
+
+var TICKER_ITEMS = [];
 
 function renderTicker(){
   var items = TICKER_ITEMS.concat(TICKER_ITEMS); // duplicate for seamless loop
@@ -731,21 +710,19 @@ function renderTicker(){
       + '</div>';
   }).join('');
   var el = document.getElementById('dn-ticker');
-  if (el) el.innerHTML = html;
+  if (!el) return;
+  el.innerHTML = TICKER_ITEMS.length ? html
+    : '<div class="dn-ticker-item"><span class="dn-ticker-company">Award feed unavailable — no live award source is connected.</span></div>';
 }
 
-var REG_ITEMS = [
-  { cat:'cmmc',       catLabel:'CMMC',         date:'Nov 10 2025', borderColor:'#991b1b', headline:'DFARS 252.204-7021 now live — CMMC Phase 1 self-assessments required in active solicitations', insight:'Check every current solicitation for 252.204-7021 clause. If present, your SPRS score must be current or you are non-responsive.' },
-  { cat:'regulatory', catLabel:'NDAA §866',    date:'Jun 1 2026',  borderColor:'#b45309', headline:'DoD cybersecurity harmonization deadline June 1 — expect DFARS clause consolidation across military departments', insight:'Watch for interim DFARS rule reducing duplicative cybersecurity clauses. Less compliance overhead on contracts issued after Jun 1.' },
-  { cat:'regulatory', catLabel:'FY2026 NDAA',  date:'Dec 18 2025', borderColor:'#b45309', headline:'CAS threshold raised — Cost Accounting Standards compliance burden reduced for small defense contractors', insight:'CAS exemption threshold increase under §1806 reduces compliance burden. Update your proposal pricing certification language for post-NDAA contracts.' },
-  { cat:'cmmc',       catLabel:'FCA / DOJ',    date:'Jan 2026',    borderColor:'#991b1b', headline:'DoJ Civil Cyber-Fraud Initiative: $52M recovered FY2025, first subcontractor enforcement action — misrepresentation, not breaches', insight:'False SPRS scores = False Claims Act liability. If you have a POA&M, document it and do not attest to full compliance.' },
-  { cat:'budget',     catLabel:'NDAA §1823',   date:'Dec 18 2025', borderColor:'#378ADD', headline:'Commercial solutions openings expanded to all commercial products — new CSO pathway available for NAICS 336413/332710 manufacturers', insight:'CSO bids no longer require "innovative" classification. Review FY2026 solicitations for CSO language — lower proposal burden than full RFP.' },
-  { cat:'regulatory', catLabel:'SUPPLY CHAIN', date:'Feb 10 2026', borderColor:'#b45309', headline:'NDAA §837–§838: DoD must assess FEOC supply chain dependencies — Xinjiang prohibition enforcement tightened', insight:'DFARS 252.225-7060 Xinjiang prohibition now backed by NDAA mandate. Certify your tier-2 suppliers before Q3 proposals or risk disqualification.' }
-];
+// Regulatory highlights require a live source. None is wired, so it stays empty.
+
+var REG_ITEMS = [];
 
 function renderRegFeed(){
   var el = document.getElementById('dn-reg-grid');
   if (!el) return;
+  if (!REG_ITEMS.length){ el.innerHTML = '<div class="dn-empty">Regulatory highlights unavailable — no live source is connected for this panel.</div>'; return; }
   el.innerHTML = REG_ITEMS.map(function(r){
     return '<div class="dn-reg-item" style="border-left-color:' + r.borderColor + '">'
       + '<div class="dn-reg-item-meta">'
@@ -790,34 +767,9 @@ if (document.readyState === 'loading') {
     return Object.keys(m).map(function(k){ return { cat:k, n:m[k] }; }).sort(function(a,b){ return b.n-a.n; });
   }
 
-  // deterministic pseudo-volume per day from topic mix (stable across reloads)
-  function volumeSeries(){
-    var topics = topicCounts();
-    var days = 14, out = [];
-    for (var i=0;i<days;i++){
-      var base = 6 + Math.round(4*Math.sin(i/2.1) + 3*Math.cos(i/1.3) + (i*0.25));
-      var hi = Math.max(0, Math.round(base*0.42 + 2*Math.sin(i/1.7+1)));
-      out.push({ day:i, total: Math.max(3, base), high: Math.min(base, Math.max(1,hi)) });
-    }
-    return out;
-  }
-
-  function renderKPIs(){
-    var el = document.getElementById('dn-kpis'); if(!el) return;
-    var arts = articles();
-    var topics = topicCounts();
-    var cmmc = arts.filter(function(a){ return catOf(a)==='CMMC'; }).length;
-    var naicsMentions = arts.filter(function(a){ var t=((a.title||'')+(a.description||'')).toLowerCase(); return t.indexOf('336413')!==-1||t.indexOf('332710')!==-1||t.indexOf('332721')!==-1||t.indexOf('naics')!==-1; }).length;
-    var cards = [
-      { v: arts.length, l:'Stories Tracked', s:'across your topics', tone:'blue' },
-      { v: topics.length ? topics[0].cat : '—', l:'Top Topic', s: topics.length ? topics[0].n+' stories' : '', tone:'purple', small:true },
-      { v: naicsMentions, l:'Your-NAICS Mentions', s:'direct code references', tone:'green' },
-      { v: '167d', l:'CMMC Countdown', s: cmmc+' related stories', tone:'red' }
-    ];
-    el.innerHTML = cards.map(function(c){
-      return '<div class="dn-kpi" data-tone="'+c.tone+'"><div class="dn-kpi-v"'+(c.small?' style="font-size:18px"':'')+'>'+c.v+'</div><div class="dn-kpi-l">'+c.l+'</div><div class="dn-kpi-s">'+c.s+'</div></div>';
-    }).join('');
-  }
+  // Per-day history is not collected, so there is no series to draw. Returning
+  // empty makes renderVolume state that; a generated curve would not.
+  function volumeSeries(){ return []; }
 
   function renderVolume(){
     var svg = d3.select('#dn-vol-svg'); if(svg.empty()) return; svg.selectAll('*').remove();
@@ -825,6 +777,13 @@ if (document.readyState === 'loading') {
     var W = node.clientWidth || 420, H = 150, m = { t:12, r:10, b:20, l:26 };
     svg.attr('viewBox','0 0 '+W+' '+H);
     var data = volumeSeries();
+    if (!data.length){
+      svg.append('text').attr('x',W/2).attr('y',H/2).attr('text-anchor','middle')
+        .attr('font-family','IBM Plex Mono').attr('font-size',10).attr('fill',css('--mute'))
+        .text('Per-day volume history is not collected.');
+      var t0 = document.getElementById('dn-vol-tag'); if(t0) t0.innerHTML = '';
+      return;
+    }
     var x = d3.scaleLinear().domain([0,data.length-1]).range([m.l, W-m.r]);
     var y = d3.scaleLinear().domain([0, d3.max(data,function(d){return d.total;})*1.15]).range([H-m.b, m.t]);
     // grid
