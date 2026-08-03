@@ -16,6 +16,7 @@ import { ocrPdfToText, looksGarbled } from "./pdf-ocr";
 import { isEnvOn } from "./env-flags";
 import { scanOcrExcerpt, type ExcerptScan } from "./ocr-token-validation";
 import { repairDisplacedRuns } from "./pdf-displaced-run-repair";
+import { recoverAcroFormFields, type FieldObjectSource } from "./pdf-acroform-fields";
 
 export interface ExtractedDocument {
   pages: PageText[];
@@ -139,6 +140,7 @@ export async function extractText(pdfBuffer: Buffer): Promise<ExtractedDocument>
       // root cause stayed invisible. A masked root cause here is how the Vercel extraction
       // outage survived undiagnosed; never re-call as fallback, log and let the outer catch own it.
       let pagesArr: Array<{ text?: string; num?: number }> | null = null;
+      let acroFormBlock = "";
       const isV2Class = typeof (PdfParseCtor as { prototype?: { getText?: unknown } }).prototype?.getText === "function";
       if (isV2Class) {
         try {
@@ -147,6 +149,28 @@ export async function extractText(pdfBuffer: Buffer): Promise<ExtractedDocument>
           rawText = String(out?.text ?? "");
           if (Array.isArray(out?.pages)) pagesArr = out.pages;
           pageCount = Array.isArray(out?.pages) ? out.pages.length : Number(out?.numpages ?? 1);
+
+          // ACROFORM RECOVERY (flag AUDIT_INGEST_ACROFORM_FIELDS, default OFF ⇒ byte-identical). Must happen
+          // HERE, inside the branch that owns the loaded document: a filled form keeps its labels in the page
+          // content stream and its answers in field dictionaries, so `out.text` structurally cannot contain
+          // them. See pdf-acroform-fields.ts — the checkbox states matter more than the text values, because
+          // both options of a checkbox row print as ordinary text and the tick lives only in /AS.
+          //
+          // We reuse the pdfjs document pdf-parse ALREADY loaded rather than resolving a second copy of pdfjs.
+          // That is deliberate: a second module-resolution path is exactly what broke PDF extraction under
+          // Vercel's serverless tracing before (the DOMMatrix outage), and this needs no second parse anyway.
+          // `doc` is not part of pdf-parse's published surface, so it is probed structurally and every failure
+          // degrades to "no block" rather than throwing — an absent form is the normal case, not an error.
+          if (isEnvOn(process.env.AUDIT_INGEST_ACROFORM_FIELDS)) {
+            const doc = (inst as { doc?: FieldObjectSource }).doc;
+            const af = await recoverAcroFormFields(doc);
+            if (af.refused) warnings.push(`ACROFORM_FIELDS: not recovered — ${af.refused}`);
+            else if (af.fields.length) {
+              acroFormBlock = af.block;
+              const ticked = af.fields.filter((f) => f.checked !== undefined).length;
+              warnings.push(`ACROFORM_FIELDS: recovered ${af.fields.length} form field value(s)${ticked ? `, incl. ${ticked} checkbox/radio state(s) that page text cannot express` : ""}.`);
+            }
+          }
         } catch (err) {
           console.error(`[PDF-DIAG] v2 getText THREW (original error, unmasked): ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}`);
           throw err;
@@ -259,6 +283,14 @@ export async function extractText(pdfBuffer: Buffer): Promise<ExtractedDocument>
       // rawText would leave pages[] disagreeing with it — the two are read by different downstream stages.
       // NOT applied on the OCR path above: OCR text has no cell separators and a different failure mode entirely.
       rawText = healDisplacedRuns(pages, rawText, warnings);
+
+      // Appended AFTER the displaced-run repair so that repair only ever sees real extracted text, never a
+      // block we composed. rawText ONLY, deliberately: the attachment ingest that assembles the per-document
+      // regions reads `extracted.rawText` (sam-attachments.ts:1033), while `pages[]` carries page STRUCTURE
+      // used for page budgeting and section detection. Form values belong to the document, not to a page, and
+      // pushing them into pages[] would distort both counts and any whole-document reconstruction that
+      // concatenates pages — the same content would appear twice.
+      if (acroFormBlock) rawText += acroFormBlock;
 
       // [PDF-DIAG] (#157) — the live worker success probe; keep it after the partial-page
       // warning so the log line carries that warning too.
