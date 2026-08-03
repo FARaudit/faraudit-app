@@ -6,7 +6,7 @@
 // FA-2 cleanup helper · @/lib/anthropic-files re-exports from the canonical
 // agents/audit-ai/anthropic-files.ts.
 import { deletePdfFromFilesApi } from "@/lib/anthropic-files";
-import { DEADLINE_DEAD_DATE_RE } from "./audit-deadline-extract";
+import { DEADLINE_DEAD_DATE_RE, DEADLINE_EXCLUDE_RE, DEADLINE_SUBMISSION_RE, DEADLINE_BLOCK8_RE, DEADLINE_AMEND_UPDATED_RE } from "./audit-deadline-extract";
 import { isEnvOn } from "@/lib/env-flags";
 import { sizeStandardFor, formatSizeStandard } from "@/lib/sba-size-standards";
 
@@ -2393,12 +2393,12 @@ export function parseDocDeadline(deadlines: unknown): Date | null {
   // the submission pool. NOTE: "amendment" was REMOVED from the exclude set —
   // an "Amendment … updated deadline" is the CONTROLLING submission date and
   // must NOT be blanket-dropped (RC4c handles supersede below).
-  const excludeRe = /site\s*visit|walk\W?through|pre[\s-]?(proposal|bid|award)|conference|registr|question|inquir|\bRF[IPQ]\b|clarification|sources?\s+sought|industry\s+day|q\s*&\s*a|notice\s+of\s+intent|period\s+of\s+performance|option\s+year|delivery|completion|award\s+date|contract\s+(start|award)|issue|posted|effective/i;
-  const submissionRe = /offer|proposal|quote|\bbid\b|response|receipt|submi|clos(e|ing)|due\s+date/i;
+  const excludeRe = DEADLINE_EXCLUDE_RE;
+  const submissionRe = DEADLINE_SUBMISSION_RE;
   // RC4(d) — SF-1449/1442 "Offer due" / "Block 8" submission date.
-  const block8Re = /block\s*8|offers?\s+due|sf[\s-]?1449|sf[\s-]?1442/i;
+  const block8Re = DEADLINE_BLOCK8_RE;
   // RC4(c) — amendment-updated controlling deadline markers.
-  const amendUpdatedRe = /amendment|amended|revised|updated|supersed/i;
+  const amendUpdatedRe = DEADLINE_AMEND_UPDATED_RE;
   // FA-deadline-SAM-authoritative (2026-06-20 P0): a label like "Prior proposal
   // due date (superseded by Amendment 0005)" is a DEAD, CANCELLED date — yet it
   // matches amendUpdatedRe on "superseded". Left in, it polluted the "amended"

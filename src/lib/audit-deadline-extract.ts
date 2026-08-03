@@ -27,13 +27,20 @@ const RECONCILE_ENABLED = process.env.AUDIT_DEADLINE_RECONCILE === "true";
 // Offer-due / quote-due / response-deadline labels (SF1449 Block 8, combined-synopsis, RFQ addenda).
 const DUE_LABEL_RE = /(offer\s+due\s+date|due\s+date\s*\/\s*local\s+time|offers?\s+(?:are\s+)?due|quotes?\s+(?:are\s+)?due|responses?\s+(?:are\s+)?due|response\s+(?:date|deadline)|proposals?\s+(?:are\s+)?due|closing\s+(?:date|time)|receipt\s+of\s+(?:offers|quotes|proposals))/i;
 
-// RECONCILIATION vocabulary — MIRRORS the battle-tested V1 reconciler (_view-model.ts:560-570, parseSourceOfferDue), which
-// carries real customer-fatal-bug provenance (FA487726 closed a live sol off a superseded 17-Feb date) but is DEAD CODE for
-// agentic_v3 (V1 render path). These live here (the engine half) so the V4 render path can reuse them. Kept in sync with V1.
-const DEADLINE_EXCLUDE_RE = /site\s*visit|walk\W?through|pre[\s-]?(proposal|bid|award)|conference|registr|question|inquir|\bRF[IPQ]\b|clarification|sources?\s+sought|industry\s+day|q\s*&\s*a|notice\s+of\s+intent|period\s+of\s+performance|option\s+year|delivery|completion|award\s+date|contract\s+(start|award)|issue|posted|effective/i;
-const DEADLINE_SUBMISSION_RE = /offer|proposal|quote|\bbid\b|response|receipt|submi|clos(e|ing)|due\s+date/i;
-const DEADLINE_BLOCK8_RE = /block\s*8|offers?\s+due|sf[\s-]?1449|sf[\s-]?1442/i;
-const DEADLINE_AMEND_UPDATED_RE = /amendment|amended|revised|updated|supersed/i;
+// RECONCILIATION vocabulary. This block used to end "Kept in sync with V1" — by hand, across three files. That promise
+// is what failed: DEADLINE_DEAD_DATE_RE drifted from its two copies in both directions on the disqualifier-class
+// deadline path (see the banner below). The provenance is real and worth keeping — FA487726 closed a LIVE solicitation
+// off a superseded 17-Feb date — which is exactly why the recognizers now have ONE home and the other files import
+// them. Nothing is "kept in sync" any more; there is nothing to sync.
+// THE DEADLINE RECOGNIZER FAMILY — exported because audit-engine.ts implements the SAME controlling-deadline
+// selection (parseSourceOfferDue) and used to re-declare every one of these as a local literal. That is not a
+// hypothetical drift surface: the fifth member of this family, DEADLINE_DEAD_DATE_RE, DID drift, in both
+// directions, on the disqualifier-class deadline path. These four were still byte-identical when consolidated —
+// this closes the surface before it costs anything rather than after.
+export const DEADLINE_EXCLUDE_RE = /site\s*visit|walk\W?through|pre[\s-]?(proposal|bid|award)|conference|registr|question|inquir|\bRF[IPQ]\b|clarification|sources?\s+sought|industry\s+day|q\s*&\s*a|notice\s+of\s+intent|period\s+of\s+performance|option\s+year|delivery|completion|award\s+date|contract\s+(start|award)|issue|posted|effective/i;
+export const DEADLINE_SUBMISSION_RE = /offer|proposal|quote|\bbid\b|response|receipt|submi|clos(e|ing)|due\s+date/i;
+export const DEADLINE_BLOCK8_RE = /block\s*8|offers?\s+due|sf[\s-]?1449|sf[\s-]?1442/i;
+export const DEADLINE_AMEND_UPDATED_RE = /amendment|amended|revised|updated|supersed/i;
 // A DEAD date — "Prior proposal due date (superseded by Amendment 0005)" — must NEVER be the controlling date or drive
 // open/closed. Excluded from the candidate pool entirely (parsing as the lone survivor closed live solicitations).
 // SINGLE SOURCE (engine audit pass 1, CEO queue #4). This decision used to be made in FOUR places with THREE
