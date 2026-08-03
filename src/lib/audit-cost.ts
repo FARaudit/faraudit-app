@@ -21,8 +21,28 @@ export function priceKeyFor(model: string): string | null {
   return null;
 }
 
-/** One model call's usage. Anthropic semantics: input_tokens = NON-cached input; cache_* are separate counters. */
-export interface UsageCall { model: string; input_tokens: number; output_tokens: number; cache_write: number; cache_read: number; }
+/** One model call's usage. Anthropic semantics: input_tokens = NON-cached input; cache_* are separate counters.
+ *
+ *  `label` and `ms` are OPTIONAL and were ALREADY BEING PRODUCED before this type admitted them. `StructuredUsage`
+ *  (anthropic-structured.ts) has carried both since it was written — `label: "panel:gatekeeper"`,
+ *  `label: "judgment-first"`, `label: "panel:<lens>"` — and those objects are pushed straight into `UsageCall[]`.
+ *  At runtime the properties survived; the TYPE erased them, `aggregate()` reads only model+tokens, and the array
+ *  was reduced to a dollar figure and discarded. So the engine has been measuring per-stage latency and token spend
+ *  on every paid run and throwing it away — which is why "where does wall-clock and token spend go" could not be
+ *  answered from 113 banked records (1 carried any `wall_ms`, 2 any `cost_usd`). Declaring them costs nothing and
+ *  makes the measurement that already exists legible to the run record. Optional, so every historical caller and
+ *  every banked record stays valid. */
+export interface UsageCall {
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  cache_write: number;
+  cache_read: number;
+  /** Stage identity — the call site's own label, e.g. `panel:contracts_attorney`, `judgment-first`. */
+  label?: string;
+  /** Wall-clock for this single model call, in milliseconds. */
+  ms?: number;
+}
 export interface PerModelCost { model: string; priceKey: string | null; calls: number; input_tokens: number; output_tokens: number; cache_write: number; cache_read: number; usd: number; }
 export interface Totals { calls: number; input_tokens: number; output_tokens: number; cache_write: number; cache_read: number; usd: number; unpriced_calls: number; }
 
