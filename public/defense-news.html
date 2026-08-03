@@ -538,7 +538,7 @@ function relativeTime(dateStr){
 }
 
 function insightForCat(cat){
-  if (cat === 'CMMC') return 'Phase 2 enforcement Nov 10 2026 — verify your SPRS score is current.';
+  if (cat === 'CMMC') return 'Verify your SPRS score is current before bidding on any CUI contract.';
   if (cat === 'CONTRACTS') return 'Monitor SAM.gov for sub-tier notices in NAICS 336413/332710/332721.';
   if (cat === 'NDAA') return 'Review proposal templates for clauses affected by FY2026 NDAA provisions.';
   if (cat === 'REGULATORY') return 'Check solicitations for updated FAR/DFARS clause language before submitting.';
@@ -637,13 +637,10 @@ function renderGrid(){
 
 /* ─── Sidebar (CMMC countdown, recent awards, sources) ─── */
 function renderSidebar(){
-  var target = new Date('2026-11-10T00:00:00Z');
-  var now = new Date();
-  var days = Math.max(0, Math.ceil((target - now) / 86400000));
-  var pct = Math.min(100, ((365 - days) / 365) * 100);
-  // Award records require a live source. None is wired to this panel, so it
-  // states that rather than listing awards nobody looked up.
-  var AWARDS = [];
+  // No hardcoded milestone date. The Phase 2 transition this panel counted down to
+  // is not a date this page can assert, and a countdown that cannot be right on any
+  // day is worse than no countdown.
+var AWARDS = [];
   // The four feeds /api/defense-news actually requests. Listing a source we do
   // not read would claim coverage we do not have.
   var SOURCES = [
@@ -655,21 +652,7 @@ function renderSidebar(){
   var el = document.getElementById('dn-sidebar-col');
   if (!el) return;
   el.innerHTML =
-      '<div class="dn-sw" style="border-top:3px solid #991b1b">'
-    +   '<div class="dn-sw-title">CMMC PHASE 2</div>'
-    +   '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">'
-    +     '<div style="font-size:42px;font-weight:800;color:#991b1b;font-family:\'IBM Plex Mono\',monospace;line-height:1">' + days + '</div>'
-    +     '<div>'
-    +       '<div style="font-size:11px;color:var(--mute)">days remaining</div>'
-    +       '<div style="font-size:11px;font-weight:700;color:var(--ink)">Nov 10, 2026</div>'
-    +     '</div>'
-    +   '</div>'
-    +   '<div style="height:4px;background:#fee2e2;border-radius:2px;margin-bottom:8px">'
-    +     '<div style="height:100%;width:' + pct + '%;background:#991b1b;border-radius:2px"></div>'
-    +   '</div>'
-    +   '<div style="font-size:10px;color:#991b1b;font-weight:600">&lt;1,100 of 76,000 contractors certified</div>'
-    + '</div>'
-    + '<div class="dn-sw">'
+      '<div class="dn-sw">'
     +   '<div class="dn-sw-title">RECENT AWARDS · YOUR NAICS</div>'
     +   (AWARDS.length ? '' : '<div style="font-size:11px;color:var(--mute);padding:6px 0">Award feed unavailable — no live award source is connected.</div>')
     +   AWARDS.map(function(a){
