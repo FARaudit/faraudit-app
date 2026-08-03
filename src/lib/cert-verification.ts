@@ -62,6 +62,55 @@ export function verifiedCertRecords(
   return out;
 }
 
+/** Display label per canonical program. The Opportunities banner names the programs SBA has
+ *  registered the firm under, so the label space is exactly the attr space this file emits. */
+export const PROGRAM_LABEL: Readonly<Record<string, string>> = {
+  "se:8a": "8(a)",
+  "se:hubzone": "HUBZone",
+  "se:sdvosb": "SDVOSB",
+  "se:edwosb": "EDWOSB",
+  "se:wosb": "WOSB",
+  "se:vosb": "VOSB",
+};
+
+/** ONE-WAY program containment. An EDWOSB firm is a WOSB firm by definition, and an SDVOSB is a
+ *  VOSB, so a registration under the narrower program also establishes eligibility for the wider
+ *  pool. The converse is FALSE in both pairs and must never be added: a WOSB is not economically
+ *  disadvantaged, and a VOSB is not service-disabled. 8(a) and HUBZone contain nothing.
+ *
+ *  This is the only place eligibility is WIDENED, so it is the only place a wrong entry could
+ *  clear a bar the firm does not hold. */
+const PROGRAM_IMPLIES: Readonly<Record<string, readonly string[]>> = {
+  "se:edwosb": ["se:wosb"],
+  "se:sdvosb": ["se:vosb"],
+};
+
+/** The programs a record set establishes AS OF `nowIso` — expiry applied, containment expanded.
+ *
+ *  A record whose expiry has passed establishes nothing: SAM registration lapsed, so the
+ *  reps-and-certs behind it are no longer attested. It is dropped rather than downgraded, which
+ *  lands the program on "not established" — where absence is never a disqualifier, only a
+ *  non-clear. Pure; `nowIso` is injected so a gate asserts the output, not a stub of the clock. */
+export function establishedPrograms(
+  // The structural minimum this needs, so a caller holding the serialized shape
+  // (attr + expiry, provenance already applied upstream) can pass it directly
+  // rather than casting a narrower object into a record it is not.
+  records: readonly { attr: string; expiresAt?: string | null }[] | null | undefined,
+  nowIso: string,
+): string[] {
+  const now = Date.parse(nowIso);
+  if (Number.isNaN(now)) return [];
+  const out = new Set<string>();
+  for (const r of records ?? []) {
+    if (!r || typeof r.attr !== "string") continue;
+    const exp = Date.parse(String(r.expiresAt ?? ""));
+    if (Number.isNaN(exp) || exp <= now) continue;
+    out.add(r.attr);
+    for (const implied of PROGRAM_IMPLIES[r.attr] ?? []) out.add(implied);
+  }
+  return [...out].sort();
+}
+
 /** Fetch the customer's SAM record by UEI and derive their verified eligibility records.
  *  Returns [] on every failure path — "not verified", never "not certified". */
 export async function verifyCertificationsForUei(

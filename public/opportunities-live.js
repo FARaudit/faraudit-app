@@ -321,6 +321,41 @@
     }
   }
 
+  // ── CERTIFICATIONS ──────────────────────────────────────────────────────────
+  // A SEPARATE request from the feed, deliberately. The two answer different
+  // questions and fail independently: SAM's Entity API can be slow or down while
+  // the opportunities read is fine, and a page that awaited both would let the
+  // certification lookup hold up 191 rows the customer can already act on.
+  //
+  // Every failure path lands on a state that narrows NOTHING. The set-aside
+  // subtraction fires only on 'verified'; 'unverified', 'registration-inactive',
+  // 'no-uei' and a thrown request all leave the full read on screen and say why.
+  async function wireCerts() {
+    if (!window.DSO) return;
+    try {
+      const res = await fetch('/api/certifications', { credentials: 'include' });
+      if (!res.ok) throw new Error('certifications fetch failed: ' + res.status);
+      const data = await res.json();
+      const state = typeof data.state === 'string' ? data.state : 'unverified';
+      window.DSO.CERTS = {
+        // An unrecognised state must not reach the render layer as if it were
+        // 'verified'. Anything outside the four known poles reads as unverified,
+        // which asserts nothing and screens nothing out.
+        state: (state === 'verified' || state === 'no-uei' ||
+                state === 'registration-inactive') ? state : 'unverified',
+        records: Array.isArray(data.records) ? data.records : [],
+        establishedPrograms: Array.isArray(data.establishedPrograms) ? data.establishedPrograms : [],
+        registrationExpires: data.registrationExpires || null
+      };
+    } catch (e) {
+      console.error('[opportunities-live] certifications failed:', e);
+      window.DSO.CERTS = { state: 'unverified', records: [], establishedPrograms: [], registrationExpires: null };
+    }
+    if (window.DSO_APP && typeof window.DSO_APP.render === 'function') {
+      window.DSO_APP.render();
+    }
+  }
+
   const obs = new MutationObserver(() => {
     if (window.DSO_APP && typeof window.DSO_APP.onThemeChange === 'function') {
       window.DSO_APP.onThemeChange();
@@ -328,9 +363,11 @@
   });
   obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
+  function start() { wire(); wireCerts(); }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', wire);
+    document.addEventListener('DOMContentLoaded', start);
   } else {
-    wire();
+    start();
   }
 })();

@@ -54,5 +54,13 @@ window.DSO = (function () {
   // WATCHED_NOTICE_IDS: Map notice_id→watch status · PIPELINE_IDS: Set of
   // solicitation refs. Both null until hydrated (null = state unavailable, which
   // the render layer shows as a disabled control rather than a false "off").
-  return { OPPS, NAICS, STAGES, STAGE_META, SETASIDES, SAVED_VIEWS, FEED_STATE: 'loading', WATCHED_NOTICE_IDS: null, PIPELINE_IDS: null, LAST_INGEST: null };
+  //
+  // CERTS: the customer's SAM-verified set-aside programs, owned by
+  // opportunities-live.js from /api/certifications and read by dso-app.js.
+  // 'loading' until that read answers. Only the 'verified' state may narrow what
+  // the page shows — every other state leaves the full read on screen, because
+  // "we did not read your registration" is not "you do not qualify".
+  const CERTS = { state: 'loading', records: [], establishedPrograms: [], registrationExpires: null };
+
+  return { OPPS, NAICS, STAGES, STAGE_META, SETASIDES, SAVED_VIEWS, FEED_STATE: 'loading', WATCHED_NOTICE_IDS: null, PIPELINE_IDS: null, LAST_INGEST: null, CERTS };
 })();
