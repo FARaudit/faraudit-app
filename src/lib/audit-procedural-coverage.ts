@@ -94,7 +94,13 @@ export function makeModelProceduralExtractor(
   return async (sections) => {
     const sys = "You extract PROCEDURAL obligations from a U.S. federal Part-12 commercial solicitation's instructions (§L / 52.212-1) and evaluation (§M / 52.212-2) sections. Return ONLY a JSON object {\"candidates\":[{\"section\":\"L|M\",\"quote\":\"<VERBATIM sentence copied EXACTLY from the section, >=4 words>\"}]}. Every quote MUST be copied verbatim; do not paraphrase.";
     const user = sections.map((s) => `=== SECTION ${s.key} ===\n${s.text.slice(0, 8000)}`).join("\n\n");
-    try { return (await callJSON({ system: sys, user })).candidates ?? []; } catch { return []; }
+    try { return (await callJSON({ system: sys, user })).candidates ?? []; } catch (err) {
+      console.error("[procedural-coverage] model extractor call failed", {
+        sections: sections.map((s) => s.key),
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return [];
+    }
   };
 }
 
@@ -110,7 +116,19 @@ export async function proceduralCoveragePass(ctx: AuditToolContext, opts?: { ext
   if (!sections.length) return [];
   const extract = opts?.extract ?? deterministicProceduralExtractor;
   let candidates: ProceduralCandidate[] = [];
-  try { candidates = await extract(sections); } catch { candidates = []; }
+  // Behaviour here is deliberately unchanged: this pass EMITS covered_direct
+  // findings, so an extractor failure yields fewer of them and pushes the verdict
+  // toward INCOMPLETE. That is the safe direction, and it is the reason this catch
+  // is not the Rule 61 defect the others in this sweep were. What it lacked was a
+  // cause — a run that lost every procedural obligation to a thrown extractor was
+  // indistinguishable from a solicitation that stated none.
+  try { candidates = await extract(sections); } catch (err) {
+    console.error("[procedural-coverage] extractor threw; no procedural obligations proposed", {
+      sections: sections.map((s) => s.key),
+      error: err instanceof Error ? err.message : String(err),
+    });
+    candidates = [];
+  }
   if (!Array.isArray(candidates)) candidates = [];                    // a misbehaving extractor must honest-fail, never crash the audit
   candidates = candidates.slice(0, 200);                             // bound an injected extractor (deterministic default is already ≤80)
 

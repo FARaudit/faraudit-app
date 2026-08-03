@@ -282,7 +282,12 @@ export async function fetchAgencySpendByNaics(opts: {
   }
 
   let data: { results?: Array<{ name?: string; amount?: number }> } = {};
-  try { data = await res.json(); } catch { return []; }
+  // The fetch-throw and non-OK exits above both log; this one did not, so a
+  // malformed 200 was the single failure here that left no trace at all.
+  try { data = await res.json(); } catch (err) {
+    console.error("[usaspending agency] body not JSON", { naics: opts.naicsCodes, fy: opts.fiscalYear, error: err instanceof Error ? err.message : String(err) });
+    return [];
+  }
   const rows = data.results || [];
 
   return rows.map((r) => ({

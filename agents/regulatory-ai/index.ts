@@ -48,13 +48,20 @@ function extractClauses(t: string): string[] {
   return Array.from(out);
 }
 
+// A tick that reaches no source and a tick with nothing new both wrote zero rows
+// and both reported success. Failures are now named on the way out so a permanently
+// dead feed cannot sit behind a green tick — acquisition.gov (504) and the DPC DFARS
+// path (404) both had, measured 2026-08-03.
 async function fetchRSS(url: string, source: RegItem["source"]): Promise<RegItem[]> {
   try {
     const res = await fetch(url, {
       headers: { Accept: "application/rss+xml,application/atom+xml,application/xml,text/xml" },
       signal: AbortSignal.timeout(15000)
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.error("[regulatory-ai] feed non-OK", { source, url, status: res.status });
+      return [];
+    }
     const xml = await res.text();
     const items: RegItem[] = [];
     const blocks = xml.match(/<(item|entry)[\s\S]*?<\/(item|entry)>/g) || [];
@@ -83,7 +90,10 @@ async function fetchRSS(url: string, source: RegItem["source"]): Promise<RegItem
       });
     }
     return items;
-  } catch { return []; }
+  } catch (err) {
+    console.error("[regulatory-ai] feed threw", { source, url, error: err instanceof Error ? err.message : String(err) });
+    return [];
+  }
 }
 
 async function fetchFedRegister(): Promise<RegItem[]> {
@@ -97,7 +107,10 @@ async function fetchFedRegister(): Promise<RegItem[]> {
       headers: { Accept: "application/json" },
       signal: AbortSignal.timeout(15000)
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.error("[regulatory-ai] federal register non-OK", { url, status: res.status });
+      return [];
+    }
     const data = await res.json() as { results?: Array<{ title: string; abstract?: string; html_url: string; publication_date: string }> };
     return (data.results || []).map((d) => ({
       source: "federal_register" as const,
@@ -107,7 +120,10 @@ async function fetchFedRegister(): Promise<RegItem[]> {
       published_at: d.publication_date ? new Date(d.publication_date).toISOString() : null,
       affects_clauses: extractClauses(`${d.title} ${d.abstract || ""}`)
     }));
-  } catch { return []; }
+  } catch (err) {
+    console.error("[regulatory-ai] federal register threw", { url, error: err instanceof Error ? err.message : String(err) });
+    return [];
+  }
 }
 
 async function auditsCitingClause(clause: string): Promise<Array<{ id: string; notice_id: string | null; agency: string | null }>> {
