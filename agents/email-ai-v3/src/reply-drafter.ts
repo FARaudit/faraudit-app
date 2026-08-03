@@ -32,10 +32,17 @@ export interface DrafterResult {
 }
 
 function loadVoiceCorpus(): any[] {
+  // An optional local file, so absent is a legitimate state and stays silent. A
+  // file that exists but will not parse is not — that drafts every reply in a
+  // generic voice while the corpus sits on disk looking healthy.
   if (!existsSync(VOICE_CORPUS_PATH)) return [];
   try {
     return JSON.parse(readFileSync(VOICE_CORPUS_PATH, "utf-8"));
-  } catch {
+  } catch (err) {
+    console.error("[reply-drafter] voice corpus present but unreadable; drafting without voice samples", {
+      path: VOICE_CORPUS_PATH,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return [];
   }
 }

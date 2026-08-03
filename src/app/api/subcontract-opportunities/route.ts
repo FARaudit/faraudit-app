@@ -42,7 +42,9 @@ interface USASpendingAwardResultRow {
   generated_internal_id?: string | null;
 }
 
-async function fetchPrimes(naics: string, agencyKeyword: string | null): Promise<SubcontractRow[]> {
+interface PrimeResult { ok: boolean; rows: SubcontractRow[]; reason?: string }
+
+async function fetchPrimes(naics: string, agencyKeyword: string | null): Promise<PrimeResult> {
   const today = new Date().toISOString().slice(0, 10);
   const sixMonthsAgo = new Date(Date.now() - 180 * 86400_000).toISOString().slice(0, 10);
 
@@ -74,14 +76,25 @@ async function fetchPrimes(naics: string, agencyKeyword: string | null): Promise
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(15000)
     });
-  } catch { return []; }
-  if (!res.ok) return [];
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error("[subcontract-opportunities] fetch threw", { naics, reason });
+    return { ok: false, rows: [], reason };
+  }
+  if (!res.ok) {
+    console.error("[subcontract-opportunities] non-OK", { naics, status: res.status });
+    return { ok: false, rows: [], reason: `HTTP ${res.status}` };
+  }
 
   let data: { results?: USASpendingAwardResultRow[] } = {};
-  try { data = await res.json(); } catch { return []; }
+  try { data = await res.json(); } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error("[subcontract-opportunities] body not JSON", { naics, reason });
+    return { ok: false, rows: [], reason };
+  }
   const rows = data.results || [];
 
-  return rows.map((r) => ({
+  return { ok: true, rows: rows.map((r) => ({
     prime_uei: r.Recipient?.uei || null,
     prime_name: r.Recipient?.recipient_name || r["Recipient Name"] || r.recipient_name || "—",
     contract_value: typeof r["Award Amount"] === "number" ? Math.round(r["Award Amount"] as number) : null,
@@ -94,7 +107,7 @@ async function fetchPrimes(naics: string, agencyKeyword: string | null): Promise
     expiration: r["Period of Performance Current End Date"] || r.period_of_performance_current_end_date || null,
     source_url: r["Award ID"] || r.generated_internal_id ? `https://usaspending.gov/award/${r["Award ID"] || r.generated_internal_id}` : null,
     notes: "Synthesized from USAspending prime award · SBLO contact not public · use SAM.gov entity lookup for vendor contact"
-  }));
+  })) };
 }
 
 export async function GET(req: NextRequest) {
@@ -121,7 +134,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ opportunities: cached, cached: true });
   }
 
-  const synth = await fetchPrimes(naics, agency);
+  const result = await fetchPrimes(naics, agency);
+
+  // Rule 61: USAspending not answering is an outage, not "no primes in this NAICS".
+  if (!result.ok) {
+    return NextResponse.json(
+      {
+        error: "USAspending did not respond, so prime awards could not be read.",
+        opportunities: cached || [],
+        reason: result.reason,
+        degraded: true
+      },
+      { status: 503 }
+    );
+  }
+  const synth = result.rows;
 
   // Persist (best-effort).
   if (synth.length > 0) {
@@ -134,5 +161,5 @@ export async function GET(req: NextRequest) {
       .then(() => null, () => null);
   }
 
-  return NextResponse.json({ opportunities: synth, cached: false });
+  return NextResponse.json({ opportunities: synth, cached: false, degraded: false });
 }

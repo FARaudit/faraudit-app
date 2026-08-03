@@ -702,7 +702,18 @@ export function consequenceTailsAfter(fullSource: string, ob: string): string[] 
       if (tail.trim()) tails.push(tail);
       if (m.index === re.lastIndex) re.lastIndex++;
     }
-  } catch { return []; }
+  } catch (err) {
+    // Behaviour deliberately unchanged, and this one is NOT the Rule 61 class the
+    // rest of this sweep was: the pattern is escaped before compiling, [] means no
+    // consequence tail, capture declines and the release stands — which the
+    // docblock above already reasons through and the ledger still records. Only
+    // the silence changes: a regex that somehow failed to compile left no trace.
+    console.error("[gate-v2] consequence tail scan failed", {
+      needleLength: needle.length,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return [];
+  }
   return tails;
 }
 /** The sentence-pair KILL test (one place; probes + sweep share it). The examined unit is the first TWO
