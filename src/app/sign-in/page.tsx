@@ -12,6 +12,7 @@ function SignInForm() {
   const [error, setError]                 = useState<string | null>(null);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [resetSent, setResetSent]         = useState(false);
+  const [resetSentTo, setResetSentTo]     = useState("");
   const router       = useRouter();
   const searchParams = useSearchParams();
   const urlError     = searchParams.get("error");
@@ -44,6 +45,14 @@ function SignInForm() {
     else { setMagicLinkSent(true); setLoading(false); }
   };
 
+  // resetPasswordForEmail resolves without error even when the address has no
+  // account, and even when the mail never leaves the building — that is deliberate,
+  // it stops the form being used to enumerate accounts. So a success here is proof
+  // the REQUEST was accepted and nothing more, and the copy below must not claim
+  // delivery it cannot observe. What made this a lockout rather than an
+  // inconvenience was the old success state REPLACING the form: no retry, no way to
+  // correct a typo, no support route. Nothing to do but wait for an email that may
+  // never have been sent.
   const handleForgotPassword = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (!email) { setError("Enter your email address first."); return; }
@@ -54,7 +63,7 @@ function SignInForm() {
       redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
     });
     if (error) { setError(error.message); setLoading(false); }
-    else { setResetSent(true); setLoading(false); }
+    else { setResetSent(true); setResetSentTo(email); setLoading(false); }
   };
 
   // ── Markup: new Claude Design sign-in layout, hooked to existing handlers ──
@@ -120,10 +129,37 @@ function SignInForm() {
                 Check your inbox — expires in 1 hour.
               </div>
             ) : resetSent ? (
-              <div className="auth-info">
-                Password reset email sent to <strong>{email}</strong>.<br />
-                Check your inbox.
-              </div>
+              <>
+                <div className="auth-info">
+                  If an account exists for <strong>{resetSentTo}</strong>, a reset link is on its
+                  way. It expires in 1 hour.<br />
+                  Nothing after a few minutes? Check spam, then try the options below.
+                </div>
+                <div className="auth-recovery-actions">
+                  <button
+                    type="button"
+                    className="auth-alt-btn"
+                    disabled={loading}
+                    onClick={(ev) => handleForgotPassword(ev)}
+                  >
+                    {loading ? "Sending…" : "Send it again"}
+                  </button>
+                  <button
+                    type="button"
+                    className="auth-alt-btn"
+                    onClick={() => { setResetSent(false); setError(null); }}
+                  >
+                    Use a different email
+                  </button>
+                </div>
+                <p className="auth-recovery-help">
+                  Still locked out?{" "}
+                  <a href={`mailto:jose@faraudit.com?subject=${encodeURIComponent("Password reset not arriving")}&body=${encodeURIComponent(`I requested a password reset for ${resetSentTo} and it has not arrived.`)}`}>
+                    Email jose@faraudit.com
+                  </a>{" "}
+                  and we will reset it by hand.
+                </p>
+              </>
             ) : (
               <form onSubmit={handleSubmit}>
                 <label className="field">
