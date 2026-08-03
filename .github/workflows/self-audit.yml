@@ -35,3 +35,19 @@ jobs:
       # failing, so CI never goes red for an absent credential. Flag drift is checked from a workstation.
       - name: self-audit (suites · gold · parked seams · verdict-critical coverage · cert coherence)
         run: npx tsx scripts/audit-ai/self-audit.ts suites gold parked coverage certs
+      # FORT KNOX (2026-08-03). Until today this script could not fail — no `exit` statement anywhere, and its
+      # one failure flag was set and never read; a planted ghp_-shaped token was detected, printed, and the
+      # script exited 0. Adding it to CI in that state would have manufactured a permanently-green check.
+      #
+      # It now exits 1 on a finding and reports an ABSENT input as a NAMED SKIP rather than a pass, which is
+      # what makes it safe here: the sibling checkouts (bullrize, lexanchor, faraudit-cron) do not exist on a
+      # runner and say so out loud instead of printing "✓". What DOES enforce in CI is real — .env never
+      # committed, .env in .gitignore, no credential in the remote URL, public/backups absent, the live CEO
+      # files still blocked, and the home.html auth wall still up.
+      #
+      # The deterministic invariants (Rules 32, 60, 17) are NOT here: they run as a normal suite above, via
+      # src/lib/security-invariants.test.ts, where they are pure functions carrying planted-positive proofs.
+      #
+      # Fixed command, no event data interpolated — the no-injection invariant in this file's header holds.
+      - name: fort knox (operational security scan — fails the build on a finding)
+        run: bash scripts/security/fort-knox-scan.sh
