@@ -1,0 +1,37 @@
+# Engine self-audit — the standing regression floor.
+#
+# Runs the unit suites plus the structural checks on every push and PR. It catches SILENT REGRESSION:
+# a suite that starts failing, a parked module re-wired, a verdict-critical module that loses its suite,
+# a cert asserting a dead flag.
+#
+# It is a floor, not the review battery. It does not find defects no test encodes.
+# A green run is not a statement that the engine is correct.
+#
+# SECURITY: this workflow interpolates NO event data (no github.event.*, no github.head_ref). Every step
+# runs fixed commands over checked-out code, so there is no workflow-injection surface. Keep it that way —
+# if a step ever needs event data, pass it via env: and quote it, never inline in run:.
+name: engine self-audit
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  self-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      # The flag census needs the Railway CLI and is skipped in CI by design — it reports SKIP rather than
+      # failing, so CI never goes red for an absent credential. Flag drift is checked from a workstation.
+      - name: self-audit (suites · gold · parked seams · verdict-critical coverage · cert coherence)
+        run: npx tsx scripts/audit-ai/self-audit.ts suites gold parked coverage certs
