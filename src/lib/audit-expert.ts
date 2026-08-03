@@ -229,7 +229,10 @@ type SdkClient = { messages: { create: (a: Record<string, unknown>, opts?: { sig
 
 /** Opt-in usage capture for the expert tool-loop (mirrors anthropic-structured's setStructuredUsageSink so
  *  a proof run can total cost across BOTH the SDK expert loop AND the structured skeptic). NULL in prod. */
-export interface ExpertUsage { model: string; input_tokens: number; output_tokens: number; cache_write: number; cache_read: number; }
+/** `label` + `ms` mirror `StructuredUsage`, which has carried both since it was written. The expert path never
+ *  did, so LENS calls — the largest share of a paid run's spend — landed in the cost ledger anonymous and
+ *  untimed. Optional so every existing caller and banked record stays valid. */
+export interface ExpertUsage { model: string; input_tokens: number; output_tokens: number; cache_write: number; cache_read: number; label?: string; ms?: number; }
 let _expertUsageSink: ((u: ExpertUsage) => void) | null = null;
 export function setExpertUsageSink(sink: ((u: ExpertUsage) => void) | null) { _expertUsageSink = sink; }
 
@@ -240,7 +243,7 @@ export function setExpertUsageSink(sink: ((u: ExpertUsage) => void) | null) { _e
  *  Extended thinking is intentionally OMITTED here: the loop reconstructs assistant turns from normalized
  *  state, and replaying tool-use turns WITH thinking blocks requires echoing them verbatim — out of scope
  *  for a stateless rebuild. Tool grounding (not CoT) is what makes this expert correct. */
-export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: { maxTokens?: number; onUsage?: (u: ExpertUsage) => void }): CallModel {
+export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: { maxTokens?: number; onUsage?: (u: ExpertUsage) => void; label?: string }): CallModel {
   return async ({ system, userTask, priorToolResults, forceSubmit, signal }) => {
     const messages: Array<Record<string, unknown>> = [{ role: "user", content: userTask }];
     for (const batch of priorToolResults) {
@@ -290,14 +293,17 @@ export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: 
     // spend) instead of abandoning a Promise that keeps costing. Absent signal = no-op.
     // Per-run tally (opts.onUsage, concurrency-safe — each audit owns its own) AND the legacy global sink
     // (null in prod; kept for single-run proofs). Both are best-effort — never affects the returned findings.
-    const tally = (r: { usage?: SdkUsage }) => {
+    // `ms` is measured per ATTEMPT, not per turn: the max_tokens retry below is a second paid call and its
+    // latency belongs to itself, or a stage's cost and its duration stop describing the same thing.
+    const tally = (r: { usage?: SdkUsage }, ms: number) => {
       if (!r.usage) return;
-      const u = { model, input_tokens: r.usage.input_tokens ?? 0, output_tokens: r.usage.output_tokens ?? 0, cache_write: r.usage.cache_creation_input_tokens ?? 0, cache_read: r.usage.cache_read_input_tokens ?? 0 };
+      const u = { model, input_tokens: r.usage.input_tokens ?? 0, output_tokens: r.usage.output_tokens ?? 0, cache_write: r.usage.cache_creation_input_tokens ?? 0, cache_read: r.usage.cache_read_input_tokens ?? 0, label: opts?.label ?? "expert", ms };
       try { opts?.onUsage?.(u); } catch { /* never let cost capture break an audit */ }
       if (_expertUsageSink) _expertUsageSink(u);
     };
+    const t0 = Date.now();
     let resp = await client.messages.create(req, signal ? { signal } : undefined);
-    tally(resp);
+    tally(resp, Date.now() - t0);
     // STEP 1 (Brain card 221) — a max_tokens stop is SUSPECT output even when the tool JSON parses: the last
     // finding's `excerpt` may be clipped mid-clause (a valid-JSON trailing field). Retry the SAME request ONCE
     // at the 8k ceiling so the model has room to emit full excerpts. Both attempts' stop_reasons are logged
@@ -305,8 +311,9 @@ export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: 
     // any excerpt still clipped after the retry.
     const EXPERT_TOKEN_CEILING = 8000;
     if (resp.stop_reason === "max_tokens" && (req.max_tokens as number) < EXPERT_TOKEN_CEILING) {
+      const t1 = Date.now();
       const resp2 = await client.messages.create({ ...req, max_tokens: EXPERT_TOKEN_CEILING }, signal ? { signal } : undefined);
-      tally(resp2);
+      tally(resp2, Date.now() - t1);
       console.log(`[expert] max_tokens retry: attempt1=max_tokens attempt2=${resp2.stop_reason ?? "?"} (max_tokens ${req.max_tokens as number}→${EXPERT_TOKEN_CEILING})`);
       // T0-3 (engine line-audit 2026-07-06) — prefer the retry (fuller excerpts) ONLY when it actually
       // re-produced submit_findings. If the retry narrates or reads a tool instead of re-submitting, KEEP

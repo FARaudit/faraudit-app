@@ -1012,6 +1012,12 @@ export async function executeAgenticPrimary(
       auditId,
       sol: solicitation?.solicitationNumber || solicitation?.noticeId || auditId,
       startedAt: generatedAt,
+      // STAGE LEDGER — the SAME `usageCalls` array aggregated into the COGS figure below. It has always held
+      // per-call model, tokens and cache split; `label` and `ms` ride along from the structured-call path, and
+      // from 2026-08-03 from the expert/lens path too. Banking it makes the run record answer "which stage
+      // spent the wall-clock and the tokens" for every run from here on. Passed by reference to the same array
+      // the cost aggregate reads, so the ledger and the invoice can never disagree about the run.
+      usage: usageCalls,
       flags: {
         AUDIT_SECTION_M_DEPTH: process.env.AUDIT_SECTION_M_DEPTH,
         AUDIT_PROCUREMENT_TYPE_SECTIONS: process.env.AUDIT_PROCUREMENT_TYPE_SECTIONS,
