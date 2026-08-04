@@ -102,6 +102,14 @@ export interface OpportunityRow {
   award_ceiling: number | null;
   created_at: string;
   processed_at: string | null;
+  // SAM notice detail, present on live rows and absent on queue-backed rows.
+  // `resource_links` null means "not read"; [] means SAM listed none. The card
+  // must not render those two the same way.
+  resource_links?: string[] | null;
+  ui_link?: string | null;
+  office_path?: string | null;
+  department?: string | null;
+  sub_tier?: string | null;
 }
 
 // ─── Tab 3: Audit (history) ───────────────────────────────────────────────
