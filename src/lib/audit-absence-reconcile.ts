@@ -77,6 +77,9 @@ const DOC_ABSENCE = /\b(?:is|are|was|were)\s+(?:(?!(?:is|are|was|were)\b)[A-Za-z
 /** Exported for the falsification probe only — the probe must measure the SHIPPED rule, not a copy of it that can
  *  silently drift from it. Not part of the module's behavioural surface. */
 export const DOC_ABSENCE_FOR_TEST = DOC_ABSENCE;
+/** Exported for measurement only — a cost probe must use the REAL identifier rule, never a copy that would share
+ *  its premise and agree with it by construction. */
+export const DOC_IDENTIFIER_FOR_TEST = () => DOC_IDENTIFIER;
 
 /** Distinctive tokens for a document, derived from its own name at runtime. Drops extensions, dates, pure numbers and
  *  short/common words, so "PWS KO Appropved - 20260720.pdf" yields ["pws"] and "WAGE DETERMINATIONS - 20260513.pdf"
@@ -121,6 +124,10 @@ function consequenceOf(claim: string): string {
 }
 /** A clause boundary — where this claim's subject can start. The em/en dash is included because REPORT-TRUTH #2
  *  prefixes claims with "UNVERIFIED ABSENCE — " and lenses habitually write "<assertion> — <consequence>". */
+/** An EXPLICIT document identifier — the shape that says WHICH document, not merely what kind. Deliberately an
+ *  allowlist: an unrecognised identifier form fails to match, the claim stands, and no warning is deleted. The
+ *  numeric part is required, because "the attachment" identifies nothing. */
+const DOC_IDENTIFIER = /\b(?:attachment|attach|exhibit|appendix|annex|enclosure|amendment|amd|schedule|tab|item)\b[\s.:#-]*(?:no\.?|number)?[\s.:#-]*\d/i;
 const CLAUSE_BOUNDARY = /[.;:—–]/g;
 /** Filler that may sit inside a subject without making it a subject about something ELSE. Determiners only. */
 const SUBJECT_FILLER = /\b(?:the|a|an|this|that|these|those|its|their)\b/gi;
@@ -161,6 +168,23 @@ function assertsDocAbsent(claim: string, tokens: string[]): boolean {
 
   // The span must actually name this document...
   if (!tokens.some((t) => lower.includes(t))) return false;
+
+  // ...SPECIFICALLY ENOUGH TO BE THIS DOCUMENT AND NOT A NEIGHBOUR (adversarial round 3 vector 1, 2026-08-04).
+  //
+  // Naming a token was never identification. A region's tokens include ordinary head nouns, so a bare "The register
+  // is not provided" matched ATT12_Submittal Register.pdf and "The narrative is not attached" matched
+  // ATT11_260007_Design Narrative.pdf — refuting an underspecified claim against whichever file happened to share a
+  // word, and DELETING A TRUE WARNING each time. Reproduced on real posted data (run 496a9a21 / FA813726R0033).
+  //
+  // TOKEN COMPLETENESS IS NOT AVAILABLE as the discriminator — the red-team executed that and it destroys 2 of the
+  // 4 banked true positives, because real filenames carry tokens no lens will ever write: "Appropved", "ATT10_",
+  // "P07_", "Raytheon", "AMD 002", "SAM.GOV". Do not re-propose it.
+  //
+  // What all 4 banked true positives DO carry, and no break does, is an EXPLICIT DOCUMENT IDENTIFIER — "PWS
+  // (Attachment 0001)", "Wage Determination (Attachment 0002)". So this is an ALLOWLIST OF SAFE SHAPES rather than
+  // an enumeration of unsafe ones: proceed only if the claim identifies WHICH document it means. An identifier the
+  // list does not recognise leaves the claim standing — the safe direction — instead of deleting a warning.
+  if (!DOC_IDENTIFIER.test(span)) return false;
 
   // ...and, once the document's own name and ordinary determiners are removed, nothing else may remain.
   let residue = span.replace(/\([^)]*\)/g, " ").replace(/\[[^\]]*\]/g, " "); // parentheticals are not a second subject
