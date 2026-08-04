@@ -1,356 +1,319 @@
-/* ═══════════════════════════════════════════════════════════════════
-   FARaudit · Contracting Officers (best-in-class) — Relationship CRM logic
-   ═══════════════════════════════════════════════════════════════════ */
+/* FARaudit · Contracting Officers — render layer.
+
+   Renders window.DCO, which contracting-officers-live.js fills from
+   /api/ko-intelligence. Every value on this page is carried from the notice
+   SAM published: name, address, phone, agency, office, NAICS and the notices
+   themselves. Nothing here scores, averages or infers, so there is no branch
+   that can print a number the feed did not contain.
+
+   Officer fields are external input, so every one of them reaches the page as
+   a text node built through h() — this file never assigns markup. */
 (function () {
-  const D = window.DCO;
+  'use strict';
+
+  const S = { agency: 'all', q: '', sel: null };
   const $ = (id) => document.getElementById(id);
-  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 
-  const S = { agency: 'all', seg: null, q: '', sel: 'co-hartwell', funnelStage: null, funnelMode: 'in' };
-
-  /* ─── viz style flags (flip to revert) ───────────────────────────────
-     resp:   'number' = hero reply-% + vs-avg chip (new)  |  'bar' = solid bar (old)
-     funnel: 'funnel' = centered tapering funnel (new)    |  'bars' = flat bars (old) */
-  const VIZ = { resp: 'number', funnel: 'funnel' };
-  const NET_AVG_RESP = Math.round(D.OFFICERS.reduce((s, o) => s + o.resp, 0) / D.OFFICERS.length);
-
-  /* ─── funnel stages (nested predicates; single source of truth for funnel + drill-down) ─── */
-  const _contacted = o => o.timeline.some(t => t.kind === 'out');
-  const _replied = o => _contacted(o) && (o.resp >= 60 || o.timeline.some(t => t.kind === 'in'));
-  const _met = o => _replied(o) && o.timeline.some(t => t.kind === 'call' || t.kind === 'event');
-  const _awarded = o => _met(o) && o.timeline.some(t => t.kind === 'win');
-  const STAGES = [
-    { key: 'identified', label: 'Identified', sub: 'in your NAICS', color: '#94a3b8', test: () => true },
-    { key: 'contacted', label: 'Contacted', sub: 'you reached out', color: '#378ADD', test: _contacted },
-    { key: 'replied', label: 'Replied', sub: 'engaged back', color: '#185FA5', test: _replied },
-    { key: 'met', label: 'Met / Called', sub: 'real conversation', color: '#7c3aed', test: _met },
-    { key: 'awarded', label: 'Awarded', sub: 'won work', color: '#059669', test: _awarded }
-  ];
-
-  const relColor = (r) => D.REL_META[r].color;
-
-  /* ─── controls ─── */
-  function buildControls() {
-    $('agencyFilters').innerHTML = D.AGENCY_FILTERS.map(a =>
-      `<button class="fpill ${a === S.agency ? 'active' : ''}" data-agency="${a}">${a === 'all' ? 'All' : a}</button>`).join('');
-    $('agencyFilters').querySelectorAll('button').forEach(b => b.onclick = () => { S.agency = b.dataset.agency; sync(); renderAll(); });
-
-    $('segments').innerHTML = D.SAVED_SEGMENTS.map(s =>
-      `<button class="view-chip ${s.key === S.seg ? 'active' : ''}" data-seg="${s.key}"><span class="vc-t">${s.label}</span><span class="vc-d">${s.desc}</span></button>`).join('');
-    $('segments').querySelectorAll('button').forEach(b => b.onclick = () => { S.seg = (S.seg === b.dataset.seg ? null : b.dataset.seg); sync(); renderAll(); });
-
-    $('peopleTabs').innerHTML = [['fit', 'Best fit'], ['resp', 'Responsive'], ['awards', 'Buying power'], ['cold', 'Coldest']]
-      .map(t => `<button class="people-tab ${t[0] === (S.sort || 'fit') ? 'active' : ''}" data-sort="${t[0]}">${t[1]}</button>`).join('');
-    $('peopleTabs').querySelectorAll('button').forEach(b => b.onclick = () => { S.sort = b.dataset.sort; $('peopleTabs').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b)); renderPeople(); });
-
-    $('searchInput').addEventListener('input', e => { S.q = e.target.value.toLowerCase(); renderAll(); });
-    $('resetBtn').onclick = () => { S.agency = 'all'; S.seg = null; S.q = ''; S.funnelStage = null; $('searchInput').value = ''; sync(); renderAll(); };
-  }
-  function sync() {
-    $('agencyFilters').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.agency === S.agency));
-    $('segments').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.seg === S.seg));
-  }
-
-  /* ─── filtering ─── */
-  function filtered() {
-    return D.OFFICERS.filter(o => {
-      if (S.agency !== 'all' && o.agency !== S.agency) return false;
-      if (S.q && !(o.name + ' ' + o.agency + ' ' + o.office + ' ' + o.title).toLowerCase().includes(S.q)) return false;
-      if (S.seg === 'warm' && !(o.rel === 'warm' && o.fit >= 85)) return false;
-      if (S.seg === 'rewarm' && !(o.rel === 'cold' && o.lastContact >= 30)) return false;
-      if (S.seg === 'responsive' && o.resp < 75) return false;
-      if (S.seg === 'whales' && o.awards < 100) return false;
-      return true;
-    });
-  }
-
-  /* ─── KPIs ─── */
-  function renderKPIs() {
-    const f = filtered();
-    const avgResp = f.length ? Math.round(f.reduce((a, o) => a + o.resp, 0) / f.length) : 0;
-    const totalAwards = f.reduce((a, o) => a + o.awards, 0);
-    const warm = f.filter(o => o.rel === 'warm').length;
-    const rewarm = f.filter(o => o.rel === 'cold' && o.lastContact >= 30).length;
-    const cards = [
-      { lbl: 'COs In Network', val: f.length, unit: '', foot: 'buying your NAICS', tone: 'blue' },
-      { lbl: 'Avg Response Rate', val: avgResp, unit: '%', foot: 'they reply to industry', tone: 'green' },
-      { lbl: 'Obligated · Your Codes', val: '$' + totalAwards, unit: 'M', foot: 'last 12 months', tone: 'purple' },
-      { lbl: 'Need Re-warming', val: rewarm, unit: '', foot: '30+ days since contact', tone: 'amber' }
-    ];
-    $('kpiStrip').innerHTML = cards.map(c => `<div class="kpi" data-tone="${c.tone}">
-      <p class="lbl">${c.lbl}</p><div class="kpi-val">${c.val}<span class="unit">${c.unit}</span></div><div class="foot">${c.foot}</div></div>`).join('');
-    $('hsTotal').textContent = D.OFFICERS.length;
-    $('hsWarm').textContent = D.OFFICERS.filter(o => o.rel === 'warm').length;
-    $('hsRewarm').textContent = D.OFFICERS.filter(o => o.rel === 'cold' && o.lastContact >= 30).length;
-  }
-
-  /* ─── scatter: responsiveness (x) vs buying power (y), size=fit, color=rel ─── */
-  function renderScatter() {
-    const svg = d3.select('#scatterSvg'); svg.selectAll('*').remove();
-    const W = $('scatterSvg').clientWidth || 680, H = 300;
-    const m = { t: 22, r: 20, b: 40, l: 54 };
-    svg.attr('viewBox', `0 0 ${W} ${H}`);
-    const data = filtered();
-    const x = d3.scaleLinear().domain([35, 100]).range([m.l, W - m.r]);
-    const y = d3.scaleLinear().domain([0, 160]).range([H - m.b, m.t]);
-    const r = d3.scaleSqrt().domain([60, 100]).range([7, 24]);
-    const medX = 70, medY = 80;
-    // sweet spot top-right
-    svg.append('rect').attr('x', x(medX)).attr('y', m.t).attr('width', (W - m.r) - x(medX)).attr('height', y(medY) - m.t).attr('fill', css('--green-500')).attr('opacity', .05);
-    svg.append('text').attr('class', 'zone').attr('x', W - m.r - 4).attr('y', m.t + 12).attr('text-anchor', 'end').attr('fill', css('--green-700')).text('PRIORITY ◆');
-    svg.append('line').attr('x1', x(medX)).attr('x2', x(medX)).attr('y1', m.t).attr('y2', H - m.b).attr('stroke', css('--line')).attr('stroke-dasharray', '4,3');
-    svg.append('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', y(medY)).attr('y2', y(medY)).attr('stroke', css('--line')).attr('stroke-dasharray', '4,3');
-    svg.append('g').attr('class', 'axis').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).tickValues([40, 55, 70, 85, 100]).tickFormat(d => d + '%').tickSize(4));
-    svg.append('g').attr('class', 'axis').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(d => '$' + d + 'M').tickSize(4));
-    svg.append('text').attr('class', 'axis-title').attr('x', W - m.r).attr('y', H - 6).attr('text-anchor', 'end').text('response rate →');
-    svg.append('text').attr('class', 'axis-title').attr('transform', 'rotate(-90)').attr('x', -m.t).attr('y', 13).attr('text-anchor', 'end').text('$ obligated · your codes ↑');
-
-    svg.selectAll('circle.dot').data(data, d => d.id).join('circle')
-      .attr('class', d => 'dot' + (S.sel === d.id ? ' sel' : '') + (S.sel && S.sel !== d.id ? ' dim' : ''))
-      .attr('cx', d => x(d.resp)).attr('cy', d => y(Math.min(158, d.awards))).attr('r', d => r(d.fit))
-      .attr('fill', d => relColor(d.rel)).attr('opacity', .9).attr('stroke', css('--card')).attr('stroke-width', 1.6)
-      .on('mousemove', (ev, d) => {
-        const tip = $('coTip');
-        tip.innerHTML = `<div style="font-family:Manrope;font-weight:800;font-size:12.5px;margin-bottom:3px">${d.name}</div>
-          <div style="font-family:'IBM Plex Mono';font-size:10px;color:#cbd5e1;line-height:1.5">${d.agency} · fit <b style="color:#fff">${d.fit}</b><br>${d.resp}% reply · ~${d.respDays}d · $${d.awards}M obligated</div>`;
-        tip.style.display = 'block'; tip.style.left = Math.min(ev.clientX + 14, window.innerWidth - 230) + 'px'; tip.style.top = (ev.clientY + 14) + 'px';
-      })
-      .on('mouseleave', () => $('coTip').style.display = 'none')
-      .on('click', (ev, d) => { S.sel = d.id; renderAll(); });
-
-    svg.selectAll('text.dotlab').data(data).join('text')
-      .attr('class', 'dotlab').attr('x', d => x(d.resp)).attr('y', d => y(Math.min(158, d.awards)) - r(d.fit) - 3).attr('text-anchor', 'middle')
-      .text(d => d.initials);
-
-    $('scatterLegend').innerHTML = Object.entries(D.REL_META).map(([k, v]) => `<span class="lg"><i style="background:${v.color}"></i>${v.label}</span>`).join('') + `<span class="lg" style="color:var(--mute-2)">○ size = fit</span>`;
-  }
-
-  /* ─── CO profile panel ─── */
-  function ring(score, size, label) {
-    const r = (size - 8) / 2, c = 2 * Math.PI * r, off = c * (1 - score / 100);
-    const col = score >= 85 ? css('--green-600') : score >= 70 ? css('--accent') : css('--mute-2');
-    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-      <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="var(--line-2)" stroke-width="5"/>
-      <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${col}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${off}"/>
-    </svg>`;
-  }
-  function fitVerdict(f){ if(f>=85)return{label:'MATCH',tone:'green'}; if(f>=70)return{label:'WORKABLE',tone:'blue'}; if(f>=60)return{label:'STRETCH',tone:'amber'}; return{label:'TRAP',tone:'red'}; }
-  function fitTile(f,lg){ const v=fitVerdict(f); return `<div class="fit-tile${lg?' lg':''} tone-${v.tone}"><span class="ft-num">${f}</span><span class="ft-lbl">${v.label}</span></div>`; }
-  function renderPanel() {
-    const o = D.OFFICERS.find(x => x.id === S.sel);
-    const el = $('coPanel');
-    if (!o) {
-      el.innerHTML = `<div class="cop-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="7" r="3"/><path d="M2 21c0-4 3.5-6 7-6s7 2 7 6"/><circle cx="18" cy="8" r="2.5"/></svg><div class="t">Select a contracting officer</div><div class="d">Click any point on the chart or a row below to see their profile, history, and what they buy.</div></div>`;
-      return;
-    }
-    const rm = D.REL_META[o.rel];
-    const fitTxt = o.fit >= 85 ? 'Strong match to your codes' : o.fit >= 70 ? 'Workable overlap' : 'Partial overlap';
-    el.innerHTML = `
-      <div class="cop-head">
-        <div class="cop-av" style="background:linear-gradient(135deg,${rm.color},${shade(rm.color)})">${o.initials}</div>
-        <div class="cop-id">
-          <div class="cop-name">${o.name}</div>
-          <div class="cop-title">${o.title}</div>
-          <span class="cop-agy">${o.agency} · ${o.office}</span>
-        </div>
-        <span class="cop-rel" style="background:${hexA(rm.color,.13)};color:${rm.color}"><i style="background:${rm.color}"></i>${rm.label}</span>
-      </div>
-      <div class="cop-metrics">
-        <div class="cop-m"><span class="mv">${o.resp}<small>%</small></span><span class="ml">Reply rate</span></div>
-        <div class="cop-m"><span class="mv">${o.respDays}<small>d</small></span><span class="ml">Avg response</span></div>
-        <div class="cop-m"><span class="mv">$${o.awards}<small>M</small></span><span class="ml">Obligated 12mo</span></div>
-        <div class="cop-m"><span class="mv">${o.actions}</span><span class="ml">Award actions</span></div>
-        <div class="cop-m"><span class="mv">${o.setaside}<small>%</small></span><span class="ml">To small biz</span></div>
-        <div class="cop-m"><span class="mv">${o.warrant}</span><span class="ml">Warrant</span></div>
-      </div>
-      <div class="cop-ring-wrap">
-        ${fitTile(o.fit, true)}
-        <div class="cop-ring-txt"><div class="t">${fitTxt}</div><div class="d">Buys ${o.naics.join(', ')} · last contact ${o.lastContact}d ago${o.lastContact >= 30 ? ' — re-warm soon' : ''}.</div></div>
-      </div>
-      <div class="cop-note"><b>Your note</b>${o.note}</div>
-      <div class="cop-actions">
-        <button class="cop-btn primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg>Log outreach</button>
-        <button class="cop-btn ghost"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z" opacity="0"/><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 8h18"/></svg>Add to plan</button>
-      </div>`;
-  }
-
-  /* ─── people rail ─── */
-  function renderPeople() {
-    let data = filtered().slice();
-    let drillNote = '';
-    if (S.funnelStage) {
-      const idx = STAGES.findIndex(s => s.key === S.funnelStage);
-      const st = STAGES[idx];
-      if (S.funnelMode === 'dropped' && idx > 0) {
-        const prev = STAGES[idx - 1];
-        data = data.filter(o => prev.test(o) && !st.test(o));
-        drillNote = `Dropped off before <b>${st.label}</b>`;
-      } else {
-        data = data.filter(st.test);
-        drillNote = `Reached <b>${st.label}</b>`;
+  /* h(tag, opts, children) — opts: {cls, text, attrs, style} */
+  function h(tag, opts, children) {
+    const o = opts || {};
+    const node = document.createElement(tag);
+    if (o.cls) node.className = o.cls;
+    if (o.text !== undefined && o.text !== null) node.textContent = String(o.text);
+    if (o.style) node.setAttribute('style', o.style);
+    if (o.attrs) {
+      for (const k of Object.keys(o.attrs)) {
+        const v = o.attrs[k];
+        if (v !== null && v !== undefined) node.setAttribute(k, String(v));
       }
     }
-    const sort = S.sort || 'fit';
-    if (sort === 'fit') data.sort((a, b) => b.fit - a.fit);
-    else if (sort === 'resp') data.sort((a, b) => b.resp - a.resp);
-    else if (sort === 'awards') data.sort((a, b) => b.awards - a.awards);
-    else if (sort === 'cold') data.sort((a, b) => b.lastContact - a.lastContact);
-    $('pplCount').innerHTML = drillNote
-      ? `<span class="ppl-drill">Funnel</span>${drillNote} · <b>${data.length}</b> ${data.length === 1 ? 'CO' : 'COs'} <button class="ppl-clear" id="pplClear">clear ✕</button>`
-      : `${data.length} officers · click to open profile`;
-    if (drillNote) $('pplClear').onclick = clearDrill;
-    $('pplList').innerHTML = data.map(o => {
-      const rm = D.REL_META[o.rel];
-      const respCol = o.resp >= 75 ? css('--green-600') : o.resp >= 55 ? css('--amber-600') : css('--red-500');
-      const fc = o.fit >= 85 ? css('--green-600') : o.fit >= 70 ? css('--accent') : css('--mute-2');
-      const cR = 16, circ = 2 * Math.PI * cR, off = circ * (1 - o.fit / 100);
-      const dlt = o.resp - NET_AVG_RESP;
-      const replyCell = VIZ.resp === 'number'
-        ? `<div class="ppl-reply">
-             <div class="pr-top"><span class="pr-pct" style="color:${respCol}">${o.resp}<small>%</small></span><span class="pr-delta ${dlt >= 0 ? 'up' : 'down'}">${dlt >= 0 ? '+' : '−'}${Math.abs(dlt)} vs avg</span></div>
-             <div class="pr-sub">~${o.respDays}d to first reply</div>
-           </div>`
-        : `<div class="ppl-reply"><div class="ppl-resp-bar"><i style="width:${o.resp}%;background:${respCol}"></i></div><span class="pr-sub"><b style="color:${respCol}">${o.resp}%</b> reply · ~${o.respDays}d</span></div>`;
-      return `<div class="ppl-row${S.sel === o.id ? ' sel' : ''}" data-id="${o.id}">
-        <div class="ppl-av" style="background:linear-gradient(135deg,${rm.color},${shade(rm.color)})">${o.initials}<span class="reldot" style="background:${rm.color}"></span></div>
-        <div class="ppl-info"><div class="ppl-name">${o.name}</div><div class="ppl-sub">${o.agency} · ${o.office}</div></div>
-        ${replyCell}
-        <div class="ppl-awd2"><span class="pa-v">$${o.awards}M</span><span class="pa-l">obligated</span></div>
-        <div class="ppl-touch"><span class="pt-v">${o.lastContact}d ago</span><span class="pt-l" style="color:${rm.color}">${rm.label}</span></div>
-        ${fitTile(o.fit)}
-      </div>`;
-    }).join('') || `<div class="tl-empty">No officers match your filters.</div>`;
-    $('pplList').querySelectorAll('.ppl-row').forEach(r => r.onclick = () => { S.sel = r.dataset.id; renderAll(); });
+    (children || []).forEach((c) => { if (c) node.appendChild(c); });
+    return node;
   }
 
-  /* ─── timeline ─── */
-  function renderTimeline() {
-    const o = D.OFFICERS.find(x => x.id === S.sel);
-    $('tlSub').textContent = o ? `${o.name} · ${o.timeline.length} touchpoints` : 'Your touchpoint history';
-    if (!o) { $('timeline').innerHTML = `<div class="tl-empty">Select a CO to see history.</div>`; return; }
-    $('timeline').innerHTML = o.timeline.map(t => {
-      const km = D.KIND_META[t.kind];
-      return `<div class="tl-item">
-        <div class="tl-dot" style="background:${km.color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="${km.icon}"/></svg></div>
-        <div class="tl-body"><div class="tl-t">${t.t}</div><div class="tl-d">${km.label} · ${t.d}</div></div>
-      </div>`;
-    }).join('');
+  function fill(host, children) {
+    if (!host) return;
+    host.replaceChildren.apply(host, children.filter(Boolean));
   }
 
-  /* ─── portfolio (what they buy) ─── */
-  function renderSched() {
-    const o = D.OFFICERS.find(x => x.id === S.sel);
-    $('schedSub').textContent = o ? `${o.name}'s obligations in your codes` : 'Obligations in your codes ($M)';
-    if (!o) { $('schedList').innerHTML = `<div class="tl-empty">Select a CO.</div>`; return; }
-    const max = Math.max(...o.sched.map(s => s.v));
-    $('schedList').innerHTML = o.sched.map(s => {
-      const col = D.NAICS_COLORS[s.code] || css('--accent');
-      return `<div class="sched-row">
-        <div class="sched-top"><span class="sched-code">${s.code}</span><span class="sched-v">$${s.v}M</span></div>
-        <div class="sched-bar"><i style="width:${Math.max(6, s.v / max * 100)}%;background:${col}"></i></div>
-      </div>`;
-    }).join('') + `<div style="font-family:'IBM Plex Mono';font-size:9.5px;color:var(--mute);padding-top:4px">Your codes only · last 12 months</div>`;
+  /* An unparseable date renders as an em dash, never as "Invalid Date" and
+     never as today. */
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    const t = Date.parse(iso);
+    if (Number.isNaN(t)) return '—';
+    return new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
-  /* ─── outreach funnel (network-wide) ─── */
-  function renderFunnel() {
-    const f = filtered();
-    /* nested subsets via shared STAGES predicates (each test ⊆ the one above) */
-    const steps = STAGES.map(st => ({ ...st, val: f.filter(st.test).length }));
-    const identified = steps[0].val;
-    const max = identified || 1;
-    const fnEl = $('funnel');
-    if (VIZ.funnel === 'bars') {
-      fnEl.classList.remove('fn-shape');
-      fnEl.innerHTML = steps.map((s, i) => {
-        const conv = i === 0 ? 100 : steps[i - 1].val ? Math.round(s.val / steps[i - 1].val * 100) : 0;
-        return `<div class="fn-row">
-          <div class="fn-label">${s.label}<small>${s.sub}</small></div>
-          <div class="fn-track"><div class="fn-fill" style="width:${Math.max(8, s.val / max * 100)}%;background:${s.color}">${s.val}</div></div>
-          <div class="fn-conv">${i === 0 ? '—' : conv + '%'}</div>
-        </div>`;
-      }).join('');
-      return;
-    }
-    /* clean corporate funnel — continuous taper, crisp seams, click-to-drill */
-    fnEl.classList.add('fn-shape');
-    const wf = v => 0.16 + 0.84 * (v / max);
-    const tz = (tp, bt) => `polygon(${(50 - tp * 50).toFixed(2)}% 0,${(50 + tp * 50).toFixed(2)}% 0,${(50 + bt * 50).toFixed(2)}% 100%,${(50 - bt * 50).toFixed(2)}% 100%)`;
-    /* find the bottleneck: worst step-conversion (stage you advance INTO) */
-    let botIdx = -1, botConv = 101;
-    steps.forEach((s, i) => { if (i > 0 && steps[i - 1].val) { const c = s.val / steps[i - 1].val * 100; if (c < botConv) { botConv = c; botIdx = i; } } });
-    fnEl.innerHTML = steps.map((s, i) => {
-      const nextV = i < steps.length - 1 ? steps[i + 1].val : s.val;
-      const clip = tz(wf(s.val), wf(nextV));
-      const pctTop = Math.round(s.val / (steps[0].val || 1) * 100);
-      const conv = i === 0 ? null : steps[i - 1].val ? Math.round(s.val / steps[i - 1].val * 100) : 0;
-      const leak = i === 0 ? 0 : Math.max(0, steps[i - 1].val - s.val);
-      const isBot = i === botIdx;
-      const activeIn = S.funnelStage === s.key && S.funnelMode === 'in';
-      const activeDrop = S.funnelStage === s.key && S.funnelMode === 'dropped';
-      const leakBtn = leak ? `<button class="fn-leak2 fn-drillbtn${activeDrop ? ' on' : ''}" data-stage="${s.key}" data-mode="dropped">${leak} dropped off →</button>` : `<span class="fn-leak2">0 dropped off</span>`;
-      const meta = i === 0
-        ? `<span class="fn-meta-top">top of funnel</span>`
-        : `<span class="fn-conv2${isBot ? ' hot' : ''}"><b>${conv}%</b> advance</span>${leakBtn}${isBot ? '<span class="fn-flag">◆ biggest drop</span>' : ''}`;
-      return `<div class="fn-lbl"><span class="fn-l-name">${s.label}</span><span class="fn-l-sub">${s.sub}</span><span class="fn-l-top">${pctTop}% of network</span></div>
-        <button class="fn-body fn-drill${activeIn ? ' on' : ''}" data-stage="${s.key}" data-mode="in" title="Show the ${s.val} COs who reached ${s.label}"><div class="fn-tz" style="clip-path:${clip};-webkit-clip-path:${clip};background:linear-gradient(180deg,${s.color},${shade(s.color)})"><span class="fn-num">${s.val}</span></div>${i < steps.length - 1 ? '<span class="fn-arrow"></span>' : ''}</button>
-        <div class="fn-meta">${meta}</div>`;
-    }).join('');
-    fnEl.querySelectorAll('[data-stage]').forEach(el => el.onclick = (e) => {
-      e.stopPropagation();
-      drillToStage(el.dataset.stage, el.dataset.mode);
+  function avColor(seed) {
+    let n = 0;
+    const s = String(seed || '');
+    for (let i = 0; i < s.length; i++) n = (n * 31 + s.charCodeAt(i)) >>> 0;
+    const hues = [212, 199, 258, 172, 28, 340];
+    const hue = hues[n % hues.length];
+    return 'background:linear-gradient(155deg,hsl(' + hue + ',62%,52%),hsl(' + hue + ',68%,34%))';
+  }
+
+  function officers() {
+    return Array.isArray(window.DCO && window.DCO.OFFICERS) ? window.DCO.OFFICERS : [];
+  }
+
+  function meta() {
+    return (window.DCO && window.DCO.meta) || { state: 'loading' };
+  }
+
+  function filtered() {
+    const q = S.q.trim().toLowerCase();
+    return officers().filter((o) => {
+      if (S.agency !== 'all' && o.agency !== S.agency) return false;
+      if (!q) return true;
+      return [o.name, o.email, o.office, o.agency].some((v) => v && String(v).toLowerCase().includes(q));
     });
   }
 
-  /* ─── funnel → CO Network drill-down ─── */
-  function drillToStage(key, mode) {
-    if (S.funnelStage === key && S.funnelMode === mode) S.funnelStage = null;
-    else { S.funnelStage = key; S.funnelMode = mode; }
-    renderPeople(); renderFunnel();
-    if (S.funnelStage) {
-      const card = $('pplList').closest('.widget');
-      if (card) window.scrollTo({ top: card.getBoundingClientRect().top + window.scrollY - 18, behavior: 'smooth' });
-    }
-  }
-  function clearDrill() { S.funnelStage = null; renderPeople(); renderFunnel(); }
+  /* ── state banner ───────────────────────────────────────────────────── */
 
-  /* ─── insight ─── */
-  function renderInsight() {
-    const o = D.OFFICERS.find(x => x.id === S.sel);
-    let html;
-    if (o) {
-      if (o.rel === 'cold' && o.lastContact >= 30)
-        html = `<span class="ib-label">Re-warm</span><b>${o.name}</b> (${o.agency}) controls <b>$${o.awards}M</b> in your codes but has gone <b>${o.lastContact} days</b> quiet — ${o.note.split('.')[0]}. Re-engage before the next recompete.`;
-      else if (o.resp >= 80 && o.awards >= 100)
-        html = `<span class="ib-label">Priority</span><b>${o.name}</b> is a top target — <b>${o.resp}% reply rate</b> and <b>$${o.awards}M</b> obligated in your codes. Keep the relationship warm with quarterly touchpoints.`;
-      else
-        html = `<span class="ib-label">Focus</span><b>${o.name}</b> · ${D.REL_META[o.rel].label.toLowerCase()} relationship, ${o.resp}% reply rate, fit ${o.fit}/100. ${o.note.split('.')[0]}.`;
+  const EMPTY_COPY = {
+    'no-profile-codes': {
+      label: 'No codes on file',
+      body: 'Your feed has no NAICS codes yet, so there are no notices to read contacts from. Add your codes on the Capability Statement page and they appear here.',
+      link: { href: '/capability-statement', text: 'Capability Statement' }
+    },
+    'no-notices-in-window': {
+      label: 'No open notices',
+      body: 'SAM published no open notices in your codes in this window, so there are no points of contact to list.'
+    },
+    'no-contacts-on-notices': {
+      label: 'No contacts published',
+      body: 'The notices in your feed carry no point-of-contact email, which is the only field this page can identify an officer by.'
+    }
+  };
+
+  function renderBanner() {
+    const el = $('stateBanner');
+    if (!el) return;
+    const m = meta();
+    el.classList.remove('is-error');
+
+    if (m.state === 'loading') {
+      el.hidden = false;
+      fill(el, [
+        h('span', { cls: 'sb-label', text: 'Loading' }),
+        h('span', { text: 'Reading the points of contact on the notices in your feed…' })
+      ]);
+      return;
+    }
+    if (m.state === 'error') {
+      el.hidden = false;
+      el.classList.add('is-error');
+      fill(el, [
+        h('span', { cls: 'sb-label', text: 'Unavailable' }),
+        h('span', { text: 'The live feed did not answer, so this page has nothing to show. It is not an empty directory — reload to try again.' }),
+        m.detail ? h('b', { text: m.detail }) : null
+      ]);
+      return;
+    }
+    if (m.state === 'empty') {
+      const copy = EMPTY_COPY[m.reason] || EMPTY_COPY['no-notices-in-window'];
+      el.hidden = false;
+      fill(el, [
+        h('span', { cls: 'sb-label', text: copy.label }),
+        h('span', { text: copy.body }),
+        copy.link ? h('a', { text: copy.link.text, attrs: { href: copy.link.href } }) : null
+      ]);
+      return;
+    }
+    el.hidden = true;
+    fill(el, []);
+  }
+
+  /* ── header + controls ──────────────────────────────────────────────── */
+
+  function renderStats() {
+    const list = officers();
+    const m = meta();
+    const agencies = new Set(list.map((o) => o.agency).filter(Boolean));
+    const ready = m.state === 'ready' || m.state === 'empty';
+    const put = (id, n) => { const el = $(id); if (el) el.textContent = ready ? String(n) : '—'; };
+    put('hsTotal', list.length);
+    put('hsNotices', m.noticeCount || 0);
+    put('hsAgencies', agencies.size);
+    // The LIVE pill is a claim about the feed, so it appears only when the feed
+    // actually answered. During an outage it must not keep pulsing green.
+    const pill = $('livePill');
+    if (pill) pill.hidden = m.state !== 'ready';
+  }
+
+  function renderAgencyPills() {
+    const host = $('agencyFilters');
+    if (!host) return;
+    const list = Array.isArray(window.DCO.AGENCY_FILTERS) ? window.DCO.AGENCY_FILTERS : ['all'];
+    fill(host, list.map((a) => {
+      const b = h('button', {
+        cls: 'fpill' + (S.agency === a ? ' active' : ''),
+        text: a === 'all' ? 'All' : a,
+        attrs: { type: 'button' }
+      });
+      b.addEventListener('click', () => { S.agency = a; renderAll(); });
+      return b;
+    }));
+  }
+
+  /* ── list ───────────────────────────────────────────────────────────── */
+
+  function emptyBlock(title, detail) {
+    return h('div', { cls: 'cop-empty' }, [
+      h('div', { cls: 't', text: title }),
+      h('div', { cls: 'd', text: detail })
+    ]);
+  }
+
+  function renderPeople() {
+    const host = $('pplList');
+    if (!host) return;
+    const rows = filtered();
+    const total = officers().length;
+    const m = meta();
+
+    const count = $('pplCount');
+    if (count) {
+      count.textContent = m.state === 'ready'
+        ? (rows.length === total ? total + ' officers' : rows.length + ' of ' + total + ' officers')
+        : '';
+    }
+    const src = $('pplSource');
+    if (src) {
+      src.textContent = m.state === 'ready' && m.windowDays ? 'SAM.gov · last ' + m.windowDays + ' days' : '';
+    }
+
+    if (rows.length === 0) {
+      fill(host, [total === 0
+        ? emptyBlock('Nothing to list', 'See the note above for why.')
+        : emptyBlock('No officer matches this filter', 'Clear the agency filter or the search to see the full list.')]);
+      return;
+    }
+
+    fill(host, rows.map((o) => {
+      const naics = (o.naics || []).join(' · ');
+      const row = h('div', { cls: 'ppl-row' + (S.sel === o.id ? ' sel' : '') }, [
+        h('div', { cls: 'ppl-av', text: o.initials, style: avColor(o.email || o.id) }),
+        h('div', { cls: 'ppl-info' }, [
+          h('div', { cls: 'ppl-name', text: o.name }),
+          h('div', { cls: 'ppl-sub', text: o.office || o.email })
+        ]),
+        h('div', { cls: 'ppl-touch' }, [h('div', { cls: 'pt-v', text: o.agency || '—' })]),
+        h('div', { cls: 'ppl-touch' }, [h('div', { cls: 'pt-v mono', text: naics || '—' })]),
+        h('div', { cls: 'ppl-touch' }, [
+          h('div', { cls: 'pt-v', text: fmtDate(o.latestPosted) }),
+          h('div', { cls: 'pt-l', text: 'POSTED', style: 'color:var(--mute)' })
+        ]),
+        h('div', { cls: 'ppl-awd', text: o.noticeCount }, [h('small', { text: 'NOTICES' })])
+      ]);
+      row.addEventListener('click', () => { S.sel = o.id; renderPeople(); renderPanel(); });
+      return row;
+    }));
+  }
+
+  /* ── detail panel ───────────────────────────────────────────────────── */
+
+  function noticeRow(n) {
+    const label = n.solicitation_number || n.notice_id;
+    const bits = [
+      n.naics_code ? ' · ' + n.naics_code : '',
+      n.set_aside ? ' · ' + n.set_aside : '',
+      ' · closes ' + fmtDate(n.response_deadline)
+    ].join('');
+    const line = h('div', { cls: 'mono', style: 'font-size:10.5px;color:var(--mute);margin-top:4px' });
+    if (n.ui_link) {
+      line.appendChild(h('a', { text: label, attrs: { href: n.ui_link, target: '_blank', rel: 'noopener noreferrer' } }));
     } else {
-      const rewarm = D.OFFICERS.filter(x => x.rel === 'cold' && x.lastContact >= 30);
-      html = `<span class="ib-label">Read</span>Your warmest, highest-value COs sit top-right on the chart. <b>${rewarm.length} cold COs</b> control real spend but have gone quiet — use the <b>Needs re-warming</b> segment to prioritize outreach.`;
+      line.appendChild(document.createTextNode(String(label || '')));
     }
-    $('insightBar').innerHTML = `<span class="ib-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a7 7 0 00-4 12.7V17a1 1 0 001 1h6a1 1 0 001-1v-2.3A7 7 0 0012 2z"/><path d="M9 21h6"/></svg></span><span>${html}</span>`;
+    line.appendChild(document.createTextNode(bits));
+    return h('div', { style: 'padding:10px 0;border-bottom:1px solid var(--line-3)' }, [
+      h('div', { text: n.title || 'Untitled notice', style: 'font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.35' }),
+      line
+    ]);
   }
 
-  /* ─── helpers ─── */
-  function shade(hex) {
-    const n = parseInt(hex.slice(1), 16);
-    let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
-    r = Math.round(r * .68); g = Math.round(g * .68); b = Math.round(b * .68);
-    return `rgb(${r},${g},${b})`;
-  }
-  function hexA(hex, a) {
-    const n = parseInt(hex.slice(1), 16);
-    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  function noteBlock(label, body) {
+    return h('div', { cls: 'cop-note' }, [h('b', { text: label }), body]);
   }
 
-  function renderAll() { renderKPIs(); renderScatter(); renderPanel(); renderPeople(); renderTimeline(); renderSched(); renderFunnel(); renderInsight(); }
-  function onThemeChange() { renderAll(); }
+  function renderPanel() {
+    const host = $('coPanel');
+    if (!host) return;
+    const list = filtered();
+    const o = officers().find((x) => x.id === S.sel) || null;
+
+    if (!o) {
+      fill(host, [list.length
+        ? emptyBlock('Select an officer', 'Pick a name to see their contact details and every notice they posted in your codes.')
+        : emptyBlock('No officer selected', 'There is no one to select yet.')]);
+      return;
+    }
+
+    const naicsChips = h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:2px' },
+      (o.naics || []).map((c) => h('span', { cls: 'fpill', text: c })));
+
+    const noticeList = h('div', { style: 'max-height:260px;overflow-y:auto' },
+      (o.notices || []).map(noticeRow));
+
+    const actions = h('div', { cls: 'cop-actions' }, [
+      h('a', { cls: 'cop-btn primary', text: 'Email', attrs: { href: 'mailto:' + o.email } }),
+      o.phone
+        ? h('a', { cls: 'cop-btn ghost', text: o.phone, attrs: { href: 'tel:' + String(o.phone).replace(/[^0-9+]/g, '') } })
+        : h('span', { cls: 'cop-btn ghost', text: 'No phone published', style: 'cursor:default;opacity:.7' })
+    ]);
+
+    fill(host, [
+      h('div', { cls: 'cop-head' }, [
+        h('div', { cls: 'cop-av', text: o.initials, style: avColor(o.email || o.id) }),
+        h('div', { cls: 'cop-id' }, [
+          h('div', { cls: 'cop-name', text: o.name }),
+          h('div', { cls: 'cop-title', text: o.contactType ? o.contactType + ' contact on SAM' : 'Point of contact on SAM' }),
+          o.agency ? h('div', { cls: 'cop-agy', text: o.agency }) : null
+        ])
+      ]),
+      noteBlock('Office', h('span', { text: o.office || 'Not published on the notice' })),
+      noteBlock('Address', h('span', { cls: 'mono', text: o.email })),
+      (o.naics || []).length ? noteBlock('Codes they posted in', naicsChips) : null,
+      noteBlock(o.noticeCount + ' notice' + (o.noticeCount === 1 ? '' : 's') + ' in your feed', noticeList),
+      actions
+    ]);
+  }
+
+  /* ── wiring ─────────────────────────────────────────────────────────── */
+
+  function renderAll() {
+    renderBanner();
+    renderStats();
+    renderAgencyPills();
+    renderPeople();
+    renderPanel();
+  }
+
+  function buildControls() {
+    const search = $('searchInput');
+    if (search) search.addEventListener('input', (e) => { S.q = e.target.value; renderPeople(); renderPanel(); });
+    const reset = $('resetBtn');
+    if (reset) {
+      reset.addEventListener('click', () => {
+        S.agency = 'all';
+        S.q = '';
+        S.sel = null;
+        if (search) search.value = '';
+        renderAll();
+      });
+    }
+  }
 
   function init() {
-    buildControls(); renderAll();
-    let to; window.addEventListener('resize', () => { clearTimeout(to); to = setTimeout(renderScatter, 220); });
+    buildControls();
+    renderAll();
   }
-  window.DCO_APP = { render: renderAll, onThemeChange };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+
+  window.DCO_APP = { render: renderAll, onThemeChange: renderAll };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
 })();

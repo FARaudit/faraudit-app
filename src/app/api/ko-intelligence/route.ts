@@ -1,94 +1,83 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
+import { fetchLiveOpportunitiesScoped, WINDOW_DAYS } from "@/lib/bd-os/live-opportunities";
+import { groupOfficers, agencyFiltersOf } from "@/lib/bd-os/ko-directory";
 
 export const dynamic = "force-dynamic";
 
-interface PostBody {
-  ko_email: string;
-  ko_name?: string | null;
-  ko_phone?: string | null;
-  agency?: string | null;
-  agency_office?: string | null;
-  naics_codes?: string[];
-  notes?: string | null;
-  last_solicitation_id?: string | null;
-}
+// WHAT THIS SERVES, AND WHY IT NO LONGER TOUCHES ko_intelligence.
+//
+// This route used to read and write the `ko_intelligence` table. Both
+// directions were dead against production: migration 003 declared the table
+// with CREATE TABLE IF NOT EXISTS, but 001 had already created it with a
+// different column set, so 003 was a silent no-op. Measured on production:
+// the list query (order by last_contact) returned 42703 column-does-not-exist,
+// the upsert returned PGRST204 for agency_office, the table held zero rows,
+// and nothing in the repo had ever written one. The page's only caller
+// therefore took its failure branch on every load and rendered a seed file of
+// invented officials.
+//
+// The officers here are the points of contact SAM publishes on the notices in
+// THIS customer's feed — the same rows the Opportunities page shows, from the
+// same cached call, so the two surfaces can never disagree. Every field is
+// carried from the notice; nothing is scored, inferred or averaged. Response
+// rates, reply times, obligated dollars and fit scores are absent because
+// nothing computes them.
+//
+// A point of contact is not necessarily the warranted contracting officer —
+// SAM types them only as primary/secondary — so `contactType` carries what SAM
+// said and the page must not assert a warrant.
 
-const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-export async function GET(req: NextRequest) {
+export async function GET() {
   const supabase = await createServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const url = new URL(req.url);
-  const email = url.searchParams.get("email");
-  const agency = url.searchParams.get("agency");
-
-  if (email) {
-    const { data, error } = await supabase
-      .from("ko_intelligence")
-      .select("*")
-      .eq("ko_email", email)
-      .maybeSingle();
-    if (error) return NextResponse.json({ error: `lookup failed: ${error.message} — run migration 003_intelligence_layer.sql` }, { status: 503 });
-    if (!data) return NextResponse.json({ error: "not found" }, { status: 404 });
-    return NextResponse.json({ ko: data });
-  }
-
-  let q = supabase
-    .from("ko_intelligence")
-    .select("*")
-    .order("last_contact", { ascending: false, nullsFirst: false });
-  if (agency) q = q.eq("agency", agency);
-
-  const { data, error } = await q;
-  if (error) return NextResponse.json({ error: `list failed: ${error.message} — run migration 003_intelligence_layer.sql` }, { status: 503 });
-  return NextResponse.json({ kos: data || [] });
-}
-
-export async function POST(req: NextRequest) {
-  const supabase = await createServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-
-  let body: PostBody;
+  let rows;
+  let scope;
   try {
-    body = (await req.json()) as PostBody;
-  } catch {
-    return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
-  }
-
-  if (!body.ko_email || !EMAIL_RX.test(body.ko_email)) {
-    return NextResponse.json({ error: "valid ko_email required" }, { status: 400 });
-  }
-
-  // Upsert by ko_email.
-  const row = {
-    ko_email: body.ko_email,
-    ko_name: body.ko_name ?? null,
-    ko_phone: body.ko_phone ?? null,
-    agency: body.agency ?? null,
-    agency_office: body.agency_office ?? null,
-    naics_codes: Array.isArray(body.naics_codes) ? body.naics_codes : [],
-    notes: body.notes ?? null,
-    last_contact: new Date().toISOString(),
-    last_solicitation_id: body.last_solicitation_id ?? null,
-    updated_at: new Date().toISOString()
-  };
-
-  const { data, error } = await supabase
-    .from("ko_intelligence")
-    .upsert(row, { onConflict: "ko_email" })
-    .select()
-    .single();
-
-  if (error) {
+    const out = await fetchLiveOpportunitiesScoped(supabase);
+    rows = out.rows;
+    scope = out.scope;
+  } catch (e) {
+    // Rule 61 — a failed dependency gets a visible failure state, never a
+    // plausible one. The client renders this as an error, not as an empty
+    // directory, because "SAM did not answer" and "you have no officers" are
+    // different facts and must not look alike.
+    const msg = e instanceof Error ? e.message : "unknown error";
     return NextResponse.json(
-      { error: `upsert failed: ${error.message} — run migration 003_intelligence_layer.sql` },
+      { error: `live feed unavailable: ${msg}`, meta: { reason: "upstream-failed", window_days: WINDOW_DAYS } },
       { status: 503 }
     );
   }
 
-  return NextResponse.json({ ko: data });
+  const { officers, pocWithoutEmail } = groupOfficers(rows);
+
+  // `reason` is null iff there is something to show. The empty cases are named
+  // separately because they need different words on the page and a different
+  // next action from the customer: no codes on file is a profile they can fix,
+  // an empty window is a real zero result.
+  const reason =
+    officers.length > 0
+      ? null
+      : scope.source === "no-profile-codes"
+        ? "no-profile-codes"
+        : rows.length === 0
+          ? "no-notices-in-window"
+          : "no-contacts-on-notices";
+
+  return NextResponse.json({
+    OFFICERS: officers,
+    AGENCY_FILTERS: agencyFiltersOf(officers),
+    meta: {
+      source: "sam-live-poc",
+      scope: scope.source,
+      naics: scope.codes,
+      window_days: WINDOW_DAYS,
+      notice_count: rows.length,
+      officer_count: officers.length,
+      poc_without_email: pocWithoutEmail,
+      reason
+    }
+  });
 }

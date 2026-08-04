@@ -83,7 +83,6 @@ button{font-family:inherit}
 .fpill:hover{border-color:var(--accent-light);color:var(--accent-deep)}
 .fpill.active{background:rgba(55,138,221,0.12);border-color:var(--accent-light);color:var(--accent-deep)}
 [data-theme="dark"] .fpill.active{color:var(--accent-light);background:rgba(55,138,221,0.2)}
-.ctl-divider{width:1px;height:22px;background:var(--line)}
 .ctl-search{display:flex;align-items:center;gap:8px;height:30px;width:230px;padding:0 11px;border-radius:8px;background:var(--card-soft);border:1px solid var(--line)}
 .ctl-search svg{width:14px;height:14px;color:var(--mute);flex-shrink:0}
 .ctl-search input{border:0;background:transparent;outline:0;font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--ink);width:100%}
@@ -91,25 +90,10 @@ button{font-family:inherit}
 .vr-right{margin-left:auto;display:flex;align-items:center;gap:14px;flex-shrink:0}
 .reset-btn{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:700;color:var(--mute);background:none;border:0;cursor:pointer;letter-spacing:.03em}
 .reset-btn:hover{color:var(--accent-deep);text-decoration:underline}
-.seg-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--line-2)}
-.view-chip{display:inline-flex;flex-direction:column;gap:1px;padding:6px 12px;border-radius:9px;background:var(--card-soft);border:1px solid var(--line);cursor:pointer;transition:all .14s;text-align:left}
-.view-chip:hover{border-color:var(--accent-light)}
 .view-chip.active{background:var(--accent-pale);border-color:var(--accent-light)}
 [data-theme="dark"] .view-chip.active{background:rgba(55,138,221,0.16)}
-.view-chip .vc-t{font-size:11.5px;font-weight:700;color:var(--ink);line-height:1.2}
-.view-chip .vc-d{font-family:"IBM Plex Mono",monospace;font-size:9px;color:var(--mute);letter-spacing:.02em}
 .view-chip.active .vc-t{color:var(--accent-deep)}
 [data-theme="dark"] .view-chip.active .vc-t{color:var(--accent-light)}
-
-/* KPI */
-.kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-sm);padding:16px 18px;display:flex;flex-direction:column;gap:7px}
-.kpi .lbl{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);margin:0}
-.kpi-val{font-family:"Manrope",sans-serif;font-size:32px;font-weight:800;letter-spacing:-.03em;color:var(--ink);line-height:.95;display:flex;align-items:baseline;gap:3px}
-.kpi-val .unit{font-size:15px;font-weight:700;color:var(--mute)}
-.kpi[data-tone="amber"] .kpi-val{color:var(--amber-700)} .kpi[data-tone="green"] .kpi-val{color:var(--green-700)} .kpi[data-tone="blue"] .kpi-val{color:var(--accent-deep)} .kpi[data-tone="purple"] .kpi-val{color:var(--purple-600)}
-[data-theme="dark"] .kpi[data-tone="amber"] .kpi-val{color:#fcd34d}[data-theme="dark"] .kpi[data-tone="green"] .kpi-val{color:#6ee7b7}[data-theme="dark"] .kpi[data-tone="blue"] .kpi-val{color:var(--accent-light)}[data-theme="dark"] .kpi[data-tone="purple"] .kpi-val{color:#c4b5fd}
-.kpi .foot{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute)}
 
 /* rows + widgets */
 .row{display:grid;gap:16px;align-items:stretch}
@@ -126,21 +110,7 @@ button{font-family:inherit}
 .wh-text h3{font-family:"Manrope",sans-serif;font-size:14.5px;font-weight:800;letter-spacing:-.01em;color:var(--ink);margin:0;line-height:1.2}
 .wh-text .wh-sub{font-size:11.5px;color:var(--mute);margin:0;line-height:1.35}
 .wh-source{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mute-2);background:var(--card-soft);border:1px solid var(--line);padding:3px 7px;border-radius:5px;white-space:nowrap;flex-shrink:0}
-
-/* scatter */
-.scatter-svg{width:100%;height:300px;display:block;overflow:visible}
-.scatter-svg .axis line,.scatter-svg .axis path{stroke:var(--line);stroke-width:1}
-.scatter-svg .axis text{font-family:"IBM Plex Mono";font-size:9.5px;fill:var(--mute)}
-.scatter-svg .axis-title{font-family:"IBM Plex Mono";font-size:9.5px;font-weight:700;letter-spacing:.04em;fill:var(--mute)}
-.scatter-svg .zone{font-family:"IBM Plex Mono";font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
-.scatter-svg circle.dot{cursor:pointer;transition:opacity .12s,stroke-width .12s}
-.scatter-svg circle.dot:hover{stroke:var(--ink);stroke-width:2}
 .scatter-svg circle.dot.sel{stroke:var(--ink);stroke-width:2.5}
-.scatter-svg circle.dot.dim{opacity:.16}
-.scatter-svg text.dotlab{font-family:"IBM Plex Mono";font-size:8.5px;font-weight:700;fill:var(--ink-2);pointer-events:none}
-.scatter-legend{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--mute)}
-.scatter-legend .lg{display:inline-flex;align-items:center;gap:6px}
-.scatter-legend .lg i{width:9px;height:9px;border-radius:50%}
 
 /* CO profile panel */
 .co-panel{display:flex;flex-direction:column;gap:0;min-width:0}
@@ -151,19 +121,6 @@ button{font-family:inherit}
 .cop-title{font-size:11.5px;color:var(--mute);margin-top:1px}
 .cop-agy{display:inline-flex;align-items:center;gap:6px;margin-top:6px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--accent-deep);background:var(--accent-pale);padding:3px 8px;border-radius:5px}
 [data-theme="dark"] .cop-agy{background:rgba(55,138,221,0.18);color:var(--accent-light)}
-.cop-rel{align-self:flex-start;display:inline-flex;align-items:center;gap:5px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:4px 9px;border-radius:6px;flex-shrink:0}
-.cop-rel i{width:6px;height:6px;border-radius:50%}
-.cop-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:14px 0;border-bottom:1px solid var(--line-2)}
-.cop-m{display:flex;flex-direction:column;gap:3px}
-.cop-m .mv{font-family:"IBM Plex Mono",monospace;font-size:16px;font-weight:800;color:var(--ink);line-height:1}
-.cop-m .mv small{font-size:10px;color:var(--mute);font-weight:600}
-.cop-m .ml{font-family:"IBM Plex Mono",monospace;font-size:8.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);font-weight:700}
-.cop-ring-wrap{display:flex;align-items:center;gap:13px;padding:14px 0;border-bottom:1px solid var(--line-2)}
-.cop-ring{position:relative;width:62px;height:62px;flex-shrink:0}
-.cop-ring svg{transform:rotate(-90deg)}
-.cop-ring .rn{position:absolute;inset:0;display:grid;place-items:center;flex-direction:column;font-family:"Manrope";font-weight:800;font-size:18px;color:var(--ink)}
-.cop-ring .rn small{font-size:8px;font-weight:700;color:var(--mute);letter-spacing:.06em}
-.cop-ring-txt{min-width:0}
 .cop-ring-txt .t{font-size:12px;font-weight:800;color:var(--ink)}
 .cop-ring-txt .d{font-size:11px;color:var(--mute);line-height:1.45;margin-top:2px}
 .cop-note{font-size:12px;color:var(--ink-2);line-height:1.55;padding:13px 0;border-bottom:1px solid var(--line-2)}
@@ -180,10 +137,6 @@ button{font-family:inherit}
 .cop-empty svg{width:34px;height:34px;color:var(--mute-2)}
 .cop-empty .t{font-size:13px;font-weight:700;color:var(--ink-2)}
 .cop-empty .d{font-size:11.5px;color:var(--mute);max-width:240px;line-height:1.5}
-
-/* people rail (table) */
-.people-tabs{display:flex;gap:4px}
-.people-tab{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);background:var(--card-soft);border:1px solid var(--line);border-radius:6px;padding:5px 9px;cursor:pointer}
 .people-tab.active{background:rgba(55,138,221,0.12);border-color:var(--accent-light);color:var(--accent-deep)}
 [data-theme="dark"] .people-tab.active{color:var(--accent-light)}
 .ppl-list{display:flex;flex-direction:column;gap:4px;max-height:520px;overflow-y:auto;padding-right:3px}
@@ -195,135 +148,38 @@ button{font-family:inherit}
 .ppl-info{min-width:0}
 .ppl-name{font-size:14px;font-weight:800;color:var(--ink);line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ppl-sub{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ppl-reply{display:flex;flex-direction:column;gap:4px;justify-content:center;min-width:0}
-.pr-top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
-.pr-pct{font-family:"Manrope",sans-serif;font-size:20px;font-weight:800;letter-spacing:-.02em;line-height:1}
-.pr-pct small{font-size:11px;font-weight:700;opacity:.6;margin-left:1px}
-.pr-delta{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;line-height:1;white-space:nowrap}
 .pr-delta.up{color:var(--green-700);background:rgba(5,150,105,.1)}
-.pr-delta.down{color:var(--red-500);background:rgba(220,38,38,.09)}
 [data-theme="dark"] .pr-delta.up{color:#6ee7b7;background:rgba(16,185,129,.14)}
-[data-theme="dark"] .pr-delta.down{color:#fca5a5;background:rgba(220,38,38,.16)}
-.pr-sub{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute);font-weight:600}
-.ppl-resp-bar{height:6px;border-radius:3px;background:var(--line-2);overflow:hidden}
-.ppl-resp-bar i{display:block;height:100%;border-radius:3px}
-.ppl-awd2{display:flex;flex-direction:column;gap:3px;justify-content:center}
-.pa-v{font-family:"IBM Plex Mono",monospace;font-size:14px;font-weight:800;color:var(--accent-deep)}
-[data-theme="dark"] .pa-v{color:var(--accent-light)}
-.pa-l{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
 .ppl-touch{display:flex;flex-direction:column;gap:3px;justify-content:center}
 .pt-v{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.1}
 .pt-l{display:flex;align-items:center;gap:5px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.04em}
 .pt-l::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0}
-.fit-tile{width:42px;height:42px;border-radius:11px;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;box-shadow:var(--shadow-sm)}
-.fit-tile .ft-num{font-family:"Manrope",sans-serif;font-size:16px;font-weight:800;letter-spacing:-.03em;line-height:1;color:#fff}
-.fit-tile .ft-lbl{font-family:"IBM Plex Mono",monospace;font-size:6px;font-weight:700;letter-spacing:.06em;color:#fff}
-.fit-tile.lg{width:62px;height:62px;border-radius:15px}
-.fit-tile.lg .ft-num{font-size:23px}
-.fit-tile.lg .ft-lbl{font-size:8px}
-.fit-tile.tone-green{background:linear-gradient(155deg,#10b981,#047857)}
-.fit-tile.tone-blue{background:linear-gradient(155deg,#378ADD,#185FA5)}
-.fit-tile.tone-amber{background:linear-gradient(155deg,#f59e0b,#b45309)}
-.fit-tile.tone-red{background:linear-gradient(155deg,#ef4444,#b91c1c)}
 .ppl-awd{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:800;color:var(--accent-deep);text-align:right}
 [data-theme="dark"] .ppl-awd{color:var(--accent-light)}
 .ppl-awd small{display:block;font-size:8px;color:var(--mute);font-weight:600;letter-spacing:.04em}
-.ppl-fit{position:relative;width:40px;height:40px;margin:0 auto}
-.ppl-fit svg{transform:rotate(-90deg)}
-.ppl-fit .fn{position:absolute;inset:0;display:grid;place-items:center;font-family:"IBM Plex Mono";font-size:11px;font-weight:800;color:var(--ink)}
 .ppl-head{display:grid;grid-template-columns:44px 2.4fr 1.5fr 1fr 1.25fr 52px;gap:16px;padding:0 14px 8px;border-bottom:1px solid var(--line-2)}
 .ppl-head span{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
 .ppl-head span:last-child{text-align:center}
-
-/* timeline */
-.tl-wrap{display:flex;flex-direction:column;gap:0;position:relative}
-.tl-item{display:grid;grid-template-columns:28px 1fr;gap:11px;padding-bottom:15px;position:relative}
-.tl-item:last-child{padding-bottom:0}
-.tl-item::before{content:"";position:absolute;left:13px;top:26px;bottom:-2px;width:2px;background:var(--line-2)}
-.tl-item:last-child::before{display:none}
-.tl-dot{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;color:#fff;flex-shrink:0;z-index:1}
-.tl-dot svg{width:14px;height:14px}
-.tl-body{display:flex;flex-direction:column;gap:1px;padding-top:3px}
-.tl-t{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.3}
-.tl-d{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute)}
-.tl-empty{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute);padding:14px 0;text-align:center}
-
-/* schedule bars (CO portfolio by NAICS) */
-.sched-list{display:flex;flex-direction:column;gap:11px;padding-top:2px}
-.sched-row{display:flex;flex-direction:column;gap:5px}
-.sched-top{display:flex;align-items:baseline;justify-content:space-between}
-.sched-code{font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:700;color:var(--ink)}
-.sched-v{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:800;color:var(--accent-deep)}
-[data-theme="dark"] .sched-v{color:var(--accent-light)}
-.sched-bar{height:8px;border-radius:4px;background:var(--line-2);overflow:hidden}
-.sched-bar i{display:block;height:100%;border-radius:4px}
-
-/* outreach funnel */
-.funnel{display:flex;flex-direction:column;gap:9px}
-.fn-row{display:grid;grid-template-columns:128px 1fr 44px;gap:12px;align-items:center}
-.fn-label{font-size:12px;font-weight:700;color:var(--ink-2)}
-.fn-label small{display:block;font-family:"IBM Plex Mono",monospace;font-size:9px;color:var(--mute);font-weight:600}
-.fn-track{height:30px;border-radius:8px;background:var(--line-2);overflow:hidden;position:relative}
-.fn-fill{height:100%;border-radius:8px;display:flex;align-items:center;padding-left:11px;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:800;color:#fff;transition:width .5s cubic-bezier(.16,1,.3,1)}
-.fn-conv{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:800;color:var(--green-700);text-align:right}
-[data-theme="dark"] .fn-conv{color:#6ee7b7}
-
-/* CO response — hero number + vs-avg chip (new) */
-.resp-num{display:flex;flex-direction:column;gap:2px;justify-content:center}
-.resp-num .rn-top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
-.resp-num .rn-pct{font-family:"Manrope",sans-serif;font-size:19px;font-weight:800;letter-spacing:-.02em;line-height:1}
-.resp-num .rn-pct small{font-size:11px;font-weight:700;opacity:.65;margin-left:1px}
-.resp-num .rn-delta{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:5px;line-height:1;white-space:nowrap}
 .resp-num .rn-delta.up{color:var(--green-700);background:rgba(5,150,105,.1)}
-.resp-num .rn-delta.down{color:var(--red-500);background:rgba(220,38,38,.09)}
 [data-theme="dark"] .resp-num .rn-delta.up{color:#6ee7b7;background:rgba(16,185,129,.14)}
-[data-theme="dark"] .resp-num .rn-delta.down{color:#fca5a5;background:rgba(220,38,38,.16)}
-.resp-num .rn-sub{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--mute);font-weight:600}
-
-/* outreach funnel — connected silhouette + ghost leak wedges (new) */
-.funnel.fn-shape{display:grid;grid-template-columns:150px 1fr 150px;align-items:stretch;gap:3px 18px;padding:6px 0}
-.fn-lbl{display:flex;flex-direction:column;justify-content:center;text-align:right;min-height:62px}
-.fn-l-name{font-size:12.5px;font-weight:800;color:var(--ink);letter-spacing:-.01em;line-height:1.15}
-.fn-l-sub{font-family:"IBM Plex Mono",monospace;font-size:9px;color:var(--mute);font-weight:600;margin-top:2px}
-.fn-l-top{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--accent-deep);font-weight:700;margin-top:4px}
-[data-theme="dark"] .fn-l-top{color:var(--accent-light)}
-.fn-body{position:relative;min-height:62px;background:rgba(120,132,156,.09);border-radius:7px;border:0;padding:0;width:100%;display:block;cursor:pointer;transition:background .14s,box-shadow .14s}
-.fn-body:hover{background:rgba(55,138,221,.13)}
 .fn-body.on{background:rgba(55,138,221,.13);box-shadow:0 0 0 2px var(--accent)}
-[data-theme="dark"] .fn-body{background:rgba(255,255,255,.04)}
 [data-theme="dark"] .fn-body:hover,[data-theme="dark"] .fn-body.on{background:rgba(55,138,221,.18)}
-.fn-drillbtn{background:none;border:0;padding:0;cursor:pointer;text-align:left;text-decoration:underline;text-decoration-color:transparent;text-underline-offset:2px;transition:color .12s,text-decoration-color .12s}
-.fn-drillbtn:hover{color:var(--accent-deep);text-decoration-color:currentColor}
 .fn-drillbtn.on{color:var(--accent-deep);text-decoration-color:currentColor;font-weight:800}
 [data-theme="dark"] .fn-drillbtn:hover,[data-theme="dark"] .fn-drillbtn.on{color:var(--accent-light)}
-.ppl-drill{display:inline-flex;align-items:center;font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#fff;background:var(--accent);padding:2px 7px;border-radius:5px;margin-right:7px;vertical-align:middle}
-.ppl-clear{border:0;background:var(--line-2);color:var(--ink-2);font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;padding:2px 9px;border-radius:5px;cursor:pointer;margin-left:7px;transition:background .12s,color .12s;vertical-align:middle}
-.ppl-clear:hover{background:var(--accent);color:#fff}
-.fn-arrow{position:absolute;left:50%;bottom:5px;transform:translateX(-50%);width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:8px solid rgba(255,255,255,.8);filter:drop-shadow(0 1px 1px rgba(0,0,0,.18));z-index:3;pointer-events:none}
-.fn-ghost::after{content:"";position:absolute;inset:0;background-image:repeating-linear-gradient(-45deg,transparent 0 5px,rgba(100,116,139,.16) 5px 6px)}
-.fn-ghost.hot::after{background-image:repeating-linear-gradient(-45deg,transparent 0 5px,rgba(239,68,68,.30) 5px 6px)}
-.fn-tz{position:absolute;inset:0;display:grid;place-items:center;color:#fff;transition:clip-path .55s cubic-bezier(.16,1,.3,1)}
-.fn-num{font-family:"IBM Plex Mono",monospace;font-size:21px;font-weight:800;letter-spacing:-.02em;text-shadow:0 1px 2px rgba(0,0,0,.22)}
-.fn-meta{display:flex;flex-direction:column;justify-content:center;min-height:62px;gap:2px}
-.fn-conv2{font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:700;color:var(--mute)}
-.fn-conv2 b{color:var(--green-700);font-weight:800;font-size:13px}
-.fn-conv2.hot b{color:var(--red-500)}
-[data-theme="dark"] .fn-conv2 b{color:#6ee7b7}
-[data-theme="dark"] .fn-conv2.hot b{color:#fca5a5}
-.fn-leak2{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:600;color:var(--mute-2)}
-.fn-meta-top{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:600;color:var(--mute-2)}
-.fn-flag{display:inline-flex;align-items:center;gap:4px;width:fit-content;margin-top:3px;font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--red-500);background:rgba(239,68,68,.1);padding:2px 7px;border-radius:5px}
-[data-theme="dark"] .fn-flag{color:#fca5a5;background:rgba(239,68,68,.16)}
 
-/* insight bar */
-.insight-bar{display:flex;align-items:center;gap:11px;padding:12px 16px;background:var(--accent-pale);border:1px solid var(--accent-light);border-radius:11px;font-size:12.5px;color:var(--ink-2);line-height:1.5}
-[data-theme="dark"] .insight-bar{background:rgba(55,138,221,0.1);border-color:rgba(181,212,244,0.3)}
-.insight-bar .ib-ico{width:26px;height:26px;border-radius:7px;background:var(--accent);color:#fff;display:grid;place-items:center;flex-shrink:0}
-.insight-bar .ib-ico svg{width:15px;height:15px}
-.insight-bar b{color:var(--accent-deep);font-weight:800}
-[data-theme="dark"] .insight-bar b{color:var(--accent-light)}
-.insight-bar .ib-label{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-deep);margin-right:2px}
-[data-theme="dark"] .insight-bar .ib-label{color:var(--accent-light)}
+/* state banner — loading, empty and failure states */
+.state-banner{display:flex;align-items:center;gap:11px;padding:12px 16px;background:var(--accent-pale);border:1px solid var(--accent-light);border-radius:11px;font-size:12.5px;color:var(--ink-2);line-height:1.5}
+/* the class sets display, so it must also honour the hidden attribute */
+.state-banner[hidden]{display:none}
+[data-theme="dark"] .state-banner{background:rgba(55,138,221,0.1);border-color:rgba(181,212,244,0.3)}
+.state-banner b{color:var(--accent-deep);font-weight:800}
+[data-theme="dark"] .state-banner b{color:var(--accent-light)}
+.state-banner .sb-label{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-deep);margin-right:2px}
+[data-theme="dark"] .state-banner .sb-label{color:var(--accent-light)}
+.state-banner.is-error{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.35)}
+.state-banner.is-error .sb-label,.state-banner.is-error b{color:#b91c1c}
+[data-theme="dark"] .state-banner.is-error .sb-label,[data-theme="dark"] .state-banner.is-error b{color:#fca5a5}
+.state-banner a{color:inherit;font-weight:700}
 
 /* sidebar (canonical) */
 :root{--sb-width:56px}
@@ -375,7 +231,6 @@ button{font-family:inherit}
 </head>
 <body>
 
-<div class="geo-tip" id="coTip" style="position:fixed;z-index:200;display:none;pointer-events:none;background:#050d1a;color:#fff;padding:9px 11px;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.35);min-width:160px"></div>
 
 <div class="frame">
 
@@ -414,8 +269,8 @@ button{font-family:inherit}
 
   <main class="main">
     <div class="topbar">
-      <div class="crumbs"><b>Contracting Officers</b><span class="sep">/</span><span>Relationship CRM</span></div>
-      <span class="live-pill">LIVE</span>
+      <div class="crumbs"><b>Contracting Officers</b><span class="sep">/</span><span>Points of contact</span></div>
+      <span class="live-pill" id="livePill" hidden>LIVE</span>
       <div class="tb-search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
         <span>Search officers, agencies, offices…</span><span class="kbd">⌘K</span>
@@ -433,43 +288,36 @@ button{font-family:inherit}
     <div class="body">
       <header class="page-header">
         <div class="heading">
-          <p class="eyebrow">Relationship Intelligence</p>
+          <p class="eyebrow">Points of contact · SAM.gov</p>
           <h1>Contracting Officers</h1>
-          <p class="sub">Who buys your codes, who answers, and who to warm next — <b>FPDS awardee data + your engagement log</b></p>
+          <p class="sub">Every point of contact SAM published on the notices in your feed — name, office, and what they posted</p>
         </div>
         <div class="hdr-stat">
-          <div class="hs"><span class="v" id="hsTotal">8</span><span class="l">In Network</span></div>
-          <div class="hs"><span class="v warm" id="hsWarm">3</span><span class="l">Warm</span></div>
-          <div class="hs"><span class="v" id="hsRewarm">2</span><span class="l">Re-warm</span></div>
+          <div class="hs"><span class="v" id="hsTotal">—</span><span class="l">Officers</span></div>
+          <div class="hs"><span class="v" id="hsNotices">—</span><span class="l">Notices</span></div>
+          <div class="hs"><span class="v" id="hsAgencies">—</span><span class="l">Agencies</span></div>
         </div>
       </header>
 
       <section class="controls">
         <div class="ctl-line">
           <span class="ctl-label">Agency</span><div class="pillset" id="agencyFilters"></div>
-          <div class="ctl-search vr-right" style="margin-left:auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input id="searchInput" type="text" placeholder="Search officers…" /></div>
-        </div>
-        <div class="seg-row">
-          <span class="ctl-label">Segments</span>
-          <div class="pillset" id="segments"></div>
-          <button class="reset-btn" id="resetBtn" style="margin-left:auto">Reset</button>
+          <div class="ctl-search vr-right" style="margin-left:auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input id="searchInput" type="text" placeholder="Search name, email or office…" /></div>
+          <button class="reset-btn" id="resetBtn" style="margin-left:12px">Reset</button>
         </div>
       </section>
 
-      <section class="kpi-strip" id="kpiStrip"></section>
+      <div class="state-banner" id="stateBanner" hidden></div>
 
-      <div class="insight-bar" id="insightBar"></div>
-
-      <!-- HERO: scatter + CO profile -->
       <section class="row hero">
         <section class="widget">
-          <header class="widget-head">
-            <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><circle cx="8" cy="15" r="1.6"/><circle cx="13" cy="9" r="1.6"/><circle cx="18" cy="6" r="1.6"/></svg></span>
-              <div class="wh-text"><h3>Responsiveness vs Buying Power</h3><p class="wh-sub">Top-right = answers fast &amp; buys big · bubble size = fit · color = relationship</p></div></div>
-            <span class="wh-source">FPDS · CRM</span>
+          <header class="widget-head" style="align-items:center">
+            <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="7" r="3"/><path d="M2 21c0-4 3.5-6 7-6s7 2 7 6"/><circle cx="18" cy="8" r="2.5"/><path d="M22 20c0-2.5-2-4.5-4.5-4.5"/></svg></span>
+              <div class="wh-text"><h3>Officers in your feed</h3><p class="wh-sub plist-count" id="pplCount"></p></div></div>
+            <span class="wh-source" id="pplSource"></span>
           </header>
-          <svg class="scatter-svg" id="scatterSvg"></svg>
-          <div class="scatter-legend" id="scatterLegend"></div>
+          <div class="ppl-head"><span>CO</span><span>Name / Office</span><span>Agency</span><span>NAICS</span><span>Latest notice</span><span>Notices</span></div>
+          <div class="ppl-list" id="pplList"></div>
         </section>
 
         <section class="widget" id="coPanelWidget">
@@ -477,53 +325,10 @@ button{font-family:inherit}
         </section>
       </section>
 
-      <!-- people rail -->
-      <section class="widget">
-        <header class="widget-head" style="align-items:center">
-          <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="7" r="3"/><path d="M2 21c0-4 3.5-6 7-6s7 2 7 6"/><circle cx="18" cy="8" r="2.5"/><path d="M22 20c0-2.5-2-4.5-4.5-4.5"/></svg></span>
-            <div class="wh-text"><h3>Your CO Network</h3><p class="wh-sub plist-count" id="pplCount"></p></div></div>
-          <div class="people-tabs" id="peopleTabs"></div>
-        </header>
-        <div class="ppl-head"><span>CO</span><span>Name / Office</span><span>Reply rate</span><span>Awards</span><span>Last contact</span><span>Fit</span></div>
-        <div class="ppl-list" id="pplList"></div>
-      </section>
-
-      <!-- timeline + portfolio -->
-      <section class="row two">
-        <section class="widget">
-          <header class="widget-head">
-            <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
-              <div class="wh-text"><h3>Engagement Timeline</h3><p class="wh-sub" id="tlSub">Your touchpoint history</p></div></div>
-          </header>
-          <div class="tl-wrap" id="timeline"></div>
-        </section>
-
-        <section class="widget">
-          <header class="widget-head">
-            <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="5" rx="1"/><rect x="13" y="11" width="8" height="10" rx="1"/><rect x="3" y="14" width="8" height="7" rx="1"/></svg></span>
-              <div class="wh-text"><h3>What They Buy · By NAICS</h3><p class="wh-sub" id="schedSub">Obligations in your codes ($M)</p></div></div>
-          </header>
-          <div class="sched-list" id="schedList"></div>
-        </section>
-      </section>
-
-      <!-- outreach funnel -->
-      <section class="row">
-        <section class="widget">
-          <header class="widget-head">
-            <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 4h18l-7 9v6l-4 2v-8z"/></svg></span>
-              <div class="wh-text"><h3>Outreach Funnel</h3><p class="wh-sub">How your engagement converts to awards — across your whole CO network</p></div></div>
-            <span class="wh-source">Last 12 mo</span>
-          </header>
-          <div class="funnel" id="funnel"></div>
-        </section>
-      </section>
-
     </div>
   </main>
 </div>
 
-<script src="/vendor/d3.min.js"></script>
 <script src="dco-data.js"></script>
 <script src="dco-app.js"></script>
 <script src="contracting-officers-live.js"></script>
