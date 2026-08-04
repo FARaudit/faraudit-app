@@ -183,18 +183,21 @@ if (want("blockers")) {
     const byId = new Map(items.map((i) => [i.id, i]));
     const CLOSED = new Set(["done", "closed", "shipped", "complete"]);
     const BLOCKED = new Set(["blocked_chain", "blocked_external"]);
-    // Recorded 2026-08-04 — every one is a REAL stale blocker, not a false positive, and none is auto-fixable:
-    // unblocking is a CEO ruling ("Not silently unblocked by Code", SEQ4-FIRE's own record). Listed so CI is not
-    // red from birth, printed loudly on every run, and meant to be EMPTIED as each is ruled on.
-    //   SEQ4-FIRE            blocker cites FA-640-EFFMAP, closed 2026-07-26 as superseded and gone from the backlog
-    //   SEQ5-ROOTS           blocked_chain with no waiting_on and no blocker_reason; engineering done and armed
-    //   FA-4                 waiting_on FA-64, absent
-    //   FA-12 · FA-13        waiting_on FA-8, absent
-    //   V5-OOS-ELIG-TILE     blocked, nothing recorded
-    //   CLAUDEMD-FULL-AUDIT  blocked, nothing recorded
-    //   BUNDLE-STRIPE        blocked, nothing recorded
-    const KNOWN = new Set(["SEQ4-FIRE", "SEQ5-ROOTS", "CERT-PROVENANCE-RULING", "FA-4", "FA-12", "FA-13",
-                           "V5-OOS-ELIG-TILE", "CLAUDEMD-FULL-AUDIT", "BUNDLE-STRIPE"]);
+    // KNOWN is meant to be EMPTIED, and on 2026-08-04 it went from 9 entries to 2 in a single pass. Six were
+    // cleared on a CEO ruling and are REMOVED here rather than left listed: an id kept in KNOWN after it stops
+    // violating is a silent exemption — the item would be free to regress and this check would stay green.
+    //   CLEARED  V5-OOS-ELIG-TILE     → actionable_now (nothing was ever recorded; ready_state was already `go`)
+    //   CLEARED  CLAUDEMD-FULL-AUDIT  → monitor (ready_state is `monitor`; promoting it would misreport it)
+    //   CLEARED  FA-4                 → monitor (event-driven — a third party accepting a connection)
+    //   CLEARED  FA-12 · FA-13 · BUNDLE-STRIPE → blocker RE-POINTED, still blocked_external. NOT promoted: each
+    //            names a real bank dependency (Mercury funding, card issuance, account state) that was never a
+    //            backlog row. Flipping the money path to actionable would report that a customer can pay.
+    //   CLEARED  CERT-PROVENANCE-RULING — never actually flagged; its status is `today`, not blocked. Listing it
+    //            was defensive clutter, and a KNOWN entry that cannot fire teaches nothing.
+    // The two that remain are the two the CEO reserved to rule on himself.
+    //   SEQ4-FIRE   blocker cites FA-640-EFFMAP, closed 2026-07-26 as superseded and gone from the backlog
+    //   SEQ5-ROOTS  blocked_chain with no waiting_on and no blocker_reason; engineering done and armed
+    const KNOWN = new Set(["SEQ4-FIRE", "SEQ5-ROOTS"]);
     const stale: string[] = [];
     let prose = 0, resolved = 0;
     for (const i of items) {
