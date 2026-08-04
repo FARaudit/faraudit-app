@@ -204,8 +204,7 @@
 
   function renderByType() {
     const counts = {}; D.UPDATES.forEach(u => counts[u.type] = (counts[u.type] || 0) + 1);
-    /* Subtitle counts the rows actually charted below. It was the literal string
-       "14 updates this month", which matched no query and no timeframe. */
+    /* Subtitle counts the rows actually charted below — never a fixed figure. */
     const sub = $('bytSub');
     if (sub) sub.textContent = D.UPDATES.length + (D.UPDATES.length === 1 ? ' update' : ' updates') + ' · click to filter';
     const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]);
