@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
 import { calcRateStats } from "@/lib/calc-rates";
+import { resolveFeedScope } from "@/lib/bd-os/live-opportunities";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -150,5 +151,22 @@ export async function GET(req: NextRequest) {
     return true;
   });
 
-  return NextResponse.json({ rates: merged });
+  // The page needs the customer's own codes to offer them as filters, and it
+  // must be able to tell "nothing matches this filter" from "the reference is
+  // empty". Both travel with the rows rather than being guessed client-side.
+  const scope = await resolveFeedScope(supabase);
+
+  return NextResponse.json({
+    rates: merged,
+    scope: { codes: scope.codes, source: scope.source },
+    meta: {
+      source: "bls-sca-reference",
+      curated: merged.filter((r) => r.curated).length,
+      live_awarded: wageRows.length,
+      naics: naics || null,
+      state: state || null,
+      query: search || null,
+      reason: merged.length === 0 ? (search || naics ? "no-match" : "reference-empty") : null
+    }
+  });
 }

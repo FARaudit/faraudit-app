@@ -1,70 +1,67 @@
 /* FARaudit · Wage Benchmarks — live wiring.
-   Fetches /api/labor-rates (shared route — also serves home/HomeClient.tsx
-   for per-user wage summary). Mutates window.WAGE IN PLACE if response is
-   in WAGES shape, else no-op.
 
-   The route answers with market benchmarks (low/median/high) and carries no
-   per-operator "yours" column, so the no-op path is the live one. */
+   Fetches /api/labor-rates and installs the result on window.WAGE, then
+   renders. A search re-fetches with wage=1 so the request also asks GSA CALC+
+   for awarded rates in that labor category.
+
+   There is no fallback dataset: a failure sets state 'error' and the page says
+   so, because "the rate service did not answer" and "no category matches" are
+   different facts and must not look alike. */
 (function () {
   'use strict';
 
-  function replaceArr(name, next) {
-    if (!Array.isArray(next)) return;
-    const arr = window.WAGE[name];
-    if (!Array.isArray(arr)) { window.WAGE[name] = next.slice(); return; }
-    arr.length = 0;
-    arr.push(...next);
+  function apply(next, query) {
+    window.WAGE.RATES = Array.isArray(next.rates) ? next.rates : [];
+    window.WAGE.SCOPE = next.scope && typeof next.scope === 'object' ? next.scope : { codes: [], source: null };
+    const m = next.meta || {};
+    window.WAGE.meta = {
+      state: window.WAGE.RATES.length > 0 ? 'ready' : 'empty',
+      reason: m.reason || null,
+      curated: m.curated || 0,
+      liveAwarded: m.live_awarded || 0,
+      query: query || null,
+      naics: m.naics || null
+    };
   }
 
-  function replaceObj(name, next) {
-    if (!next || typeof next !== 'object') return;
-    const cur = window.WAGE[name];
-    if (cur && typeof cur === 'object') {
-      for (const k of Object.keys(cur)) delete cur[k];
-      Object.assign(cur, next);
-    } else {
-      window.WAGE[name] = next;
-    }
+  function fail(detail) {
+    window.WAGE.RATES = [];
+    window.WAGE.meta = { state: 'error', reason: 'fetch-failed', detail: detail || null, curated: 0, liveAwarded: 0, query: null, naics: null };
   }
 
-  async function wire() {
+  function paint() {
+    if (window.WAGE_APP && typeof window.WAGE_APP.render === 'function') window.WAGE_APP.render();
+  }
+
+  async function load(opts) {
+    const o = opts || {};
+    const params = new URLSearchParams();
+    if (o.naics) params.set('naics', o.naics);
+    if (o.q) { params.set('q', o.q); params.set('wage', '1'); }
+    const qs = params.toString();
     try {
-      const res = await fetch('/api/labor-rates', { credentials: 'include' });
-      if (!res.ok) throw new Error('labor-rates fetch failed: ' + res.status);
-      const data = await res.json();
-
-      if (data._source === 'unwired-mock-preserved') return;
-      // Legacy benchmark-only shape ({ rates: [...] }) — bail until
-      // fetchWageBenchmarksFull ships with WAGES (incl. user wages).
-      if (!Array.isArray(data.WAGES)) return;
-
-      if (!window.WAGE) return;
-
-      replaceArr('WAGES',     data.WAGES);
-      replaceArr('LOCATIONS', data.LOCATIONS);
-      replaceArr('STATUSES',  data.STATUSES);
-      replaceArr('RENEWALS',  data.RENEWALS);
-      replaceArr('SORTS',     data.SORTS);
-      replaceObj('STATUS_META', data.STATUS_META);
-
-      if (window.WAGE_APP && typeof window.WAGE_APP.render === 'function') {
-        window.WAGE_APP.render();
+      const res = await fetch('/api/labor-rates' + (qs ? '?' + qs : ''), { credentials: 'include' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || !Array.isArray(data.rates)) {
+        fail(res.status === 401 ? 'Session expired' : 'HTTP ' + res.status);
+      } else {
+        apply(data, o.q || null);
       }
     } catch (e) {
-      console.error('[wage-benchmarks-live] wire failed:', e);
+      fail(e && e.message ? e.message : null);
     }
+    paint();
   }
 
+  // The renderer asks for a reload when the filters change: a live GSA lookup
+  // is a server round-trip, not a client-side filter, so it cannot be faked.
+  window.WAGE_LOAD = load;
+
   const obs = new MutationObserver(() => {
-    if (window.WAGE_APP && typeof window.WAGE_APP.onThemeChange === 'function') {
-      window.WAGE_APP.onThemeChange();
-    }
+    if (window.WAGE_APP && typeof window.WAGE_APP.onThemeChange === 'function') window.WAGE_APP.onThemeChange();
   });
   obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', wire);
-  } else {
-    wire();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => load({}));
+  else load({});
 })();
