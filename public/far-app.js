@@ -15,7 +15,11 @@
   const esc = (s) => String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-  const fmtDate = (s) => { const d = new Date(s + 'T00:00:00'); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); };
+  /* Accepts 'YYYY-MM-DD' or a full ISO timestamp. Renders a dash, never 'Invalid Date'. */
+  const fmtDate = (s) => {
+    const d = new Date(String(s == null ? '' : s).slice(0, 10) + 'T00:00:00');
+    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
 
   const S = { type: 'all', impact: 'all', q: '', sort: 'Newest', sel: D.UPDATES.length ? D.UPDATES[0].clause : null };
 
