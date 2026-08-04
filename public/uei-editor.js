@@ -1,26 +1,24 @@
-/* uei-editor.js — the UEI/CAGE identity block on /capability-statement.
+/* uei-editor.js — the CAGE/UEI identity block on /capability-statement.
  *
  * Reads and writes GET/PATCH /api/capability-statement, the same path the NAICS
- * editor uses, so there is a single writer. PATCHing `uei` triggers
- * syncCertifications() server-side, which reads the SAM Entity record and
- * persists the verified programs.
+ * editor uses, so there is a single writer. PATCHing `uei` makes the server
+ * sync certifications from the SAM Entity record.
  *
- * Built with DOM methods, never innerHTML: this file is served verbatim to the
- * browser and every value it renders comes from the network.
+ * Uses DOM methods rather than innerHTML: every value rendered here comes from
+ * the network.
  *
- * Rendering rules:
- *  - a value not on file renders as an explicit "not on file", never as a
- *    plausible-looking placeholder;
- *  - a read that does not succeed says so, and does not imply the profile is blank;
- *  - a write that does not succeed keeps the customer's text and reports that no
- *    save occurred;
- *  - the SERVER ECHO is what is rendered back, never the local string.
+ * Rendering contract:
+ *  - a value absent from the profile renders as "not on file", never as a
+ *    placeholder that could be mistaken for a real registration;
+ *  - a read that does not complete says so, and does not imply an empty profile;
+ *  - a write that does not complete keeps the entered text and states that
+ *    nothing changed;
+ *  - the server echo is rendered back, never the local string.
  */
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
-  // SAM assigns a 12-character alphanumeric UEI. Reject early rather than
-  // letting SAM answer "not found" for what is really a typo.
+  // SAM assigns a 12-character alphanumeric UEI.
   var UEI_RE = /^[A-Z0-9]{12}$/;
 
   function el(tag, cls, txt) {
@@ -81,8 +79,7 @@
       m.style.color = kind === 'err' ? '#fca5a5' : kind === 'ok' ? '#86efac' : '#aebbcf';
     };
 
-    // "not on file" is a FACT about the profile; "could not read" is a fact
-    // about the request. They are never collapsed into the same rendering.
+    // "not on file" and "could not read" are distinct states.
     function paint(st) {
       $('ueCage').textContent = (st && st.cage_code) ? st.cage_code : 'not on file';
       $('ueUei').textContent = (st && st.uei) ? st.uei : 'not on file';
@@ -104,9 +101,7 @@
         return r.json();
       }).then(function (d) {
         paint(d && d.statement);
-        // certSync reports what SAM said. Each state gets its OWN sentence --
-        // "SAM has no record" and "we could not reach SAM" demand opposite
-        // actions from the customer and must never render the same.
+        // Each certSync state gets its own sentence.
         var cs = d && d.certSync, state = cs && cs.state;
         if (state === 'verified') {
           var n = (cs.programs || []).length;
