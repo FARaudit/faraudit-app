@@ -203,8 +203,11 @@
   }
 
   function renderByType() {
-    const f = filtered();
     const counts = {}; D.UPDATES.forEach(u => counts[u.type] = (counts[u.type] || 0) + 1);
+    /* Subtitle counts the rows actually charted below. It was the literal string
+       "14 updates this month", which matched no query and no timeframe. */
+    const sub = $('bytSub');
+    if (sub) sub.textContent = D.UPDATES.length + (D.UPDATES.length === 1 ? ' update' : ' updates') + ' · click to filter';
     const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]);
     // Math.max() of nothing is -Infinity, which makes every bar width NaN.
     const max = rows.length ? Math.max(...rows.map(r => r[1])) : 1;
@@ -224,7 +227,13 @@
       const label = e.days === 0 ? 'effective now' : 'in ' + e.days + ' days';
       const cls = e.tone === 'red' ? 'crit' : e.tone === 'amber' ? 'warn' : 'ok';
       return `<div class="eff-row"><div class="eff-info"><div class="eff-name">${esc(e.name)}</div><div class="eff-clause">${esc(e.clause)}</div></div><span class="eff-count ${cls}">${esc(label)}</span></div>`;
-    }).join('') || (function () { const [t, d] = blankReason();
+    }).join('') || (function () {
+      /* A panel with nothing in ITS OWN slice must not report on the feed. The feed can
+         have returned 40 changes and still have none taking effect ahead of today. */
+      if (D.UPDATES.length && !isDown() && !isPending() && !isPartial()) {
+        return emptyBlock('No upcoming effective dates', 'No change in this view has an effective date still ahead.');
+      }
+      const [t, d] = blankReason();
       return emptyBlock(esc(t), esc(d)); })();
   }
 
