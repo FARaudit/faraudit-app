@@ -172,7 +172,8 @@
       ui_link: o.ui_link || null,
       office_path: o.office_path || null,
       psc: o.psc_code || null,
-      poc: Array.isArray(o.point_of_contact) ? o.point_of_contact : null
+      poc: Array.isArray(o.point_of_contact) ? o.point_of_contact : null,
+      place_of_performance: o.place_of_performance || null
     };
   }
 
