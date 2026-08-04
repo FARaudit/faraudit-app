@@ -115,8 +115,20 @@ const htmlFiles = readdirSync(PUBLIC).filter((f) => f.endsWith(".html"));
    the same source has to drive this one or the two gates can disagree about which
    pages are public.
 
-   "/" is mapped explicitly: middleware lists the ROUTE, and the route serves
-   public/index.html. Extracting only *.html entries silently drops it. */
+   "/" NEEDS NO MAPPING, AND THE ONE IT CARRIED WAS WRONG. This read `"/" -> index.html`,
+   reasoning that middleware lists the route and the route serves public/index.html. It does
+   not: src/app/page.tsx reads public/root-landing.html by name, and root-landing.html is
+   already its own entry in PUBLIC. index.html is AUTH-WALLED — 307 to /sign-in, measured on
+   production — so that line put a GATED page into a set named "pre-auth".
+
+   It passed anyway, which is why it survived: index.html happens to be rail-less, so for the
+   RAIL question the set came out right by coincidence. The reasoning did not, and it
+   travelled — a session handoff generalised it into "the pre-auth page set comes from
+   middleware, map / to index.html". In a gate that grades MARKETING COPY that scores a page
+   no prospect can reach, and it already did once: swept as pre-auth, index.html was the only
+   page "arguing no pillar".
+
+   index.html is exempt from the rail for its own reason, named below. */
 function preAuthPages(): Set<string> {
   const src = readFileSync(path.join(process.cwd(), "src", "middleware.ts"), "utf8");
   const at = src.indexOf("const PUBLIC = [");
@@ -125,12 +137,19 @@ function preAuthPages(): Set<string> {
   const out = new Set<string>();
   for (const m of block.matchAll(/"([^"]+)"/g)) {
     const route = m[1];
-    if (route === "/") out.add("index.html");
-    else if (route.endsWith(".html")) out.add(route.replace(/^\//, ""));
+    if (route.endsWith(".html")) out.add(route.replace(/^\//, ""));
   }
   return out;
 }
-const PRE_AUTH = preAuthPages();
+
+/* Served .html that is neither pre-auth marketing nor a platform page, so the rail does not
+   belong on it. index.html is the internal tab index: auth-walled, linked from no nav, part
+   of no customer path. Kept as its own named set rather than folded into the pre-auth one,
+   because the two are exempt for OPPOSITE reasons — one is public and carries no rail by
+   design, the other carries none because it is not the product. Folding them together is
+   what let a gated page be called public in the first place. */
+const GATED_RAIL_LESS = new Set(["index.html"]);
+const PRE_AUTH = new Set([...preAuthPages(), ...GATED_RAIL_LESS]);
 
 const carriesRail = (f: string) => readHtml(f).includes("sb-group-label");
 const railFiles = htmlFiles.filter(carriesRail);
