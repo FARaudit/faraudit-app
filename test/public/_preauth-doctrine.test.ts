@@ -181,10 +181,23 @@ const linkedSheets = (p: string) =>
     .map((m) => m[1].replace(/^\//, ""))
     .filter((f) => existsSync(path.join(PUBLIC_DIR, f)));
 
-console.log("\nD2 · the brand palette is a real share of the page, not a token presence");
+// HOW THIS REPORTS ITSELF, corrected on Design's reading of the first output. The number that
+// carries evidence is the PRESENCE one — zero of six brand hexes anywhere in a file is a fact.
+// The ratio is a share over a denominator nobody declared (how many colour declarations the page
+// happens to contain), so it ranks nothing: a page at 28.6% is NOT twice as on-brand as one at
+// 14.0%, and neither is shown healthy by its column. Design's caution, verbatim in substance:
+// "printing a ratio invites exactly that reading, and 14% would be an alarming number if the
+// denominator meant what it looks like it means."
+//
+// So the presence counts lead, and the ratio is labelled as the detector figure it is. The pass
+// condition is unchanged — only what the line claims about itself.
+const paletteDetail = (brand: number, off: number, share: number) =>
+  `brand hexes present: ${brand} · off-brand: ${off} · detector ratio ${(share * 100).toFixed(1)}% (not a brand-health score)`;
+
+console.log("\nD2 · the brand palette is present on the page, not absent from it");
 for (const p of PAGES) {
   const { brand, off, share } = brandShare(ownCss(p));
-  const pct = `${(share * 100).toFixed(1)}% (${brand} brand / ${off} off-brand)`;
+  const pct = paletteDetail(brand, off, share);
   if (DESIGN_EXEMPT.has(p)) { console.log(`  ⏭ SKIP ${p} — design-lane exemption (${pct})`); continue; }
   if (brand + off < MIN_OWN_DECLS) {
     // A NAMED skip, never a pass: this page declares too little colour of its own
@@ -192,7 +205,7 @@ for (const p of PAGES) {
     console.log(`  ⏭ SKIP ${p} — ${brand + off} own colour declaration(s), palette comes from ${linkedSheets(p).join(", ") || "(none)"}`);
     continue;
   }
-  ok(share >= BRAND_SHARE_FLOOR, `${p} is inside the brand system`, pct);
+  ok(share >= BRAND_SHARE_FLOOR, `${p} uses the brand palette`, pct);
 }
 
 console.log("\nD2a · every shared stylesheet is itself inside the brand system");
@@ -204,8 +217,7 @@ console.log("\nD2a · every shared stylesheet is itself inside the brand system"
   console.log(`  (${sheets.length} shared sheet(s): ${sheets.join(", ") || "none linked"})`);
   for (const s of sheets) {
     const { brand, off, share } = brandShare(readFileSync(path.join(PUBLIC_DIR, s), "utf8"));
-    ok(share >= BRAND_SHARE_FLOOR, `${s} is inside the brand system`,
-      `${(share * 100).toFixed(1)}% (${brand} brand / ${off} off-brand)`);
+    ok(share >= BRAND_SHARE_FLOOR, `${s} uses the brand palette`, paletteDetail(brand, off, share));
   }
 }
 
