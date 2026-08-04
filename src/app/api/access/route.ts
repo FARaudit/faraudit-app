@@ -13,19 +13,20 @@ export const dynamic = "force-dynamic";
 // src/app/api/feedback/route.ts.
 
 interface AccessRequest {
-  firstName?: string;
-  lastName?: string;
+  name?: string;
   email?: string;
   company?: string;
   role?: string;
   naics?: string;
-  solicitations?: string;
-  revenue?: string;
+  context?: string;
 }
 
-const REQUIRED: Array<keyof AccessRequest> = [
-  "firstName", "lastName", "email", "company", "role", "naics", "solicitations", "revenue"
-];
+// Exactly the fields public/access.html marks `required`. The previous list
+// demanded firstName/lastName/solicitations/revenue, which that form has never
+// collected — so every well-formed submission would have 400'd on arrival had
+// anything ever reached here. NAICS and context are optional on the form and are
+// optional here; a contract that is stricter than its own form rejects real users.
+const REQUIRED: Array<keyof AccessRequest> = ["name", "email", "company", "role"];
 
 const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -55,37 +56,35 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Email delivery offline (RESEND_API_KEY not configured)." }, { status: 503 });
   }
 
-  const firstName = String(body.firstName).trim();
-  const lastName = String(body.lastName).trim();
+  const name = String(body.name).trim();
   const company = String(body.company).trim();
   const role = String(body.role).trim();
-  const naics = String(body.naics).trim();
-  const solicitations = String(body.solicitations).trim();
-  const revenue = String(body.revenue).trim();
+  const naics = body.naics ? String(body.naics).trim() : "(not given)";
+  const context = body.context ? String(body.context).trim() : "(not given)";
 
-  const subject = `Access Request · ${company} · ${firstName} ${lastName}`;
+  const subject = `Access Request · ${company} · ${name}`;
   const text = `New Access Request — FARaudit Design Partner Program
 
-Name:           ${firstName} ${lastName}
-Email:          ${email}
-Company:        ${company}
-Role:           ${role}
-NAICS:          ${naics}
-Solicitations:  ${solicitations}
-Revenue:        ${revenue}
+Name:     ${name}
+Email:    ${email}
+Company:  ${company}
+Role:     ${role}
+NAICS:    ${naics}
+
+Where their pipeline loses deals:
+${context}
 
 Submitted: ${new Date().toISOString()}
 Source: public/access.html`;
 
   const html = `<div style="font-family:'JetBrains Mono',monospace;background:#03080f;color:#c8dff2;padding:24px;max-width:560px;line-height:1.7;font-size:13px">
     <div style="font-size:11px;color:#378ADD;letter-spacing:.18em;text-transform:uppercase;margin-bottom:12px">New Access Request</div>
-    <div style="font-size:18px;color:#fff;font-weight:600;margin-bottom:20px">${esc(firstName)} ${esc(lastName)} · ${esc(company)}</div>
+    <div style="font-size:18px;color:#fff;font-weight:600;margin-bottom:20px">${esc(name)} · ${esc(company)}</div>
     <table style="border-collapse:collapse;width:100%">
       <tr><td style="padding:4px 0;color:#5a7fa0;width:140px">Email</td><td style="color:#fff"><a href="mailto:${esc(email)}" style="color:#378ADD">${esc(email)}</a></td></tr>
       <tr><td style="padding:4px 0;color:#5a7fa0">Role</td><td style="color:#fff">${esc(role)}</td></tr>
       <tr><td style="padding:4px 0;color:#5a7fa0">NAICS</td><td style="color:#fff">${esc(naics)}</td></tr>
-      <tr><td style="padding:4px 0;color:#5a7fa0">Revenue band</td><td style="color:#fff">${esc(revenue)}</td></tr>
-      <tr><td style="padding:4px 0;color:#5a7fa0;vertical-align:top">Solicitations</td><td style="color:#fff;white-space:pre-wrap">${esc(solicitations)}</td></tr>
+      <tr><td style="padding:4px 0;color:#5a7fa0;vertical-align:top">Loses deals on</td><td style="color:#fff;white-space:pre-wrap">${esc(context)}</td></tr>
     </table>
     <div style="font-size:11px;color:#243a52;margin-top:24px">Source: public/access.html · ${new Date().toISOString()}</div>
   </div>`;

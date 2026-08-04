@@ -394,7 +394,6 @@ button{font-family:inherit}
   <div class="sb-divider"></div>
   <div class="sb-group-label">INTELLIGENCE</div>
   <a class="sb-icon" href="/opportunities"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">Opportunities</span><span class="sb-badge live">Live</span><span class="sb-tip">Opportunities</span></a>
-  <a class="sb-icon" href="/watching"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg><span class="sb-label">Watching</span><span class="sb-badge count" data-sb-watching-count style="display:none"></span><span class="sb-tip">Watching</span></a>
   <a class="sb-icon active" href="/defense-news"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L4 8v8l8 5 8-5V8l-8-5z"/></svg><span class="sb-label">Defense News</span><span class="sb-tip">Defense News</span></a>
   <a class="sb-icon" href="/defense-spending"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="13" width="3" height="4"/></svg><span class="sb-label">Defense Spending</span><span class="sb-tip">Defense Spending</span></a>
   <a class="sb-icon" href="/agencies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg><span class="sb-label">Defense Agencies</span><span class="sb-badge count">8</span><span class="sb-tip">Defense Agencies</span></a>
@@ -538,7 +537,7 @@ function relativeTime(dateStr){
 }
 
 function insightForCat(cat){
-  if (cat === 'CMMC') return 'Phase 2 enforcement Nov 10 2026 — verify your SPRS score is current.';
+  if (cat === 'CMMC') return 'Verify your SPRS score is current before bidding on any CUI contract.';
   if (cat === 'CONTRACTS') return 'Monitor SAM.gov for sub-tier notices in NAICS 336413/332710/332721.';
   if (cat === 'NDAA') return 'Review proposal templates for clauses affected by FY2026 NDAA provisions.';
   if (cat === 'REGULATORY') return 'Check solicitations for updated FAR/DFARS clause language before submitting.';
@@ -637,13 +636,7 @@ function renderGrid(){
 
 /* ─── Sidebar (CMMC countdown, recent awards, sources) ─── */
 function renderSidebar(){
-  var target = new Date('2026-11-10T00:00:00Z');
-  var now = new Date();
-  var days = Math.max(0, Math.ceil((target - now) / 86400000));
-  var pct = Math.min(100, ((365 - days) / 365) * 100);
-  // Award records require a live source. None is wired to this panel, so it
-  // states that rather than listing awards nobody looked up.
-  var AWARDS = [];
+var AWARDS = [];
   // The four feeds /api/defense-news actually requests. Listing a source we do
   // not read would claim coverage we do not have.
   var SOURCES = [
@@ -655,21 +648,7 @@ function renderSidebar(){
   var el = document.getElementById('dn-sidebar-col');
   if (!el) return;
   el.innerHTML =
-      '<div class="dn-sw" style="border-top:3px solid #991b1b">'
-    +   '<div class="dn-sw-title">CMMC PHASE 2</div>'
-    +   '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">'
-    +     '<div style="font-size:42px;font-weight:800;color:#991b1b;font-family:\'IBM Plex Mono\',monospace;line-height:1">' + days + '</div>'
-    +     '<div>'
-    +       '<div style="font-size:11px;color:var(--mute)">days remaining</div>'
-    +       '<div style="font-size:11px;font-weight:700;color:var(--ink)">Nov 10, 2026</div>'
-    +     '</div>'
-    +   '</div>'
-    +   '<div style="height:4px;background:#fee2e2;border-radius:2px;margin-bottom:8px">'
-    +     '<div style="height:100%;width:' + pct + '%;background:#991b1b;border-radius:2px"></div>'
-    +   '</div>'
-    +   '<div style="font-size:10px;color:#991b1b;font-weight:600">&lt;1,100 of 76,000 contractors certified</div>'
-    + '</div>'
-    + '<div class="dn-sw">'
+      '<div class="dn-sw">'
     +   '<div class="dn-sw-title">RECENT AWARDS · YOUR NAICS</div>'
     +   (AWARDS.length ? '' : '<div style="font-size:11px;color:var(--mute);padding:6px 0">Award feed unavailable — no live award source is connected.</div>')
     +   AWARDS.map(function(a){

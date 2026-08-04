@@ -102,7 +102,7 @@ function SignInForm() {
               </svg>
             </div>
           </div>
-          <div className="bp-foot mono">SAM.gov synced 2m ago</div>
+          <div className="bp-foot mono">Federal Contract Intelligence</div>
         </aside>
 
         {/* ── RIGHT FORM PANEL ── */}

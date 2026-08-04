@@ -356,10 +356,12 @@ function renderCertBanner(host){
     btn.type = 'button';
     btn.id = 'addUeiBtn';
     btn.textContent = c.btn;
-    // The UEI field lives in the capability statement, which the hash routing on
-    // /home opens directly. The in-page editor below handles NAICS codes only, so
-    // sending them there would be sending them to a form without the field.
-    btn.onclick = ()=>{ window.location.href = '/home#capability'; };
+    // The UEI field lives on the capability statement. This pointed at
+    // /home#capability until 2026-08-03 -- the LEGACY SPA, which is not part of
+    // this platform and is now deleted; the real page had no UEI input at all,
+    // which is why the button had to leave. uei-editor.js supplies that field,
+    // so this stays inside the platform.
+    btn.onclick = ()=>{ window.location.href = '/capability-statement'; };
     host.appendChild(btn);
   }
 }
@@ -610,7 +612,10 @@ function wireActions() {
     // would DELETE that history, so the toggle is refused, not offered.
     if (status && status !== 'watching') {
       b.className = 'btn-2 on locked'; b.disabled = true; b.textContent = 'Tracking';
-      b.title = 'Watch has advanced (' + status + ') — manage it on the Watching page';
+      // Said "manage it on the Watching page" until 2026-08-03. /watching was a
+      // redirect into the legacy SPA and is deleted; there is no Watching page on
+      // this platform, so the tooltip states the reason instead of pointing nowhere.
+      b.title = 'Watch has advanced (' + status + ') — it is linked to an audit, so it can no longer be untracked here';
       return;
     }
     b.className = 'btn-2' + (status ? ' on' : '');
