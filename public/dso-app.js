@@ -529,6 +529,20 @@ function fmtAbs(v, withTime) {
   if (!withTime) return date;
   return date + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
+/* The buying-office LEAF from SAM's dotted fullParentPathName. The parent
+   segments are the department and command, which pc-buyer already prints, so
+   only the final segment is new information. Returns null when absent, when the
+   leaf is empty, or when it repeats what pc-buyer shows for this row. */
+function officeLeaf(path, o) {
+  if (!path) return null;
+  const segs = String(path).split('.').map((s) => s.trim()).filter(Boolean);
+  if (!segs.length) return null;
+  const leaf = segs[segs.length - 1].replace(/\s+/g, ' ');
+  if (!leaf) return null;
+  const shown = o ? [officeName(o.office), deptName(o.agency)] : [];
+  if (shown.some((s) => s && s.toUpperCase() === leaf.toUpperCase())) return null;
+  return leaf;
+}
 function datesLine(o) {
   const parts = [];
   const close = fmtAbs(o.response_deadline, true);
@@ -543,7 +557,8 @@ function datesLine(o) {
       ? esc(String(rl.length)) + (rl.length === 1 ? ' attachment' : ' attachments')
       : 'none posted') + '</span>');
   }
-  if (o.office_path) parts.push('<span class="pc-dt"><b>Office</b> ' + esc(o.office_path) + '</span>');
+  const leaf = officeLeaf(o.office_path, o);
+  if (leaf) parts.push('<span class="pc-dt"><b>Office</b> ' + esc(leaf) + '</span>');
   if (o.ui_link) {
     parts.push('<a class="pc-dt pc-link" href="' + esc(o.ui_link) +
       '" target="_blank" rel="noopener noreferrer"><b>SAM.gov</b> view notice ↗</a>');
