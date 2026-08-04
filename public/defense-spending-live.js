@@ -28,13 +28,23 @@
   async function wire() {
     try {
       const res = await fetch('/api/defense-spending', { credentials: 'include' });
-      if (!res.ok) throw new Error('defense-spending fetch failed: ' + res.status);
+      if (!res.ok) {
+        if (window.DSB) window.DSB.STATUS = { state: 'unwired', reason: 'Spending data could not be loaded (HTTP ' + res.status + ').' };
+        if (window.DSB_APP && typeof window.DSB_APP.render === 'function') window.DSB_APP.render();
+        return;
+      }
       const data = await res.json();
 
-      // Architecture stub — server hasn't shipped real data yet.
-      if (data._source === 'unwired-mock-preserved') return;
-
       if (!window.DSB) return;
+
+      // No live source yet. Record the state so the page states it, rather than
+      // returning and leaving whatever was already on screen.
+      if (data.state === 'unwired') {
+        window.DSB.STATUS = { state: 'unwired', reason: data.reason || '' };
+        if (window.DSB_APP && typeof window.DSB_APP.render === 'function') window.DSB_APP.render();
+        return;
+      }
+      window.DSB.STATUS = { state: 'ok', reason: '' };
 
       if (Array.isArray(data.FYS))            replaceArr('FYS', data.FYS);
       if (Array.isArray(data.AGENCY_FILTERS)) replaceArr('AGENCY_FILTERS', data.AGENCY_FILTERS);
@@ -56,6 +66,8 @@
       }
     } catch (e) {
       console.error('[defense-spending-live] wire failed:', e);
+      if (window.DSB) window.DSB.STATUS = { state: 'unwired', reason: 'Spending data could not be loaded.' };
+      if (window.DSB_APP && typeof window.DSB_APP.render === 'function') window.DSB_APP.render();
     }
   }
 

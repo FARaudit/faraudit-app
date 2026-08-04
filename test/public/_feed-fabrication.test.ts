@@ -179,6 +179,50 @@ for (const file of ["far-dfars-updates-live.js", "defense-news-live.js"] as cons
   check(`${file} · catch surfaces failure to the page`, /renderUnavailable/.test(catchBody), "catch only logs to console");
 }
 
+// ── Part E · dsb-data.js carries no invented defense-spending records ────────────
+// The most damaging of the three, because it makes claims about IDENTIFIABLE THIRD
+// PARTIES: "Raytheon Intel & Space · NAVSEA · $54.2M · May 26", "General Dynamics
+// Land · TACOM · $87.5M", "F-35 GSE Support IDIQ · incumbent DRS Technologies ·
+// $500M". Real defense contractors, invented award values, agencies and dates,
+// under a green LIVE pill citing "FY2026 · FPDS-NG + USAspending.gov". The route
+// serving it says "Template-only with mock data for design review" and it sits
+// behind the auth gate on a permanent nav item.
+console.log("\n── Part E · dsb-data.js holds no invented spending records ──");
+const dsb = read("dsb-data.js");
+
+const DSB_TEMPLATES = new Set(["AGENCY_FILTERS", "RANK_TABS", "FY_TABS"]);
+console.log(`   exempt as render templates: ${[...DSB_TEMPLATES].join(", ")}`);
+
+const dsbArrays = [...dsb.matchAll(/(?:^|\n)\s*(?:const|var)\s+([A-Z_][A-Z0-9_]*)\s*=\s*\[/g)].map((m) => m[1]);
+check("dsb-data.js · array declarations are readable", dsbArrays.length > 0, "found none");
+for (const name of dsbArrays) {
+  if (DSB_TEMPLATES.has(name)) continue;
+  check(
+    `dsb-data.js · ${name} holds no record literals`,
+    arrayIsEmpty(dsb, name),
+    "still contains object literals — invented business data",
+  );
+}
+
+// A named company beside a dollar figure is the specific harm. These are the exact
+// third parties the file shipped; none of them was sourced from anything.
+for (const co of ["Raytheon", "General Dynamics", "Ducommun", "DRS Technologies", "Vertex Aerospace", "Aviall"]) {
+  check(`dsb-data.js · no invented award attributed to "${co}"`, !dsb.includes(co), "named third party present");
+}
+
+// The page must not assert a live federal data source it never queries.
+const dsbHtml = read("defense-spending.html");
+check(
+  "defense-spending.html · no LIVE pill over unwired data",
+  !/class="live-pill"[^>]*>\s*LIVE/i.test(dsbHtml),
+  "a LIVE pill is asserted",
+);
+check(
+  "defense-spending.html · does not cite FPDS-NG / USAspending as its source",
+  !/FPDS-NG|USAspending/i.test(dsbHtml),
+  "cites a federal source the route never queries",
+);
+
 // ── Part D · planted positives: prove every checker can fail ─────────────────────
 console.log("\n── Part D · planted positives (each probe must catch a known bad) ──");
 const PLANTED_ARR = `const UPDATES = [ { clause: '252.204-7021', diff: { before: 'x', after: 'y' }, affects: 7 } ];`;
