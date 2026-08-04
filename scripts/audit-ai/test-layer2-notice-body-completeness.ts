@@ -83,8 +83,19 @@ eq("Sources Sought + stray commercial, no form → [] (exempt)",
   coreMissingFor(ctx(SOW_STRAY_COMMERCIAL, { C: SOW_STRAY_COMMERCIAL }), { requiresLM: false, formIdentified: false }),
   []);
 // Flag ON path still caps when both absent (unchanged Brain card-135 behavior).
-eq("commercial flag ON, both 52.212 absent → [52.212-1,52.212-2] (unchanged)",
-  coreMissingFor(ctx(SOW_STRAY_COMMERCIAL, { C: SOW_STRAY_COMMERCIAL }), { commercialHonestFail: true }),
+// RE-BASELINED 2026-08-04 — the old assertion here was "commercial flag ON, both 52.212 absent → cap", called
+// "(unchanged)". It is not unchanged: AUDIT_COMMERCIAL_CLAUSE_APPLICABILITY (deep-research 2026-07-08 against
+// primary FAR text, acquisition.gov/far/12.301 + 52.252-1) ruled that on a GENUINE commercial buy 52.212-1 is
+// incorporated BY REFERENCE via SF-1449/SF-18 Block 27a — its full text is EXPECTED absent from the body — and
+// 52.212-2 is discretionary ("the CO may insert"). Absence-in-body is therefore not a completeness defect, and
+// that flag is live-armed in production. What still caps is the card-262 IMPOSTOR class: a SOW-only source that
+// classifies commercial off a stray string with NO recognized primary form. Both are asserted below, so the
+// distinction the ruling drew is pinned rather than deleted.
+eq("genuine commercial (form identified), both 52.212 absent → [] (FAR 12.301: incorporated by reference)",
+  coreMissingFor(ctx(SOW_STRAY_COMMERCIAL, { C: SOW_STRAY_COMMERCIAL }), { commercialHonestFail: true, requiresLM: true, formIdentified: true }),
+  []);
+eq("IMPOSTOR commercial (no form), both 52.212 absent → [52.212-1,52.212-2] (cap survives the applicability fix)",
+  coreMissingFor(ctx(SOW_STRAY_COMMERCIAL, { C: SOW_STRAY_COMMERCIAL }), { commercialHonestFail: true, requiresLM: true, formIdentified: false }),
   ["52.212-1", "52.212-2"]);
 
 console.log(`\n${fail === 0 ? "✅" : "❌"} Layer-2 completeness: ${pass} passed, ${fail} failed`);

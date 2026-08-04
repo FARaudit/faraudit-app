@@ -71,9 +71,21 @@ eq("ii-bv best-overall-value §M → covered (flag ON)", coveredHas(completeness
 // (ii-weighted) THE REFINE TARGET: populated weighted/adjectival §M, NO token, NOT thin → NOT flagged.
 eq("ii-weighted populated non-token §M → NOT flagged (false-negative closed)", coveredHas(completenessOf(M_WEIGHTED, ["M"], [], new Set(["M"]), ON), "M"), true);
 
-// (ii-direct) a §M with a DIRECT grounded finding but no token in the heading text → covered (real evidence wins).
+// (ii-direct) RE-BASELINED 2026-08-04, and the old expectation was the hole its own sibling forbids. It asserted
+//   that a direct grounded §M finding OVERRIDES the depth check — but the finding it used grounds the stub's own
+//   "Details will be provided separately", which is the literal absence of evaluation criteria. Honouring it would
+//   have re-opened exactly the false-COMPLETE that case (ii) four lines above exists to close: a §M heading with no
+//   criteria, credited as covered because something cited §M. The depth check is now unconditional for §M
+//   (audit-orchestrator.ts:2195 → "evaluation criteria not found / not evaluated"), so a citation cannot launder a
+//   criteria-less section. Asserted in BOTH directions so "real evidence wins" is still pinned where there IS
+//   evidence to win with.
 const mFinding = [{ requirement: "eval basis", citation: "§M", excerpt: "Details will be provided separately", grounded: true, lens: "x", kind: "other" as const, controllability: "bidder_controls" as const, id: "m#0" }];
-eq("ii-direct §M with a direct grounded finding → covered (not overridden by the token check)", coveredHas(completenessOf(M_STUB, ["M"], mFinding, new Set(["M"]), ON), "M"), true);
+const stubWithFinding = completenessOf(M_STUB, ["M"], mFinding, new Set(["M"]), ON);
+eq("ii-direct eval-less §M + a finding citing its non-criteria sentence → STILL not covered", coveredHas(stubWithFinding, "M"), false);
+eq("ii-direct the depth reason is what surfaces (not a coverage claim)", /evaluation criteria not found/.test(JSON.stringify(stubWithFinding.attestations)), true);
+// the other direction — a §M carrying REAL evaluation prose is covered, so the depth check has not become a blanket veto.
+const lptaFinding = [{ requirement: "eval basis", citation: "§M", excerpt: "Award will be made on a lowest-priced technically acceptable basis", grounded: true, lens: "x", kind: "other" as const, controllability: "bidder_controls" as const, id: "m#1" }];
+eq("ii-direct real-criteria §M + a direct grounded finding → covered (evidence still wins)", coveredHas(completenessOf(M_LPTA, ["M"], lptaFinding, new Set(["M"]), ON), "M"), true);
 
 // (iii) SCOPE DISCIPLINE: §L is identical with/without the flag (the §M check only fires for sec==="M").
 eq("iii §L identical with/without flag", JSON.stringify(completenessOf(L_OBLIG, ["L"], [], new Set(["L"]))), JSON.stringify(completenessOf(L_OBLIG, ["L"], [], new Set(["L"]), ON)));
