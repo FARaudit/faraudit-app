@@ -356,11 +356,9 @@ function renderCertBanner(host){
     btn.type = 'button';
     btn.id = 'addUeiBtn';
     btn.textContent = c.btn;
-    // The UEI field lives on the capability statement. This pointed at
-    // /home#capability until 2026-08-03 -- the LEGACY SPA, which is not part of
-    // this platform and is now deleted; the real page had no UEI input at all,
-    // which is why the button had to leave. uei-editor.js supplies that field,
-    // so this stays inside the platform.
+    // The UEI field lives on the capability statement, supplied by uei-editor.js.
+    // That page is the only surface carrying the input, so it is the only correct
+    // destination for this control.
     btn.onclick = ()=>{ window.location.href = '/capability-statement'; };
     host.appendChild(btn);
   }
@@ -635,9 +633,8 @@ function wireActions() {
     // would DELETE that history, so the toggle is refused, not offered.
     if (status && status !== 'watching') {
       b.className = 'btn-2 on locked'; b.disabled = true; b.textContent = 'Tracking';
-      // Said "manage it on the Watching page" until 2026-08-03. /watching was a
-      // redirect into the legacy SPA and is deleted; there is no Watching page on
-      // this platform, so the tooltip states the reason instead of pointing nowhere.
+      // The tooltip states the reason rather than naming a page to go to: there is
+      // no separate watch-management surface, so a pointer would lead nowhere.
       b.title = 'Watch has advanced (' + status + ') — it is linked to an audit, so it can no longer be untracked here';
       return;
     }

@@ -16,10 +16,10 @@ window.DSO = (function () {
   const OPPS = [];   // live rows only — populated by opportunities-live.js
   const NAICS = [];  // live-derived — distinct codes in the current feed
 
-  // Stage vocabulary. 'notice' (Special Notice — industry day, amendment
-  // announcement, intent-to-sole-source, cancellation) and 'UNKNOWN' were added
-  // 2026-07-29 so the classifier can fail CLOSED instead of asserting "Open RFP"
-  // on notices it did not recognise. Every pole normStage() can return MUST have
+  // Stage vocabulary. 'notice' covers Special Notice — industry day, amendment
+  // announcement, intent-to-sole-source, cancellation — and 'UNKNOWN' lets the
+  // classifier fail CLOSED rather than assert "Open RFP" on a notice it does not
+  // recognise. Every pole normStage() can return MUST have
   // a STAGE_META entry — the render layer indexes it directly, so a missing pole
   // is a blank chip, and the coverage test asserts this.
   const STAGES = [
@@ -38,10 +38,9 @@ window.DSO = (function () {
     eval:    { label: 'In Evaluation',     color: '#7c3aed' },
     UNKNOWN: { label: 'Type not recognised', color: '#64748b' }
   };
-  // Set-aside filters. SoleSource / WOSB / EDWOSB / SB-Partial / UNKNOWN were
-  // added 2026-07-29: the old six-value list collapsed SAM's real enumeration
-  // into two poles, which is how an inverted 83-row group and a sole-source
-  // notice hid inside a "correct" count.
+  // Set-aside filters. The list mirrors SAM's own enumeration one-for-one:
+  // collapsing distinct set-aside types into a shared pole lets a mis-grouped row
+  // hide inside a count that still looks correct.
   const SETASIDES = ['all', 'SB', 'SB-Partial', 'SDVOSB', '8(a)', 'HUBZone', 'WOSB', 'EDWOSB', 'SoleSource', 'Full', 'UNKNOWN'];
 
   const SAVED_VIEWS = [

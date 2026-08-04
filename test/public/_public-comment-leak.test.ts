@@ -89,7 +89,28 @@ const PROSE_CEILING = 200; // chars of payload; a divider label never approaches
 // flagged four "CARD 1: Critical P0 Flags" layout labels in home.html. A UI card label is not an
 // internal card reference, and a gate that cries wolf on real markup gets switched off.
 const INTERNAL_MARKER =
-  /Brain ruling|CEO ruling|card #\d|ARC #\d|\bRule \d+\b|Gauntlet|flag-OFF|AUDIT_[A-Z0-9_]{3,}|\bTODO\b|\bFIXME\b|\bHACK\b|Design polishes|_render\.ts|view-model|RETIRED engine|unverifiable|red-team/i;
+  /\b(?:CEO|Brain)\b|card #\d|ARC #\d|\bRule \d+\b|Gauntlet|flag-OFF|AUDIT_[A-Z0-9_]{3,}|\bTODO\b|\bFIXME\b|\bHACK\b|Design polishes|_render\.ts|view-model|RETIRED engine|unverifiable|red-team/i;
+
+// ── THE THIRD SHAPE: A COMMENT THAT DATES ITSELF ──────────────────────────────────────────────────
+// The confession net requires a prior-state word AND a fault word, and change history routinely
+// carries neither. Four served comments walked through it untouched, including two on the MARKETING
+// pages: "The pulsing green status dot … are deliberately gone (CEO 2026-07-27). They asserted a
+// currency the page never had: every call this feed made was blocked by our own CSP" — a public
+// admission that the panel never worked, on the front door, in a comment the gate called clean.
+//
+// SHAPE, not more vocabulary. Widening SUPERSEDED/DEFECT word by word is the reconstruction treadmill:
+// "inverted" evades a rule written for "inversion", "never had" evades one written for "never did".
+// What every one of those comments carries instead is a CALENDAR DATE — because documentation
+// describes what the code does, and only change history needs to say WHEN. A date is the tell, and it
+// is a shape a paraphrase cannot slip.
+//
+// MEASURED before committing, against the real tree: 913 comments swept, the date rule fires 11 times,
+// and all 11 are things that should never have shipped — two marketing-page admissions, four change
+// logs pointing at deleted routes, and five disclosing internal feed measurements or defect RATES
+// ("83 rows (42%) told a small business that an unrestricted competition was reserved for them").
+// Zero legitimate documentation was condemned. A date-stamped VERSION on a divider is caught too, and
+// that is correct: a version stamp is change tracking, and git already holds it.
+const DATED_CHANGE = /\b(?:19|20)\d{2}-\d{2}-\d{2}\b/;
 
 // The .js primary rule: what does this comment point AT. Each alternative is a REFERENCE pattern, not
 // a topic word, so it stays a shape rule rather than a list of things one author thought of.
@@ -125,6 +146,11 @@ const INTERNAL_REF = new RegExp([
   String.raw`\b(?:card|arc|wire-?map|ruling|spec|phase)s?\b[\s#:-]{0,3}\d+`,
   String.raw`\bQ\d+\s+spec\b`,
   String.raw`\b(?:CEO|Brain|Design|Code)\s+ruling\b`,
+  // The bare role, with no noun after it. "(CEO 2026-07-27)" attributes a decision to an internal
+  // authority just as plainly as "CEO ruling" and evaded the line above for want of one word.
+  // Measured: fires 3 times in 913 served comments, all three on marketing pages, none legitimate.
+  // Only CEO and Brain — "Design" and "Code" are ordinary English a served comment may need.
+  String.raw`\b(?:CEO|Brain)\b`,
   String.raw`\bscratchpad\b`,
   String.raw`\bFork\s+[A-Z]\b`,
   String.raw`\bTODO\b`, String.raw`\bFIXME\b`, String.raw`\bHACK\b`,
@@ -138,6 +164,7 @@ function findLeaks(src: string, kind: "html" | "js" = "html"): { payload: string
     const payload = prosePayload(raw);
     if (payload.length > PROSE_CEILING) leaks.push({ payload, why: `prose ${payload.length}c > ${PROSE_CEILING}` });
     else if (INTERNAL_MARKER.test(payload)) leaks.push({ payload, why: `internal marker: ${payload.match(INTERNAL_MARKER)![0]}` });
+    else if (DATED_CHANGE.test(payload)) leaks.push({ payload, why: `dated change: ${payload.match(DATED_CHANGE)![0]}` });
   };
   // No prose ceiling here — see the SCOPE WIDENED note. A long module header is documentation; an
   // internal reference of any length is a leak.
@@ -146,6 +173,8 @@ function findLeaks(src: string, kind: "html" | "js" = "html"): { payload: string
     if (!payload) return;
     const ref = payload.match(INTERNAL_REF);
     if (ref) { leaks.push({ payload, why: `internal reference: ${ref[0]}` }); return; }
+    const dated = payload.match(DATED_CHANGE);
+    if (dated) { leaks.push({ payload, why: `dated change: ${dated[0]}` }); return; }
     const sup = payload.match(SUPERSEDED), def = payload.match(DEFECT);
     if (sup && def) leaks.push({ payload, why: `confession: "${sup[0]}" + "${def[0]}"` });
   };
@@ -248,6 +277,37 @@ function findLeaks(src: string, kind: "html" | "js" = "html"): { payload: string
   for (const [src, label] of confessions) {
     assert(findLeaks(src, "js").length === 1, `KNOWN-POSITIVE(js/confession): ${label}`);
   }
+  // The dated-change net and the bare-role net, both directions. These are the two shapes that let
+  // four real comments — two of them on the marketing pages — walk through the confession net, so a
+  // planted proof matters more here than anywhere else in this file: without it, the passing output
+  // of the widened gate is byte-identical to the output of the gate that missed them.
+  const datedPositives: [string, "html" | "js", string][] = [
+    [`  // This pointed at /home#capability until 2026-08-03 — that page is deleted.`, "js", "line, change history with a date"],
+    [`/* Stage vocabulary. 'UNKNOWN' was added 2026-07-29 so the classifier fails closed. */`, "js", "block, dated addition"],
+    [`<style>/* the dot and its keyframes are gone (CEO 2026-07-27) */\n.a{color:red}</style>`, "html", "css inside html, dated internal decision"],
+    [`<!-- SINGLE-COLUMN HERO (CEO 2026-07-27). -->`, "html", "html comment, dated internal decision"],
+    [`<!-- hero rebuilt on the CEO's instruction -->`, "html", "html comment, bare role with no date"],
+    [`  // Removed at Brain's request; the panel had no source.`, "js", "js, bare role with no date"],
+  ];
+  for (const [src, kind, label] of datedPositives) {
+    const found = findLeaks(src, kind);
+    assert(found.length === 1, `KNOWN-POSITIVE(${kind}/dated): ${label}${found.length ? "" : " — NOT caught"}`);
+  }
+
+  // And the negatives, or the rule is just "flag anything with digits in it". A date the CODE handles
+  // is not a date the COMMENT is stamped with, and the ordinary English words "design" and "code"
+  // stay ordinary — only CEO and Brain are reserved.
+  const datedNegatives: [string, "html" | "js", string][] = [
+    [`  // response_deadline is an ISO instant; undated rows sort last.\nvar d = '2026-11-10';`, "js", "an ISO date in CODE is not a stamped comment"],
+    [`/* The design of this grid follows the column count, not the reverse. */`, "js", `"design" is ordinary English`],
+    [`/* This code path runs only for signed-in users. */`, "js", `"code" is ordinary English`],
+    [`<!-- hero -->`, "html", "a short structural label is untouched"],
+  ];
+  for (const [src, kind, label] of datedNegatives) {
+    const found = findLeaks(src, kind);
+    assert(found.length === 0, `KNOWN-NEGATIVE(${kind}/dated): ${label}${found.length ? ` — fired on ${found[0].why}` : ""}`);
+  }
+
   const halves: [string, string][] = [
     [`/* The old precedence chain runs verdict first, then run state — one field, one control. */`, "SUPERSEDED alone must not fire"],
     [`/* A 0 here would be a false all-clear, so an uncomputed score renders as a neutral tile. */`, "DEFECT alone must not fire"]
