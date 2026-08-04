@@ -130,6 +130,20 @@ const SRC = [
   // ...and none of that costs the true positive, which has a parenthetical rather than a modifier or a list.
   ok("the real PWS claim still refutes", run([PWS], "SBA").refuted.length === 1);
 
+  // ---- 2e. ADVERSARIAL ROUND-3 VECTOR 2 (2026-08-04) — A DOCUMENT'S IDENTITY CAN BE ITS NUMBER ------------------
+  // The residue test asked only `/[A-Za-z]/`, so digits counted as "nothing else". The corpus holds three distinct
+  // Wage Determination files whose token sets are IDENTICAL (["wage","determination"]) — for a WD the revision
+  // number IS the identity, and it was exactly what the test discarded. So a claim about WD 15-5110 was refuted by
+  // the presence of an unrelated WD, deleting a true warning on the document at the centre of this whole arc.
+  // Failure direction is the dangerous one, and it reproduced on unmutated production bytes (run 61aaaa95).
+  ok("a DIFFERENT wage determination does not refute (identity is the number, not the words)",
+     run(["Wage Determination 15-5110 is not provided in the assigned source."], "SBA").refuted.length === 0);
+  ok("a different solicitation number does not refute",
+     run(["Solicitation W9123826QA099 is not provided."], "SBA").refuted.length === 0);
+  // The banked true positives carry their identifier inside a PARENTHETICAL, which is stripped before the residue
+  // test — so tightening the alphabet cannot cost them. Asserted, not assumed:
+  ok("the real WD claim still refutes (identifier is parenthetical)", run([WD], "SBA").refuted.length === 1);
+
   // ---- 3. STRUCTURAL ------------------------------------------------------------------------------------------
   ok("no regions ⇒ untouched", reconcileAbsenceClaims([{ id: "a", requirement: PWS }], "", PROV, "SBA").refuted.length === 0);
   ok("empty findings ⇒ no crash", reconcileAbsenceClaims([], SRC, PROV, "SBA").findings.length === 0);
