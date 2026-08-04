@@ -91,7 +91,7 @@ const readHtml = (f: string) => readFileSync(path.join(PUBLIC, f), "utf8");
 const htmlFiles = readdirSync(PUBLIC).filter((f) => f.endsWith(".html"));
 
 /* The rail is platform chrome, so the population is defined by its COMPLEMENT: the
-   pre-auth pages, NAMED one by one. Everything else must carry it.
+   pre-auth pages. Everything else must carry it.
 
    Two weaker forms were tried and both leak:
      `railFiles.length >= 19` — a literal floor. It went red when public/watching.html
@@ -104,20 +104,43 @@ const htmlFiles = readdirSync(PUBLIC).filter((f) => f.endsWith(".html"));
        leaves the population and passes in silence. Measured: with both stripped from
        naics.html the shell form exits 0, this form exits 1 and names the file.
 
-   Naming the complement fails CLOSED: a new page belongs to neither set until someone
-   says which it is, so it fails until classified. An allowlist of safe shapes, never
-   an inference about the unsafe ones. Ported from the closed #433, which got this leg
-   right where the shipped version did not. */
-const PRE_AUTH = new Set([
-  "access.html", "how-it-works.html", "index.html", "landing.html",
-  "learn.html", "pricing.html", "root-landing.html",
-]);
+   Taking the complement fails CLOSED: a new page belongs to neither set until the
+   router says which it is, so it fails until classified. An allowlist of safe shapes,
+   never an inference about the unsafe ones. Ported from the closed #433, which got
+   this leg right where the shipped version did not. */
+/* The pre-auth set is READ FROM THE ROUTER, not kept as a second hand-maintained
+   list. src/middleware.ts decides what is reachable signed-out, so it is the only
+   thing that can be right about it, and a copy here would be a second rule free to
+   drift from the first. #438 established this source for the pre-auth doctrine gate;
+   the same source has to drive this one or the two gates can disagree about which
+   pages are public.
+
+   "/" is mapped explicitly: middleware lists the ROUTE, and the route serves
+   public/index.html. Extracting only *.html entries silently drops it. */
+function preAuthPages(): Set<string> {
+  const src = readFileSync(path.join(process.cwd(), "src", "middleware.ts"), "utf8");
+  const at = src.indexOf("const PUBLIC = [");
+  if (at < 0) return new Set();
+  const block = src.slice(at, src.indexOf("]", at));
+  const out = new Set<string>();
+  for (const m of block.matchAll(/"([^"]+)"/g)) {
+    const route = m[1];
+    if (route === "/") out.add("index.html");
+    else if (route.endsWith(".html")) out.add(route.replace(/^\//, ""));
+  }
+  return out;
+}
+const PRE_AUTH = preAuthPages();
 
 const carriesRail = (f: string) => readHtml(f).includes("sb-group-label");
 const railFiles = htmlFiles.filter(carriesRail);
 const shouldCarry = htmlFiles.filter((f) => !PRE_AUTH.has(f));
 
 console.log("\nR2 · every served page carrying the rail is swept");
+// Fail closed: an unreadable router must not exempt nothing and pass, nor exempt
+// everything and pass. Either way the population is wrong without saying so.
+ok(PRE_AUTH.size > 0, `pre-auth pages read from src/middleware.ts (${PRE_AUTH.size})`,
+  PRE_AUTH.size ? "" : "could not parse PUBLIC[] — the population is unknown, not empty");
 // Fail closed: a sweep that finds nothing must not read as "nothing to check".
 ok(railFiles.length > 0, `the rail is served from ${railFiles.length} pages`,
   railFiles.length ? "" : "NONE FOUND — the sweep is inert");
