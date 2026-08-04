@@ -64,6 +64,10 @@ interface RawSamItem {
   uiLink?: string | null;
   awardCeiling?: number | null;
   baseAndAllOptionsValue?: number | null;
+  classificationCode?: string | null;
+  pointOfContact?: Array<{ type?: string | null; fullName?: string | null; email?: string | null; phone?: string | null }> | null;
+  placeOfPerformance?: unknown;
+  officeAddress?: unknown;
 }
 
 async function searchNaicsPage(
@@ -160,6 +164,13 @@ export function mapSamItems(raw: RawSamItem[], now: Date): OpportunityRow[] {
       resource_links: Array.isArray(o.resourceLinks) ? o.resourceLinks : null,
       ui_link: o.uiLink ?? null,
       office_path: o.fullParentPathName ?? null,
+      // Free in the search call we already make. Measured on the live feed:
+      // psc and point_of_contact are present on every notice; place_of_performance
+      // is present on some, so it is carried and rendered only when set.
+      psc_code: o.classificationCode ?? null,
+      point_of_contact: Array.isArray(o.pointOfContact) ? o.pointOfContact : null,
+      place_of_performance: o.placeOfPerformance ?? null,
+      office_address: o.officeAddress ?? null,
       department: o.department ?? null,
       sub_tier: o.subTier ?? null
     });
