@@ -33,8 +33,13 @@ jobs:
       - run: npm ci --no-audit --no-fund
       # The flag census needs the Railway CLI and is skipped in CI by design — it reports SKIP rather than
       # failing, so CI never goes red for an absent credential. Flag drift is checked from a workstation.
-      - name: self-audit (suites · gold · parked seams · verdict-critical coverage · cert coherence)
-        run: npx tsx scripts/audit-ai/self-audit.ts suites gold parked coverage certs
+      # `blockers` reads ceo/digest-data.json, which is gitignored — so HERE it always reports a NAMED SKIP,
+      # never a silent pass. It is listed anyway for the same reason the flag census is: a leg absent from the
+      # invocation is invisible, while a leg that prints SKIP states what is not being covered. It enforces for
+      # real from the primary checkout, where ceo/update-digest.sh runs it on every backlog edit.
+      # No event data is interpolated here — the file's no-injection invariant holds.
+      - name: self-audit (suites · gold · parked seams · verdict-critical coverage · cert coherence · stale blockers)
+        run: npx tsx scripts/audit-ai/self-audit.ts suites gold parked coverage certs blockers
       # SERVED-SURFACE GATES (2026-08-04). test/public/ held 21 gates and NONE of them ran here, so for their
       # whole existence they gated nothing — they helped only when someone remembered to run them locally.
       # Measured 2026-08-03: main was carrying three red gates from an already-merged PR, and separately a

@@ -154,6 +154,84 @@ if (want("coverage")) {
     + `overall ${allMods.length - untested.length}/${allMods.length} audit-* modules have a direct suite`);
 }
 
+/** 7 · STALE BLOCKERS — a backlog item marked blocked whose blocker is GONE.
+ *
+ *  WHY: `status_normalized: blocked_chain` is set by hand and NOTHING re-checks it when the cause disappears, so an
+ *  item keeps reading as "not your problem yet" long after it became actionable. Measured 2026-08-04 across the 22
+ *  blocked items: only TWO name a dependency that resolves to a real backlog id. SEQ4-FIRE waited on
+ *  FA-640-EFFMAP, closed 2026-07-26 as superseded and no longer in the backlog at all; SEQ5-ROOTS and
+ *  CERT-PROVENANCE-RULING record NO blocker of any kind. Three P0s sat behind blockers that did not exist.
+ *
+ *  WHAT COUNTS AS A FAILURE — two shapes, both meaning "this can never be re-checked or is provably resolved":
+ *    (a) blocked with NEITHER waiting_on NOR blocker_reason — nothing records why, so nothing can ever clear it;
+ *    (b) waiting_on names an id that is ABSENT from the backlog, or present and already closed.
+ *
+ *  waiting_on holding PROSE instead of an id (Rule 52 says it is an FA-N reference) is counted and NAMED rather
+ *  than failed: it is a schema debt, not a stale blocker, and failing it would make this check red from birth,
+ *  which is how a check gets narrowed until it is inert. It is printed on every run so the number is visible.
+ *
+ *  KNOWN list follows the `coverage` convention exactly — printed loudly, meant to be emptied, and a NEW stale
+ *  blocker still fails. Deliberately NOT auto-fixed: SEQ4-FIRE's own record says "Not silently unblocked by Code",
+ *  and unblocking is a CEO ruling. This check SURFACES, it does not decide. */
+if (want("blockers")) {
+  const DIGEST = join(ROOT, "ceo", "digest-data.json");
+  if (!existsSync(DIGEST)) {
+    // ceo/ is gitignored and absent in worktrees and CI — a NAMED SKIP, never a silent pass.
+    add("blockers", true, "SKIP — ceo/digest-data.json not present (gitignored; runs from the primary checkout)", true);
+  } else {
+    const items = (JSON.parse(readFileSync(DIGEST, "utf8")).action_items || []) as Array<Record<string, string>>;
+    const byId = new Map(items.map((i) => [i.id, i]));
+    const CLOSED = new Set(["done", "closed", "shipped", "complete"]);
+    const BLOCKED = new Set(["blocked_chain", "blocked_external"]);
+    // Recorded 2026-08-04 — every one is a REAL stale blocker, not a false positive, and none is auto-fixable:
+    // unblocking is a CEO ruling ("Not silently unblocked by Code", SEQ4-FIRE's own record). Listed so CI is not
+    // red from birth, printed loudly on every run, and meant to be EMPTIED as each is ruled on.
+    //   SEQ4-FIRE            blocker cites FA-640-EFFMAP, closed 2026-07-26 as superseded and gone from the backlog
+    //   SEQ5-ROOTS           blocked_chain with no waiting_on and no blocker_reason; engineering done and armed
+    //   FA-4                 waiting_on FA-64, absent
+    //   FA-12 · FA-13        waiting_on FA-8, absent
+    //   V5-OOS-ELIG-TILE     blocked, nothing recorded
+    //   CLAUDEMD-FULL-AUDIT  blocked, nothing recorded
+    //   BUNDLE-STRIPE        blocked, nothing recorded
+    const KNOWN = new Set(["SEQ4-FIRE", "SEQ5-ROOTS", "CERT-PROVENANCE-RULING", "FA-4", "FA-12", "FA-13",
+                           "V5-OOS-ELIG-TILE", "CLAUDEMD-FULL-AUDIT", "BUNDLE-STRIPE"]);
+    const stale: string[] = [];
+    let prose = 0, resolved = 0;
+    for (const i of items) {
+      if (!BLOCKED.has(i.status_normalized)) continue;
+      const w = (i.waiting_on || "").trim();
+      const b = (i.blocker_reason || "").trim();
+      if (!w && !b) { stale.push(`${i.id}: blocked with no waiting_on and no blocker_reason — nothing can ever clear it`); continue; }
+      // A blocker written as PROSE still cites its dependency, and the specimen that motivated this whole check is
+      // exactly that shape: SEQ4-FIRE's blocker names FA-640-EFFMAP, closed 2026-07-26 and gone from the backlog.
+      // Skipping prose would have made this check miss the case it was built for — the same way the cert-coherence
+      // check missed the one cert its own comment named. So prose IS scanned, but only for the `FA-N` family, which
+      // is the one id shape this backlog uses unambiguously. HONEST LIMIT, stated rather than implied: a dependency
+      // cited in prose under any other style is NOT machine-checkable here and is not claimed to be. Deriving the
+      // shape from the data mattered — a general "CAPS-with-hyphens" pattern also matched RE-DECIDING, CERT-5 and
+      // R5-R7, and a check that cries wolf gets narrowed until it is inert.
+      for (const tok of new Set((b.match(/\bFA-\d+(?:-[A-Z0-9]+)*\b/g) || []))) {
+        const cited = byId.get(tok);
+        if (!cited) stale.push(`${i.id}: blocker cites ${tok}, which is NOT in the backlog`);
+        else if (CLOSED.has(cited.status_normalized)) stale.push(`${i.id}: blocker cites ${tok}, which is ${cited.status_normalized}`);
+      }
+      if (!w) continue;
+      if (w.length > 40 || /\s/.test(w.replace(/^[A-Z0-9-]+$/, ""))) { prose++; continue; }
+      const dep = byId.get(w);
+      if (!dep) { stale.push(`${i.id}: waiting_on ${w}, which is NOT in the backlog`); continue; }
+      if (CLOSED.has(dep.status_normalized)) { stale.push(`${i.id}: waiting_on ${w}, which is ${dep.status_normalized}`); continue; }
+      resolved++;
+    }
+    const uniq = [...new Set(stale)];                     // one item can be caught by both legs; report it once
+    const fresh = uniq.filter((s) => !KNOWN.has(s.split(":")[0]));
+    const known = [...new Set(uniq.filter((s) => KNOWN.has(s.split(":")[0])).map((s) => s.split(":")[0]))];
+    add("blockers", fresh.length === 0,
+      `${fresh.length ? `NEW stale blocker: ${fresh.join(" · ")} · ` : ""}`
+      + `${known.length ? `⚠ ${known.length} KNOWN stale blocker(s), awaiting a CEO ruling (must be emptied): ${known.join(", ")} · ` : ""}`
+      + `${resolved} blocker(s) resolve to an open item · ${prose} waiting_on hold prose, not an id (Rule 52)`);
+  }
+}
+
 /** 6 · CERT COHERENCE — two certs asserting opposite things is worse than no cert, because whichever runs first
  *  looks authoritative. `_cert-rt8-wiring.ts` survived the #8 park still asserting the seam WAS flag-gated.
  *
