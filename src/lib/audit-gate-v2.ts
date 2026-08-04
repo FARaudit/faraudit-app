@@ -389,6 +389,19 @@ export function hasBarSignal(ob: string): boolean {
 // Read at CALL time (not module load) so the demotion toggles per-invocation, like the notice-body emitter flags.
 const ambiguousSignalDemotionEnabled = () => process.env.AUDIT_AMBIGUOUS_SIGNAL_DEMOTION === "true";
 
+// DEMOTION TAIL VETO (flag AUDIT_DEMOTION_TAIL_VETO, default-OFF). The card-#572/#576 severed-tail belt guards the
+// benign-recital and performance-upkeep exits but NOT the ambiguous-signal demotion below it, which reads
+// hasBarSignal on the obligation TEXT ALONE. obligationsOf splits on `[.;\n]`, so a bar living in the severed tail
+// ("The contractor shall maintain the required insurance" ⟂ "and shall maintain bonding capacity of $5,000,000 with
+// a Treasury-listed surety") is invisible at that exit and the whole obligation demotes — the last demotion exit is
+// the only one with no tail defense. Applies the SAME recitalTailVeto to it: a POSITIVE tail bar refuses the
+// demotion and the obligation escalates as before the demotion flag existed.
+// SCOPE — deliberately narrow: only a verified-present recital whose tail POSITIVELY carries a bar refuses. An
+// unlocatable recital keeps demoting, unlike the two exits above (which have a benign CLAIM to fail closed on;
+// this exit has none, and failing closed on unlocatable would escalate the whole non-locatable population — a
+// recall change far wider than the defect). Flag-OFF ⇒ branch skipped ⇒ byte-identical.
+const demotionTailVetoEnabled = () => process.env.AUDIT_DEMOTION_TAIL_VETO === "true";
+
 // GOVERNMENT-EVALUATION-FRAME refinement (card #460 ruling #2). A §M sentence whose SUBJECT is the government's
 // evaluation methodology for cost/pricing DATA — "information/data other than certified cost or pricing data MAY BE
 // REQUIRED to support price reasonableness / SHALL BE EVALUATED to support a determination" — trips BAR_SIGNAL only
@@ -1009,7 +1022,11 @@ export function gradeCoverageV2(attestations: SectionAttestation[], opts?: {
         }
         if (ambiguousSignalDemotionEnabled() && (!hasBarSignal(ob) || isGovtEvalMethodologyNonBar(ob)
               || (conditionalTinaDemotionEnabled() && isConditionalTinaBoilerplate(ob)))) {
-          ungroundedNonBarSignal.push({ section: a.section, obligation: ob }); continue;
+          // DEMOTION TAIL VETO (see doctrine at the flag) — re-scan the SEVERED tail this exit is otherwise blind to.
+          // Verified-present recital + POSITIVE tail bar ⇒ refuse the demotion ⇒ fall through to escalate.
+          const tv = demotionTailVetoEnabled() ? (opts?.verifyRecitalPresence?.(ob) ?? null) : null;
+          const tailVetoed = !!tv?.present && recitalTailVeto(tv.continuation);
+          if (!tailVetoed) { ungroundedNonBarSignal.push({ section: a.section, obligation: ob }); continue; }
         }
         disqualifierUncovered.push(enrich({ section: a.section, obligation: ob }));
       }
