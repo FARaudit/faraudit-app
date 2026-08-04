@@ -1,64 +1,45 @@
 /* FARaudit · Defense Agencies — live wiring.
-   Fetches /api/agencies, mutates window.DAG IN PLACE, re-renders.
-   When API ships `_source: "unwired-mock-preserved"`, this script is a no-op
-   and the client-side mock in dag-data.js continues to display.
-   When real DAG shape lands in the API, mutations + render fire normally. */
+
+   Fetches /api/agencies and records what came back on window.DAG.STATUS, then
+   renders. There is no fallback dataset: while no source is connected the page
+   says so, and a failed request says something different again. */
 (function () {
   'use strict';
 
-  function replaceArr(name, next) {
-    if (!Array.isArray(next)) return;
-    const arr = window.DAG[name];
-    if (!Array.isArray(arr)) { window.DAG[name] = next.slice(); return; }
-    arr.length = 0;
-    arr.push(...next);
-  }
-
-  function replaceObj(name, next) {
-    if (!next || typeof next !== 'object') return;
-    const cur = window.DAG[name];
-    if (cur && typeof cur === 'object') {
-      for (const k of Object.keys(cur)) delete cur[k];
-      Object.assign(cur, next);
-    } else {
-      window.DAG[name] = next;
-    }
+  function paint() {
+    if (window.DAG_APP && typeof window.DAG_APP.render === 'function') window.DAG_APP.render();
   }
 
   async function wire() {
     try {
       const res = await fetch('/api/agencies', { credentials: 'include' });
-      if (!res.ok) throw new Error('agencies fetch failed: ' + res.status);
-      const data = await res.json();
-
-      if (data._source === 'unwired-mock-preserved') return;
-      if (!window.DAG) return;
-
-      replaceArr('DEPTS',      data.DEPTS);
-      replaceArr('SETASIDES',  data.SETASIDES);
-      replaceArr('SORTS',      data.SORTS);
-      replaceObj('POSTURE',    data.POSTURE);
-      replaceObj('FORECAST',   data.FORECAST);
-      replaceObj('NAICS_COLORS', data.NAICS_COLORS);
-
-      if (window.DAG_APP && typeof window.DAG_APP.render === 'function') {
-        window.DAG_APP.render();
+      const data = await res.json().catch(function () { return null; });
+      if (!res.ok || !data) {
+        window.DAG.STATUS = {
+          state: 'error',
+          reason: res.status === 401
+            ? 'Your session expired, so this page could not ask for agency data.'
+            : 'The agency service answered HTTP ' + res.status + '.'
+        };
+      } else if (data.state === 'unwired') {
+        window.DAG.STATUS = { state: 'unwired', reason: data.reason || '' };
+      } else if (Array.isArray(data.DEPTS) && data.DEPTS.length > 0) {
+        window.DAG.DEPTS = data.DEPTS;
+        window.DAG.STATUS = { state: 'ok', reason: '' };
+      } else {
+        window.DAG.STATUS = { state: 'unwired', reason: data.reason || '' };
       }
     } catch (e) {
-      console.error('[agencies-live] wire failed:', e);
+      window.DAG.STATUS = { state: 'error', reason: e && e.message ? e.message : 'The request failed.' };
     }
+    paint();
   }
 
-  const obs = new MutationObserver(() => {
-    if (window.DAG_APP && typeof window.DAG_APP.onThemeChange === 'function') {
-      window.DAG_APP.onThemeChange();
-    }
+  var obs = new MutationObserver(function () {
+    if (window.DAG_APP && typeof window.DAG_APP.onThemeChange === 'function') window.DAG_APP.onThemeChange();
   });
   obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', wire);
-  } else {
-    wire();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
+  else wire();
 })();
