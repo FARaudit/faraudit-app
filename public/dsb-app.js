@@ -504,17 +504,56 @@
   }
 
   /* ════════════════ ORCHESTRATION ════════════════ */
+
+  /* ════════════════ FEED STATE ════════════════
+     This page has no live data source wired yet. Rather than run fourteen
+     renderers over empty arrays — which draws blank panels, NaN axes and zeroed
+     tiles that read as measured values — the whole content region is replaced by
+     one stated notice. One guard, so no panel can be left half-honest. */
+  function dsbState() { return (D.STATUS && D.STATUS.state) || 'unwired'; }
+  function dsbHasData() { return dsbState() === 'ok'; }
+  function renderUnavailable() {
+    const reason = (D.STATUS && D.STATUS.reason) || '';
+    // Replace only the DATA region. The page header, the NAICS pills and the tab
+    // strip are the page's identity, not its data — wiping <main> made an honest
+    // state look like a broken page.
+    const body = document.querySelector('.body');
+    if (!body) return;
+    const header = body.querySelector('.page-header');
+    [...body.children].forEach((el) => { if (el !== header) el.remove(); });
+    const host = body;
+    const box = document.createElement('div');
+    box.className = 'dsb-unavailable';
+    box.setAttribute('role', 'status');
+    box.style.cssText = 'margin:20px 0 0;padding:22px 24px;border:1px solid var(--line-2,rgba(0,0,0,.12));'
+      + 'border-radius:10px;max-width:720px';
+    const h = document.createElement('div');
+    h.style.cssText = 'font-family:Manrope,sans-serif;font-weight:800;font-size:15px;margin-bottom:8px';
+    h.textContent = 'Spending data not connected';
+    const p = document.createElement('p');
+    p.style.cssText = 'font-size:12.5px;line-height:1.65;color:var(--mute,#64748b)';
+    p.textContent = reason || 'This view has no live federal spending source connected yet. '
+      + 'Nothing is shown rather than showing figures that were never measured.';
+    box.appendChild(h); box.appendChild(p);
+    host.appendChild(box);
+  }
+
   function renderAll() {
+    if (!dsbHasData()) return renderUnavailable();
     renderKPIs(); renderMap(); renderRankList(); renderTreemap(); renderScatter();
     renderAgencyList(); renderRecompetes(); renderIncumbents(); renderInsight();
   }
-  function renderStatic() { renderTrend(); renderBudget(); renderPricing(); renderNDAA(); }
+  function renderStatic() {
+    if (!dsbHasData()) return;
+    renderTrend(); renderBudget(); renderPricing(); renderNDAA();
+  }
 
   function onThemeChange() {
     renderLegend(); renderAll(); renderStatic();
   }
 
   function init() {
+    if (!dsbHasData()) { renderUnavailable(); return; }
     buildControls(); renderLegend(); renderRankTabs();
     renderStatic(); renderAll();
     fetch('/vendor/states-10m.json')

@@ -55,6 +55,9 @@ button{font-family:inherit}
 .live-pill{display:inline-flex;align-items:center;gap:7px;height:24px;padding:0 10px;border-radius:999px;background:var(--green-50);color:var(--green-800);font-size:11.5px;font-weight:700;letter-spacing:.02em;border:1px solid var(--green-200)}
 [data-theme="dark"] .live-pill{background:rgba(16,185,129,0.12);color:#6ee7b7;border-color:rgba(110,231,183,0.30)}
 .live-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green-500);box-shadow:0 0 0 3px rgba(16,185,129,.18);animation:pulse 1.6s ease-out infinite}
+.live-pill[data-state="unwired"]{background:#f1f5f9;color:#475569;border-color:#cbd5e1}
+.live-pill[data-state="unwired"]::before{background:#94a3b8;box-shadow:none;animation:none}
+[data-theme="dark"] .live-pill[data-state="unwired"]{background:rgba(148,163,184,.14);color:#cbd5e1;border-color:rgba(203,213,225,.28)}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(16,185,129,.45)}100%{box-shadow:0 0 0 8px rgba(16,185,129,0)}}
 .tb-search{margin-left:auto;display:flex;align-items:center;gap:10px;height:34px;width:300px;padding:0 12px;border-radius:9px;background:var(--search-bg);border:1px solid var(--line);color:var(--mute);font-size:13px}
 .tb-search .kbd{margin-left:auto;font-family:"IBM Plex Mono";font-size:10.5px;color:var(--mute-2);background:var(--card);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
@@ -437,7 +440,7 @@ button{font-family:inherit}
   <main class="main">
     <div class="topbar">
       <div class="crumbs"><b>Defense Spending</b><span class="sep">/</span><span>Budget Intelligence</span></div>
-      <span class="live-pill">LIVE</span>
+      <span class="live-pill" id="dsbPill" data-state="unwired">NOT CONNECTED</span>
       <div class="tb-search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
         <span>Search agencies, NAICS, awardees…</span><span class="kbd">⌘K</span>
@@ -458,7 +461,7 @@ button{font-family:inherit}
         <div class="heading">
           <p class="eyebrow">Budget Intelligence</p>
           <h1>Defense Spending</h1>
-          <p class="sub">Where the money is, who's winning it, and where <b>you</b> can — FY2026 · FPDS-NG + USAspending.gov</p>
+          <p class="sub">Where the money is, who's winning it, and where <b>you</b> can</p>
         </div>
         <div class="hdr-naics">
           <span class="hdr-naics-label">Your NAICS</span>
@@ -490,7 +493,6 @@ button{font-family:inherit}
           <header class="widget-head">
             <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
               <div class="wh-text"><h3>Where Your NAICS Money Flows</h3><p class="wh-sub">Click any state to focus the dashboard · red outline = BD gap</p></div></div>
-            <span class="wh-source">FPDS · POP-derived</span>
           </header>
           <div class="geo-wrap">
             <svg class="geo-svg" id="geoSvg" viewBox="0 0 960 500" preserveAspectRatio="xMidYMid meet"></svg>
@@ -516,7 +518,7 @@ button{font-family:inherit}
           <header class="widget-head">
             <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="11" rx="1"/><rect x="13" y="3" width="8" height="7" rx="1"/><rect x="13" y="12" width="8" height="9" rx="1"/><rect x="3" y="16" width="8" height="5" rx="1"/></svg></span>
               <div class="wh-text"><h3>Spend Concentration · Agency × NAICS</h3><p class="wh-sub">Block size = obligated $ · click to filter by agency</p></div></div>
-            <span class="wh-source">FPDS-NG</span>
+            
           </header>
           <button id="treeClear" class="tree-clear" type="button" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg><span id="treeClearTxt">Show all agencies</span></button>
           <svg class="tree-svg" id="treeSvg" preserveAspectRatio="none"></svg>
@@ -527,7 +529,6 @@ button{font-family:inherit}
           <header class="widget-head">
             <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><circle cx="8" cy="15" r="1.6"/><circle cx="13" cy="9" r="1.6"/><circle cx="18" cy="6" r="1.6"/></svg></span>
               <div class="wh-text"><h3>Opportunity Matrix · Competition vs Reward</h3><p class="wh-sub">Top-left = fewer rivals, more $ per win · bubble = total $</p></div></div>
-            <span class="wh-source">SAM · FPDS</span>
           </header>
           <svg class="scatter-svg" id="scatterSvg"></svg>
           <div class="scatter-legend" id="scatterLegend"></div>
@@ -540,7 +541,6 @@ button{font-family:inherit}
           <header class="widget-head">
             <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20h18"/><rect x="5" y="10" width="3" height="10"/><rect x="10.5" y="6" width="3" height="14"/><rect x="16" y="13" width="3" height="7"/></svg></span>
               <div class="wh-text"><h3>DoD Budget Trajectory</h3><p class="wh-sub">5-yr topline — CR years constrain new starts</p></div></div>
-            <span class="wh-source">OMB · Comptroller</span>
           </header>
           <div class="chart-wrap"><svg id="budgetSvg" class="bud-svg"></svg></div>
           <div class="bud-legend">
@@ -554,7 +554,7 @@ button{font-family:inherit}
           <header class="widget-head">
             <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,17 8,12 13,15 21,7"/></svg></span>
               <div class="wh-text"><h3>Market Trend · Your NAICS</h3><p class="wh-sub">Market size &amp; 5-yr momentum by code · FY27 projected</p></div></div>
-            <span class="wh-source">FPDS-NG</span>
+            
           </header>
           <div class="mkt-list" id="trendList"></div>
         </section>
@@ -566,7 +566,7 @@ button{font-family:inherit}
           <header class="widget-head">
             <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg></span>
               <div class="wh-text"><h3>Recompete Radar · FY2027</h3><p class="wh-sub">Incumbent win rate is 70–90% — start positioning 12–18 months out</p></div></div>
-            <span class="wh-source">FPDS-NG</span>
+            
           </header>
           <div class="rc-timeline"><div class="rc-quarters" id="rcQuarters"></div></div>
         </section>
@@ -578,7 +578,6 @@ button{font-family:inherit}
           <header class="widget-head">
             <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M21 17c-.5-2-2-3.5-4-3.5"/></svg></span>
               <div class="wh-text"><h3>Incumbent Intelligence</h3><p class="wh-sub">Recent awards = your teaming targets</p></div></div>
-            <span class="wh-source">USASpending.gov</span>
           </header>
           <div style="overflow:auto">
             <table class="ii-table"><thead><tr><th>Awardee</th><th>Agency</th><th class="r">Value</th><th>NAICS</th><th>Type</th></tr></thead><tbody id="iiBody"></tbody></table>
@@ -589,7 +588,6 @@ button{font-family:inherit}
           <header class="widget-head">
             <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></span>
               <div class="wh-text"><h3>Pricing Intelligence</h3><p class="wh-sub">What agencies actually pay per contract ($K)</p></div></div>
-            <span class="wh-source">FPDS · NSN</span>
           </header>
           <div class="price-wrap"><svg class="price-svg" id="priceSvg"></svg></div>
           <div class="price-legend" id="priceLegend"></div>
@@ -602,7 +600,6 @@ button{font-family:inherit}
           <header class="widget-head">
             <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/></svg></span>
               <div class="wh-text"><h3>Agency Breakdown</h3><p class="wh-sub">Bar = FY26 spend · green = SB share · click to filter</p></div></div>
-            <span class="wh-source">FPDS</span>
           </header>
           <div class="ag-head"><span>Agency</span><span>Spend · SB shaded</span><span>FY26</span><span>YoY</span></div>
           <div class="ag-list" id="agencyList"></div>
@@ -613,7 +610,6 @@ button{font-family:inherit}
           <header class="widget-head">
             <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h6"/></svg></span>
               <div class="wh-text"><h3>NDAA Highlights · FY2026</h3><p class="wh-sub">Provisions affecting your bids — act before enforcement</p></div></div>
-            <span class="wh-source">NDAA §</span>
           </header>
           <div class="ndaa-list" id="ndaaList"></div>
         </section>
