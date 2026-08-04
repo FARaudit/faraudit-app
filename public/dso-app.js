@@ -581,7 +581,8 @@ function rowHTML(o) {
       '<div class="pc-title">' + esc(TITLECASE(o.title)) + '</div>' +
       '<div class="pc-buyer">' + (officeName(o.office) === deptName(o.agency) ? '<b>' + esc(officeName(o.office)) + '</b>' : '<b>' + esc(officeName(o.office)) + '</b> · ' + esc(deptName(o.agency))) + '</div>' +
       '<div class="pc-id">' + esc(o.id) + '</div>' +
-      '<div class="pc-chips"><span class="chip naics">' + esc(o.naics || 'NAICS —') + '</span><span class="chip stage">' + esc(STAGE_LABEL[o.stage] || o.stage) + '</span><span class="chip ' + sa.cls + '">' + esc(sa.label) + '</span></div>' +
+      '<div class="pc-chips"><span class="chip naics">' + esc(o.naics || 'NAICS —') + '</span>' +
+        (o.psc ? '<span class="chip psc" title="Product Service Code">PSC ' + esc(o.psc) + '</span>' : '') + '<span class="chip stage">' + esc(STAGE_LABEL[o.stage] || o.stage) + '</span><span class="chip ' + sa.cls + '">' + esc(sa.label) + '</span></div>' +
       /* Absolute close/posted dates alongside the relative "1d". Each renders
          only when present. */
       '<div class="pc-dates">' + datesLine(o) + '</div>' +
