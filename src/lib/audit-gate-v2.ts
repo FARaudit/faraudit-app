@@ -374,9 +374,53 @@ const REGISTER_TOKENS_RE = new RegExp([
   "\\bPart\\s*145\\b", "\\brepair\\s+station\\s+certificate\\b", "\\bairworthiness\\s+certificate\\b",
 ].join("|"), "i");
 
+// CREDENTIAL WITH A NAMED PRIVATE ISSUER (Brain ruling on card #800, flag AUDIT_PRIVATE_ISSUER_CREDENTIAL_BAR,
+// default-OFF). The recognizer already carries credentials the bidder must HOLD, but every one of them is issued by
+// a government or accreditation body (SBA, DCSA, a state board, a C3PAO). "…its status as an authorized OEM
+// distributor for Caterpillar" is the SAME class with the issuer being a named private manufacturer — a missing
+// ISSUER TYPE, not a new "status" class. Ruled so 2026-08-04; the taxonomy entry (OEM dealer · factory-authorized
+// service center · franchised distributor) is Brain's.
+//
+// THE SHAPE, and why it survives paraphrase (no vocabulary blocklist — Brain's discriminator is the SUBJECT, not
+// the noun). Three structural conditions, ALL required:
+//   (1) BIDDER-BOUND — the bidder is the SUBJECT holding the credential ("its status as a …", "the offeror shall
+//       be a …"), never a third party ("the contractor may procure FROM authorized distributors" — the distributor
+//       is someone else, and the role must follow the binding CONTIGUOUSLY, so "shall be obtained from an
+//       authorized dealer" cannot match on its "shall be");
+//   (2) NAMED GRANTOR — a capitalized private issuer follows the role ("… distributor FOR Caterpillar"). A role
+//       with no named grantor is ordinary supply-chain prose;
+//   (3) TEMPORAL BINDING — "maintain" / "at time of award" / "during the period of performance" / "at all times".
+//
+// DIRECTION OF RISK, and why it is no longer symmetric. This ADDS escalation, so over-fire is the danger — but
+// Rule 70 changed what over-fire COSTS: an escalated uncovered obligation now caps at BID_WITH_CAUTION with the
+// item NAMED, it does not mute the verdict. A false escalate is a named line the bidder clears with one phone
+// call; a false demote is a missed disqualifier, the FALSE-BID pole. Fail-toward-disqualifier decides it on
+// structure. FREQUENCY STAYS OPEN: the fixture is 6 solicitations, so no over-fire RATE can honestly be measured
+// here, and Brain ruled that waiting for one means waiting on customers we do not yet have. Flag-OFF ⇒ byte-identical.
+const privateIssuerCredentialEnabled = () => process.env.AUDIT_PRIVATE_ISSUER_CREDENTIAL_BAR === "true";
+// The credential a private issuer grants. ≤2 filler words carry "authorized OEM distributor" / "certified warranty
+// service center" without opening the phrase to a whole clause.
+const PRIVATE_CREDENTIAL_ROLE = "(?:authorized|factory[-\\s]?authorized|franchised|certified|approved)\\s+(?:[A-Za-z][A-Za-z-]*\\s+){0,2}(?:distributor|dealer|reseller|service\\s+cent(?:er|re)|repair\\s+(?:station|facility)|integrator|installer|partner)";
+// The bidder holding it — possessive-status or an obligation verb, with the role CONTIGUOUS (condition 1).
+// The determiner covers both orders the class is written in: "its status as an authorized distributor for X" and
+// the possessive "maintain ITS authorized distributor status for X".
+const BIDDER_BOUND_CREDENTIAL = "(?:\\b(?:its|their|his|her)\\s+status\\s+as\\s+|\\b(?:shall|must|will)\\s+(?:be|remain|become|maintain|hold)\\s+)(?:an?|its|their)?\\s*";
+// An optional head-noun the role hangs off ("authorized distributor STATUS for X", "dealer AGREEMENT with X") —
+// structural, not a vocabulary list: it only permits the grantor to sit one noun further right.
+const CREDENTIAL_HEAD_NOUN = "(?:\\s+(?:status|standing|designation|authorization|certification|appointment|agreement|letter))?";
+// A capitalized named grantor (condition 2) — "for Caterpillar", "of John Deere", "authorized by Cummins".
+const NAMED_PRIVATE_GRANTOR = "\\s+(?:for|of|with|from|appointed\\s+by|authorized\\s+by)\\s+(?:the\\s+)?[A-Z][A-Za-z0-9&.'\\-]{2,}";
+const PRIVATE_ISSUER_CREDENTIAL_RE = new RegExp(BIDDER_BOUND_CREDENTIAL + PRIVATE_CREDENTIAL_ROLE + CREDENTIAL_HEAD_NOUN + NAMED_PRIVATE_GRANTOR);
+// Condition 3 — the duty is bound in time. Case-insensitive; the grantor above is deliberately case-SENSITIVE.
+const CREDENTIAL_TEMPORAL_BINDING = /\bmaintain\b|\bduring\b[^.;]{0,40}\bperformance\b|\bat\b[^.;]{0,24}\baward\b|\bthroughout\b|\bfor\s+the\s+duration\b|\bat\s+all\s+times\b/i;
+export function isPrivateIssuerCredentialBar(ob: string): boolean {
+  return PRIVATE_ISSUER_CREDENTIAL_RE.test(ob) && CREDENTIAL_TEMPORAL_BINDING.test(ob);
+}
+
 export function hasBarSignal(ob: string): boolean {
   if (bondPaperNonBarEnabled()) ob = ob.replace(/\bbond(?:ed)?[\s-]+paper\b/gi, " ");   // "bond paper" (paper stock) ≠ a surety bond
   if (registerTokensEnabled() && REGISTER_TOKENS_RE.test(ob)) return true;
+  if (privateIssuerCredentialEnabled() && isPrivateIssuerCredentialBar(ob)) return true;
   return BAR_SIGNAL_RE.test(ob);
 }
 
