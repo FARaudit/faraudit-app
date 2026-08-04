@@ -29,11 +29,11 @@
 //   R1  CALIBRATION — the contrast function reproduces known pairs, INCLUDING an
 //       alpha case. Three samplers were written for this rail and two produced
 //       confident wrong numbers; an uncalibrated one is not evidence.
-//   R2  COVERAGE — every served .html carrying the rail is swept, and the
-//       population is non-empty.
+//   R2  COVERAGE — every served .html outside a NAMED pre-auth set carries the
+//       rail, so a page that loses it fails rather than leaving the population.
 //   R3  CONTRAST FLOOR — every rail text token clears 4.5:1 against its
 //       COMPOSITED ground.
-//   R4  THE COPIES AGREE — all 19 files resolve to the SAME effective values,
+//   R4  THE COPIES AGREE — every copy resolves to the SAME effective values,
 //       so a fix applied to some of them fails here rather than forking silently.
 //   R5  PLANTED POSITIVES — the pre-fix values must be caught, and a single
 //       divergent copy must be caught.
@@ -90,23 +90,45 @@ const PUBLIC = path.join(process.cwd(), "public");
 const readHtml = (f: string) => readFileSync(path.join(PUBLIC, f), "utf8");
 const htmlFiles = readdirSync(PUBLIC).filter((f) => f.endsWith(".html"));
 
-/* Pages carrying the sidebar SHELL. The rail lives inside it, so that is the
-   population the rail must cover — derived, not counted.
-   The literal floor here (`>= 19`) went red when public/watching.html was deleted in
-   #427: a clean removal, no dead links, nothing broken. A threshold that must be
-   hand-edited whenever a page is added or removed reports staleness as a defect, and
-   the edit that silences it is indistinguishable from one that hides a regression. */
-const shellFiles = htmlFiles.filter((f) => readHtml(f).includes("data-sb="));
-const railFiles = shellFiles.filter((f) => readHtml(f).includes("sb-group-label"));
+/* The rail is platform chrome, so the population is defined by its COMPLEMENT: the
+   pre-auth pages, NAMED one by one. Everything else must carry it.
+
+   Two weaker forms were tried and both leak:
+     `railFiles.length >= 19` — a literal floor. It went red when public/watching.html
+       was deleted in #427, a clean removal with no dead links, condemning 18 healthy
+       pages for the absence of a nineteenth that was meant to go. Bumping it to 18
+       only re-arms it, and the edit that silences it is indistinguishable from one
+       that hides a regression.
+     inferring the population from the shell (`data-sb=`) — the form that shipped, and
+       it has a hole: a platform page that loses BOTH the shell and the rail simply
+       leaves the population and passes in silence. Measured: with both stripped from
+       naics.html the shell form exits 0, this form exits 1 and names the file.
+
+   Naming the complement fails CLOSED: a new page belongs to neither set until someone
+   says which it is, so it fails until classified. An allowlist of safe shapes, never
+   an inference about the unsafe ones. Ported from the closed #433, which got this leg
+   right where the shipped version did not. */
+const PRE_AUTH = new Set([
+  "access.html", "how-it-works.html", "index.html", "landing.html",
+  "learn.html", "pricing.html", "root-landing.html",
+]);
+
+const carriesRail = (f: string) => readHtml(f).includes("sb-group-label");
+const railFiles = htmlFiles.filter(carriesRail);
+const shouldCarry = htmlFiles.filter((f) => !PRE_AUTH.has(f));
 
 console.log("\nR2 · every served page carrying the rail is swept");
 // Fail closed: a sweep that finds nothing must not read as "nothing to check".
-ok(shellFiles.length > 0, `the sidebar shell is served from ${shellFiles.length} pages`,
-  shellFiles.length ? "" : "NONE FOUND — the sweep is inert");
-const railMissing = shellFiles.filter((f) => !railFiles.includes(f));
+ok(railFiles.length > 0, `the rail is served from ${railFiles.length} pages`,
+  railFiles.length ? "" : "NONE FOUND — the sweep is inert");
+const railMissing = shouldCarry.filter((f) => !carriesRail(f));
 ok(railMissing.length === 0,
-  `every page with the sidebar shell carries the rail (${railFiles.length}/${shellFiles.length})`,
+  `every page outside the named pre-auth set carries the rail (${railFiles.length}/${shouldCarry.length})`,
   railMissing.join(", "));
+// The allowlist must not silently outlive its entries: a stale name would quietly
+// exempt a page that later gained the rail, or one that no longer exists.
+const staleExempt = [...PRE_AUTH].filter((f) => !htmlFiles.includes(f) || carriesRail(f));
+ok(staleExempt.length === 0, `every PRE_AUTH entry is a real, rail-less page (${PRE_AUTH.size})`, staleExempt.join(", "));
 
 // ── extract EFFECTIVE values, not strings ────────────────────────────────────
 /** The last matching declaration wins in CSS source order, which is what the browser resolves. */
