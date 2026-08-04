@@ -189,16 +189,13 @@
       <div class="wk-body"><div class="wk-label">${w.label}</div>${tag}</div>
     </a>`;
   }
-  // Per-group display caps. Measured on the live feed 2026-07-29: 197 dated
-  // notices, of which 71 land inside 7 days — so a single flat cap below 71
-  // rendered week one and nothing else, and "This Month" / "Later This Year"
-  // could never appear however high it went. Capping each group separately is
-  // what actually raises the calendar's reach: every designed group gets rows.
-  // .week-list now scrolls internally (max-height + overflow-y in today.html),
-  // so these caps no longer trade against page height — they trade against
-  // scannability. 20/15/10 covers a full quarter of real deadlines on the
-  // measured feed (71/109/17) while every group still reports its true total
-  // and its own remainder.
+  // Per-group display caps. A single flat cap across all three groups renders the
+  // nearest deadlines and nothing else, because near-term notices outnumber the
+  // rest — "This Month" and "Later This Year" can never appear however high it is
+  // set. Capping each group separately is what gives the calendar its reach.
+  // .week-list scrolls internally (max-height + overflow-y in today.html), so
+  // these caps trade against scannability rather than page height, and every
+  // group still reports its true total and its own remainder.
   const WEEK_GROUP_CAPS = { 'This Week': 20, 'This Month': 15, 'Later This Year': 10 };
 
   function renderWeek() {

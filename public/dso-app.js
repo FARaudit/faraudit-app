@@ -356,11 +356,9 @@ function renderCertBanner(host){
     btn.type = 'button';
     btn.id = 'addUeiBtn';
     btn.textContent = c.btn;
-    // The UEI field lives on the capability statement. This pointed at
-    // /home#capability until 2026-08-03 -- the LEGACY SPA, which is not part of
-    // this platform and is now deleted; the real page had no UEI input at all,
-    // which is why the button had to leave. uei-editor.js supplies that field,
-    // so this stays inside the platform.
+    // The UEI field lives on the capability statement, supplied by uei-editor.js.
+    // That page is the only surface carrying the input, so it is the only correct
+    // destination for this control.
     btn.onclick = ()=>{ window.location.href = '/capability-statement'; };
     host.appendChild(btn);
   }
@@ -520,6 +518,26 @@ function sortRows(data) {
   return d;
 }
 
+/* Absolute dates for the card. Every value is parsed and range-checked before
+   it renders, so an unparseable date yields null, never a printed date string.
+   datesLine returns '' when neither date is usable and the slot stays empty. */
+function fmtAbs(v, withTime) {
+  if (!v) return null;
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return null;
+  const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  if (!withTime) return date;
+  return date + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+function datesLine(o) {
+  const parts = [];
+  const close = fmtAbs(o.response_deadline, true);
+  const posted = fmtAbs(o.ingested_at, false);
+  if (close) parts.push('<span class="pc-dt"><b>Closes</b> ' + esc(close) + '</span>');
+  if (posted) parts.push('<span class="pc-dt"><b>Posted</b> ' + esc(posted) + '</span>');
+  return parts.join('');
+}
+
 /* ── the row. Design's markup; the two action buttons carry Code's wiring. ── */
 function rowHTML(o) {
   const v = verdict(o), sa = saRender(o.sa);
@@ -536,6 +554,9 @@ function rowHTML(o) {
       '<div class="pc-buyer">' + (officeName(o.office) === deptName(o.agency) ? '<b>' + esc(officeName(o.office)) + '</b>' : '<b>' + esc(officeName(o.office)) + '</b> · ' + esc(deptName(o.agency))) + '</div>' +
       '<div class="pc-id">' + esc(o.id) + '</div>' +
       '<div class="pc-chips"><span class="chip naics">' + esc(o.naics || 'NAICS —') + '</span><span class="chip stage">' + esc(STAGE_LABEL[o.stage] || o.stage) + '</span><span class="chip ' + sa.cls + '">' + esc(sa.label) + '</span></div>' +
+      /* Absolute close/posted dates alongside the relative "1d". Each renders
+         only when present. */
+      '<div class="pc-dates">' + datesLine(o) + '</div>' +
     '</div>' +
     '<div class="pc-state"><span class="vd ' + v.cls + '">' + v.word + '</span><span class="pc-note">' + clause(o) + '</span></div>' +
     '<div class="pc-actions">' +
@@ -612,9 +633,8 @@ function wireActions() {
     // would DELETE that history, so the toggle is refused, not offered.
     if (status && status !== 'watching') {
       b.className = 'btn-2 on locked'; b.disabled = true; b.textContent = 'Tracking';
-      // Said "manage it on the Watching page" until 2026-08-03. /watching was a
-      // redirect into the legacy SPA and is deleted; there is no Watching page on
-      // this platform, so the tooltip states the reason instead of pointing nowhere.
+      // The tooltip states the reason rather than naming a page to go to: there is
+      // no separate watch-management surface, so a pointer would lead nowhere.
       b.title = 'Watch has advanced (' + status + ') — it is linked to an audit, so it can no longer be untracked here';
       return;
     }
@@ -711,8 +731,11 @@ function renderList() {
   wireActions();
 }
 
+/* Clears every key in S that narrows or reorders the list. These values are the
+   initial values of S (:196); a filter key added there belongs here too. */
 function reset() {
   S.stage = 'all'; S.sa = 'all'; S.view = null; S.band = null; S.q = '';
+  S.sort = 'closing'; S.profile = false;
   const si = $('searchInput'); if (si) si.value = '';
   S.naics = new Set(ROWS.map((o) => o.naics).filter(Boolean));
   renderAll();

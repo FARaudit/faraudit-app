@@ -12,15 +12,11 @@
   'use strict';
 
   // ── SET-ASIDE · EXPLICIT ALLOWLIST, FAILS CLOSED ────────────────────────────
-  // Until 2026-07-29 this ended in a bare `return 'SB'`, so any token it didn't
-  // recognise was ASSERTED as a small-business set-aside. Measured on 200 live
-  // rows: SAM's literal "No Set aside used" (= full and open) matched none of the
-  // tests and fell through, so **83 rows (42%) told a small business that an
-  // unrestricted competition was reserved for them** — the single most
-  // decision-relevant field on the row, inverted in the permissive direction.
-  // A WOSB *sole-source* notice landed on 'SB' too, rendering a directed buy as
-  // competable. Two more collapses: WOSB → SB (WOSB is not SB-wide eligibility)
-  // and Partial → Total (different subcontracting posture).
+  // Set-aside is the most decision-relevant field on the row, and every collapse
+  // here fails in the permissive direction: a full-and-open notice read as small
+  // business, a sole-source notice read as competable, WOSB read as SB-wide
+  // eligibility, Partial read as Total. Each one tells a reader a competition is
+  // open to them when it is not.
   //
   // Doctrine: shape ALLOWLISTS only, never blocklists, in eligibility logic; an
   // unrecognisable token goes to the restrictive/honest pole, never a permissive
