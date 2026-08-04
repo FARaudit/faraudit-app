@@ -187,7 +187,7 @@ export default function Navigation(_: { initialPinned: boolean }) {
   // suppresses itself there (return null below), so --sidebar-w must be
   // 0 on those routes to avoid double-padding the main column.
   const suppressed =
-    pathname.startsWith("/home") || pathname.startsWith("/command-center");
+    pathname.startsWith("/today") || pathname.startsWith("/command-center");
 
   useEffect(() => {
     if (suppressed) {
@@ -216,11 +216,11 @@ export default function Navigation(_: { initialPinned: boolean }) {
     badge?: NavBadge;
   }> = [
     { id: "command-center", label: "Command Center", icon: "today", href: "/command-center", badge: { text: "New", variant: "gold" } },
-    { id: "today", label: "Today", icon: "today", href: "/home" },
-    { id: "audit", label: "Run Audit", icon: "audit", href: "/home#audit", badge: { text: "New", variant: "gold" } },
-    { id: "past-audits", label: "Past Audits", icon: "past-audits", href: "/home#past-audits" },
-    { id: "pipeline", label: "Pipeline", icon: "pipeline", href: "/home#pipeline" },
-    { id: "capability", label: "Capability Statement", icon: "capability", href: "/home#capability" }
+    { id: "today", label: "Today", icon: "today", href: "/today" },
+    { id: "audit", label: "Run Audit", icon: "audit", href: "/run-audit", badge: { text: "New", variant: "gold" } },
+    { id: "past-audits", label: "Past Audits", icon: "past-audits", href: "/past-audits" },
+    { id: "pipeline", label: "Pipeline", icon: "pipeline", href: "/pipeline" },
+    { id: "capability", label: "Capability Statement", icon: "capability", href: "/capability-statement" }
   ];
 
   const intelligenceDefs: Array<{
@@ -230,16 +230,16 @@ export default function Navigation(_: { initialPinned: boolean }) {
     href: string;
     badge?: NavBadge;
   }> = [
-    { id: "opportunities", label: "Opportunities", icon: "opportunities", href: "/home#opportunities", badge: { text: "Live", variant: "green" } },
-    { id: "defense-spending", label: "Defense Spending", icon: "defense-spending", href: "/home#defense-spending" },
-    { id: "news", label: "Defense News", icon: "news", href: "/home#news" },
-    { id: "contracting-officers", label: "Contracting Officers", icon: "contracting-officers", href: "/home#contracting-officers" },
-    { id: "agencies", label: "Agencies", icon: "agencies", href: "/home#agencies" },
-    { id: "protests", label: "GAO Protests", icon: "protests", href: "/home#protests" },
-    { id: "regulatory", label: "FAR/DFARS Updates", icon: "regulatory", href: "/home#regulatory" },
-    { id: "cmmc", label: "CMMC Readiness", icon: "cmmc", href: "/home#cmmc" },
-    { id: "wages", label: "Wage Benchmarks", icon: "wages", href: "/home#wages" },
-    { id: "teaming", label: "Teaming Partners", icon: "teaming", href: "/home#teaming" }
+    { id: "opportunities", label: "Opportunities", icon: "opportunities", href: "/opportunities", badge: { text: "Live", variant: "green" } },
+    { id: "defense-spending", label: "Defense Spending", icon: "defense-spending", href: "/defense-spending" },
+    { id: "news", label: "Defense News", icon: "news", href: "/defense-news" },
+    { id: "contracting-officers", label: "Contracting Officers", icon: "contracting-officers", href: "/contracting-officers" },
+    { id: "agencies", label: "Agencies", icon: "agencies", href: "/defense-agencies" },
+    { id: "protests", label: "GAO Protests", icon: "protests", href: "/gao-protests" },
+    { id: "regulatory", label: "FAR/DFARS Updates", icon: "regulatory", href: "/far-dfars-updates" },
+    { id: "cmmc", label: "CMMC Readiness", icon: "cmmc", href: "/cmmc-readiness" },
+    { id: "wages", label: "Wage Benchmarks", icon: "wages", href: "/wage-benchmarks" },
+    { id: "teaming", label: "Teaming Partners", icon: "teaming", href: "/teaming-partners" }
   ];
 
   const toItem = (def: { id: string; label: string; icon: IconName; href: string; badge?: NavBadge }): NavItemDef => ({

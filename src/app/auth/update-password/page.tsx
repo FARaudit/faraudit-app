@@ -52,9 +52,11 @@ export default function UpdatePasswordPage() {
         setBusy(false);
         return;
       }
-      setInfo("Password updated. Redirecting to /home…");
+      // Landed on /home until 2026-08-03 — the legacy SPA, now deleted. /today is
+      // the platform's first nav item and the equivalent landing surface.
+      setInfo("Password updated. Redirecting…");
       setTimeout(() => {
-        router.push("/home");
+        router.push("/today");
         router.refresh();
       }, 800);
     } catch (err) {

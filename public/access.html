@@ -38,7 +38,7 @@
         </svg>
       </div>
     </div>
-    <div class="bp-foot mono">SAM.gov synced 2m ago</div>
+    <div class="bp-foot mono">Federal Contract Intelligence</div>
   </aside>
 
   <!-- right form -->
@@ -56,6 +56,7 @@
         <div class="slots"><span>Founding cohort</span></div>
         <div class="slots"><span>Applications open</span></div>
 
+        <div id="access-error" role="alert" style="display:none;padding:11px 13px;border-radius:8px;margin-bottom:16px;font-size:13px;line-height:1.55;background:rgba(239,68,68,.09);border:1px solid rgba(239,68,68,.28);color:#fca5a5"></div>
         <form id="access-form" onsubmit="return submitForm(event)">
           <div class="field-row">
             <label class="field">
@@ -119,8 +120,57 @@
 </div>
 
 <script>
-  function submitForm(e){
+  /* This handler used to preventDefault, hide the form and show "Application
+     received" without contacting anything. The form carried no action and made no
+     request, so every application was discarded while the applicant was told it
+     had arrived. The success state is now shown only after the server accepts it. */
+  function acFail(msg){
+    var box = document.getElementById('access-error');
+    box.textContent = msg;
+    box.style.display = 'block';
+    box.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+
+  async function submitForm(e){
     e.preventDefault();
+    var form = document.getElementById('access-form');
+    var btn  = form.querySelector('button[type="submit"]');
+    var box  = document.getElementById('access-error');
+    box.style.display = 'none';
+
+    var fd = new FormData(form);
+    var payload = {
+      name:    (fd.get('name')    || '').toString().trim(),
+      email:   (fd.get('email')   || '').toString().trim(),
+      company: (fd.get('company') || '').toString().trim(),
+      role:    (fd.get('role')    || '').toString().trim(),
+      naics:   (fd.get('naics')   || '').toString().trim(),
+      context: (fd.get('context') || '').toString().trim()
+    };
+
+    var label = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = 'Sending\u2026';
+
+    try {
+      var res = await fetch('/api/access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        var why = 'We could not submit your application (HTTP ' + res.status + ').';
+        try { var b = await res.json(); if (b && b.error) why = b.error; } catch (_) {}
+        btn.disabled = false; btn.innerHTML = label;
+        acFail(why + ' Please try again, or email jose@faraudit.com directly.');
+        return false;
+      }
+    } catch (err) {
+      btn.disabled = false; btn.innerHTML = label;
+      acFail('We could not reach the server. Please try again, or email jose@faraudit.com directly.');
+      return false;
+    }
+
     document.getElementById('form-view').style.display = 'none';
     var sv = document.getElementById('success-view');
     sv.classList.add('show');
