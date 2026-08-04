@@ -170,7 +170,9 @@
       // would collapse them into one.
       resource_links: Array.isArray(o.resource_links) ? o.resource_links : null,
       ui_link: o.ui_link || null,
-      office_path: o.office_path || null
+      office_path: o.office_path || null,
+      psc: o.psc_code || null,
+      poc: Array.isArray(o.point_of_contact) ? o.point_of_contact : null
     };
   }
 
