@@ -218,34 +218,14 @@ export async function fetchRecentAudits(
 }
 
 // ─── KO intelligence ──────────────────────────────────────────────────────
-export interface KORow {
-  id: string;
-  ko_email: string;
-  ko_name: string | null;
-  ko_phone: string | null;
-  agency: string | null;
-  agency_office: string | null;
-  naics_codes: string[] | null;
-  solicitations_issued: number;
-  questions_asked: number;
-  questions_answered: number;
-  avg_response_days: number | null;
-  last_contact: string | null;
-  last_solicitation_id: string | null;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export async function fetchKOs(client: SupabaseClient): Promise<KORow[]> {
-  const { data, error } = await client
-    .from("ko_intelligence")
-    .select("*")
-    .order("last_contact", { ascending: false, nullsFirst: false })
-    .limit(500);
-  if (error) return []; // table may not exist yet — graceful empty list
-  return (data as KORow[]) || [];
-}
+// fetchKOs()/KORow were deleted here. They queried `ko_intelligence` on columns
+// the production table does not have (migration 003 declared a second, wider
+// shape with CREATE TABLE IF NOT EXISTS, which was a no-op because 001 had
+// already created it), so every call returned 42703 — and the `if (error)
+// return []` swallow turned that into an empty list no caller could tell from
+// a genuine zero. The reader had zero callers and the table zero rows.
+// Contracting officers now come from the notice point-of-contact block via
+// /api/ko-intelligence.
 
 // ─── Agency intelligence ──────────────────────────────────────────────────
 export interface AgencyRow {
