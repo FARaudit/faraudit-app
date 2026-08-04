@@ -1,180 +1,329 @@
-/* FARaudit · Teaming Partners (best-in-class) — render + partner-fit scatter */
+/* FARaudit · Teaming Partners — render layer.
+
+   Renders window.TEAM, which teaming-partners-live.js fills from
+   /api/teaming-partners. Every field on this page is a SAM registration fact:
+   legal name, UEI, CAGE, state, primary NAICS, SBA business types, the
+   registration's expiry, and the government business point of contact.
+
+   What is NOT here, and must not return: a fit score, a complementarity score,
+   past-performance dollars, an agency-overlap claim, or a written "insight"
+   about why to team with someone. None of those has a writer — the product
+   holds no past-performance data and no relationship between these entities
+   and this customer.
+
+   The one derived number the page shows is a COUNT of the certifications
+   present in the pool it just listed, which is arithmetic over what is on
+   screen rather than a claim about the market.
+
+   Values reach the page as text nodes built through h(); this file never
+   assigns markup. */
 (function () {
-  const D = window.TEAM;
+  'use strict';
+
+  const S = { naics: 'all', cert: 'all', q: '', sel: null };
   const $ = (id) => document.getElementById(id);
-  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-  const topCert = (p) => p.certs.find(c => c !== 'SB') || 'SB';
-  const certCol = (c) => D.CERT_COLOR[c] || css('--mute-2');
 
-  const S = { naics: 'all', cert: 'all', q: '', sort: 'Best fit', sel: 'p-002' };
+  function h(tag, opts, children) {
+    const o = opts || {};
+    const node = document.createElement(tag);
+    if (o.cls) node.className = o.cls;
+    if (o.text !== undefined && o.text !== null) node.textContent = String(o.text);
+    if (o.style) node.setAttribute('style', o.style);
+    if (o.attrs) {
+      for (const k of Object.keys(o.attrs)) {
+        const v = o.attrs[k];
+        if (v !== null && v !== undefined) node.setAttribute(k, String(v));
+      }
+    }
+    (children || []).forEach((c) => { if (c) node.appendChild(c); });
+    return node;
+  }
 
-  function buildControls() {
-    $('naicsFilters').innerHTML = D.NAICS_FILTERS.map(n => `<button class="fpill ${n.key === S.naics ? 'active' : ''}" data-naics="${n.key}">${n.label}</button>`).join('');
-    $('naicsFilters').querySelectorAll('button').forEach(b => b.onclick = () => { S.naics = b.dataset.naics; sync(); renderAll(); });
-    $('certFilters').innerHTML = D.CERT_FILTERS.map(c => `<button class="fpill ${c.key === S.cert ? 'active' : ''}" data-cert="${c.key}">${c.label}</button>`).join('');
-    $('certFilters').querySelectorAll('button').forEach(b => b.onclick = () => { S.cert = b.dataset.cert; sync(); renderAll(); });
-    const sortHtml = D.SORTS.map(s => `<button data-sort="${s}" class="fpill ${s === S.sort ? 'active' : ''}">${s}</button>`).join('');
-    $('sortSeg').innerHTML = sortHtml;
-    $('sortTabs').innerHTML = D.SORTS.map(s => `<button class="people-tab ${s === S.sort ? 'active' : ''}" data-sort="${s}">${s}</button>`).join('');
-    const onSort = (b) => { S.sort = b.dataset.sort; syncSort(); renderList(); };
-    $('sortSeg').querySelectorAll('button').forEach(b => b.onclick = () => onSort(b));
-    $('sortTabs').querySelectorAll('button').forEach(b => b.onclick = () => onSort(b));
-    $('searchInput').addEventListener('input', e => { S.q = e.target.value.toLowerCase(); renderAll(); });
-    $('resetBtn').onclick = () => { S.naics = 'all'; S.cert = 'all'; S.q = ''; S.sort = 'Best fit'; $('searchInput').value = ''; sync(); syncSort(); renderAll(); };
+  function fill(host, children) {
+    if (!host) return;
+    host.replaceChildren.apply(host, children.filter(Boolean));
   }
-  function sync() {
-    $('naicsFilters').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.naics === S.naics));
-    $('certFilters').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.cert === S.cert));
+
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    const t = Date.parse(iso);
+    if (Number.isNaN(t)) return '—';
+    return new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
-  function syncSort() {
-    $('sortSeg').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.sort === S.sort));
-    $('sortTabs').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.sort === S.sort));
+
+  const meta = () => (window.TEAM && window.TEAM.meta) || { state: 'loading' };
+  const partners = () => (window.TEAM && Array.isArray(window.TEAM.PARTNERS) ? window.TEAM.PARTNERS : []);
+  const scope = () => (window.TEAM && window.TEAM.SCOPE) || { codes: [], source: null };
+
+  function certsOf(p) {
+    return Array.isArray(p.certifications) ? p.certifications : [];
   }
 
   function filtered() {
-    let d = D.PARTNERS.filter(p => {
-      if (S.naics !== 'all' && !p.naics.includes(S.naics)) return false;
-      if (S.cert !== 'all' && !p.certs.includes(S.cert)) return false;
-      if (S.q && !(p.name + ' ' + p.loc + ' ' + p.naics.join(' ') + ' ' + p.certs.join(' ')).toLowerCase().includes(S.q)) return false;
-      return true;
+    const q = S.q.trim().toLowerCase();
+    return partners().filter((p) => {
+      if (S.cert !== 'all' && !certsOf(p).some((c) => c === S.cert)) return false;
+      if (!q) return true;
+      return [p.legal_business_name, p.uei, p.cage_code, p.state, p.poc_name]
+        .some((v) => v && String(v).toLowerCase().includes(q));
     });
-    if (S.sort === 'Best fit') d.sort((a, b) => b.fit - a.fit);
-    else if (S.sort === 'Complementarity') d.sort((a, b) => b.complement - a.complement);
-    else d.sort((a, b) => b.value - a.value);
-    return d;
   }
 
-  function renderKPIs() {
-    const f = filtered();
-    const certsViaTeam = D.CERT_COVERAGE.filter(c => !c.yours && c.via > 0).length;
-    const avgFit = f.length ? Math.round(f.reduce((a, p) => a + p.fit, 0) / f.length) : 0;
-    const totalPP = f.reduce((a, p) => a + p.value, 0).toFixed(1);
-    const cards = [
-      { lbl: 'Matched Partners', val: f.length, unit: '', foot: 'in your NAICS', tone: 'blue' },
-      { lbl: 'Set-Asides via Team', val: certsViaTeam, unit: '', foot: 'you cannot bid alone', tone: 'purple' },
-      { lbl: 'Avg Partner Fit', val: avgFit, unit: '/100', foot: 'NAICS + cert + agency', tone: 'green' },
-      { lbl: 'Combined Past Perf', val: '$' + totalPP, unit: 'B', foot: 'addressable with partners', tone: 'amber' }
-    ];
-    $('kpiStrip').innerHTML = cards.map(c => `<div class="kpi" data-tone="${c.tone}"><p class="lbl">${c.lbl}</p><div class="kpi-val">${c.val}<span class="unit">${c.unit}</span></div><div class="foot">${c.foot}</div></div>`).join('');
-    $('hsTotal').textContent = D.PARTNERS.length;
-    $('hsCerts').textContent = certsViaTeam;
-    $('hsOpps').textContent = D.TEAMING_OPPS.length;
+  /* ── state banner ───────────────────────────────────────────────────── */
+
+  const EMPTY_COPY = {
+    'no-profile-codes': {
+      label: 'No codes on file',
+      body: 'Partners are matched on your NAICS codes, and none are on file yet. Add them on the Capability Statement page.',
+      link: { href: '/capability-statement', text: 'Capability Statement' }
+    },
+    'sam-key-missing': {
+      label: 'Partner search unavailable',
+      body: 'The SAM entity search is not configured on the server, so no partner list could be requested. This is a configuration fault, not an empty market.'
+    },
+    'no-partners': {
+      label: 'No registered entities',
+      body: 'SAM answered and returned no active registrations under your primary codes.'
+    },
+    'no-match': {
+      label: 'No entity matches this filter',
+      body: 'SAM answered, but nothing matched the set-aside or state you asked for. Clear the filter to see the full list.'
+    }
+  };
+
+  function renderBanner() {
+    const el = $('stateBanner');
+    if (!el) return;
+    const m = meta();
+    el.classList.remove('is-error');
+
+    if (m.state === 'loading') {
+      el.hidden = false;
+      fill(el, [
+        h('span', { cls: 'sb-label', text: 'Loading' }),
+        h('span', { text: 'Asking SAM for active registrations under your codes…' })
+      ]);
+      return;
+    }
+    if (m.state === 'error') {
+      el.hidden = false;
+      el.classList.add('is-error');
+      fill(el, [
+        h('span', { cls: 'sb-label', text: 'Unavailable' }),
+        h('span', { text: 'The partner search did not answer, so this page has nothing to show. It is not an empty market — reload to try again.' }),
+        m.detail ? h('b', { text: m.detail }) : null
+      ]);
+      return;
+    }
+    if (m.state === 'empty') {
+      const copy = EMPTY_COPY[m.reason] || EMPTY_COPY['no-partners'];
+      el.hidden = false;
+      fill(el, [
+        h('span', { cls: 'sb-label', text: copy.label }),
+        h('span', { text: copy.body }),
+        copy.link ? h('a', { text: copy.link.text, attrs: { href: copy.link.href } }) : null
+      ]);
+      return;
+    }
+    el.hidden = true;
+    fill(el, []);
   }
 
-  /* scatter: x = complementarity, y = fit, size = past perf, color = cert */
-  function renderScatter() {
-    const svg = d3.select('#scatterSvg'); svg.selectAll('*').remove();
-    const node = $('scatterSvg'); if (!node) return;
-    const W = node.clientWidth || 680, H = 360, m = { t: 20, r: 20, b: 38, l: 50 };
-    svg.attr('viewBox', `0 0 ${W} ${H}`);
-    const data = filtered();
-    const x = d3.scaleLinear().domain([40, 95]).range([m.l, W - m.r]);
-    const y = d3.scaleLinear().domain([65, 95]).range([H - m.b, m.t]);
-    const r = d3.scaleSqrt().domain([1, 5.5]).range([7, 22]);
-    const mx = 75, my = 82;
-    svg.append('rect').attr('x', x(mx)).attr('y', m.t).attr('width', (W - m.r) - x(mx)).attr('height', y(my) - m.t).attr('fill', css('--green-500')).attr('opacity', .05);
-    svg.append('text').attr('class', 'zone').attr('x', W - m.r - 4).attr('y', m.t + 12).attr('text-anchor', 'end').attr('font-family', 'IBM Plex Mono').attr('font-size', 9.5).attr('font-weight', 700).attr('fill', css('--green-700')).text('PRIORITY ◆');
-    svg.append('line').attr('x1', x(mx)).attr('x2', x(mx)).attr('y1', m.t).attr('y2', H - m.b).attr('stroke', css('--line')).attr('stroke-dasharray', '4,3');
-    svg.append('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', y(my)).attr('y2', y(my)).attr('stroke', css('--line')).attr('stroke-dasharray', '4,3');
-    svg.append('g').attr('class', 'axis').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(5).tickFormat(d => d).tickSize(4));
-    svg.append('g').attr('class', 'axis').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickSize(4));
-    svg.append('text').attr('class', 'axis-title').attr('x', W - m.r).attr('y', H - 6).attr('text-anchor', 'end').attr('font-family', 'IBM Plex Mono').attr('font-size', 9.5).attr('fill', css('--mute')).text('fills your gaps →');
-    svg.append('text').attr('class', 'axis-title').attr('transform', 'rotate(-90)').attr('x', -m.t).attr('y', 13).attr('text-anchor', 'end').attr('font-family', 'IBM Plex Mono').attr('font-size', 9.5).attr('fill', css('--mute')).text('overall fit ↑');
-    svg.selectAll('circle.dot').data(data, d => d.id).join('circle')
-      .attr('class', d => 'dot' + (S.sel === d.id ? ' sel' : '') + (S.sel && S.sel !== d.id ? ' dim' : ''))
-      .attr('cx', d => x(d.complement)).attr('cy', d => y(d.fit)).attr('r', d => r(d.value))
-      .attr('fill', d => certCol(topCert(d))).attr('opacity', 1).attr('stroke', css('--card')).attr('stroke-width', 1.8).style('cursor', 'pointer')
-      .on('click', (ev, d) => { S.sel = d.id; renderAll(); })
-      .on('mousemove', (ev, d) => { const tip = $('coTip'); tip.innerHTML = `<div style="font-family:Manrope;font-weight:800;font-size:12px;margin-bottom:2px">${d.name}</div><div style="font-family:'IBM Plex Mono';font-size:10px;color:#cbd5e1;line-height:1.5">fit ${d.fit} · complement ${d.complement}<br>${d.certs.join(', ')} · $${d.value}M past perf</div>`; tip.style.display = 'block'; tip.style.left = Math.min(ev.clientX + 14, window.innerWidth - 220) + 'px'; tip.style.top = (ev.clientY + 14) + 'px'; })
-      .on('mouseleave', () => $('coTip').style.display = 'none');
-    svg.selectAll('text.dotlab').data(data).join('text').attr('class', 'dotlab').attr('x', d => x(d.complement)).attr('y', d => y(d.fit) - r(d.value) - 3).attr('text-anchor', 'middle')
-      .attr('font-family', 'IBM Plex Mono').attr('font-size', 8.5).attr('font-weight', 700).attr('fill', css('--ink-2')).text(d => d.name.split(' ')[0]);
-    $('scatterLegend').innerHTML = Object.entries(D.CERT_COLOR).filter(([k]) => k !== 'SB').map(([k, c]) => `<span class="lg"><i style="background:${c}"></i>${k}</span>`).join('') + `<span class="lg"><i style="background:${D.CERT_COLOR.SB}"></i>SB only</span>`;
+  /* ── header + controls ──────────────────────────────────────────────── */
+
+  function certCounts() {
+    const counts = {};
+    for (const p of partners()) for (const c of certsOf(p)) counts[c] = (counts[c] || 0) + 1;
+    return counts;
   }
 
-  function ring(score, size) {
-    const r = (size - 8) / 2, c = 2 * Math.PI * r, off = c * (1 - score / 100);
-    const col = score >= 85 ? css('--green-600') : score >= 70 ? css('--accent') : css('--mute-2');
-    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="var(--line-2)" stroke-width="5"/><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${col}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${off}" transform="rotate(-90 ${size/2} ${size/2})"/></svg>`;
+  function renderStats() {
+    const m = meta();
+    const list = partners();
+    const ready = m.state === 'ready' || m.state === 'empty';
+    const put = (id, v) => { const el = $(id); if (el) el.textContent = ready ? String(v) : '—'; };
+    put('hsTotal', list.length);
+    put('hsCerts', Object.keys(certCounts()).length);
+    put('hsCodes', (scope().codes || []).length);
+    const pill = $('livePill');
+    if (pill) pill.hidden = m.state !== 'ready';
   }
-  function certChips(certs) { return certs.map(c => `<span class="cert-chip" style="color:${certCol(c)};background:${hexA(certCol(c),.13)}">${c}</span>`).join(''); }
 
-  function renderPanel() {
-    const p = D.PARTNERS.find(x => x.id === S.sel) || filtered()[0];
-    const el = $('partnerPanel');
-    if (!p) { el.innerHTML = `<div class="cop-empty"><div class="t">Select a partner</div></div>`; return; }
-    const tc = certCol(topCert(p));
-    const newNaics = p.naics.filter(n => !D.MY.naics.includes(n));
-    const newCerts = p.certs.filter(c => !D.MY.certs.includes(c));
-    el.innerHTML = `
-      <div class="cop-head">
-        <div class="cop-av" style="background:linear-gradient(135deg,${tc},${shade(tc)})">${p.name.split(' ').slice(0, 2).map(w => w[0]).join('')}</div>
-        <div class="cop-id"><div class="cop-name">${p.name}</div><div class="cop-title">${p.loc}</div><div class="cert-row">${certChips(p.certs)}</div></div>
-        <span class="cop-rel" style="background:${hexA(tc,.13)};color:${tc}"><i style="background:${tc}"></i>fit ${p.fit}</span>
-      </div>
-      <div class="cop-ring-wrap">
-        <div class="cop-ring">${ring(p.fit, 62)}<div class="rn">${p.fit}<small>FIT</small></div></div>
-        <div class="cop-ring-txt"><div class="t">${p.fit >= 85 ? 'Strong teaming candidate' : 'Workable fit'}</div><div class="d">Complementarity ${p.complement}/100 · $${p.value}M past performance.</div></div>
-      </div>
-      <div class="cop-metrics" style="grid-template-columns:repeat(2,1fr)">
-        <div class="cop-m"><span class="mv">${newNaics.length ? newNaics.join(', ') : '\u2014'}</span><span class="ml">NAICS they add</span></div>
-        <div class="cop-m"><span class="mv" style="color:${tc}">${newCerts.length ? newCerts.join(', ') : 'none new'}</span><span class="ml">Set-asides unlocked</span></div>
-        <div class="cop-m"><span class="mv">${p.agencies.join(', ')}</span><span class="ml">Their agencies</span></div>
-        <div class="cop-m"><span class="mv">$${p.value}M</span><span class="ml">Past performance</span></div>
-      </div>
-      <div class="cop-note"><b>⚡ Why team up</b>${p.insight}</div>
-      <div class="cop-actions">
-        <button class="cop-btn primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg>Request intro</button>
-        <button class="cop-btn ghost"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Add to team</button>
-      </div>`;
+  function renderNaicsPills() {
+    const host = $('naicsFilters');
+    if (!host) return;
+    const codes = scope().codes || [];
+    const opts = [{ k: 'all', label: 'All codes' }].concat(codes.map((c) => ({ k: c, label: c })));
+    fill(host, opts.map((o) => {
+      const b = h('button', { cls: 'fpill' + (S.naics === o.k ? ' active' : ''), text: o.label, attrs: { type: 'button' } });
+      b.addEventListener('click', () => { S.naics = o.k; reload(); });
+      return b;
+    }));
+  }
+
+  function renderCertPills() {
+    const host = $('certFilters');
+    if (!host) return;
+    const counts = certCounts();
+    const keys = Object.keys(counts).sort();
+    const opts = [{ k: 'all', label: 'All certifications' }].concat(keys.map((k) => ({ k, label: k + ' · ' + counts[k] })));
+    fill(host, opts.map((o) => {
+      const b = h('button', { cls: 'fpill' + (S.cert === o.k ? ' active' : ''), text: o.label, attrs: { type: 'button' } });
+      b.addEventListener('click', () => { S.cert = o.k; renderList(); renderPanel(); renderCertPills(); });
+      return b;
+    }));
+  }
+
+  /* ── list ───────────────────────────────────────────────────────────── */
+
+  function emptyBlock(title, detail) {
+    return h('div', { cls: 'cop-empty' }, [
+      h('div', { cls: 't', text: title }),
+      h('div', { cls: 'd', text: detail })
+    ]);
+  }
+
+  function keyOf(p) {
+    return String(p.uei || p.cage_code || p.legal_business_name || '');
   }
 
   function renderList() {
-    const data = filtered();
-    $('pplCount').innerHTML = `${data.length} partners · click to open profile`;
-    $('partnerList').innerHTML = data.map(p => {
-      const tc = certCol(topCert(p)), fc = p.fit >= 85 ? css('--green-600') : p.fit >= 70 ? css('--accent') : css('--mute-2');
-      const cR = 16, circ = 2 * Math.PI * cR, off = circ * (1 - p.fit / 100);
-      return `<div class="ppl-row ag-head2${S.sel === p.id ? ' sel' : ''}" data-id="${p.id}">
-        <div class="ppl-av" style="background:linear-gradient(135deg,${tc},${shade(tc)});border-radius:11px">${p.name.split(' ').slice(0,2).map(w=>w[0]).join('')}</div>
-        <div class="ppl-info"><div class="ppl-name">${p.name}</div><div class="ppl-sub">${p.loc} · ${p.agencies.join(', ')}</div></div>
-        <div class="pn-mid"><span class="pn-naics">${p.naics.join(' · ')}</span><div class="cert-row">${certChips(p.certs)}</div></div>
-        <div class="ppl-awd">$${p.value}M<small>complement ${p.complement}</small></div>
-        <div class="ppl-fit"><svg width="40" height="40" viewBox="0 0 40 40"><circle cx="20" cy="20" r="${cR}" fill="none" stroke="var(--line-2)" stroke-width="3.5"/><circle cx="20" cy="20" r="${cR}" fill="none" stroke="${fc}" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="${circ}" stroke-dashoffset="${off}" transform="rotate(-90 20 20)"/></svg><span class="fn">${p.fit}</span></div>
-      </div>`;
-    }).join('') || `<div class="tl-empty">No partners match your filters.</div>`;
-    $('partnerList').querySelectorAll('.ppl-row').forEach(r => r.onclick = () => { S.sel = r.dataset.id; renderScatter(); renderPanel(); renderList(); });
+    const host = $('partnerList');
+    if (!host) return;
+    const rows = filtered();
+    const total = partners().length;
+
+    const count = $('pplCount');
+    if (count) {
+      count.textContent = meta().state === 'ready'
+        ? (rows.length === total ? total + ' registered entities' : rows.length + ' of ' + total + ' registered entities')
+        : '';
+    }
+
+    if (rows.length === 0) {
+      fill(host, [total === 0
+        ? emptyBlock('Nothing to list', 'See the note above for why.')
+        : emptyBlock('No entity matches this filter', 'Clear the certification filter or the search.')]);
+      return;
+    }
+
+    fill(host, rows.map((p) => {
+      const certs = certsOf(p);
+      const row = h('div', { cls: 'team-row' + (S.sel === keyOf(p) ? ' sel' : '') }, [
+        h('div', { cls: 'tr-name' }, [
+          h('div', { cls: 'tr-legal', text: p.legal_business_name || '(no legal name on file)' }),
+          h('div', { cls: 'tr-uei mono', text: p.uei ? 'UEI ' + p.uei : (p.cage_code ? 'CAGE ' + p.cage_code : '—') })
+        ]),
+        h('div', { cls: 'tr-state', text: p.state || '—' }),
+        h('div', { cls: 'tr-naics mono', text: p.primary_naics || '—' }),
+        h('div', { cls: 'tr-certs' }, certs.length
+          ? certs.slice(0, 3).map((c) => h('span', { cls: 'fpill', text: c }))
+          : [h('span', { cls: 'tr-none', text: 'none registered' })])
+      ]);
+      row.addEventListener('click', () => { S.sel = keyOf(p); renderList(); renderPanel(); });
+      return row;
+    }));
   }
 
-  function renderCerts() {
-    $('certList').innerHTML = D.CERT_COVERAGE.map(c => {
-      const col = certCol(c.cert);
-      const status = c.yours ? 'You hold' : c.via > 0 ? `Via ${c.via} partner${c.via > 1 ? 's' : ''}` : 'Not available';
-      const cls = c.yours ? 'own' : c.via > 0 ? 'team' : 'none';
-      return `<div class="cert-cov ${cls}"><span class="cc-badge" style="background:${hexA(col,.14)};color:${col}">${c.cert}</span><div class="cc-info"><div class="cc-name">${c.label}</div><div class="cc-status">${status}</div></div><span class="cc-check ${cls}">${c.yours ? '✓ own' : c.via > 0 ? '◆ team' : '—'}</span></div>`;
-    }).join('');
-    const reach = D.CERT_COVERAGE.filter(c => c.yours || c.via > 0).length, total = D.CERT_COVERAGE.length;
-    $('certList').insertAdjacentHTML('afterbegin', `<div class="cert-summary"><div class="cs-ring"><svg width="46" height="46" viewBox="0 0 46 46"><circle cx="23" cy="23" r="19" fill="none" stroke="var(--line-2)" stroke-width="5"/><circle cx="23" cy="23" r="19" fill="none" stroke="${css('--purple-600')}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${2*Math.PI*19}" stroke-dashoffset="${2*Math.PI*19*(1-reach/total)}" transform="rotate(-90 23 23)"/></svg><span class="cs-num">${reach}/${total}</span></div><div class="cs-txt"><div class="cs-t">${reach} of ${total} set-aside lanes reachable</div><div class="cs-d">1 solo · <b>${reach-1} unlocked by teaming</b></div></div></div>`);
+  /* ── detail panel ───────────────────────────────────────────────────── */
+
+  function renderPanel() {
+    const host = $('partnerPanel');
+    if (!host) return;
+    const rows = filtered();
+    const p = partners().find((x) => keyOf(x) === S.sel) || null;
+
+    if (!p) {
+      fill(host, [rows.length
+        ? emptyBlock('Select an entity', 'Pick a registration to see its identifiers, certifications and point of contact.')
+        : emptyBlock('Nothing selected', 'There is no entity to select yet.')]);
+      return;
+    }
+
+    const certs = certsOf(p);
+    const sba = Array.isArray(p.sba_certifications) ? p.sba_certifications : [];
+
+    const certBlock = certs.length
+      ? h('div', { style: 'display:flex;flex-direction:column;gap:6px;margin-top:2px' },
+          sba.length
+            ? sba.map((c) => h('div', { style: 'font-size:12px;color:var(--ink-2)' }, [
+                h('span', { text: c.description }),
+                c.certifiedUntil ? h('span', { cls: 'mono', text: ' · until ' + fmtDate(c.certifiedUntil), style: 'color:var(--mute)' }) : null
+              ]))
+            : certs.map((c) => h('div', { text: c, style: 'font-size:12px;color:var(--ink-2)' })))
+      : h('span', { text: 'No SBA business type is registered for this entity.' });
+
+    const poc = p.poc_name || p.poc_email || p.poc_phone
+      ? h('div', { style: 'display:flex;flex-direction:column;gap:4px;margin-top:2px' }, [
+          p.poc_name ? h('div', { text: p.poc_name, style: 'font-size:12.5px;font-weight:700;color:var(--ink)' }) : null,
+          p.poc_email ? h('a', { cls: 'mono', text: p.poc_email, attrs: { href: 'mailto:' + p.poc_email }, style: 'font-size:11px' }) : null,
+          p.poc_phone ? h('div', { cls: 'mono', text: p.poc_phone, style: 'font-size:11px;color:var(--mute)' }) : null
+        ])
+      : h('span', { text: 'SAM publishes no government business point of contact for this registration.' });
+
+    fill(host, [
+      h('div', { cls: 'cop-head' }, [
+        h('div', { cls: 'cop-id' }, [
+          h('div', { cls: 'cop-name', text: p.legal_business_name || '(no legal name on file)' }),
+          h('div', { cls: 'cop-title', text: 'Active SAM registration' }),
+          p.primary_naics ? h('div', { cls: 'cop-agy', text: 'Primary NAICS ' + p.primary_naics }) : null
+        ])
+      ]),
+      h('div', { cls: 'cop-note' }, [
+        h('b', { text: 'Identifiers' }),
+        h('span', { cls: 'mono', text: [p.uei ? 'UEI ' + p.uei : null, p.cage_code ? 'CAGE ' + p.cage_code : null].filter(Boolean).join(' · ') || '—' })
+      ]),
+      h('div', { cls: 'cop-note' }, [
+        h('b', { text: 'Location' }),
+        h('span', { text: [p.state, p.zip].filter(Boolean).join(' ') || 'Not published' })
+      ]),
+      h('div', { cls: 'cop-note' }, [h('b', { text: 'SBA certifications' }), certBlock]),
+      h('div', { cls: 'cop-note' }, [h('b', { text: 'Government business contact' }), poc]),
+      h('div', { cls: 'cop-note' }, [
+        h('b', { text: 'Registration expires' }),
+        h('span', { cls: 'mono', text: fmtDate(p.registration_expiration) })
+      ]),
+      h('div', { cls: 'cop-note' }, [
+        h('b', { text: 'What this is not' }),
+        h('span', { text: 'A registration match on NAICS. It is not a past-performance record, a capability assessment, or evidence that this company would team with you.' })
+      ])
+    ]);
   }
 
-  function renderOpps() {
-    $('toppList').innerHTML = D.TEAMING_OPPS.map(o => `<div class="topp-row"><div class="topp-info"><div class="topp-title">${o.title}</div><div class="topp-sol">${o.sol} · $${o.val}M</div><div class="topp-need">${o.need}</div></div><div class="topp-match"><span class="topp-match-lbl">best match</span><span class="topp-match-name">${o.match}</span></div></div>`).join('');
+  /* ── wiring ─────────────────────────────────────────────────────────── */
+
+  function renderAll() {
+    renderBanner();
+    renderStats();
+    renderNaicsPills();
+    renderCertPills();
+    renderList();
+    renderPanel();
   }
 
-  function renderInsight() {
-    const p = D.PARTNERS.find(x => x.id === S.sel);
-    let html;
-    if (p) { const nc = p.certs.filter(c => !D.MY.certs.includes(c)); html = `<span class="ib-label">Top match</span><b>${p.name}</b> (fit ${p.fit}) ${nc.length ? `unlocks <b>${nc.join(', ')}</b> set-asides and ` : ''}${p.insight}`; }
-    else html = `<span class="ib-label">Read</span>Teaming unlocks <b>4 set-aside categories</b> you can't bid alone. <b>Desert Aerospace</b> (SDVOSB) and <b>Summit (HUBZone)</b> are your highest-leverage partners for the open T-38 and WR-ALC sols.`;
-    $('insightBar').innerHTML = `<span class="ib-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a7 7 0 00-4 12.7V17a1 1 0 001 1h6a1 1 0 001-1v-2.3A7 7 0 0012 2z"/><path d="M9 21h6"/></svg></span><span>${html}</span>`;
+  function reload() {
+    if (typeof window.TEAM_LOAD !== 'function') return;
+    window.TEAM.meta = Object.assign({}, meta(), { state: 'loading' });
+    renderBanner();
+    window.TEAM_LOAD({ naics: S.naics === 'all' ? null : S.naics });
   }
 
-  function shade(hex) { const n = parseInt(hex.slice(1), 16); return `rgb(${Math.round(((n>>16)&255)*.66)},${Math.round(((n>>8)&255)*.66)},${Math.round((n&255)*.66)})`; }
-  function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`; }
+  function buildControls() {
+    const search = $('searchInput');
+    if (search) search.addEventListener('input', (e) => { S.q = e.target.value; renderList(); renderPanel(); });
+    const reset = $('resetBtn');
+    if (reset) {
+      reset.addEventListener('click', () => {
+        S.naics = 'all'; S.cert = 'all'; S.q = ''; S.sel = null;
+        if (search) search.value = '';
+        reload();
+      });
+    }
+  }
 
-  function renderAll() { renderKPIs(); renderScatter(); renderPanel(); renderList(); renderCerts(); renderOpps(); renderInsight(); }
-  function onThemeChange() { renderAll(); }
-  function init() { buildControls(); renderAll(); let to; window.addEventListener('resize', () => { clearTimeout(to); to = setTimeout(renderScatter, 200); }); }
-  window.TEAM_APP = { render: renderAll, onThemeChange };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+  function init() { buildControls(); renderAll(); }
+
+  window.TEAM_APP = { render: renderAll, onThemeChange: renderAll };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
 })();

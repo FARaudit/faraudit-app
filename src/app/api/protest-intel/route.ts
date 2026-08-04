@@ -97,9 +97,25 @@ export async function GET(req: NextRequest) {
   if (agencyFilter) cacheQ = cacheQ.ilike("agency", `%${agencyFilter}%`);
   const { data: cached } = await cacheQ;
 
+  // WHAT HAPPENED UPSTREAM IS PART OF THE ANSWER.
+  //
+  // This used to swallow both the HTTP status and the persistence result, so an
+  // empty list meant "no protests", "GAO refused us", and "we could not write
+  // what GAO gave us" all at once — and the page, seeing an empty list, fell
+  // back to a seed of invented dockets. Measured 2026-08-04: gao.gov answers
+  // 403 Access Denied to this request (with or without a browser user-agent),
+  // and `protest_decisions` holds zero rows. Whether Vercel's egress is blocked
+  // the same way is NOT established, which is exactly why the outcome is now
+  // reported instead of inferred.
   let rows: ProtestRow[] = [];
+  let fetchStatus: number | null = null;
+  let source: "cache" | "live" | "none" = "none";
+  let persisted: boolean | null = null;
+  let upstreamError: string | null = null;
+
   if (cached && cached.length > 5) {
     rows = cached as ProtestRow[];
+    source = "cache";
   } else {
     try {
       const res = await fetch(GAO_RSS, {
@@ -107,22 +123,26 @@ export async function GET(req: NextRequest) {
         signal: AbortSignal.timeout(15000),
         next: { revalidate: 21600 } // 6h CDN cache
       });
+      fetchStatus = res.status;
       if (res.ok) {
         const xml = await res.text();
         rows = parseGAO(xml);
-        // Persist (best-effort).
+        source = rows.length > 0 ? "live" : "none";
         if (rows.length > 0) {
-          await supabase
+          const { error: upsertError } = await supabase
             .from("protest_decisions")
             .upsert(
               rows.map((r) => ({ ...r, fetched_at: new Date().toISOString() })),
               { onConflict: "docket" }
-            )
-            .then(() => null, () => null);
+            );
+          // A failed write is not a failed read: the rows still serve this
+          // request. It is recorded so an empty cache table is never read as
+          // proof the fetch never worked.
+          persisted = !upsertError;
         }
       }
-    } catch {
-      // GAO fetch failed — fall through with empty rows.
+    } catch (e) {
+      upstreamError = e instanceof Error ? e.message : "fetch failed";
     }
   }
 
@@ -146,5 +166,29 @@ export async function GET(req: NextRequest) {
     .sort((a, b) => b.total - a.total)
     .slice(0, 30);
 
-  return NextResponse.json({ decisions: rows.slice(0, 50), agencies, fetched_at: new Date().toISOString() });
+  // `reason` is null iff there is something to show. An empty list always
+  // carries WHY, because the page must be able to say "GAO refused the request"
+  // rather than render nothing and let a seed fill the gap.
+  const reason =
+    rows.length > 0
+      ? null
+      : upstreamError
+        ? "upstream-error"
+        : fetchStatus !== null && fetchStatus !== 200
+          ? "upstream-blocked"
+          : "no-decisions";
+
+  return NextResponse.json({
+    decisions: rows.slice(0, 50),
+    agencies,
+    fetched_at: new Date().toISOString(),
+    meta: {
+      source,
+      reason,
+      upstream_status: fetchStatus,
+      upstream_error: upstreamError,
+      persisted,
+      feed: GAO_RSS
+    }
+  });
 }
