@@ -13,8 +13,19 @@ const ok=(l:string,c:boolean)=>{ if(c){pass++;console.log(`  ✓ ${l}`);} else {
      /reconcileAbsenceClaims\([^)]*solicitation\?\.typeOfSetAside/.test(src.replace(/\n/g," ")));
   ok("NOT sourced from input.setAside (the placebo the first wiring had)", !/\(input as \{ setAside/.test(src));
   ok("provenance set excludes ungrounded", /!== "\(ungrounded\)"/.test(src));
-  const seam = src.indexOf("AUDIT_ABSENCE_RECONCILE"), np = src.indexOf("AUDIT_NONPRESENCE_HONESTY");
+  // Order must be measured on the GUARD, never on the flag name. `indexOf("AUDIT_ABSENCE_RECONCILE")` finds the
+  // COMMENT above the seam (executor:745) rather than the seam (executor:749), so both orderings below were being
+  // satisfied by comment position — they held only because the comments happen to sit in the same order as the
+  // code they describe. Move one without the other and the assertion would have gone on passing while lying.
+  const guard = (f: string) => src.indexOf(`process.env.${f} === "true"`);
+  const seam = guard("AUDIT_ABSENCE_RECONCILE"), np = guard("AUDIT_NONPRESENCE_HONESTY");
+  ok("both seams located as CODE, not as a comment mentioning the flag", seam > 0 && np > 0);
   ok("#7 runs AFTER #2 (it corrects #2's output)", np > 0 && seam > np);
+  // Carried over from _cert-rt8-wiring.ts, deleted 2026-08-04: that cert asserted the PARKED #8 seam was wired,
+  // so 4 of its checks were red by design and 2 more passed off the comment describing the seam's absence.
+  // _cert-rt8-parked.ts owns the #8 question now; this was its one assertion still worth keeping, re-aimed at #7.
+  ok("#7 sits BEFORE buildV3Payload (otherwise it corrects nothing the customer reads)",
+     seam > 0 && seam < src.indexOf("const payload = buildV3Payload"));
   console.log(`\nCERT RT7-WIRING: ${pass} passed, ${fail} failed`);
   process.exit(fail?1:0);
 })();
