@@ -1,185 +1,316 @@
-/* FARaudit · CMMC Readiness (best-in-class) — render + radar + gauge */
+/* FARaudit · CMMC Readiness — render layer.
+
+   Renders window.CMMC, which cmmc-readiness-live.js fills from
+   /api/cmmc-readiness. Two kinds of fact appear on this page and they are
+   never mixed:
+
+     1. What the customer's OWN audited solicitations require — counts, the
+        solicitations themselves, and the token in each one that triggered the
+        level. Every one of these traces to an audit row.
+     2. The DoD CMMC 2.0 model as reference — practice counts, triggering
+        clauses, and what each level asks for.
+
+   What is NOT here, and must not return: a readiness score, an open-controls
+   count, a domain-by-domain posture, a certification timeline. The product
+   holds no self-assessment, so it can say what a solicitation demands and
+   nothing about whether this company meets it.
+
+   Values reach the page as text nodes built through h(); this file never
+   assigns markup. */
 (function () {
-  const D = window.CMMC;
+  'use strict';
+
+  const S = { level: 'all', q: '', sel: null };
   const $ = (id) => document.getElementById(id);
-  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-  const scoreColor = (p) => p >= 80 ? css('--green-600') : p >= 50 ? css('--amber-600') : css('--red-600');
+  const LEVELS = ['1', '2', '3'];
 
-  const S = { prio: 'all', q: '', sort: 'Priority', sel: 'CM' };
-
-  const totals = () => {
-    const ctl = D.DOMAINS.reduce((a, d) => a + d.total, 0);
-    const met = D.DOMAINS.reduce((a, d) => a + d.met, 0);
-    return { ctl, met, open: ctl - met, score: Math.round(met / ctl * 100) };
-  };
-  const daysToDeadline = () => Math.max(0, Math.round((new Date(D.DEADLINE) - new Date()) / 864e5));
-
-  function buildControls() {
-    $('prioFilters').innerHTML = D.PRIORITIES.map(p => `<button class="fpill ${p.key === S.prio ? 'active' : ''}" data-prio="${p.key}">${p.label}</button>`).join('');
-    $('prioFilters').querySelectorAll('button').forEach(b => b.onclick = () => { S.prio = b.dataset.prio; sync(); renderAll(); });
-    $('sortSeg').innerHTML = ['Priority', 'Score ↑', 'Score ↓'].map(s => `<button data-sort="${s}" class="fpill ${s === S.sort ? 'active' : ''}">${s}</button>`).join('');
-    $('sortSeg').querySelectorAll('button').forEach(b => b.onclick = () => { S.sort = b.dataset.sort; syncSort(); renderDomains(); });
-    $('searchInput').addEventListener('input', e => { S.q = e.target.value.toLowerCase(); renderAll(); });
-    $('resetBtn').onclick = () => { S.prio = 'all'; S.q = ''; S.sort = 'Priority'; $('searchInput').value = ''; sync(); syncSort(); renderAll(); };
+  function h(tag, opts, children) {
+    const o = opts || {};
+    const node = document.createElement(tag);
+    if (o.cls) node.className = o.cls;
+    if (o.text !== undefined && o.text !== null) node.textContent = String(o.text);
+    if (o.style) node.setAttribute('style', o.style);
+    if (o.attrs) {
+      for (const k of Object.keys(o.attrs)) {
+        const v = o.attrs[k];
+        if (v !== null && v !== undefined) node.setAttribute(k, String(v));
+      }
+    }
+    (children || []).forEach((c) => { if (c) node.appendChild(c); });
+    return node;
   }
-  function sync() { $('prioFilters').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.prio === S.prio)); }
-  function syncSort() { $('sortSeg').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.sort === S.sort)); }
+
+  function fill(host, children) {
+    if (!host) return;
+    host.replaceChildren.apply(host, children.filter(Boolean));
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    const t = Date.parse(iso);
+    if (Number.isNaN(t)) return '—';
+    return new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  const meta = () => (window.CMMC && window.CMMC.meta) || { state: 'loading' };
+  const dist = () => (window.CMMC && window.CMMC.DISTRIBUTION) || { '0': 0, '1': 0, '2': 0, '3': 0 };
+  const byLevel = () => (window.CMMC && window.CMMC.BY_LEVEL) || { '1': [], '2': [], '3': [] };
+  const reference = () => (window.CMMC && window.CMMC.REFERENCE) || {};
+
+  function allFlagged() {
+    const b = byLevel();
+    return LEVELS.flatMap((lv) => (b[lv] || []).map((r) => Object.assign({ level: lv }, r)));
+  }
 
   function filtered() {
-    return D.DOMAINS.filter(d => {
-      if (S.prio === 'MET') { if (d.pct !== 100) return false; }
-      else if (S.prio !== 'all' && d.priority !== S.prio) return false;
-      if (S.q && !(d.code + ' ' + d.name + ' ' + d.insight).toLowerCase().includes(S.q)) return false;
-      return true;
+    const q = S.q.trim().toLowerCase();
+    return allFlagged().filter((r) => {
+      if (S.level !== 'all' && r.level !== S.level) return false;
+      if (!q) return true;
+      return [r.solicitation_number, r.title, r.agency, r.matched_on].some((v) => v && String(v).toLowerCase().includes(q));
     });
   }
 
-  function renderKPIs() {
-    const t = totals();
-    const high = D.DOMAINS.filter(d => d.priority === 'HIGH').length;
-    const full = D.DOMAINS.filter(d => d.pct === 100).length;
-    const cards = [
-      { lbl: 'Readiness Score', val: t.score, unit: '%', foot: t.met + ' of ' + t.ctl + ' controls met', tone: t.score >= 80 ? 'green' : t.score >= 60 ? 'amber' : 'red' },
-      { lbl: 'Open Controls', val: t.open, unit: '', foot: 'gaps to close', tone: 'amber' },
-      { lbl: 'High-Priority Domains', val: high, unit: '', foot: 'C3PAOs flag these first', tone: 'red' },
-      { lbl: 'Domains at 100%', val: full + '/' + D.DOMAINS.length, unit: '', foot: 'fully compliant families', tone: 'blue' }
+  /* ── state banner ───────────────────────────────────────────────────── */
+
+  const EMPTY_COPY = {
+    'no-audits': {
+      label: 'No audits yet',
+      body: 'This page reads the solicitations you have audited. Run an audit and any CMMC requirement it carries appears here.'
+    },
+    'none-flagged': {
+      label: 'No CMMC requirement found',
+      body: 'None of the solicitations you have audited names a CMMC level, a CUI obligation, or DFARS 252.204-7012/7021. The reference below still shows what each level would demand.'
+    }
+  };
+
+  function renderBanner() {
+    const el = $('stateBanner');
+    if (!el) return;
+    const m = meta();
+    el.classList.remove('is-error');
+
+    if (m.state === 'loading') {
+      el.hidden = false;
+      fill(el, [
+        h('span', { cls: 'sb-label', text: 'Loading' }),
+        h('span', { text: 'Reading the CMMC requirements in your audited solicitations…' })
+      ]);
+      return;
+    }
+    if (m.state === 'error') {
+      el.hidden = false;
+      el.classList.add('is-error');
+      fill(el, [
+        h('span', { cls: 'sb-label', text: 'Unavailable' }),
+        h('span', { text: 'Your audits could not be read, so this page has nothing to report. It is not a clean bill of health — reload to try again.' }),
+        m.detail ? h('b', { text: m.detail }) : null
+      ]);
+      return;
+    }
+    if (m.state === 'empty') {
+      const copy = EMPTY_COPY[m.reason] || EMPTY_COPY['none-flagged'];
+      el.hidden = false;
+      fill(el, [
+        h('span', { cls: 'sb-label', text: copy.label }),
+        h('span', { text: copy.body })
+      ]);
+      return;
+    }
+    // Ready — but a count drawn from partly-unanalyzed audits carries its
+    // caveat in place, not in a footnote nobody reads.
+    if (m.unanalyzed > 0) {
+      el.hidden = false;
+      fill(el, [
+        h('span', { cls: 'sb-label', text: 'Note' }),
+        h('span', { text: m.unanalyzed + ' of your ' + m.totalAudited + ' audits carry no analysis yet, so they answer neither way and are not counted as clear.' })
+      ]);
+      return;
+    }
+    el.hidden = true;
+    fill(el, []);
+  }
+
+  /* ── header stats + distribution ────────────────────────────────────── */
+
+  function renderStats() {
+    const m = meta();
+    const d = dist();
+    const flagged = d['1'] + d['2'] + d['3'];
+    const ready = m.state === 'ready' || m.state === 'empty';
+    const put = (id, v) => { const el = $(id); if (el) el.textContent = ready ? String(v) : '—'; };
+    put('hsAudited', m.totalAudited || 0);
+    put('hsFlagged', flagged);
+    const highest = LEVELS.filter((lv) => d[lv] > 0).pop();
+    const hi = $('hsHighest');
+    if (hi) hi.textContent = ready ? (highest ? 'L' + highest : 'None') : '—';
+    const pill = $('livePill');
+    if (pill) pill.hidden = m.state !== 'ready';
+  }
+
+  function renderDistribution() {
+    const host = $('kpiStrip');
+    if (!host) return;
+    const d = dist();
+    const m = meta();
+    const shown = m.state === 'ready' || m.state === 'empty';
+    const cells = [
+      { k: '0', label: 'No CMMC named', foot: 'nothing in the audit triggers a level' },
+      { k: '1', label: 'Level 1 — Foundational', foot: 'FCI · 17 practices' },
+      { k: '2', label: 'Level 2 — Advanced', foot: 'CUI · 110 practices' },
+      { k: '3', label: 'Level 3 — Expert', foot: 'critical programs · 134 practices' }
     ];
-    $('kpiStrip').innerHTML = cards.map(c => `<div class="kpi" data-tone="${c.tone}"><p class="lbl">${c.lbl}</p><div class="kpi-val">${c.val}<span class="unit">${c.unit}</span></div><div class="foot">${c.foot}</div></div>`).join('');
-    $('hsScore').textContent = t.score;
-    $('hsGaps').textContent = t.open;
-    $('hsDays').textContent = daysToDeadline();
+    fill(host, cells.map((c) => h('div', { cls: 'kpi' }, [
+      h('p', { cls: 'lbl', text: c.label }),
+      h('div', { cls: 'kpi-val', text: shown ? String(d[c.k] || 0) : '—' }, [
+        h('span', { cls: 'unit', text: 'audits' })
+      ]),
+      h('div', { cls: 'foot', text: c.foot })
+    ])));
   }
 
-  /* radar chart of domain pct */
-  function renderRadar() {
-    const svg = d3.select('#radarSvg'); svg.selectAll('*').remove();
-    const node = $('radarSvg'); if (!node) return;
-    const W = node.clientWidth || 520, H = 340, cx = W / 2, cy = H / 2 + 6, R = Math.min(W, H) / 2 - 38;
-    svg.attr('viewBox', `0 0 ${W} ${H}`);
-    const data = D.DOMAINS, n = data.length;
-    const ang = (i) => (Math.PI * 2 * i / n) - Math.PI / 2;
-    // rings
-    [25, 50, 75, 100].forEach(p => {
-      const rr = R * p / 100;
-      svg.append('circle').attr('cx', cx).attr('cy', cy).attr('r', rr).attr('fill', 'none').attr('stroke', css('--line-2')).attr('stroke-width', 1);
-    });
-    // spokes + labels
-    data.forEach((d, i) => {
-      const a = ang(i), x2 = cx + Math.cos(a) * R, y2 = cy + Math.sin(a) * R;
-      svg.append('line').attr('x1', cx).attr('y1', cy).attr('x2', x2).attr('y2', y2).attr('stroke', css('--line-2')).attr('stroke-width', 1);
-      const lx = cx + Math.cos(a) * (R + 16), ly = cy + Math.sin(a) * (R + 16);
-      svg.append('text').attr('x', lx).attr('y', ly + 3).attr('text-anchor', Math.abs(Math.cos(a)) < 0.3 ? 'middle' : (Math.cos(a) > 0 ? 'start' : 'end'))
-        .attr('font-family', 'IBM Plex Mono').attr('font-size', 9.5).attr('font-weight', 700)
-        .attr('fill', S.sel === d.code ? scoreColor(d.pct) : css('--mute')).text(d.code);
-    });
-    // polygon
-    const pts = data.map((d, i) => { const a = ang(i), rr = R * d.pct / 100; return [cx + Math.cos(a) * rr, cy + Math.sin(a) * rr]; });
-    const path = 'M' + pts.map(p => p.join(',')).join('L') + 'Z';
-    const grad = svg.append('defs').append('radialGradient').attr('id', 'radg');
-    grad.append('stop').attr('offset', '0%').attr('stop-color', css('--accent')).attr('stop-opacity', .35);
-    grad.append('stop').attr('offset', '100%').attr('stop-color', css('--accent')).attr('stop-opacity', .12);
-    svg.append('path').attr('d', path).attr('fill', 'url(#radg)').attr('stroke', css('--accent')).attr('stroke-width', 2);
-    // 80% target ring — the assessment-ready threshold
-    const tR = R * 80 / 100;
-    svg.append('circle').attr('cx', cx).attr('cy', cy).attr('r', tR).attr('fill', 'none').attr('stroke', css('--green-600')).attr('stroke-width', 1.5).attr('stroke-dasharray', '4 4').attr('opacity', .85);
-    svg.append('text').attr('x', cx).attr('y', cy - tR - 5).attr('text-anchor', 'middle').attr('font-family', 'IBM Plex Mono').attr('font-size', 8.5).attr('font-weight', 700).attr('fill', css('--green-600')).text('80% READY \u2192');
-    // dots
-    data.forEach((d, i) => {
-      svg.append('circle').attr('cx', pts[i][0]).attr('cy', pts[i][1]).attr('r', S.sel === d.code ? 6 : 4)
-        .attr('fill', scoreColor(d.pct)).attr('stroke', css('--card')).attr('stroke-width', 1.5).style('cursor', 'pointer')
-        .on('click', () => { S.sel = d.code; renderAll(); })
-        .on('mousemove', (ev) => { const tip = $('coTip'); tip.innerHTML = `<div style="font-family:Manrope;font-weight:800;font-size:12px;margin-bottom:2px">${d.code} · ${d.name}</div><div style="font-family:'IBM Plex Mono';font-size:10px;color:#cbd5e1">${d.pct}% · ${d.met}/${d.total} met</div>`; tip.style.display = 'block'; tip.style.left = Math.min(ev.clientX + 14, window.innerWidth - 200) + 'px'; tip.style.top = (ev.clientY + 14) + 'px'; })
-        .on('mouseleave', () => $('coTip').style.display = 'none');
-    });
-    const weakest = data.slice().sort((a, b) => a.pct - b.pct).slice(0, 3).map(d => d.code).join(', ');
-    $('radarLegend').innerHTML = `<span class="lg"><i style="background:${css('--green-600')}"></i>≥80% ready</span><span class="lg"><i style="background:${css('--amber-600')}"></i>50–79%</span><span class="lg"><i style="background:${css('--red-600')}"></i>&lt;50%</span><span class="lg rad-weak">◆ Fix first: ${weakest}</span>`;
+  function renderLevelPills() {
+    const host = $('prioFilters');
+    if (!host) return;
+    const d = dist();
+    const opts = [{ k: 'all', label: 'All' }].concat(
+      LEVELS.filter((lv) => d[lv] > 0).map((lv) => ({ k: lv, label: 'Level ' + lv }))
+    );
+    fill(host, opts.map((o) => {
+      const b = h('button', { cls: 'fpill' + (S.level === o.k ? ' active' : ''), text: o.label, attrs: { type: 'button' } });
+      b.addEventListener('click', () => { S.level = o.k; renderAll(); });
+      return b;
+    }));
   }
 
-  /* readiness gauge ring + domain detail */
-  function gaugeRing(score) {
-    const sz = 132, r = 56, c = 2 * Math.PI * r, off = c * (1 - score / 100), col = scoreColor(score);
-    return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}"><g transform="rotate(-90 ${sz/2} ${sz/2})">
-      <circle cx="${sz/2}" cy="${sz/2}" r="${r}" fill="none" stroke="var(--line-2)" stroke-width="11"/>
-      <circle cx="${sz/2}" cy="${sz/2}" r="${r}" fill="none" stroke="${col}" stroke-width="11" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${off}"/></g></svg>`;
+  /* ── the flagged solicitations ──────────────────────────────────────── */
+
+  function emptyBlock(title, detail) {
+    return h('div', { cls: 'cop-empty' }, [
+      h('div', { cls: 't', text: title }),
+      h('div', { cls: 'd', text: detail })
+    ]);
   }
+
+  function renderList() {
+    const host = $('domList');
+    if (!host) return;
+    const rows = filtered();
+    const total = allFlagged().length;
+
+    const count = $('feedCount');
+    if (count) {
+      count.textContent = meta().state === 'ready'
+        ? (rows.length === total ? total + ' solicitations' : rows.length + ' of ' + total + ' solicitations')
+        : '';
+    }
+
+    if (rows.length === 0) {
+      fill(host, [total === 0
+        ? emptyBlock('Nothing flagged', 'See the note above.')
+        : emptyBlock('No solicitation matches this filter', 'Clear the level filter or the search.')]);
+      return;
+    }
+
+    fill(host, rows.map((r) => {
+      const card = h('div', { cls: 'feed-card' + (S.sel === r.id ? ' sel' : '') }, [
+        h('div', { cls: 'feed-top' }, [
+          h('span', { cls: 'feed-clause', text: 'CMMC Level ' + r.level }),
+          h('span', { cls: 'feed-date', text: fmtDate(r.created_at) })
+        ]),
+        h('div', { cls: 'feed-title', text: r.title || r.solicitation_number || r.notice_id || 'Untitled solicitation' }),
+        h('div', { cls: 'feed-summary', text: [r.solicitation_number, r.agency].filter(Boolean).join(' · ') || '—' }),
+        h('div', { cls: 'feed-insight' }, [
+          h('b', { text: 'Matched on' }),
+          h('span', { text: r.matched_on || 'not recorded' })
+        ])
+      ]);
+      card.addEventListener('click', () => { S.sel = r.id; renderList(); renderPanel(); });
+      return card;
+    }));
+  }
+
+  /* ── reference panel ────────────────────────────────────────────────── */
+
   function renderPanel() {
-    const t = totals(), d = D.DOMAINS.find(x => x.code === S.sel);
-    const el = $('readyPanel');
-    const lvl = t.score >= 88 ? 'Assessment-ready' : t.score >= 70 ? 'On track' : 'Significant gaps';
-    el.innerHTML = `
-      <div class="gauge-wrap">
-        <div class="gauge">${gaugeRing(t.score)}<div class="gauge-num"><span style="color:${scoreColor(t.score)}">${t.score}<small>%</small></span><em>READY</em></div></div>
-        <div class="gauge-side">
-          <div class="gauge-lvl" style="color:${scoreColor(t.score)}">${lvl}</div>
-          <div class="gauge-sub">${t.met} of ${t.ctl} controls met · <b>${t.open} open</b></div>
-          <div class="gauge-dl">CMMC Phase 2 enforces in <b>${daysToDeadline()} days</b></div>
-        </div>
-      </div>
-      <div class="cop-metrics" style="grid-template-columns:repeat(3,1fr)">
-        <div class="cop-m"><span class="mv" style="color:${css('--green-600')}">${D.DOMAINS.filter(x=>x.pct===100).length}</span><span class="ml">Domains met</span></div>
-        <div class="cop-m"><span class="mv" style="color:${css('--amber-600')}">${D.DOMAINS.reduce((a,x)=>a+x.gap,0)}</span><span class="ml">Partial gaps</span></div>
-        <div class="cop-m"><span class="mv" style="color:${css('--red-600')}">${D.DOMAINS.reduce((a,x)=>a+x.none,0)}</span><span class="ml">Not started</span></div>
-      </div>
-      <div class="ctrl-bar-wrap"><div class="ctrl-bar-head">110 controls · path to certification</div><div class="ctrl-bar"><div class="cb-seg met" style="width:${t.met/t.ctl*100}%"></div><div class="cb-seg gap" style="width:${D.DOMAINS.reduce((a,x)=>a+x.gap,0)/t.ctl*100}%"></div><div class="cb-seg none" style="width:${D.DOMAINS.reduce((a,x)=>a+x.none,0)/t.ctl*100}%"></div></div><div class="ctrl-bar-key"><span><i class="met"></i>${t.met} met</span><span><i class="gap"></i>${D.DOMAINS.reduce((a,x)=>a+x.gap,0)} in progress</span><span><i class="none"></i>${D.DOMAINS.reduce((a,x)=>a+x.none,0)} not started</span></div></div>
-      ${d ? `<div class="cop-note" style="border-bottom:1px solid var(--line-2)"><b>${d.code} · ${d.name} — ${d.pct}%</b>${d.met} met · ${d.gap} gap · ${d.none} not started · ${d.total} controls</div>
-      <div class="cop-note"><b>⚡ Why it matters</b>${d.insight}</div>` : ''}
-      <div class="cop-actions">
-        <button class="cop-btn primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>Generate SSP</button>
-        <button class="cop-btn ghost"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>Find C3PAO</button>
-      </div>`;
+    const host = $('readyPanel');
+    if (!host) return;
+    const rows = allFlagged();
+    const sel = rows.find((r) => r.id === S.sel) || null;
+    const ref = reference();
+    const d = dist();
+    // With nothing selected, show the highest level the customer's own
+    // solicitations actually demand; fall back to Level 2, the one most
+    // contractors are asked for, purely as reference.
+    const level = sel ? sel.level : (LEVELS.filter((lv) => d[lv] > 0).pop() || '2');
+    const data = ref[level];
+
+    if (!data) {
+      fill(host, [emptyBlock('Reference unavailable', 'The CMMC level reference did not load.')]);
+      return;
+    }
+
+    const checklist = h('div', { style: 'display:flex;flex-direction:column;gap:7px;margin-top:4px' },
+      (data.checklist || []).map((c) => h('div', {
+        text: '· ' + c,
+        style: 'font-size:12px;color:var(--ink-2);line-height:1.5'
+      })));
+
+    const triggers = h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:2px' },
+      (data.triggers || []).map((t) => h('span', { cls: 'fpill', text: t })));
+
+    fill(host, [
+      h('div', { cls: 'cop-head' }, [
+        h('div', { cls: 'cop-id' }, [
+          h('div', { cls: 'cop-name', text: data.label || 'CMMC Level ' + level }),
+          h('div', { cls: 'cop-title', text: 'DoD CMMC 2.0 model · reference, not your assessment' }),
+          h('div', { cls: 'cop-agy', text: (data.practices || '—') + ' practices' })
+        ])
+      ]),
+      sel
+        ? h('div', { cls: 'cop-note' }, [
+            h('b', { text: 'Why this solicitation is here' }),
+            h('span', { text: (sel.solicitation_number || sel.notice_id || 'This audit') + ' matched on ' + (sel.matched_on || 'a CMMC signal') + '.' })
+          ])
+        : null,
+      h('div', { cls: 'cop-note' }, [h('b', { text: 'What it covers' }), h('span', { text: data.summary || '' })]),
+      h('div', { cls: 'cop-note' }, [h('b', { text: 'Triggering clauses' }), triggers]),
+      h('div', { cls: 'cop-note' }, [h('b', { text: 'What the level asks for' }), checklist]),
+      sel
+        ? h('div', { cls: 'cop-actions' }, [
+            h('a', { cls: 'cop-btn primary', text: 'Open the audit', attrs: { href: '/audit/' + sel.id } })
+          ])
+        : null
+    ]);
   }
 
-  function renderDomains() {
-    let data = filtered().slice();
-    if (S.sort === 'Priority') data.sort((a, b) => D.PRIO_META[b.priority].rank - D.PRIO_META[a.priority].rank || a.pct - b.pct);
-    else if (S.sort === 'Score ↑') data.sort((a, b) => a.pct - b.pct);
-    else data.sort((a, b) => b.pct - a.pct);
-    $('feedCount').innerHTML = `${data.length} domains · click any card to inspect`;
-    $('domList').innerHTML = data.map(d => {
-      const pm = D.PRIO_META[d.priority], col = scoreColor(d.pct);
-      return `<div class="dom-card feed-card${S.sel === d.code ? ' sel' : ''}" data-code="${d.code}" style="border-left-color:${col}">
-        <div class="feed-top"><span class="dom-badge">${d.code}</span><span class="feed-clause" style="font-weight:700">${d.name}</span><span class="dom-pct" style="color:${col}">${d.pct}%</span><span class="feed-imp" style="color:${pm.color};background:${hexA(pm.color,.12)};margin-left:auto">${pm.label}</span></div>
-        <div class="dom-meta">${d.met} met · <span style="color:var(--amber-700)">${d.gap} gap</span> · <span style="color:var(--red-600)">${d.none} not started</span> · ${d.total} controls</div>
-        <div class="dom-bar"><i style="width:${d.pct}%;background:${col}"></i></div>
-        <div class="feed-insight"><b>⚡ Why it matters</b>${d.insight}</div>
-      </div>`;
-    }).join('') || `<div class="tl-empty">No domains match your filters.</div>`;
-    $('domList').querySelectorAll('.dom-card').forEach(c => c.onclick = () => { S.sel = c.dataset.code; renderRadar(); renderPanel(); renderDomains(); });
+  /* ── wiring ─────────────────────────────────────────────────────────── */
+
+  function renderAll() {
+    renderBanner();
+    renderStats();
+    renderDistribution();
+    renderLevelPills();
+    renderList();
+    renderPanel();
   }
 
-  function renderC3() {
-    const total = D.TIMELINE.reduce((a, s) => a + s.days, 0);
-    $('c3Sub').textContent = `Estimated ${total} days to certification`;
-    const maxD = Math.max(...D.TIMELINE.map(s => s.days));
-    $('c3List').innerHTML = `<div class="c3-track">` + D.TIMELINE.map((s, i) => `
-      <div class="c3-step">
-        <div class="c3-node">${i + 1}</div>
-        <div class="c3-body"><div class="c3-name">${s.name}</div><div class="c3-note">${s.note}</div><div class="c3-bar"><i style="width:${s.days / maxD * 100}%"></i></div><div class="c3-days">${s.days} days</div></div>
-      </div>`).join('') + `</div><div class="c3-total">Total estimated path: <b>${total} days</b> · finish before the ${daysToDeadline()}-day deadline</div>`;
+  function buildControls() {
+    const search = $('searchInput');
+    if (search) search.addEventListener('input', (e) => { S.q = e.target.value; renderList(); });
+    const reset = $('resetBtn');
+    if (reset) {
+      reset.addEventListener('click', () => {
+        S.level = 'all'; S.q = ''; S.sel = null;
+        if (search) search.value = '';
+        renderAll();
+      });
+    }
   }
 
-  function renderGaps() {
-    const gaps = D.DOMAINS.filter(d => d.priority === 'HIGH' || (d.priority === 'MEDIUM' && d.pct < 70)).sort((a, b) => a.pct - b.pct).slice(0, 5);
-    $('gapList').innerHTML = gaps.map(d => {
-      const pm = D.PRIO_META[d.priority];
-      return `<div class="gap-row" data-code="${d.code}"><div class="gap-l"><span class="gap-badge" style="background:${hexA(pm.color,.14)};color:${pm.color}">${d.code}</span><div class="gap-info"><div class="gap-name">${d.name}</div><div class="gap-fix">${d.insight}</div></div></div><span class="gap-pct" style="color:${scoreColor(d.pct)}">${d.pct}%</span></div>`;
-    }).join('');
-    $('gapList').querySelectorAll('.gap-row').forEach(r => r.onclick = () => { S.sel = r.dataset.code; renderRadar(); renderPanel(); renderDomains(); });
-  }
+  function init() { buildControls(); renderAll(); }
 
-  function renderInsight() {
-    const d = D.DOMAINS.find(x => x.code === S.sel), t = totals();
-    let html;
-    if (d && d.priority === 'HIGH') html = `<span class="ib-label">Priority gap</span><b>${d.code} · ${d.name}</b> sits at <b>${d.pct}%</b> — ${d.insight}`;
-    else html = `<span class="ib-label">Read</span>You're at <b>${t.score}% readiness</b> with <b>${t.open} controls open</b>. CMMC Phase 2 enforces in <b>${daysToDeadline()} days</b> — close the HIGH-priority domains (CM, CA, SC) first.`;
-    $('insightBar').innerHTML = `<span class="ib-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a7 7 0 00-4 12.7V17a1 1 0 001 1h6a1 1 0 001-1v-2.3A7 7 0 0012 2z"/><path d="M9 21h6"/></svg></span><span>${html}</span>`;
-  }
-
-  function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`; }
-
-  function renderAll() { renderKPIs(); renderRadar(); renderPanel(); renderDomains(); renderC3(); renderGaps(); renderInsight(); }
-  function onThemeChange() { renderAll(); }
-  function init() { buildControls(); renderAll(); let to; window.addEventListener('resize', () => { clearTimeout(to); to = setTimeout(renderRadar, 200); }); }
-  window.CMMC_APP = { render: renderAll, onThemeChange };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+  window.CMMC_APP = { render: renderAll, onThemeChange: renderAll };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
 })();
