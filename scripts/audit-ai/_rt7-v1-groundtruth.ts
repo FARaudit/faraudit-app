@@ -10,7 +10,7 @@
 import dotenv from "dotenv"; dotenv.config({ path: ".env.local", quiet: true });
 import { createClient } from "@supabase/supabase-js";
 import { reconcileAbsenceClaims } from "../../src/lib/audit-absence-reconcile";
-import { docRegions } from "../../src/lib/audit-orchestrator";
+import { docRegions, findingProvenance } from "../../src/lib/audit-orchestrator";
 
 (async () => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -26,8 +26,17 @@ import { docRegions } from "../../src/lib/audit-orchestrator";
     const f = r.compliance_json?.v3?.findings;
     if (!Array.isArray(f) || !f.length) continue;
     audits++; findings += f.length;
+    // PROVENANCE IS COMPUTED, NEVER READ FROM THE RECORD (corrected 2026-08-04, adversarial round 4).
+    // This read `compliance_json.v3.finding_provenance` behind a fail-open `|| []`. That key exists on ZERO of the
+    // 16 banked audits — measured, not assumed; the v3 keys are coverage/documents/eligible/findings/generatedAt/
+    // noVerdictCause/reason/showStoppers/verdict. So the provenance set was ALWAYS EMPTY and every row this tool
+    // printed was forced to `present_not_analyzed`, a label that looked like a finding and was an artifact.
+    // The refuted SET was unaffected (refutation keys on region presence, not provenance) — but a silent `|| []`
+    // on a key that never exists is the fail-open this repo keeps re-learning.
+    // Fixed by computing it exactly as the production seam does (audit-executor-v3.ts:750), so the instrument
+    // cannot drift from the code it measures.
     const prov = new Set<string>(
-      (r.compliance_json?.v3?.finding_provenance || []).map((p: any) => p?.doc).filter((d: any) => d && d !== "(ungrounded)"),
+      findingProvenance(r.raw_pdf_text, f).map((p) => p.doc).filter((d) => d && d !== "(ungrounded)"),
     );
     const out = reconcileAbsenceClaims(f.map((x: any, i: number) => ({ ...x, id: `f#${i}` })), r.raw_pdf_text, prov, r.set_aside);
     for (const x of out.refuted) hits.push({ run: String(r.id).slice(0, 8), sol: r.solicitation_number, doc: x.doc, kind: x.kind, before: x.before });
