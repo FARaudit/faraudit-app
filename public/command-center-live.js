@@ -39,11 +39,10 @@
   // real date, and the panel claims nothing else. Wage-determination
   // expirations, regulatory effective dates and fiscal markers are NOT sourced
   // yet, so they are simply absent rather than illustrated.
-  // No flat cap here. Measured on the live feed 2026-07-29: of 197 dated
-  // notices, 71 fall inside 7 days — so ANY flat cap below 71 shows week one
-  // and nothing else, and the panel's own three-group design (This Week /
-  // This Month / Later This Year) could never appear. Truncation is therefore
-  // PER GROUP, in the render layer where the grouping lives (cc-app.js).
+  // No flat cap here. Near-term notices outnumber later ones, so any flat cap
+  // shows week one and nothing else and the panel's own three-group design
+  // (This Week / This Month / Later This Year) could never appear. Truncation is
+  // therefore PER GROUP, in the render layer where the grouping lives (cc-app.js).
   // This ceiling is only a DOM-size backstop, far above real feed volume.
   var WEEK_MAX_ROWS = 400;
   function buildWeek(opps) {
