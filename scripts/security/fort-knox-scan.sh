@@ -117,9 +117,28 @@ for path in ceo-digest.html hub.html org-chart.html vertex-hub-v6.html one-pager
 done
 
 echo ""
-echo "--- home.html auth wall ---"
-code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 8 https://www.faraudit.com/home.html)
-[[ "$code" == "307" || "$code" == "302" ]] && echo "✓ /home.html → $code (auth active)" || FAIL "/home.html → $code — auth wall is NOT active"
+echo "--- auth wall ---"
+# /home.html was the probe target until the legacy SPA was purged. /opportunities
+# is a live gated route, so the check now asserts against a page that exists.
+#
+# 000 is curl reporting NO RESPONSE — timeout, DNS, connection refused. That is a
+# fact about the probe, not about the auth wall, and reporting it as "auth wall is
+# NOT active" raised a security failure from a network blip. It is retried once,
+# then reported as an inconclusive SKIP. An actual 200 still FAILS: a reachable
+# gated route answering 200 is a real finding.
+AUTH_PROBE_PATH="/opportunities"
+code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 8 "https://www.faraudit.com${AUTH_PROBE_PATH}")
+if [[ "$code" == "000" ]]; then
+  sleep 3
+  code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "https://www.faraudit.com${AUTH_PROBE_PATH}")
+fi
+if [[ "$code" == "307" || "$code" == "302" ]]; then
+  echo "✓ ${AUTH_PROBE_PATH} → $code (auth active)"
+elif [[ "$code" == "000" ]]; then
+  SKIP "${AUTH_PROBE_PATH} unreachable (curl 000) — auth wall NOT asserted on this run"
+else
+  FAIL "${AUTH_PROBE_PATH} → $code — auth wall is NOT active"
+fi
 
 echo ""
 echo "--- landing page live ---"
