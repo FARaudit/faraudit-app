@@ -1,6 +1,12 @@
 // ┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 // │ PARKED 2026-07-31 (CEO decision) — NOT WIRED, NOT SHIPPING. Kept as the record of what was learned.           │
 // │                                                                                                              │
+// │ PARKED-FLAG: AUDIT_FORCE_GROUNDING                                                                           │
+// │ PARKED-EXPORT: groundModalForce                                                                              │
+// │ These two lines are what self-audit's `parked` check ENFORCES against. Without them the check still counted   │
+// │ this module and still printed "all unreachable" — while its enforcement loops iterated over nothing. Do not   │
+// │ remove them to quiet a failure; a failure here means something reached a gate parked for under-warning.       │
+// │                                                                                                              │
 // │ The executor seam was DELETED, not flag-gated: AUDIT_FORCE_GROUNDING now does nothing at all. Do not revive   │
 // │ this by restoring the call — it needs a redesign first, for the reason below.                                 │
 // │                                                                                                              │

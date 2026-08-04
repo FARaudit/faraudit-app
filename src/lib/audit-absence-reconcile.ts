@@ -166,7 +166,14 @@ function assertsDocAbsent(claim: string, tokens: string[]): boolean {
   let residue = span.replace(/\([^)]*\)/g, " ").replace(/\[[^\]]*\]/g, " "); // parentheticals are not a second subject
   for (const t of tokens) residue = residue.replace(new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), " ");
   residue = residue.replace(SUBJECT_FILLER, " ");
-  return !/[A-Za-z]/.test(residue);
+  // "Nothing else" must mean nothing else — DIGITS AND NON-ASCII LETTERS COUNT (adversarial round 3, 2026-08-04).
+  // This asked only `/[A-Za-z]/`, so an identifying NUMBER was treated as absence of a distinguisher. The corpus
+  // holds three distinct Wage Determination files whose token sets are identical (["wage","determination"]): for a
+  // WD the revision number IS the identity, and it was exactly what this discarded, so "Wage Determination 15-5110
+  // is not provided" was refuted by an unrelated WD — deleting a true warning, on unmutated production bytes.
+  // The banked true positives are unaffected because they carry their identifier inside a parenthetical, which is
+  // stripped above; the suite asserts that rather than assuming it.
+  return !/[\p{L}\p{N}]/u.test(residue);
 }
 
 /** SECOND ARM — a RESOLVED-FACT absence claim. The third AUTO-F component on run 583df921 was not about a document:

@@ -90,11 +90,26 @@ if (want("parked")) {
   // have been wrong the moment it was written — the first version listed REPORT-TRUTH #8, which is parked on its
   // own branch and still wired on main, so the check reported a failure that was really just branch skew. Deriving
   // it means the check is true on every branch and needs no maintenance when the next module is parked.
+  // MEMBERSHIP IS BY DECLARATION, NOT BY MENTION (corrected 2026-08-04). Deriving the registry from "the file says
+  // PARKED <date>" put audit-executor-v3.ts — the SHIPPING file — in the registry, because it carries a comment
+  // explaining the park. It reported "2 parked module(s)" for one parked module.
+  //
+  // AND THE ENFORCEMENT WAS INERT: neither file declared a single PARKED-FLAG or PARKED-EXPORT, so both inner loops
+  // iterated ZERO times and the check printed "all unreachable" — a claim it had never tested — for the whole of its
+  // existence. It is the check that makes the CEO's #8 park durable, on a gate parked for UNDER-WARNING a bidder.
+  // Found by a negative control: restoring a deleted armer did not turn it red.
+  //
+  // So a banner without declarations is now a FAILURE, never a silent pass. That is the leg that would have caught
+  // this, and it is why the count below is trustworthy rather than decorative.
   const bad: string[] = [];
   let parkedCount = 0;
   for (const f of readdirSync(LIB).filter((x) => x.endsWith(".ts") && !x.endsWith(".test.ts"))) {
     const src = readFileSync(join(LIB, f), "utf8");
     if (!/PARKED \d{4}-\d{2}-\d{2}/.test(src)) continue;
+    const declares = /PARKED-FLAG:\s*[A-Z0-9_]+/.test(src) || /PARKED-EXPORT:\s*\w+/.test(src);
+    // A file that only DISCUSSES a park (the executor's seam comment) is not a parked module and is not counted.
+    if (!declares && !/NOT WIRED, NOT SHIPPING/.test(src)) continue;
+    if (!declares) { bad.push(`${f} carries a PARKED banner but declares no PARKED-FLAG/PARKED-EXPORT — nothing is enforced`); continue; }
     parkedCount++;
     const mod = f.replace(/\.ts$/, "");
     for (const m of src.matchAll(/PARKED-FLAG:\s*([A-Z0-9_]+)/g)) {
@@ -104,6 +119,17 @@ if (want("parked")) {
     for (const m of src.matchAll(/PARKED-EXPORT:\s*(\w+)/g)) {
       const callers = grepFiles(new RegExp(`\\b${m[1]}\\s*\\(`), ["src", "agents"]).filter((x) => !x.includes(".test.") && !x.includes(mod));
       if (callers.length) bad.push(`${m[1]}() called by ${callers.join(", ")}`);
+    }
+    // ...and no TOOLING may still arm the parked flag. Reachability alone was not enough: the #8 park left behind
+    // BOTH a cert asserting the seam was still wired and a script that armed the dead flag on Vercel, and this
+    // check reported "all unreachable" beside them. Arming a flag nothing reads is inert, which is exactly why it
+    // is dangerous to leave lying around — it reads as a live control, and the next session finds a documented
+    // arm procedure for a gate that was parked for under-warning a bidder. Both were deleted 2026-08-04; this is
+    // what stops the third one. Scoped to arm/enable tooling, so a disarm script stays legitimate.
+    for (const m of src.matchAll(/PARKED-FLAG:\s*([A-Z0-9_]+)/g)) {
+      const armers = grepFiles(new RegExp(`${m[1]}`), ["scripts"])
+        .filter((x) => /(^|\/)_?(arm|enable)[-_]/i.test(x) && !x.includes("disarm"));
+      if (armers.length) bad.push(`${m[1]} still armed by ${armers.join(", ")}`);
     }
   }
   add("parked", bad.length === 0, bad.length ? bad.join(" · ") : `${parkedCount} parked module(s), all unreachable`);
