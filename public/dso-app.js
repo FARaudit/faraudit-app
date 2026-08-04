@@ -535,6 +535,19 @@ function datesLine(o) {
   const posted = fmtAbs(o.ingested_at, false);
   if (close) parts.push('<span class="pc-dt"><b>Closes</b> ' + esc(close) + '</span>');
   if (posted) parts.push('<span class="pc-dt"><b>Posted</b> ' + esc(posted) + '</span>');
+  // Attachments: three distinct states, never collapsed. null = SAM was not
+  // read for this row, so the card says nothing rather than implying zero.
+  const rl = o.resource_links;
+  if (Array.isArray(rl)) {
+    parts.push('<span class="pc-dt"><b>Docs</b> ' + (rl.length
+      ? esc(String(rl.length)) + (rl.length === 1 ? ' attachment' : ' attachments')
+      : 'none posted') + '</span>');
+  }
+  if (o.office_path) parts.push('<span class="pc-dt"><b>Office</b> ' + esc(o.office_path) + '</span>');
+  if (o.ui_link) {
+    parts.push('<a class="pc-dt pc-link" href="' + esc(o.ui_link) +
+      '" target="_blank" rel="noopener noreferrer"><b>SAM.gov</b> view notice ↗</a>');
+  }
   return parts.join('');
 }
 

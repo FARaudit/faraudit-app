@@ -164,7 +164,13 @@
       fit: typeof o.compliance_score === 'number' ? o.compliance_score : null, // null = not audited
       is_audited: !!o.is_audited,
       incumbent: o.incumbent_name || null,                     // null = none on record
-      ingested_at: o.created_at || null
+      ingested_at: o.created_at || null,
+      // SAM notice detail. `|| null` is deliberately NOT used on resource_links:
+      // [] and null carry different facts (SAM listed none vs not read) and `||`
+      // would collapse them into one.
+      resource_links: Array.isArray(o.resource_links) ? o.resource_links : null,
+      ui_link: o.ui_link || null,
+      office_path: o.office_path || null
     };
   }
 
