@@ -535,6 +535,19 @@ function datesLine(o) {
   const posted = fmtAbs(o.ingested_at, false);
   if (close) parts.push('<span class="pc-dt"><b>Closes</b> ' + esc(close) + '</span>');
   if (posted) parts.push('<span class="pc-dt"><b>Posted</b> ' + esc(posted) + '</span>');
+  // Attachments: three distinct states, never collapsed. null = SAM was not
+  // read for this row, so the card says nothing rather than implying zero.
+  const rl = o.resource_links;
+  if (Array.isArray(rl)) {
+    parts.push('<span class="pc-dt"><b>Docs</b> ' + (rl.length
+      ? esc(String(rl.length)) + (rl.length === 1 ? ' attachment' : ' attachments')
+      : 'none posted') + '</span>');
+  }
+  if (o.office_path) parts.push('<span class="pc-dt"><b>Office</b> ' + esc(o.office_path) + '</span>');
+  if (o.ui_link) {
+    parts.push('<a class="pc-dt pc-link" href="' + esc(o.ui_link) +
+      '" target="_blank" rel="noopener noreferrer"><b>SAM.gov</b> view notice ↗</a>');
+  }
   return parts.join('');
 }
 
@@ -752,8 +765,20 @@ function onThemeChange() { renderAll(); }
 /* renderHeader is exported so live.js can refresh the feed line as soon as the
    fetch answers, without waiting on watch/pipeline hydration. */
 window.DSO_APP = { render: renderAll, renderHeader: renderHeader, onThemeChange: onThemeChange };
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', renderAll);
-else renderAll();
+
+/* Binds the persistent "Reset all" control. `#clearAll` is rendered only inside
+   the empty-list message, so it covers that case only; this covers the button.
+   The element's presence is asserted, not assumed: a handler bound to an absent
+   id raises nothing, so a missing element is named in the console. */
+function bindResetAll() {
+  const b = document.getElementById('resetBtn');
+  if (!b) { console.warn('[dso-app] #resetBtn not found — Reset all is unbound'); return; }
+  b.addEventListener('click', (e) => { e.preventDefault(); reset(); });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => { renderAll(); bindResetAll(); });
+} else { renderAll(); bindResetAll(); }
 /* the cell floor is a webfont measurement — re-derive once the fonts land, or
    it is computed against fallback metrics and reports a generous number. */
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ renderControls(); });

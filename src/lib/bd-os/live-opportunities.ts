@@ -151,7 +151,17 @@ export function mapSamItems(raw: RawSamItem[], now: Date): OpportunityRow[] {
       is_audited: false,
       award_ceiling: o.awardCeiling ?? o.baseAndAllOptionsValue ?? null,
       created_at: o.postedDate ?? now.toISOString(),
-      processed_at: null
+      processed_at: null,
+      // SAM returns these on every notice and they were being dropped here.
+      // resource_links is the attachment set: its LENGTH is the only claim the
+      // card makes from it, because a notice with no links and a notice whose
+      // links we failed to read must not render alike — absent stays null, and
+      // an empty array means "SAM listed none", which is a different fact.
+      resource_links: Array.isArray(o.resourceLinks) ? o.resourceLinks : null,
+      ui_link: o.uiLink ?? null,
+      office_path: o.fullParentPathName ?? null,
+      department: o.department ?? null,
+      sub_tier: o.subTier ?? null
     });
   }
   if (droppedNoPdf || droppedExpired) {
