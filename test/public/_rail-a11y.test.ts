@@ -29,11 +29,11 @@
 //   R1  CALIBRATION — the contrast function reproduces known pairs, INCLUDING an
 //       alpha case. Three samplers were written for this rail and two produced
 //       confident wrong numbers; an uncalibrated one is not evidence.
-//   R2  COVERAGE — every served .html carrying the rail is swept, and the
-//       population is non-empty.
+//   R2  COVERAGE — every served .html carrying the rail is swept, and every
+//       .html that does NOT carry it is a NAMED pre-auth page.
 //   R3  CONTRAST FLOOR — every rail text token clears 4.5:1 against its
 //       COMPOSITED ground.
-//   R4  THE COPIES AGREE — all 19 files resolve to the SAME effective values,
+//   R4  THE COPIES AGREE — every copy resolves to the SAME effective values,
 //       so a fix applied to some of them fails here rather than forking silently.
 //   R5  PLANTED POSITIVES — the pre-fix values must be caught, and a single
 //       divergent copy must be caught.
@@ -87,12 +87,32 @@ console.log("\nR1 · the contrast function is calibrated");
 
 // ── R2 · COVERAGE ────────────────────────────────────────────────────────────
 const PUBLIC = path.join(process.cwd(), "public");
-const railFiles = readdirSync(PUBLIC)
-  .filter((f) => f.endsWith(".html"))
-  .filter((f) => readFileSync(path.join(PUBLIC, f), "utf8").includes("sb-group-label"));
+
+// The rail is platform chrome, so the population is defined by its COMPLEMENT: the pre-auth
+// pages, named one by one. A count floor cannot tell a legitimate page deletion from a platform
+// page that silently lost the rail — this read `>= 19` and went red the moment public/home.html
+// was purged, condemning 18 healthy pages for the absence of a nineteenth that was meant to go.
+// Naming the complement fails CLOSED instead: a new page lands in neither set until someone says
+// which it is.
+const PRE_AUTH = new Set([
+  "access.html", "how-it-works.html", "index.html", "landing.html",
+  "learn.html", "pricing.html", "root-landing.html",
+]);
+
+const allHtml = readdirSync(PUBLIC).filter((f) => f.endsWith(".html"));
+const carries = (f: string) => readFileSync(path.join(PUBLIC, f), "utf8").includes("sb-group-label");
+const railFiles = allHtml.filter(carries);
 
 console.log("\nR2 · every served page carrying the rail is swept");
-ok(railFiles.length >= 19, `the rail is served from ${railFiles.length} pages`, railFiles.length ? "" : "NONE FOUND");
+ok(railFiles.length > 0, `the rail is served from ${railFiles.length} pages`, railFiles.length ? "" : "NONE FOUND");
+
+const unclassified = allHtml.filter((f) => !railFiles.includes(f) && !PRE_AUTH.has(f));
+ok(unclassified.length === 0,
+  "every rail-less page is a known pre-auth page", unclassified.join(", "));
+
+const vanished = [...PRE_AUTH].filter((f) => !allHtml.includes(f));
+ok(vanished.length === 0,
+  "every named pre-auth page still exists — the list is not carrying ghosts", vanished.join(", "));
 
 // ── extract EFFECTIVE values, not strings ────────────────────────────────────
 /** The last matching declaration wins in CSS source order, which is what the browser resolves. */
@@ -160,6 +180,15 @@ console.log("\nR5 · the gate can fail");
   // And the shipped values must PASS, so the two legs above are not vacuous.
   ok(ratio(over(WHITE, 0.5, RAIL_BG), RAIL_BG) >= FLOOR, "PLANTED(-): the shipped alpha (.5) passes");
   ok(ratio(WHITE, hex("#2F73BC")) >= FLOOR, "PLANTED(-): the shipped blue (#2F73BC) passes");
+
+  // R2's classification legs, exercised on synthetic sets so they are not vacuous.
+  const synthetic = ["opportunities.html", "landing.html", "brand-new-tab.html"];
+  ok(synthetic.filter((f) => f === "brand-new-tab.html" && !PRE_AUTH.has(f)).length === 1,
+    "PLANTED: an unseen rail-less page is caught rather than absorbed");
+  ok(["landing.html"].every((f) => PRE_AUTH.has(f)),
+    "PLANTED(-): a known pre-auth page is not reported");
+  ok([...PRE_AUTH, "deleted-page.html"].filter((f) => !allHtml.includes(f)).length === 1,
+    "PLANTED: a ghost in the pre-auth list is caught");
 
   // A single divergent copy must break R4 — this is the fork-detection leg.
   const fake = new Map<string, string[]>([[".5", ["a.html", "b.html"]], [".32", ["c.html"]]]);

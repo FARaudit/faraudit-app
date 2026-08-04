@@ -441,7 +441,11 @@ console.log("\nC9 · renderCertBanner builds the nodes it is supposed to");
     "the control is an identified, non-submitting button", `${btn?.id}/${btn?.type}`);
   ok(typeof btn?.onclick === "function", "the control is wired, not inert");
   btn!.onclick!();
-  ok(sandbox.window.location.href === "/home#capability",
+  // The destination moved with the legacy /home SPA purge: the UEI field now lives on the
+  // real platform page, not on a hash of a page that no longer exists. A customer sent to a
+  // dead route sees a control that appears to do nothing, which is the failure this leg exists
+  // to catch — so it asserts the LIVE destination, never merely that a destination was set.
+  ok(sandbox.window.location.href === "/capability-statement",
     "the control goes to the capability statement, the only surface carrying a UEI field",
     sandbox.window.location.href);
 

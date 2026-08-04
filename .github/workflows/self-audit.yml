@@ -35,6 +35,33 @@ jobs:
       # failing, so CI never goes red for an absent credential. Flag drift is checked from a workstation.
       - name: self-audit (suites · gold · parked seams · verdict-critical coverage · cert coherence)
         run: npx tsx scripts/audit-ai/self-audit.ts suites gold parked coverage certs
+      # SERVED-ASSET GATES (2026-08-04). Files under public/ ship VERBATIM to the browser — no bundler,
+      # no minifier — and until now NOTHING ran their suites on a push or a PR. Every defect the 08-03
+      # fabrication arc found in that tree was found by READING it, and reading does not repeat. These
+      # suites are the part that stays fixed: invented feed rows, a rationale comment shipped to the
+      # browser, an inline script that does not parse, a nav control pointing at a purged route.
+      #
+      # Every suite runs even after one fails — a single red must not mask the others — and the step
+      # exits non-zero if any did. An empty glob is a FAILURE, not a silent pass: if these files are
+      # ever moved or renamed, this step must go red rather than quietly certify nothing.
+      #
+      # Fixed glob, no event data interpolated — the no-injection invariant in this file's header holds.
+      - name: served-asset gates (test/public — the public/ tree ships unbundled)
+        run: |
+          shopt -s nullglob
+          files=(test/public/*.test.ts)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "NO SERVED-ASSET SUITES FOUND — the glob matched nothing, so nothing was checked"
+            exit 1
+          fi
+          echo "running ${#files[@]} served-asset suite(s)"
+          rc=0
+          for f in "${files[@]}"; do
+            echo "::group::$f"
+            npx tsx "$f" || rc=1
+            echo "::endgroup::"
+          done
+          exit $rc
       # FORT KNOX (2026-08-03). Until today this script could not fail — no `exit` statement anywhere, and its
       # one failure flag was set and never read; a planted ghp_-shaped token was detected, printed, and the
       # script exited 0. Adding it to CI in that state would have manufactured a permanently-green check.
