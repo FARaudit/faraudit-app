@@ -566,9 +566,50 @@ function datesLine(o) {
   return parts.join('');
 }
 
+
+/* Detail panel. Renders only fields SAM actually returned for this row; a field
+   it did not return is omitted, never shown as an empty label. Returns '' when
+   the row carries none, and the caller then renders no panel and no toggle. */
+function detailHTML(o) {
+  const rows = [];
+  const poc = Array.isArray(o.poc) ? o.poc : [];
+  const primary = poc.find((c) => c && c.type === 'primary') || poc[0] || null;
+  if (primary && (primary.fullName || primary.email)) {
+    const name = primary.fullName ? esc(primary.fullName) : '';
+    const mail = primary.email
+      ? '<a href="mailto:' + esc(primary.email) + '">' + esc(primary.email) + '</a>'
+      : '';
+    rows.push(['Contracting officer', name + (name && mail ? ' · ' : '') + mail]);
+  }
+  const pop = popText(o.place_of_performance);
+  if (pop) rows.push(['Place of performance', esc(pop)]);
+  const n = Array.isArray(o.resource_links) ? o.resource_links.length : null;
+  if (n) {
+    rows.push(['Attachments', o.resource_links.slice(0, 8).map(function (u, i) {
+      return '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">Document ' + (i + 1) + '</a>';
+    }).join(' · ') + (n > 8 ? ' · +' + (n - 8) + ' more' : '')]);
+  }
+  if (!rows.length) return '';
+  return '<div class="pc-detail">' + rows.map(function (r) {
+    return '<div class="pd-row"><span class="pd-k">' + r[0] + '</span><span class="pd-v">' + r[1] + '</span></div>';
+  }).join('') + '</div>';
+}
+
+/* SAM returns placeOfPerformance as an object whose shape varies by notice.
+   Only the parts present are joined; an unrecognised shape yields null. */
+function popText(v) {
+  if (!v || typeof v !== 'object') return null;
+  const city = v.city && (v.city.name || v.city) || null;
+  const state = v.state && (v.state.name || v.state.code || v.state) || null;
+  const country = v.country && (v.country.name || v.country.code || v.country) || null;
+  const zip = v.zip || null;
+  const parts = [city, state, zip, country].filter(function (x) { return x && typeof x === 'string'; });
+  return parts.length ? parts.join(', ') : null;
+}
 /* ── the row. Design's markup; the two action buttons carry Code's wiring. ── */
 function rowHTML(o) {
   const v = verdict(o), sa = saRender(o.sa);
+  const detail = detailHTML(o);
   const far = o.days == null ? 'later' : o.days <= 3 ? '' : o.days <= 7 ? 'far' : 'later';
   const hasSolicitation = o.stage !== 'notice';
   const auditRef = o.notice_id || o.id;
@@ -594,7 +635,9 @@ function rowHTML(o) {
         : '<span class="btn-open off" title="' + (hasSolicitation ? 'No notice reference' : 'Special Notice — no solicitation document has posted for this requirement yet') + '">' + (hasSolicitation ? 'Run audit' : 'No solicitation yet') + '</span>') +
       '<button class="btn-2" type="button" data-watch-notice="' + esc(o.notice_id) + '">Track</button>' +
       '<button class="btn-2" type="button" data-track="' + esc(o.id) + '">Pipeline</button>' +
-    '</div></div>';
+    '</div>' +
+    (detail ? '<button class="pc-more" type="button" data-more="' + esc(o.id) + '" aria-expanded="false">Details</button>' + detail : '') +
+    '</div>';
 }
 
 /* ── the four Track/Pipeline states.
@@ -786,6 +829,25 @@ window.DSO_APP = { render: renderAll, renderHeader: renderHeader, onThemeChange:
    the empty-list message, so it covers that case only; this covers the button.
    The element's presence is asserted, not assumed: a handler bound to an absent
    id raises nothing, so a missing element is named in the console. */
+/* Detail toggles. Delegated on the list container so it survives every
+   re-render; the panel's open state lives in the DOM class, not in S, so a
+   filter change collapses everything rather than restoring a stale set. */
+function bindDetailToggles() {
+  const host = $('plist');
+  if (!host) { console.warn('[dso-app] #plist not found — details cannot bind'); return; }
+  host.addEventListener('click', (e) => {
+    const b = e.target && e.target.closest ? e.target.closest('[data-more]') : null;
+    if (!b || !host.contains(b)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const card = b.closest('.pcard');
+    if (!card) return;
+    const open = card.classList.toggle('is-open');
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    b.textContent = open ? 'Hide details' : 'Details';
+  });
+}
+
 function bindResetAll() {
   const b = document.getElementById('resetBtn');
   if (!b) { console.warn('[dso-app] #resetBtn not found — Reset all is unbound'); return; }
@@ -793,8 +855,8 @@ function bindResetAll() {
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => { renderAll(); bindResetAll(); });
-} else { renderAll(); bindResetAll(); }
+  document.addEventListener('DOMContentLoaded', () => { renderAll(); bindResetAll(); bindDetailToggles(); });
+} else { renderAll(); bindResetAll(); bindDetailToggles(); }
 /* the cell floor is a webfont measurement — re-derive once the fonts land, or
    it is computed against fallback metrics and reports a generous number. */
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ renderControls(); });
