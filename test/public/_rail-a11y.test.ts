@@ -87,12 +87,26 @@ console.log("\nR1 · the contrast function is calibrated");
 
 // ── R2 · COVERAGE ────────────────────────────────────────────────────────────
 const PUBLIC = path.join(process.cwd(), "public");
-const railFiles = readdirSync(PUBLIC)
-  .filter((f) => f.endsWith(".html"))
-  .filter((f) => readFileSync(path.join(PUBLIC, f), "utf8").includes("sb-group-label"));
+const readHtml = (f: string) => readFileSync(path.join(PUBLIC, f), "utf8");
+const htmlFiles = readdirSync(PUBLIC).filter((f) => f.endsWith(".html"));
+
+/* Pages carrying the sidebar SHELL. The rail lives inside it, so that is the
+   population the rail must cover — derived, not counted.
+   The literal floor here (`>= 19`) went red when public/watching.html was deleted in
+   #427: a clean removal, no dead links, nothing broken. A threshold that must be
+   hand-edited whenever a page is added or removed reports staleness as a defect, and
+   the edit that silences it is indistinguishable from one that hides a regression. */
+const shellFiles = htmlFiles.filter((f) => readHtml(f).includes("data-sb="));
+const railFiles = shellFiles.filter((f) => readHtml(f).includes("sb-group-label"));
 
 console.log("\nR2 · every served page carrying the rail is swept");
-ok(railFiles.length >= 19, `the rail is served from ${railFiles.length} pages`, railFiles.length ? "" : "NONE FOUND");
+// Fail closed: a sweep that finds nothing must not read as "nothing to check".
+ok(shellFiles.length > 0, `the sidebar shell is served from ${shellFiles.length} pages`,
+  shellFiles.length ? "" : "NONE FOUND — the sweep is inert");
+const railMissing = shellFiles.filter((f) => !railFiles.includes(f));
+ok(railMissing.length === 0,
+  `every page with the sidebar shell carries the rail (${railFiles.length}/${shellFiles.length})`,
+  railMissing.join(", "));
 
 // ── extract EFFECTIVE values, not strings ────────────────────────────────────
 /** The last matching declaration wins in CSS source order, which is what the browser resolves. */

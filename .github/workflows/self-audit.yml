@@ -35,6 +35,45 @@ jobs:
       # failing, so CI never goes red for an absent credential. Flag drift is checked from a workstation.
       - name: self-audit (suites · gold · parked seams · verdict-critical coverage · cert coherence)
         run: npx tsx scripts/audit-ai/self-audit.ts suites gold parked coverage certs
+      # SERVED-SURFACE GATES (2026-08-04). test/public/ held 21 gates and NONE of them ran here, so for their
+      # whole existence they gated nothing — they helped only when someone remembered to run them locally.
+      # Measured 2026-08-03: main was carrying three red gates from an already-merged PR, and separately a
+      # route.ts containing literal '<<<<<<< HEAD' conflict markers passed the entire suite, because nothing
+      # imported src/app/api/**. Both reached main across a green board.
+      #
+      # Gates are discovered by glob, not listed, so a new one enforces the day it lands rather than the day
+      # someone remembers to add it here. Each exits non-zero on failure and carries its own planted-positive
+      # proofs, which is what makes them safe to enforce rather than merely noisy.
+      #
+      # The loop must not swallow a failure: a `for` returns the status of its LAST command, so a red gate in
+      # the middle would vanish. rc is latched and every gate still runs, so one failure cannot mask the rest.
+      #
+      # Fixed commands, no event data interpolated — the no-injection invariant in this file's header holds.
+      - name: served-surface gates (test/public/**)
+        run: |
+          rc=0
+          shopt -s nullglob
+          files=(test/public/*.test.ts)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::no gates discovered under test/public/ — the sweep is inert"
+            exit 1
+          fi
+          echo "discovered ${#files[@]} gate(s)"
+          for f in "${files[@]}"; do
+            echo "-- $f"
+            if npx tsx "$f"; then echo "   PASS $f"; else echo "::error::gate failed: $f"; rc=1; fi
+          done
+          exit $rc
+
+      # The Federal Register query gate lives outside test/public/ because it calls a live API. It runs here
+      # with SKIP_NETWORK=1, which turns its live section into a NAMED SKIP rather than a silent pass, so CI
+      # stays hermetic while its offline halves — the query axis and the parser's planted positives — still
+      # enforce. The live half is what a workstation run covers.
+      - name: regulatory feed query gate (offline half)
+        env:
+          SKIP_NETWORK: "1"
+        run: npx tsx test/regulatory-feed-query.test.ts
+
       # FORT KNOX (2026-08-03). Until today this script could not fail — no `exit` statement anywhere, and its
       # one failure flag was set and never read; a planted ghp_-shaped token was detected, printed, and the
       # script exited 0. Adding it to CI in that state would have manufactured a permanently-green check.

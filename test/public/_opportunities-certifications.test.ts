@@ -39,7 +39,7 @@
 // what this asserts and what the browser runs.
 // ─────────────────────────────────────────────────────────────────────────────
 export {}; // module scope (harness memory: tsx script-scope redeclare collisions)
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 import { establishedPrograms, PROGRAM_LABEL } from "../../src/lib/cert-verification";
@@ -441,8 +441,20 @@ console.log("\nC9 · renderCertBanner builds the nodes it is supposed to");
     "the control is an identified, non-submitting button", `${btn?.id}/${btn?.type}`);
   ok(typeof btn?.onclick === "function", "the control is wired, not inert");
   btn!.onclick!();
-  ok(sandbox.window.location.href === "/home#capability",
-    "the control goes to the capability statement, the only surface carrying a UEI field",
+  /* Destination is checked against the surface that ACTUALLY carries the UEI field,
+     not a remembered path. This asserted "/home#capability" until 2026-08-03; the
+     control had by then correctly moved to /capability-statement, where uei-editor.js
+     is served — and home.html contains no UEI field at all. The gate was pinning the
+     button to a page where the customer could not have completed the task. */
+  const ueiSurfaces = readdirSync(path.join(process.cwd(), "public"))
+    .filter((f) => f.endsWith(".html"))
+    .filter((f) => readFileSync(P(f), "utf8").includes("uei-editor.js"))
+    .map((f) => "/" + f.replace(/\.html$/, ""));
+  ok(ueiSurfaces.length === 1,
+    `exactly one served surface carries the UEI field (${ueiSurfaces.join(", ") || "none"})`,
+    String(ueiSurfaces.length));
+  ok(sandbox.window.location.href === ueiSurfaces[0],
+    `the control goes to ${ueiSurfaces[0]}, the only surface carrying a UEI field`,
     sandbox.window.location.href);
 
   sandbox.window.DSO.CERTS = { state: "loading", records: [], establishedPrograms: [] };
