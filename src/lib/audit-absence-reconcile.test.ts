@@ -46,6 +46,48 @@ const SRC = [
   ok("set-aside text names the resolved value", /resolved to SBA/.test(sa));
   ok("the original analysis is PRESERVED, not deleted", pws.includes("staffing") && wd.includes("SCA wage rates") && sa.includes("NAICS 561730"));
 
+  // ---- 1b. THE SET-ASIDE ARM MUST FIT THE RENDERER TOO (adversarial round 3, 2026-08-04) ----------------------
+  // The doc arm calls fitToRender; the SET-ASIDE arm never did. The report renders `requirement` through
+  // truncateOnWord(..., 400) (_view-model.ts:2165), so a longer correction was persisted whole and silently shaved
+  // ON THE PAGE — measured at 593 persisted vs 395 rendered, dropping 198 characters of the preserved analysis.
+  // That is precisely the divergence the fitToRender comment claims to have closed, left open on one of two arms.
+  // The correction's own base is ~222 chars, so the budget always falls in the appended analysis: the correction
+  // survives intact and only the tail shortens, which is the right priority order.
+  const LONG_SA = "NAICS 561730 applies to all CLINs and the size standard governs joint-venture eligibility. "
+    + "Set-aside type is not stated in Section B. "
+    + "The bidder must confirm its size status under the assigned code before pricing, because an oversize prime "
+    + "cannot cure the defect after award and the contracting officer may find the offer ineligible on that basis "
+    + "alone; subcontracting limitations under FAR 52.219-14 then apply to the whole period of performance.";
+  const saLong = run([LONG_SA], "Total Small Business Set-Aside").findings[0].requirement ?? "";
+  ok("set-aside correction fits the renderer's 400-char budget",
+     saLong.length <= 400);
+  ok("...and the correction itself survives — only the appended analysis is shortened",
+     /resolved to Total Small Business Set-Aside/.test(saLong) && /qualifies under it/.test(saLong));
+  ok("truncation is on a word boundary with an ellipsis, never mid-word",
+     saLong.length < 400 ? true : /…$/.test(saLong));
+
+  // ---- 1c. THE BUDGET MUST STAY IN STEP WITH THE RENDERER --------------------------------------------------
+  // The module's comment says "Keep in step with the renderer" and nothing enforced it, which is how one arm drifted
+  // in the first place. `truncateOnWord` is not exported, so this asserts the two facts a probe would otherwise have
+  // to assume — read from the renderer's REAL source, not from a copy of its rule that would share its premise:
+  //   (a) the call site that renders `requirement` still passes 400, matching RENDER_BUDGET;
+  //   (b) truncateOnWord still returns the string UNCHANGED at or under the budget.
+  // Together those make "persisted ≤ 400" a proof that rendered === persisted. If either changes, this fails here
+  // rather than silently shaving a customer's report again.
+  const { RENDER_BUDGET } = await import("./audit-absence-reconcile");
+  const VM = (await import("node:fs")).readFileSync("src/app/audit/[id]/_view-model.ts", "utf8");
+  // Call sites are ENUMERATED, not named — there are two that render a requirement and a hand-picked one would go
+  // stale the moment a third appears. Zero found is a FAILURE, never a silent pass.
+  const sites = VM.split("\n")
+    .filter((l) => /truncateOnWord\(/.test(l) && /requirement|rawReq/i.test(l))
+    .map((l) => Number(l.match(/,\s*(\d+)\s*\)/)?.[1]))
+    .filter((n) => Number.isFinite(n));
+  ok(`renderer requirement call sites found (${sites.length})`, sites.length >= 2);
+  ok(`every requirement budget (${sites.join(", ")}) matches RENDER_BUDGET (${RENDER_BUDGET})`,
+     sites.length > 0 && sites.every((n) => n === RENDER_BUDGET));
+  ok("truncateOnWord still returns the string unchanged at or under the budget",
+     /if \(str\.length <= max\) return str;/.test(VM));
+
   // ---- 1b. THE TWO FIXES MUST NOT CONTRADICT EACH OTHER --------------------------------------------------------
   // REPORT-TRUTH #2 appends "(this audit did not locate it; absence was not verified…)" to every absence claim. Once
   // #7 has PROVEN the document IS in the source, that caveat is FALSE — two of our own fixes disagreeing inside one

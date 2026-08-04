@@ -216,7 +216,12 @@ export function reconcileAbsenceClaims<T extends { id?: string; requirement?: st
           .filter((sent) => !FACT_ABSENCE.test(sent) && !/UNVERIFIED ABSENCE/.test(sent))
           .join(" ")
           .trim();
-        const after = `${CORRECTED_PREFIX}this solicitation's set-aside resolved to ${resolvedSetAside}, which this report states on its own masthead; an earlier statement that it was unstated was wrong. Confirm your firm qualifies under it.${saConseq ? ` Related analysis: ${saConseq}` : ""}`;
+        // BUDGET — this arm must fit the renderer exactly as the doc arm below does. It did not, and the omission
+        // is the same defect fitToRender exists to prevent: persisted 593 chars, rendered 395, 198 characters of
+        // the preserved analysis silently dropped ON THE PAGE while looking complete in the engine. The correction's
+        // own base is ~222 chars, so the cut always lands in the appended analysis — the correction survives whole
+        // and only the tail shortens, which is the right priority order.
+        const after = fitToRender(`${CORRECTED_PREFIX}this solicitation's set-aside resolved to ${resolvedSetAside}, which this report states on its own masthead; an earlier statement that it was unstated was wrong. Confirm your firm qualifies under it.${saConseq ? ` Related analysis: ${saConseq}` : ""}`);
         refuted.push({ id: f.id ?? "(unidentified)", doc: `set-aside:${resolvedSetAside}`, kind: "present_and_analyzed", before, after });
         return { ...f, requirement: after };
       }
