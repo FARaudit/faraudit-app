@@ -1,27 +1,20 @@
 /* uei-editor.js — the UEI/CAGE identity block on /capability-statement.
  *
- * WHY THIS EXISTS: the block it replaces was four HARDCODED values
- * (UEI "APX7R4X2000000", CAGE "7R4X2", NAICS 336413, set-aside SDVOSB)
- * shipped to signed-in customers as if they were their own registration.
- * There was no UEI input anywhere on the platform, so the Opportunities
- * eligibility line could only ever read -0 and the "Add your UEI" button
- * had to send people to the legacy /home form to find the field.
+ * Reads and writes GET/PATCH /api/capability-statement, the same path the NAICS
+ * editor uses, so there is a single writer. PATCHing `uei` triggers
+ * syncCertifications() server-side, which reads the SAM Entity record and
+ * persists the verified programs.
  *
- * It reads and writes the SAME library path the NAICS editor already uses --
- * GET/PATCH /api/capability-statement -- so there is one writer, not two.
- * PATCHing `uei` server-side triggers syncCertifications(), which reads the
- * SAM Entity record and persists the verified programs. That is what makes
- * the eligibility subtraction able to fire at all.
+ * Built with DOM methods, never innerHTML: this file is served verbatim to the
+ * browser and every value it renders comes from the network.
  *
- * Built with DOM methods, never innerHTML: this file is served verbatim to
- * the browser and every value it renders comes from the network.
- *
- * HONESTY RULES, matching the feed's:
- *  - a value that is not on file renders as an explicit "not on file",
- *    never as a plausible-looking placeholder;
- *  - a failed read says so and does not imply the profile is blank;
- *  - a failed write keeps the customer's text and says nothing was saved;
- *  - the SERVER ECHO is what we render back, never the local string.
+ * Rendering rules:
+ *  - a value not on file renders as an explicit "not on file", never as a
+ *    plausible-looking placeholder;
+ *  - a read that does not succeed says so, and does not imply the profile is blank;
+ *  - a write that does not succeed keeps the customer's text and reports that no
+ *    save occurred;
+ *  - the SERVER ECHO is what is rendered back, never the local string.
  */
 (function () {
   'use strict';
