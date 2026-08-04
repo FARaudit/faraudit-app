@@ -63,10 +63,27 @@ for (const name of ["signin.html", "sign-in.html"]) {
 
 // The public landing page must point at the real route. A relative href to a deleted file is a 404 for
 // every unauthenticated visitor — the single worst link on the site to break.
-const landing = readFileSync(join(PUBLIC, "landing.html"), "utf8");
-const signInHrefs = [...landing.matchAll(/<a[^>]+href=["']([^"']+)["'][^>]*class=["'][^"']*nav-signin/gi)].map((m) => m[1]);
-assert(signInHrefs.length > 0, "landing.html has a Sign In link");
-assert(signInHrefs.every((h) => h === "/sign-in"), `landing.html Sign In → /sign-in (found: ${signInHrefs.join(", ") || "none"})`);
+//
+// THE PAGE THIS GUARDS MOVED, AND THAT IS THE POINT. This read public/landing.html, an ORPHAN: nothing
+// in src/ or public/ linked to it, and `/` has always been served from public/root-landing.html by
+// src/app/page.tsx. So the strongest link-integrity check on the site was pointed at a page no visitor
+// reached, while the actual front door went unchecked. It now reads what `/` serves.
+//
+// The selector is href-based, not class-based: the old one keyed on `class="nav-signin"`, and the live
+// landing markup carries no class on those anchors — ported verbatim it would have found zero links and
+// passed the "every" leg vacuously.
+const landingFile = "root-landing.html";
+const landing = readFileSync(join(PUBLIC, landingFile), "utf8");
+const anchors = [...landing.matchAll(/<a[^>]+href=["']([^"']+)["'][^>]*>/gi)].map((m) => m[1]);
+const signInHrefs = anchors.filter((h) => /sign-?in/i.test(h));
+assert(signInHrefs.length > 0, `${landingFile} has a Sign In link`);
+assert(signInHrefs.every((h) => h === "/sign-in"), `${landingFile} Sign In → /sign-in (found: ${signInHrefs.join(", ") || "none"})`);
+// The retired page must not come back by the same door it left: an orphan re-added to the allowlist is
+// exactly how this one survived a week past its replacement.
+assert(!existsSync(join(PUBLIC, "landing.html")), "public/landing.html (orphaned duplicate landing page) is gone");
+for (const f of ["src/middleware.ts", "src/app/_components/auth-shell.tsx"]) {
+  assert(!/["']\/landing\.html["']/.test(readFileSync(join(ROOT, f), "utf8")), `${f} no longer lists /landing.html`);
+}
 
 // Nothing in the app should still describe /signin.html as a public path it expects to serve.
 for (const f of ["src/middleware.ts", "src/app/_components/auth-shell.tsx"]) {

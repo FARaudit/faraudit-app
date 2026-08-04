@@ -123,8 +123,11 @@ code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 8 https://www.faraudit.
 
 echo ""
 echo "--- landing page live ---"
-code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 8 https://www.faraudit.com/landing.html)
-[ "$code" = "200" ] && echo "✓ /landing.html → 200" || echo "⚠️  /landing.html → $code"
+# `/` is the landing page — it is served from public/root-landing.html by src/app/page.tsx. This
+# checked /landing.html, an orphaned second landing page nothing linked to, so the live check on the
+# actual front door did not exist while a page no visitor reached was polled every run.
+code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 8 https://www.faraudit.com/)
+[ "$code" = "200" ] && echo "✓ / → 200" || echo "⚠️  / → $code"
 
 echo ""
 echo "════ C · GIT HISTORY & FILE SYSTEM ════"

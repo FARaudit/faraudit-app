@@ -96,7 +96,11 @@ function visibleText(page: string): string {
 // The exemption cannot rot quietly: if an exempt page starts PASSING, this gate
 // goes red and demands the entry be deleted. An exemption that outlives its
 // defect is how a gate turns into a permanent silence.
-const DESIGN_EXEMPT = new Set(["landing.html"]);
+// EMPTY, AND THAT IS THE OUTCOME THE GATE WAS BUILT TO FORCE. Its one entry was `landing.html`,
+// which turned out not to need a redesign at all: it was an ORPHAN — nothing in src/ or public/
+// linked to it, and `/` has always been served from root-landing.html. Retired rather than restyled,
+// so the exemption went with the page. The mechanism stays for the next one.
+const DESIGN_EXEMPT = new Set<string>([]);
 
 // ── D1 · TYPOGRAPHY ──────────────────────────────────────────────────────────
 // Named families first, then the bare `serif` keyword with `sans-serif` excluded
