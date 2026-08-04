@@ -32,8 +32,11 @@ export interface CheckResult {
 // design.
 const ROUTE_STATUS: CheckSpec[] = [
   { name: "faraudit.com /",                kind: "route_status", url: "https://faraudit.com/",                expect: [200, 307, 308] },
-  { name: "faraudit.com /landing.html",    kind: "route_status", url: "https://faraudit.com/landing.html",    expect: [200, 307, 308] },
   { name: "faraudit.com /access.html",     kind: "route_status", url: "https://faraudit.com/access.html",     expect: [200, 307, 308] },
+  // /landing.html was an orphaned second landing page — nothing linked to it and `/` has always been
+  // served from root-landing.html. It is deleted and no longer allowlisted, so it now falls to the auth
+  // wall: 307/308 only. A 200 here would mean the page came back.
+  { name: "faraudit.com /landing.html",    kind: "route_status", url: "https://faraudit.com/landing.html",    expect: [307, 308] },
   // The real front door. /signin.html was a placeholder that authenticated nothing; it is deleted and
   // redirected, so a 200 there would mean the fake door came back — hence 307/308 only, never 200.
   { name: "faraudit.com /sign-in",         kind: "route_status", url: "https://faraudit.com/sign-in",         expect: [200, 307, 308] },
@@ -69,8 +72,7 @@ const API_ENDPOINT: CheckSpec[] = [
 const HTML_MARKER: CheckSpec[] = [
   // Placeholder — once any public route reliably returns 200 with stable
   // markup, add it here. With current full-lockdown auth, all routes 307,
-  // so there is no scrapable HTML body. Re-enable when public landing
-  // returns 200 again (e.g. when /landing.html exits the auth wall).
+  // so there is no scrapable HTML body.
 ];
 
 export const ALL_CHECKS: CheckSpec[] = [
