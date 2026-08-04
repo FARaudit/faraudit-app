@@ -44,6 +44,33 @@
     };
   }
 
+  /* Rows whose effective date is still ahead, as a countdown. Only real dates count:
+     a row with no effective_date is omitted rather than defaulted to today, which
+     would invent an enforcement deadline. Dates are compared at UTC day granularity
+     so a row does not change bucket with the reader's timezone. */
+  function buildEffective(rows) {
+    var DAY = 86400000;
+    var now = new Date();
+    var todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    var out = [];
+    (rows || []).forEach(function (u) {
+      var raw = u && u.effective_date;
+      if (!raw) return;
+      var m = String(raw).match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (!m) return;
+      var when = Date.UTC(+m[1], +m[2] - 1, +m[3]);
+      var days = Math.round((when - todayUTC) / DAY);
+      if (days < 0) return;                       // already in force — not upcoming
+      out.push({
+        name: u.title || '',
+        clause: u.clause || (u.affects_clauses && u.affects_clauses[0]) || '',
+        days: days,
+        tone: days <= 7 ? 'red' : days <= 30 ? 'amber' : 'green'
+      });
+    });
+    return out.sort(function (a, b) { return a.days - b.days; });
+  }
+
   function setStatus(state, reason, sources) {
     if (!window.FARD) return;
     window.FARD.STATUS = { state: state, reason: reason || '', sources: sources || [] };
@@ -96,6 +123,15 @@
       const mapped = items.map(mapUpdate);
       window.FARD.UPDATES.length = 0;
       window.FARD.UPDATES.push.apply(window.FARD.UPDATES, mapped);
+
+      /* EFFECTIVE drives the "Effective ≤30d" count and the countdown panel. Nothing
+         populated it, so that number could only ever be 0 — it read as a computed risk
+         indicator while being structurally incapable of moving. The route now supplies
+         effective_date, so it is derived here from the same rows on screen. */
+      if (Array.isArray(window.FARD.EFFECTIVE)) {
+        window.FARD.EFFECTIVE.length = 0;
+        window.FARD.EFFECTIVE.push.apply(window.FARD.EFFECTIVE, buildEffective(items));
+      }
       repaint();
     } catch (e) {
       console.error('[far-dfars-updates-live] wire failed:', e);
