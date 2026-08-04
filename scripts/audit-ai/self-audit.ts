@@ -129,19 +129,43 @@ if (want("coverage")) {
 }
 
 /** 6 · CERT COHERENCE — two certs asserting opposite things is worse than no cert, because whichever runs first
- *  looks authoritative. `_cert-rt8-wiring.ts` survived the #8 park still asserting the seam WAS flag-gated. */
+ *  looks authoritative. `_cert-rt8-wiring.ts` survived the #8 park still asserting the seam WAS flag-gated.
+ *
+ *  THIS CHECK WAS A PLACEBO UNTIL 2026-08-04, and the way it failed is the lesson. It scanned for
+ *  `process.env.AUDIT_X === "true"` INSIDE the cert — but a cert does not read the flag, it greps the EXECUTOR
+ *  for the guard, so the assertion is written as a bare regex literal:
+ *      ok("seam is flag-gated", /AUDIT_FORCE_GROUNDING === "true"/.test(src))
+ *  No `process.env.` prefix, no match, zero hits in the exact file the comment above names. It reported
+ *  "59 certs, none asserting a dead flag" on every push while that specimen sat RED in the same directory.
+ *
+ *  TWO REWRITES WERE WRONG BEFORE THIS ONE, both for the same reason — they tried to RECOGNIZE the assertion.
+ *  Cut 1 scanned every AUDIT_* token on a non-comment line: three false positives, because `const AUDIT_ID = "..."`
+ *  and a `process.env.X = "true"` setup line mention a token while asserting nothing. Cut 2 restricted to lines
+ *  containing `ok(` — and its fail-closed leg immediately reported 24 certs it could not read, because this corpus
+ *  has no single assertion helper (`ok(`, `probe(`, `run(`, and bare inline ✓/✗ all appear). Recognizing the
+ *  assertion is the treadmill; there is always a next spelling.
+ *
+ *  WHAT IS CHECKED INSTEAD needs no convention, no polarity and no line classification. A cert that embeds the
+ *  literal guard `AUDIT_X === "true"` is, by embedding it, asserting production CONTAINS that guard. So: find the
+ *  guards each cert embeds, and require production to actually contain them. The park shape passes by
+ *  construction — `!/process\.env\.AUDIT_FORCE_GROUNDING/.test(ex)` embeds no `=== "true"` guard — and so do the
+ *  setup line (single `=`) and the const binding (never `AUDIT_ID === "true"`). Zero false positives by shape,
+ *  not by exemption. */
 if (want("certs")) {
   const certs = readdirSync(join(ROOT, "scripts", "audit-ai")).filter((f) => /^_cert-.*\.ts$/.test(f));
   const stale: string[] = [];
+  let claims = 0;
   for (const c of certs) {
     const src = readFileSync(join(ROOT, "scripts", "audit-ai", c), "utf8");
-    for (const m of src.matchAll(/process\.env\.(AUDIT_[A-Z0-9_]+) === "true"/g)) {
-      const flag = m[1];
-      const readInProd = grepFiles(new RegExp(`process\\.env\\.${flag}`), ["src", "agents"]).filter((f) => !f.includes(".test."));
-      if (!readInProd.length && /=== "true"/.test(src)) stale.push(`${c} asserts on ${flag}, which no production code reads`);
+    for (const flag of new Set([...src.matchAll(/\b(AUDIT_[A-Z0-9_]+) === "true"/g)].map((m) => m[1]))) {
+      claims++;
+      const guard = new RegExp(`${flag} === "true"`);
+      const inProd = grepFiles(guard, ["src", "agents"]).filter((f) => !f.includes(".test."));
+      if (!inProd.length) stale.push(`${c} asserts production guards on ${flag}, but no production code contains that guard`);
     }
   }
-  add("certs", stale.length === 0, stale.length ? stale.join(" · ") : `${certs.length} certs, none asserting a dead flag`);
+  add("certs", stale.length === 0,
+    stale.length ? stale.join(" · ") : `${certs.length} certs, ${claims} guard claims, all present in production`);
 }
 
 function walk(dir: string, out: string[] = []): string[] {
