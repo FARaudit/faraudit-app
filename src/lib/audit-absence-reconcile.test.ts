@@ -186,6 +186,29 @@ const SRC = [
   // test — so tightening the alphabet cannot cost them. Asserted, not assumed:
   ok("the real WD claim still refutes (identifier is parenthetical)", run([WD], "SBA").refuted.length === 1);
 
+  // ---- 2f. ADVERSARIAL ROUND-3 VECTOR 1 (2026-08-04) — NAMING A TOKEN IS NOT IDENTIFYING A DOCUMENT -----------
+  // A region's tokens include ordinary head nouns, so a bare "The register is not provided" matched
+  // ATT12_Submittal Register.pdf and "The narrative is not attached" matched ATT11_260007_Design Narrative.pdf —
+  // refuting an underspecified claim against whichever file happened to share a word, DELETING A TRUE WARNING.
+  // Reproduced on real posted data (run 496a9a21 / FA813726R0033).
+  //
+  // Token COMPLETENESS is not available as the discriminator: the red-team executed it and it destroys 2 of the 4
+  // banked true positives, because real filenames carry tokens no lens writes ("Appropved", "ATT10_", "Raytheon").
+  // What all 4 true positives carry and no break does is an EXPLICIT IDENTIFIER, so that is the allowlist.
+  const V1 = "==== DOCUMENT: ATT12_Submittal Register.pdf ====\nSubmittal register.\n" + "q".repeat(400)
+           + "\n==== DOCUMENT: ATT11_260007_Design Narrative.pdf ====\nDesign narrative.\n" + "r".repeat(400);
+  const v1run = (req: string) =>
+    reconcileAbsenceClaims([{ id: "a", requirement: req }], V1, new Set(["ATT12_Submittal Register.pdf"]), null).refuted.length;
+  ok("bare head noun does not refute (\"The register is not provided\")", v1run("The register is not provided.") === 0);
+  ok("bare head noun does not refute (\"The narrative is not attached\")", v1run("The narrative is not attached.") === 0);
+  ok("bare head noun does not refute (\"The design is not provided\")", v1run("The design is not provided.") === 0);
+  ok("an explicit identifier still refutes", v1run("Submittal Register (Attachment 12) is not provided.") === 1);
+  // THE FALSE NEGATIVE THIS DELIBERATELY ACCEPTS, pinned as CURRENT BEHAVIOUR rather than as correct: a claim that
+  // names the document plainly and truly, with no identifier, is now left standing. That is the SAFE direction —
+  // a false claim survives instead of a true warning being deleted — but it is a real cost and must not be
+  // discovered by surprise later. Marginal cost on the banked corpus is zero (refuted set byte-identical, 5/5).
+  ok("KNOWN FALSE NEGATIVE: an unidentified claim is left standing, by design", v1run("The register is not provided in the source.") === 0);
+
   // ---- 3. STRUCTURAL ------------------------------------------------------------------------------------------
   ok("no regions ⇒ untouched", reconcileAbsenceClaims([{ id: "a", requirement: PWS }], "", PROV, "SBA").refuted.length === 0);
   ok("empty findings ⇒ no crash", reconcileAbsenceClaims([], SRC, PROV, "SBA").findings.length === 0);
