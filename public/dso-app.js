@@ -752,8 +752,20 @@ function onThemeChange() { renderAll(); }
 /* renderHeader is exported so live.js can refresh the feed line as soon as the
    fetch answers, without waiting on watch/pipeline hydration. */
 window.DSO_APP = { render: renderAll, renderHeader: renderHeader, onThemeChange: onThemeChange };
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', renderAll);
-else renderAll();
+
+/* Binds the persistent "Reset all" control. `#clearAll` is rendered only inside
+   the empty-list message, so it covers that case only; this covers the button.
+   The element's presence is asserted, not assumed: a handler bound to an absent
+   id raises nothing, so a missing element is named in the console. */
+function bindResetAll() {
+  const b = document.getElementById('resetBtn');
+  if (!b) { console.warn('[dso-app] #resetBtn not found — Reset all is unbound'); return; }
+  b.addEventListener('click', (e) => { e.preventDefault(); reset(); });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => { renderAll(); bindResetAll(); });
+} else { renderAll(); bindResetAll(); }
 /* the cell floor is a webfont measurement — re-derive once the fonts land, or
    it is computed against fallback metrics and reports a generous number. */
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ renderControls(); });
