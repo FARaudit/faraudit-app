@@ -6,13 +6,20 @@
 // finding survive re-typed, flipping E1/E4 red). Run both flag states.
 import { makeAgenticVerifier, makeTieredSkeptic } from "../../src/lib/audit-verifier";
 import type { SkepticVerdict } from "../../src/lib/audit-verifier";
-import type { AuditToolContext } from "../../src/lib/audit-tools";
+import { claimEntailmentEnabled, type AuditToolContext } from "../../src/lib/audit-tools";
 import type { TypedFinding } from "../../src/lib/audit-findings";
 
 let fail = 0; const ok = (l: string, c: boolean) => { c || fail++; console.log(`${c ? "✓" : "✗"} ${l}`); };
-const FLAG = process.env.AUDIT_ATTACHMENT_COVERAGE === "true";
+// PREMISE READ FROM THE ENGINE, not from one env var. This used to be
+// `process.env.AUDIT_ATTACHMENT_COVERAGE === "true"`, which was the same question only while the entailment
+// guard rode that flag. Now that the guard has its own (AUDIT_CLAIM_ENTAILMENT), a hard-coded read would
+// assert INERTNESS against an ARMED engine and go red for no defect — the stale-baseline failure the engine
+// walk of 2026-08-05 measured across 19 gates. Ask the predicate the verifier itself asks.
+const FLAG = claimEntailmentEnabled();
 (async () => {
-console.log(`\n===== Card #373 Option-1 re-proof — AUDIT_ATTACHMENT_COVERAGE=${FLAG ? "ON" : "OFF"} =====`);
+console.log(`\n===== Card #373 Option-1 re-proof — claimEntailmentEnabled()=${FLAG ? "ON" : "OFF"} ` +
+  `(AUDIT_CLAIM_ENTAILMENT=${process.env.AUDIT_CLAIM_ENTAILMENT ?? "unset"} · ` +
+  `AUDIT_ATTACHMENT_COVERAGE=${process.env.AUDIT_ATTACHMENT_COVERAGE ?? "unset"}) =====`);
 
 const EXC = "the contractor shall provide all materials compatibility test and evaluation services";
 const ctx: AuditToolContext = { fullSource: `Attachment 1 SOW. ${EXC}. End of section.` } as AuditToolContext;
@@ -56,7 +63,10 @@ const tiered = (baseV: SkepticVerdict, escV: SkepticVerdict) =>
 // E5 — escalation sets entailmentFail + corrected on the contested fabrication
 const e5 = await tiered({ index: 0, upheld: false, reason: "base overturn → contested" }, { index: 0, upheld: false, entailmentFail: true, corrected: { controllability: "bidder_controls" }, reason: "requirement not in excerpt" });
 if (FLAG) {
-  ok("E5 flag-ON: entailmentFail PRESERVED through the tiered merge → fabrication DROPPED end-to-end (guard live in prod)", e5.survived.length === 0 && e5.rejected.length === 1);
+  // Label corrected 2026-08-05: this read "(guard live in prod)". It was not — the guard rode
+  // AUDIT_ATTACHMENT_COVERAGE, false on the worker, so the ON side this line describes had never run there.
+  // A gate that reports its own subject as shipped is the one place that claim must not be guessed.
+  ok("E5 flag-ON: entailmentFail PRESERVED through the tiered merge → fabrication DROPPED end-to-end", e5.survived.length === 0 && e5.rejected.length === 1);
 } else {
   ok("E5 flag-OFF: byte-identical — tiered merge, entailmentFail ignored → survives re-typed", e5.survived.length === 1);
 }
