@@ -293,6 +293,9 @@ export function isLptaConsequenceNonBar(ob: string): boolean {
 // Brain step-4 ruling item 2 (card #682 named defect) — see the guard inside `importanceOf`. Default-OFF: this is a
 // verdict-path change, so the arm is a CEO click, never Code's. Read at CALL time so it toggles per-invocation.
 const boilerplateBarSignalGuardEnabled = () => process.env.AUDIT_BOILERPLATE_BAR_SIGNAL_GUARD === "true";
+// PARITY FIX — see the block at the NOOP-REP release inside `importanceOf`. Default-OFF for the same reason as
+// its sibling directly above: a verdict-path change is armed by the CEO, not by Code. Read at CALL time.
+const noopRepBarSignalParityEnabled = () => isEnvOn(process.env.AUDIT_NOOP_REP_BAR_SIGNAL_PARITY);
 // B4 (Brain ruling, cards #690/#691) — see the banner block in `gateV2Outcome`. Verdict-inert, reason-only.
 const bannerNoUnrankedBarClaimEnabled = () => process.env.AUDIT_BANNER_NO_UNRANKED_BAR_CLAIM === "true";
 
@@ -322,7 +325,31 @@ export function importanceOf(ob: string): "disqualifier" | "boilerplate" | "ambi
   }
   // OFFEROR-RIGHTS / NO-OP-REP family — allow-list OUT only when the sentence carries NO eligibility-bar signal.
   // (Preserves the prior protest/debrief behavior exactly: each member still gates on its own flag + RE + !BAR_SIGNAL.)
-  if (!BAR_SIGNAL_RE.test(ob) && NOOP_REP_FAMILY.some((m) => m.enabled && m.re.test(ob))) return "boilerplate";
+  //
+  // ── PARITY FIX (flag `AUDIT_NOOP_REP_BAR_SIGNAL_PARITY`, default-OFF) ──────────────────────────────────────
+  // This branch tests the RAW `BAR_SIGNAL_RE`; every sibling tests `hasBarSignal()`, which is that regex PLUS two
+  // arms the raw one does not carry — `REGISTER_TOKENS_RE` (FCL · DD Form 254 · Part 145 · airworthiness
+  // certificate; note `BAR_SIGNAL_RE`'s `certif(ied|ication)` does NOT match "certificate") and
+  // `isPrivateIssuerCredentialBar`. Both are armed in production, as are all five NOOP-REP members, so at THIS
+  // one branch they add no escalation at all. A "boilerplate" return is a FULL release — gradeCoverageV2 drops
+  // it, so it never reaches `disqualifierUncovered` and never caps — which makes the failure direction FALSE-BID.
+  // Measured 4/4 asymmetric at production parity: `scripts/audit-ai/_probe-gatev2-barsignal-asymmetry.ts`.
+  //
+  // The register half was documented at the REGISTER_TOKENS block as a known limitation, left because widening
+  // this branch is a behaviour change. The private-issuer half was never documented: it was armed 2026-08-04 to
+  // ADD escalation and here it added none. Reachability is NARROW — it needs a sentence with no DISQUALIFIER_RE
+  // token, no BOILERPLATE_RE verb, a NOOP-REP frame, and a register/private-issuer bar carrying no BAR_SIGNAL_RE
+  // token — so this is a correctness gap, not a fire.
+  //
+  // `hasBarSignal` also brings the #587b `bond paper` carve-out, which is the ONE direction where the raw regex
+  // was stricter: "submitted on SF-1444 or bond paper" currently refuses the release on a paper-stock false hit.
+  // Under the flag that release is permitted, matching the sibling branches. That is the carve-out working as
+  // designed, and it is the only behaviour this fix LOOSENS — everything else it does is more escalation.
+  //
+  // DEFAULT-OFF because it is a verdict-path change: the arm is a CEO click, never Code's — the same posture as
+  // AUDIT_BOILERPLATE_BAR_SIGNAL_GUARD one branch above, which closed the mirror-image asymmetry.
+  const barSignal = noopRepBarSignalParityEnabled() ? hasBarSignal(ob) : BAR_SIGNAL_RE.test(ob);
+  if (!barSignal && NOOP_REP_FAMILY.some((m) => m.enabled && m.re.test(ob))) return "boilerplate";
   return "ambiguous";
 }
 
