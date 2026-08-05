@@ -25,6 +25,7 @@
 // not analyzed". The customer ends up with a true statement instead of a false one, never with silence.
 
 import { docRegions } from "./audit-orchestrator";
+import { regionCarriesText } from "./doc-region-substance";
 
 /** The report renders `requirement` through `truncateOnWord(..., 400)` (src/app/audit/[id]/_view-model.ts, both the
  *  routed-row and matrix-title paths). Anything past that is silently dropped on the page while looking complete in
@@ -217,7 +218,17 @@ export function reconcileAbsenceClaims<T extends { id?: string; requirement?: st
   provenanceDocs: Set<string>,
   resolvedSetAside?: string | null,
 ): AbsenceReconcileResult<T> {
-  const regions = docRegions(fullSource || "").map((r) => ({ name: r.name, tokens: docTokens(r.name), chars: r.text.length }));
+  // PRESENCE FLOOR (flag AUDIT_REGION_SUBSTANCE_FLOOR, default-OFF ⇒ byte-identical). A region only counts as
+  // evidence that the document "IS in the source" when it actually carries readable text. Without this the arm
+  // published a FAILED EXTRACTION as presence — a Wage Determination whose every page extracted blank refuted a
+  // true "not provided" claim at "116 characters", and an attachment refuted at "105 characters" whose entire
+  // region text is the ingest's OWN `not text-extracted` marker. Rule 61: a failed dependency is a visible
+  // failure state, never a plausible answer. Removing a region here can only DROP a refutation, leaving the
+  // lens's absence claim standing (already framed as unverified by the Rule-64 non-presence wrapper).
+  const substanceFloorOn = process.env.AUDIT_REGION_SUBSTANCE_FLOOR === "true";
+  const regions = docRegions(fullSource || "")
+    .filter((r) => !substanceFloorOn || regionCarriesText(r.text))
+    .map((r) => ({ name: r.name, tokens: docTokens(r.name), chars: r.text.length }));
   const refuted: AbsenceReconcileResult<T>["refuted"] = [];
   if (!regions.length) return { findings, refuted };
 
