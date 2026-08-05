@@ -261,6 +261,30 @@ export const ATTACHMENT_COVERAGE_ENABLED = isEnvOn(process.env.AUDIT_ATTACHMENT_
 // without a subprocess -- the shape strictFindingsToolEnabled already uses.
 export const lensDiscoveryEnabled = () => isEnvOn(process.env.AUDIT_LENS_DISCOVERY);
 
+// ── CLAIM↔EXCERPT ENTAILMENT (cards #372/#373, flag AUDIT_CLAIM_ENTAILMENT) ─────────────────────────────────
+// ROOT: Rule 64 states its own limit — the grounding check proves the EXCERPT is in the document, never that the
+// CLAIM says what the excerpt says. Run eab43ada published a fabricated $29.99 wage gate whose own grounding
+// excerpt read "It is not a Wage Determination", and it passed Rule 64 correctly.
+//
+// The guard for that is `entailmentFail` (audit-verifier.ts): a first-class skeptic signal on any finding whose
+// `requirement` asserts something its own `excerpt` does not support, hard-dropped BEFORE the re-type branch so a
+// `corrected:{…}` can never resurrect it. It is built, and `_prove-card373.ts` passes 7/7 on its ON side.
+//
+// IT WAS DARK, AND NOT BY ITS OWN FLAG. All three of its parts — prompt clause, response-schema property, hard-drop
+// branch — read ATTACHMENT_COVERAGE_ENABLED. That same flag also switches on the coverage-lens PRE-INJECT (seeding
+// one lens the full text of every binding attachment), which exhausted the 270s budget on two live runs. So the
+// correctness guard could only be armed together with a known wall-clock regression, and it went off with it.
+//
+// SEPARATE FLAG, for the reason already ruled on for lens discovery directly above: one arm must not ship two
+// independent bets. Entailment is a prompt+schema change on a call the skeptic already makes and adds no model
+// call; the coverage sweep is a token-cost change. They fail in different ways and deserve independent arms.
+//
+// BACKWARD-COMPATIBLE BY CONSTRUCTION: attachment coverage still implies entailment, so no existing configuration
+// changes behaviour, and BOTH off is byte-identical to today. Read at CALL time (the lensDiscoveryEnabled shape) so
+// both states are reachable in one process and a gate can prove the red side without a subprocess.
+export const claimEntailmentEnabled = () =>
+  isEnvOn(process.env.AUDIT_CLAIM_ENTAILMENT) || ATTACHMENT_COVERAGE_ENABLED;
+
 // parseDocRegions + resolvePrimary moved VERBATIM to primary-doc-resolve.ts (root-b U1, 2026-07-29) so the
 // section detector can consult the SAME Card #370 election without an import cycle. Re-exported here so every
 // existing consumer's import path is unchanged.
