@@ -167,7 +167,11 @@ export function renderRail(activeKey: string, counts: RailCounts = {}): string {
   return (
     `<aside class="sidebar">\n` +
     `  <button class="sb-toggle" id="sbToggle" type="button" aria-label="Toggle sidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>\n` +
-    `  <div class="sb-logo-row"><div class="sb-logo">F</div><span class="sb-wordmark">FAR<span class="wm-au">audit</span></span></div>\n  ` +
+    // The retired single-letter mark is deliberately ABSENT here — the wordmark stands alone.
+    // It survived the purge because the rail is injected at SERVE time: a sweep of the design
+    // files and public/*.html never reached this string, and it kept rendering on all 18
+    // surfaces. One source, one line, 18 pages. Do not reintroduce a mark beside the wordmark.
+    `  <div class="sb-logo-row"><span class="sb-wordmark">FAR<span class="wm-au">audit</span></span></div>\n  ` +
     groups +
     `\n  <div class="sb-bottom">\n` +
     // Identity is NEVER hardcoded — the rail script fills these from
