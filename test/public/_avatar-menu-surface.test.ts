@@ -224,11 +224,17 @@ console.log("\nR6  PLANTED — each leg above must go RED on the pre-fix value")
     ok(now.surface !== now.ground || (now.line !== now.divider && now.shadow !== ""),
       "PLANTED(-): the shipped light panel passes on its edge, not its ground");
   }
-  // R2 / R3 / R4 — the pre-fix values.
-  ok(!(9.5 >= 11), "PLANTED: the pre-fix 9.5px label fails the type floor");
-  ok(11.5 !== 13.5, "PLANTED: the pre-fix 11.5px item size is not the row label size");
-  ok("8px 9px" !== "10px", "PLANTED: the pre-fix 8px/9px padding fails the row box");
-  ok(!("" === "ellipsis"), "PLANTED: a name with no text-overflow fails R4");
+  // R2 / R3 / R4 — the pre-fix values, held in typed bindings and pushed through
+  // the SAME predicates the live legs use. Comparing bare literals here would be
+  // a tautology TypeScript can fold at compile time, which is a plant that proves
+  // nothing about the check it claims to falsify.
+  const PRE: { labelSize: number; itemSize: number; padding: string; ellipsis: string } = {
+    labelSize: 9.5, itemSize: 11.5, padding: "8px 9px", ellipsis: "",
+  };
+  ok(!(PRE.labelSize >= 11), "PLANTED: the pre-fix 9.5px label fails the type floor");
+  ok(PRE.itemSize !== 13.5, "PLANTED: the pre-fix 11.5px item size is not the row label size");
+  ok(PRE.padding !== "10px", "PLANTED: the pre-fix 8px/9px padding fails the row box");
+  ok(PRE.ellipsis !== "ellipsis", "PLANTED: a name with no text-overflow fails R4");
   // R5 — the matchers must actually SEE a competing rule, or R5 can never go red.
   ok(COMPETING_SIZE.test(".sb-avatar{width:32px;height:32px;border-radius:50%}"),
     "PLANTED: the competing 32px rule is recognised by R5's matcher");
