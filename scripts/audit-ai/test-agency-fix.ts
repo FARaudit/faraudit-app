@@ -113,10 +113,24 @@ function check(name: string, cond: boolean, detail: string) {
 
 // ── Clause-citation fidelity (Polish B) ────────────────────────────────────
 // 14) THE AFARS CASE: clause number absent from source + not in known list → de-attributed.
+//   FIXTURE RE-BASELINED 2026-08-04. As written this case's source carried NO clause token at all, which is
+//   indistinguishable from a MISSING TEXT LAYER — and _v2GroundRiskClauses has since grown a degraded-source
+//   fallback (`!sourceHasClauses ⇒ grounded`) precisely so an empty/unreadable grounding text cannot mass-drop
+//   valid risk citations. The old fixture therefore exercised the fallback, not de-attribution, and reported
+//   FAIL against behaviour that is correct. The source now carries one real clause token so the text layer reads
+//   as PRESENT and the de-attribution the case is named for is what is actually measured. Case 16 below is the
+//   twin that pins the fallback itself, so both directions stay covered.
+{
+  const risks = [{ trapClause: "AFARS 5152.242-9000", isDfarsTrap: true }];
+  const n = _v2GroundRiskClauses(risks, "PWS: contractor personnel require NCIC-III and Real ID for base access. Clause 52.204-9 applies.", []);
+  check("ungrounded AFARS clause de-attributed (readable source)", n === 1 && risks[0].trapClause === null && risks[0].isDfarsTrap === false, JSON.stringify(risks[0]));
+}
+// 14b) THE OTHER DIRECTION, made explicit: the SAME ungrounded clause against a source with no clause token at
+//   all is KEPT — text-layer absence is not evidence the citation is fabricated (degraded-source fallback).
 {
   const risks = [{ trapClause: "AFARS 5152.242-9000", isDfarsTrap: true }];
   const n = _v2GroundRiskClauses(risks, "PWS: contractor personnel require NCIC-III and Real ID for base access.", []);
-  check("ungrounded AFARS clause de-attributed", n === 1 && risks[0].trapClause === null && risks[0].isDfarsTrap === false, JSON.stringify(risks[0]));
+  check("same clause KEPT when the source has no clause token (no mass-drop)", n === 0 && risks[0].trapClause === "AFARS 5152.242-9000", JSON.stringify(risks[0]));
 }
 // 15) Grounded by extracted clause list → kept.
 {

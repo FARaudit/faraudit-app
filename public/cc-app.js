@@ -49,6 +49,19 @@
     return '$' + n;
   }
 
+  // The foot under Pipeline Value is a CLAIM about the customer's pursuits, so
+  // it may only describe a pipeline this page actually read. An unreadable
+  // pipeline says so; a null total never prints as 0.
+  function pipelineFoot(L) {
+    if (!L) return 'not loaded';
+    if (L.pipelineAvailable === false) return 'your pipeline could not be read';
+    const total = num(L.pipelineTotal);
+    if (total === null) return 'your pipeline could not be read';
+    if (total === 0) return 'no pursuits in your pipeline yet';
+    const money = fmtMoney(L.pipelineWeightedValue);
+    return total + ' active pursuit' + (total === 1 ? '' : 's') + (money ? '' : ' · none carry a stated value');
+  }
+
   function renderKPIs() {
     const L = window.CC.LIVE;
     const arrow = '<span class="kpi-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M7 17L17 7M9 7h8v8"/></svg></span>';
@@ -60,7 +73,7 @@
       { href: '/opportunities', lbl: 'Live Notices',     val: L ? String(num(L.liveCount) ?? DASH) : DASH,    unit: '',  foot: L ? 'matching your NAICS on SAM.gov' : 'feed not loaded', tone: 'blue' },
       { href: '/opportunities', lbl: 'Closing ≤ 7 Days', val: L ? String(num(L.deadlineSoon) ?? DASH) : DASH, unit: '',  foot: L ? 'live notices with a stated deadline' : 'feed not loaded', tone: 'amber' },
       { href: '/past-audits',   lbl: 'Audits This Month', val: L ? String(num(L.auditsThisMonth) ?? DASH) : DASH, unit: '', foot: L ? 'completed by you' : 'not loaded', tone: 'red' },
-      { href: '/pipeline',      lbl: 'Pipeline Value',   val: money ?? DASH, unit: '', foot: money ? (num(L.pipelineTotal) || 0) + ' active pursuits' : 'no stated values in your pipeline', tone: 'green' }
+      { href: '/pipeline',      lbl: 'Pipeline Value',   val: money ?? DASH, unit: '', foot: pipelineFoot(L), tone: 'green' }
     ];
     $('kpiStrip').innerHTML = cards.map(c => `<a class="kpi" data-tone="${c.tone}" href="${c.href}">${arrow}<p class="lbl">${c.lbl}</p><div class="kpi-val">${c.val}<span class="unit">${c.unit}</span></div><div class="foot">${c.foot}</div></a>`).join('');
     renderHdr();

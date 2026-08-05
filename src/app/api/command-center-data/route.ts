@@ -86,15 +86,26 @@ export async function GET() {
       fetchRecentAudits(supabase, user.id, 200).catch(() => []),
       // Pipeline rows for the user — feeds Active Pursuits funnel, .ps-mid/.ps-right
       // aggregates, sidebar Pipeline danger badge, and since-bar pursuitsAdvanced.
+      //
+      // `status` is NOT a column on `pipeline` and never was: the table carries
+      // stage · due_date · updated_at · estimated_value · agency · naics · notes
+      // · solicitation_number · title. Naming it made the whole select return
+      // 42703, and the old handler turned that into `[]` — so every pipeline
+      // number on Today was a structural zero rather than a measurement, while
+      // the customer had pursuits on file. It was also never read.
+      //
+      // null (not []) on failure, matching what this route already does for the
+      // live feed: "no pursuits" and "could not read your pursuits" are
+      // different facts and the page must not render them alike.
       // PostgrestBuilder is a thenable but not a real Promise, so we use the
       // two-arg .then(onFulfilled, onRejected) form instead of .catch().
       supabase
         .from("pipeline")
-        .select("stage, due_date, updated_at, estimated_value, status")
+        .select("stage, due_date, updated_at, estimated_value")
         .eq("user_id", user.id)
         .then(
-          (r) => (r.data as any[]) || [],
-          () => [] as any[]
+          (r) => (r.error ? null : ((r.data as any[]) || [])),
+          () => null
         ),
     ]);
 
@@ -133,7 +144,14 @@ export async function GET() {
       return a.bid_no_bid === "no-bid" || rec === "decline";
     }).length;
 
-    const pursuitsAdvanced = (pipelineRows as any[]).filter((c) => {
+    // Every pipeline aggregate below is null when the read failed. A zero here
+    // would be indistinguishable from an empty pipeline, and the client renders
+    // null as an em dash rather than a number nobody measured.
+    const pipeRows: any[] | null = (pipelineRows as any[] | null);
+    const pipelineAvailable = pipeRows !== null;
+    const P: any[] = pipeRows ?? [];
+
+    const pursuitsAdvanced = !pipelineAvailable ? null : P.filter((c) => {
       const ts = c.updated_at ? new Date(c.updated_at).getTime() : NaN;
       return !isNaN(ts) && (nowMs - ts) < dayMs;
     }).length;
@@ -150,41 +168,43 @@ export async function GET() {
     opportunities.forEach((o) => { if (o.agency) agencies.add(o.agency); });
     const agencyCount = agencies.size;
 
-    const pipelineAtRisk = (pipelineRows as any[]).filter((c) => {
+    const pipelineAtRisk = !pipelineAvailable ? null : P.filter((c) => {
       const ts = c.due_date ? new Date(c.due_date).getTime() : NaN;
       if (isNaN(ts)) return false;
       return ts >= nowMs && (ts - nowMs) <= day2Ms;
     }).length;
 
-    const pipelineTotal = (pipelineRows as any[]).length;
+    const pipelineTotal = pipelineAvailable ? P.length : null;
 
     // Funnel bucket counts (s0-s4) — matches design .fseg.s0/s1/s2/s3/s4 selector.
-    const pipelineFunnel: Record<string, number> = { s0: 0, s1: 0, s2: 0, s3: 0, s4: 0 };
-    (pipelineRows as any[]).forEach((c) => {
+    const funnelCounts: Record<string, number> = { s0: 0, s1: 0, s2: 0, s3: 0, s4: 0 };
+    P.forEach((c) => {
       const bucket = STAGE_TO_BUCKET[c.stage as string];
-      if (bucket) pipelineFunnel[bucket]++;
+      if (bucket) funnelCounts[bucket]++;
     });
+    const pipelineFunnel = pipelineAvailable ? funnelCounts : null;
 
     // Pipeline weighted value sum (for .ps-right .lead "$M weighted").
-    const pipelineWeightedValue = (pipelineRows as any[]).reduce((sum, c) => {
+    const pipelineWeightedValueRaw = P.reduce((sum, c) => {
       const v = typeof c.estimated_value === "number"
         ? c.estimated_value
         : (typeof c.estimated_value === "string" ? parseFloat(c.estimated_value) || 0 : 0);
       return sum + v;
     }, 0);
+    const pipelineWeightedValue = pipelineAvailable ? pipelineWeightedValueRaw : null;
 
     // .focus callout counts ("N pursuit closes in <24h · M need your action this week")
-    const pipelineClosing24h = (pipelineRows as any[]).filter((c) => {
+    const pipelineClosing24h = !pipelineAvailable ? null : P.filter((c) => {
       const ts = c.due_date ? new Date(c.due_date).getTime() : NaN;
       return !isNaN(ts) && ts >= nowMs && (ts - nowMs) <= dayMs;
     }).length;
-    const pipelineClosingWeek = (pipelineRows as any[]).filter((c) => {
+    const pipelineClosingWeek = !pipelineAvailable ? null : P.filter((c) => {
       const ts = c.due_date ? new Date(c.due_date).getTime() : NaN;
       return !isNaN(ts) && ts >= nowMs && (ts - nowMs) <= weekMs;
     }).length;
 
     // Top 6 pipeline cards by soonest due_date (drives the 6 .pursuit rows)
-    const pipelineTop6 = (pipelineRows as any[])
+    const pipelineTop6 = !pipelineAvailable ? null : P
       .filter((c) => c.due_date)
       .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
       .slice(0, 6);
@@ -259,7 +279,9 @@ export async function GET() {
       pipelineAtRisk,
       pipelineTotal,
 
-      // Active Pursuits panel
+      // Active Pursuits panel. `pipelineAvailable` false ⇒ every field below is
+      // null, and the page renders "unavailable" rather than a zero.
+      pipelineAvailable,
       pipelineFunnel,
       pipelineWeightedValue,
       pipelineClosing24h,

@@ -7,9 +7,28 @@
 // coverage-only: never eligibility_bar, never a showstopper, never in the 206-A unverifiedGates, and adding them
 // to an already-complete decision changes neither verdict, eligible, nor showStoppers.
 
+//
+// ── RE-BASELINED 2026-08-04 (read this before the assertions below) ────────────────────────────────────────────
+// As authored, this gate built VerdictInputs WITHOUT `coverageV2`. That shape reaches a legacy line
+// (audit-decide.ts:3614, "!inp.coverageComplete ⇒ INCOMPLETE") which PRODUCTION NEVER REACHES: the orchestrator
+// always supplies coverageV2 while AUDIT_GATE_V2 is on (audit-orchestrator.ts:3105), and it is on in production.
+// So the gate's headline failure — "verdict got INCOMPLETE, expected BID_WITH_CAUTION" — was measuring a dead
+// path, not the engine muting. Rebuilt to the production shape, the same record returns BID_WITH_CAUTION with the
+// uncovered §C item NAMED: Rule 70 cap-not-mute holding, which is what this gate should have been pinning.
+//
+// Two coverage claims are retired with the reasons named, rather than deleted:
+//   · "coverage completes (missing=[])" — later floors legitimately refuse blanket coverage on this record's §B,
+//     §C and §M. §C is refused by name by the live-armed AUDIT_COVERED_DIRECT_BAR_FLOOR (ungrounded eligibility
+//     bars co-resident with a grounded finding). Coverage completion is no longer the thing that decides the
+//     verdict, so asserting it is asserting the pre-Rule-70 architecture.
+//   · "procedural-OFF ⇒ INCOMPLETE baseline" — MEASURED FALSE on this record under the live flag set: §L is
+//     covered by the ledger demotion (AUDIT_LEDGER_BROAD_AMBIGUOUS) with or without the procedural pass, so the
+//     contrast the baseline drew is inert HERE. That is a fact about this record's §L (all-benign obligations),
+//     not proof the pass is inert generally — a §L carrying a real bar would not demote.
 import { readFileSync, readdirSync } from "fs";
 import { deriveVerdict, applySetAsideFirmStatusGate } from "@/lib/audit-decide";
-import { buildManifest, completenessOf } from "@/lib/audit-orchestrator";
+import { buildManifest, completenessOf, locateObligationContext } from "@/lib/audit-orchestrator";
+import { gradeCoverageV2, verifyRecitalInSource, consequenceTailsAfter } from "@/lib/audit-gate-v2";
 import { proceduralCoveragePass } from "@/lib/audit-procedural-coverage";
 import { readSection, type AuditToolContext } from "@/lib/audit-tools";
 import type { TypedFinding, VerdictInputs } from "@/lib/audit-findings";
@@ -23,7 +42,17 @@ const withEnv = <T>(env: Record<string, string | undefined>, fn: () => T): T => 
   try { return fn(); } finally { for (const k of Object.keys(env)) { if (prev[k] === undefined) delete process.env[k]; else process.env[k] = prev[k]!; } }
 };
 const orch = (fs: TypedFinding[], profile: any) => applySetAsideFirmStatusGate(fs, profile, { enabled: process.env.AUDIT_ELIGIBLE_TRISTATE === "true" });
-const vin = (fs: TypedFinding[], cov: boolean): VerdictInputs => ({ findings: fs, bidderProfile: null, coverageComplete: cov, verifierSound: true, conflict: false, manifestComplete: true });
+// PRODUCTION SHAPE — coverageV2 built exactly as audit-orchestrator.ts:3105 builds it. Without it the verdict
+// runs the legacy pre-GATE_V2 line that production cannot reach (see the re-baseline note in the header).
+const vin = (fs: TypedFinding[], cov: boolean, atts?: unknown[]): VerdictInputs => ({
+  findings: fs, bidderProfile: null, coverageComplete: cov, verifierSound: true, conflict: false, manifestComplete: true,
+  source: ctx.fullSource,
+  ...(atts ? { coverageV2: gradeCoverageV2(atts as never, {
+    locate: (o: string) => locateObligationContext(ctx.fullSource, o),
+    verifyRecitalPresence: (o: string) => verifyRecitalInSource(ctx.fullSource, o),
+    consequenceTails: (o: string) => consequenceTailsAfter(ctx.fullSource, o),
+  }) } : {}),
+} as VerdictInputs);
 
 // Pin to the card-202 authoring fixture (PRE-tristate): its §L/§M are NOT pre-grounded, so the procedural-OFF
 // INCOMPLETE cases stay meaningful. The card-210 record (AUDIT_ELIGIBLE_TRISTATE=true) has §L/§M pre-grounded;
@@ -39,6 +68,7 @@ const required = buildManifest(ctx);
 const sr = new Set<string>(rec.result.sectionsRead);
 const recFindings = (): TypedFinding[] => rec.result.findings.map((f: any) => ({ ...f }));
 const covComplete = (fs: TypedFinding[]) => { const { missing } = completenessOf(ctx, required, fs, sr); return missing.length === 0 && required.length > 0; };
+const cover = (fs: TypedFinding[], s: Set<string> = sr) => completenessOf(ctx, required, fs, s) as unknown as { missing: string[]; attestations: unknown[] };
 
 async function main() {
   // The pass (deterministic default) grounds §L/§M — part12-commercial doc.
@@ -48,21 +78,29 @@ async function main() {
   ok("all bidder_controls, grounded, no cautionFloor/requiredAttribute", proc.every((f) => f.controllability === "bidder_controls" && f.grounded && !f.cautionFloor && !f.requiredAttribute));
   ok("every excerpt is VERBATIM in its section (Rule-64)", proc.every((f) => { const sec = f.citation.match(/§([A-M])/)?.[1] ?? ""; return readSection(ctx, sec).text.replace(/\s+/g, " ").toLowerCase().includes(f.excerpt.replace(/\s+/g, " ").toLowerCase()); }));
 
-  // (a) BOTH flags ON → ruled target end-state.
+  // (a) BOTH flags ON → the ruled target end-state, measured through the PRODUCTION input shape (coverageV2).
   await withEnv({ AUDIT_PROCEDURAL_COVERAGE_LENS: "true", AUDIT_ELIGIBLE_TRISTATE: "true" }, () => {
     const fs = [...recFindings(), ...proc];
-    eq("a coverage completes with procedural", covComplete(fs), true);
-    const d = deriveVerdict(vin(orch(fs, null), covComplete(fs)));
-    eq("a verdict=BID_WITH_CAUTION", d.verdict, "BID_WITH_CAUTION");
+    const c = cover(fs);
+    // Coverage does NOT complete on this record and is no longer required to: §B/§C/§M are refused by later
+    // floors (§C by name, by the live-armed covered_direct HARD-BAR floor). Rule 70 caps the committal and NAMES
+    // the item instead of muting — that is the property worth pinning, so pin it directly.
+    ok("a §C is the named uncovered item (covered_direct hard-bar floor, not a silent drop)", c.missing.includes("C"));
+    const d = deriveVerdict(vin(orch(fs, null), covComplete(fs), c.attestations));
+    eq("a verdict=BID_WITH_CAUTION (Rule 70 cap-not-mute, NOT muted to INCOMPLETE)", d.verdict, "BID_WITH_CAUTION");
     eq("a eligible=null", d.eligible, null);
+    ok("a the uncovered item is NAMED in the reason (never a bare manifest complaint)", /CAUTION/.test(d.reason) && /§C/.test(d.reason));
     ok("a WOSB gate_to_clear", d.dispositions.some((f) => f.requiredAttribute === "setaside:WOSB" && f.disposition === "gate_to_clear"));
     ok("a mandatory WOSB verify-caution", /ELIGIBILITY NOT VERIFIED/.test(d.reason) && /WOSB/i.test(d.reason));
   });
-  // baseline: procedural OFF → INCOMPLETE (coverage not complete).
+  // baseline: procedural OFF. RE-BASELINED — the old "⇒ INCOMPLETE" contrast is MEASURED FALSE here (header note):
+  // §L is covered by the ledger demotion with or without the pass, so the verdict is the same committal cap. What
+  // is still true and worth pinning is that turning the pass off never IMPROVES the verdict.
   await withEnv({ AUDIT_PROCEDURAL_COVERAGE_LENS: undefined, AUDIT_ELIGIBLE_TRISTATE: "true" }, () => {
     const fs = recFindings(); // no procedural
-    const d = deriveVerdict(vin(orch(fs, null), covComplete(fs)));
-    eq("baseline procedural-OFF verdict=INCOMPLETE", d.verdict, "INCOMPLETE");
+    const c = cover(fs);
+    const d = deriveVerdict(vin(orch(fs, null), covComplete(fs), c.attestations));
+    eq("baseline procedural-OFF verdict is the same capped committal (pass adds no false green)", d.verdict, "BID_WITH_CAUTION");
   });
 
   // (b) FLAG-OFF BYTE-IDENTITY — the pass never runs when its flag is off (guarded at the orchestrator call site);
@@ -98,12 +136,15 @@ async function main() {
     // Apply the wiring: mark the pass's grounded sections read.
     for (const f of proc) { const m = f.citation.match(/§([A-M])\b/); if (m) srNoLM.add(m[1]); }
     const after = completenessOf(ctx, required, fs, srNoLM).missing;
-    eq("d with the wiring fix → coverage completes (missing=[])", after, []);
+    // RE-BASELINED — the wiring's job is to lift §L/§M out of the 'unread' gate, NOT to complete coverage: §B/§C/§M
+    // are refused downstream by later floors on their own merits. Asserting missing=[] asserted those floors away.
+    ok("d with the wiring fix → §L is no longer 'unread'-missing", before.includes("L") && !after.includes("L"));
+    eq("d the wiring changes ONLY the unread gate (the floors' own refusals survive)", after, cover(fs).missing);
   }
 
   console.log(`procedural-coverage gate: ${pass}/${pass + fails.length} pass`);
   if (fails.length) { console.log("FAILURES:"); fails.forEach((x) => console.log("  ❌ " + x)); process.exit(1); }
-  console.log("✅ ALL PASS — Part-12 procedural pass completes coverage → ruled end-state; flag-OFF inert; procedural class is coverage-only (never a bar/eligibility input).");
+  console.log("✅ ALL PASS — Part-12 procedural pass grounds §L/§M and lifts them out of the unread gate; the verdict caps at BID_WITH_CAUTION with the uncovered §C item NAMED (Rule 70, not muted); flag-OFF inert; procedural class is coverage-only (never a bar/eligibility input).");
   process.exit(0);
 }
 main();

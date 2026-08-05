@@ -154,5 +154,44 @@ check("C1 · banned-token list catches the planted row", plantedTokenCaught);
 check("C2 · currency sweep catches the planted figure", plantedMoneyCaught);
 check("C3 · array-shape check catches the planted record", plantedArrayCaught);
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Part D · THE PIPELINE READ MUST NOT FAIL OPEN (added 2026-08-04)
+//
+// /api/command-center-data selected `pipeline.status` — a column that does not
+// exist. The select returned 42703, the handler turned that into `[]`, and every
+// pipeline number on Today became a structural zero: the customer had 3 pursuits
+// on file while the page showed an empty pipeline and hid the sidebar badge.
+// Verified against production: the corrected select returns those 3 rows.
+//
+// The contract now matches the one this same route already uses for the live
+// feed — null on failure, never [] — so "no pursuits" and "could not read your
+// pursuits" stay different facts.
+// ─────────────────────────────────────────────────────────────────────────────
+{
+  const ROUTE = readFileSync(join(process.cwd(), "src", "app", "api", "command-center-data", "route.ts"), "utf8");
+  const CCAPP = readFileSync(join(process.cwd(), "public", "cc-app.js"), "utf8");
+
+  const sel = ROUTE.match(/from\("pipeline"\)\s*\n?\s*\.select\("([^"]+)"\)/);
+  check("D1 · the pipeline select is findable (gate fails closed if it moves)", !!sel);
+  const cols = (sel ? sel[1] : "").split(",").map((c) => c.trim());
+  // The real columns, read from production 2026-08-04.
+  const REAL = new Set(["stage", "due_date", "updated_at", "estimated_value", "agency",
+    "naics", "notes", "solicitation_number", "title", "id", "user_id", "created_at"]);
+  const bogus = cols.filter((c) => c && !REAL.has(c));
+  check("D2 · every selected pipeline column exists", bogus.length === 0, "bogus: " + bogus.join(","));
+
+  check("D3 · a pipeline query error yields null, not an empty array", /r\.error\s*\?\s*null/.test(ROUTE));
+  check("D4 · the response carries whether the pipeline was readable", /pipelineAvailable/.test(ROUTE));
+  check("D5 · pipelineTotal is null when unreadable", /pipelineTotal\s*=\s*pipelineAvailable\s*\?/.test(ROUTE));
+
+  check("D6 · the page renders the unreadable case distinctly", /pipelineAvailable\s*===\s*false/.test(CCAPP));
+  check("D7 · …and says so in words", /could not be read/.test(CCAPP));
+  check("D8 · the old foot that asserted an empty pipeline is gone", !/no stated values in your pipeline/.test(CCAPP));
+
+  // planted positives
+  check("D9 · PLANTED: the column probe catches `status` returning", ["stage", "due_date", "status"].filter((c) => !REAL.has(c)).length === 1);
+  check("D10 · PLANTED: the null-on-error probe rejects the old fail-open handler", !/r\.error\s*\?\s*null/.test(`.then((r) => (r.data as any[]) || [], () => [] as any[])`));
+}
+
 console.log(`\n${pass} passed · ${fail} failed`);
 if (fail > 0) process.exit(1);

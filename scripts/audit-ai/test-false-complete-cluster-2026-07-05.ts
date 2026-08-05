@@ -40,12 +40,23 @@ const ctxM: AuditToolContext = { fullSource: "irrelevant", sections: {
   B: "Pricing shall be firm fixed price for all CLINs.",
   M: "Award is made on a best value tradeoff basis, where pricing shall be firm fixed price is one factor the Government evaluates.",
 } };
+// RE-BASELINED 2026-08-04 — both legs asserted a STATUS LITERAL this section can no longer carry. §L/§M are
+// PER_OBLIGATION sections (audit-orchestrator.ts:2171 excludes them from blanket covered_direct), so §M is graded
+// obligation-by-obligation and reaches `covered_attested`, never `covered_direct`. Leg 1's assertion was also
+// broader than its own stated intent ("no false covered_DIRECT"): under card #474 ruling 3
+// (AUDIT_LEDGER_BROAD_AMBIGUOUS, live-armed) §M's lone government-evaluation-methodology sentence is a demoted
+// NON-BAR, so the section is credited `covered_boilerplate_signal` — by the demotion ledger, NOT by the §B
+// finding. The invariant this case exists to defend is intact, and is now asserted DIRECTLY rather than through
+// a status literal: no cross-section finding may ever be CREDITED to §M.
 const bCitedOnly = [f({ requirement: "FFP pricing", citation: "§B", excerpt: "Pricing shall be firm fixed price for all CLINs.", id: "b1" })];
 const covB = completenessOf(ctxM, ["M"], bCitedOnly, new Set(["M"]));
-check("§B-cited finding whose excerpt is in §M text → §M NOT covered (no false covered_direct)", !covB.covered.includes("M"), `covered=${JSON.stringify(covB.covered)} status=${covB.attestations[0]?.status}`);
+const attB = covB.attestations[0];
+check("§B-cited finding whose excerpt is in §M text → never covered_direct", attB?.status !== "covered_direct", `status=${attB?.status}`);
+check("§B-cited finding is NOT credited to §M (the cross-section invariant)", !(attB?.citedFindingIds ?? []).includes("b1"), JSON.stringify(attB?.citedFindingIds));
 const mCited = [f({ requirement: "eval basis", citation: "§M", excerpt: "Award is made on a best value tradeoff basis", id: "m1" })];
 const covM = completenessOf(ctxM, ["M"], mCited, new Set(["M"]));
-check("§M-cited finding whose excerpt is in §M text → §M covered_direct (no over-tightening)", covM.covered.includes("M") && covM.attestations[0]?.status === "covered_direct");
+check("§M-cited finding whose excerpt is in §M text → §M covered (no over-tightening)", covM.covered.includes("M"), `status=${covM.attestations[0]?.status}`);
+check("§M reaches it through the per-obligation path, not a blanket credit", covM.attestations[0]?.status === "covered_attested", `status=${covM.attestations[0]?.status}`);
 
 console.log(`\n${fail === 0 ? "✅ ALL GREEN" : "❌ FAILURES"} — ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);
