@@ -307,6 +307,41 @@ console.log("\n── Part H · card 807 workflow rail ──");
 //
 // So this does not name defense-news. It checks that ONE value is shared, whichever
 // page breaks ranks next.
+// ── Part J · the rail is styled at first paint, and it stays on screen ──
+// Both found by driving the live platform, not by reading.
+//   · The stylesheet was injected before </body> — last of five sheets and the only
+//     one outside <head> — so every navigation painted the rail with the PAGE's own
+//     sidebar CSS first (oversized icons, page palette) and repainted when the sheet
+//     parsed. The user saw it as a flash on every tab click.
+//   · The OPEN rail had overflow-y:visible while the CLOSED rail had auto. With the
+//     sections expanded the content needs ~936px, so under that viewport the profile
+//     control at the bottom spilled out of the sticky box and off the bottom of the
+//     page. It fit on a tall monitor, which is why it survived review.
+console.log("\n── Part J · styled at first paint, and stays on screen ──");
+{
+  const page = "<html><head><style>.page{}</style></head><body><aside class=\"sidebar\"></aside></body></html>";
+  const out = injectRail(page, "today");
+  const headEnd = out.indexOf("</head>");
+  check("rail stylesheet is in <head>", out.indexOf('id="sb-phase5"') < headEnd, "injected after the body — the rail paints unstyled first");
+  check("font link is in <head>", out.indexOf('id="sb-phase5-font"') < headEnd, "the face swaps in after the mark has painted");
+  check("rail script stays at the end of the body", out.indexOf("sbAvatarBtn") > headEnd, "a blocking script moved into the head");
+  const sheet = railStyle();
+  // Anchored on the rule's own boundary. The first version matched
+  // `[data-sb="mini"] .sidebar{overflow…}` as well, because that selector CONTAINS the
+  // bare one — so deleting the rule under test left the check green. It could not fail.
+  const bareSidebarRule = /[};]\.sidebar\{[^}]*\}/g;
+  const bare = (sheet.match(bareSidebarRule) ?? []).join(" ");
+  check("the rail owns its own stickiness", /position:sticky!important/.test(bare) && /height:100vh!important/.test(bare), "stickiness is left to each page's CSS");
+  check("the rail scrolls inside itself, open or closed", /overflow-y:auto!important/.test(bare), "content spills past the sticky box on a short viewport");
+  check("the closed strip still scrolls too", /\[data-sb="mini"\] \.sidebar,\[data-sb="closed"\] \.sidebar\{overflow-x:hidden!important;overflow-y:auto!important\}/.test(sheet), "the strip lost its overflow rule");
+
+  // Planted positives.
+  const bodyInjected = page.replace("</body>", '<style id="sb-phase5"></style></body>');
+  check("J-P1 · rejects a stylesheet injected after the body", !(bodyInjected.indexOf('id="sb-phase5"') < bodyInjected.indexOf("</head>")));
+  check("J-P2 · rejects a rail with no overflow rule", !/overflow-y:auto!important/.test("}.sidebar{background:red}".match(/[};]\.sidebar\{[^}]*\}/g)?.join(" ") ?? ""));
+  check("J-P3 · the anchored match ignores the mini/closed rule", ('[data-sb="mini"] .sidebar,[data-sb="closed"] .sidebar{overflow-y:auto!important}'.match(/[};]\.sidebar\{[^}]*\}/g) ?? []).length === 0);
+}
+
 console.log("\n── Part I · no page forks the field colour ──");
 {
   // Scoped to the RAIL pages — the ones that carry the replaceable <aside class="sidebar">.
