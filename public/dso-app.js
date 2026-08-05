@@ -854,9 +854,28 @@ function bindResetAll() {
   b.addEventListener('click', (e) => { e.preventDefault(); reset(); });
 }
 
+/* Search. Sets S.q, which the row predicate reads; composes with
+   stage/set-aside/band rather than replacing them. Escape clears the term
+   without touching the other filters. */
+function bindSearch() {
+  const el = $('searchInput');
+  if (!el) { console.warn('[dso-app] #searchInput not found — search is unbound'); return; }
+  const apply = () => {
+    const next = el.value.trim().toLowerCase();
+    if (next === S.q) return;
+    S.q = next;
+    renderAll();
+  };
+  el.addEventListener('input', apply);
+  el.addEventListener('paste', () => setTimeout(apply, 0));
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && el.value) { e.preventDefault(); el.value = ''; apply(); }
+  });
+}
+
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => { renderAll(); bindResetAll(); bindDetailToggles(); });
-} else { renderAll(); bindResetAll(); bindDetailToggles(); }
+  document.addEventListener('DOMContentLoaded', () => { renderAll(); bindResetAll(); bindDetailToggles(); bindSearch(); });
+} else { renderAll(); bindResetAll(); bindDetailToggles(); bindSearch(); }
 /* the cell floor is a webfont measurement — re-derive once the fonts land, or
    it is computed against fallback metrics and reports a generous number. */
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ renderControls(); });
