@@ -26,6 +26,7 @@ import type { AuditToolContext } from "./audit-tools";
 import type { BidderProfile, TypedFinding } from "./audit-findings";
 import type { CallModel, ExpertSpec } from "./audit-expert";
 import type { ConstructionManifest } from "./audit-construction-manifest";
+import { isEnvOn } from "./env-flags";
 
 export interface AuditPackageInput {
   fullSource: string;                       // assembled package source (every routed section + attachment)
@@ -205,12 +206,12 @@ export async function auditPackage(input: AuditPackageInput): Promise<AuditResul
   // adapter (returns the parseable prefix on max_tokens) wrapped in makeShardedSkeptic (≤15/shard, id-keyed, coverage-
   // asserted, per-finding residue). OFF ⇒ adaptBase===adapt and the skeptic is exactly the prior batched-or-single
   // base ⇒ byte-identical. The escalation judge keeps the strict adapter (small contested set; truncation there → NHR).
-  const _sharded = process.env.AUDIT_VERIFIER_SHARDED === "true";
+  const _sharded = isEnvOn(process.env.AUDIT_VERIFIER_SHARDED);
   const adaptBase = _sharded ? structuredAdapterSalvaging(apiKey, input.signal, input.onUsage) : adapt;
   const baseSkeptic: SkepticFn = makeStructuredSkeptic(adaptBase, input.skepticBaseModel ?? modelFor("lens"));
   const skeptic = makeTieredSkeptic(
     _sharded ? makeShardedSkeptic(baseSkeptic)
-      : (process.env.AUDIT_VERIFIER_BATCHING === "true" ? makeBatchedSkeptic(baseSkeptic) : baseSkeptic),
+      : (isEnvOn(process.env.AUDIT_VERIFIER_BATCHING) ? makeBatchedSkeptic(baseSkeptic) : baseSkeptic),
     makeStructuredSkeptic(adapt, input.skepticEscalateModel ?? modelFor("judge")),
   );
   const verify = makeAgenticVerifier(skeptic);
@@ -231,7 +232,7 @@ export async function auditPackage(input: AuditPackageInput): Promise<AuditResul
   // L3 (Brain card 265/267) — grounded agentic section-finder. Constructed ONLY when AUDIT_SECTION_FINDER is on,
   // so flag-OFF ⇒ sectionFinder undefined ⇒ L3 never runs (byte-identical, no paid calls). The caller is a
   // LOCATE-only structured call; the offset-string-match gate in runSectionFinder makes a wrong locate fail-safe.
-  const sectionFinder = process.env.AUDIT_SECTION_FINDER === "true"
+  const sectionFinder = isEnvOn(process.env.AUDIT_SECTION_FINDER)
     ? makeSectionFinderCaller(
         async (a) => (await callStructuredClaude({ apiKey, model: a.model, system: a.system, userPrompt: a.user, schema: a.schema as Record<string, unknown>, maxTokens: a.maxTokens, signal: a.signal, onUsage: input.onUsage, ...(a.cachedSystemPrefix ? { cachedSystemPrefix: a.cachedSystemPrefix } : {}) })).text,
         input.sectionFinderModel ?? modelFor("finder"),
@@ -241,7 +242,7 @@ export async function auditPackage(input: AuditPackageInput): Promise<AuditResul
 
   return runAgenticAudit({
     ctx,
-    experts: input.experts ?? auditLenses({ personaDiversity: process.env.AUDIT_PERSONA_DIVERSITY === "true" }),
+    experts: input.experts ?? auditLenses({ personaDiversity: isEnvOn(process.env.AUDIT_PERSONA_DIVERSITY) }),
     callModel,
     verify,
     sectionFinder,
@@ -304,12 +305,12 @@ export async function runJudgmentFirstAudit(input: AuditPackageInput): Promise<J
   // adapter (returns the parseable prefix on max_tokens) wrapped in makeShardedSkeptic (≤15/shard, id-keyed, coverage-
   // asserted, per-finding residue). OFF ⇒ adaptBase===adapt and the skeptic is exactly the prior batched-or-single
   // base ⇒ byte-identical. The escalation judge keeps the strict adapter (small contested set; truncation there → NHR).
-  const _sharded = process.env.AUDIT_VERIFIER_SHARDED === "true";
+  const _sharded = isEnvOn(process.env.AUDIT_VERIFIER_SHARDED);
   const adaptBase = _sharded ? structuredAdapterSalvaging(apiKey, input.signal, input.onUsage) : adapt;
   const baseSkeptic: SkepticFn = makeStructuredSkeptic(adaptBase, input.skepticBaseModel ?? modelFor("lens"));
   const skeptic = makeTieredSkeptic(
     _sharded ? makeShardedSkeptic(baseSkeptic)
-      : (process.env.AUDIT_VERIFIER_BATCHING === "true" ? makeBatchedSkeptic(baseSkeptic) : baseSkeptic),
+      : (isEnvOn(process.env.AUDIT_VERIFIER_BATCHING) ? makeBatchedSkeptic(baseSkeptic) : baseSkeptic),
     makeStructuredSkeptic(adapt, input.skepticEscalateModel ?? modelFor("judge")),
   );
   const verify = makeAgenticVerifier(skeptic);
@@ -318,7 +319,7 @@ export async function runJudgmentFirstAudit(input: AuditPackageInput): Promise<J
   // Brain card 291 — PER-DOC DECOMPOSITION (flag-gated). When on, wrap the holistic proposer so each binding document
   // also gets its own proposer pass (findings unioned) → per-doc attestation is satisfiable by construction; the rail
   // still DISPOSEs over the union. OFF ⇒ the single holistic proposer (byte-identical). Multi-doc packages only.
-  const propose = process.env.AUDIT_PERDOC_DECOMP === "true" ? makePerDocProposer(basePropose, docRegions) : basePropose;
+  const propose = isEnvOn(process.env.AUDIT_PERDOC_DECOMP) ? makePerDocProposer(basePropose, docRegions) : basePropose;
 
   // The RAIL: the full deterministic orchestrator over the re-grounded proposal. runAgenticAudit re-grounds the
   // seed (drops any ungrounded finding), runs the deterministic sweep/temporal/verify/completeness + every re-typing

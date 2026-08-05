@@ -452,7 +452,7 @@ const normClauseCiteBoundary = (s: string) => s.replace(/[‐-―]/g, "-").repla
  *  an adjacent digit so only a whole clause number matches (T0-1, engine line-audit 2026-07-06). */
 export function makeClauseSourceChecker(sourceText: string): (clause: string) => boolean {
   // card #539: boundary-preserving normalization under the flag (default-OFF ⇒ legacy whitespace-strip, byte-identical).
-  const normFn = process.env.AUDIT_CLAUSE_SOURCE_FULLTEXT === "true" ? normClauseCiteBoundary : normClauseCite;
+  const normFn = isEnvOn(process.env.AUDIT_CLAUSE_SOURCE_FULLTEXT) ? normClauseCiteBoundary : normClauseCite;
   const norm = normFn(sourceText);
   return (clause: string) => {
     const c = normFn(clause);

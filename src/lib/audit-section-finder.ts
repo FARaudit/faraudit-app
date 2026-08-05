@@ -22,6 +22,7 @@
 // (typically largest) §C off a single anchor.
 
 /** What each locatable proposal section contains — handed to the finder so it knows what to look for. */
+import { isEnvOn } from "./env-flags";
 const SECTION_INTENT: Record<string, string> = {
   L: "the instructions to offerors — how to prepare and submit a proposal/quote (proposal contents, volumes, page limits, submission format)",
   M: "the evaluation factors / basis for award — how the Government will evaluate quotes and select an awardee (best value, LPTA, technical vs price)",
@@ -173,7 +174,7 @@ export function makeSectionFinderCaller(
     // on, carry the document as a SHARED cached system prefix (identical across §L/§M) so the FIRST locate writes
     // it and the SECOND reads it (~10% of input price). The section-specific ask stays in the (tiny) user turn.
     // Flag-OFF ⇒ document rides the user turn exactly as before (BYTE-IDENTICAL prompt — no behavior change).
-    const cacheOn = process.env.AUDIT_PROMPT_CACHE === "true";
+    const cacheOn = isEnvOn(process.env.AUDIT_PROMPT_CACHE);
     const docBlock = `---DOCUMENT---\n${fullSource}`;
     const user = cacheOn
       ? `Required section §${sectionKey} contains ${sectionIntent}.\n\n` +

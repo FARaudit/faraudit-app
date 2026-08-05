@@ -21,12 +21,13 @@
 import type { Verdict, Decision } from "./audit-decide";
 import type { TypedFinding, BidderProfile } from "./audit-findings";
 import { disposeVerdict, type DisposeResult } from "./audit-dispose";
+import { isEnvOn } from "./env-flags";
 
 // DORMANT (T2-3): this helper has ZERO callers in the live path (src/ + agents/). The AUDIT_JUDGMENT_FIRST flag
 // gates nothing in production today; it exists for the offline proof-harnesses + the eventual (unparked) executor
 // branch. Kept as the single source of the flag name so wiring it later is one edit, not a grep-and-hope.
 export function judgmentFirstEnabled(env: Record<string, string | undefined> = process.env): boolean {
-  return env.AUDIT_JUDGMENT_FIRST === "true";
+  return isEnvOn(env.AUDIT_JUDGMENT_FIRST);
 }
 
 /** What the holistic proposer returns: a top-line verdict + the GROUNDED findings that support it + the boardroom

@@ -17,6 +17,7 @@
 
 import { excerptHash, registerVerifier, registerUniversalDefectProducer } from "./audit-decide";
 import type { TypedFinding } from "./audit-findings";
+import { isEnvOn } from "./env-flags";
 
 /** The J-1 producer identity (registers into UNIVERSAL_DEFECT_PRODUCERS so the doctrine boot coupling-lock is coherent). */
 export const JUDGMENT_PRODUCER_ID = "judgment-producer@v1";
@@ -26,7 +27,7 @@ export const JUDGMENT_VERIFIER_ID = "judgment-layer-verifier@v1";
 
 /** Is the judgment layer enabled? Default-OFF ⇒ byte-identical. Read live so tests can toggle. */
 export function judgmentLayerEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env.AUDIT_JUDGMENT_LAYER === "true";
+  return isEnvOn(env.AUDIT_JUDGMENT_LAYER);
 }
 
 // ── COST LEDGER ───────────────────────────────────────────────────────────────────────────────────────
@@ -273,7 +274,7 @@ function clampSource(fullSource: string, excerpt: string, window = 2000): string
 // so enabling the layer without the tristate fails LOUD at boot (never a silent half-configured engine).
 export function registerJudgmentVerifier(env: NodeJS.ProcessEnv = process.env): void {
   if (!judgmentLayerEnabled(env)) return;
-  if (env.AUDIT_ELIGIBLE_TRISTATE !== "true")
+  if (!isEnvOn(env.AUDIT_ELIGIBLE_TRISTATE))
     throw new Error("[judgment-layer] AUDIT_JUDGMENT_LAYER=true requires AUDIT_ELIGIBLE_TRISTATE=true (Fork-2 coupling-lock: a universalDefect producer needs a positive eligibility determination reachable). Enable the tristate or disable the judgment layer.");
   // Register BOTH the verifier (Fork-5 allowlist) and J-1 as a universalDefect producer (the doctrine registry lock
   // — audit-decide.ts validateUniversalDefectProducerConfig — so both boot locks are coherent). registerVerifier is

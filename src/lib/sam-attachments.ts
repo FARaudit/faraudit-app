@@ -1336,7 +1336,7 @@ export async function assembleSamDocumentSet(
   // versions the v3 manifest kept — not unretrieved documents. Removed from BOTH the denominator and the skipped
   // count, so neither `files_ingested >= files_total` nor `overflow` reports a gap that does not exist. They stay
   // LISTED (never silently dropped), re-labelled with what actually happened.
-  const superseded = process.env.AUDIT_INGEST_DENOMINATOR_RECONCILE === "true"
+  const superseded = isEnvOn(process.env.AUDIT_INGEST_DENOMINATOR_RECONCILE)
     ? supersededManifestEntries(files, resourceLinks?.length ?? 0, ingestedCount)
     : [];
   for (const f of superseded) {

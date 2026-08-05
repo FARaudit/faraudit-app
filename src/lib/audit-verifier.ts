@@ -13,6 +13,7 @@ import { findInSource, ATTACHMENT_COVERAGE_ENABLED, type AuditToolContext } from
 import type { VerifyFn, VerifyResult, CorrectedDrop, VerifierLedger, VerifierClaimRuling } from "./audit-orchestrator";
 import type { TypedFinding, BidderProfile, Controllability } from "./audit-findings";
 import { knifeEdgeIndices } from "./audit-decide";
+import { isEnvOn } from "./env-flags";
 
 /** One skeptic ruling on a finding (by its index in the set). upheld=false ⇒ overturned (dropped). When
  *  `corrected` is present, the skeptic RE-TYPES the finding instead — escalation feeds deriveVerdict better
@@ -31,7 +32,7 @@ export function makeAgenticVerifier(skeptic: SkepticFn): VerifyFn {
     // ledger is never built and the VerifyResult is byte-identical to the pre-R1 return. Capture-only; deriveVerdict
     // never reads it. The residue predicate + preview helpers are HOISTED above the challenge so the zero-grounded and
     // skeptic-throw exits — which occur before the per-claim loop — can still emit a full ledger.
-    const bankOn = process.env.AUDIT_BANK_RUN_RECORD === "true";
+    const bankOn = isEnvOn(process.env.AUDIT_BANK_RUN_RECORD);
     // RESIDUE DOCTRINE (Brain card 285, Fix 1), flag-gated AUDIT_VERIFIER_BATCHING. An UNRESOLVED finding (the
     // skeptic returned no ruling for its index — truncation / claim-explosion residue) is classified:
     //   • VERDICT-DRIVING (bar-class OR knife-edge — could support/block a committal) → the run is NOT sound
@@ -44,7 +45,7 @@ export function makeAgenticVerifier(skeptic: SkepticFn): VerifyFn {
     // AUDIT_VERIFIER_SHARDED (card #609) rides the SAME residue doctrine: the sharded path's coverage guarantee means
     // residue is near-zero, but any finding the shards genuinely never rule must escalate PER-FINDING (verdict-driving
     // → NHR; informational → unverified) exactly as the batched path does. Flag-OFF for BOTH ⇒ byte-identical old rule.
-    const residueDoctrine = process.env.AUDIT_VERIFIER_BATCHING === "true" || process.env.AUDIT_VERIFIER_SHARDED === "true";
+    const residueDoctrine = isEnvOn(process.env.AUDIT_VERIFIER_BATCHING) || isEnvOn(process.env.AUDIT_VERIFIER_SHARDED);
     // CONSERVATIVE verdict-driving predicate (adversarial-review hardening, card 285). A finding is "informational"
     // (safe to leave UNRESOLVED without sinking soundness) ONLY when its KIND is one the engine defines as
     // structurally NEVER-a-bar: procedural_obligation (coverage-only, invisible to the verdict) or boilerplate

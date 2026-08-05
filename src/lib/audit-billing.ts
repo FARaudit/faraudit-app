@@ -7,6 +7,7 @@
 // erring toward caution (an honest-fail) is FREE to the customer.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PerModelCost, Totals } from "./audit-cost";
+import { isEnvOn } from "./env-flags";
 
 /** Deterministic-engine verdicts that are non-committal honest-fails (audit-decide.ts verdict enum). */
 export const HONEST_FAIL_VERDICTS: ReadonlySet<string> = new Set(["INCOMPLETE", "NEEDS_HUMAN_REVIEW"]);
@@ -31,7 +32,7 @@ export function isHonestFail(s: HonestFailSignals): boolean {
 
 /** Step-9 flag — default-OFF, Step-7 wiring template (`=== "true"` to enable). */
 export function honestFailNoChargeEnabled(): boolean {
-  return process.env.AUDIT_HONESTFAIL_NO_CHARGE === "true";
+  return isEnvOn(process.env.AUDIT_HONESTFAIL_NO_CHARGE);
 }
 
 /** A customer is charged ONLY for a committal verdict. billable=false IFF (flag ON AND honest-fail).

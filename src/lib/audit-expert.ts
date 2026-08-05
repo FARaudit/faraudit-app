@@ -11,6 +11,7 @@
 
 import { AUDIT_TOOLS, auditToolsFor, listBindingDocuments, runAuditTool, findInSource, normalizeForSearch, phrasePresentInNormalized, ATTACHMENT_COVERAGE_ENABLED, lensDiscoveryEnabled, type AuditToolContext } from "./audit-tools";
 import type { TypedFinding, RequirementKind, Controllability } from "./audit-findings";
+import { isEnvOn } from "./env-flags";
 
 /** What the expert emits per requirement (pre-grounding) — facts, no verdict. */
 export interface RawFinding {
@@ -213,7 +214,7 @@ export async function runAgenticExpert(
  *  WHY IT IS FLAG-GATED. Tool definitions render at prompt position 0, so changing one invalidates the prompt cache
  *  and moves the schema off prod-today — the same byte-identity constraint the attestations property below is bound
  *  by (Gauntlet #349 F3). Flag-OFF returns the definition unchanged. */
-export const strictFindingsToolEnabled = () => process.env.AUDIT_STRICT_FINDINGS_TOOL === "true";
+export const strictFindingsToolEnabled = () => isEnvOn(process.env.AUDIT_STRICT_FINDINGS_TOOL);
 
 /** The `submit_findings` tool — its input_schema FORCES a typed findings array (structured output via a
  *  strict tool). The expert calls it to terminate its loop; the harness parses the validated input. */
@@ -286,7 +287,7 @@ export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: 
     // Anthropic silently no-ops a breakpoint under the model minimum (~1024 tok), so this is safe.
     // Flag-OFF ⇒ req is BYTE-IDENTICAL to the prior prod shape (proven by test-expert-prompt-cache).
     // ONE unified flag AUDIT_PROMPT_CACHE governs all engine caching (this expert loop + the L3 finder).
-    const cacheOn = process.env.AUDIT_PROMPT_CACHE === "true";
+    const cacheOn = isEnvOn(process.env.AUDIT_PROMPT_CACHE);
     const EPHEMERAL = { type: "ephemeral" as const };
     // cache_control on the LAST tool caches the whole tool-schema prefix (all tools before it).
     // ATTACHMENT COVERAGE (Brain #347) — expose read_document only when the flag is on (auditToolsFor). Flag-OFF ⇒

@@ -7,6 +7,7 @@
 import { applyNmrNaicsDormancy, isNmrApplicableNaics, NMR_SUPPLY_SECTORS, NMR_ATTRIBUTE, disposeFinding } from "./audit-decide";
 import { NMR_CAUTION } from "./audit-keyfact-detector";
 import type { TypedFinding } from "./audit-findings";
+import { isEnvOn } from "./env-flags";
 
 let failures = 0;
 const assert = (c: boolean, m: string) => { console.log(`${c ? "✅" : "❌"} ${m}`); if (!c) failures++; };
@@ -41,7 +42,7 @@ const WHOLESALE = "423430";// sector 42 — Wholesale Trade
 
 console.log("── P1 — flag OFF ⇒ byte-identical (counter-proof: the false bar SURVIVES untouched) ──");
 withFlag(false, () => {
-  const out = applyNmrNaicsDormancy([nmrKeyfact(), nmrSetAsideNotice()], SERVICES, { enabled: process.env.AUDIT_NMR_NAICS_DORMANCY === "true" });
+  const out = applyNmrNaicsDormancy([nmrKeyfact(), nmrSetAsideNotice()], SERVICES, { enabled: isEnvOn(process.env.AUDIT_NMR_NAICS_DORMANCY) });
   assert(out.every((f) => f.controllability === "bidder_cannot_move" && f.kind === "eligibility_bar"), "OFF: both NMR findings stay bidder_cannot_move eligibility bars (dormancy not applied)");
   assert(disposeFinding(out[0]) === "disqualifying", "OFF: NMR keyfact bar still disposes 'disqualifying' (the un-fixed false-AUTO-F path)");
 });

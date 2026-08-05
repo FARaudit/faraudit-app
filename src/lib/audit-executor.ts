@@ -20,6 +20,7 @@ import { executeAgenticPrimary } from "@/lib/audit-executor-v3";
 import type { BidderProfile } from "@/lib/audit-findings";
 import { aggregate, type UsageCall } from "@/lib/audit-cost";
 import { recordAuditCost, decrementAuditQuota } from "@/lib/audit-billing";
+import { isEnvOn } from "./env-flags";
 
 // T2-2 (engine line-audit 2026-07-07) — REMOVED three retired-engine phantoms:
 //   • AuditPersistError — a class that was caught (route.ts) + advertised in the
@@ -235,7 +236,7 @@ export async function executeAudit(
         console.warn(`[FACTS] SAM cross-ref for ${solNum} failed/timed out (non-fatal): ${e instanceof Error ? e.message : e}`);
         return null;
       });
-      if (process.env.AUDIT_TIMING_PREPANEL === "true") console.log(`[timing] prepanel:sam-facts-fetch ${Date.now() - _tSam}ms · ${samFacts ? "hit" : "miss/timeout"}`);
+      if (isEnvOn(process.env.AUDIT_TIMING_PREPANEL)) console.log(`[timing] prepanel:sam-facts-fetch ${Date.now() - _tSam}ms · ${samFacts ? "hit" : "miss/timeout"}`);
       if (samFacts) {
         // A SAM record with no set-aside is DEFINITIVELY full & open — record that
         // as a known fact, never leave it blank/unknown.

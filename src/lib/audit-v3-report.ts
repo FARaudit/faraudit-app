@@ -19,6 +19,7 @@
 
 import { disposeFinding } from "./audit-decide";
 import type { Decision, NoVerdictCause } from "./audit-decide";
+import { isEnvOn } from "./env-flags";
 
 /** Compact, persistable finding — the unit the report renders. `disposition` is
  *  the derived bucket (show-stopper / gate / met) so the renderer needs no
@@ -189,7 +190,7 @@ interface VerdictPres { word: string; cls: string; kind: "decision" | "unresolve
 // verdict band from ADVICE ("Recommendation / submit / do not bid") to GATE language ("gate, not advice") — the
 // presentation side of zero-contract-loss (the tool surfaces a gate; the human makes the call). Flag OFF ⇒
 // verdictPres returns the current contract BYTE-IDENTICALLY (the early-return below is skipped).
-export function gateFramingEnabled(): boolean { return process.env.AUDIT_GATE_FRAMING === "true"; }
+export function gateFramingEnabled(): boolean { return isEnvOn(process.env.AUDIT_GATE_FRAMING); }
 
 // GATE-FRAMING presentation (doctrine #8: name the gate + state its condition; never issue an instruction).
 // PORTED 1:1 from Design's `Agentic Report v3 - Retrofit.html` VERDICTS map (card 126-R, Brain-selected v3).

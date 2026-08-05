@@ -12,6 +12,7 @@ import type { ExtractedDocument } from "./pdf-text-extractor";
 import { checkManifest, type ManifestResult } from "./agentic-panel";
 import { detectDocumentClass, checkBiddableContent, routeCommercialSections, ucfHeaderCount, FALLBACK_BUNDLE_KEYS, type DocumentClass } from "./panel-doc-class";
 import { LENS_SECTIONS, LENS_SECTIONS_COMMERCIAL, lensAssignedSections, type PanelLensKey } from "./agentic-sections";
+import { isEnvOn } from "./env-flags";
 
 // #525 fix (Brain card #629 shape-(i)) — the keys routeCommercialSections can actually produce. The no-lens-starved
 // predicate below only considers a lens "starved" if it owns one of THESE and got none (H/J/A never route
@@ -57,7 +58,7 @@ export function commercialRoutingSafe(placedKeys: string[]): boolean {
 //       means no lens can read nothing, whichever map is armed. `assembleLensPasses` dedupes identical section
 //       text across a lens's assigned keys, so the wider key set costs no extra tokens beyond the whole-source
 //       read itself — each lens still reads the source once.
-const UCF_BLIND_FALLBACK = () => process.env.AUDIT_UCF_BLIND_SECTION_FALLBACK === "true";
+const UCF_BLIND_FALLBACK = () => isEnvOn(process.env.AUDIT_UCF_BLIND_SECTION_FALLBACK);
 
 /** Every UCF key the LIVE lens map assigns to at least one lens (respects AUDIT_LENS_EMISSION_INTEGRITY +
  *  documentClass exactly as the runner does). The rescue's whole-source bundle spans these so no lens starves. */
@@ -185,7 +186,7 @@ export function buildPanelInputs(fullSource: string): PanelInputs {
   // strengthened RFQ/SF-1449 anchors + the no-lens-starved predicate (route whenever every lens gets its owned
   // content; fall back to whole-source — LOGGED — only when a lens would be STARVED, which is worse than
   // whole-source). OFF ⇒ legacy anchors + the §L-AND-§M predicate exactly as before.
-  const routingV2 = process.env.AUDIT_COMMERCIAL_ROUTING_V2 === "true";
+  const routingV2 = isEnvOn(process.env.AUDIT_COMMERCIAL_ROUTING_V2);
   const routed = routeCommercialSections(src, { v2: routingV2 });
   const routeOk = routingV2 ? commercialRoutingSafe(routed.placedKeys) : routed.routed;
   // whole-source single-bundle fallback when routing is not safe (assembleLensPasses dedupes identical section text

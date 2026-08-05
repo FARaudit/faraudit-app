@@ -21,6 +21,7 @@ import { deriveVerdict, applyFindingDedup, applyCrossFleetDedup } from "./audit-
 import { consequenceTailsAfter, gradeCoverageV2, verifyRecitalInSource, type CoverageV2 } from "./audit-gate-v2";
 import type { TypedFinding, VerdictInputs, BidderProfile } from "./audit-findings";
 import type { UsageCall } from "./audit-cost";
+import { isEnvOn } from "./env-flags";
 
 export const RUN_RECORD_SCHEMA = "run-record/v1" as const;
 
@@ -376,8 +377,8 @@ export function replayCoverageStage(rec: RunRecord): CoverageStageReplay {
   const pre = rec.result.diagnostics?.preProcessingFindings ?? null;
   let dedup: CoverageStageReplay["dedup"] = null;
   if (pre) {
-    const clauseDeduped = applyFindingDedup(pre, { enabled: process.env.AUDIT_FINDING_DEDUP === "true" });
-    const post = applyCrossFleetDedup(clauseDeduped, { enabled: process.env.AUDIT_CROSS_FLEET_DEDUP === "true" });  // mirror the live path (clause gate then cross-fleet gate)
+    const clauseDeduped = applyFindingDedup(pre, { enabled: isEnvOn(process.env.AUDIT_FINDING_DEDUP) });
+    const post = applyCrossFleetDedup(clauseDeduped, { enabled: isEnvOn(process.env.AUDIT_CROSS_FLEET_DEDUP) });  // mirror the live path (clause gate then cross-fleet gate)
     dedup = { pre: pre.length, post: post.length, delta: pre.length - post.length };
   }
   return {

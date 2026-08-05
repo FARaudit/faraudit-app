@@ -65,7 +65,27 @@ if (want("flags")) {
   } catch { live = []; }
   if (!live.length) add("flags", true, "SKIP — railway CLI unavailable (CI or offline)", true);
   else {
-    const referenced = new Set(grepAll(/AUDIT_[A-Z0-9_]+/g, ["src", "agents"]));
+    // READ, not merely NAMED. The first version of this check counted any occurrence of the flag name as a
+    // reference — so AUDIT_AGENTIC_PRIMARY and AUDIT_ENGINE_V2 passed as "referenced" on the strength of a
+    // boot-log string array in agents/audit-worker/index.ts, months after commit 5dc9b18d deleted the only
+    // code that read them. A census whose denominator is "the name appears somewhere" cannot find a dead
+    // flag, which is the one thing it exists to find. A read is the name inside an env ACCESS.
+    // The `env.AUDIT_X` form is a read too — several gates take `env: NodeJS.ProcessEnv = process.env` as a
+    // parameter so they can be tested without mutating the real environment. Omitting it reported
+    // AUDIT_JUDGMENT_LAYER and AUDIT_SETASIDE_OVERTYPE_GUARD as orphans while both are read on every run:
+    // a census that condemns a live flag is as useless as one that clears a dead one.
+    const readSites = new Set(
+      grepAll(/(?:process\.)?env\.(AUDIT_[A-Z0-9_]+)|process\.env\[\s*["'](AUDIT_[A-Z0-9_]+)["']\s*\]/g, ["src", "agents"])
+        .map((m) => (m.match(/AUDIT_[A-Z0-9_]+/) ?? [""])[0]),
+    );
+    // A flag reached through a named constant (`process.env[EXCERPT_HEAD_REGROUND_FLAG]`) is a real read the
+    // pattern above cannot see, so string constants holding a flag name count too. Narrower than "appears
+    // anywhere" — a name inside an array literal of log labels is still not a read.
+    for (const m of grepAll(/=\s*["'](AUDIT_[A-Z0-9_]+)["']\s*;/g, ["src", "agents"])) {
+      const k = (m.match(/AUDIT_[A-Z0-9_]+/) ?? [""])[0];
+      if (k) readSites.add(k);
+    }
+    const referenced = readSites;
     const keys = live.map((l) => l.split("=")[0]);
     // A key containing whitespace is not a flag — it is a MALFORMED VARIABLE, almost always a mangled
     // `railway variables --set "A B C=true"` that stored the whole list as one name. Reported separately, because
@@ -78,6 +98,20 @@ if (want("flags")) {
       + ` · orphans: ${orphans.length ? orphans.join(", ") : "none"}`
       + (malformed.length ? ` · MALFORMED KEYS: ${malformed.length} (first ${malformed[0].split(/\s+/).length} tokens, ${malformed[0].length} chars)` : "");
     add("flags", orphans.length === 0 && malformed.length === 0, detail);
+  }
+}
+
+/** 3b · FLAG PARSE UNIFORMITY — every env flag must go through src/lib/env-flags.ts. Check 3 finds flags that no
+ *  code reads; this finds flags the code reads WRONG. They are different failures: a flag can be read at 191 sites
+ *  and still be mis-parsed at every one of them. Unlike the census this needs no network, so it never SKIPs. */
+if (want("parse")) {
+  try {
+    const out = execFileSync("npx", ["tsx", "scripts/audit-ai/_cert-env-flag-parse-uniformity.ts"], { cwd: ROOT, encoding: "utf8", stdio: "pipe" });
+    add("parse", /✅ CLEAN/.test(out), (out.trim().split("\n").pop() || "").trim().slice(0, 120));
+  } catch (e) {
+    const out = String((e as { stdout?: string }).stdout ?? "");
+    const hits = out.split("\n").filter((l) => /bypass src\/lib\/env-flags/.test(l));
+    add("parse", false, hits[0]?.trim() || `threw: ${String((e as Error).message).slice(0, 100)}`);
   }
 }
 
@@ -264,9 +298,16 @@ if (want("certs")) {
   let claims = 0;
   for (const c of certs) {
     const src = readFileSync(join(ROOT, "scripts", "audit-ai", c), "utf8");
-    for (const flag of new Set([...src.matchAll(/\b(AUDIT_[A-Z0-9_]+) === "true"/g)].map((m) => m[1]))) {
+    // A guard claim is embedded in EITHER spelling. Production was routed through env-flags.isEnvOn on
+    // 2026-08-04; a matcher pinned to `=== "true"` reported three healthy certs stale the moment the parser
+    // changed, which is the same defect one layer up — asserting the SPELLING of a guard instead of the guard.
+    const embedded = new Set([
+      ...[...src.matchAll(/\b(AUDIT_[A-Z0-9_]+) === "true"/g)].map((m) => m[1]),
+      ...[...src.matchAll(/isEnvOn\(process\.env\.(AUDIT_[A-Z0-9_]+)\)/g)].map((m) => m[1]),
+    ]);
+    for (const flag of embedded) {
       claims++;
-      const guard = new RegExp(`${flag} === "true"`);
+      const guard = new RegExp(`${flag} === "true"|isEnvOn\\(process\\.env\\.${flag}\\)|isEnvOff\\(process\\.env\\.${flag}\\)`);
       const inProd = grepFiles(guard, ["src", "agents"]).filter((f) => !f.includes(".test."));
       if (!inProd.length) stale.push(`${c} asserts production guards on ${flag}, but no production code contains that guard`);
     }

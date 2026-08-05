@@ -101,7 +101,7 @@ export function procurementPart(ctx: AuditToolContext): ProcurementPart {
   // UCF/commercial/unknown detection below (prod byte-identical). No parallel format surface — the manifest is the
   // one construction signal, computed over FULL doc text, so a stray "SF 1442" string in an attachment can't flip a
   // services buy (isConstruction requires the header OR NAICS-23 at sweep time).
-  if (process.env.AUDIT_FORMAT_PART36 === "true" && ctx.constructionManifest?.isConstruction) return "part36-construction";
+  if (isEnvOn(process.env.AUDIT_FORMAT_PART36) && ctx.constructionManifest?.isConstruction) return "part36-construction";
   switch (detectFormat(ctx)) {
     case "UCF": return "part15-ucf";
     case "SF-1449-RFQ":

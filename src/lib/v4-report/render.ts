@@ -9,6 +9,8 @@
    fields carry attacker-influenceable text: doc names, excerpts, agency).
    ============================================================================= */
 
+import { isEnvOn } from "@/lib/env-flags";
+
 export type Tone = "go" | "caution" | "stop" | "slate";
 export type Pole =
   | "BID" | "BID_WITH_CAUTION" | "NO_BID" | "INELIGIBLE"
@@ -138,7 +140,7 @@ function verdict(v: V4Verdict, meta: { auditId?: string; auditDate?: string; cov
   // (docs-read / docs-total); the coverage CARD renders the GROUNDED axis (cov.state). When those disagree, the
   // masthead showed "100%" directly above a card reading "INCOMPLETE". Flag-ON: when state ≠ COMPLETE the masthead
   // shows the STATE (grounded axis), coherent with the card — never a read-100% that contradicts an incomplete grounding.
-  const coherent = process.env.AUDIT_COVERAGE_DISPLAY_COHERENT === "true";
+  const coherent = isEnvOn(process.env.AUDIT_COVERAGE_DISPLAY_COHERENT);
   const covIncomplete = coherent && cov.state != null && cov.state !== "COMPLETE";
   const covVal = covIncomplete
     ? esc(cov.state === "INCOMPLETE" ? "Incomplete" : String(cov.state))
@@ -209,7 +211,7 @@ function temporal(t?: V4Temporal): string {
 // p0 blocker registry (this aligns v4 with v5-report/core.ts SEVLAB, which already says "Gate"). "unrated" =
 // UNRATED (the honest UNCOMPUTED-DEFAULT rendering — never promoted upward). Evaluated PER-CALL (not a module const)
 // so the flag is honoured at render time, not frozen at import.
-const sevLab = (): Record<string, string> => process.env.AUDIT_SEVERITY_HONEST === "true"
+const sevLab = (): Record<string, string> => isEnvOn(process.env.AUDIT_SEVERITY_HONEST)
   ? { p0: "Stop", p1: "Gate", p2: "Advisory", unrated: "Unrated" }
   : { p0: "Stop", p1: "Critical", p2: "Advisory" };
 function findingRow(f: V4Finding, sev: string, open: boolean): string {

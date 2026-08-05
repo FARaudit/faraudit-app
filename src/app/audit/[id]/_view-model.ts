@@ -12,6 +12,7 @@ import { isActionableSubmissionItem, looksLikeOrgName, looksLikeSetAsideValue } 
 import { poleToRecommendation } from "@/lib/verdict-pole";
 import { suppressContradictedConfidenceNotes } from "./_v2-render-surfaces";
 import type { AuditConfidenceNote } from "@/lib/audit-judgment";
+import { isEnvOn } from "@/lib/env-flags";
 
 type AuditRow = Record<string, unknown>;
 
@@ -2136,9 +2137,9 @@ function deriveTimelineGates(
 // line-item / coverage-% fields findings don't carry; synthesizing them = fabrication.
 // boilerplate is dropped (informational). Flag OFF ⇒ empty extras + no §07 exclusion
 // ⇒ byte-identical legacy render on every audit.
-const V3_ROUTING_ON = process.env.AUDIT_V3_SECTION_ROUTING === "true";
+const V3_ROUTING_ON = isEnvOn(process.env.AUDIT_V3_SECTION_ROUTING);
 // Root-C render-coherence (card #423) — NHR-pole body honesty (matches the flag read in _render.ts). Default OFF.
-const NHR_COHERENCE_ON = process.env.AUDIT_REPORT_NHR_COHERENCE === "true";
+const NHR_COHERENCE_ON = isEnvOn(process.env.AUDIT_REPORT_NHR_COHERENCE);
 // Kinds lifted OUT of §07 when routing is on (their rows now render in §L/§05/§04).
 // boilerplate is NOT here on purpose: it is dropped from §07 ONLY when the engine
 // ALSO marks disposition==='dropped' (both signals must agree) — a boilerplate-typed
@@ -3114,7 +3115,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   // response_deadline 2026-07-18 already passed, but UPDATE 03 reset it to TBD). When reset, the tile shows a reset
   // caveat and the passed date + countdown + expired banner are suppressed. Flag-OFF ⇒ every field is byte-identical.
   const nbd = (compJson.notice_body_deadline ?? null) as { status?: string; note?: string; lastStated?: { date?: string; label?: string } } | null;
-  const deadlineResetTbd = process.env.AUDIT_DEADLINE_RESET_RENDER === "true" && nbd?.status === "reset_tbd";
+  const deadlineResetTbd = isEnvOn(process.env.AUDIT_DEADLINE_RESET_RENDER) && nbd?.status === "reset_tbd";
   const deadlineResetBy = (/(UPDATE\s*\d+)/i.exec(nbd?.note ?? "") ?? [])[1] ?? "the latest amendment";
   const deadlineResetLabel = `Deadline reset — TBD per ${deadlineResetBy}`;
   const deadlineResetNote = deadlineResetTbd ? (nbd?.note ?? deadlineResetLabel) : "";

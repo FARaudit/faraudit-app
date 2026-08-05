@@ -42,6 +42,7 @@ import { createHash } from "node:crypto";
 import type { TypedFinding, BidderProfile, VerdictInputs, Controllability } from "./audit-findings";
 import { scanPackageMarkers, absenceClaimContradicted } from "./absence-grounding-gate";
 import { consequenceTailsAfter, disqualifierTriggersOf, GATE_V2_ENABLED, gradeCoverageV2, groundingVariantToleranceEnabled, importanceOf, isLedgerDemotableNonBar, verifyRecitalInSource } from "./audit-gate-v2";
+import { isEnvOff, isEnvOn } from "./env-flags";
 
 // B1 (Brain card #421 Fork-1) — §L/§M coverage-ledger honors boilerplate. A READ §L/§M whose ONLY ungrounded
 // obligation sentences are administrative BOILERPLATE (importanceOf==="boilerplate") reads COVERED-WITH-SIGNAL, not
@@ -49,7 +50,7 @@ import { consequenceTailsAfter, disqualifierTriggersOf, GATE_V2_ENABLED, gradeCo
 // un-quoted boilerplate alone flipped a fully-read section to missing). INVARIANT (Brain, non-negotiable): a genuine
 // ungrounded §L/§M DISQUALIFIER or ambiguous obligation (importanceOf!=="boilerplate") — or any [truncated] marker —
 // STILL escalates exactly as today (stays obligations_ungrounded → missing → NHR/INCOMPLETE). Flag OFF ⇒ byte-identical.
-const COVERAGE_LEDGER_V2 = process.env.AUDIT_COVERAGE_LEDGER_V2 === "true";
+const COVERAGE_LEDGER_V2 = isEnvOn(process.env.AUDIT_COVERAGE_LEDGER_V2);
 
 /** UCF sections that carry binding obligations — the ones completeness is measured against.
  *  C-8 (Brain C.f): expanded {B,C,H,I,L,M} → {B,C,D,E,F,H,I,K,L,M}. §D (packaging/marking), §E (inspection &
@@ -308,7 +309,7 @@ export function coreMissingFor(ctx: AuditToolContext, opts?: { commercialHonestF
     //   wrongly treated by-reference / discretionary absence as suspicious → the FA442726Q1068 false-INCOMPLETE (form
     //   identified, both absent-in-body, correctly by-reference/discretionary). Flag ON ⇒ genuine commercial never
     //   false-flags 52.212-1/-2 (the impostor cap above still fires). Flag OFF ⇒ byte-identical to card-135 Step 8.
-    if (process.env.AUDIT_COMMERCIAL_CLAUSE_APPLICABILITY === "true") return [];
+    if (isEnvOn(process.env.AUDIT_COMMERCIAL_CLAUSE_APPLICABILITY)) return [];
     if (opts?.commercialHonestFail) return bothAbsent ? ["52.212-1", "52.212-2"] : []; // Brain card 135 Step 8 — legacy; OFF ⇒ byte-identical for GENUINE commercial
     return [];
   }
@@ -774,7 +775,7 @@ export function primaryIndeterminateFor(fullSource: string): boolean {
 // quote the SAM Notice Body verbatim while the gap list named it "not confirmed read/grounded" (the contradiction the
 // Gate-4 panel + red-team confirmed). REGION-GRANULAR per design-panel R5: keyed to the region a decision-bearing
 // grounded finding's excerpt is actually IN. Pure; model-free. Flag-OFF ⇒ never called ⇒ byte-identical.
-const coverageCounterSplitEnabled = (): boolean => process.env.AUDIT_COVERAGE_COUNTER_SPLIT === "true";
+const coverageCounterSplitEnabled = (): boolean => isEnvOn(process.env.AUDIT_COVERAGE_COUNTER_SPLIT);
 export function groundedSourceRegionNames(fullSource: string, findings: TypedFinding[]): Set<string> {
   const nameKey = (s: string): string => (s || "").replace(/\s+/g, " ").trim().toLowerCase();
   const decisionBearing = findings.filter((f) => f.grounded === true && !!f.excerpt && disposeFinding(f) !== "dropped");
@@ -869,7 +870,7 @@ export function documentsCovered(
       // where nothing else is uncovered it would force incompleteness by itself, a false decline sourced entirely to
       // a synopsis blurb. It is NOT left unguarded: the notice body carries its own dedicated deterministic
       // eligibility-bar floor (card #421 Fork-3, ~line 1223) which is the purpose-built path for it.
-      const bindingDocAnalysisFloor = process.env.AUDIT_BINDING_DOC_ANALYSIS_FLOOR === "true" && r.name !== NOTICE_BODY_DOC_NAME;
+      const bindingDocAnalysisFloor = isEnvOn(process.env.AUDIT_BINDING_DOC_ANALYSIS_FLOOR) && r.name !== NOTICE_BODY_DOC_NAME;
       if (!bindingDocAnalysisFloor && !(crossAttGate && ELIGIBILITY_BAR_RE.test(r.text))) continue;         // no eligibility-bar (or flag off) ⇒ genuinely-read thin binding attachment is covered
       if (bindingDocAnalysisFloor) console.warn(`[coverage] read_no_obligation valve WITHDRAWN for "${r.name}" — binding document with no obligation SENTENCE must still be covered by a grounded finding (indicative-voice amendments carry deadline/quantity changes no duty-verb detector sees) → falling through to the grounded-finding check`);
       else console.warn(`[coverage] read_no_obligation valve REJECTED for "${r.name}" — ELIGIBILITY-BAR language present though obligationsOf found no obligation SENTENCE (verb-less bar); requires a grounded finding → uncovered`);
@@ -963,7 +964,7 @@ const SIZE_STD_BE_OBLIGATION_RE = /\b(?:shall|must|required to|will need to)\s+b
 // own BOA emitter but ALSO surfaced here so a size standard coupled to it never demotes). Idiomatic restriction, not a
 // bar noun; short + anchored so it does not span the size clause.
 const SIZE_STD_RESTRICTION_RE = /\bholders?\s+only\b|\bonly\s+holders?\b/i;
-const SIZE_STANDARD_SELF_CERT_ENABLED = () => process.env.AUDIT_SIZE_STANDARD_SELF_CERT === "true";
+const SIZE_STANDARD_SELF_CERT_ENABLED = () => isEnvOn(process.env.AUDIT_SIZE_STANDARD_SELF_CERT);
 export function isBareSizeStandardSentence(sentence: string): boolean {
   if (!SIZE_STANDARD_RE.test(sentence)) return false;
   const sizeSpans = [...sentence.matchAll(new RegExp(SIZE_STANDARD_RE.source, "gi"))].map((m) => [m.index ?? 0, (m.index ?? 0) + m[0].length] as [number, number]);
@@ -1024,7 +1025,7 @@ export function isBareSizeStandardSentence(sentence: string): boolean {
 //      (the #507/#515 treadmill). Ambiguity FAILS TOWARD ESCALATION (NHR), never toward demotion.
 // SAME two position-checked shape tests as isBareSizeStandardSentence (both must pass), now over the UNION of
 // self-determinable substance spans instead of the size-standard span alone.
-const SELF_DET_CLASS_ENABLED = () => process.env.AUDIT_SELF_DETERMINABLE_ELIG_CLASS === "true";
+const SELF_DET_CLASS_ENABLED = () => isEnvOn(process.env.AUDIT_SELF_DETERMINABLE_ELIG_CLASS);
 // The closed socioeconomic set-aside PROGRAM allowlist (FAR 19 / 13 CFR 121-128). A firm bidding one of these
 // self-certifies / is SBA-certified for it — bidder-self-determinable. Position-anchored to the program token so a
 // clearance/ITAR/QPL sentence never matches (those are NOT socioeconomic programs).
@@ -1396,7 +1397,7 @@ export function emitNoticeBodyEligBarFindings(fullSource: string, findings: Type
     const windowRel = new RegExp(SITE_VISIT_CONCLUDED_RE.source, "i").exec(windowText);
     let cAbs: number | null = windowRel && windowRel.index != null ? winStart + windowRel.index : null;
     const fromWindow = cAbs != null;
-    if (cAbs == null && NOTICE_SITE_VISIT_RE.test(excerpt) && singleSiteVisit && process.env.AUDIT_SITEVISIT_CONCLUDED_NOTICEWIDE === "true") {
+    if (cAbs == null && NOTICE_SITE_VISIT_RE.test(excerpt) && singleSiteVisit && isEnvOn(process.env.AUDIT_SITEVISIT_CONCLUDED_NOTICEWIDE)) {
       const wideMatches = [...nNotice.matchAll(new RegExp(SITE_VISIT_CONCLUDED_RE.source, "gi"))];
       if (wideMatches.length === 1 && wideMatches[0].index != null) cAbs = wideMatches[0].index;
     }
@@ -1414,7 +1415,7 @@ export function emitNoticeBodyEligBarFindings(fullSource: string, findings: Type
       // was 1 of 2). When the notice ALSO carries the OPERATIVE attendance-eligibility sentence ("must attend … to be
       // considered eligible to propose"), prepend it to the grounded excerpt (still verbatim in the notice) so E passes
       // and the gate is named. Flag-OFF ⇒ outExcerpt unchanged ⇒ byte-identical.
-      if (process.env.AUDIT_ELIG_OPERATIVE_EXCERPT === "true") {
+      if (isEnvOn(process.env.AUDIT_ELIG_OPERATIVE_EXCERPT)) {
         const opM = new RegExp(SITE_VISIT_MANDATORY_ATTENDANCE_RE.source, "i").exec(nNotice);
         if (opM && opM.index != null) {
           const [os, oe] = sentenceSpan(opM.index);
@@ -1435,7 +1436,7 @@ export function emitNoticeBodyEligBarFindings(fullSource: string, findings: Type
       // It also called the visit "Mandatory" unconditionally, on a path that never tested mandatoriness.
       // The replacement ATTRIBUTES rather than asserts, names the artifact that actually resolves it, and keeps
       // the SITE_VISIT_CONCLUDED_RE-matchable frame the promotion guard keys on (asserted by cert).
-      if (process.env.AUDIT_SITEVISIT_LITERAL_HONEST === "true") {
+      if (isEnvOn(process.env.AUDIT_SITEVISIT_LITERAL_HONEST)) {
         // "Mandatory" only when mandatory-attendance is grounded in the notice — never as a default adjective.
         const mandatoryGrounded = new RegExp(SITE_VISIT_MANDATORY_ATTENDANCE_RE.source, "i").test(concludedSentence)
           || new RegExp(SITE_VISIT_MANDATORY_ATTENDANCE_RE.source, "i").test(outExcerpt);
@@ -1476,7 +1477,7 @@ export function emitNoticeBodyEligBarFindings(fullSource: string, findings: Type
   // fact, and the panel's #1 miss on FA813726R0033 ("Tinker AFB - MAC BOA Holders ONLY" 7× in body, 0× in report).
   // Deduped vs spans a decision-bearing lens finding already owns (the B2 keep-class handles THAT one) and vs bars
   // already emitted above. The keep-class (AUDIT_BOA_IDIQ_HOLDER_KEEP) routes the emitted bar to a conditional NHR.
-  if (process.env.AUDIT_NOTICE_BODY_BOA_EMIT === "true") {
+  if (isEnvOn(process.env.AUDIT_NOTICE_BODY_BOA_EMIT)) {
     const bscan = new RegExp(BOA_HOLDER_ONLY_EMIT_RE.source, "gi");
     for (const m of nNotice.matchAll(bscan)) {
       const [ss, se] = sentenceSpan(m.index ?? 0);
@@ -2078,7 +2079,7 @@ function sectionUngroundedEligBars(text: string, findings: TypedFinding[], decla
   //   TS/SCI-cleared, CMMC, AS9100, ISO9001, ITAR, eligible/ineligible/debarred, set-aside, socioeconomic programs) — the
   //   residual is only a passive-framed bar whose noun is passive-vocab-only (e.g. bare polygraph / VAR / QPL) stated in the
   //   synopsis body. Both are under-fire residuals in the safe-to-defer tail, carded for the CEO scope batch, NOT chased here.
-  if (process.env.AUDIT_ELIG_BAR_PASSIVE_FRAME === "true") {
+  if (isEnvOn(process.env.AUDIT_ELIG_BAR_PASSIVE_FRAME)) {
     for (const m of nText.matchAll(new RegExp(PASSIVE_CREDENTIAL_NOUN_RE.source, "gi"))) {
       const hs = m.index ?? 0, he = hs + m[0].length;
       if (covering.some(([s, e]) => s < he && hs < e)) continue;        // grounded by an overlapping finding → analyzed
@@ -2156,7 +2157,7 @@ export function completenessOf(ctx: AuditToolContext, required: string[], findin
     // through the engine's OWN importanceOf authority in BOTH flag states (V1 missing→INCOMPLETE · V2 disqualifier
     // Uncovered→escalate). Scoped away from §L/§M (already per-obligation) and §I/§K (boilerplate-attest + self-cert).
     // Clean sections return [] ⇒ byte-identical. Flag default-OFF ⇒ guard never runs ⇒ byte-identical (Rule 61).
-    if (process.env.AUDIT_COVERED_DIRECT_BAR_FLOOR === "true" && !PER_OBLIGATION_SECTIONS.has(sec) && !BOILERPLATE_ATTESTABLE.has(sec)) {
+    if (isEnvOn(process.env.AUDIT_COVERED_DIRECT_BAR_FLOOR) && !PER_OBLIGATION_SECTIONS.has(sec) && !BOILERPLATE_ATTESTABLE.has(sec)) {
       const eligBars = sectionUngroundedEligBars(text, findings, opts?.declaredSetAside);
       if (eligBars.length) {
         console.warn(`[coverage] covered_direct HARD-BAR floor: §${sec} carries ${eligBars.length} ungrounded eligibility bar(s) ("${eligBars[0].slice(0, 90)}") co-resident with a grounded finding — blanket covered_direct REFUSED → obligations_ungrounded (escalate via importanceOf)`);
@@ -2226,7 +2227,7 @@ export function completenessOf(ctx: AuditToolContext, required: string[], findin
       // on the corruption axis ⇒ zero over-fire by construction; a homoglyph-that-stays-clean-Latin-1 is a SAFE under-fire (stays
       // covered = status quo). Dropped-periods/glue instead UNDER-count to one mega-sentence (non-empty → grounded-or-ungrounded
       // path), already fail-safe. Flag default-OFF ⇒ unchanged.
-      if (process.env.AUDIT_OBLIGATION_GARBLE_FLOOR === "true" && looksMojibake(text)) {
+      if (isEnvOn(process.env.AUDIT_OBLIGATION_GARBLE_FLOOR) && looksMojibake(text)) {
         console.warn(`[coverage] read_no_obligation valve REJECTED for §${sec} — section text is OCR-mojibake (looksMojibake: corruption-char density); obligationsOf cannot certify "no obligation" on garbage → obligations_ungrounded (INCOMPLETE)`);
         attestations.push({ section: sec, status: "obligations_ungrounded", obligations: [], citedFindingIds: [], ungrounded: [`[garbled] §${sec} text is OCR-garbled — obligationsOf cannot be trusted to certify "no obligation"; requires clean text or a grounded finding`] }); continue;
       }
@@ -2588,7 +2589,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //         (personnel quals / FAT preconditions / delivery windows / QPL / or-equal) directly from source so
   //         lens shared-miss can't drop them. Merged before dedup so it collapses with any lens duplicate.
   //         Set AUDIT_GROUNDING_SWEEP="false" to disable.
-  if (process.env.AUDIT_GROUNDING_SWEEP !== "false") {
+  if (!isEnvOff(process.env.AUDIT_GROUNDING_SWEEP)) {
     const swept = highSignalSweep(ctx.fullSource);
     assignUniqueFindingIds(swept, "deterministic_sweep", findings);
     if (swept.length) { perLens["deterministic_sweep"] = swept.length; findings.push(...swept); }
@@ -2599,7 +2600,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //          the archetype sweep deliberately excludes — so the boilerplate attestation in completenessOf can NEVER
   //          swallow one (condition 3: a hit surfaces as a finding, drives the verdict). The sweep RUNNING is exactly
   //          condition 2 (detectors swept the section). Flag OFF ⇒ neither sweep nor attestation runs (byte-identical).
-  const boilerplateAttestOn = process.env.AUDIT_BOILERPLATE_ATTEST === "true";
+  const boilerplateAttestOn = isEnvOn(process.env.AUDIT_BOILERPLATE_ATTEST);
   if (boilerplateAttestOn) {
     const traps = boilerplateTrapSweep(ctx.fullSource);
     assignUniqueFindingIds(traps, "boilerplate_trap", findings);
@@ -2658,7 +2659,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //         adversarial check, and post-verify placement guarantees the §L/§M procedural obligations reach
   //         completenessOf). COVERAGE-ONLY / inert: bidder_controls + kind procedural_obligation → never a bar,
   //         never an eligibility gate (invisible to the 206-A guarantee). part12-commercial gate is inside the pass.
-  if (process.env.AUDIT_PROCEDURAL_COVERAGE_LENS === "true") {
+  if (isEnvOn(process.env.AUDIT_PROCEDURAL_COVERAGE_LENS)) {
     const proc = await proceduralCoveragePass(ctx, { extract: opts.proceduralExtract });
     assignUniqueFindingIds(proc, "procedural_coverage", findings);
     if (proc.length) {
@@ -2711,7 +2712,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // P4 — completeness (B-corrected): every binding section READ + obligation-coverage (direct or attested
   //      with cited finding IDs); experts must have converged. Attestations carried for trace adjudication.
   const { covered, missing, attestations } = completenessOf(ctx, required, findings, sectionsRead, {
-    sectionMDepth: process.env.AUDIT_SECTION_M_DEPTH === "true",
+    sectionMDepth: isEnvOn(process.env.AUDIT_SECTION_M_DEPTH),
     ...(boilerplateAttestOn ? { boilerplateAttest: { sections: ["I", "K"], swept: true } } : {}),
     // Phase 4 floor reuses the notice-body floor's declaredSetAside so a self-certifiable set-aside sentence is demoted
     // by the SAME authority (isSelfCertDemotableSentence); absent when the flag is off ⇒ helper never runs.
@@ -2736,7 +2737,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // Brain card 288 RULING 2 — interim amendment-resolution fail-safe (flag-gated; OFF ⇒ byte-identical). Unresolved
   // SF-30 supersession → INCOMPLETE, never a decided verdict over possibly-superseded terms. Full resolution is a
   // later tranche; this is detection + fail-safe only.
-  const amendmentUnresolved = process.env.AUDIT_AMENDMENT_RESOLUTION === "true" && amendmentSupersessionUnresolved(ctx.fullSource);
+  const amendmentUnresolved = isEnvOn(process.env.AUDIT_AMENDMENT_RESOLUTION) && amendmentSupersessionUnresolved(ctx.fullSource);
   // Brain card #320 ruling — `allConverged` (per-lens react-loop self-signal) is DEMOTED to telemetry only: it
   // measures answer STABILITY, not coverage — a category error that keys the false-INCOMPLETE veto off a flaky
   // signal (external research whnm9ishz + engine panel wf_d2d5e1cd). Completeness now rests on the DETERMINISTIC
@@ -2747,11 +2748,11 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // never sees. Routed through its OWN verdict gate (noticeBodyBarUngrounded), NOT the coverageComplete veto — the
   // latter is BYPASSED when GATE_V2 + coverageV2 are on (audit-decide:1581), which is the prod flag state. Flag off ⇒
   // short-circuits false ⇒ never set on VerdictInputs ⇒ byte-identical.
-  const noticeBodyBarUngrounded = process.env.AUDIT_NOTICE_BODY_ELIG_FLOOR === "true" && noticeBodyEligibilityUngrounded(ctx.fullSource, findings, ctx.noticeBodyText, opts.setAside);
+  const noticeBodyBarUngrounded = isEnvOn(process.env.AUDIT_NOTICE_BODY_ELIG_FLOOR) && noticeBodyEligibilityUngrounded(ctx.fullSource, findings, ctx.noticeBodyText, opts.setAside);
   const coverageComplete = missing.length === 0 && required.length > 0 && docCoverage.complete && !amendmentUnresolved;
   if (amendmentUnresolved) console.log(`[orchestrator] amendment-resolution: unresolved SF-30 supersession → INCOMPLETE (fail-safe, interim)`);
   if (noticeBodyBarUngrounded) console.log(`[orchestrator] notice-body eligibility floor: ungrounded hard bar in notice body → NEEDS_HUMAN_REVIEW (fail-safe, B3)`);
-  if (process.env.CONSTRUCTION_DEBUG === "true") {
+  if (isEnvOn(process.env.CONSTRUCTION_DEBUG)) {
     const provCount: Record<string, number> = {};
     for (const p of findingProvenance(ctx.fullSource, findings)) provCount[p.doc] = (provCount[p.doc] ?? 0) + 1;
     console.log(`[CONSTRUCTION_DEBUG] part=${procurementPart(ctx)} coverageComplete=${coverageComplete} | allConverged=${allConverged} required=${JSON.stringify(required)} missing=${JSON.stringify(missing)} docCoverage.complete=${docCoverage.complete} docUncovered=${JSON.stringify(docCoverage.uncovered)} amendmentUnresolved=${amendmentUnresolved} coreMissing=${JSON.stringify(coreMissingFor(ctx, { requiresLM: requiresProposalSections(opts.noticeType), formIdentified: opts.formIdentified }))}`);
@@ -2769,7 +2770,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // classifies commercial off a stray "SF 1449"/"RFQ" string but has NO recognized primary form → capped
   // flag-independently, while a genuine SF-1449 RFQ (form_identified=true) stays byte-identical.
   const coreMissing = coreMissingFor(ctx, {
-    commercialHonestFail: process.env.AUDIT_PROCUREMENT_TYPE_SECTIONS === "true",
+    commercialHonestFail: isEnvOn(process.env.AUDIT_PROCUREMENT_TYPE_SECTIONS),
     requiresLM: requiresProposalSections(opts.noticeType),
     formIdentified: opts.formIdentified,
   });
@@ -2792,7 +2793,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      → bidder_controls + cautionFloor (furnish an approved equal). A co-stated restrictive qualifier (only /
   //      no substitution / sole source) VETOES it → stays a bar. Once re-typed, every downstream structural gate
   //      and firmStatus skips it. NEVER touches a non-brand-name bar (QPL/clearance). Flag off ⇒ unchanged.
-  findings = applyOrEqualCarveout(findings, { enabled: process.env.AUDIT_OREQUAL_CARVEOUT === "true" });
+  findings = applyOrEqualCarveout(findings, { enabled: isEnvOn(process.env.AUDIT_OREQUAL_CARVEOUT) });
 
   // Brain #334 (Direction C, part A) — deterministic set-aside NOTICE detector. The governing set-aside notice(s) in
   // the clause matrix were systematically NOT surfaced as findings (FA1068: all lenses missed 52.219-3 HUBZone +
@@ -2803,7 +2804,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // softened to a curable BID_WITH_CAUTION (verify-language, no no-bid phrasing); closed-world holder → BID (firmStatus
   // reconciles the canonical requiredAttribute); non-holder → INELIGIBLE. A multi-program doc still → NHR (the conflict
   // gate below reads the raw matrix independently and DOMINATES). Same flag as the gate (one revert unit).
-  if (process.env.AUDIT_SETASIDE_CONFLICT_GATE === "true") {
+  if (isEnvOn(process.env.AUDIT_SETASIDE_CONFLICT_GATE)) {
     findings = mergeSetAsideNoticeFindings(findings, emitSetAsideNoticeFindings(ctx.fullSource));
   }
 
@@ -2827,7 +2828,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // Enabled by its own flag OR by AUDIT_ELIGIBLE_TRISTATE (card 206-A): the null-profile eligibility guarantee's
   // mandatory firm-status typing (behavior a) — placed HERE, in the guard chain, so the re-typed finding is the one
   // both persisted/rendered AND handed to deriveVerdict (no grid-vs-verdict divergence). Idempotent if both on.
-  findings = applySetAsideFirmStatusGate(findings, bidderProfile, { enabled: process.env.AUDIT_SETASIDE_FIRMSTATUS_GATE === "true" || process.env.AUDIT_ELIGIBLE_TRISTATE === "true" });
+  findings = applySetAsideFirmStatusGate(findings, bidderProfile, { enabled: isEnvOn(process.env.AUDIT_SETASIDE_FIRMSTATUS_GATE) || isEnvOn(process.env.AUDIT_ELIGIBLE_TRISTATE) });
 
   // P4.3a-bis — NONMANUFACTURER RULE GATE (Brain card 132) — RETIRED (Brain card 242). The SAM-facts cautionFloor
   //      emitter is deleted; the keyfact detector (below) is now the SOLE NMR-attribute emitter and the Fork-7
@@ -2841,7 +2842,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      NEVER a show-stopper, NEVER flips eligible false). POST-VERIFY (skeptic can't cull). Flag off ⇒ unchanged.
   {
     const before = findings.length;
-    findings = applyKeyfactDetector(findings, ctx.fullSource, { enabled: process.env.AUDIT_KEYFACT_DETECTOR === "true", procurementPart: procurementPart(ctx) });
+    findings = applyKeyfactDetector(findings, ctx.fullSource, { enabled: isEnvOn(process.env.AUDIT_KEYFACT_DETECTOR), procurementPart: procurementPart(ctx) });
     // COLLISION-FREE IDS. This numbered from zero unconditionally, so it re-issued an id the set was already
     // using whenever the incoming findings already carried keyfact ids — which is exactly the judgment-first /
     // replay shape, where the seed is a previous run's persisted findings. A banked record carrying
@@ -2859,7 +2860,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      keyed on the finding's grounded citation field (exact clause match): 52.204-7 (SAM) → curable caution;
   //      52.246-15 (Certificate of Conformance) → non-blocking. Runs BEFORE the structural-bar whitelist so the
   //      verified per-clause disposition is AUTHORITATIVE over the whitelist's generic fail-safe. Flag off ⇒ unchanged.
-  findings = applyClauseSemanticsGuard(findings, { enabled: process.env.AUDIT_CLAUSE_SEMANTICS_GUARD === "true" });
+  findings = applyClauseSemanticsGuard(findings, { enabled: isEnvOn(process.env.AUDIT_CLAUSE_SEMANTICS_GUARD) });
 
   // P4.3b — STRUCTURAL-BAR WHITELIST (Brain card 114), default-OFF (Rule 61). The general rule the award-basis /
   //      set-aside guards were special cases of: a non-curable bidder_cannot_move bar under a NULL profile is kept
@@ -2867,26 +2868,26 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      a bidder-resolvable compliance/representation item (size-standard, OCI, reps&certs) → caution; an
   //      unrecognized one is LEFT (→ human review), never silently BID. NEVER touches no_one_can_move or a loaded
   //      profile. Flag off ⇒ findings pass through unchanged.
-  findings = applyStructuralBarWhitelist(findings, bidderProfile, { enabled: process.env.AUDIT_STRUCTURAL_BAR_WHITELIST !== "false" });
+  findings = applyStructuralBarWhitelist(findings, bidderProfile, { enabled: !isEnvOff(process.env.AUDIT_STRUCTURAL_BAR_WHITELIST) });
 
   // P4.4 — PRECONDITION OVER-TYPE FLOOR (Brain card 92), default-OFF (Rule 61). Re-types a time-curable
   //      precondition (FAT/source-approval/qualification-testing) that a lens mis-typed no_one_can_move with
   //      NO co-stated window conflict → bidder_controls, so a feasible precondition with an adequate window is
   //      not a false universal NO_BID. NEVER touches the temporal_conflict finding or structural bars. Runs
   //      BEFORE caution-floor; deriveVerdict untouched. Flag off ⇒ findings pass through unchanged.
-  findings = applyPreconditionOvertypeFloor(findings, { enabled: process.env.AUDIT_PRECONDITION_OVERTYPE_FLOOR === "true" });
+  findings = applyPreconditionOvertypeFloor(findings, { enabled: isEnvOn(process.env.AUDIT_PRECONDITION_OVERTYPE_FLOOR) });
 
   // P4.4-bis — ROUTINE-CLAUSE OVER-TYPE GUARD (Guard 2), default-OFF (=== "true"). Corrects the per-doc construction
   //      proposer's residual typing variance: an Availability-of-Funds contingency (52.232-18/-19) mis-typed
   //      no_one_can_move → bidder_controls, and a bonding requirement (52.228-1/-15/-16) mis-typed bidder_cannot_move
   //      → bidder_controls (the bidder obtains the bond). Narrow FAR-clause-specific regexes; NEVER touches a verified
   //      universal defect. Reduces false honest-fail NHR on routine construction clauses. Flag off ⇒ unchanged.
-  findings = applyRoutineClauseOvertypeGuard(findings, { enabled: process.env.AUDIT_ROUTINE_CLAUSE_GUARD === "true" });
+  findings = applyRoutineClauseOvertypeGuard(findings, { enabled: isEnvOn(process.env.AUDIT_ROUTINE_CLAUSE_GUARD) });
 
   // Vehicle A–E item D (flag AUDIT_CYBER_RFI_RECONCILE, default-OFF) — demote an over-claimed DFARS cyber obligation
   // to informational ONLY when the package's RFI responses ground a CO withdrawal (no CUI/FCI + "no longer a
   // requirement"). Over-claim class (own independent seat). Flag-OFF ⇒ byte-identical.
-  findings = applyCyberRfiReconciliation(findings, ctx.fullSource, { enabled: process.env.AUDIT_CYBER_RFI_RECONCILE === "true" });
+  findings = applyCyberRfiReconciliation(findings, ctx.fullSource, { enabled: isEnvOn(process.env.AUDIT_CYBER_RFI_RECONCILE) });
 
   // P4.4-ter — ELIGIBILITY-AUTHORITY ALLOW-LIST (Brain card 329), default-OFF (=== "true"). Kills the fabricated
   //      trade-agreement / end-product-origin / publicizing DISQUALIFIER class (live root, audit a80a9a13): a lens
@@ -2901,7 +2902,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      status bar has no FAR-19 authority, so the allow-list would phantom-demote it to a caution. Holder status
   //      is an UNSTATED profile attribute — keep the bar so it routes to NEEDS_HUMAN_REVIEW ("confirm holder
   //      status"), never a silent caution, never INELIGIBLE (that needs a closed-world profile — a future path).
-  findings = applyEligibilityAuthorityAllowlist(findings, { enabled: process.env.AUDIT_ELIGIBILITY_AUTHORITY_ALLOWLIST === "true", boaIdiqKeep: process.env.AUDIT_BOA_IDIQ_HOLDER_KEEP === "true" });
+  findings = applyEligibilityAuthorityAllowlist(findings, { enabled: isEnvOn(process.env.AUDIT_ELIGIBILITY_AUTHORITY_ALLOWLIST), boaIdiqKeep: isEnvOn(process.env.AUDIT_BOA_IDIQ_HOLDER_KEEP) });
 
   // P4.4-quater — INQUIRY-DEADLINE BENIGN GUARD (Brain card 520, R1), default-OFF (Rule 61, === "true"). A lens
   //      mis-types an information-exchange milestone (questions/inquiries/RFI-submission window, Q&A answer-posting
@@ -2912,12 +2913,12 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      vehicle/BOA/IDIQ enrollment/on-ramp) or a real offer-submission deadline STAYS a universal-path candidate
   //      (veto). Ambiguity → escalate. Runs after the sibling over-type guards; deriveVerdict untouched. Flag off ⇒
   //      findings pass through byte-identical.
-  findings = applyInquiryDeadlineBenignGuard(findings, { enabled: process.env.AUDIT_INQUIRY_DEADLINE_BENIGN === "true" });
+  findings = applyInquiryDeadlineBenignGuard(findings, { enabled: isEnvOn(process.env.AUDIT_INQUIRY_DEADLINE_BENIGN) });
 
   // P4.5 — DETERMINISTIC CAUTION-FLOOR (Brain card 75-R2 / 78-R1), default-OFF (Rule 61). When enabled, it
   //      marks caution-archetype findings (quantified personnel-quals / professional cert / QPL-QML / or-equal)
   //      so deriveVerdict floors to BID_WITH_CAUTION minimum. Flag off ⇒ findings pass through unchanged.
-  findings = applyCautionFloor(findings, { enabled: process.env.AUDIT_CAUTION_FLOOR !== "false" });
+  findings = applyCautionFloor(findings, { enabled: !isEnvOff(process.env.AUDIT_CAUTION_FLOOR) });
 
   // P4.6 — FORK-7 NMR MECHANISM (Brain card 240 + card 242 ruling), default-OFF (=== "true"). The SINGLE NMR
   //      mechanism now that card-132's applyNonmanufacturerRuleGate is RETIRED. Runs LAST (after every re-typing
@@ -2928,7 +2929,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      compliant→already_satisfied (MET, eligible=true — kills P-8); closed-world canonical-noncompliant→INELIGIBLE
   //      (attribute-specific); unknown / unrecognized synonym→NHR with curability text. Never universal, never NO_BID;
   //      order-independent. Flag off ⇒ findings pass through byte-identical (keyfact NMR keeps its card-206-A path).
-  if (process.env.AUDIT_NMR_FIRMSTATUS_GATE === "true") {
+  if (isEnvOn(process.env.AUDIT_NMR_FIRMSTATUS_GATE)) {
     findings = applyNmrSingleEmitter(findings);
     findings = applyNmrFirmStatusGate(findings, bidderProfile, { enabled: true });
   }
@@ -2940,7 +2941,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      561320) is demoted to a verdict-inert P2 applicability flag regardless of which lens emitted it. Runs after
   //      the firm-status gate (its own flag, so it fires even when AUDIT_NMR_FIRMSTATUS_GATE is off) and before
   //      deriveVerdict. Null/unknown NAICS ⇒ NO demotion (fail-toward-escalation). Flag off ⇒ byte-identical.
-  findings = applyNmrNaicsDormancy(findings, opts.naics, { enabled: process.env.AUDIT_NMR_NAICS_DORMANCY === "true" });
+  findings = applyNmrNaicsDormancy(findings, opts.naics, { enabled: isEnvOn(process.env.AUDIT_NMR_NAICS_DORMANCY) });
 
   // P4.6-ter — CHECKBOX-STATE FIDELITY GATE (Phase 3 Unit 3, Brain card #551 design C), default-OFF (=== "true"). The
   //      Section I clause matrix records incorporation MECHANICS (☒/☐), never obligation existence. When a finding
@@ -2948,7 +2949,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      "☒ 52.219-14 checked in Section I" while source is ☐), CORRECT the checkbox-state provenance and re-attribute
   //      to a verified-present basis, KEEPING the obligation at severity (non-destructive; box-state is not a
   //      suppression authority). Fail-toward-keep on any ambiguity. Flag off ⇒ byte-identical.
-  findings = applyCheckboxStateFidelity(findings, ctx.fullSource, { enabled: process.env.AUDIT_CHECKBOX_STATE_FIDELITY === "true" });
+  findings = applyCheckboxStateFidelity(findings, ctx.fullSource, { enabled: isEnvOn(process.env.AUDIT_CHECKBOX_STATE_FIDELITY) });
 
   // P4.6-quater — PERF-OBLIGATION INSURANCE DO-THE-WORK GATE (Phase 3 Unit 1), default-OFF (=== "true"). Insurance is a
   //      do-the-work gate the bidder CLEARS by obtaining a policy (self-acquirable in the window, exactly like a bond) —
@@ -2959,12 +2960,12 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      matches the insurance do-the-work SHAPE → bidder_controls + curable. Strict safety (a demotion is the dangerous
   //      direction): keep-the-bar veto on STRUCTURAL_BAR_RE_114, never a verified universal defect, positive-shape
   //      allowlist on citation+requirement only. Own flag (fires independent of the other guards). Flag off ⇒ byte-identical.
-  findings = applyPerfObligationInsuranceTyping(findings, { enabled: process.env.AUDIT_PERF_OBLIGATION_INSURANCE === "true" });
+  findings = applyPerfObligationInsuranceTyping(findings, { enabled: isEnvOn(process.env.AUDIT_PERF_OBLIGATION_INSURANCE) });
 
   // CLAUSE-KEYED TYPING FLOOR (Brain card #609-(2)a, AUDIT_CLAUSE_TYPING_FLOOR default-OFF) — deterministic re-typing for
   // the ratified closed self-clearable clause set (52.219-14 · insurance · SAM/52.204-7 · state-licensure · size-self-cert),
   // possession/long-lead OVERRIDE (never stamp curable). Runs pre-deriveVerdict/-deriveShadowVerdict. Flag OFF ⇒ byte-identical.
-  findings = applyClauseKeyedTypingFloor(findings, { enabled: process.env.AUDIT_CLAUSE_TYPING_FLOOR === "true" });
+  findings = applyClauseKeyedTypingFloor(findings, { enabled: isEnvOn(process.env.AUDIT_CLAUSE_TYPING_FLOOR) });
 
   // P4.6-quinquies — STRUCTURAL-ASSERTION FIDELITY GATE (Phase 3 Unit 4, Brain #551 Unit-3/Unit-4 boundary), default-OFF
   //      (=== "true"). A finding may attribute its clause/obligation to a UCF SECTION heading absent from the ingested
@@ -2974,7 +2975,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      and mark it, KEEPING kind/controllability/severity/excerpt. VERDICT-INERT (deriveVerdict does not read the
   //      marker) — this only stops a fabricated section heading from reaching render as verified provenance. Source
   //      with no detectable sections ⇒ fail-toward-keep. Own flag. Flag off ⇒ byte-identical.
-  findings = applyStructuralAssertionFidelity(findings, ctx.fullSource, { enabled: process.env.AUDIT_STRUCTURAL_ASSERTION_FIDELITY === "true" });
+  findings = applyStructuralAssertionFidelity(findings, ctx.fullSource, { enabled: isEnvOn(process.env.AUDIT_STRUCTURAL_ASSERTION_FIDELITY) });
 
   // P4.6-sexies — QUANTITY-AMBIGUITY FIDELITY GATE (Phase 3 Unit 5), default-OFF (=== "true"). A solicitation may pose
   //      a MATERIAL quantity as an EXPLICIT, unresolved either/or — the seq-2 dccce793 Q&A asks "Is the total requirement
@@ -2986,7 +2987,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      a bar, never NHR/NO_BID). ADDITIVE + NON-DESTRUCTIVE (no existing finding mutated; deduped if a lens already
   //      flagged the pair as unresolved). Latent numeric conflicts (no explicit question) are OUT of scope — a latent
   //      detector is the over-fire treadmill. No interrogative either/or shape ⇒ byte-identical. Own flag.
-  findings = applyQuantityAmbiguityFidelity(findings, ctx.fullSource, { enabled: process.env.AUDIT_QUANTITY_AMBIGUITY_FIDELITY === "true" });
+  findings = applyQuantityAmbiguityFidelity(findings, ctx.fullSource, { enabled: isEnvOn(process.env.AUDIT_QUANTITY_AMBIGUITY_FIDELITY) });
 
   // P5 — DECIDE deterministically from the typed grounded facts. manifestComplete enforces the card-58
   //      asymmetry cap: a no-bar verdict (BID/CAUTION) on a package with an unfetched manifest attachment,
@@ -3005,7 +3006,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //   eligible=null + a verify-caution, INDEPENDENT of whether the proposer emitted a correctly-typed eligibility_bar
   //   finding (the residual the card-291 prompt could not make reliable). Sourced from the manifest (source-grounded),
   //   NOT the unreliable SAM typeOfSetAside metadata. Only bites under AUDIT_ELIGIBLE_TRISTATE; flag off ⇒ unchanged.
-  const detectedUnverifiableEligibilityGate = process.env.AUDIT_SETASIDE_ELIG_CLAMP === "true"
+  const detectedUnverifiableEligibilityGate = isEnvOn(process.env.AUDIT_SETASIDE_ELIG_CLAMP)
     && bidderProfile == null
     && !!ctx.constructionManifest?.elements.some((e) => e.key === "set_aside" && e.present);
   // GATE V2 (AUDIT_GATE_V2, default OFF — ceo/ENGINE-ARCHITECTURE-RESEARCH): re-read the SAME attestations through
@@ -3035,12 +3036,12 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //   pool-definer notice is re-typed to a non-blocking P2 doc-integrity flag (surfaced, verdict-inert) and the
   //   multi-program conflict is SUPPRESSED → committal-<governing> instead of NHR. HARD: only the structural tell
   //   licenses this; SAM/doc agreement alone never does. Flag OFF ⇒ downgrade null ⇒ byte-identical to today.
-  const structuralDowngrade = applySetAsideStructuralDowngrade(findings, ctx.fullSource, opts.setAside, { enabled: process.env.AUDIT_SETASIDE_STRUCTURAL_DOWNGRADE === "true" });
+  const structuralDowngrade = applySetAsideStructuralDowngrade(findings, ctx.fullSource, opts.setAside, { enabled: isEnvOn(process.env.AUDIT_SETASIDE_STRUCTURAL_DOWNGRADE) });
   findings = structuralDowngrade.findings;
   if (structuralDowngrade.downgrade) {
     console.log(`[orchestrator] set-aside structural downgrade: governing ${structuralDowngrade.downgrade.governing}; stray notice(s) [${structuralDowngrade.downgrade.strays.join(", ")}] → P2 doc-integrity flag; conflict SUPPRESSED (committal-${structuralDowngrade.downgrade.governing})`);
   }
-  const setAsideConflict = process.env.AUDIT_SETASIDE_CONFLICT_GATE === "true" && !structuralDowngrade.downgrade
+  const setAsideConflict = isEnvOn(process.env.AUDIT_SETASIDE_CONFLICT_GATE) && !structuralDowngrade.downgrade
     ? detectSetAsideConflict(opts.setAside, findings, ctx.fullSource)
     : undefined;
   // Card #370 R1 — PRIMARY INDETERMINATE (flag-gated): a multi-doc package where identity detection cannot confidently
@@ -3071,7 +3072,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // CONTAINS — a producer SAYING "no Section B" is not evidence when the deterministic scan finds Section B present. A
   // genuine-absence finding (element truly missing) is untouched → survives. Flag AUDIT_ABSENCE_GROUNDING_GATE
   // default-OFF ⇒ byte-identical. Runs LAST (after every re-typing guard/emitter), right before deriveVerdict.
-  if (process.env.AUDIT_ABSENCE_GROUNDING_GATE === "true") {
+  if (isEnvOn(process.env.AUDIT_ABSENCE_GROUNDING_GATE)) {
     const absMarkers = scanPackageMarkers(ctx.fullSource);
     const beforeAbs = findings.length;
     findings = findings.filter((f) => !absenceClaimContradicted(f.requirement ?? "", absMarkers));
@@ -3088,17 +3089,17 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // CAPTURE-ONLY (card #582, verdict-inert) — snapshot the pre-dedup finding set + counts for the run-record bank /
   // coverage-stage replay. Rides the AUDIT_BANK_RUN_RECORD flag: when banking is off the snapshot is never taken and
   // `_bankDiag` stays undefined ⇒ AuditResult.diagnostics absent ⇒ byte-identical. Never read by deriveVerdict.
-  const _bankInstrOn = process.env.AUDIT_BANK_RUN_RECORD === "true";
+  const _bankInstrOn = isEnvOn(process.env.AUDIT_BANK_RUN_RECORD);
   // Per-finding copies, not `.slice()` (review round 3, finding #1). A shallow array copy holds the SAME
   // objects, so the post-verdict head pass would rewrite the excerpts inside this "pre-processing" snapshot
   // too — a diagnostic whose entire value is showing the findings as they stood at this stage.
   const _preDedupFindings = _bankInstrOn ? findings.map((f) => ({ ...f })) : null;
-  findings = applyFindingDedup(findings, { enabled: process.env.AUDIT_FINDING_DEDUP === "true" });
+  findings = applyFindingDedup(findings, { enabled: isEnvOn(process.env.AUDIT_FINDING_DEDUP) });
   // CROSS-FLEET DEADLINE-DEDUP (Phase 3 Unit 6 follow-on) — collapses the no-clause cross-fleet inflation the clause gate
   // can't reach: plain rows restating one dated deadline across the two paraphrasing panels. Runs right after the clause
   // gate, on its output. Verdict-safe by the same protected-passthrough construction (plain-only; survivor plain). Flag
   // AUDIT_CROSS_FLEET_DEDUP default-OFF ⇒ byte-identical.
-  findings = applyCrossFleetDedup(findings, { enabled: process.env.AUDIT_CROSS_FLEET_DEDUP === "true" });
+  findings = applyCrossFleetDedup(findings, { enabled: isEnvOn(process.env.AUDIT_CROSS_FLEET_DEDUP) });
   const _bankDiag: RunDiagnostics | undefined = _preDedupFindings
     ? { preProcessingFindings: _preDedupFindings, stageCounts: { preDedup: _preDedupFindings.length, postDedup: findings.length }, ...(ver.ledger ? { verifierLedger: ver.ledger } : {}) }
     : undefined;
@@ -3109,7 +3110,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   if (coverageV2?.caveatRecital?.length) findings = emitPerformanceUpkeepCaveats(findings, coverageV2.caveatRecital);
   // ④ SOLE-SOURCE LOCK (card #746, flag AUDIT_SOLE_SOURCE_LOCK default-OFF) — DETECT the named-vendor lock over the
   // assembled source; deriveVerdict runs the over-fire carve-out pre-gate + routing. Flag-OFF ⇒ null ⇒ byte-identical.
-  const soleSourceLock = process.env.AUDIT_SOLE_SOURCE_LOCK === "true" ? detectSoleSourceLock(ctx.fullSource) : null;
+  const soleSourceLock = isEnvOn(process.env.AUDIT_SOLE_SOURCE_LOCK) ? detectSoleSourceLock(ctx.fullSource) : null;
   // ── GROUNDING RECOMPUTE (ARC #747 · CEO option A, flag AUDIT_GROUNDING_RECOMPUTE default-OFF) ─────────
   // `grounded` is documented as a deterministic check that the excerpt is present in the source. It is not:
   // it is a hardcoded `true` at 22 emitter sites, and the only real verifier had ONE production caller (the
@@ -3118,13 +3119,13 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // instead of 22 promises, and one a future emitter cannot bypass by adding a 23rd declaration.
   // Flag-OFF: measured and logged, nothing mutated ⇒ byte-identical.
   {
-    const gr = recomputeGrounding(findings, ctx.fullSource, { enabled: process.env.AUDIT_GROUNDING_RECOMPUTE === "true" });
+    const gr = recomputeGrounding(findings, ctx.fullSource, { enabled: isEnvOn(process.env.AUDIT_GROUNDING_RECOMPUTE) });
     findings = gr.findings;
     if (gr.stats.demoted > 0 || gr.stats.promoted > 0) {
       try {
         console.log(`[grounding] declared=${gr.stats.declaredTrue} computed=${gr.stats.computedTrue} ` +
           `DEMOTED=${gr.stats.demoted} promoted=${gr.stats.promoted} noExcerpt=${gr.stats.noExcerpt} ` +
-          `applied=${process.env.AUDIT_GROUNDING_RECOMPUTE === "true"} byLens=${JSON.stringify(gr.stats.demotedLenses)}`);
+          `applied=${isEnvOn(process.env.AUDIT_GROUNDING_RECOMPUTE)} byLens=${JSON.stringify(gr.stats.demotedLenses)}`);
       } catch { /* logging never affects the verdict */ }
     }
   }
@@ -3136,15 +3137,15 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // protects the recorded one. Shallow per-finding copies: the fields decide reads are all primitives, and
   // nothing downstream compares finding identity across the two arrays (checked). Values are identical at this
   // point, so a flag-OFF run banks byte-identical JSON.
-  const inputs: VerdictInputs = { findings: findings.map((f) => ({ ...f })), bidderProfile, samSetAside: opts.setAside ?? null, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(opts.dispositiveCompletenessForEligibility !== undefined ? { dispositiveCompletenessForEligibility: opts.dispositiveCompletenessForEligibility } : {}), ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(process.env.AUDIT_SITEVISIT_SEVERITY_FLOOR === "true" ? { siteVisitSeverityFloor: true } : {}), ...(coverageV2 ? { coverageV2 } : {}), ...(soleSourceLock ? { soleSourceLock } : {}), ...(opts.temporal ? { temporalSnapshot: opts.temporal.snapshot, liveSam: opts.temporal.liveSam, ingestedAmendmentComplete: opts.temporal.ingestedAmendmentComplete, today: opts.temporal.today, nowIso: opts.temporal.nowIso ?? null } : {}) };
+  const inputs: VerdictInputs = { findings: findings.map((f) => ({ ...f })), bidderProfile, samSetAside: opts.setAside ?? null, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(opts.dispositiveCompletenessForEligibility !== undefined ? { dispositiveCompletenessForEligibility: opts.dispositiveCompletenessForEligibility } : {}), ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(isEnvOn(process.env.AUDIT_SITEVISIT_SEVERITY_FLOOR) ? { siteVisitSeverityFloor: true } : {}), ...(coverageV2 ? { coverageV2 } : {}), ...(soleSourceLock ? { soleSourceLock } : {}), ...(opts.temporal ? { temporalSnapshot: opts.temporal.snapshot, liveSam: opts.temporal.liveSam, ingestedAmendmentComplete: opts.temporal.ingestedAmendmentComplete, today: opts.temporal.today, nowIso: opts.temporal.nowIso ?? null } : {}) };
   // Phase-1 SHADOW (cards #596/#597) — compute the positive-shape pole BESIDE the real verdict and bank it. VERDICT-INERT:
   // the shadow is never routed on; the live deriveVerdict below is untouched. Gated on AUDIT_POSITIVE_VERDICT_POLE (default-
   // OFF ⇒ never computed ⇒ byte-identical) AND banking on (the diagnostics carrier). naics is the SAM fact (Rule 64).
-  if (_bankDiag && process.env.AUDIT_POSITIVE_VERDICT_POLE === "true") {
+  if (_bankDiag && isEnvOn(process.env.AUDIT_POSITIVE_VERDICT_POLE)) {
     try { _bankDiag.shadowVerdict = deriveShadowVerdict(inputs, { naics: opts.naics }); }
     catch (e) { console.log(`[shadow] deriveShadowVerdict threw (verdict-inert, ignored): ${e instanceof Error ? e.message : e}`); }
   }
-  if (process.env.CONSTRUCTION_DEBUG === "true") {
+  if (isEnvOn(process.env.CONSTRUCTION_DEBUG)) {
     const kc: Record<string, number> = {}, dc: Record<string, number> = {};
     for (const f of findings) { kc[f.kind] = (kc[f.kind] ?? 0) + 1; const d = disposeFinding(f); dc[d] = (dc[d] ?? 0) + 1; }
     console.log(`[CONSTRUCTION_DEBUG] DECIDE-INPUTS verifierSound=${ver.sound} conflict=${conflict} findings=${findings.length} verifierDrops=${ver.rejected?.length ?? 0} manifestComplete=${manifestComplete(ctx) && coreMissing.length === 0} documentsComplete=${opts.manifestComplete}`);
@@ -3294,7 +3295,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // precisely how the two drifted apart. `uncoveredForGap` (not raw docCoverage.uncovered) is the list the verdict path
   // itself uses, so display and verdict cannot disagree. Region-space names throughout (docRegions), the same namespace
   // findingProvenance reports in — no cross-namespace join with the ingestion manifest.
-  const docAnalyzedTruth = process.env.AUDIT_DOC_ANALYZED_TRUTH === "true"
+  const docAnalyzedTruth = isEnvOn(process.env.AUDIT_DOC_ANALYZED_TRUTH)
     ? { docCoverage: { complete: docCoverage.complete, uncovered: uncoveredForGap ?? [] } }
     : {};
   return { decision, inputs, findings, coverage: { required, covered, missing, attestations, coreMissing, ...docAnalyzedTruth }, perLens, conflict, sectionsRead: [...sectionsRead], trace, ...(withheldAll.length ? { citationsWithheld: withheldAll } : {}), ...(verifierDrops.length ? { verifierDrops } : {}), ...(judgmentLayerEnabled() && (opts.judgmentReason || opts.judgmentEntail) ? { judgmentCost } : {}), ...(_bankDiag ? { diagnostics: _bankDiag } : {}) };

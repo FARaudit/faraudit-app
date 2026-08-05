@@ -16,13 +16,14 @@
 // consumer is a non-authoritative caveat, a stray capture is at worst a harmless
 // "double-check" note, never a false open/closed determination.
 
+import { isEnvOn } from "./env-flags";
 export interface DocumentDeadline { label: string; date: string }
 
 // D2-A (Brain card 441, flag AUDIT_DEADLINE_RECONCILE, default-OFF) — amendment-supersession deadline reconciliation.
 // Off ⇒ the extractor keeps the constant "Offers due (from document)" label + first-wins/cap-3 behavior (byte-identical),
 // and no consumer calls reconcileOfferDueDeadlines. On ⇒ the extractor captures the matched LABEL LINE (so "revised /
 // amendment / prior / superseded" context survives) and reconcileOfferDueDeadlines resolves the CONTROLLING date.
-const RECONCILE_ENABLED = process.env.AUDIT_DEADLINE_RECONCILE === "true";
+const RECONCILE_ENABLED = isEnvOn(process.env.AUDIT_DEADLINE_RECONCILE);
 
 // Offer-due / quote-due / response-deadline labels (SF1449 Block 8, combined-synopsis, RFQ addenda).
 const DUE_LABEL_RE = /(offer\s+due\s+date|due\s+date\s*\/\s*local\s+time|offers?\s+(?:are\s+)?due|quotes?\s+(?:are\s+)?due|responses?\s+(?:are\s+)?due|response\s+(?:date|deadline)|proposals?\s+(?:are\s+)?due|closing\s+(?:date|time)|receipt\s+of\s+(?:offers|quotes|proposals))/i;
@@ -165,7 +166,7 @@ export function reconcileOfferDueDeadlines(deadlines: unknown): ReconciledDeadli
 // read the UPDATE stack newest-first; an "UPDATE NN – <date>" dateline is NEVER a due date; surface the true controlling
 // state — if the newest update RESETS the date ("a new due date will be provided"), status=reset_tbd + carry the last
 // affirmatively-stated response date as a demoted note. Display-only — never a source of open/closed. Flag OFF ⇒ no caller.
-const UPDATE_STACK_ENABLED = process.env.AUDIT_DEADLINE_UPDATE_STACK === "true";
+const UPDATE_STACK_ENABLED = isEnvOn(process.env.AUDIT_DEADLINE_UPDATE_STACK);
 
 export interface NoticeBodyDeadlineState {
   status: "reset_tbd" | "stated" | "none";

@@ -85,8 +85,11 @@ ok("D censusPackage aggregates (3 docs, 1 scanned, imageBytes=6MB)",
 // ── E: flag-OFF byte-identity (structural) ──────────────────────────────────────────────────────────────────────
 console.log("\n── E. Flag-OFF byte-identity (structural) ──");
 const execSrc = readFileSync("src/lib/audit-executor-v3.ts", "utf8");
-ok("E gate is wholly under `AUDIT_COST_PRESCREEN === \"true\"`",
-  /process\.env\.AUDIT_COST_PRESCREEN === "true" && manifestComplete && !constructionOOS/.test(execSrc));
+// Guard shape updated 2026-08-04: the raw `=== "true"` was routed through env-flags.isEnvOn (a dashboard-set
+// "True" read as OFF at 201 sites). Both spellings are accepted so this cert proves the GATE, not the parser
+// of the day — pinning one spelling is what made this cert fail on a change that never touched its subject.
+ok("E gate is wholly under the AUDIT_COST_PRESCREEN flag",
+  /(?:isEnvOn\(process\.env\.AUDIT_COST_PRESCREEN\)|process\.env\.AUDIT_COST_PRESCREEN === "true") && manifestComplete && !constructionOOS/.test(execSrc));
 const preSrc = readFileSync("src/lib/cost-prescreen.ts", "utf8");
 const pureFns = preSrc.slice(preSrc.indexOf("BUILD C —"));
 ok("E projection/census pure fns read NO env (flag-independent)",

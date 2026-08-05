@@ -222,7 +222,7 @@ export async function executeAgenticPrimary(
   //    become the stall source). Flag AUDIT_TEMPORAL_VERDICT default-OFF ⇒ liveSamPromise stays null ⇒ byte-identical.
   //    Only real SAM notices (an upload has no live notice). The 12s budget wrapper resolves null on timeout/error →
   //    the disposition falls to INDETERMINATE (→ INCOMPLETE), NEVER a guess, NEVER a false CLOSED (panel non-negotiable).
-  const temporalEnabled = process.env.AUDIT_TEMPORAL_VERDICT === "true";
+  const temporalEnabled = isEnvOn(process.env.AUDIT_TEMPORAL_VERDICT);
   const LIVE_SAM_BUDGET_MS = 12_000;
   const liveSamPromise: Promise<LiveSamStatus | null> | null =
     temporalEnabled && isSamSol && solicitation?.noticeId
@@ -246,7 +246,7 @@ export async function executeAgenticPrimary(
   // PRE-PANEL TIMING INSTRUMENTATION (card #567, log-only, flag AUDIT_TIMING_PREPANEL default-OFF ⇒ byte-identical).
   // Splits the ~132s blind stretch inside the 270s budget (ingest → assembly → grounding) so a stall is diagnosed,
   // not assumed. Emits nothing behavior-affecting — pure console timing, gated so flag-OFF is a strict no-op.
-  const _timeOn = process.env.AUDIT_TIMING_PREPANEL === "true";
+  const _timeOn = isEnvOn(process.env.AUDIT_TIMING_PREPANEL);
   const _tIngest = Date.now();
   let docs = await buildAgenticDocs({
     primaryName: input.primaryDocName ?? "primary solicitation",
@@ -296,8 +296,8 @@ export async function executeAgenticPrimary(
   // compressor: an over-budget package is shrunk by keeping every BINDING line verbatim (+ context) and dropping
   // only noise, NEVER summarizing. Runs BEFORE the chunked branch and short-circuits it (no paid MAP calls).
   // Flag-OFF ⇒ this branch never runs ⇒ byte-identical to today. (W9126: 2.83M→~331K tok, §M/wage/bonding survive.)
-  const losslessOn = process.env.AUDIT_LOSSLESS_INGEST === "true";
-  const chunkedOn = process.env.AUDIT_CHUNKED_INGEST === "true";
+  const losslessOn = isEnvOn(process.env.AUDIT_LOSSLESS_INGEST);
+  const chunkedOn = isEnvOn(process.env.AUDIT_CHUNKED_INGEST);
   // The lossless READ budget is sized to the model's 1M-token window (~4M chars), NOT the compression-era 1.4M-char
   // budget (that ceiling forced the summarizer). Default ~3M chars (~750K tok — a safe margin under 1M for the
   // system prompt + schema). A package whose BINDING content (post-filter) still exceeds this reads honest-INCOMPLETE.
@@ -476,12 +476,12 @@ export async function executeAgenticPrimary(
   // absent (byte-identical). Step 5 — narrowed OUT_OF_SCOPE (design-heavy CSI/drawing-dominant, NO resolvable offer
   // structure) honest-fail cap, gated by the master flag. W9126 (offer structure present) → null → decided path
   // proceeds. Reuses the INCOMPLETE cap via manifestComplete (no new verdict enum): OOS → honest-fail, no charge.
-  const constructionManifest = process.env.AUDIT_CONSTRUCTION_SWEEP === "true"
+  const constructionManifest = isEnvOn(process.env.AUDIT_CONSTRUCTION_SWEEP)
     ? sweepConstructionManifest(docs.map((d) => ({ name: d.name, text: d.text })), solicitation?.naicsCode ?? null)
     : undefined;
   // OOS reads the PRE-compression full text (docs joined), NOT the lossy digest — else the offer-structure veto could
   // be lost to compression and false-fire OUT_OF_SCOPE on a biddable construction buy (adversarial-review finding).
-  const constructionOOS = process.env.AUDIT_CONSTRUCTION_DECIDED === "true"
+  const constructionOOS = isEnvOn(process.env.AUDIT_CONSTRUCTION_DECIDED)
     && !!detectConstructionOutOfScope({ naicsCode: solicitation?.naicsCode ?? null, fullText: docs.map((d) => d.text).join("\n") });
   if (constructionOOS) console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: construction OUT_OF_SCOPE (design-build, no resolvable offer/submission structure) → honest-fail, no charge`);
 
@@ -503,7 +503,7 @@ export async function executeAgenticPrimary(
   //   (c) the Rule 61 arm card itself (atomic arm + flipset-assert registration).
   // None is this pass. While OFF this block is provably inert (3 independent finders confirmed byte-identity); the
   // risk is ONLY on arming.
-  if (process.env.AUDIT_COST_PRESCREEN === "true" && manifestComplete && !constructionOOS) {
+  if (isEnvOn(process.env.AUDIT_COST_PRESCREEN) && manifestComplete && !constructionOOS) {
     // WHOLE-PIPELINE census (Build C, card #624-2). Scanned classification uses the AUTHORITATIVE ingest signal
     // (`has_text` = word-shape AND full-page-text AND not-OCR-suspect) — NOT a re-classify of docs[].text, which is
     // already OCR-recovered and would under-count scanned docs (defeating fail-safe). chars = the assembled text the
@@ -583,7 +583,7 @@ export async function executeAgenticPrimary(
   // expert-phase (orchestrator :2232 JOIN). So under the flag the producer runs CONCURRENTLY with the expert-phase and
   // joins at that merge (wall-clock = max, not sum). The finding UNION into deriveVerdict is byte-identical to serial
   // (same set, same merge point, same dedup order). Flag-OFF ⇒ the serial `await runPanel()` path below ⇒ byte-identical.
-  const panelParallel = AGENTIC_PANEL_ENABLED && process.env.AUDIT_PANEL_PARALLEL === "true";
+  const panelParallel = AGENTIC_PANEL_ENABLED && isEnvOn(process.env.AUDIT_PANEL_PARALLEL);
   let panelPromise: Promise<PanelResult | null> | null = null;
   // The producer, with its graceful degradation preserved EXACTLY (non-abort throw → panel-off; abort → rethrow).
   const runPanel = async (): Promise<PanelResult | null> => {
@@ -642,7 +642,7 @@ export async function executeAgenticPrimary(
   // OCR-held doc like a Wage Determination). A grounded eligibility bar may outrank INCOMPLETE ONLY if EVERY
   // incomplete doc is affirmatively non-dispositive to a WHO-MAY-BID gate (conservative-adverse default). Flag-OFF ⇒
   // undefined ⇒ A never fires ⇒ byte-identical.
-  const dispositiveCompletenessForEligibility = process.env.AUDIT_VERDICT_POLE_PRECEDENCE === "true"
+  const dispositiveCompletenessForEligibility = isEnvOn(process.env.AUDIT_VERDICT_POLE_PRECEDENCE)
     ? (input.ingestion != null
         ? [...assembled.droppedDocs, ...assembled.contentLossDocs, ...bindingContentLossDocs(input.ingestion).map((f) => f.name)]
             .every((n) => eligibilityNonDispositiveByRole(n))
@@ -734,7 +734,7 @@ export async function executeAgenticPrimary(
   // VERDICT. This changes only what the customer reads, never what the engine concluded. `excerpt` is untouched, so
   // finding_provenance (which matches on excerpts, not requirements) is unaffected.
   let reportFindings = res.findings;
-  if (process.env.AUDIT_NONPRESENCE_HONESTY === "true") {
+  if (isEnvOn(process.env.AUDIT_NONPRESENCE_HONESTY)) {
     const gated = applyNonPresenceHonesty(res.findings);
     reportFindings = gated.findings;
     for (const r of gated.rewrites) {
@@ -746,7 +746,7 @@ export async function executeAgenticPrimary(
   // Runs AFTER #2 deliberately: #2 WRAPS an absence claim, #7 CHECKS it against the run's own ledger and corrects the
   // premise — including stripping #2's now-false "this audit did not locate it" caveat once the document is proven
   // present. Order reversed, #2 would re-wrap a corrected finding.
-  if (process.env.AUDIT_ABSENCE_RECONCILE === "true") {
+  if (isEnvOn(process.env.AUDIT_ABSENCE_RECONCILE)) {
     const provDocs = new Set(findingProvenance(fullSource, res.findings).map((p) => p.doc).filter((d) => d && d !== "(ungrounded)"));
     const rec = reconcileAbsenceClaims(reportFindings, fullSource, provDocs, solicitation?.typeOfSetAside ?? null);
     reportFindings = rec.findings;
@@ -1052,7 +1052,7 @@ export async function executeAgenticPrimary(
         ...(noticeBody?.text ? { noticeBodyText: noticeBody.text } : {}),
       },
       billing: { honestFail, billable: billable(honestFail) },
-      commercialHonestFail: process.env.AUDIT_PROCUREMENT_TYPE_SECTIONS === "true",
+      commercialHonestFail: isEnvOn(process.env.AUDIT_PROCUREMENT_TYPE_SECTIONS),
     });
   } catch (bankErr) {
     console.warn(`[RUN-RECORD-BANK] call-site guard (audit unaffected): ${bankErr instanceof Error ? bankErr.message : String(bankErr)}`);

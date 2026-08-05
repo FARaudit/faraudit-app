@@ -24,6 +24,7 @@
 // requirement has no source span to re-ground and correctly stays a gate failure, prevented by STEP-1 retry.)
 import { PROCEDURAL_SENTENCE_GUARDS } from "./audit-procedural-coverage";
 import type { TypedFinding } from "./audit-findings";
+import { isEnvOn } from "./env-flags";
 
 // Lenses whose findings are produced DETERMINISTICALLY (verbatim spans, not model-emitted) → never clipped by
 // a model max_tokens stop → out of scope. procedural_coverage is Fork-A's domain (card 215).
@@ -121,7 +122,7 @@ function boundaryEnd(window: string): number {
 // precondition, not the whole of E1.
 export const EXCERPT_HEAD_REGROUND_FLAG = "AUDIT_EXCERPT_HEAD_REGROUND";
 export function headRegroundEnabled(): boolean {
-  return process.env[EXCERPT_HEAD_REGROUND_FLAG] === "true";
+  return isEnvOn(process.env[EXCERPT_HEAD_REGROUND_FLAG]);
 }
 
 const MAX_HEAD_EXTEND = 400; // chars; a backward reach longer than this is not a clause, it is a paragraph

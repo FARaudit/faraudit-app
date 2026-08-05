@@ -8,6 +8,7 @@ import { buildV4Data } from "@/lib/v4-report/build-data";
 import { REPORT_V5_CSS, REPORT_V5_SEAL_CSS } from "@/lib/v5-report/styles";
 import { FONTS_CSS } from "@/lib/v5-report/fonts";
 import { shouldGateExport } from "@/lib/audit-display";
+import { isEnvOn } from "@/lib/env-flags";
 
 const esc = (s: unknown): string =>
   String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -89,7 +90,7 @@ export function renderV5ReportFromRow(audit: Record<string, unknown>): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FARaudit · ${sol}</title>
 <style>${FONTS_CSS}</style>
-<style>${REPORT_V5_CSS}</style>${process.env.AUDIT_V5_SEAL === "true" ? `\n<style>${REPORT_V5_SEAL_CSS}</style>` : ""}
+<style>${REPORT_V5_CSS}</style>${isEnvOn(process.env.AUDIT_V5_SEAL) ? `\n<style>${REPORT_V5_SEAL_CSS}</style>` : ""}
 <style>${EXPORT_MENU_CSS}</style>
 <style>${printGateCss}</style>
 </head>

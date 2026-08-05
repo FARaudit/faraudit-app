@@ -26,6 +26,7 @@ import { renderV4ReportFromRow } from "@/lib/v4-report/report";
 import { renderExecBriefV5 } from "@/lib/v5-report/render-pdf";
 import { renderGateDeckV5 } from "@/lib/v5-report/render-deck";
 import { displaySolicitationId, shouldGateExport } from "@/lib/audit-display";
+import { isEnvOn } from "@/lib/env-flags";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -52,7 +53,7 @@ export async function GET(
   // identical. The web report's two-item Export menu passes ?format=brief|deck.
   const fmtParam = new URL(req.url).searchParams.get("format");
   const v5Format =
-    process.env.AUDIT_REPORT_V5 === "true" && (fmtParam === "brief" || fmtParam === "deck")
+    isEnvOn(process.env.AUDIT_REPORT_V5) && (fmtParam === "brief" || fmtParam === "deck")
       ? fmtParam
       : null;
 

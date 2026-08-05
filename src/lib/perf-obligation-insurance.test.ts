@@ -7,6 +7,7 @@
 // Run: npx tsx src/lib/perf-obligation-insurance.test.ts
 import { applyPerfObligationInsuranceTyping } from "./audit-decide";
 import type { TypedFinding } from "./audit-findings";
+import { isEnvOn } from "./env-flags";
 
 let failures = 0;
 const assert = (c: boolean, m: string) => { console.log(`${c ? "✅" : "❌"} ${m}`); if (!c) failures++; };
@@ -20,7 +21,7 @@ const base = (o: Partial<TypedFinding>): TypedFinding => ({
 });
 // The gate fired on f iff it flipped to bidder_controls + curable + the marker.
 const fired = (f: TypedFinding) => f.controllability === "bidder_controls" && f.curableInWindow === true && f.perfObligationGuard === true;
-const run = (f: TypedFinding) => withFlag(true, () => applyPerfObligationInsuranceTyping([f], { enabled: process.env.AUDIT_PERF_OBLIGATION_INSURANCE === "true" }))[0];
+const run = (f: TypedFinding) => withFlag(true, () => applyPerfObligationInsuranceTyping([f], { enabled: isEnvOn(process.env.AUDIT_PERF_OBLIGATION_INSURANCE) }))[0];
 
 // ── POSITIVE — a bidder_cannot_move insurance do-the-work obligation is re-typed ──────────────────────────
 assert(fired(run(base({ citation: "PWS §7.2.2", requirement: "must maintain professional liability insurance at minimum $1M per occurrence / $3M aggregate throughout performance" }))),
@@ -172,7 +173,7 @@ assert(fired(out) && out.severity === src.severity && out.kind === src.kind && o
 
 // ── FLAG-OFF — byte-identical no-op (same array reference) ────────────────────────────────────────────────
 const arr = [base({ requirement: "maintain professional liability insurance $1M/occ" })];
-assert(withFlag(false, () => applyPerfObligationInsuranceTyping(arr, { enabled: process.env.AUDIT_PERF_OBLIGATION_INSURANCE === "true" })) === arr,
+assert(withFlag(false, () => applyPerfObligationInsuranceTyping(arr, { enabled: isEnvOn(process.env.AUDIT_PERF_OBLIGATION_INSURANCE) })) === arr,
   "FLAG-OFF: gate returns the same array reference — byte-identical (Rule 61)");
 
 // ── BOUNDARY vs mm-evidence-factor — Unit 1 is a who-can-win controllability re-type, a DIFFERENT rail from the

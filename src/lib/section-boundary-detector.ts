@@ -24,6 +24,7 @@ import { parseDelimiterName, resolvePrimary } from "./primary-doc-resolve";
 // audit-construction-manifest runs the Rule 69 completeness carrier off byte-identical copies (engine audit pass 2).
 import { SF1442_HEADER_RE, DAVIS_BACON_RE, OFFER_STRUCTURE_RE } from "./construction-recognizers";
 import type { ExtractedDocument } from "./pdf-text-extractor";
+import { isEnvOff, isEnvOn } from "./env-flags";
 
 export type SectionConfidence = "high" | "medium" | "low" | "missing";
 export type FormatType = "UCF" | "SF-18" | "SF-1449-RFQ" | "combined-synopsis" | "unknown";
@@ -183,7 +184,7 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
   // honored ONLY when confident — on confident=false the positional window is RETAINED and a warning is pushed;
   // the existing primaryIndeterminate path (audit-orchestrator, ATTACHMENT_COVERAGE) owns the honest-fail/NHR
   // routing, and this detector must not invent a second one. Flag-OFF ⇒ positional, byte-identical.
-  if (process.env.AUDIT_PRIMARY_DOC_ELECTION === "true" && docMarkers.length >= 2) {
+  if (isEnvOn(process.env.AUDIT_PRIMARY_DOC_ELECTION) && docMarkers.length >= 2) {
     const bounds = docMarkers.map((m, i) => ({
       start: m + 1,
       end: i + 1 < docMarkers.length ? docMarkers[i + 1] : allLines.length,
@@ -218,7 +219,7 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
   } else if (SF18_HEADER_RE.test(primaryText)) {
     formatDetected = "SF-18";
     formatConfidence = "high";
-  } else if (process.env.AUDIT_PROCUREMENT_TYPE_SECTIONS === "true" && COMBINED_SYNOPSIS_RE.test(primaryText)) {
+  } else if (isEnvOn(process.env.AUDIT_PROCUREMENT_TYPE_SECTIONS) && COMBINED_SYNOPSIS_RE.test(primaryText)) {
     // Bare Part-12 combined synopsis/solicitation (no SF-1449 form header). Flag-gated default-OFF ⇒ when the
     // flag is unset this branch is skipped and the doc falls through to UCF/unknown exactly as before (prod
     // byte-identical). procurementPart() maps "combined-synopsis" → part12-commercial.
@@ -248,7 +249,7 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
         // boundary and (with equal high confidence + lower line) beats the REAL "Section L" header in dedup. Reject
         // a LOWERCASE captured letter on pattern #0 only; uppercase "SECTION L"/"Section L" still matches. Patterns
         // #1 (dash/colon) and #2 (PART I) are untouched. Flag OFF ⇒ behavior is byte-identical to the prior detector.
-        if (process.env.AUDIT_UCF_UPPERCASE_GUARD !== "false" && pat === UCF_HEADER_PATTERNS[0] && !/[A-M]/.test(m[1])) continue;
+        if (!isEnvOff(process.env.AUDIT_UCF_UPPERCASE_GUARD) && pat === UCF_HEADER_PATTERNS[0] && !/[A-M]/.test(m[1])) continue;
         const key = m[1].toUpperCase();
         if (UCF_SECTIONS[key]) {
           boundaries.push({ key, lineIdx: i, confidence: "high", matchedPattern: pat.source });

@@ -43,7 +43,13 @@ const SET_ASIDES = (process.env.SET_ASIDES || "SBA,8A,8AS,WOSB,EDWOSB,SDVOSBC,SD
   .split(",").map((s) => s.trim()).filter(Boolean);
 const BACKFILL_DAYS = Number(process.env.BACKFILL_DAYS) || 60;
 const PAGE_LIMIT = Math.min(Number(process.env.PAGE_LIMIT) || 100, 1000);
-const DRY_RUN = process.env.DRY_RUN === "true";
+// Tolerant parse, mirroring src/lib/env-flags.ts:isEnvOn — CANONICAL DEFINITION LIVES THERE.
+// Copied, not imported: sam-ingest is a standalone package with its own package.json and no `@/`
+// alias, so the aliased import type-checks from the repo root and then throws at boot.
+// The failure direction matters here — a dashboard-set DRY_RUN=True read as FALSE writes to prod.
+const isEnvOn = (v: string | undefined): boolean =>
+  v != null && ["true", "1", "yes", "on"].includes(v.trim().toLowerCase());
+const DRY_RUN = isEnvOn(process.env.DRY_RUN);
 
 interface PendingRow {
   id: string;

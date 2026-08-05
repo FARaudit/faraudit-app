@@ -15,6 +15,7 @@
 // `bidder_controls` (do-the-work gates); elevation is left to the already-built caution-floor (#4) and the
 // Step-2 temporal check (NO_BID) — the sweep grounds, it does not type-up.
 import type { TypedFinding } from "./audit-findings";
+import { isEnvOn } from "./env-flags";
 
 const ROLE_RE = /\b(?:senior|lead|chief|principal|project|fine\s+art|architectural|registered)?\s*(?:conservator|architect|engineer|scientist|geologist|hydrologist|hygienist|surveyor|estimator|superintendent|inspector|specialist|technician|designer|planner|toxicologist|archaeologist|biologist|chemist)s?\b/i;
 const YEARS_RE = /\b(?:\d{1,2}|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|twenty|twenty[-\s]five|thirty)\b\s*(?:\(\s*\d{1,2}\s*\)\s*)?years?\b/i;
@@ -95,9 +96,9 @@ function classifyAll(p: string): SweepHit[] {
     hits.push({ archetype: "personnel_qual", requirementLabel: "Personnel-qualification gate: named role with a quantified minimum experience", kind: "submission", anchor: YEARS_RE });
   if (CERT_RE.test(p) && PERSONNEL_RE.test(p) && !EXCLUDE_RE.test(p))
     hits.push({ archetype: "personnel_qual", requirementLabel: "Personnel-qualification gate: specialized professional certification/license of performing personnel", kind: "submission", anchor: CERT_RE });
-  if (process.env.AUDIT_BID_GUARANTEE_EMIT === "true" && BID_GUARANTEE_RE.test(p) && BID_GUARANTEE_REQUIRED_RE.test(p))
+  if (isEnvOn(process.env.AUDIT_BID_GUARANTEE_EMIT) && BID_GUARANTEE_RE.test(p) && BID_GUARANTEE_REQUIRED_RE.test(p))
     hits.push({ archetype: "bid_guarantee", requirementLabel: "Bid guarantee (bond) required with the offer — a bidder-obtainable bond (FAR 28.101); failure to furnish risks rejection", kind: "submission", anchor: BID_GUARANTEE_RE, forceSection: "L" }); // §L: furnish-with-your-offer submission instruction (grounds the §L obligation, not the crude nearestSection §C)
-  if (process.env.AUDIT_MAGNITUDE_LD_EMIT === "true") {
+  if (isEnvOn(process.env.AUDIT_MAGNITUDE_LD_EMIT)) {
     if (MAGNITUDE_RE.test(p))
       hits.push({ archetype: "magnitude", requirementLabel: "Estimated construction magnitude — the price-range bracket the offer is sized against (FAR 36.204)", kind: "pricing", anchor: MAGNITUDE_RE });
     if (LD_RE.test(p) && LD_AMOUNT_RE.test(p))

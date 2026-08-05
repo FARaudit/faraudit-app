@@ -47,7 +47,13 @@ import {
   type RunMetrics,
 } from "./types";
 
-const KILL_SWITCH = process.env.EMAIL_AI_ENABLED === "true";
+// Tolerant parse, mirroring src/lib/env-flags.ts:isEnvOn — CANONICAL DEFINITION LIVES THERE.
+// Copied, not imported: email-ai-v3 is a standalone package (own tsconfig, rootDir ./src, no `@/`
+// alias) that compiles with its own tsc — an aliased import fails its Railway BUILD outright.
+// This is a KILL SWITCH: a dashboard-set EMAIL_AI_ENABLED=True read as FALSE leaves it dead.
+const isEnvOn = (v: string | undefined): boolean =>
+  v != null && ["true", "1", "yes", "on"].includes(v.trim().toLowerCase());
+const KILL_SWITCH = isEnvOn(process.env.EMAIL_AI_ENABLED);
 
 // ────────────────────────────────────────────────────────────
 // Helpers

@@ -27,6 +27,7 @@
 import type { BidderProfile, ProfileAttributeRecord } from "./audit-findings";
 import { canonicalizeEligibilityAttr } from "./audit-decide";
 import { sizeStandardFor, isSmallUnder } from "./sba-size-standards";
+import { isEnvOn } from "./env-flags";
 
 /** The subset of a capability_statements row we read. Minimal so any row satisfies it. */
 export interface CapabilityProfileSource {
@@ -43,7 +44,7 @@ export interface ProfileConstructionOptions {
   now?: () => string;
 }
 
-const profileSchemaV2Enabled = () => process.env.AUDIT_PROFILE_SCHEMA_V2 === "true";
+const profileSchemaV2Enabled = () => isEnvOn(process.env.AUDIT_PROFILE_SCHEMA_V2);
 const RECORD_SOURCES = new Set(["sam_api", "sba_api", "verified_import", "customer_asserted", "document"]);
 // Verification round F2: size-class namespaces may NEVER ride in via attributes_v2 — a stored
 // `sb:total`/`naics:*-small`/`size:*` record is exactly the NAICS-independent derived boolean the

@@ -8,6 +8,7 @@
 // display-only — a parsed doc date may NEVER close/expire a live solicitation; SAM stays authoritative for open/closed.
 import { reconcileOfferDueDeadlines, extractDocumentDeadlines } from "./audit-deadline-extract";
 import { offerDueFact } from "./v4-report/build-data";
+import { isEnvOn } from "./env-flags";
 
 let failures = 0;
 const assert = (cond: boolean, msg: string) => { console.log(`${cond ? "✅" : "❌"} ${msg}`); if (!cond) failures++; };
@@ -104,7 +105,7 @@ console.log("\n── 8 · extractor rich-label capture (flag ON) ──");
   const ex = extractDocumentDeadlines(src);
   const r = reconcileOfferDueDeadlines(ex);
   // flag ON ⇒ labels carry "Revised offer due date" → reconciler resolves 31 Jul as controlling.
-  const flagOn = process.env.AUDIT_DEADLINE_RECONCILE === "true";
+  const flagOn = isEnvOn(process.env.AUDIT_DEADLINE_RECONCILE);
   if (flagOn) {
     assert(ex.some((e) => /revised/i.test(e.label)), "flag ON: extractor preserved the 'Revised offer due date' label");
     assert(r.controlling?.date === "2026-07-31", "end-to-end (extract→reconcile): controlling = 31 Jul amendment reset");
@@ -116,7 +117,7 @@ console.log("\n── 8 · extractor rich-label capture (flag ON) ──");
 // ── 9 · V4 RENDERER (offerDueFact) — the real masthead function on the live agentic_v3 path ──
 console.log("\n── 9 · V4 renderer offerDueFact ──");
 {
-  const flagOn = process.env.AUDIT_DEADLINE_RECONCILE === "true";
+  const flagOn = isEnvOn(process.env.AUDIT_DEADLINE_RECONCILE);
   // bd605b88-shaped: SAM 18 Jul (response_deadline) · doc deadlines [06-24 stale, 31-Jul amendment reset].
   const sam = "2026-07-18T14:00:00-05:00";
   const cj = { deadlines: [dl("Offers due", "2026-06-24"), dl("Revised offers due (Amendment 0001)", "2026-07-31")] };
@@ -138,7 +139,7 @@ console.log("\n── 9 · V4 renderer offerDueFact ──");
 // ── 10 · SAM-FLOOR GUARD (D-3, card #444/#448) — a controlling doc date EARLIER than SAM must NEVER win the masthead ──
 console.log("\n── 10 · SAM-floor guard (earlier-than-SAM doc date never wins) ──");
 {
-  const flagOn = process.env.AUDIT_DEADLINE_RECONCILE === "true";
+  const flagOn = isEnvOn(process.env.AUDIT_DEADLINE_RECONCILE);
   // 64b79916 shape when the 31-Jul reset is IMAGE-ONLY (unextractable): deadlines carry only earlier dates, with
   // supersession evidence (≥2 distinct submission dates). SAM 18 Jul must keep the masthead; 06-24 must NOT win.
   const sam = "2026-07-18T14:00:00-05:00";

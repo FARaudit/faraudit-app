@@ -31,8 +31,9 @@
 // already-captured records (ingest FROZEN for the bake-off). Flag OFF ⇒ this module is inert.
 
 import type { RequirementKind, Controllability, TypedFinding, VerdictInputs } from "./audit-findings";
+import { isEnvOn } from "./env-flags";
 
-export const CANDIDATE_A_ENABLED = process.env.AUDIT_CANDIDATE_A === "true";
+export const CANDIDATE_A_ENABLED = isEnvOn(process.env.AUDIT_CANDIDATE_A);
 
 // ── Native Citations response shape (local mirror; mirrors audit-expert.ts SdkBlock — no SDK type coupling).
 //    Only the fields Candidate A reads are modeled. document_title is nullable per the API.

@@ -22,8 +22,9 @@
 // ── FLAG ────────────────────────────────────────────────────────────────────────────────────────────────
 // Read per call, never frozen at import: a module-level const captures the value at import time and makes
 // the flag un-testable and un-armable in a running worker. [[feedback_placebo_arm_record_surface_inert]]
+import { isEnvOn } from "./env-flags";
 export function citationFidelityEnabled(): boolean {
-  return process.env.AUDIT_CITATION_FIDELITY === "true";
+  return isEnvOn(process.env.AUDIT_CITATION_FIDELITY);
 }
 
 // ── GRAMMARS ────────────────────────────────────────────────────────────────────────────────────────────

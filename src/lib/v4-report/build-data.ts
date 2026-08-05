@@ -9,6 +9,7 @@ import type {
   V4SubmissionL, V4EvalM, V4Clins, V4Date, V4Provenance, Tone, Pole,
 } from "@/lib/v4-report/render";
 import { reconcileOfferDueDeadlines, isDeadDateLabel } from "@/lib/audit-deadline-extract";
+import { isEnvOn } from "@/lib/env-flags";
 
 // ── pole → display word + tone (Brain doctrine; honest-fail poles carry noVerdict + noCharge) ──
 const POLE_BAND: Record<string, string> = {
@@ -70,7 +71,7 @@ const RE_M = /§\s*M\b|(?:^|[\s(])M[-.\s]\d/i;
 const RE_CLIN = /\bCLIN\b|§\s*B\b/i;
 // REPORT-TRUTH #3 (flag AUDIT_PANEL_COMPUTE_OR_ABSENT, default OFF ⇒ every panel below keeps its legacy "" fields ⇒
 // byte-identical). Evaluated per call, not frozen at import, so the flag is honoured at render time.
-const panelComputeOrAbsent = (): boolean => process.env.AUDIT_PANEL_COMPUTE_OR_ABSENT === "true";
+const panelComputeOrAbsent = (): boolean => isEnvOn(process.env.AUDIT_PANEL_COMPUTE_OR_ABSENT);
 // A CLIN number is only a CLIN number when a LINE-ITEM MARKER says so. Anchoring on the marker is what separates
 // "CLIN 0006" from a street number, a year, or the -7012 tail of a DFARS clause. Optional plural ("CLINs 0001-0006"),
 // optional "No.", optional leading zeros, and the A/AA alphanumeric SLIN suffix federal schedules use.
@@ -121,7 +122,7 @@ function mapFinding(f: FindingLite): V4Finding {
 // Vehicle F2 · F-2 (flag AUDIT_SEVERITY_HONEST, default-OFF) — the UNCOMPUTED-DEFAULT class (L42): an absent
 // severity must NEVER default UPWARD. When ON, a finding with no severity AND a disposition that does not
 // authoritatively rank it renders as UNRATED + emits a defect signal — it is never silently promoted to a gate.
-const severityHonestEnabled = (): boolean => process.env.AUDIT_SEVERITY_HONEST === "true";
+const severityHonestEnabled = (): boolean => isEnvOn(process.env.AUDIT_SEVERITY_HONEST);
 
 // severity bucket: explicit severity wins; else infer from the AUTHORITATIVE disposition
 // (disqualifying→P0, gate_to_clear→P1). "met"→satisfied, "dropped"→excluded.
@@ -328,7 +329,7 @@ function buildClins(all: FindingLite[], rawSource?: string): V4Clins | { grounde
   // arrangement and periods — while this panel was deriving CLINs from finding PROSE a few hundred lines away and
   // rendering a street number as a line item (#3). Findings are the FALLBACK now, not the source of truth: a stated
   // schedule beats an inferred one, and when §B states nothing the panel degrades exactly as before.
-  if (process.env.AUDIT_CLIN_SCHEDULE_EXTRACT === "true" && rawSource) {
+  if (isEnvOn(process.env.AUDIT_CLIN_SCHEDULE_EXTRACT) && rawSource) {
     const sched = extractClinSchedule(rawSource);
     if (sched.length) return { grounded: true, rows: sched.map((r) => ({ clin: r.clin, title: r.title ?? "", ...(r.type ? { type: r.type } : {}), ...(r.qtyUnit ? { qtyUnit: r.qtyUnit } : {}), ...(r.period ? { period: r.period } : {}) })) };
   }
@@ -424,7 +425,7 @@ function deadlineConflictNote(responseDeadline: string, cj: Record<string, unkno
 // latest-wins). SAFETY RAIL (RULED, pinned in the test): this is DISPLAY-ONLY — it changes ONLY the "Offers due" fact
 // value + sub-note, NEVER open/closed (that stays SAM-authoritative, computed elsewhere). Flag OFF ⇒ the exact prior
 // behavior (SAM value + verify caveat), byte-identical (Rule 61).
-const DEADLINE_RECONCILE_ENABLED = process.env.AUDIT_DEADLINE_RECONCILE === "true";
+const DEADLINE_RECONCILE_ENABLED = isEnvOn(process.env.AUDIT_DEADLINE_RECONCILE);
 
 // Vehicle F3 · masthead deadline reconcile (flag AUDIT_MASTHEAD_DEADLINE_RECONCILE, default-OFF) — DOMAIN RULING
 // (Brain, card #736): the offer-due date hierarchy is (a) an executed SF-30 amendment in the package = AUTHORITATIVE;
@@ -436,7 +437,7 @@ const DEADLINE_RECONCILE_ENABLED = process.env.AUDIT_DEADLINE_RECONCILE === "tru
 // context AND only on an unambiguous From→To pair; anything else → null (SAM stays authoritative). SAM-floor is applied
 // by the caller (override only when strictly later than SAM). Pure; raw_pdf_text scan is a cheap targeted regex.
 // PER-CALL (not a module const) so the flag is honoured at render time, not frozen at import — matches severityHonestEnabled.
-const mastheadDeadlineReconcileEnabled = (): boolean => process.env.AUDIT_MASTHEAD_DEADLINE_RECONCILE === "true";
+const mastheadDeadlineReconcileEnabled = (): boolean => isEnvOn(process.env.AUDIT_MASTHEAD_DEADLINE_RECONCILE);
 const MONTH_IX_V4: Record<string, number> = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
 function ddMonYyyyToIso(d: string): string | null {
   const m = d.match(/(\d{1,2})\s+([A-Za-z]{3})[a-z]*\s+(\d{4})/);
@@ -520,7 +521,7 @@ export function offerDueFact(responseDeadline: string, cj: Record<string, unknow
 // "missing" while 30+ grounded L/M findings rendered (masthead "100% · 9/9" vs body "L/M missing / INCOMPLETE").
 // Reconcile the coverage panel against the evidence: an evidenced section is marked COVERED (chip flips to ok) and
 // drops out of `missing`. Flag OFF ⇒ the exact prior sets (byte-identical, Rule 61).
-const COVERAGE_COHERENCE_ENABLED = process.env.AUDIT_COVERAGE_COHERENCE === "true";
+const COVERAGE_COHERENCE_ENABLED = isEnvOn(process.env.AUDIT_COVERAGE_COHERENCE);
 function buildCoverage(p: V3ReportPayload, documentsComplete: boolean, noVerdict: boolean): V4Coverage {
   const cov = p.coverage || { required: [], covered: [], missing: [] };
   const docs = p.documents || null;
@@ -635,7 +636,7 @@ export function buildV4Data(audit: Record<string, unknown>): V4Data {
   // Vehicle F2 · F-4 (flag AUDIT_MASTHEAD_OFFICE_LEAF, default-OFF) — surface the issuing-office leaf (e.g. AFSC/PZIOC,
   // the org that authored §I) when the engine captured it. COMPUTE-OR-ABSENT: rendered ONLY when office_leaf is
   // populated; when the column is empty it is silently absent (never a fabricated leaf). Flag-OFF: byte-identical.
-  if (process.env.AUDIT_MASTHEAD_OFFICE_LEAF === "true") {
+  if (isEnvOn(process.env.AUDIT_MASTHEAD_OFFICE_LEAF)) {
     const leaf = s(audit.office_leaf);
     if (leaf) facts.push({ k: "Issuing office", v: leaf });
   }
@@ -646,7 +647,7 @@ export function buildV4Data(audit: Record<string, unknown>): V4Data {
   // header DERIVES from that finding instead of parroting the metadata. Flag-OFF: raw value (byte-identical).
   if (setAside) {
     const setAsideType = s(audit.set_aside_type);
-    const bodyDeniesSetAside = process.env.AUDIT_SETASIDE_HEADER_RECONCILE === "true"
+    const bodyDeniesSetAside = isEnvOn(process.env.AUDIT_SETASIDE_HEADER_RECONCILE)
       && !setAsideType
       // THE ANALYZED SPAN, not the displayed one (review round 5, finding #1). This predicate asks what the
       // ENGINE FOUND — "did the body deny the set-aside?" — and then overrides a SAM-sourced masthead fact with
@@ -675,7 +676,7 @@ export function buildV4Data(audit: Record<string, unknown>): V4Data {
   // checklist §1 + the V1 legacy renderer (audit-v3-report.ts, which only charged-off INCOMPLETE/OOS, never NHR).
   // Flag AUDIT_NHR_NOCHARGE_SUPPRESS excludes NHR from the chip; INCOMPLETE/OUT_OF_SCOPE untouched.
   // Flag OFF ⇒ NO_VERDICT_POLES.has(pole) unchanged, byte-identical (Rule 61).
-  const NHR_NOCHARGE_SUPPRESS = process.env.AUDIT_NHR_NOCHARGE_SUPPRESS === "true";
+  const NHR_NOCHARGE_SUPPRESS = isEnvOn(process.env.AUDIT_NHR_NOCHARGE_SUPPRESS);
   const verdict: V4Verdict = {
     pole,
     band: POLE_BAND[pole] || pole,

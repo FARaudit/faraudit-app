@@ -22,6 +22,7 @@
 
 import type { TypedFinding } from "./audit-findings";
 import type { ProcurementPart } from "./audit-tools";
+import { isEnvOn } from "./env-flags";
 
 // ROOT-5 FORM-KEYED CITATION (Brain card #474 ruling #2, flag AUDIT_FORM_KEYED_CITATION, default-OFF). The quote-
 // deadline finding hardcoded citation "SF-1449 Block 8" REGARDLESS of the detected form. On the FA8137 SF-1442
@@ -30,7 +31,7 @@ import type { ProcurementPart } from "./audit-tools";
 // the rest of the engine uses (procurementPart). INVARIANT (zero-tolerance): no form-name may appear in the citation
 // unless it IS the detected form — commercial→"SF-1449 Block 8" (correct), construction→"SF-1442" (no wrong block #),
 // UCF/unknown→form-NEUTRAL (no form-name asserted). Flag-OFF ⇒ the legacy hardcoded string (byte-identical).
-const formKeyedCitationEnabled = () => process.env.AUDIT_FORM_KEYED_CITATION === "true";
+const formKeyedCitationEnabled = () => isEnvOn(process.env.AUDIT_FORM_KEYED_CITATION);
 export function deadlineCitation(part: ProcurementPart | undefined): string {
   if (!formKeyedCitationEnabled()) return "SF-1449 Block 8 / Notice to Offerors (closing date)"; // legacy → byte-identical
   if (part === "part12-commercial") return "SF-1449 Block 8 / Notice to Offerors (closing date)"; // SF-1449 IS the commercial cover form
@@ -180,7 +181,7 @@ export function applyKeyfactDetector(
     // verified zero occurrences under any dash variant). NMR prose grounded in another regulation's clause text
     // (150c3ab3: VAAR 852.219-73(d)) cites the regulatory basis + the excerpt, never a clause the package lacks.
     const nmrLiteralInSource = /52\.219[-‑–—]33/.test(src);
-    const honestCitation = process.env.AUDIT_NMR_CITATION_HONESTY === "true" && !nmrLiteralInSource;
+    const honestCitation = isEnvOn(process.env.AUDIT_NMR_CITATION_HONESTY) && !nmrLiteralInSource;
     if (span) add.push({
       requirement: NMR_CAUTION,
       citation: honestCitation

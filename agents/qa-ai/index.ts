@@ -18,7 +18,14 @@ const telegramNs: any = await import("./telegram.ts");
 const t = telegramNs.default ?? telegramNs;
 const { sendAlert } = t;
 
-const DRY_RUN = process.env.DRY_RUN !== "false";  // default true for safety
+// Tolerant parse, mirroring src/lib/env-flags.ts:isEnvOff — CANONICAL DEFINITION LIVES THERE.
+// Copied, not imported: qa-ai is a standalone Railway package with its own package.json and no `@/`
+// alias, so `import ... from "@/lib/env-flags"` type-checks from the repo root and then throws at
+// boot. Root `tsc --noEmit` is NOT the instrument for these packages — run the entry point.
+// DRY_RUN is DEFAULT-ON, so the test is for an explicit off-value: unset must stay dry.
+const isEnvOff = (v: string | undefined): boolean =>
+  v != null && ["false", "0", "no", "off"].includes(v.trim().toLowerCase());
+const DRY_RUN = !isEnvOff(process.env.DRY_RUN);  // default true for safety
 const ALERT_ON = (process.env.ALERT_ON || "route_status,auth_wall,api_endpoint,html_marker")
   .split(",").map((s) => s.trim()).filter(Boolean);
 
