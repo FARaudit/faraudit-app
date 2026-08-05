@@ -69,7 +69,25 @@ const FETCH_TIMEOUT_MS = 30000;
 // the real, safe ceilings: a genuinely huge package still trims lowest-tier docs
 // in tier order rather than 400-ing. 30 lets a normal large solicitation ingest
 // in full at no extra cost.
-export const MAX_DOCS = 36;
+// 2026-08-05 — MADE ENV-OVERRIDABLE (`AUDIT_MAX_DOCS`), default UNCHANGED at 36 so nothing moves until
+// it is armed deliberately. Measured on the live W911SG27BA002 run: this cap dropped 19 of 55 documents
+// and ALL 19 WERE BINDING — UFGS Earthwork / Cast-in-Place Concrete / Electrical / Asphalt Paving, and
+// SF 1413, a form the bidder must SUBMIT. A normal defense construction pursuit ships ~52 attachments;
+// the ceiling was 36, so the engine was structurally unable to read a routine package.
+//
+// ⚠ RAISING THIS ALONE DELIVERS NOTHING, and that is measured, not predicted. The 36 survivors already
+// assemble to 1,565,625 chars against MAX_FULLSOURCE_CHARS = 1,400,000, so the char ceiling then drops 7
+// more whole documents (29 of 55 actually reach the engine). Admitting all 55 needs ~2.39M chars — 1.7×
+// the char ceiling. BOTH must move together or the drop simply relocates to a later stage where it is
+// harder to see. Pair this with `AGENTIC_MAX_FULLSOURCE_CHARS` (agentic-executor.ts), which is already
+// env-overridable. The token budget below (850k) is NOT the binding constraint: 36 docs measured ~391k,
+// and all 55 project ~598k, still under it.
+// FAIL-SAFE PARSE, and it is not decoration: `Number("-5") || 36` yields -5, because -5 is truthy — a
+// negative or fractional value would sail through and silently ingest nothing. Caught by this file's own
+// gate. Only a positive integer overrides; anything else keeps the default.
+const DEFAULT_MAX_DOCS = 36;
+const _maxDocsEnv = Number(process.env.AUDIT_MAX_DOCS);
+export const MAX_DOCS = Number.isInteger(_maxDocsEnv) && _maxDocsEnv > 0 ? _maxDocsEnv : DEFAULT_MAX_DOCS;
 export const MAX_TOTAL_INLINE_BYTES = 15 * 1024 * 1024;
 // FA-INGEST4 (2026-06-22, root-class fix on the live N4008526R0065 run): the 15MB
 // MAX_TOTAL_INLINE_BYTES gate was running PRE-DOWNLOAD inside applyBudget, summing
@@ -1367,6 +1385,7 @@ export async function assembleSamDocumentSet(
     ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${distinctTotal} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens / ${MAX_TOTAL_PAGES}pp vision / ${Math.round(MAX_DOWNLOAD_BYTES / 1048576)}MB download; PDF + .docx/.xlsx read as text, scanned PDFs OCR'd, other types not)` } : {}),
     files: files.map((f) => ({ ...f, section_roles: f.role === "attachment" ? classifySectionRoles(f.name) : [] })),
   };
+  logIngestShortfall(ingestion);
   return {
     primary: primary ? { name: primary.name, base64: primary.base64, buffer: primary.buffer, text: primary.text } : null,
     attachments: attachments.map((a) => ({ name: a.name, base64: a.base64, buffer: a.buffer, text: a.text })),
@@ -1527,9 +1546,57 @@ export async function assembleUploadedDocumentSet(
     ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${distinctTotal} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens / ${MAX_TOTAL_PAGES}pp vision / ${Math.round(MAX_DOWNLOAD_BYTES / 1048576)}MB download; PDF + .docx/.xlsx read as text, scanned PDFs OCR'd, other types not)` } : {}),
     files: files.map((f) => ({ ...f, section_roles: f.role === "attachment" ? classifySectionRoles(f.name) : [] })),
   };
+  logIngestShortfall(ingestion);
   return {
     primary: primary ? { name: primary.name, base64: primary.base64, buffer: primary.buffer, text: primary.text } : null,
     attachments: attachments.map((a) => ({ name: a.name, base64: a.base64, buffer: a.buffer, text: a.text })),
     ingestion
   };
+}
+
+/** Say OUT LOUD, at assembly, which documents did not make it and why — grouped by reason, with every
+ *  BINDING drop named individually. Pure logging: it changes nothing about what is ingested or decided.
+ *
+ *  THE DEFECT THIS CLOSES (live run 58c612f5 / W911SG27BA002, 2026-08-05). The worker logged exactly one
+ *  line — "document set assembled · 36/55 ingested" — and nothing more. Nineteen documents were dropped:
+ *  seventeen to the MAX_DOCS cap and two as unsupported types, and ALL NINETEEN were binding (UFGS
+ *  Earthwork / Cast-in-Place Concrete / Electrical / Asphalt Paving among them, plus SF 1413 — a form the
+ *  bidder must SUBMIT). Every one of those reasons was already recorded per-file on `ingestion.files`.
+ *  The information existed; nobody could see it.
+ *
+ *  It compounded on that run: the 360s budget aborted before persistence, and the abort path writes
+ *  nothing, so `ingestion` never reached the database either. The reasons died with the process, and
+ *  recovering them meant re-driving ingest by hand. A log line costs nothing and survives an abort.
+ *
+ *  WHAT THIS IS NOT: it is not the completeness guard, and it does not rescue a package. That guard
+ *  already works — `files_ingested >= files_total` is false here and `overflow` is set, so
+ *  agenticManifestComplete returns false and the verdict caps to INCOMPLETE naming the gap. The engine
+ *  KNEW. This makes the OPERATOR know, at the moment it happens, which is the difference between
+ *  diagnosing it in ten seconds and paying for a run to find out. */
+export function logIngestShortfall(ingestion: IngestionMeta): void {
+  const dropped = ingestion.files.filter((f) => !f.ingested && !f.superseded);
+  if (dropped.length === 0) return;
+
+  const byReason = new Map<string, IngestionFileMeta[]>();
+  for (const f of dropped) {
+    const r = f.reason ?? "(NO REASON RECORDED — investigate: every drop must carry one)";
+    if (!byReason.has(r)) byReason.set(r, []);
+    byReason.get(r)!.push(f);
+  }
+  const isBinding = (f: IngestionFileMeta) => isBindingDoc({ role: f.role, name: f.name });
+  const binding = dropped.filter(isBinding);
+
+  // The headline carries the BINDING count, because that is the number deciding whether a verdict could
+  // have been sound — nineteen dropped brochures and nineteen dropped specifications are not one event.
+  console.warn(
+    `[ingest] SHORTFALL — ${dropped.length} of ${ingestion.files_total} document(s) NOT ingested, ` +
+    `${binding.length} of them BINDING (files_ingested=${ingestion.files_ingested}). ` +
+    `Completeness is already false here, so the verdict caps to INCOMPLETE — this line is why, not whether.`
+  );
+  for (const [reason, fs] of [...byReason].sort((a, b) => b[1].length - a[1].length)) {
+    console.warn(`[ingest]   ${fs.length}× ${reason}`);
+    // Binding drops are named individually and NEVER truncated — a specification that silently vanished
+    // is the entire point of this line. Non-binding drops are counted, not enumerated.
+    for (const f of fs.filter(isBinding)) console.warn(`[ingest]       BINDING · ${f.name}`);
+  }
 }
