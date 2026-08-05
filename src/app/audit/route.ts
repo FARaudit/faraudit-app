@@ -16,15 +16,23 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { createServerClient } from "@/lib/supabase-server";
 import { injectRail } from "@/lib/nav/rail";
+import { signInRedirectPath } from "@/lib/nav/sign-in-redirect";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createServerClient();
   const {
     data: { user }
   } = await supabase.auth.getUser();
-  if (!user) redirect("/sign-in?next=/audit");
+  if (!user) {
+    // SECOND LAYER ONLY — src/middleware.ts matches every path and gates this route before it runs, so a
+    // signed-out visitor is redirected there, not here. Kept as defense-in-depth (if the matcher ever narrows,
+    // this must not silently start dropping the deep link) and deliberately IDENTICAL in shape to the middleware:
+    // `next` carries pathname AND search, because `/audit?noticeId=<ref>` is where every Opportunities
+    // "Run audit" button points and the page's prefill reads that param from location.search.
+    redirect(signInRedirectPath("/audit", new URL(request.url).search));
+  }
 
   const filePath = path.join(
     process.cwd(),

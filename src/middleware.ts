@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { signInRedirectPath } from "@/lib/nav/sign-in-redirect";
 
 const PUBLIC = [
   "/",
@@ -69,10 +70,15 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/sign-in";
-    url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
+    // PRESERVE THE DEEP LINK ACROSS THE SIGN-IN BOUNCE. `next` used to carry the PATHNAME only, while the clone
+    // kept the original query as top-level params on /sign-in — so `/audit?noticeId=<ref>` became
+    // `/sign-in?noticeId=<ref>&next=/audit`, and sign-in (which router.push()es `next` verbatim and ignores
+    // everything else) landed the visitor on a BLANK Run Audit form with the reference silently gone. That is the
+    // "Run Audit drops the noticeId" symptom, on the one path a signed-in walk cannot see: a shared link, an
+    // expired session, a second tab. Every "Run audit" button on Opportunities points at that URL.
+    // Built fresh rather than cloned, so the original params cannot ride along as decoration. The URL itself is
+    // built by the single shared helper — this gate and the per-route gates must never disagree about it.
+    return NextResponse.redirect(new URL(signInRedirectPath(pathname, request.nextUrl.search), request.nextUrl.origin));
   }
 
   return response;
