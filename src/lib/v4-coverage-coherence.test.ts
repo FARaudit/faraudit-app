@@ -6,10 +6,11 @@
 // reconciles coverage against the evidence — an evidenced section drops out of `missing` and its core chip
 // flips to ok. Tested through the REAL public render path buildV4Data (production faithfulness).
 import { buildV4Data } from "./v4-report/build-data";
+import { isEnvOn } from "./env-flags";
 
 let failures = 0;
 const assert = (cond: boolean, msg: string) => { console.log((cond ? "PASS" : "FAIL") + ": " + msg); if (!cond) failures++; };
-const flagOn = process.env.AUDIT_COVERAGE_COHERENCE === "true";
+const flagOn = isEnvOn(process.env.AUDIT_COVERAGE_COHERENCE);
 
 // A row whose coverage lists L/M "missing" while findings cite §L / §M (the 64b79916 incoherence).
 const row = () => ({

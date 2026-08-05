@@ -28,11 +28,15 @@ if (missing.length > 0) {
 
 // FA-124 — boot logs the effective env so deploy verification doesn't depend
 // on dashboard screenshots. Flag values are printed; secrets are presence-only.
-// Includes the agentic flags so a deploy can CONFIRM the agentic-primary path is
-// actually ON (a mistyped/unset flag silently runs the old V2 single-pass path and
-// the run would otherwise look fine). AUDIT_MAP_MODEL is printed too — a stray Opus
-// override there would re-introduce the per-doc cost bleed.
-const flags = ["CLAUDE_TIMEOUT_MS", "AUDIT_ENGINE_V2", "AUDIT_AGENTIC", "AUDIT_AGENTIC_PRIMARY", "AUDIT_MAP_MODEL", "AUDIT_ASYNC_ENQUEUE", "WORKER_POLL_MS"] as const;
+// ONLY flags that something actually reads. AUDIT_ENGINE_V2 and AUDIT_AGENTIC_PRIMARY
+// were printed here until 2026-08-04 — commit 5dc9b18d deleted the code that read them
+// when V1/V2 were purged, so for months this line invited an operator to confirm a
+// setting that could not affect the run. Worse, being NAMED here was what let both pass
+// the self-audit flag census as "referenced". A boot log that prints an inert flag is
+// not neutral: it manufactures false confidence at exactly the moment someone is
+// checking. There is no engine-selection flag any more (audit-executor-v3.ts:53).
+// AUDIT_MAP_MODEL stays — a stray Opus override there re-introduces the per-doc cost bleed.
+const flags = ["CLAUDE_TIMEOUT_MS", "AUDIT_AGENTIC", "AUDIT_MAP_MODEL", "AUDIT_ASYNC_ENQUEUE", "WORKER_POLL_MS"] as const;
 console.log(
   "[audit-worker] effective env ·",
   flags.map((k) => `${k}=${process.env[k] ?? "(unset)"}`).join(" · "),

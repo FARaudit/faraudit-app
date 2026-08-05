@@ -25,6 +25,7 @@ import { callStructuredClaude } from "./anthropic-structured";
 import { sanitizePdfText } from "./audit-engine";
 import { modelFor, isOpusModel } from "./model-registry";
 import { createHash } from "crypto";
+import { isEnvOn } from "./env-flags";
 
 /** One work-statement body, tagged with its source document. Append-all (NOT
  *  first-wins) so a package with multiple SOW/PWS docs keeps every one. */
@@ -623,7 +624,7 @@ async function mapDocumentUncached(docName: string, text: string, model: string,
   // with the flag off it falls through to the single call (which slices to the limit) and is
   // FLAGGED truncated. Default OFF ⇒ byte-identical to the pre-chunking behavior.
   const oversize = sanitized.length > MAP_INPUT_CHAR_LIMIT;
-  const chunkingEnabled = process.env.AUDIT_MAP_CHUNKING === "true";
+  const chunkingEnabled = isEnvOn(process.env.AUDIT_MAP_CHUNKING);
 
   let parsed: ChunkExtract;
   let stopReason: string | null | undefined;

@@ -48,7 +48,13 @@ const SET_ASIDES = (process.env.SET_ASIDES || "SBA,8A,8AS,WOSB,EDWOSB,SDVOSBC,SD
 // pulls. Set on Railway, deploy, run, then unset so cron returns to daily mode.
 const DAILY_WINDOW_DAYS = Number(process.env.BACKFILL_DAYS) || Number(process.env.DAILY_WINDOW_DAYS) || 1;
 const PAGE_LIMIT = Math.min(Number(process.env.PAGE_LIMIT) || 100, 1000);
-const DRY_RUN = process.env.DRY_RUN === "true";
+// Tolerant parse, mirroring src/lib/env-flags.ts:isEnvOn — CANONICAL DEFINITION LIVES THERE.
+// Copied, not imported: sam-ingest is a standalone package with its own package.json and no `@/`
+// alias, so the aliased import type-checks from the repo root and then throws at boot.
+// The failure direction matters here — a dashboard-set DRY_RUN=True read as FALSE writes to prod.
+const isEnvOn = (v: string | undefined): boolean =>
+  v != null && ["true", "1", "yes", "on"].includes(v.trim().toLowerCase());
+const DRY_RUN = isEnvOn(process.env.DRY_RUN);
 
 // FA-49: hard-fail if DRY_RUN not explicitly set (prevents accidental prod writes from local terminal)
 // Rule 47: Railway-side env vars win over local prefix — require explicit value every run.

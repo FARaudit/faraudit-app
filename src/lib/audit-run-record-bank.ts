@@ -18,8 +18,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildRunRecord, captureAuditFlagEnv, type RunRecordMeta, type RunRecordInput } from "./audit-run-record";
 import type { UsageCall } from "./audit-cost";
 import type { AuditResult } from "./audit-orchestrator";
+import { isEnvOn } from "./env-flags";
 
-export const RUN_RECORD_BANK_ENABLED = process.env.AUDIT_BANK_RUN_RECORD === "true";
+export const RUN_RECORD_BANK_ENABLED = isEnvOn(process.env.AUDIT_BANK_RUN_RECORD);
 const BUCKET = "run-records";
 
 export interface BankRunRecordArgs {

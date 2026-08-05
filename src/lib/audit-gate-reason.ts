@@ -19,8 +19,9 @@
  *  Surface THAT. A gate is only honest if it says what is missing and what the reader should do instead — telling
  *  someone a report is withheld, while telling them it is complete, is worse than saying nothing.
  *  Falls back to the legacy copy for V1 rows and for any gate whose cause is not named. */
+import { isEnvOn } from "./env-flags";
 export function gateCause(audit: Record<string, unknown>): { head: string; body: string } | null {
-  if (process.env.AUDIT_GATE_REASON_NAMED !== "true") return null;
+  if (!isEnvOn(process.env.AUDIT_GATE_REASON_NAMED)) return null;
   const comp = (audit.compliance_json ?? {}) as Record<string, unknown>;
   if (comp.engine !== "agentic_v3") return null;
   const v3 = (comp.v3 ?? {}) as Record<string, unknown>;

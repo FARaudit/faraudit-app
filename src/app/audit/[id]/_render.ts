@@ -18,6 +18,7 @@ import type {
 import { buildV2ViewModelFromShadow, renderV2Surfaces, renderIngestionBannerFromAudit } from "./_v2-render-surfaces";
 import type { ChecklistBucketGroup } from "./_normalizers";
 import { isActionableSubmissionItem } from "@/lib/section-extractors";
+import { isEnvOn } from "@/lib/env-flags";
 
 // P1-b raw-fragment guard (2026-06-21, strengthened after panel re-review). The V2
 // checklist surfaced raw extraction debris the canonical action gate didn't catch.
@@ -27,7 +28,7 @@ const ACTION_VERB_RE = /\b(shall|must|submit|provide|include|complete|sign|regis
 // Root-C render-coherence (Brain #332/#387) — when ON, an NHR-pole audit's BODY sections render honest, pole-accurate
 // states instead of the scored "clean pass / proceed" defaults that contradict the "Human review" masthead. Default OFF
 // (Rule 61 — byte-identical when off); flipped only after Design confirms the flag-on render 1:1.
-const NHR_COHERENCE_ON = process.env.AUDIT_REPORT_NHR_COHERENCE === "true";
+const NHR_COHERENCE_ON = isEnvOn(process.env.AUDIT_REPORT_NHR_COHERENCE);
 function looksGarbledFragment(t: string): boolean {
   const s = t.trim();
   // Unambiguous OCR/extraction garbage — drop regardless of content.

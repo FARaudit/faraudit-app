@@ -34,6 +34,7 @@ import { type PdfSource } from "@/lib/audit-engine";
 // DELETED V1 engine and V3 never consults it. See the banner below.
 import { modelFor, type ModelRole } from "@/lib/model-registry";
 import { modelFor as panelModelFor } from "@/lib/agentic-panel-runner";
+import { isEnvOn } from "@/lib/env-flags";
 
 const POLL_MS = Number(process.env.WORKER_POLL_MS || 10_000);
 const STALE_PROCESSING_MS = 30 * 60 * 1000;
@@ -647,7 +648,7 @@ async function buildInput(row: UserPendingRow): Promise<AuditExecutionInput> {
         console.warn(`[audit-worker] FA-136: document-set assembly failed for ${row.notice_id} — legacy single-URL path: ${err instanceof Error ? err.message : err}`);
         return null;
       });
-      if (process.env.AUDIT_TIMING_PREPANEL === "true") console.log(`[timing] prepanel:sam-retrieval(assembleSamDocumentSet) ${Date.now() - _tSamDl}ms · ${assembled ? `${assembled.ingestion.files_ingested}/${assembled.ingestion.files_total} docs` : "failed→legacy"}`);
+      if (isEnvOn(process.env.AUDIT_TIMING_PREPANEL)) console.log(`[timing] prepanel:sam-retrieval(assembleSamDocumentSet) ${Date.now() - _tSamDl}ms · ${assembled ? `${assembled.ingestion.files_ingested}/${assembled.ingestion.files_total} docs` : "failed→legacy"}`);
     }
     if (assembled?.primary) {
       pdfBase64 = assembled.primary.base64;

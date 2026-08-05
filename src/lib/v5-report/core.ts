@@ -16,6 +16,7 @@
    (never "None") on any noVerdict pole; tri-state eligibility is a top-line value.
    ============================================================================= */
 import type { Tone, V4Data, V4Verdict } from "@/lib/v4-report/render";
+import { isEnvOn } from "@/lib/env-flags";
 
 // REPORT-TRUTH #3 — compute-or-absent for panel columns, shared by every v5 surface (web · deck · pdf) so they cannot
 // disagree about which columns exist. `undefined` on every row means the engine never typed that attribute → the
@@ -66,7 +67,7 @@ export function scorecardTiles(d: V4Data): ScorecardTile[] {
   // Vehicle F · D3 (flag AUDIT_NHR_NARRATIVE_TRUE_CAUSE) — on an ELIGIBILITY-cause NHR the gate(s) ARE determined (the
   // engine named a grounded eligibility bar), so Show-stoppers/Eligibility surface the conditional gate instead of the
   // blanket "Not determined". Flag-OFF / other causes ⇒ eligGate false ⇒ exact legacy tiles ⇒ byte-identical.
-  const eligGate = process.env.AUDIT_NHR_NARRATIVE_TRUE_CAUSE === "true" && (v as { noVerdictCause?: string }).noVerdictCause === "eligibility" && p0 > 0;
+  const eligGate = isEnvOn(process.env.AUDIT_NHR_NARRATIVE_TRUE_CAUSE) && (v as { noVerdictCause?: string }).noVerdictCause === "eligibility" && p0 > 0;
   const tiles: ScorecardTile[] = [
     eligGate
       ? { k: "Show-stoppers", v: String(p0), tone: "caution", sub: "eligibility gate — confirm your firm's status", textv: false }

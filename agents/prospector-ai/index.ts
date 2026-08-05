@@ -24,7 +24,14 @@ import { findEmailViaHunter } from './hunter-enrich';
 const NOTION_KEY = process.env.NOTION_API_KEY!;
 const SAM_KEY = process.env.SAM_API_KEY || '';
 const BD_DB_ID = 'c2a5451fa95d4198be2a1648fed5df0b';
-const DRY_RUN = process.env.DRY_RUN === 'true';
+// Tolerant parse, mirroring src/lib/env-flags.ts:isEnvOn — CANONICAL DEFINITION LIVES THERE.
+// This is a deliberate local copy, not drift: prospector-ai is a standalone Railway package
+// (own package.json + tsconfig, `include: ["*.ts"]`, no `@/` alias) and cannot import from src/.
+// It is copied rather than skipped because the failure here is the expensive direction — a
+// dashboard-set DRY_RUN=True parsed by `=== 'true'` reads FALSE, and the "dry" run writes to Notion.
+const isEnvOn = (v: string | undefined): boolean =>
+  v != null && ['true', '1', 'yes', 'on'].includes(v.trim().toLowerCase());
+const DRY_RUN = isEnvOn(process.env.DRY_RUN);
 
 if (!NOTION_KEY) {
   console.error('NOTION_API_KEY missing — refuse to start');

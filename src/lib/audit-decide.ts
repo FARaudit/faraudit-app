@@ -24,6 +24,7 @@ import { demoteMmEvidenceFactor, hasGroundedLeadTimeBasis } from "./mm-evidence-
 import { classifyGateShape } from "./panel-findings-bridge"; // ratified positive who-can-win shape classifier — the Unit-1 perf-obligation gate's keep-the-bar veto (Gauntlet R1: no bar-vocab blocklist). Type-only elsewhere ⇒ no import cycle.
 
 export type Verdict = "BID" | "BID_WITH_CAUTION" | "NO_BID" | "INELIGIBLE" | "NEEDS_HUMAN_REVIEW" | "INCOMPLETE";
+import { isEnvOff, isEnvOn } from "./env-flags";
 export type Disposition = "met" | "gate_to_clear" | "disqualifying" | "dropped";
 
 export interface DecidedFinding extends TypedFinding { disposition: Disposition; }
@@ -686,7 +687,7 @@ function setAsideRowWindow(src: string, at: number): string {
   // clause#+partial-title line and MISSES the "Yes" cell → set-asides under-read → wrong conflict pole). When ON,
   // the window spans newlines up to a char cap; the prev/next clause-number bounds (not the physical line) are what
   // prevent bleed into an adjacent row's cell. Flag OFF ⇒ the exact physical-line window as before (byte-identical).
-  const spanWrapped = process.env.AUDIT_SETASIDE_WRAPPED_ROWS === "true";
+  const spanWrapped = isEnvOn(process.env.AUDIT_SETASIDE_WRAPPED_ROWS);
   const lineStart = src.lastIndexOf("\n", at) + 1;
   let lineEnd = src.indexOf("\n", at);
   if (lineEnd < 0) lineEnd = src.length;
@@ -905,7 +906,7 @@ export function detectSetAsideConflict(samSetAside: string | null | undefined, f
   //   (2) the findings (a genuine positive set-aside's canonical requiredAttribute OR its 52.219 citation) — a
   //       belt-and-suspenders catch for a prose-only set-aside a lens surfaced but the matrix scan didn't.
   // The union biases toward SURFACING ambiguity (→ NHR, the zero-contract-loss pole), never toward a silent pick.
-  const subsetAware = process.env.AUDIT_SETASIDE_SUBSET_AWARE === "true";
+  const subsetAware = isEnvOn(process.env.AUDIT_SETASIDE_SUBSET_AWARE);
   const docCanons = new Set<string>();
   for (const n of detectSetAsideNotices(source)) docCanons.add(n.canon);
   for (const f of findings) {
@@ -1136,8 +1137,8 @@ export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: 
  *  mis-typed no_one_can_move socioeconomic set-aside → NEEDS_HUMAN_REVIEW); there is no env knob for the disposition
  *  itself. `enabled` continues to honor AUDIT_AWARDBASIS_OVERTYPE_GUARD (default-ON) unchanged. Pure. */
 export function setAsideOvertypeGuardOpts(env: Record<string, string | undefined>): { enabled: boolean; normalizeNoOneCanMoveSetAside?: boolean; setAsideOvertypeDisposition?: "nhr" } {
-  const enabled = env.AUDIT_AWARDBASIS_OVERTYPE_GUARD !== "false";
-  return env.AUDIT_SETASIDE_OVERTYPE_GUARD === "true"
+  const enabled = !isEnvOff(env.AUDIT_AWARDBASIS_OVERTYPE_GUARD);
+  return isEnvOn(env.AUDIT_SETASIDE_OVERTYPE_GUARD)
     ? { enabled, setAsideOvertypeDisposition: "nhr" }
     : { enabled, normalizeNoOneCanMoveSetAside: false };
 }
@@ -1344,7 +1345,7 @@ export function applyNmrNaicsDormancy(
       // has zero occurrences in the package (the grounding lives in VAAR 852.219-73(d)). The honest form grounds
       // on the excerpt the finding CARRIES (kept by the spread) — true whether or not the clause is in the matrix.
       // Rule-identity naming of the NMR by its FAR number is a regulatory fact and stays. Flag-OFF ⇒ legacy text.
-      requirement: process.env.AUDIT_NMR_CITATION_HONESTY === "true"
+      requirement: isEnvOn(process.env.AUDIT_NMR_CITATION_HONESTY)
         ? `Applicability flag: the Nonmanufacturer Rule (FAR 52.219-33) is legally DORMANT on this acquisition — the assigned NAICS ${digits} (sector ${sector}) is not a supply/manufacturing/wholesale/retail code, so 13 CFR 121.406(b)(3)-(4) makes the NMR inapplicable (it governs supply buys only). Referenced in the solicitation text (see excerpt) but not an eligibility bar for this buy; confirm scope with the Contracting Officer.`
         : `Applicability flag: the Nonmanufacturer Rule (FAR 52.219-33) is legally DORMANT on this acquisition — the assigned NAICS ${digits} (sector ${sector}) is not a supply/manufacturing/wholesale/retail code, so 13 CFR 121.406(b)(3)-(4) makes the NMR inapplicable (it governs supply buys only). Present in the clause matrix but not an eligibility bar for this buy; confirm scope with the Contracting Officer.`,
     };
@@ -2696,7 +2697,7 @@ export function disposeFinding(f: TypedFinding): Disposition {
 // checks) -> the promotion lives in the branch that OWNS the pole. The customer render frames an NHR-pole
 // show-stopper as a CONDITIONAL bar (Brain/Design ruling card 432), never committal "blocks award" copy.
 // Item B (card #703) flag — a concluded site visit needs GROUNDED mandatory-attendance to confer bar-status.
-const siteVisitMandatoryGroundedEnabled = () => process.env.AUDIT_SITEVISIT_MANDATORY_GROUNDED === "true";
+const siteVisitMandatoryGroundedEnabled = () => isEnvOn(process.env.AUDIT_SITEVISIT_MANDATORY_GROUNDED);
 // OVER-FIRE GUARDS (isSiteVisitOrEligBar): disposition===disqualifying (a benign site-visit-ENCOURAGED gate is
 // bidder_controls -> excluded) · NOT curableInWindow===true (curable = a gate to clear, branch-5b parity) · NOT
 // firmStatus==="satisfies" (the firm PROVES it holds the bar). Flag-OFF ⇒ the branch passes [] as before
@@ -2741,7 +2742,7 @@ function siteVisitEligStoppers(dispositions: DecidedFinding[], profile: BidderPr
 // BOA vehicle" — a firm cannot clear one and fail the other). Group by a gate SIGNATURE (requiredAttribute + requirement
 // tokens), keep the first, and PRESERVE the merged bar's citation on the survivor (no citation lost). Flag-gated
 // AUDIT_BAND_DEDUP, default-OFF ⇒ returns the list unchanged (byte-identical).
-const bandDedupEnabled = () => process.env.AUDIT_BAND_DEDUP === "true";
+const bandDedupEnabled = () => isEnvOn(process.env.AUDIT_BAND_DEDUP);
 function gateSignature(f: DecidedFinding): string {
   const combined = `${f.requiredAttribute ?? ""} ${f.requirement ?? ""}`.toLowerCase();
   // Site-visit is checked FIRST (most specific): the FA8137 notice body carries "MAC BOA Holders ONLY" adjacent to the
@@ -2772,7 +2773,7 @@ export function dedupBandGates(stoppers: DecidedFinding[]): DecidedFinding[] {
 // eligibility gates on the vehicle seat) so it no longer contradicts the masthead. Flag AUDIT_SETASIDE_REFRAME, default
 // OFF ⇒ findings untouched (byte-identical). A genuinely-unrestricted solicitation (set_aside empty/none) ⇒ NOT reframed
 // (the "no set-aside" finding is true) — the guard requires an authoritative set-aside.
-const setAsideReframeEnabled = () => process.env.AUDIT_SETASIDE_REFRAME === "true";
+const setAsideReframeEnabled = () => isEnvOn(process.env.AUDIT_SETASIDE_REFRAME);
 // Match ONLY a finding that ASSERTS the ABSENCE of a set-aside (the masthead-contradicting claim) — not a benign mention
 // of 52.219-6. Requires "no set-aside … present/applies/exists", "no … set-aside clause", or "there is no … 52.219-6".
 const NO_SETASIDE_CLAIM_RE = /\bno\s+set[\s-]?aside\s+(?:restriction\s+|designation\s+)?(?:is\s+|are\s+)?(?:present|applies|exists|found|in\s+(?:this|the))|\bno\s+(?:\S+\s+){0,3}?set[\s-]?aside\s+clause\b|\bno\s+small\s+business\s+program\s+eligibility\s+bar|there\s+is\s+no\s+(?:far\s+)?52\.219-6\b|\b52\.219-6\s+is\s+(?:not|n['’]?t)\s+(?:in|present)/i;
@@ -2801,7 +2802,7 @@ export function reframeNoSetAsideFindings<T extends { requirement: string }>(fin
 // generic B3 fail-safe boilerplate ("a bidder-eligibility bar … could not be confirmed as analyzed"), which understated
 // the audit's own grounded analysis — the 6a67c0f1 stamp-bar #6 miss. Deduped, first-clause-trimmed, ≤3 bars. Returns
 // null when no named bar is available ⇒ the caller keeps the generic string (byte-identical). Flag-OFF ⇒ never called.
-const reasonLineNamedEnabled = () => process.env.AUDIT_REASON_LINE_NAMED === "true";
+const reasonLineNamedEnabled = () => isEnvOn(process.env.AUDIT_REASON_LINE_NAMED);
 
 /** Card #479 class-regression guard — clamp a DERIVED CUSTOMER-FACING string to `max` chars WITHOUT ever cutting
  *  mid-word or leaving a fake terminal period. Under the limit ⇒ returned EXACTLY as-is (byte-identical to a prior
@@ -2850,7 +2851,7 @@ export function namedEligibilityReason(stoppers: DecidedFinding[]): string | nul
 // this fill NEVER touches). Reuses the SAME siteVisitEligStoppers filter (only genuine site-visit/eligibility_bar
 // disqualifiers, floored P0, framed CONDITIONAL by the render — card 432), so a non-elig disqualifier is never promoted.
 // Flag-OFF ⇒ passes [] exactly as today (byte-identical, Rule 61).
-const coverageNhrStopperFillEnabled = () => process.env.AUDIT_COVERAGE_NHR_STOPPER_FILL === "true";
+const coverageNhrStopperFillEnabled = () => isEnvOn(process.env.AUDIT_COVERAGE_NHR_STOPPER_FILL);
 
 // ── ITEM A (card #703 repair · flag AUDIT_NHR_HEADLINE_SHOWSTOPPER_FIRST, default-OFF) — HEADLINE SELECTION ONLY ──
 // The first live customer run (FA813726R0033) headlined the NHR with an ungrounded §L reps-&-certs recital (the
@@ -2864,8 +2865,8 @@ const coverageNhrStopperFillEnabled = () => process.env.AUDIT_COVERAGE_NHR_STOPP
 // ⚠ ARM SEQUENCING (item-A seat, P3): do NOT arm this flag before repair-unit ITEM B lands. Until B, a concluded
 // site visit can still carry a disqualifying disposition (an over-claim), and item A would faithfully lead the
 // headline with that over-claimed bar. Arm A only WITH or AFTER B, so the bar A promotes is a real disqualifier.
-const nhrHeadlineShowStopperFirstEnabled = () => process.env.AUDIT_NHR_HEADLINE_SHOWSTOPPER_FIRST === "true";
-const soleSourceLockEnabled = () => process.env.AUDIT_SOLE_SOURCE_LOCK === "true";
+const nhrHeadlineShowStopperFirstEnabled = () => isEnvOn(process.env.AUDIT_NHR_HEADLINE_SHOWSTOPPER_FIRST);
+const soleSourceLockEnabled = () => isEnvOn(process.env.AUDIT_SOLE_SOURCE_LOCK);
 
 /** Against a disqualifying (bidder_cannot_move) bar, the firm's status is one of three — and that, not the
  *  bar's mere presence, decides the outcome (the standing facts-vs-analysis / no-blind-INELIGIBLE doctrine):
@@ -2927,7 +2928,7 @@ export function requiredAttributeGrounded(requiredAttribute: string, source: str
 // decertified cert read as live and DELETED the 206-A verify-caution (worse than a null profile); B2 — the
 // exact-match fast path bypassed NON_SELF_CLEARABLE_BAR_RE, so an asserted profile string cleared FCL/QPL/size
 // structural bars. Flag OFF ⇒ every branch byte-identical (probe O1 + suites).
-const profileSchemaV2Enabled = () => process.env.AUDIT_PROFILE_SCHEMA_V2 === "true";
+const profileSchemaV2Enabled = () => isEnvOn(process.env.AUDIT_PROFILE_SCHEMA_V2);
 const AUTHORITATIVE_SOURCES = new Set(["sam_api", "sba_api", "verified_import"]);
 // Namespaces a customer can NEVER self-assert into "satisfies" (the SB seat's floor): socioeconomic programs
 // (incl. sb: — "sb:total" is a PRODUCTION deterministic-emitter token, verification F2), size/NAICS,
@@ -3100,7 +3101,7 @@ export function _clearUniversalDefectProducers(): void { UNIVERSAL_DEFECT_PRODUC
 /** BOOT/REGISTRATION-TIME coupling-lock (Ruling i). A registered universalDefect producer while tristate is OFF
  *  ⇒ throw at INIT (process refuses to start). No-op in prod (empty registry) and byte-identical when tristate ON. */
 export function validateUniversalDefectProducerConfig(env: NodeJS.ProcessEnv = process.env): void {
-  const tristate = env.AUDIT_ELIGIBLE_TRISTATE === "true";
+  const tristate = isEnvOn(env.AUDIT_ELIGIBLE_TRISTATE);
   if (UNIVERSAL_DEFECT_PRODUCERS.size > 0 && !tristate)
     throw new EngineInvariantError(
       `FORK-2 coupling-lock (card 228 Ruling i, INIT): universalDefect producer(s) [${[...UNIVERSAL_DEFECT_PRODUCERS].join(", ")}] registered while AUDIT_ELIGIBLE_TRISTATE is not "on" — a committal NO_BID must carry a POSITIVE eligibility determination, never a default true. Enable the tristate or unregister the producer. Process refuses to start.`);
@@ -3117,7 +3118,7 @@ const mk = (verdict: Verdict, eligible: boolean | null, reason: string, disposit
 // "undetermined." Flag DEFAULT-OFF (=== "true"): ON → null ("not determined"); OFF → false, byte-identical to
 // pre-flag behavior. A TRUE firm-credential bar (INELIGIBLE) always emits false and is NOT routed through here.
 const honestFailEligible = (): boolean | null =>
-  process.env.AUDIT_ELIGIBLE_TRISTATE === "true" ? null : false;
+  isEnvOn(process.env.AUDIT_ELIGIBLE_TRISTATE) ? null : false;
 
 // Doctrine #2 (Brain card 125) — VERDICT-WORD INVARIANT (defensive backstop). INELIGIBLE asserts a FIRM-
 // credential failure; it may stand ONLY when a real eligibility_bar show-stopper exists. A requirement-side
@@ -3126,7 +3127,7 @@ const honestFailEligible = (): boolean | null =>
 // (elig is derived from the same predicate); the value is catching a FUTURE refactor or any OTHER path that
 // emits eligible:false. Exported for a $0 unit-proof against a crafted violation.
 export function enforceVerdictWordInvariant(d: Decision): Decision {
-  if (process.env.AUDIT_VERDICT_WORD_INVARIANT !== "true") return d;  // flag OFF → invariant does not run (byte-identical)
+  if (!isEnvOn(process.env.AUDIT_VERDICT_WORD_INVARIANT)) return d;  // flag OFF → invariant does not run (byte-identical)
   if (d.eligible === false && !d.showStoppers.some((s) => s.kind === "eligibility_bar")) {
     if (process.env.NODE_ENV !== "production")
       throw new Error("invariant_violation:ineligible_without_eligibility_bar");  // dev/test: loud — catches the refactor
@@ -3205,11 +3206,11 @@ export function applyClauseKeyedTypingFloor(findings: TypedFinding[], o: { enabl
 // ⇒ the existing NHR/INELIGIBLE ladder is byte-identical. On eligible, deriveVerdict floors to BID_WITH_CAUTION with the
 // FULL named self-cert caveat list (never a plain BID). Red-team: packages that LOOK self-clearable but hide a
 // CMMC/clearance/QPL bar, an at-award possession frame, or an untyped bar. Flag-OFF ⇒ never called ⇒ byte-identical.
-const selfClearablePackageEnabled = () => process.env.AUDIT_SELF_CLEARABLE_PACKAGE === "true";
-const incompletePrecedenceEnabled = () => process.env.AUDIT_INCOMPLETE_PRECEDENCE === "true"; // Brain #664 — documentsComplete=false not subordinate to coverage-pole NHR
-const coverageCapNotMuteEnabled = () => process.env.AUDIT_COVERAGE_CAP_NOT_MUTE === "true"; // U-A cap-not-mute (panel 2026-07-29) — uncovered obligation caps committal at BWC, never NHR-mutes
+const selfClearablePackageEnabled = () => isEnvOn(process.env.AUDIT_SELF_CLEARABLE_PACKAGE);
+const incompletePrecedenceEnabled = () => isEnvOn(process.env.AUDIT_INCOMPLETE_PRECEDENCE); // Brain #664 — documentsComplete=false not subordinate to coverage-pole NHR
+const coverageCapNotMuteEnabled = () => isEnvOn(process.env.AUDIT_COVERAGE_CAP_NOT_MUTE); // U-A cap-not-mute (panel 2026-07-29) — uncovered obligation caps committal at BWC, never NHR-mutes
 // ── Vehicle A–E · item A + E (flag AUDIT_VERDICT_POLE_PRECEDENCE, default-OFF) ─────────────────────────────────────
-const verdictPolePrecedenceEnabled = () => process.env.AUDIT_VERDICT_POLE_PRECEDENCE === "true";
+const verdictPolePrecedenceEnabled = () => isEnvOn(process.env.AUDIT_VERDICT_POLE_PRECEDENCE);
 // item E (design-panel R1, hard dependency of A's site-visit fire) — the promoted finding's excerpt must carry
 // OPERATIVE eligibility-limiting language, NOT a bare recital ("site visit held and concluded" alone is NOT
 // dispositive — the concluded-site-visit trap). Deterministic SHAPE test; model-free. Matches the operative
@@ -3367,7 +3368,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //    Graduates the tristate + adds two paired behaviors — ONE guarantee: the engine never asserts a firm is
   //    ELIGIBLE for an eligibility gate it could not VERIFY (null/unverified profile). Flag OFF ⇒ every branch
   //    below is byte-identical to pre-card behavior (guarded). Grounding rules untouched.
-  const tristate = process.env.AUDIT_ELIGIBLE_TRISTATE === "true";
+  const tristate = isEnvOn(process.env.AUDIT_ELIGIBLE_TRISTATE);
   // (a) MANDATORY FIRM-STATUS TYPING lives in the ORCHESTRATOR guard chain (applySetAsideFirmStatusGate, now also
   //     enabled by AUDIT_ELIGIBLE_TRISTATE) so the re-typed finding propagates to BOTH the persisted/rendered
   //     findings grid AND this decision — never a grid-vs-verdict divergence (code-review #1). So by here a
@@ -3379,7 +3380,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   // non-curable / show-stopper poles. R2 vetoes (coupled true bar / possession-at-offer / who-may-bid ambiguity)
   // escalate; R3 source-contradiction ("preferred/not required") demotes. Flag OFF ⇒ inp.findings passes through
   // untouched ⇒ every branch below is byte-identical.
-  const mmDemote = process.env.AUDIT_MM_EVIDENCE_FACTOR_DEMOTION === "true";
+  const mmDemote = isEnvOn(process.env.AUDIT_MM_EVIDENCE_FACTOR_DEMOTION);
   const mmDemoted = mmDemote ? inp.findings.map((f) => demoteMmEvidenceFactor(f, inp.source)) : inp.findings;
   // ── FINDING-#46 SCOPE-OPACITY RECONCILIATION (repair item C · Brain #703/#707 · flag AUDIT_SCOPE_OPACITY_RECONCILE,
   //    default-OFF). A P0 "scope opacity / no SOW-spec-drawings visible" gate finding is demoted to a P2 attribute
@@ -3387,7 +3388,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //    materially false to surface a "cannot price, missing scope" P0 gate over a package whose SOW was ingested.
   //    Scoped to the absence-claim SHAPE + gate-band + scope-doc-read gate; flag-OFF (or no scope doc read) ⇒
   //    byte-identical. SET-LEVEL: needs the whole findings set to prove the attachment was read.
-  const decidedFindings = reconcileScopeOpacity(mmDemoted, inp.source, process.env.AUDIT_SCOPE_OPACITY_RECONCILE === "true");
+  const decidedFindings = reconcileScopeOpacity(mmDemoted, inp.source, isEnvOn(process.env.AUDIT_SCOPE_OPACITY_RECONCILE));
   const dispositions: DecidedFinding[] = decidedFindings.map((f) => ({ ...f, disposition: disposeFinding(f) }));
   // (b/c) UNVERIFIED ELIGIBILITY GATES — a PROFILE-DEPENDENT eligibility gate (kind eligibility_bar carrying a
   //     specific requiredAttribute credential to check) the profile does not PROVE the firm satisfies. On a
@@ -3428,7 +3429,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //    complete ingested amendment set. `ingestedAmendmentComplete ?? false` fails conservative: an unsupplied
   //    completeness signal is treated as incomplete ⇒ INDETERMINATE, never a false CLOSED.
   const temporal: TemporalDisposition | null =
-    process.env.AUDIT_TEMPORAL_VERDICT === "true" && inp.temporalSnapshot && inp.today
+    isEnvOn(process.env.AUDIT_TEMPORAL_VERDICT) && inp.temporalSnapshot && inp.today
       ? deriveTemporalDisposition(inp.temporalSnapshot, inp.liveSam ?? null, inp.ingestedAmendmentComplete ?? false, inp.today, inp.nowIso ?? null)
       : null;
   // CLOSED DOMINATES (design move 6): you cannot bid a closed solicitation regardless of read-completeness or which
@@ -3468,7 +3469,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //    NOT THE FALSE-BID BACKSTOP: per the re-scoped PANEL RULING 1, veto retirement is gated on MEASURED
   //    false-BID = 0 on the v2 obligation ledger at retirement time. This module's existence satisfies nothing.
   const setAsideBackstop: SetAsideBackstopDisposition | null =
-    process.env.AUDIT_SETASIDE_BACKSTOP === "true" && inp.source
+    isEnvOn(process.env.AUDIT_SETASIDE_BACKSTOP) && inp.source
       ? deriveSetAsideBackstop(
           // program key: the positive-set-aside classifier first, then the finding's OWN canonical attribute —
           // findingSetAsideCanon carries several deliberate vetoes (size-disqualification, subcontracting-goal, …)
@@ -3713,7 +3714,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   // (AUDIT_FOURWALLS_NOBID, default OFF ⇒ suppressed), a verified-but-not-four-walls universal defect fails SAFE to
   // NEEDS_HUMAN_REVIEW. Downgrade-only (PROPOSE/DISPOSE rail authority, card 276): the rail may never fabricate a
   // committal verdict the model's single-verifier judgment merely PROPOSED.
-  if (universalDefect.length && process.env.AUDIT_FOURWALLS_NOBID !== "true") {
+  if (universalDefect.length && !isEnvOn(process.env.AUDIT_FOURWALLS_NOBID)) {
     const msg = `card 275 R4b: ${universalDefect.length} verified universalDefect(s) SUPPRESSED to NHR pending four-walls re-enable (single-verifier entailment is not four-walls): ${universalDefect.map((s) => s.requirement).join("; ")}`;
     try { console.log(`[card275-r4b] ${msg}`); } catch { /* logging must never affect the verdict */ } // a normal suppression, NOT an invariant breach
     return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), msg, dispositions, universalDefect, "verification");
@@ -3862,7 +3863,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
     //   Flag ON  → grounding decision is DECOUPLED from mmDemote: mechanic emits iff grounded (the invariant).
     //   Flag OFF → legacy mmDemote-coupled decision (card #538 R4), byte-identical to pre-#574 (grounded prose when
     //              !mmDemote OR a grounded basis exists; neutral consequence prose otherwise).
-    const fabricationInvariant = process.env.AUDIT_FABRICATION_INVARIANT === "true";
+    const fabricationInvariant = isEnvOn(process.env.AUDIT_FABRICATION_INVARIANT);
     const mechanic = fabricationInvariant
       ? groundedMechanicClause(nonCurable)
       : ((!mmDemote || hasGroundedLeadTimeBasis(nonCurable)) ? GROUNDED_LEADTIME_MECHANIC : "");

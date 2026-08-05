@@ -18,6 +18,7 @@ import { renderAuditTransitionalState } from "./_render-states";
 import { isV2Finalizing, shouldGateExport } from "@/lib/audit-display";
 import { gateCause } from "@/lib/audit-gate-reason";
 import { injectRail } from "@/lib/nav/rail";
+import { isEnvOn } from "@/lib/env-flags";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -419,7 +420,7 @@ export async function GET(
     // covers navigation; full site-shell embedding is a Design follow-up.
     // v5 "Gate Brief" report (flag-gated, default OFF ⇒ v4 byte-identical). Phase-2
     // web-view port; the two PDF exports + font-embed follow before it becomes default.
-    const html = process.env.AUDIT_REPORT_V5 === "true"
+    const html = isEnvOn(process.env.AUDIT_REPORT_V5)
       ? renderV5ReportFromRow(audit)
       : renderV4ReportFromRow(audit);
     return new Response(html, {

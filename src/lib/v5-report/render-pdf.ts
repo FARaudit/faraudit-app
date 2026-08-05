@@ -43,6 +43,7 @@ import { FONTS_CSS } from "@/lib/v5-report/fonts";
 import { DOC_PAGE_JS } from "@/lib/v5-report/doc-page";
 import { buildV4Data } from "@/lib/v4-report/build-data";
 import type { V4Data, V4Verdict, V4Finding } from "@/lib/v4-report/render";
+import { isEnvOn } from "@/lib/env-flags";
 
 // The "representative sample" flag is a Design-mock-only affordance (watermark +
 // review banner). Production buildV4Data never sets it, so prod briefs are clean.
@@ -56,7 +57,7 @@ const READLABEL: Record<string, string> = { full: "Read in full", indexed: "Inde
 const coverElig = (v: V4Verdict): EligInfo => (v.pole === "OUT_OF_SCOPE" ? null : eligInfo(v));
 
 // ── AUDIT_V5_SEAL — "Decision Seal" verdict box (flag-gated; default-OFF byte-identical) ──
-const V5_SEAL = process.env.AUDIT_V5_SEAL === "true";
+const V5_SEAL = isEnvOn(process.env.AUDIT_V5_SEAL);
 const STAMP: Record<string, string> = { go: "CLEARED", caution: "CONDITIONAL", stop: "BLOCKED", slate: "NO VERDICT" };
 const SEAL_ICON: Record<string, string> = {
   go: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8.2 12.4l2.6 2.6 5-5.4"/></svg>',

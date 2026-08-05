@@ -6,6 +6,7 @@
 // Run: npx tsx src/lib/checkbox-state-fidelity.test.ts
 import { applyCheckboxStateFidelity, parseCheckboxMatrix } from "./audit-decide";
 import type { TypedFinding } from "./audit-findings";
+import { isEnvOn } from "./env-flags";
 
 let failures = 0;
 const assert = (c: boolean, m: string) => { console.log(`${c ? "✅" : "❌"} ${m}`); if (!c) failures++; };
@@ -50,7 +51,7 @@ const f10 = (): TypedFinding => base({
 console.log("\n── P1 — flag OFF ⇒ byte-identical (fabricated ☒ framing survives) ──");
 withFlag(false, () => {
   const inp = [f10()];
-  const out = applyCheckboxStateFidelity(inp, SRC, { enabled: process.env.AUDIT_CHECKBOX_STATE_FIDELITY === "true" });
+  const out = applyCheckboxStateFidelity(inp, SRC, { enabled: isEnvOn(process.env.AUDIT_CHECKBOX_STATE_FIDELITY) });
   assert(out === inp && out[0] === inp[0], "OFF: same refs — the un-fixed fabricated 'clause list' framing stands");
 });
 

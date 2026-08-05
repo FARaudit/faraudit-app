@@ -19,9 +19,10 @@
    ============================================================================= */
 import type { V4Data, V4Verdict, V4Findings, V4Finding, V4Date, V4Temporal, V4SubmissionL, V4EvalM, V4Clins, V4Provenance, Tone } from "@/lib/v4-report/render";
 import { esc, hasCol, TONE_LABEL, SEVLAB, eligInfo, eyebrowFor, plur, cap, scorecardTiles, splitCaveatRationale, type EligInfo } from "./core";
+import { isEnvOn } from "@/lib/env-flags";
 
 // AUDIT_V5_SEAL — "Decision Seal" masthead redesign (flag-gated; default-OFF = byte-identical).
-const V5_SEAL = process.env.AUDIT_V5_SEAL === "true";
+const V5_SEAL = isEnvOn(process.env.AUDIT_V5_SEAL);
 
 // ── Seal builder — COPY-IDENTICAL to render-pdf.ts (STAMPWORD/DISPO/KICK/SEAL_ICON/
 // sealStamp/sealStatus) so web = Executive Brief = Gate Deck 1:1. render-pdf imports
@@ -109,7 +110,7 @@ function commandHeader(d: V4Data): string {
   // never reached the served surface (card #735/#736, FA813726R0033: masthead showed the orphan SAM "18 Jul 2026" with no
   // caveat while SF-30 Mod 0001 amended it to 31 Jul; UPDATE 03 signals a further revision). Flag-ON: render od.sub under
   // the clock. Flag-OFF: byte-identical (no caveat node). Data-present-only (never fabricated).
-  const deadlineCaveat = (process.env.AUDIT_MASTHEAD_DEADLINE_RECONCILE === "true" && od && od.sub)
+  const deadlineCaveat = (isEnvOn(process.env.AUDIT_MASTHEAD_DEADLINE_RECONCILE) && od && od.sub)
     ? `<div class="cmd-clock-caveat">${esc(od.sub)}</div>` : "";
   const clockHTML = !od ? "" : V5_SEAL ? `
       <div class="cmd-clock" title="Solicitation closing — grounded fact read from source; not a schedulability judgment">
@@ -294,7 +295,7 @@ export function reasoningSteps(d: V4Data): ReasoningStep[] {
     // NOT a partial read). When everything posted was read, the sequence stops on GROUNDING/certification, not on an
     // unread doc — say so. Flag-OFF ⇒ the exact legacy string ⇒ byte-identical.
     const allRead = cov.read != null && cov.total != null && cov.read >= cov.total;
-    coverageDetail = (process.env.AUDIT_COVERAGE_COUNTER_SPLIT === "true" && allRead)
+    coverageDetail = (isEnvOn(process.env.AUDIT_COVERAGE_COUNTER_SPLIT) && allRead)
       ? `All ${cov.total} documents were read; the sequence stops because not all binding content could be grounded/confirmed — no verdict is issued on an unconfirmed read.`
       : `${cov.read} of ${cov.total} documents could be read. A partial read cannot certify what it did not see — the sequence stops here and no verdict is issued.`;
   } else if (v.noVerdict) {
@@ -333,7 +334,7 @@ export function reasoningSteps(d: V4Data): ReasoningStep[] {
     // ENUMERATED cause instead of asserting "findings conflict" on every NHR (21/22 were fabricated). conflict language
     // renders IFF cause==="conflict"; an absent/unknown cause renders a NEUTRAL TRUE string + a defect signal (fail-loud).
     // Flag-OFF (or OOS) ⇒ the exact legacy strings ⇒ byte-identical.
-    const trueCause = process.env.AUDIT_NHR_NARRATIVE_TRUE_CAUSE === "true" && !oos;
+    const trueCause = isEnvOn(process.env.AUDIT_NHR_NARRATIVE_TRUE_CAUSE) && !oos;
     if (!trueCause) {
       steps.push({
         tone: "slate", label: oos ? "Scope checked" : "Findings reconciled",

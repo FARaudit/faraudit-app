@@ -17,6 +17,7 @@ import {
   MAX_PDF_BYTES
 } from "@/lib/validators";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { isEnvOn } from "@/lib/env-flags";
 
 // FA-2 (2026-05-17): mirror agents/audit-ai/pdf.ts + src/lib/sam-pdf.ts —
 // PDFs above this size are uploaded to the Anthropic Files API once instead
@@ -318,7 +319,7 @@ export async function POST(req: NextRequest) {
   // and noticeId runs are unchanged. (FA-170 forced multi-file to the sync
   // path because the worker read one anthropic_file_id / pdf_path / pdf_url;
   // upload_docs lifts that constraint.)
-  if (process.env.AUDIT_ASYNC_ENQUEUE === "true") {
+  if (isEnvOn(process.env.AUDIT_ASYNC_ENQUEUE)) {
     const singleBuffer = uploadedDocs.length === 1 ? uploadedDocs[0].buffer : pdfBuffer;
     return enqueueAsyncAudit({ supabase, userId: user.id, solicitation, pdfBuffer: singleBuffer, uploadedDocs, safeName, rate });
   }

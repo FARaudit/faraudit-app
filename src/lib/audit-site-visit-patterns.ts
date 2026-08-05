@@ -6,6 +6,7 @@
 // both, never duplicated.
 
 // A UCF/notice site-visit / tour / job-walk / pre-proposal-conference mention (CONTENT match).
+import { isEnvOn } from "./env-flags";
 export const SITE_VISIT_RE = /\bsite[\s-]?(?:visit|tour|inspection)\b|\bjob[\s-]?walk\b|\bpre[\s-]?(?:proposal|bid)\s+(?:conference|meeting)\b|\bwalk[\s-]?(?:through|thru)\b/i;
 
 // A SAM-body / UPDATE-line past-marker that the site visit already HELD / CONCLUDED / CLOSED. Contract regex:
@@ -57,7 +58,7 @@ export const MANDATORY_NEGATION_LOOKBEHIND = "(?<!non[-\\s])(?<!not\\s)";
  *  says the opposite — a NEW fabrication the legacy string never made. The two flags are therefore not
  *  independent, and the dependency is enforced here rather than left to whoever arms them. */
 export const mandatoryNegationGuardOn = (): boolean =>
-  process.env.AUDIT_MANDATORY_NEGATION_GUARD === "true" || process.env.AUDIT_SITEVISIT_LITERAL_HONEST === "true";
+  isEnvOn(process.env.AUDIT_MANDATORY_NEGATION_GUARD) || isEnvOn(process.env.AUDIT_SITEVISIT_LITERAL_HONEST);
 const NEG = mandatoryNegationGuardOn() ? MANDATORY_NEGATION_LOOKBEHIND : "";
 export const SITE_VISIT_MANDATORY_ATTENDANCE_RE = new RegExp([
   // b1 — "mandatory" ADJ before an event noun ("mandatory site visit", "mandatory job walk")

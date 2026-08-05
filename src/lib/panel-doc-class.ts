@@ -10,6 +10,7 @@
 import { detectSections } from "./section-boundary-detector";
 import type { ExtractedDocument } from "./pdf-text-extractor";
 import type { ManifestResult } from "./agentic-panel";
+import { isEnvOn } from "./env-flags";
 
 function asExtractedDoc(text: string): ExtractedDocument {
   const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
@@ -54,7 +55,7 @@ export function ucfHeaderCount(fullSource: string): number {
 // classifies commercial and takes the commercial path, which HAS a biddable-content gate, content routing and a
 // whole-source fallback. The UCF path's failure mode is blindness (the #SEQ5-ROOTS root). Misrouting toward the
 // path with three fallbacks is strictly better than misrouting toward the path with none.
-const UCF_CLASS_STRICT = () => process.env.AUDIT_UCF_CLASS_STRICT === "true";
+const UCF_CLASS_STRICT = () => isEnvOn(process.env.AUDIT_UCF_CLASS_STRICT);
 
 // A TOC entry: the header line trails into dot leaders (optionally followed by a page number).
 const TOC_DOT_LEADER = /\.{3,}[\s.]*\d*\s*$/;
@@ -198,7 +199,7 @@ export function routeCommercialSections(
   // a sub-threshold head — an earlier revision initialized it to `headChars < 20`, and the routing log then printed
   // "RECOVERED→A,L" for an 18-char head on a flag-OFF run, asserting an injection that never happened. A status
   // field that reports an action must be set by the action, never by the condition that skipped it.
-  const headCovered = headChars >= 20 && process.env.AUDIT_ROUTING_HEAD_COVERAGE === "true";
+  const headCovered = headChars >= 20 && isEnvOn(process.env.AUDIT_ROUTING_HEAD_COVERAGE);
   if (headCovered) {
     sectionText["A"] = sectionText["A"] ? `${head}\n\n${sectionText["A"]}` : head;
     sectionText["L"] = sectionText["L"] ? `${head}\n\n${sectionText["L"]}` : head;

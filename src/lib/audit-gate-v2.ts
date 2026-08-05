@@ -21,7 +21,7 @@
 import type { SectionAttestation } from "./audit-orchestrator";
 import { isEnvOn } from "./env-flags";
 
-export const GATE_V2_ENABLED = process.env.AUDIT_GATE_V2 === "true";
+export const GATE_V2_ENABLED = isEnvOn(process.env.AUDIT_GATE_V2);
 
 // Markers that completenessOf embeds in an attestation's `ungrounded[]` to mean "this section could not be fully
 // READ" (as opposed to "read but an obligation wasn't quoted verbatim"). These are the GENUINE incompletes.
@@ -69,7 +69,7 @@ const BOILERPLATE_RE = new RegExp([
 // flip additionally requires the sentence to carry NO eligibility-bar signal (BAR_SIGNAL_RE) — any bar-ish
 // wording keeps it on the safe ambiguous→NHR pole (over-tag = recoverable NHR; under-tag = lost contract).
 // Flag-OFF ⇒ not consulted ⇒ byte-identical.
-const PROTEST_ALLOWLIST_ENABLED = process.env.AUDIT_PROTEST_CLAUSE_ALLOWLIST === "true";
+const PROTEST_ALLOWLIST_ENABLED = isEnvOn(process.env.AUDIT_PROTEST_CLAUSE_ALLOWLIST);
 const PROTEST_DISPUTES_RE = new RegExp([
   "\\b52\\.233-[1-4]\\b",                                  // Disputes / Service of Protest / Protest after Award / Applicable Law
   "service\\s+of\\s+protest", "served\\s+on\\s+the\\s+contracting\\s+officer",
@@ -145,7 +145,7 @@ const BAR_SIGNAL_RE = new RegExp([
 // offeror-rights phrases (a "debrief" is never a bar; the 15.50x sections are debriefing/notification procedure); (2)
 // the flip additionally requires NO eligibility-bar signal (BAR_SIGNAL_RE) — a compound sentence that pairs a real
 // bar with a debriefing mention stays on the safe ambiguous→NHR pole. Flag-OFF ⇒ not consulted ⇒ byte-identical.
-const DEBRIEF_ALLOWLIST_ENABLED = process.env.AUDIT_DEBRIEF_ALLOWLIST === "true";
+const DEBRIEF_ALLOWLIST_ENABLED = isEnvOn(process.env.AUDIT_DEBRIEF_ALLOWLIST);
 const DEBRIEF_NOTIFY_RE = new RegExp([
   "\\bdebrief(?:ing|ed|ings)?\\b",                                   // a debriefing is always a post-decision offeror RIGHT
   "\\b15\\.50[356]\\b",                                              // FAR 15.503 notifications · 15.505 preaward · 15.506 postaward debriefing
@@ -173,7 +173,7 @@ const DEBRIEF_NOTIFY_RE = new RegExp([
 // election frame is the CATEGORICAL closer: only a genuine domestic exemption election launders; every duty/identifier
 // sentence routes to the SAFE ambiguous→NHR pole (over-tag = recoverable; under-tag = lost contract). The BAR_SIGNAL_RE
 // duty vocabulary (foreign person / remit / withhold / two-percent) is kept as defense-in-depth for the whole family.
-const NOOP_REP_ALLOWLIST_ENABLED = process.env.AUDIT_NOOP_REP_ALLOWLIST === "true";
+const NOOP_REP_ALLOWLIST_ENABLED = isEnvOn(process.env.AUDIT_NOOP_REP_ALLOWLIST);
 const FOREIGN_TAX_REP_RE = new RegExp([
   "(?:full|partial|no)\\s+exemption[^.]{0,40}excise\\s+tax",     // the FA8137 election sentence
   "excise\\s+tax[^.]{0,40}exemption",
@@ -195,7 +195,7 @@ const FOREIGN_TAX_REP_RE = new RegExp([
 // once in importanceOf) keeps any COMPOUND sentence that pairs a real eligibility bar with precedence wording
 // (e.g. "…the 8(a) set-aside eligibility requirements shall take precedence…") on the safe ambiguous→NHR pole.
 // Flag-OFF ⇒ not consulted ⇒ byte-identical.
-const PRECEDENCE_ALLOWLIST_ENABLED = process.env.AUDIT_PRECEDENCE_ALLOWLIST === "true";
+const PRECEDENCE_ALLOWLIST_ENABLED = isEnvOn(process.env.AUDIT_PRECEDENCE_ALLOWLIST);
 const DOC_PRECEDENCE_RE = new RegExp([
   "\\border\\s+of\\s+precedence\\b",                                                     // 52.215-8 / 52.214-29 title + concept
   "\\b52\\.215-8\\b", "\\b52\\.214-29\\b",                                               // the FAR order-of-precedence clauses
@@ -213,7 +213,7 @@ const DOC_PRECEDENCE_RE = new RegExp([
 // members. CLARIFICATION_RIGHTS_RE keeps ONLY the "believes … error/omission/unsound" and "errors/omissions … brought
 // to / submitted to the CO" clarification frames; the SHARED !BAR_SIGNAL_RE guard keeps any compound real bar
 // (must-hold-clearance-and-report-errors) on the safe ambiguous→NHR pole. Flag-OFF ⇒ not consulted ⇒ byte-identical.
-const CLARIFICATION_ALLOWLIST_ENABLED = process.env.AUDIT_CLARIFICATION_ALLOWLIST === "true";
+const CLARIFICATION_ALLOWLIST_ENABLED = isEnvOn(process.env.AUDIT_CLARIFICATION_ALLOWLIST);
 const CLARIFICATION_RIGHTS_RE = new RegExp([
   "\\bbelieves?\\b[^.]{0,90}\\b(?:error|omission|ambiguit|unsound|discrepanc|conflict|defect)\\b",                 // "if an offeror believes … error/omission/unsound"
   "\\b(?:error|omission|ambiguit|discrepanc|defect)s?\\b[^.]{0,80}\\b(?:brought|reported|submitted|identified|raised|call(?:ed)?)\\b[^.]{0,40}\\b(?:contracting\\s+officer|attention|\\bCO\\b|\\bKO\\b)", // "errors … brought to the CO's attention"
@@ -251,7 +251,7 @@ const NOOP_REP_FAMILY: Array<{ name: string; re: RegExp; enabled: boolean }> = [
 // methodology vocab) — the treadmill is closed. Cost is only conservative: an unusually-worded benign methodology
 // sentence may fail the vocab check and stay NHR (over-tag = recoverable human review; under-tag = lost contract).
 // Read at CALL time; flag-OFF ⇒ never consulted ⇒ importanceOf byte-identical.
-const lptaConsequenceReleaseEnabled = () => process.env.AUDIT_LPTA_CONSEQUENCE_AMBIGUOUS === "true";
+const lptaConsequenceReleaseEnabled = () => isEnvOn(process.env.AUDIT_LPTA_CONSEQUENCE_AMBIGUOUS);
 // The LPTA-consequence methodology FRAME (subject = quote/offer/proposal that FAILS TO MEET the TECHNICAL
 // criteria/requirements). Necessary gate — but NOT sufficient on its own (that was v1's mistake); the vocab check below
 // is what makes it safe.
@@ -292,9 +292,9 @@ export function isLptaConsequenceNonBar(ob: string): boolean {
  *  family (protest + debriefing + foreign-procurement-tax + document order-of-precedence) must never silently narrow. */
 // Brain step-4 ruling item 2 (card #682 named defect) — see the guard inside `importanceOf`. Default-OFF: this is a
 // verdict-path change, so the arm is a CEO click, never Code's. Read at CALL time so it toggles per-invocation.
-const boilerplateBarSignalGuardEnabled = () => process.env.AUDIT_BOILERPLATE_BAR_SIGNAL_GUARD === "true";
+const boilerplateBarSignalGuardEnabled = () => isEnvOn(process.env.AUDIT_BOILERPLATE_BAR_SIGNAL_GUARD);
 // B4 (Brain ruling, cards #690/#691) — see the banner block in `gateV2Outcome`. Verdict-inert, reason-only.
-const bannerNoUnrankedBarClaimEnabled = () => process.env.AUDIT_BANNER_NO_UNRANKED_BAR_CLAIM === "true";
+const bannerNoUnrankedBarClaimEnabled = () => isEnvOn(process.env.AUDIT_BANNER_NO_UNRANKED_BAR_CLAIM);
 
 export function importanceOf(ob: string): "disqualifier" | "boilerplate" | "ambiguous" {
   if (DISQUALIFIER_RE.test(ob)) {
@@ -337,7 +337,7 @@ export function importanceOf(ob: string): "disqualifier" | "boilerplate" | "ambi
 // paper-stock sense before the guard runs (strictly narrowing — it can only REMOVE a false surety hit, never add one;
 // a real "bid bond"/"performance bond"/"payment bond" is untouched). Flag-OFF ⇒ byte-identical. Sibling of the Unit-5
 // digit-collision + Unit-4 preprint-marker cases (feedback_token_substring_collision_doctrine).
-const bondPaperNonBarEnabled = () => process.env.AUDIT_BOND_PAPER_NONBAR === "true";
+const bondPaperNonBarEnabled = () => isEnvOn(process.env.AUDIT_BOND_PAPER_NONBAR);
 
 // ── REGISTER TOKENS (Brain step-4 envelope item 2, flag `AUDIT_BAR_SIGNAL_REGISTER_TOKENS`, default-OFF) ─────
 // Fire-side additions for the card-#680 registers, so the step-2 boilerplate guard has something to bite on:
@@ -362,7 +362,7 @@ const bondPaperNonBarEnabled = () => process.env.AUDIT_BOND_PAPER_NONBAR === "tr
 // NOOP-REP release does not see these tokens. Left deliberately unchanged — widening it is a behaviour change to
 // a ratified branch and is out of this item's scope.
 // DIRECTION OF RISK: this ADDS escalation ⇒ over-fire / crying-wolf is the danger, measured on the corpus.
-const registerTokensEnabled = () => process.env.AUDIT_BAR_SIGNAL_REGISTER_TOKENS === "true";
+const registerTokensEnabled = () => isEnvOn(process.env.AUDIT_BAR_SIGNAL_REGISTER_TOKENS);
 const REGISTER_TOKENS_RE = new RegExp([
   // 4b ruling — clearance-fragment discriminator
   "\\bFCL\\b",
@@ -397,7 +397,7 @@ const REGISTER_TOKENS_RE = new RegExp([
 // call; a false demote is a missed disqualifier, the FALSE-BID pole. Fail-toward-disqualifier decides it on
 // structure. FREQUENCY STAYS OPEN: the fixture is 6 solicitations, so no over-fire RATE can honestly be measured
 // here, and Brain ruled that waiting for one means waiting on customers we do not yet have. Flag-OFF ⇒ byte-identical.
-const privateIssuerCredentialEnabled = () => process.env.AUDIT_PRIVATE_ISSUER_CREDENTIAL_BAR === "true";
+const privateIssuerCredentialEnabled = () => isEnvOn(process.env.AUDIT_PRIVATE_ISSUER_CREDENTIAL_BAR);
 // The credential a private issuer grants. ≤2 filler words carry "authorized OEM distributor" / "certified warranty
 // service center" without opening the phrase to a whole clause.
 const PRIVATE_CREDENTIAL_ROLE = "(?:authorized|factory[-\\s]?authorized|franchised|certified|approved)\\s+(?:[A-Za-z][A-Za-z-]*\\s+){0,2}(?:distributor|dealer|reseller|service\\s+cent(?:er|re)|repair\\s+(?:station|facility)|integrator|installer|partner)";
@@ -431,7 +431,7 @@ export function hasBarSignal(ob: string): boolean {
 // ambiguous ALWAYS escalates ⇒ byte-identical. Dissolves the §L/§M benign proposal-prep residuals (formatting, POC,
 // page limits) that structurally over-escalated on a large negotiated §L, while every real bar keeps escalating.
 // Read at CALL time (not module load) so the demotion toggles per-invocation, like the notice-body emitter flags.
-const ambiguousSignalDemotionEnabled = () => process.env.AUDIT_AMBIGUOUS_SIGNAL_DEMOTION === "true";
+const ambiguousSignalDemotionEnabled = () => isEnvOn(process.env.AUDIT_AMBIGUOUS_SIGNAL_DEMOTION);
 
 // DEMOTION TAIL VETO (flag AUDIT_DEMOTION_TAIL_VETO, default-OFF). The card-#572/#576 severed-tail belt guards the
 // benign-recital and performance-upkeep exits but NOT the ambiguous-signal demotion below it, which reads
@@ -444,7 +444,7 @@ const ambiguousSignalDemotionEnabled = () => process.env.AUDIT_AMBIGUOUS_SIGNAL_
 // unlocatable recital keeps demoting, unlike the two exits above (which have a benign CLAIM to fail closed on;
 // this exit has none, and failing closed on unlocatable would escalate the whole non-locatable population — a
 // recall change far wider than the defect). Flag-OFF ⇒ branch skipped ⇒ byte-identical.
-const demotionTailVetoEnabled = () => process.env.AUDIT_DEMOTION_TAIL_VETO === "true";
+const demotionTailVetoEnabled = () => isEnvOn(process.env.AUDIT_DEMOTION_TAIL_VETO);
 
 // GOVERNMENT-EVALUATION-FRAME refinement (card #460 ruling #2). A §M sentence whose SUBJECT is the government's
 // evaluation methodology for cost/pricing DATA — "information/data other than certified cost or pricing data MAY BE
@@ -478,7 +478,7 @@ export function isGovtEvalMethodologyNonBar(ob: string): boolean {
 // required to submit certified cost or pricing data") demotes; an UNCONDITIONAL duty with no 15.403-1 citation ("the
 // offeror shall be required to submit certified cost or pricing data prior to award") carries no 403-1 token → STAYS
 // ESCALATED (card #460 ruling #3 is NOT reversed). Read at call time; flag-OFF ⇒ never consulted ⇒ byte-identical.
-const conditionalTinaDemotionEnabled = () => process.env.AUDIT_CONDITIONAL_TINA_DEMOTION === "true";
+const conditionalTinaDemotionEnabled = () => isEnvOn(process.env.AUDIT_CONDITIONAL_TINA_DEMOTION);
 // FAR 15.403-1 (prohibition on obtaining certified cost or pricing data / its exceptions) — the conditional-frame marker.
 // Deliberately EXCLUDES 15.403-3 (price-analysis realism) and 15.403-4 (the REQUIRING clause) so a genuine "required per
 // 15.403-4" duty never demotes. Matches "403-1" and "15.403-1"; the trailing (?!\d) stops "403-10"/"403-1x" false hits.
@@ -520,7 +520,7 @@ export function isConditionalTinaBoilerplate(ob: string): boolean {
 // requirement that still escalates until grounded (ruling #1's grounding fast-follow). The caller vetoes
 // importanceOf==="disqualifier" FIRST, and hasBarSignal keeps every real bar escalating, so nothing real is laundered.
 // Flag-OFF ⇒ the #472 belt is byte-identical.
-const ledgerBroadAmbiguousEnabled = () => process.env.AUDIT_LEDGER_BROAD_AMBIGUOUS === "true";
+const ledgerBroadAmbiguousEnabled = () => isEnvOn(process.env.AUDIT_LEDGER_BROAD_AMBIGUOUS);
 // UNIT 2.2 (cards #548/#549) — grounding-matcher variant tolerance + true-location attribution. Single flag for
 // the unit; consumed by groundedBy (orchestrator), the gradeCoverageV2 locator wiring, and readable by tests.
 export const groundingVariantToleranceEnabled = () => isEnvOn(process.env.AUDIT_GROUNDING_VARIANT_TOLERANCE); // R5-F5 — same tolerant parser as unit 2.1 (no per-flag drift within one card)
@@ -572,7 +572,7 @@ export function isLedgerDemotableNonBar(ob: string): boolean {
 // restriction) plus a continuation-window tail veto (the obligationsOf `\n`/URL-dot split severs sentences — the
 // severed tail is re-scanned for a bar) refuse anything ambiguous between benign and bar → falls through to the
 // existing escalate path. Flag-OFF ⇒ the block short-circuits, the CoverageV2 field is omitted ⇒ byte-identical.
-const benignRecitalCoveredEnabled = () => process.env.AUDIT_BENIGN_RECITAL_COVERED === "true";
+const benignRecitalCoveredEnabled = () => isEnvOn(process.env.AUDIT_BENIGN_RECITAL_COVERED);
 
 // SHARED REFUSAL GUARDS — a hit on ANY of these over the obligation (or its severed tail) REFUSES the benign claim.
 // These can only SHRINK the benign set (never define it) — the positive arm frame is what defines membership (#507).
@@ -679,7 +679,7 @@ const benignNorm = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]+/g,
 // needed at time of award" that immediately follows the LBJ recital starts capitalized → STOP (never bridged, so its
 // "at time of award" can never be laundered into the caveat frame). Flag-OFF ⇒ the old single-line behavior ⇒ byte-
 // identical. Over-fire (bridging into a separate lowercase-led obligation) is the Gauntlet red-team focus.
-const recitalLineWrapBridgeEnabled = () => process.env.AUDIT_RECITAL_LINEWRAP_BRIDGE === "true";
+const recitalLineWrapBridgeEnabled = () => isEnvOn(process.env.AUDIT_RECITAL_LINEWRAP_BRIDGE);
 function recitalContinuation(after: string): string {
   if (!recitalLineWrapBridgeEnabled()) {                                    // flag-OFF — legacy: stop at the first newline
     const nl = after.indexOf("\n");
@@ -714,8 +714,8 @@ function recitalContinuation(after: string): string {
 //                               "shall acknowledge all amendments." travels apart from "failure ... will not be
 //                               considered." — measured 82/478 released items across the banked cohort); and the
 //                               conditional-TINA demotion refuses a co-sentenced NMR/kill-class bar.
-const releaseLedgerEnabled = () => process.env.AUDIT_RELEASE_LEDGER === "true";
-const consequenceCaptureEnabled = () => process.env.AUDIT_CONSEQUENCE_CAPTURE === "true";
+const releaseLedgerEnabled = () => isEnvOn(process.env.AUDIT_RELEASE_LEDGER);
+const consequenceCaptureEnabled = () => isEnvOn(process.env.AUDIT_CONSEQUENCE_CAPTURE);
 // Rejection-consequence SHAPE (allowlist, #507 doctrine). NARROWED per the U-B verification round (executed
 // over-fires): `reject` not after "right to" (52.212-1(g) reserves-the-right boilerplate + performance-QA
 // personnel rejection are standing government rights, not duty-specific kill consequences); `unacceptable`
@@ -834,7 +834,7 @@ export function verifyRecitalInSource(fullSource: string, ob: string): { present
 // identical — only the reason prose differs). FABRICATION-INVARIANT COMPLIANT (mirror of the #574 defect class): the
 // credential phrase is extracted VERBATIM from the obligation's own text (grounded, never invented); the phrasing is
 // CONDITIONAL and makes ZERO claim about whether the bidder holds or lacks it. Flag-OFF ⇒ legacy reason byte-identical.
-const credentialConditionalReasonEnabled = () => process.env.AUDIT_CREDENTIAL_CONDITIONAL_REASON === "true";
+const credentialConditionalReasonEnabled = () => isEnvOn(process.env.AUDIT_CREDENTIAL_CONDITIONAL_REASON);
 // A credential noun the "maintain … during performance" duty can govern (the firm-inherent-credential family, #557).
 // Deliberately EXCLUDES "qualif*" (Gauntlet F3 — "maintain qualified personnel during performance" is a staffing duty,
 // not a firm-inherent credential; the "confirm you hold it" framing would mislead).
@@ -888,7 +888,7 @@ export function credentialConditionalRecital(ob: string): { credential: string }
 //   Axis 2 ORDINARINESS — an affirmative ordinary-course allowlist (#507: business licensing, insurance, SAM-registration
 //     maintenance, generic quality/safety certs) → demote-eligible. A long-lead/scarce credential (facility clearance,
 //     CMMC, FAA/airworthiness, QPL/QML, and the #574 grounded-mechanic taxonomy) → ESCALATE REGARDLESS of temporal frame.
-const performanceUpkeepCaveatEnabled = () => process.env.AUDIT_PERFORMANCE_UPKEEP_CAVEAT === "true";
+const performanceUpkeepCaveatEnabled = () => isEnvOn(process.env.AUDIT_PERFORMANCE_UPKEEP_CAVEAT);
 // Axis 1 — during/throughout-performance UPKEEP frame (post-award), and the maintain/keep verb.
 const PERF_UPKEEP_TEMPORAL_RE = /\b(?:during|throughout)\s+(?:the\s+)?(?:entire\s+)?(?:contract\s+|order\s+|period\s+of\s+)?performance(?:\s+period)?\b|\bperiod\s+of\s+performance\b|\bthroughout\s+the\s+(?:life\s+of|term\s+of|duration\s+of)\b|\bfor\s+the\s+(?:entire\s+)?(?:duration|term|life)\s+of\s+the\s+(?:contract|order|performance)\b/i;
 const UPKEEP_VERB_RE = /\b(?:maintain|keep|retain|have\s+and\s+(?:shall\s+)?maintain|hold\s+and\s+(?:shall\s+)?maintain|continue\s+to\s+(?:hold|maintain|keep))\b/i;
@@ -1119,7 +1119,7 @@ export type GateV2Outcome = { cap: "INCOMPLETE" | "NEEDS_HUMAN_REVIEW" | null; r
 // itemized flip-adjudication over the banked run-records; Brain step-4 ruling PART 1, 2026-07-22). Flag-OFF is
 // byte-identical: the branch below is entered exactly as before and the fall-through reason string is unchanged
 // (the ledger note appends ONLY when the flag is on AND the bucket is non-empty).
-const retireVerbatimVetoEnabled = () => process.env.AUDIT_RETIRE_VERBATIM_VETO === "true";
+const retireVerbatimVetoEnabled = () => isEnvOn(process.env.AUDIT_RETIRE_VERBATIM_VETO);
 
 // ── STEP-4 OPTION (C) · VETO NARROWING (Brain ruling 2026-07-23, card #693) ─────────────────────────────────
 // Flag `AUDIT_VETO_NARROW_UNIVERSAL`, default-OFF.
@@ -1175,7 +1175,7 @@ const retireVerbatimVetoEnabled = () => process.env.AUDIT_RETIRE_VERBATIM_VETO =
 // FAILURE DIRECTION: incompleteness of the exclusion fails toward FIRE — an unrecognised boilerplate phrase
 // merely keeps today's over-fire, which is the safe direction for a veto. The dangerous direction (releasing a
 // genuine bar) is what the single-clause invariant closes.
-const vetoNarrowUniversalEnabled = () => process.env.AUDIT_VETO_NARROW_UNIVERSAL === "true";
+const vetoNarrowUniversalEnabled = () => isEnvOn(process.env.AUDIT_VETO_NARROW_UNIVERSAL);
 
 /** A SECOND operative duty riding the same sentence: a coordinating conjunction followed by a modal/copula duty,
  *  or any semicolon/colon-introduced clause. POSITIVE detection of compoundness — never a bar-vocabulary list. */
@@ -1225,7 +1225,7 @@ export function isNarrowedUniversalNonBar(ob: string): boolean {
 }
 
 // ── B3 · BANNER BAR RANKING (Brain ruling 2026-07-23) ───────────────────────────────────────────────────────
-const bannerBarRankingEnabled = () => process.env.AUDIT_BANNER_BAR_RANKING === "true";
+const bannerBarRankingEnabled = () => isEnvOn(process.env.AUDIT_BANNER_BAR_RANKING);
 
 /** Normalize for the tier-1 correspondence test: lowercase, collapse whitespace, drop punctuation. Deliberately
  *  NOT the grounding matcher — this decides DISPLAY ORDER only and can never change a cap, so a miss costs a
@@ -1359,14 +1359,14 @@ export function gateV2Outcome(cov: CoverageV2, opts?: { findings?: Array<{ kind?
       // Prose selection: pre-U-A behavior quotes the head iff the HEAD is cc (byte-identical with cap-not-mute
       // OFF); with cap-not-mute ON the prose may quote the cc item found anywhere in the bucket — under the cap
       // regime the cc item IS the reason the mute holds, so it is the sentence the customer must see.
-      const ccQuote = process.env.AUDIT_COVERAGE_CAP_NOT_MUTE === "true" ? ccAny : ccHead;
+      const ccQuote = isEnvOn(process.env.AUDIT_COVERAGE_CAP_NOT_MUTE) ? ccAny : ccHead;
       if (ccQuote) {
         const cc = credentialConditionalRecital(ccQuote.obligation)!;
         const ccWhere = ccQuote.locatedAt ? `at ${ccQuote.locatedAt}` : `in §${ccQuote.section}`;
         const ccCtx = ccQuote.contextNote ? ` ${clampNote(ccQuote.contextNote)}` : "";
         // F-R2-4: under the cap regime the cc item may not be the B3-ranked head — disclose the count so the
         // ranked most-significant item is never silently absent from the customer reason. Cap OFF ⇒ "" (byte-identical).
-        const ccMore = process.env.AUDIT_COVERAGE_CAP_NOT_MUTE === "true" && cov.disqualifierUncovered.length > 1
+        const ccMore = isEnvOn(process.env.AUDIT_COVERAGE_CAP_NOT_MUTE) && cov.disqualifierUncovered.length > 1
           ? ` ${cov.disqualifierUncovered.length} obligations in this package could not be grounded; this one is quoted because it turns on a firm credential.` : "";
         return { cap: "NEEDS_HUMAN_REVIEW", kind: "credential_conditional", reason: `A credential-conditional requirement ${ccWhere} could not be grounded to a finding — it requires ${cc.credential}. Confirm your firm holds this before bidding — human verification needed: "${ccQuote.obligation.slice(0, 120)}".${ccMore}${ccCtx}` };
       }
