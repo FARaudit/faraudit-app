@@ -141,10 +141,40 @@ console.log("\nR2  TYPE FLOOR — 11px, the smallest size the menu is allowed to
 }
 
 // ── R3 · ROW BOX ─────────────────────────────────────────────────────────────
+// Design's card first ruled `padding:10px` -> "36px, the rail's own row box".
+// Measured, padding:10px renders 38.5px (20px padding + an 18.5px line box at
+// line-height:normal), and the rail's OPEN row is 35px — 36x36 is the CLOSED
+// strip tile, cited for the wrong element. Design withdrew the 36 and restated
+// the invariant: THE PADDING GOVERNS, and the row must be no smaller than the
+// rail's open row. So this asserts the padding, not a pixel height — forcing a
+// line-height to hit 36 would have been inventing a mechanism to protect a
+// number, which Card 808 fix 1 already ruled against.
 console.log("\nR3  ROW BOX — the destructive action may not sit on the smallest target");
 {
   const pad = norm(decl(".sb-am-item", "padding"));
-  ok(pad === "10px", ".sb-am-item padding is the rail's own row box", pad || "(unset)");
+  ok(pad === "10px", ".sb-am-item padding is the ruled row box", pad || "(unset)");
+}
+
+// ── R7 · THE TILE HAS AN EDGE BY DECISION ────────────────────────────────────
+// The avatar tile's only border used to come from the page's own `.sb-avatar`
+// rule — rgba(255,255,255,.06), a dark-field construction that rendered
+// approximately nothing on the white rail. One token across two grounds is a
+// defect this project has banked twice. The rail now declares the edge per
+// field, so the tile has an edge by decision rather than by leftover.
+console.log("\nR7  TILE EDGE — declared per field, not inherited from a page");
+{
+  const border = norm(decl(".sb-avatar", "border"));
+  ok(/^1px solid var\(--sb-tile-line\)$/.test(border),
+    "the tile's edge is declared in the rail sheet, 1px, through a token", border || "(unset)");
+  ok(norm(decl(".sb-avatar", "box-sizing")) === "border-box",
+    "  …and box-sizing keeps the tile 26px with the edge on it");
+  const lightEdge = norm(token("--sb-tile-line", "light"));
+  const darkEdge = norm(token("--sb-tile-line", "dark"));
+  ok(lightEdge !== "" && darkEdge !== "" && lightEdge !== darkEdge,
+    "each field declares its own tile edge", `light ${lightEdge} · dark ${darkEdge}`);
+  // The specific defect: a white-alpha edge is invisible on a white ground.
+  ok(!/rgba\(255,\s*255,\s*255/.test(lightEdge),
+    "the light field's edge is not a white-alpha construction", lightEdge);
 }
 
 // ── R4 · TRUNCATION IS VISIBLE ───────────────────────────────────────────────
@@ -204,9 +234,19 @@ console.log("\nR6  PLANTED — each leg above must go RED on the pre-fix value")
     "PLANTED: the competing 32px rule is recognised by R5's matcher");
   ok(COMPETING_FORK.test('[data-sb="open"] .sb-avatar{align-self:flex-start}'),
     "PLANTED: the one-page positional fork is recognised by R5's matcher");
+  // R7 — the pre-fix tile edge came from the page, in one white-alpha value used
+  // on both grounds. Both halves of that must be caught.
+  ok(!/^1px solid var\(--sb-tile-line\)$/.test(""),
+    "PLANTED: a tile with no declared edge fails R7");
+  ok(/rgba\(255,\s*255,\s*255/.test("rgba(255,255,255,.06)"),
+    "PLANTED: a white-alpha edge on the light field is recognised");
+  ok(!("rgba(255,255,255,.06)" !== "rgba(255,255,255,.06)"),
+    "PLANTED: one edge value shared across both grounds fails R7");
   // And the SHIPPED values must pass, so the legs above are not trivially true.
   ok(px(decl(".sb-am-label", "font-size")) >= 11, "PLANTED(-): the shipped label size passes");
   ok(norm(decl(".sb-am-item", "padding")) === "10px", "PLANTED(-): the shipped padding passes");
+  ok(/^1px solid var\(--sb-tile-line\)$/.test(norm(decl(".sb-avatar", "border"))),
+    "PLANTED(-): the shipped tile edge passes");
 }
 
 console.log(`\n${fail === 0 ? "✅" : "❌"} ${pass} passed, ${fail} failed`);
