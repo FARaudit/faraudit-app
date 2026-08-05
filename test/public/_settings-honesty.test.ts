@@ -25,8 +25,45 @@ const html = read("public/profile-settings.html");
 const app = read("public/ps-app.js");
 const live = read("public/profile-settings-live.js");
 const route = read("src/app/api/profile/route.ts");
+const capRoute = read("src/app/api/capability-statement/route.ts");
 
-console.log("── the page claims no save it cannot perform ──");
+// ── THE PAGE MAY ONLY READ FIELDS THE ROUTE RETURNS ────────────────────────────────────
+// Found 2026-08-05, live, on a real record: Settings rendered "CAGE code — Not on file"
+// while capability_statements held 8TZ42. The client read `rec.cage` and `rec.address`;
+// the route returns `cage_code` and `contact_address` and never returned the other two.
+// A misspelt key is indistinguishable from an empty record — undefined || '' is '' — so
+// the page stated a FACT ABOUT THE CUSTOMER'S RECORD that was false, and nothing failed.
+//
+// The route's first-visit stub literal enumerates its own response shape, so it is the
+// contract to check the client's reads against.
+console.log("── every field the page reads is a field the route returns ──");
+{
+  const stub = capRoute.slice(capRoute.indexOf("statement: {"), capRoute.indexOf("stub: true"));
+  const shape = new Set([...stub.matchAll(/^\s*(\w+):/gm)].map((m) => m[1]));
+  check("the stub literal was located", shape.size > 8, `only found ${shape.size} fields`);
+
+  // Comments stripped first: a comment naming the wrong key is documentation, not a read,
+  // and scanning it made this check fire on its own explanation of the bug.
+  const capBlock = live
+    .slice(live.indexOf("capability-statement"), live.indexOf("AGENCIES"))
+    .split("\n").map((l) => l.replace(/\/\/.*$/, "")).join("\n");
+  const reads = [...new Set([...capBlock.matchAll(/\brec\.(\w+)/g)].map((m) => m[1]))];
+  check("the page reads at least one company field", reads.length > 0, "no rec.* reads found — did the block move?");
+  for (const key of reads) {
+    check(`page reads rec.${key} — route returns it`, shape.has(key), `route returns [${[...shape].join(", ")}]`);
+  }
+
+  // A read that lands on the envelope instead of the record reports every field absent.
+  check("no fallback that accepts the envelope as the record", !/\|\|\s*cap\s*\)/.test(live), "`cap.statement || cap` makes an outage look like an empty record");
+  check("a missing statement is reported, not rendered as empty", /company-unreadable/.test(live) && /no statement in response/.test(live), "an unreadable record silently reads as 'Not on file'");
+
+  // Planted positives — the parity check must be able to go red.
+  check("K-P1 · rejects a key the route does not return", !shape.has("cage"), "the route would have to return `cage` for this to be a false alarm");
+  check("K-P2 · accepts a key the route does return", shape.has("cage_code"));
+  check("K-P3 · the envelope check rejects the old fallback", /\|\|\s*cap\s*\)/.test("const rec = (cap && (cap.statement || cap)) || {};"));
+}
+
+console.log("\n── the page claims no save it cannot perform ──");
 check("no 'changes save automatically' claim", !/changes save automatically/i.test(html), "the header still promises auto-save");
 check("no hardcoded 'Last sync <date>'", !/Last sync \w+ \d{1,2}, \d{4}/.test(app), "a literal sync date is back");
 check("no unconditional '✓ Saved' badge in the company panel", !/<span class="saved">✓ Saved<\/span>/.test(app.split("naics:")[0]), "the account panel asserts saved with nothing behind it");

@@ -120,6 +120,20 @@ button{font-family:inherit}
 .sec-title{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-deep);display:flex;align-items:center;gap:9px}
 [data-theme="dark"] .sec-title{color:var(--accent-light)}
 .sec-title::before{content:"";width:14px;height:2px;border-radius:2px;background:var(--accent)}
+.cs-prose{margin:0 0 10px;font-size:13.5px;line-height:1.62;color:var(--ink)}
+.cs-prose:last-child{margin-bottom:0}
+.cs-empty{margin:0;font-size:13px;line-height:1.55;color:var(--mute)}
+.cs-unset{color:var(--mute);font-style:italic;font-weight:500}
+.cs-unwired{margin:10px 0 0;font-size:12px;line-height:1.5;color:var(--mute)}
+.cs-note{margin-left:10px;font-size:12px;font-weight:700;color:var(--good,#067647)}
+.cs-note.is-error{color:var(--alarm,#b42318)}
+.cs-note[hidden]{display:none}
+.lh-name-edit{all:unset;cursor:pointer;border-bottom:1px dashed var(--dc,#e5e7eb)}
+.lh-name-edit:hover,.lh-name-edit:focus-visible{border-bottom-color:var(--accent)}
+.contact-item{cursor:pointer}
+.contact-item:hover .cv{text-decoration:underline dotted}
+body.cs-unreadable .doc-card::before{content:"Your company record could not be read. This is a connection problem, not an empty record — reload, and if it persists the page is not showing what is on file.";display:block;padding:12px 16px;font-size:12.5px;font-weight:600;line-height:1.5;color:var(--alarm,#b42318);background:var(--alarm-wash,#fef3f2);border-bottom:1px solid var(--alarm-line,#fecdca)}
+body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
 .edit-btn{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;color:var(--mute);cursor:pointer;transition:border-color .14s, color .14s, background .14s}
 .edit-btn:hover{border-color:var(--accent-light);color:var(--accent);background:rgba(55,138,221,0.04)}
 .edit-btn svg{width:13px;height:13px}
@@ -300,7 +314,7 @@ button{font-family:inherit}
   <!-- ═════════════ MAIN ═════════════ -->
   <main class="main">
     <div class="topbar">
-      <div class="crumbs"><b>Capability Statement</b><span class="sep">/</span><span>v1.0 · generated today</span></div>
+      <div class="crumbs"><b>Capability Statement</b><span class="sep">/</span><span>Your company record</span></div>
       <span class="live-pill">LIVE</span>
       <div class="search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
@@ -330,20 +344,21 @@ button{font-family:inherit}
         <div class="heading">
           <p class="eyebrow">Workspace · Capability Statement</p>
           <h1>Your Capability Statement</h1>
-          <p class="sub">Auto-generated from your audit history and past performance — <b>refreshes after every new audit</b>, tailored to the agencies you pursue most.</p>
+          <p class="sub">The document you send to contracting officers — and the record the audit engine reads when it judges whether you are eligible to bid. <b>Past performance fills in from audits you record as won</b>; everything else is yours to write.</p>
         </div>
-        <button class="cta-primary" type="button">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 2L9 9 2 12l7 3 3 7 3-7 7-3-7-3-3-7z"/></svg>
-          Regenerate
+        <button class="cta-primary" id="csCopy" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+          Copy statement
         </button>
+        <span class="cs-note" id="csNote" hidden></span>
       </header>
 
       <!-- stat strip -->
       <section class="stat-strip">
-        <div class="stat-card"><p class="lbl">Contracts Audited</p><p class="val">15</p><p class="sub">feeding the narrative</p></div>
-        <div class="stat-card"><p class="lbl">NAICS Codes</p><p class="val mono">336413<br>332710 · 332721</p><p class="sub">primary + 2 secondary</p></div>
-        <div class="stat-card"><p class="lbl">Completeness</p><p class="val">82<span style="font-size:16px;color:var(--mute)">%</span></p><p class="sub">3 items remaining</p></div>
-        <div class="stat-card"><p class="lbl">Last Generated</p><p class="val" style="font-size:22px">Today</p><p class="sub">11:42 AM CT · v1.0</p></div>
+        <div class="stat-card"><p class="lbl">Awards on file</p><p class="val"></p><p class="sub"></p></div>
+        <div class="stat-card"><p class="lbl">NAICS codes</p><p class="val mono"></p><p class="sub"></p></div>
+        <div class="stat-card"><p class="lbl">Completeness</p><p class="val"></p><p class="sub"></p></div>
+        <div class="stat-card"><p class="lbl">Last saved</p><p class="val"></p><p class="sub"></p></div>
       </section>
 
       <!-- two-column -->
@@ -353,19 +368,16 @@ button{font-family:inherit}
         <article class="doc-card">
           <div class="doc-toolbar">
             <span class="tl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Generated Statement</span>
-            <span class="tr">v1.0 · auto-synced</span>
+            <span class="tr"></span>
           </div>
 
           <!-- letterhead -->
           <div class="letterhead">
             <div class="lh-top">
-              <button class="lh-logo" type="button" aria-label="Upload logo">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v10"/><path d="M8 9l4-4 4 4"/><path d="M5 19h14"/></svg>
-                <span class="lt">LOGO</span>
-              </button>
+              <div class="lh-logo" aria-hidden="true"><span class="lt">LOGO</span></div>
               <div class="lh-id">
-                <div class="lh-name">Apex Precision Machining LLC<span class="mock-badge" title="Pulls from your company profile when live data is wired">Mock</span></div>
-                <div class="lh-tag">Radar Sustainment · Mission Systems Software · Precision Manufacturing</div>
+                <div class="lh-name"><button class="lh-name-edit" type="button" data-cs-field="company_name" aria-label="Edit company name"></button></div>
+                <div class="lh-tag"></div>
               </div>
             </div>
             <div class="lh-codes" id="lhCodes"></div>
@@ -377,40 +389,16 @@ button{font-family:inherit}
               <span class="sec-title">Core Competencies</span>
               <button class="edit-btn" type="button" aria-label="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
             </div>
-            <ul class="bullet-list">
-              <li><b>Radar &amp; sensor sustainment</b> — overhaul, repair, and upgrade of shipboard and ground-based radar arrays, supporting AN/SPY-class systems and GPS-III ground stations.</li>
-              <li><b>Mission systems software</b> — CI/CD pipeline engineering for embedded test harnesses, verified against F-35 mission-critical airworthiness criteria.</li>
-              <li><b>Cyber resilience &amp; CMMC</b> — Level 2 ready posture; assessment-grade documentation packages for critical-infrastructure clients under USACE Huntsville scope.</li>
-              <li><b>Precision machining &amp; turned-product manufacturing</b> — NAICS 332710 / 332721 production runs supporting DLA, Army TACOM, and Air Force tier-2 OEM contracts.</li>
-            </ul>
+            <div class="cs-body"></div>
           </div>
 
           <!-- past performance -->
           <div class="doc-section">
             <div class="sec-head">
               <span class="sec-title">Past Performance</span>
-              <button class="edit-btn" type="button" aria-label="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
             </div>
-            <div class="perf-list">
-              <div class="perf-item">
-                <span class="perf-title">SPY-6 Radar Sustainment — Phase IV CDRL Refresh</span>
-                <span class="perf-value">$18.4M</span>
-                <span class="perf-agency">U.S. Navy · NAVSEA · N00024-26-R-2207</span>
-                <p class="perf-summary">Authored Phase IV CDRL refresh covering reliability data submissions and 6-month operational sustainment milestones. Delivered ahead of schedule with zero CO-issued deficiency reports.</p>
-              </div>
-              <div class="perf-item">
-                <span class="perf-title">GPS-III Ground Station Software Modernization</span>
-                <span class="perf-value">$24.6M</span>
-                <span class="perf-agency">U.S. Space Force · SSC · FA2517-26-R-0033</span>
-                <p class="perf-summary">Migrated legacy command/control codebase to containerized microservices with cryptographic key-handling re-architecture. Zero classified-data spillage across 14 months.</p>
-              </div>
-              <div class="perf-item">
-                <span class="perf-title">F-35 Mission Systems — CI Pipeline Refactor</span>
-                <span class="perf-value">$7.9M</span>
-                <span class="perf-agency">Dept. of the Air Force · AFLCMC · FA8730-26-Q-0114</span>
-                <p class="perf-summary">Re-engineered the test harness for mission-systems builds, cutting nightly verification time 62% and unblocking 3 stalled airworthiness packages.</p>
-              </div>
-            </div>
+            <div class="perf-list"></div>
+          </div>
           </div>
 
           <!-- differentiators -->
@@ -419,29 +407,30 @@ button{font-family:inherit}
               <span class="sec-title">Differentiators</span>
               <button class="edit-btn" type="button" aria-label="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
             </div>
-            <ul class="diff-list">
-              <li>Cleared workforce — 78% TS/SCI, 22% Secret</li>
-              <li>ISO 9001:2015 + AS9100D certified production</li>
-              <li>CMMC Level 2 conformance attested 2026-04</li>
-              <li>Sub-12-month average Phase IV delivery cycle</li>
-              <li>Two HUBZone partner integrators on retainer</li>
-              <li>Direct-buy authority on 14 DLA NSNs</li>
-            </ul>
+            <div class="cs-body"></div>
           </div>
 
           <!-- contact strip -->
           <div class="contact-strip">
             <div class="contact-item">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>
-              <div class="ci"><div class="ck">Point of Contact</div><div class="cv">Jose Rodriguez · President</div></div>
+              <div class="ci"><div class="ck">Point of Contact</div><div class="cv"></div></div>
             </div>
             <div class="contact-item">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
-              <div class="ci"><div class="ck">Email</div><div class="cv">contracts@faraudit-defense.com</div></div>
+              <div class="ci"><div class="ck">Email</div><div class="cv"></div></div>
             </div>
             <div class="contact-item">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.13.96.36 1.9.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0122 16.92z"/></svg>
-              <div class="ci"><div class="ck">Phone</div><div class="cv">(703) 555-0142</div></div>
+              <div class="ci"><div class="ck">Phone</div><div class="cv"></div></div>
+            </div>
+            <div class="contact-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 010 18a15 15 0 010-18z"/></svg>
+              <div class="ci"><div class="ck">Website</div><div class="cv"></div></div>
+            </div>
+            <div class="contact-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>
+              <div class="ci"><div class="ck">Business address</div><div class="cv"></div></div>
             </div>
           </div>
         </article>
@@ -452,10 +441,9 @@ button{font-family:inherit}
           <section class="side-card">
             <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Export</h3>
             <div class="export-list">
-              <button class="export-btn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>Download as PDF<span class="ext">.PDF</span></button>
-              <button class="export-btn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 4 4-7"/></svg>Download as Word<span class="ext">.DOCX</span></button>
-              <button class="export-btn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>Copy to Clipboard<span class="ext">TEXT</span></button>
+              <button class="export-btn" id="csCopy" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>Copy to Clipboard<span class="ext">TEXT</span></button>
             </div>
+            <p class="cs-unwired">PDF and Word export are not built yet. Copy to clipboard gives you the full statement as text.</p>
           </section>
 
           <section class="side-card">
@@ -466,48 +454,17 @@ button{font-family:inherit}
                   <circle cx="37" cy="37" r="30" fill="none" stroke="var(--line-2)" stroke-width="7"/>
                   <circle cx="37" cy="37" r="30" fill="none" stroke="var(--accent)" stroke-width="7" stroke-linecap="round" stroke-dasharray="188.5" stroke-dashoffset="33.9"/>
                 </svg>
-                <div class="ring-num"><span class="pct">82%</span></div>
+                <div class="ring-num"><span class="pct"></span></div>
               </div>
-              <div class="health-cap"><b>Strong foundation.</b> Three additions would make this CO-ready for tier-2 set-aside competitions.</div>
+              <div class="health-cap"></div>
             </div>
-            <ul class="health-missing">
-              <li class="done">Company name, CAGE &amp; UEI</li>
-              <li class="done">Primary &amp; secondary NAICS</li>
-              <li class="done">Core competencies (4 of 4)</li>
-              <li class="done">Past performance (3 of 3)</li>
-              <li class="todo">Add socioeconomic certifications</li>
-              <li class="todo">Add a tier-2 differentiator</li>
-              <li class="todo">Upload company logo (300×300)</li>
-            </ul>
-            <button class="improve-btn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 2L9 9 2 12l7 3 3 7 3-7 7-3-7-3-3-7z"/></svg>Improve with AI</button>
+            <ul class="health-missing"></ul>
+            
           </section>
 
           <section class="side-card">
-            <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/></svg>Tailored Versions</h3>
-            <div class="ver-list">
-              <a class="ver-row" href="#">
-                <div class="ver-left">
-                  <span class="ver-seal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg></span>
-                  <div class="ver-text"><div class="ver-title">U.S. Army Edition</div><div class="ver-meta">USACE · TACOM · AMC focus</div></div>
-                </div>
-                <span class="ver-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 18l6-6-6-6"/></svg></span>
-              </a>
-              <a class="ver-row" href="#">
-                <div class="ver-left">
-                  <span class="ver-seal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7M12 5v14M4 19h16"/></svg></span>
-                  <div class="ver-text"><div class="ver-title">U.S. Navy Edition</div><div class="ver-meta">NAVSEA · NAVAIR · NAVFAC focus</div></div>
-                </div>
-                <span class="ver-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 18l6-6-6-6"/></svg></span>
-              </a>
-              <a class="ver-row" href="#">
-                <div class="ver-left">
-                  <span class="ver-seal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L3 7l9 5 9-5-9-5z"/><path d="M3 12l9 5 9-5"/></svg></span>
-                  <div class="ver-text"><div class="ver-title">Air &amp; Space Force Edition</div><div class="ver-meta">AFLCMC · SSC · AFSC focus</div></div>
-                </div>
-                <span class="ver-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 18l6-6-6-6"/></svg></span>
-              </a>
-              <button class="ver-add" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>New tailored version</button>
-            </div>
+            <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/></svg>Tailored versions</h3>
+            <p class="cs-unwired">Agency-specific editions are not built yet. This statement is the single version.</p>
           </section>
 
         </aside>
@@ -519,7 +476,7 @@ button{font-family:inherit}
 <script>/* theme + sidebar toggles */
 (function(){
   var root=document.documentElement, sun=document.getElementById('themeSun'), moon=document.getElementById('themeMoon'), btn=document.getElementById('themeToggle');
-  function sync(){ var t=root.getAttribute('data-theme'); if(t==='light'){sun.style.display='none';moon.style.display='';} else {sun.style.display='';moon.style.display='none';} }
+  function sync(){ if(!sun||!moon) return; var t=root.getAttribute('data-theme'); if(t==='light'){sun.style.display='none';moon.style.display='';} else {sun.style.display='';moon.style.display='none';} }
   try{ var saved=localStorage.getItem('faraudit-theme'); if(saved) root.setAttribute('data-theme',saved); }catch(e){}
   sync();
   if(btn) btn.addEventListener('click', function(){ var next=root.getAttribute('data-theme')==='light'?'dark':'light'; root.setAttribute('data-theme',next); try{localStorage.setItem('faraudit-theme',next);}catch(e){} sync(); });
@@ -536,6 +493,7 @@ button{font-family:inherit}
 })();
 </script>
 <script src="/uei-editor.js" defer></script>
+<script src="/capability-statement-live.js" defer></script>
 <script src="/notifications-chrome.js" defer></script>
 </body>
 </html>
