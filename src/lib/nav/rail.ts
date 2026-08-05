@@ -230,6 +230,16 @@ export function railStyle(): string {
     `.sb-am-item:hover{background:rgba(255,255,255,.06)}` +
     `.sb-am-item svg{width:14px;height:14px;flex:none}` +
     `.sb-am-signout{color:#fca5a5}` +
+    // ── LIVE-PILL HONESTY GUARD, for every rail-injected page ───────────────────────────
+    // `.live-pill{display:inline-flex}` OUTRANKS the `hidden` attribute, so a page that
+    // hides its pill while loading, empty, or erroring still PAINTS a green LIVE badge.
+    // The guard was added to six pages; the pill has since spread to 18, and the other 12
+    // were never covered — a claim of "live" on surfaces that are not.
+    // Declared here rather than in 12 page files for the same reason the retired mark could
+    // hide in one: the rail is the single injected source, so one line covers every page
+    // that has the rail, including pages added later. `.live-pill[hidden]` is (0,2,0)
+    // against the base rule's (0,1,0), so it wins on specificity, not on source order.
+    `.live-pill[hidden]{display:none!important}` +
     `.sb-am-sep{height:1px;background:rgba(255,255,255,.10);margin:4px 2px}` +
     `.sb-am-label{padding:2px 9px 4px;font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.42)}` +
     // The checked option reads as chosen without colour doing the work alone —
