@@ -16,16 +16,40 @@
       // Wire identity from Supabase auth (email + full_name).
       const c = window.PS.COMPANY;
       c.email   = data.email      || '';
-      c.contact = data.full_name  || data.email || '';
-      c.name    = '';   // no source field
-      c.cage    = '';   // no source field
-      c.uei     = '';   // no source field
-      c.address = '';   // no source field
-      c.phone   = '';   // no source field
+      // The name field is EDITABLE, so it must show what is stored — not the email as a
+      // stand-in. Falling back to the email made an unset name look already filled in.
+      c.contact = data.full_name  || '';
+      c.phone   = '';   // no source field anywhere yet
 
-      // Cleared — certs / naics / agencies / notifs / usage have no source field.
-      window.PS.CERTS.length    = 0;
-      window.PS.NAICS.length    = 0;
+      // The COMPANY record HAS a source — capability_statements — and it is the same record
+      // the audit engine reads. Settings shows it READ-ONLY; the capability statement tab
+      // edits it. A failed read leaves the fields empty and flags the body, because "not on
+      // file" and "could not be read" are different answers and only one is fixable by
+      // typing something in.
+      c.name = ''; c.cage = ''; c.uei = ''; c.address = '';
+      window.PS.CERTS.length = 0;
+      window.PS.NAICS.length = 0;
+      try {
+        const capRes = await fetch('/api/capability-statement', { credentials: 'include' });
+        if (capRes.ok) {
+          const cap = await capRes.json();
+          const rec = (cap && (cap.capability_statement || cap.statement || cap)) || {};
+          c.name    = rec.company_name || '';
+          c.cage    = rec.cage         || '';
+          c.uei     = rec.uei          || '';
+          c.address = rec.address      || '';
+          (Array.isArray(rec.naics_codes) ? rec.naics_codes : [])
+            .forEach(function (n) { if (n) window.PS.NAICS.push({ code: String(n) }); });
+          (Array.isArray(rec.certifications) ? rec.certifications : [])
+            .forEach(function (k) { if (k) window.PS.CERTS.push({ k: String(k), on: true }); });
+        } else {
+          document.body.classList.add('company-unreadable');
+        }
+      } catch (e) {
+        document.body.classList.add('company-unreadable');
+      }
+
+      // Cleared — agencies / notifs / usage still have no source field.
       window.PS.AGENCIES.length = 0;
       window.PS.NOTIFS.length   = 0;
       window.PS.USAGE.length    = 0;
@@ -55,6 +79,51 @@
       document.body.classList.remove('is-loading');
     }
   }
+
+  /* SAVE — the person, and only the person.
+     This page previously rendered a "Save changes" button, a "✓ Saved" badge and the line
+     "changes save automatically" over a form with NO write path at all: every keystroke was
+     discarded and the page said it had saved. So this handler reports only what the server
+     confirms, and says the word "saved" in exactly one case — a 2xx whose echoed value
+     matches what was sent. Delegated, because ps-app.js re-templates the panel on render
+     and on every theme flip, which detaches any directly-bound listener. */
+  function note(msg, ok) {
+    const el = document.getElementById('psSavedNote');
+    if (!el) return;
+    el.hidden = false;
+    el.textContent = msg;
+    el.classList.toggle('is-error', !ok);
+  }
+
+  document.addEventListener('click', async function (e) {
+    const btn = e.target && e.target.closest && e.target.closest('#psSaveBtn');
+    if (!btn) return;
+    const input = document.getElementById('psFullName');
+    if (!input) return;
+    const full_name = input.value.trim();
+    btn.disabled = true;
+    note('Saving…', true);
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ full_name })
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) { note((body && body.error) || ('Could not save (HTTP ' + res.status + ')'), false); return; }
+      // Believe the SERVER's echo, not the input box. The route reads the value back from
+      // the persisted user before returning it, so a mismatch here means it did not land.
+      if (!body || body.full_name !== full_name) { note('Save did not persist — reload and try again', false); return; }
+      window.PS.COMPANY.contact = body.full_name;
+      document.querySelectorAll('.sb-avatar-name').forEach(function (el) { el.textContent = body.full_name; });
+      note('✓ Saved', true);
+    } catch (err) {
+      note('Could not reach the server', false);
+    } finally {
+      btn.disabled = false;
+    }
+  });
 
   // Theme re-render — ps-app.js re-templates panel HTML on theme flip.
   const obs = new MutationObserver(() => {
