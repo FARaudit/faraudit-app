@@ -32,6 +32,12 @@ import { gradeCoverageV2, verifyRecitalInSource, consequenceTailsAfter } from "@
 import { proceduralCoveragePass } from "@/lib/audit-procedural-coverage";
 import { readSection, type AuditToolContext } from "@/lib/audit-tools";
 import type { TypedFinding, VerdictInputs } from "@/lib/audit-findings";
+import { requireCorpus, EXIT_CORPUS_ABSENT } from "@/lib/corpus-fixture";
+
+// Declared BEFORE any assertion, per the corpus-fixture contract. This also covers the case the
+// readdirSync below cannot: an empty run-records directory (`.gitkeep` makes it exist in a fresh
+// checkout, so existence is not the question — record count is).
+requireCorpus("procedural-coverage");
 
 let pass = 0; const fails: string[] = [];
 const eq = (l: string, g: unknown, e: unknown) => { if (JSON.stringify(g) === JSON.stringify(e)) pass++; else fails.push(`${l}: got ${JSON.stringify(g)} exp ${JSON.stringify(e)}`); };
@@ -61,7 +67,16 @@ const rf = readdirSync("scripts/audit-ai/run-records")
   .filter((x) => x.includes("SP3300") && x.endsWith(".json"))
   .filter((x) => JSON.parse(readFileSync("scripts/audit-ai/run-records/" + x, "utf8")).meta?.flags?.AUDIT_ELIGIBLE_TRISTATE !== "true")
   .sort().pop();
-if (!rf) { console.log("⚠ no SP3300 run record — run paid-run.ts first. Cannot gate."); process.exit(1); }
+// A fixture this suite cannot find is "could not run", NOT "ran and was wrong". Exiting 1 here spent a
+// triage pass reading this gate as an engine failure — it is the "passes only on the author's machine"
+// class, and the repo already has one exit code for it. EXIT_CORPUS_ABSENT (3) is reported by self-audit
+// as a SKIP BY NAME: never a pass, never silent.
+if (!rf) {
+  console.log("○ SKIP — procedural-coverage: no SP3300 run record with AUDIT_ELIGIBLE_TRISTATE!=true present.");
+  console.log("  The banked corpus is intentionally untracked (government email addresses; this repo is public).");
+  console.log("  Restore it or run paid-run.ts. Not a pass. This suite asserted NOTHING on this run.");
+  process.exit(EXIT_CORPUS_ABSENT);
+}
 const rec = JSON.parse(readFileSync("scripts/audit-ai/run-records/" + rf, "utf8"));
 const ctx: AuditToolContext = { fullSource: rec.input.fullSource };
 const required = buildManifest(ctx);
