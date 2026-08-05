@@ -53,6 +53,9 @@ const I = {
   wage: '<path d="M3 20h18"/><rect x="5" y="11" width="3" height="9"/><rect x="10.5" y="6" width="3" height="14"/><rect x="16" y="14" width="3" height="6"/>',
   settings: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/>',
   signout: '<path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
+  themeLight: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  themeDark: '<path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/>',
+  themeSystem: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
 };
 
 // The five weighted groups — importance order within each (spec §A).
@@ -181,6 +184,27 @@ export function renderRail(activeKey: string, counts: RailCounts = {}): string {
     `<svg class="sb-avatar-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></button>\n` +
     `    <div class="sb-avatar-menu" id="sbAvatarMenu" role="menu" hidden>\n` +
     `      <a class="sb-am-item" role="menuitem" href="/settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${I.settings}</svg>Profile &amp; Settings</a>\n` +
+    // APPEARANCE — one definition for all 18 rail-injected pages. The per-page inline
+    // toggle is 17 hand-copied scripts, which is how Defense News ended up able to switch
+    // theme but unable to remember it. This control is the single source; `aria-checked`
+    // is set at runtime from the stored preference, never hardcoded.
+    `      <div class="sb-am-sep" role="separator"></div>\n` +
+    `      <div class="sb-am-label">Appearance</div>\n` +
+    `      <div class="sb-am-themes" role="group" aria-label="Appearance">\n` +
+    (
+      [
+        { v: "light", label: "Light", icon: I.themeLight },
+        { v: "dark", label: "Dark", icon: I.themeDark },
+        { v: "auto", label: "System", icon: I.themeSystem },
+      ] as const
+    )
+      .map(
+        (t) =>
+          `        <button type="button" class="sb-am-item sb-am-theme" data-theme-choice="${t.v}" role="menuitemradio" aria-checked="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${t.icon}</svg>${t.label}</button>\n`,
+      )
+      .join("") +
+    `      </div>\n` +
+    `      <div class="sb-am-sep" role="separator"></div>\n` +
     `      <form action="/api/auth/sign-out" method="post" style="display:contents"><button type="submit" class="sb-am-item sb-am-signout" role="menuitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${I.signout}</svg>Sign out</button></form>\n` +
     `    </div>\n` +
     `  </div>\n` +
@@ -206,6 +230,12 @@ export function railStyle(): string {
     `.sb-am-item:hover{background:rgba(255,255,255,.06)}` +
     `.sb-am-item svg{width:14px;height:14px;flex:none}` +
     `.sb-am-signout{color:#fca5a5}` +
+    `.sb-am-sep{height:1px;background:rgba(255,255,255,.10);margin:4px 2px}` +
+    `.sb-am-label{padding:2px 9px 4px;font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.42)}` +
+    // The checked option reads as chosen without colour doing the work alone —
+    // colour + weight + a filled dot, so it survives a monochrome or high-contrast view.
+    `.sb-am-theme[aria-checked="true"]{background:rgba(255,255,255,.09);color:#fff;font-weight:650}` +
+    `.sb-am-theme[aria-checked="true"]::after{content:"";width:5px;height:5px;border-radius:50%;background:currentColor;margin-left:auto;flex:none}` +
     `</style>`
   );
 }
@@ -218,6 +248,30 @@ export function railScript(): string {
     `b.addEventListener('click',function(e){e.stopPropagation();var o=m.hidden;m.hidden=!o;b.setAttribute('aria-expanded',String(o));});` +
     `document.addEventListener('click',function(e){if(!m.hidden&&!m.contains(e.target)&&e.target!==b)close();});` +
     `document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});}` +
+    // ── APPEARANCE: light · dark · system ────────────────────────────────────────────
+    // Stored preference is light|dark|auto under the SAME key the 17 per-page inline
+    // scripts already use, so the two never fight. Those scripts run earlier in the
+    // document and set data-theme to the raw stored value; this runs last and RESOLVES
+    // `auto` against the OS. The pages define [data-theme="auto"] as light, so resolving
+    // to a concrete light|dark here means System works with ZERO CSS changes to any page.
+    // No stored preference ⇒ nothing is written and the page keeps its own default
+    // (light). Turning System on for existing users is a product decision, not a
+    // side effect of shipping the control.
+    `var K='faraudit-theme',root=document.documentElement;` +
+    `var mq=window.matchMedia?window.matchMedia('(prefers-color-scheme: dark)'):null;` +
+    `var pref=function(){try{return localStorage.getItem(K)||''}catch(e){return ''}};` +
+    `var resolve=function(v){return v==='auto'?((mq&&mq.matches)?'dark':'light'):v};` +
+    `var mark=function(v){document.querySelectorAll('.sb-am-theme').forEach(function(b){` +
+    `b.setAttribute('aria-checked',String(b.getAttribute('data-theme-choice')===v));});};` +
+    `var apply=function(v,persist){var r=resolve(v);if(r)root.setAttribute('data-theme',r);` +
+    `if(persist){try{localStorage.setItem(K,v)}catch(e){}}mark(v);};` +
+    `var cur=pref();if(cur)apply(cur,false);else mark(root.getAttribute('data-theme')||'light');` +
+    `document.querySelectorAll('.sb-am-theme').forEach(function(b){b.addEventListener('click',function(e){` +
+    `e.stopPropagation();apply(b.getAttribute('data-theme-choice'),true);});});` +
+    // Follow the OS live, but ONLY while the preference is System — an explicit
+    // light/dark choice must not be overridden when the OS flips.
+    `if(mq){var onSys=function(){if(pref()==='auto')apply('auto',false);};` +
+    `if(mq.addEventListener)mq.addEventListener('change',onSys);else if(mq.addListener)mq.addListener(onSys);}` +
     // Identity hydration — the SIGNED-IN user from /api/profile, never a
     // hardcoded name. On failure identity stays blank: empty is honest,
     // a wrong name is not (Rule 61).
