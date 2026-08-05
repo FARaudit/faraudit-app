@@ -1296,11 +1296,17 @@ var __fdPartialNoticeId=null;
    behind the user's explicit click. */
 (function(){
   try{
+    // Kept as a single expression: the row-actions tie-out gate matches this exact
+    // shape to prove the param the row EMITS is the one this page READS.
     var ref=new URLSearchParams(location.search).get('noticeId');
-    if(!ref)return;
+    // Opportunities shows the SOLICITATION number; arriving here to a 32-hex
+    // notice UUID gave the customer no way to confirm the right notice carried.
+    // This field accepts either, so prefill the one they just clicked.
+    var sol=new URLSearchParams(location.search).get('sol');
+    if(!ref&&!sol)return;
     var input=document.querySelector('.ev-d .sm-input');
     if(!input)return;
-    input.value=ref;
+    input.value=sol||ref;
     input.dispatchEvent(new Event('input',{bubbles:true}));
     input.focus();
   }catch(e){}
