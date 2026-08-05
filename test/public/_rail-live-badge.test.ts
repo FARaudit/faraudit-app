@@ -14,7 +14,8 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { renderRail, railStyle, injectRail } from "@/lib/nav/rail";
+import vm from "vm";
+import { renderRail, railStyle, railScript, injectRail, railFonts } from "@/lib/nav/rail";
 
 let pass = 0; let fail = 0;
 const check = (label: string, ok: boolean, detail = "") => {
@@ -40,8 +41,11 @@ console.log("── Part A · rail badge ──");
   // declaration line and inspect only that.
   const line = rail.split("\n").find((l) => l.includes('key: "opportunities"')) ?? "";
   check("rail.ts · opportunities entry declares no hardcoded status text", !/text:\s*"(Live|Online|Active|Up)"/i.test(line), line.trim().slice(0, 140));
-  // Empty badge text must still be the documented "render no pill" path.
-  check("rail.ts · empty badge text renders no pill", /if \(txt\)/.test(rail), "renderItem no longer guards empty text");
+  // Card 807 removed badges entirely — both went stale because a badge is a claim about
+  // time and nobody owns its expiry. The old check guarded an EMPTY badge; the stronger
+  // property now is that no badge can render at all, so neither can go stale again.
+  check("rail · renders no badge markup at all", !/sb-badge/.test(renderRail("opportunities")), "a badge is back in the rail");
+  check("rail.ts · declares no badge classes", !/BADGE_CLASS/.test(rail), "badge machinery returned");
 }
 
 // ── Part B · the badge is written only where feed state is actually known ──
@@ -148,15 +152,17 @@ console.log("\n── Part D · planted positives ──");
 // must hold the wordmark and nothing else.
 console.log("\n── Part E · retired brand mark ──");
 {
-  const row = (rail.match(/<div class="sb-logo-row">[\s\S]*?<\/div>/) ?? [""])[0];
-  check("rail.ts · a logo row exists to check", row.length > 0, "sb-logo-row not found — this gate asserted nothing");
+  // Card 807 replaced .sb-logo-row with .sb-head (wordmark + collapse control). Asserted on
+  // the RENDERED markup so a structural rename cannot make this leg quietly stop looking.
+  const row = (renderRail("opportunities").match(/<div class="sb-head">[\s\S]*?<\/div>/) ?? [""])[0];
+  check("rail · a head row exists to check", row.length > 0, "sb-head not found — this gate asserted nothing");
   check("rail.ts · no retired single-letter mark beside the wordmark", !/class="sb-logo"/.test(row), row.slice(0, 160));
-  check("rail.ts · the logo row is the wordmark alone", /^<div class="sb-logo-row"><span class="sb-wordmark">/.test(row), row.slice(0, 160));
+  check("rail · the head opens with the wordmark, no mark beside it", /^<div class="sb-head"><span class="sb-wordmark">FAR<span class="wm-au">audit<\/span><\/span>/.test(row), row.slice(0, 160));
 
   // Planted positives — this leg must be able to go red, in BOTH directions.
-  const PLANTED_BAD = `<div class="sb-logo-row"><div class="sb-logo">F</div><span class="sb-wordmark">FAR</span></div>`;
+  const PLANTED_BAD = `<div class="sb-head"><div class="sb-logo">F</div><span class="sb-wordmark">FAR</span></div>`;
   check("E-P1 · the check REJECTS the exact markup Design found", /class="sb-logo"/.test(PLANTED_BAD));
-  const PLANTED_GOOD = `<div class="sb-logo-row"><span class="sb-wordmark">FAR<span class="wm-au">audit</span></span></div>`;
+  const PLANTED_GOOD = `<div class="sb-head"><span class="sb-wordmark">FAR<span class="wm-au">audit</span></span></div>`;
   check("E-P2 · the check ACCEPTS the wordmark alone (no false positive)", !/class="sb-logo"/.test(PLANTED_GOOD));
 }
 
@@ -223,6 +229,73 @@ console.log("\n── Part G · live-pill honesty guard ──");
   check("G-P1 · catches a stylesheet with no guard", !/\.live-pill\[hidden\]/.test(PLANTED_NO_GUARD));
   const PLANTED_GUARDED = `.live-pill{display:inline-flex}.live-pill[hidden]{display:none!important}`;
   check("G-P2 · accepts a guarded stylesheet (no false positive)", /\.live-pill\[hidden\]\s*\{[^}]*display:\s*none/.test(PLANTED_GUARDED));
+}
+
+// ── Part H · card 807 workflow rail ───────────────────────────────────────────────────────
+// The rail regrouped by workflow. These pin what the handoff required AND the things its own
+// files would have broken, so neither can regress silently.
+console.log("\n── Part H · card 807 workflow rail ──");
+{
+  const R = renderRail("opportunities");
+  const S = railStyle();
+  const J = railScript();
+  const ROUTES = ["/command-center","/opportunities","/audit","/past-audits","/pipeline","/cmmc","/capability-statement","/teaming-partners","/defense-news","/defense-spending","/agencies","/contracting-officers","/naics","/far-dfars-updates","/wage-benchmarks"];
+  const hrefs = [...R.matchAll(/href="([^"]+)"/g)].map((m) => m[1]).filter((h) => h !== "/settings");
+  check("15 destinations, exactly the source routes", JSON.stringify(hrefs) === JSON.stringify(ROUTES), hrefs.join(" "));
+
+  // §6: counts derive live or do not ship. The handoff MARKUP shipped 4, 19 and a 72% with no
+  // source named anywhere — a stale number in the rail is on every page, all day.
+  check("no hardcoded counts in the markup", !/>(4|19)<\/span>|72%/.test(R), "a literal count is back");
+  check("a zero count renders nothing", !renderRail("today", { pipeline: "0" }).includes("sb-ct"), "0 rendered as a number");
+  check("a live count DOES render", renderRail("today", { pipeline: "19" }).includes(">19</span>"), "the counts argument is ignored");
+
+  // Identity is hydrated, never shipped. The handoff markup carried a real person's name.
+  check("no hardcoded identity", !/Jose Rodriguez|>JR</.test(R), "a name is baked into the rail");
+
+  // The collapse control must keep the id that 18 pages bind from OUTSIDE the replaced aside.
+  check("collapse control keeps id=sbToggle", /id="sbToggle"/.test(R), "renaming it breaks collapse on every page");
+  check("rail does not re-bind faraudit-sb", !/faraudit-sb/.test(J), "double-binding makes every click a no-op");
+
+  check("3 collapsible sections, Readiness open", (R.match(/class="sb-sec"/g) || []).length === 3 && (R.match(/data-open="true"/g) || []).length === 1);
+  check("the active page's section is forced open", (renderRail("naics").match(/data-open="true"/g) || []).length === 2, "landing in a collapsed section hides the active row");
+  check("sentence-case group headers", !/MARKET INTEL|READINESS/.test(R), "caps headers returned");
+
+  // The base layout block was MISSING from the handoff's rail.css; without it every new class
+  // has colour but no geometry.
+  for (const c of [".sb-head", ".sb-flow", ".sb-sech", ".sb-secb", ".sb-tip", ".sb-today"]) {
+    check(`stylesheet defines ${c}`, S.includes(c), "base layout block missing");
+  }
+  check("--sb-width declared for open AND closed", /\[data-sb="open"\]\{--sb-width/.test(S) && /--sb-width:66px/.test(S), "an unresolved var() voids the whole grid declaration");
+  check("no retired FA monogram", !S.includes('content:"FA"'), "the two-letter mark is back");
+  check("no CSS rationale shipped to the browser", !S.includes("/*"), "comments in served CSS are public");
+  // Card 808 FIX 1. The old form of this check pinned the literal "31.3px", which made a
+  // DERIVED number look like a constant — it asserted the answer instead of the property that
+  // makes the answer right. What must hold is that the ruled cut is actually REQUESTED (no
+  // served page asked for upright 900, so the mark rendered as a synthesised bold of an italic
+  // face or as Georgia) and that the declared size is the one that was derived against it.
+  check("wordmark ruled treatment declared", /Fraunces/.test(S) && /font-weight:900/.test(S), "16 of 18 pages hide the wordmark without this");
+  const fontLink = railFonts();
+  check("the ruled cut is requested, not just declared", /fonts\.googleapis\.com/.test(fontLink) && /Fraunces/.test(fontLink), "a declared face that is never fetched renders as the fallback");
+  check("the requested cut is UPRIGHT 900", /wght@72,900/.test(fontLink) && !/ital,/.test(fontLink), "italic-only axes were what shipped; 900 upright is the ruling");
+  const declaredPx = (S.match(/\.sb-head \.sb-wordmark\{[^}]*font-size:([\d.]+)px/) || [])[1];
+  check("the declared size is the DERIVED size", declaredPx === "31.9", `declared ${declaredPx}px — 31 x (0.720 Manrope cap / 0.700 Fraunces cap) = 31.886`);
+  check("injectRail puts the font in <head>", injectRail("<html><head></head><body></body></html>", "today").includes(`${fontLink}</head>`), "a face requested after the body swaps in post-paint");
+
+  // Planted positives for the three checks above — each must be able to go red.
+  check("F-P1 · rejects an italic-only request", !/wght@72,900/.test("family=Fraunces:ital,opsz,wght@1,72,500;1,72,600"));
+  check("F-P2 · rejects a declaration with no request", !/fonts\.googleapis\.com/.test('.sb-head .sb-wordmark{font-family:"Fraunces"}'));
+  check("F-P3 · rejects the superseded 31.3px", (('.sb-head .sb-wordmark{font-size:31.3px'.match(/font-size:([\d.]+)px/) || [])[1]) !== "31.9");
+
+  // The injected script is covered by NO other gate — the inline-script suite reads public/ only.
+  // vm.Script COMPILES without executing, so this asks only "does it parse".
+  let parses = true;
+  try { new vm.Script(J.replace(/^<script>/, "").replace(/<\/script>$/, "")); } catch { parses = false; }
+  check("injected rail script parses", parses, "one syntax error kills every rail behaviour at once");
+
+  // Planted positives — both directions.
+  check("H-P1 · the count check rejects a literal", /(>(4|19)<\/span>|72%)/.test(`<span class="sb-ct">19</span>`));
+  check("H-P2 · the count check accepts a clean rail", !/>(4|19)<\/span>|72%/.test(`<span class="sb-label">Pipeline</span>`));
+  check("H-P3 · the monogram check rejects the excluded rule", '.sb-wordmark::after{content:"FA"}'.includes('content:"FA"'));
 }
 
 console.log(`\n${pass} passed · ${fail} failed`);
