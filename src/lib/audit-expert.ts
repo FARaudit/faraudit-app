@@ -24,7 +24,11 @@ export interface ModelTurn { toolCalls: Array<{ id: string; name: string; input:
 /** A completed tool exchange — carries the original call (id/name/input) AND its result so the production
  *  model wrapper can reconstruct a PROTOCOL-VALID Anthropic transcript (assistant tool_use → user tool_result). */
 export interface ToolResult { id: string; name: string; input: Record<string, unknown>; result: unknown; }
-export type CallModel = (args: { system: string; userTask: string; priorToolResults: ToolResult[][]; forceSubmit?: boolean; signal?: AbortSignal }) => Promise<ModelTurn>;
+// `label` is PER-CALL, and it has to be: audit-package.ts constructs ONE callModel and hands the same
+// instance to all five lenses (audit-orchestrator.ts), so a label fixed at construction time cannot
+// tell them apart. That is why every lens call has been landing in the cost ledger as "expert" — the
+// label capability shipped, and the only caller that could have used it had no way to vary it.
+export type CallModel = (args: { system: string; userTask: string; priorToolResults: ToolResult[][]; forceSubmit?: boolean; signal?: AbortSignal; label?: string }) => Promise<ModelTurn>;
 
 export interface ExpertSpec { key: string; system: string; }
 
@@ -130,7 +134,11 @@ export async function runAgenticExpert(
     if (opts.signal?.aborted) throw new Error("agentic expert aborted: overall budget exceeded");
     // On the final allowed turn, FORCE submit_findings so a thorough expert that kept reading still produces
     // its findings instead of exhausting the turn cap with nothing (the 0-findings/INCOMPLETE failure mode).
-    const out = await opts.callModel({ system: spec.system, userTask, priorToolResults, forceSubmit: turn === maxTurns, signal: opts.signal });
+    // LEDGER IDENTITY (2026-08-05). `<lens>#<turn>` is the smallest label that answers the questions the
+    // aggregate cannot: which lens costs what, and — because cache behaviour is per-turn — which TURN stops
+    // reading its cache. A run's 992,418 cache writes against 630,562 reads is unattributable while every
+    // call is named "expert"; per-turn it names the stage in one pass over the banked record, for $0.
+    const out = await opts.callModel({ system: spec.system, userTask, priorToolResults, forceSubmit: turn === maxTurns, signal: opts.signal, label: `${spec.key}#${turn}` });
     if (out.findings) {
       let dropped = 0;
       // TELEMETRY ONLY (verdict-inert) — of the dropped findings, how many quoted text that IS verbatim in
@@ -267,7 +275,7 @@ export function setExpertUsageSink(sink: ((u: ExpertUsage) => void) | null) { _e
  *  state, and replaying tool-use turns WITH thinking blocks requires echoing them verbatim — out of scope
  *  for a stateless rebuild. Tool grounding (not CoT) is what makes this expert correct. */
 export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: { maxTokens?: number; onUsage?: (u: ExpertUsage) => void; label?: string }): CallModel {
-  return async ({ system, userTask, priorToolResults, forceSubmit, signal }) => {
+  return async ({ system, userTask, priorToolResults, forceSubmit, signal, label: callLabel }) => {
     const messages: Array<Record<string, unknown>> = [{ role: "user", content: userTask }];
     for (const batch of priorToolResults) {
       if (batch.length === 0) continue; // defensive: never emit an assistant/user turn with content:[] → Anthropic 400
@@ -337,9 +345,13 @@ export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: 
     // (null in prod; kept for single-run proofs). Both are best-effort — never affects the returned findings.
     // `ms` is measured per ATTEMPT, not per turn: the max_tokens retry below is a second paid call and its
     // latency belongs to itself, or a stage's cost and its duration stop describing the same thing.
-    const tally = (r: { usage?: SdkUsage }, ms: number) => {
+    // `labelOverride` exists for the max_tokens retry below. That retry is a SECOND paid generation, and
+    // tallying it under the same label as the attempt it replaces makes retry frequency unrecoverable from
+    // the ledger — the one place the answer could live. Suffixed, "how often does the retry fire" becomes a
+    // count over the banked record instead of a grep through worker logs that may have rotated.
+    const tally = (r: { usage?: SdkUsage }, ms: number, labelOverride?: string) => {
       if (!r.usage) return;
-      const u = { model, input_tokens: r.usage.input_tokens ?? 0, output_tokens: r.usage.output_tokens ?? 0, cache_write: r.usage.cache_creation_input_tokens ?? 0, cache_read: r.usage.cache_read_input_tokens ?? 0, label: opts?.label ?? "expert", ms };
+      const u = { model, input_tokens: r.usage.input_tokens ?? 0, output_tokens: r.usage.output_tokens ?? 0, cache_write: r.usage.cache_creation_input_tokens ?? 0, cache_read: r.usage.cache_read_input_tokens ?? 0, label: labelOverride ?? callLabel ?? opts?.label ?? "expert", ms };
       try { opts?.onUsage?.(u); } catch { /* never let cost capture break an audit */ }
       if (_expertUsageSink) _expertUsageSink(u);
     };
@@ -355,7 +367,7 @@ export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: 
     if (resp.stop_reason === "max_tokens" && (req.max_tokens as number) < EXPERT_TOKEN_CEILING) {
       const t1 = Date.now();
       const resp2 = await client.messages.create({ ...req, max_tokens: EXPERT_TOKEN_CEILING }, signal ? { signal } : undefined);
-      tally(resp2, Date.now() - t1);
+      tally(resp2, Date.now() - t1, `${callLabel ?? opts?.label ?? "expert"}+retry`);
       console.log(`[expert] max_tokens retry: attempt1=max_tokens attempt2=${resp2.stop_reason ?? "?"} (max_tokens ${req.max_tokens as number}→${EXPERT_TOKEN_CEILING})`);
       // T0-3 (engine line-audit 2026-07-06) — prefer the retry (fuller excerpts) ONLY when it actually
       // re-produced submit_findings. If the retry narrates or reads a tool instead of re-submitting, KEEP
