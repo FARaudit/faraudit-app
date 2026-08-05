@@ -14,7 +14,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { renderRail } from "@/lib/nav/rail";
+import { renderRail, railStyle, injectRail } from "@/lib/nav/rail";
 
 let pass = 0; let fail = 0;
 const check = (label: string, ok: boolean, detail = "") => {
@@ -197,6 +197,32 @@ console.log("\n── Part F · appearance control ──");
   check("F-P2 · accepts a runtime-marked choice (no false positive)", !/aria-checked="true"/.test(PLANTED_OK));
   const PLANTED_NO_OS = `var resolve=function(v){return v==='auto'?'light':v};`;
   check("F-P3 · catches a System option that never reads the OS", !/prefers-color-scheme/.test(PLANTED_NO_OS));
+}
+
+// ── Part G · the live-pill honesty guard reaches EVERY page ───────────────────────────────
+// `.live-pill{display:inline-flex}` outranks the `hidden` attribute, so a page hiding its
+// pill while loading/empty/erroring still PAINTS a green LIVE badge. The guard was added to
+// six pages; the pill has since spread to 18 and 12 were never covered. Found by Design on
+// the card-802 packet — the same shape as the retired mark: a fix recorded as complete that
+// reached a third of the surfaces.
+// Verified in a browser: with the rail's guard, setting `hidden` yields display:none; with
+// that single rule deleted, the pill paints "LIVE" while hidden.
+console.log("\n── Part G · live-pill honesty guard ──");
+{
+  const style = railStyle();
+  check("rail · ships the live-pill hidden guard", /\.live-pill\[hidden\]\s*\{[^}]*display:\s*none/.test(style), "pages can paint LIVE while hidden");
+
+  // The point of putting it in the rail is that pages carrying NO guard of their own still
+  // get one. Assert that on a page measured to have none — a per-page fix would not.
+  const raw = read("public/opportunities.html");
+  check("a page with no guard of its own is the right specimen", !/\.live-pill\[hidden\]/.test(raw), "specimen already guarded — this leg proves nothing");
+  const served = injectRail(raw, "opportunities");
+  check("served page gains the guard from the rail", /\.live-pill\[hidden\]/.test(served), "injection did not supply the guard");
+
+  const PLANTED_NO_GUARD = `.live-pill{display:inline-flex}`;
+  check("G-P1 · catches a stylesheet with no guard", !/\.live-pill\[hidden\]/.test(PLANTED_NO_GUARD));
+  const PLANTED_GUARDED = `.live-pill{display:inline-flex}.live-pill[hidden]{display:none!important}`;
+  check("G-P2 · accepts a guarded stylesheet (no false positive)", /\.live-pill\[hidden\]\s*\{[^}]*display:\s*none/.test(PLANTED_GUARDED));
 }
 
 console.log(`\n${pass} passed · ${fail} failed`);
