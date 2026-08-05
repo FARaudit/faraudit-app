@@ -33,11 +33,22 @@
         const capRes = await fetch('/api/capability-statement', { credentials: 'include' });
         if (capRes.ok) {
           const cap = await capRes.json();
-          const rec = (cap && (cap.capability_statement || cap.statement || cap)) || {};
-          c.name    = rec.company_name || '';
-          c.cage    = rec.cage         || '';
-          c.uei     = rec.uei          || '';
-          c.address = rec.address      || '';
+          // The route returns { statement, stub }. Reading `cap` itself as a last resort
+          // accepted the envelope as the record, which reads every field as absent and
+          // reports it as "Not on file" — an outage wearing the same face as an empty
+          // record. If the shape is not what the route documents, say so instead.
+          const rec = cap && cap.statement;
+          if (!rec || typeof rec !== 'object') {
+            document.body.classList.add('company-unreadable');
+            throw new Error('capability-statement: no statement in response');
+          }
+          // These are the column names. Reading rec.cage and rec.address — which the
+          // route has never returned — is why this page said "CAGE code: Not on file"
+          // over a record holding one.
+          c.name    = rec.company_name    || '';
+          c.cage    = rec.cage_code       || '';
+          c.uei     = rec.uei             || '';
+          c.address = rec.contact_address || '';
           (Array.isArray(rec.naics_codes) ? rec.naics_codes : [])
             .forEach(function (n) { if (n) window.PS.NAICS.push({ code: String(n) }); });
           (Array.isArray(rec.certifications) ? rec.certifications : [])
