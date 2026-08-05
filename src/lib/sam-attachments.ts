@@ -136,6 +136,18 @@ export const MAX_TOTAL_TOKENS = 850_000;
 // truncated to at most this many tokens (with an honest "(truncated)" note), so
 // one huge member can never evict §C/§L/§M.
 export const MAX_DOC_TOKENS = 250_000;
+// A document that NAMES ITSELF a solicitation or a real cover form. Hoisted to module scope
+// 2026-08-05 so the token budget and the form election read the SAME definition — it was
+// previously local to planDocumentOrder, and the budget had no notion of "this is the
+// solicitation" at all. Two copies of this pattern would be two rules; there is one.
+export const REAL_SOL_FORM = /\bsolicitation\b|\brf[qp]\b|sf[\s-]?1449|sf[\s-]?1442|sf[\s-]?33\b|sf[\s-]?0?18\b/i;
+/** CORE = the documents a verdict cannot be sound without: the elected form/primary, every
+ *  amendment (an amendment SUPERSEDES the base — dropping one silently audits a stale package),
+ *  and any document that names itself a solicitation or real cover form. Core docs are admitted
+ *  to the token budget BEFORE anything else competes for it. */
+export function isCoreDoc(d: { role: DocumentPlanEntry["role"]; name?: string }): boolean {
+  return d.role === "form" || d.role === "amendment" || REAL_SOL_FORM.test(d.name ?? "");
+}
 // FA-INGEST4b (2026-06-22) — per-doc cap for BULK SPREADSHEETS (.xlsx). ELINS /
 // inventory sheets extract to enormous text (thousands of line-item rows); at the
 // 250k MAX_DOC_TOKENS cap, 3 ingested inventory .xlsx ate ~750k of the 850k budget
@@ -616,7 +628,6 @@ export function planDocumentOrder(entries: AttachmentManifestEntry[], solicitati
   // solicitation"/SF-30; a doc that names itself a solicitation/RFQ or a real
   // cover form (SF-1449/1442/33/18) is the true primary and must win. The SF-30
   // becomes primary ONLY when no real solicitation/RFQ doc exists in the set.
-  const REAL_SOL_FORM = /\bsolicitation\b|\brf[qp]\b|sf[\s-]?1449|sf[\s-]?1442|sf[\s-]?33\b|sf[\s-]?0?18\b/i;
   const isSf30Only = (n: string): boolean =>
     /sf[\s-]?30|amendment of solicitation|amendment\/modification of contract/i.test(n) &&
     !REAL_SOL_FORM.test(n);
@@ -1136,9 +1147,14 @@ export function applyPageBudget<T extends { role: DocumentPlanEntry["role"]; pag
 //   2. Cumulative cap (maxTotalTokens): once the running total (using each doc's
 //      possibly-truncated contribution) would exceed the ceiling, later (lower-
 //      tier) docs are SKIPPED — flagged loudly, never silent.
-// The form/primary is EXEMPT from the cumulative cap (it is the solicitation and
-// must never be dropped) but is STILL subject to the per-doc truncation guard so
-// a pathologically huge primary can't by itself blow the model context.
+// CORE documents (isCoreDoc: the elected form, every amendment, and anything naming
+// itself a solicitation/RFQ or real cover form) are admitted FIRST — they win the
+// budget outright rather than depending on where tier order happened to place them.
+// They are STILL subject to the per-doc truncation guard so a pathologically huge
+// primary can't by itself blow the model context. This comment used to say "the
+// form/primary is EXEMPT … it is the solicitation and must never be dropped"; the
+// code exempted `role === "form"`, which is ONE document and was not the
+// solicitation on W911SG27BA002. The claim is now implemented rather than asserted.
 export function applyTokenBudget<T extends { role: DocumentPlanEntry["role"]; tokens: number; name?: string }>(
   docs: T[],
   maxTotalTokens = MAX_TOTAL_TOKENS,
@@ -1149,17 +1165,44 @@ export function applyTokenBudget<T extends { role: DocumentPlanEntry["role"]; to
 } {
   const ingest: Array<T & { truncated: boolean; truncatedToTokens?: number }> = [];
   const skipped: Array<{ entry: T; reason: string }> = [];
+  const admitted = new Map<T, { truncated: boolean; truncatedToTokens?: number }>();
+  const rejected = new Map<T, string>();
+  const budgetK = Math.round(maxTotalTokens / 1000);
   let total = 0;
-  for (const d of docs) {
+
+  // TWO PASSES, CORE FIRST. The single greedy pass this replaces exempted only `role === "form"`,
+  // and exactly ONE document keeps that role (the form election demotes every other candidate).
+  // On W911SG27BA002 the elected form was "Instructions to Bidders (Revised).pdf", so the document
+  // named `Solicitation - W911SG27BA002.pdf` AND `Solicitation Amendment 0001.pdf` competed as
+  // ordinary attachments and were both evicted — measured on live run e5f177aa, 2026-08-05. The
+  // engine then reached a verdict without the solicitation or the amendment that supersedes it.
+  const admit = (d: T) => {
     const truncated = d.tokens > maxDocTokens;
     const contribution = truncated ? maxDocTokens : d.tokens;
-    const isForm = d.role === "form";
-    if (!isForm && total + contribution > maxTotalTokens) {
-      skipped.push({ entry: d, reason: `token budget (${Math.round(maxTotalTokens / 1000)}k tokens) exceeded` });
-      continue;
-    }
+    if (total + contribution > maxTotalTokens) return false;
     total += contribution;
-    ingest.push(truncated ? { ...d, truncated: true, truncatedToTokens: maxDocTokens } : { ...d, truncated: false });
+    admitted.set(d, truncated ? { truncated: true, truncatedToTokens: maxDocTokens } : { truncated: false });
+    return true;
+  };
+
+  // Pass A — core. A core doc that does not fit is a DIFFERENT and far more serious condition than
+  // a spec sheet dropping off the tail, so it carries its own reason string: the core set alone
+  // overflowed, which means no ordering could have saved it and the package needs a bigger budget.
+  for (const d of docs.filter(isCoreDoc)) {
+    if (!admit(d)) rejected.set(d, `token budget (${budgetK}k tokens) exceeded by CORE documents alone — solicitation/amendment dropped`);
+  }
+  // Pass B — everything else, in the caller's tier order, on what is left.
+  for (const d of docs.filter((d) => !isCoreDoc(d))) {
+    if (!admit(d)) rejected.set(d, `token budget (${budgetK}k tokens) exceeded`);
+  }
+
+  // Emit in the CALLER'S original order — the partition decides admission, never sequence.
+  // Downstream reads this array positionally in places, so reordering here would be a silent
+  // second change riding along with the intended one.
+  for (const d of docs) {
+    const a = admitted.get(d);
+    if (a) ingest.push({ ...d, ...a });
+    else skipped.push({ entry: d, reason: rejected.get(d) ?? `token budget (${budgetK}k tokens) exceeded` });
   }
   return { ingest, skipped };
 }
