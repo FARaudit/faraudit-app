@@ -318,7 +318,26 @@ export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: 
     // runs of the same solicitation). Grounded extraction is a temperature-0 task; pin it to 0 to remove sampling
     // noise from the finding set (mirrors anthropic-structured.ts, which already pins temperature:0 on the structured
     // path). Reduces — does not eliminate — variance (path-dependent agentic trajectories remain). Reversion = drop the field.
+    // EFFORT (2026-08-05) — until now this request carried NO `output_config`, so every expert call ran at the
+    // API default, which is `high`. That was never a decision; the parameter was simply never passed. This stage
+    // is 40 of the 46 sonnet calls on live run e5f177aa and ~90% of its cost, so it is the only place a
+    // fleet-wide effort change can matter.
+    //
+    // DEFAULT UNCHANGED: absent or unrecognized env ⇒ the field is omitted entirely ⇒ byte-identical to what
+    // production sends today. Only a known level is passed, so a typo degrades to today rather than to an API
+    // 400 on an unknown enum.
+    //
+    // ⚠ THE RISK IS COVERAGE, NOT COST, AND IT RUNS THE WRONG WAY. Anthropic documents that at `low` and
+    // `medium` the model "scopes work to what was asked rather than going above and beyond" and makes "fewer and
+    // more-consolidated tool calls". Every tool call a lens makes here IS a document it opens. The measured
+    // defect on e5f177aa is that the lenses already read only 17 of 52 assembled documents. So a cheaper run
+    // that reads even fewer is not a saving — it is the known defect getting worse for less money. Any
+    // comparison of effort levels MUST read docsRead and the finding count alongside cost, or it scores a
+    // coverage regression as a win.
+    const EFFORT_LEVELS = new Set(["low", "medium", "high", "xhigh", "max"]);
+    const lensEffort = process.env.AUDIT_LENS_EFFORT;
     const req: Record<string, unknown> = { model, max_tokens: opts?.maxTokens ?? 4096, temperature: 0, system: systemField, tools, messages };
+    if (lensEffort && EFFORT_LEVELS.has(lensEffort)) req.output_config = { effort: lensEffort };
     if (forceSubmit) req.tool_choice = { type: "tool", name: "submit_findings" }; // last turn → must produce findings
     // Pass the overall-budget signal so a breach cancels the in-flight paid call (stops
     // spend) instead of abandoning a Promise that keeps costing. Absent signal = no-op.
