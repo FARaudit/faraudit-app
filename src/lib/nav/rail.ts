@@ -240,7 +240,17 @@ export function railFonts(): string {
 }
 
 // The wordmark SIZE is DERIVED, not decreed: the size at which the loaded Fraunces
-// face's cap height matches the 31px Manrope reference.
+// face's cap height matches a 31px Manrope reference.
+//
+// ⚠ THAT REFERENCE IS UNPINNED, and it is the first link in this derivation. It is
+// not written down anywhere in this repo — not in the brand file, not in the
+// handoff — and no served page sets a 31px wordmark (the two that show one use
+// 16px/800). Design ruled on it at card 809: it came from a wordmark study rather
+// than a ruled brand fact, they cannot yet point at where it is recorded, and they
+// asked that 31px NOT be treated as brand truth in source on their say-so.
+// So: the arithmetic below is sound and its premise is borrowed. If 31 is wrong,
+// 31.9 is wrong with it. Design owns pinning the provenance or re-deriving against
+// a reference that exists; do not harden this number until they do.
 //
 // Re-measured for card 808 FIX 1 by pixel-scanning rendered ink at a 2000px probe.
 // Manrope 800 caps sit at 0.720 of the font size on all 11 glyphs sampled, with no
