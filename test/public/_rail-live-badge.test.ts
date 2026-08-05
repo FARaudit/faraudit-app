@@ -14,6 +14,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { renderRail } from "@/lib/nav/rail";
 
 let pass = 0; let fail = 0;
 const check = (label: string, ok: boolean, detail = "") => {
@@ -157,6 +158,45 @@ console.log("\n── Part E · retired brand mark ──");
   check("E-P1 · the check REJECTS the exact markup Design found", /class="sb-logo"/.test(PLANTED_BAD));
   const PLANTED_GOOD = `<div class="sb-logo-row"><span class="sb-wordmark">FAR<span class="wm-au">audit</span></span></div>`;
   check("E-P2 · the check ACCEPTS the wordmark alone (no false positive)", !/class="sb-logo"/.test(PLANTED_GOOD));
+}
+
+// ── Part F · appearance control: light · dark · system ────────────────────────────────────
+// The per-page theme toggle is 17 hand-copied inline scripts; Defense News proved that shape
+// drifts (it can switch theme but never remembers it). This control is ONE definition in the
+// rail. Driven in a browser before shipping: Light/Dark/System all apply, persist across
+// reload, and System resolves against the OS in both directions.
+console.log("\n── Part F · appearance control ──");
+{
+  // Asserted on the RENDERED markup, not the source: the choices are built from a template
+  // literal, and the source also contains an `aria-checked="true"` CSS SELECTOR. Grepping the
+  // file tests the wrong string in both directions — this reads what actually ships.
+  const markup = renderRail("opportunities");
+  const choices = [...markup.matchAll(/data-theme-choice="([a-z]+)"/g)].map((m) => m[1]);
+  check("rail · offers exactly light · dark · auto", JSON.stringify(choices) === JSON.stringify(["light", "dark", "auto"]), choices.join(",") || "(none rendered)");
+
+  // The checked option MUST be set at runtime from the stored preference. A literal
+  // aria-checked="true" in the MARKUP would show a choice the user never made.
+  check("rail · no hardcoded checked state in markup", !/aria-checked="true"/.test(markup), "a choice is pre-marked in markup");
+  check("rail · every choice is a menuitemradio", (markup.match(/role="menuitemradio"/g) ?? []).length === 3, "appearance options are not exposed as a radio group");
+
+  // The WHOLE query, not just the feature name. A negative control caught this: broken to
+  // `prefers-color-scheme: nope` the loose form still passed, so the check could not go red
+  // for the defect it exists to catch.
+  check("rail.ts · System is resolved against the OS", /\(prefers-color-scheme: dark\)/.test(rail), "auto never consults the OS — System would render as light");
+  check("rail.ts · the OS listener only acts while the preference is System", /pref\(\)==='auto'/.test(rail), "an explicit light/dark choice could be overridden when the OS flips");
+
+  // Shipping the control must NOT silently switch existing users to System. With nothing
+  // stored, the page keeps its own default and nothing is written.
+  check("rail.ts · no preference is written on load", /if\(cur\)apply\(cur,false\)/.test(rail), "load path persists a value the user never chose");
+  check("rail.ts · shares the existing storage key", /'faraudit-theme'/.test(rail), "a second key would fight the 17 inline page scripts");
+
+  // Planted positives — both directions.
+  const PLANTED_HARDCODED = `<button data-theme-choice="dark" aria-checked="true">Dark</button>`;
+  check("F-P1 · rejects a pre-marked choice", /aria-checked="true"/.test(PLANTED_HARDCODED));
+  const PLANTED_OK = `<button data-theme-choice="dark" aria-checked="false">Dark</button>`;
+  check("F-P2 · accepts a runtime-marked choice (no false positive)", !/aria-checked="true"/.test(PLANTED_OK));
+  const PLANTED_NO_OS = `var resolve=function(v){return v==='auto'?'light':v};`;
+  check("F-P3 · catches a System option that never reads the OS", !/prefers-color-scheme/.test(PLANTED_NO_OS));
 }
 
 console.log(`\n${pass} passed · ${fail} failed`);
