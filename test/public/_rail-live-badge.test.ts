@@ -140,5 +140,24 @@ console.log("\n── Part D · planted positives ──");
   check("D3 · catches an unconditional live call site", !/setRailLiveBadge\((?!'live'|"live")/.test(PLANTED_CONST));
 }
 
+// ── Part E · the retired single-letter mark must never return to the rail ──────────────────
+// Design found it live on ALL 18 rail-injected surfaces after the purge was believed complete.
+// It survived precisely because the rail is injected at SERVE time: sweeping the design files
+// and public/*.html could not reach this string, and NOTHING here asserted on it. The logo row
+// must hold the wordmark and nothing else.
+console.log("\n── Part E · retired brand mark ──");
+{
+  const row = (rail.match(/<div class="sb-logo-row">[\s\S]*?<\/div>/) ?? [""])[0];
+  check("rail.ts · a logo row exists to check", row.length > 0, "sb-logo-row not found — this gate asserted nothing");
+  check("rail.ts · no retired single-letter mark beside the wordmark", !/class="sb-logo"/.test(row), row.slice(0, 160));
+  check("rail.ts · the logo row is the wordmark alone", /^<div class="sb-logo-row"><span class="sb-wordmark">/.test(row), row.slice(0, 160));
+
+  // Planted positives — this leg must be able to go red, in BOTH directions.
+  const PLANTED_BAD = `<div class="sb-logo-row"><div class="sb-logo">F</div><span class="sb-wordmark">FAR</span></div>`;
+  check("E-P1 · the check REJECTS the exact markup Design found", /class="sb-logo"/.test(PLANTED_BAD));
+  const PLANTED_GOOD = `<div class="sb-logo-row"><span class="sb-wordmark">FAR<span class="wm-au">audit</span></span></div>`;
+  check("E-P2 · the check ACCEPTS the wordmark alone (no false positive)", !/class="sb-logo"/.test(PLANTED_GOOD));
+}
+
 console.log(`\n${pass} passed · ${fail} failed`);
 if (fail > 0) process.exit(1);
