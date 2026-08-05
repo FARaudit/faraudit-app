@@ -15,7 +15,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import vm from "vm";
-import { renderRail, railStyle, railScript, injectRail } from "@/lib/nav/rail";
+import { renderRail, railStyle, railScript, injectRail, railFonts } from "@/lib/nav/rail";
 
 let pass = 0; let fail = 0;
 const check = (label: string, ok: boolean, detail = "") => {
@@ -268,7 +268,23 @@ console.log("\n── Part H · card 807 workflow rail ──");
   check("--sb-width declared for open AND closed", /\[data-sb="open"\]\{--sb-width/.test(S) && /--sb-width:66px/.test(S), "an unresolved var() voids the whole grid declaration");
   check("no retired FA monogram", !S.includes('content:"FA"'), "the two-letter mark is back");
   check("no CSS rationale shipped to the browser", !S.includes("/*"), "comments in served CSS are public");
-  check("wordmark ruled treatment declared", /Fraunces/.test(S) && /31\.3px/.test(S), "16 of 18 pages hide the wordmark without this");
+  // Card 808 FIX 1. The old form of this check pinned the literal "31.3px", which made a
+  // DERIVED number look like a constant — it asserted the answer instead of the property that
+  // makes the answer right. What must hold is that the ruled cut is actually REQUESTED (no
+  // served page asked for upright 900, so the mark rendered as a synthesised bold of an italic
+  // face or as Georgia) and that the declared size is the one that was derived against it.
+  check("wordmark ruled treatment declared", /Fraunces/.test(S) && /font-weight:900/.test(S), "16 of 18 pages hide the wordmark without this");
+  const fontLink = railFonts();
+  check("the ruled cut is requested, not just declared", /fonts\.googleapis\.com/.test(fontLink) && /Fraunces/.test(fontLink), "a declared face that is never fetched renders as the fallback");
+  check("the requested cut is UPRIGHT 900", /wght@72,900/.test(fontLink) && !/ital,/.test(fontLink), "italic-only axes were what shipped; 900 upright is the ruling");
+  const declaredPx = (S.match(/\.sb-head \.sb-wordmark\{[^}]*font-size:([\d.]+)px/) || [])[1];
+  check("the declared size is the DERIVED size", declaredPx === "31.9", `declared ${declaredPx}px — 31 x (0.720 Manrope cap / 0.700 Fraunces cap) = 31.886`);
+  check("injectRail puts the font in <head>", injectRail("<html><head></head><body></body></html>", "today").includes(`${fontLink}</head>`), "a face requested after the body swaps in post-paint");
+
+  // Planted positives for the three checks above — each must be able to go red.
+  check("F-P1 · rejects an italic-only request", !/wght@72,900/.test("family=Fraunces:ital,opsz,wght@1,72,500;1,72,600"));
+  check("F-P2 · rejects a declaration with no request", !/fonts\.googleapis\.com/.test('.sb-head .sb-wordmark{font-family:"Fraunces"}'));
+  check("F-P3 · rejects the superseded 31.3px", (('.sb-head .sb-wordmark{font-size:31.3px'.match(/font-size:([\d.]+)px/) || [])[1]) !== "31.9");
 
   // The injected script is covered by NO other gate — the inline-script suite reads public/ only.
   // vm.Script COMPILES without executing, so this asks only "does it parse".

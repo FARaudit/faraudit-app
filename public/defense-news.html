@@ -70,7 +70,7 @@ button{font-family:inherit}
 .sb-tip::before{content:"";position:absolute;left:-3px;top:50%;transform:translateY(-50%) rotate(45deg);width:6px;height:6px;background:#050d1a}
 .sb-icon:hover .sb-tip{opacity:1;transform:translateY(-50%) translateX(2px)}
 .frame{grid-template-columns:var(--sb-width, 56px) 1fr;transition:grid-template-columns .22s cubic-bezier(0.16,1,0.3,1)}
-[data-sb="open"] .frame{--sb-width:232px}
+[data-sb="open"]{--sb-width:232px}
 .sidebar{transition:width .22s cubic-bezier(0.16,1,0.3,1);width:var(--sb-width, 56px);min-height:100%}
 [data-sb="open"] .sidebar-sticky{align-items:stretch;padding:14px 10px 14px}
 .sb-wordmark{display:none}
@@ -825,8 +825,8 @@ if (document.readyState === 'loading') {
   var sun = document.getElementById('themeSun');
   var moon = document.getElementById('themeMoon');
   var themeBtn = document.getElementById('themeToggle');
-  var sbBtn = document.getElementById('sbToggle');
   function syncThemeIcons(){
+    if (!sun || !moon) return;
     var t = root.getAttribute('data-theme');
     if (t === 'light') { sun.style.display = 'none'; moon.style.display = ''; }
     else               { sun.style.display = '';    moon.style.display = 'none'; }
@@ -836,10 +836,6 @@ if (document.readyState === 'loading') {
     var next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
     root.setAttribute('data-theme', next);
     syncThemeIcons();
-  });
-  if (sbBtn) sbBtn.addEventListener('click', function(){
-    var open = root.getAttribute('data-sb') === 'open';
-    root.setAttribute('data-sb', open ? 'closed' : 'open');
   });
 })();
 </script>
