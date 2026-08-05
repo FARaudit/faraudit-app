@@ -78,6 +78,19 @@
     return `<div class="fld"><label>${label}</label><div class="fld-ro">${val ? esc(val) : '<span class="fld-none">Not on file</span>'}</div>${note ? `<div class="fld-note">${esc(note)}</div>` : ''}</div>`;
   }
 
+  // Plan name and price come from /api/profile. No field renders unless the route
+  // supplies it.
+  const money = (n) => typeof n === 'number' && isFinite(n)
+    ? '$' + n.toLocaleString('en-US') : null;
+  function planName() {
+    return window.PS.plan_label || '<span class="fld-none">Not on file</span>';
+  }
+  function planPrice() {
+    const m = money(window.PS.plan_price_monthly), y = money(window.PS.plan_price_annual);
+    if (!m && !y) return '<span class="fld-none">Price not on file</span>';
+    return [m && m + ' / month', y && 'or ' + y + ' / year'].filter(Boolean).join(' · ');
+  }
+
   const PANELS = {
     /* SETTINGS OWNS THE PERSON. The company — name, UEI, CAGE, address, NAICS,
        certifications — lives in the capability statement, which is a document the customer
@@ -112,19 +125,19 @@
       <div class="sp-hd"><div class="sp-t">NAICS Configuration</div><div class="sp-s">These codes drive every intelligence filter across FARaudit</div></div>
       <div class="sp-bd">
         ${NAICS.map(n => `<div class="naics-row"><div class="nr-l"><span class="nr-code">${n.code}</span><span class="nr-label">${n.desc}</span></div><span class="nr-tag ${n.tag === 'PRIMARY' ? 'p' : n.tag === 'MONITOR ONLY' ? 'm' : 's'}">${n.tag}</span><button class="nr-x" title="Remove">✕</button></div>`).join('')}
-        <button class="add-btn">+ Add NAICS code</button>
+        <a class="add-btn" href="/capability-statement">Edit NAICS codes on your capability statement</a>
         <div class="note"><b>How this works:</b> Your NAICS codes filter opportunities, contracting officers, agencies, wage benchmarks, and teaming partners. Changes take effect immediately across all pages.</div>
       </div>
-      <div class="sp-foot"><span class="saved">✓ Saved</span><button class="save-btn">Save changes</button></div>`,
+      `,
 
     agencies: () => `
       <div class="sp-hd"><div class="sp-t">Target Agencies</div><div class="sp-s">Toggle monitoring for each command &amp; installation</div></div>
       <div class="sp-bd">
         ${AGENCIES.map((a, i) => `<div class="ag-row"><div class="ag-l"><span class="ag-code">${a.code}</span><span class="ag-pill base">${a.base}</span><span class="ag-pill type">${a.type}</span></div><button class="ag-tg" data-ag="${i}">${tog(a.on)}</button></div>`).join('')}
-        <button class="add-btn">+ Add agency / installation</button>
+        <p class="ps-unwired">Adding an agency is not built yet. Your Opportunities feed is scoped by the NAICS codes on your capability statement.</p>
         <div class="note"><b>${AGENCIES.filter(a => a.on).length} of ${AGENCIES.length} agencies monitored.</b> Active agencies scope your Opportunities feed, Spending map, and CO network.</div>
       </div>
-      <div class="sp-foot"><span class="saved">✓ Saved</span><button class="save-btn">Save changes</button></div>`,
+      `,
 
     notifs: () => `
       <div class="sp-hd"><div class="sp-t">Notification Preferences</div><div class="sp-s">Control what triggers alerts in your inbox</div></div>
@@ -140,25 +153,25 @@
         ${NOTIFS.map((n, i) => `<div class="nf-row"><div class="nf-l"><div class="nf-t">${n.t}</div><div class="nf-d">${n.d}</div></div><span class="nf-ch">Email + In-app</span><button class="nf-tg" data-nf="${i}">${tog(n.on)}</button></div>`).join('')}
         <div class="note">Delivered to <b>${COMPANY.email}</b>. Critical alerts also push to the bell in your top bar.</div>
       </div>
-      <div class="sp-foot"><span class="saved">✓ Saved</span><button class="save-btn">Save changes</button></div>`,
+      `,
 
     team: () => `
       <div class="sp-hd"><div class="sp-t">Team Members</div><div class="sp-s">Manage who has access to your FARaudit workspace</div></div>
       <div class="sp-bd">
         ${TEAM.map(m => `<div class="tm-row"><div class="tm-av">${m.name.split(' ').map(w => w[0]).join('')}</div><div class="tm-info"><div class="tm-name">${m.name}${m.you ? ' <span class="tm-you">You</span>' : ''}</div><div class="tm-email">${m.email}</div></div><span class="tm-role">${m.role}</span></div>`).join('')}
-        <button class="add-btn">+ Add team member</button>
-        <div class="note"><b>Plan limit:</b> Design Partner plan includes 1 seat. Upgrade to Standard for 3 seats.</div>
+        <p class="ps-unwired">Inviting teammates is not built yet. This workspace has one seat, yours.</p>
+        <div class="note">One seat, yours. Seat limits are set by your plan — see Billing.</div>
       </div>`,
 
     billing: () => `
       <div class="sp-hd"><div class="sp-t">Billing &amp; Plan</div><div class="sp-s">Manage your subscription and usage</div></div>
       <div class="sp-bd">
-        <div class="plan-card"><div class="pc-l"><div class="pc-kicker">Current plan</div><div class="pc-name">Design Partner</div><div class="pc-desc">$1,250 / month · or $15,000 / year</div><div class="pc-next">Next billing: June 1, 2026 · Auto-renew on</div></div><div class="pc-r"><div class="pc-badge">Active</div></div></div>
+        <div class="plan-card"><div class="pc-l"><div class="pc-kicker">Current plan</div><div class="pc-name">${planName()}</div><div class="pc-desc">${planPrice()}</div></div></div>
         <div class="fld-sec">Usage this period</div>
-        <div class="usage-list">${USAGE.map(u => `<div class="us-row"><div class="us-l">${u.l}${u.s ? `<small>${u.s}</small>` : ''}</div><span class="us-v">${u.v}</span></div>`).join('')}</div>
-        <div class="upgrade"><div class="up-l"><div class="up-kicker">Upgrade to Standard</div><div class="up-price">$2,500 / month · or $30,000 / year</div><div class="up-desc">100 audits/month · 3 team seats · priority corpus updates</div></div><button class="save-btn dark">Upgrade to Standard</button></div>
-        <div class="bill-actions"><button class="ghost-btn">View invoices</button><button class="ghost-btn">Pay annually — $15,000/yr</button></div>
-        <div class="danger"><div class="dz-t">Danger zone</div><div class="dz-d">Canceling stops your subscription at the end of the current billing period. Your data is retained for 90 days.</div><button class="danger-btn">Cancel subscription</button></div>
+        ${USAGE.length
+          ? `<div class="usage-list">${USAGE.map(u => `<div class="us-row"><div class="us-l">${u.l}${u.s ? `<small>${u.s}</small>` : ''}</div><span class="us-v">${u.v}</span></div>`).join('')}</div>`
+          : '<p class="ps-unwired">Usage metering is not built yet, so there is nothing to show for this period.</p>'}
+        <p class="ps-unwired">Changing or cancelling your plan, and invoices, are not self-service yet — they go through your point of contact. Nothing on this page can alter your billing.</p>
       </div>`
   };
 
@@ -168,9 +181,8 @@
   }
   function renderPanel() {
     $('setContent').innerHTML = `<div class="set-panel">${PANELS[active]()}</div>`;
-    $('setContent').querySelectorAll('.tgl').forEach(t => t.parentElement.onclick = (e) => { e.preventDefault(); t.classList.toggle('on'); flash(); });
-    $('setContent').querySelectorAll('.cert-tg').forEach(b => b.onclick = () => { b.classList.toggle('on'); b.textContent = (b.classList.contains('on') ? '✓ ' : '') + b.dataset.cert; flash(); });
-    const sb = $('setContent').querySelector('.save-btn'); if (sb) sb.onclick = () => flash();
+    // Server-backed preferences bind below, by key. The company panel's Save binds in
+    // profile-settings-live.js. Nothing else on the page is interactive.
     wireServerPrefs();
   }
   // Server-backed preference toggles. data-pref-tg="<key>" looks up the
@@ -215,7 +227,13 @@
       });
     });
   }
-  function flash() { const el = $('savedAt'); if (el) { el.textContent = 'saved just now'; setTimeout(() => el.textContent = 'changes save automatically', 2200); } }
+  // Confirms a save that the server acknowledged, naming the field.
+  function flash(what) {
+    const el = $('savedAt');
+    if (!el) return;
+    el.textContent = what ? '\u2713 ' + what + ' saved' : '';
+    if (what) setTimeout(() => { el.textContent = ''; }, 2600);
+  }
 
   function init() { renderNav(); renderPanel(); }
   window.PS_APP = { render: init, onThemeChange: () => renderPanel() };

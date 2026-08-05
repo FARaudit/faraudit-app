@@ -12,7 +12,7 @@
 // Same family as test/public/_today-fabrication.test.ts: a claim with no computation
 // behind it. Part D plants positives so a vacuous pass is impossible.
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import vm from "vm";
 import { renderRail, railStyle, railScript, injectRail, railFonts } from "@/lib/nav/rail";
@@ -296,6 +296,90 @@ console.log("\n── Part H · card 807 workflow rail ──");
   check("H-P1 · the count check rejects a literal", /(>(4|19)<\/span>|72%)/.test(`<span class="sb-ct">19</span>`));
   check("H-P2 · the count check accepts a clean rail", !/>(4|19)<\/span>|72%/.test(`<span class="sb-label">Pipeline</span>`));
   check("H-P3 · the monogram check rejects the excluded rule", '.sb-wordmark::after{content:"FA"}'.includes('content:"FA"'));
+}
+
+// ── Part I · the field colour is a system value, not a page preference ──
+// Design ruling, card 809: defense-news held --page-bg:#f0f4f8 against #eef2f7 on the
+// other 18. It rendered fine, which is why it survived three reviews — a fork only
+// looks local until you count. That page has now been the outlier three separate
+// times (this token, the --sb-width scoping, and a duplicate #sbToggle binding), and
+// each one alone read as a one-page quirk.
+//
+// So this does not name defense-news. It checks that ONE value is shared, whichever
+// page breaks ranks next.
+// ── Part J · the rail is styled at first paint, and it stays on screen ──
+// Both found by driving the live platform, not by reading.
+//   · The stylesheet was injected before </body> — last of five sheets and the only
+//     one outside <head> — so every navigation painted the rail with the PAGE's own
+//     sidebar CSS first (oversized icons, page palette) and repainted when the sheet
+//     parsed. The user saw it as a flash on every tab click.
+//   · The OPEN rail had overflow-y:visible while the CLOSED rail had auto. With the
+//     sections expanded the content needs ~936px, so under that viewport the profile
+//     control at the bottom spilled out of the sticky box and off the bottom of the
+//     page. It fit on a tall monitor, which is why it survived review.
+console.log("\n── Part J · styled at first paint, and stays on screen ──");
+{
+  const page = "<html><head><style>.page{}</style></head><body><aside class=\"sidebar\"></aside></body></html>";
+  const out = injectRail(page, "today");
+  const headEnd = out.indexOf("</head>");
+  check("rail stylesheet is in <head>", out.indexOf('id="sb-phase5"') < headEnd, "injected after the body — the rail paints unstyled first");
+  check("font link is in <head>", out.indexOf('id="sb-phase5-font"') < headEnd, "the face swaps in after the mark has painted");
+  check("rail script stays at the end of the body", out.indexOf("sbAvatarBtn") > headEnd, "a blocking script moved into the head");
+  const sheet = railStyle();
+  // Anchored on the rule's own boundary. The first version matched
+  // `[data-sb="mini"] .sidebar{overflow…}` as well, because that selector CONTAINS the
+  // bare one — so deleting the rule under test left the check green. It could not fail.
+  const bareSidebarRule = /[};]\.sidebar\{[^}]*\}/g;
+  const bare = (sheet.match(bareSidebarRule) ?? []).join(" ");
+  check("the rail owns its own stickiness", /position:sticky!important/.test(bare) && /height:100vh!important/.test(bare), "stickiness is left to each page's CSS");
+  check("the rail scrolls inside itself, open or closed", /overflow-y:auto!important/.test(bare), "content spills past the sticky box on a short viewport");
+  check("the closed strip still scrolls too", /\[data-sb="mini"\] \.sidebar,\[data-sb="closed"\] \.sidebar\{overflow-x:hidden!important;overflow-y:auto!important\}/.test(sheet), "the strip lost its overflow rule");
+
+  // Planted positives.
+  const bodyInjected = page.replace("</body>", '<style id="sb-phase5"></style></body>');
+  check("J-P1 · rejects a stylesheet injected after the body", !(bodyInjected.indexOf('id="sb-phase5"') < bodyInjected.indexOf("</head>")));
+  check("J-P2 · rejects a rail with no overflow rule", !/overflow-y:auto!important/.test("}.sidebar{background:red}".match(/[};]\.sidebar\{[^}]*\}/g)?.join(" ") ?? ""));
+  check("J-P3 · the anchored match ignores the mini/closed rule", ('[data-sb="mini"] .sidebar,[data-sb="closed"] .sidebar{overflow-y:auto!important}'.match(/[};]\.sidebar\{[^}]*\}/g) ?? []).length === 0);
+}
+
+console.log("\n── Part I · no page forks the field colour ──");
+{
+  // Scoped to the RAIL pages — the ones that carry the replaceable <aside class="sidebar">.
+  // The first version of this scanned every public/*.html and condemned learn.html and
+  // root-landing.html, which are dark-first marketing surfaces and share nothing with the
+  // app field on purpose. A parity check that cannot tell a fork from a different product
+  // surface reports the healthy pages and buries the real one.
+  const pages = readdirSync(join(ROOT, "public"))
+    .filter((f) => f.endsWith(".html"))
+    .map((f) => ({ f, src: read(`public/${f}`) }))
+    .filter((p) => p.src.includes("--page-bg") && p.src.includes('class="sidebar"'));
+
+  const firstValue = (src: string, token: string) =>
+    (src.match(new RegExp(`${token}:\\s*(#[0-9a-fA-F]{3,8})`)) ?? [])[1]?.toLowerCase();
+
+  for (const token of ["--page-bg", "--bg"]) {
+    const byValue = new Map<string, string[]>();
+    for (const p of pages) {
+      // the light field is the first declaration; the dark override follows
+      const v = firstValue(p.src, token);
+      if (!v) continue;
+      byValue.set(v, [...(byValue.get(v) ?? []), p.f]);
+    }
+    const sorted = [...byValue.entries()].sort((a, b) => b[1].length - a[1].length);
+    const [majority, ...forks] = sorted;
+    const odd = forks.flatMap(([v, fs]) => fs.map((f) => `${f}=${v}`));
+    check(
+      `${token} is one value across ${pages.length} pages`,
+      odd.length === 0,
+      `majority ${majority?.[0]} on ${majority?.[1].length} · forked: ${odd.join(", ")}`,
+    );
+  }
+
+  // Planted positives — the parity check must be able to see a fork.
+  const distinct = (a: string, b: string) =>
+    new Set([a, b].map((s) => firstValue(s, "--page-bg"))).size > 1;
+  check("I-P1 · rejects two pages on different field colours", distinct("--page-bg:#eef2f7", "--page-bg:#f0f4f8"));
+  check("I-P2 · accepts two pages on the same field colour", !distinct("--page-bg:#eef2f7", "--page-bg:#eef2f7"));
 }
 
 console.log(`\n${pass} passed · ${fail} failed`);
