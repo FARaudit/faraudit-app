@@ -99,3 +99,48 @@ export const SF30_FIELDS: FixtureField[] = [
   { name: "Block14Description", value: "Response Due Date changed from 30 Jul 2026 to 06 Aug 2026." },
   { name: "EmptyOnPurpose", value: "" },
 ];
+
+// ── SF-1449 COVER PAGE (block 10) ────────────────────────────────────────────────────────────────────────────
+// TRANSCRIBED FROM THE REAL DOCUMENT, not composed: solicitation W9123826QA032 (USACE Sacramento, NAICS 561730,
+// Total Small Business Set-Aside), the 70-page specimen behind audit 583df921. Labels are the content-stream
+// lines verbatim; field names and values are what `recoverAcroFormFields` returns from that PDF's 114 widgets.
+//
+// WHY THIS FORM SPECIFICALLY. The SF-1449 is the commercial-buy cover page, so it is the highest-VOLUME form we
+// ingest, and block 10 carries two bid-deciding facts — the set-aside percentage and the size standard. Both
+// exist ONLY in the form layer: page text ends at "SET ASIDE: \t% FOR:" with the next LABEL after it.
+//
+// THE CHECKBOX ROW IS THE TRAP, and it is why a value-only fixture would not be enough. All six socioeconomic
+// captions ("8(A)", "HUBZONE SMALL BUSINESS", "SERVICE-DISABLED…", "WOMEN-OWNED…") print as ordinary page text
+// whether or not they are ticked, so page text alone reads as though every program applied. Exactly one is
+// selected here and the tick lives only in /AS.
+export const SF1449_LABELS = [
+  "10. THIS ACQUISITION IS UNRESTRICTED OR",
+  "NORTH AMERICAN",
+  "INDUSTRY CLASSIFICATION",
+  "STANDARD (NAICS):",
+  "SIZE STANDARD:",
+  "SET ASIDE: % FOR:",
+  "8(A)",
+  "ECONOMICALLY DISADVANTAGED WOMEN-OWNED SMALL BUSINESS (EDWOSB)",
+  "SERVICE-DISABLED VETERAN-OWNED SMALL BUSINESS (SDVOSB)",
+  "HUBZONE SMALL BUSINESS",
+  "SMALL BUSINESS",
+  "PREVIOUS EDITION IS NOT USABLE STANDARD FORM 1449 (REV. 11/2021)",
+];
+
+export const SF1449_FIELDS: FixtureField[] = [
+  { name: "05solicitationnumber", value: "W9123826QA032" },
+  { name: "06solissuedate", value: "29 JUL 2026" },
+  { name: "08offerduedate", value: "01 SEP 2026" },
+  { name: "10naics", value: "561730" },
+  { name: "10sizestandard", value: "USD 9,500,000.00" },
+  { name: "10setasidepercent", value: "100" },
+  { name: "10setasidecheckbox", value: "Yes", checkbox: true, checked: true },
+  { name: "10smallbusinesscheckbox", value: "Yes", checkbox: true, checked: true },
+  { name: "10unrestrictedcheckbox", value: "Yes", checkbox: true, checked: false },
+  { name: "10wosbcheckbox", value: "Yes", checkbox: true, checked: false },
+  { name: "10edwosbcheckbox", value: "Yes", checkbox: true, checked: false },
+  { name: "10hubzonecheckbox", value: "Yes", checkbox: true, checked: false },
+  { name: "10servicedisabledcheckbox", value: "Yes", checkbox: true, checked: false },
+  { name: "10_8acheckbox", value: "Yes", checkbox: true, checked: false },
+];
