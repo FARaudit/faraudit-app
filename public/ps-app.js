@@ -67,25 +67,46 @@
 
   function tog(on) { return `<span class="tgl ${on ? 'on' : ''}"><i></i></span>`; }
   function field(label, val, ph) { return `<div class="fld"><label>${label}</label><input type="text" value="${val || ''}" placeholder="${ph || ''}"></div>`; }
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  /* An editable field carries an id so the save handler can read it back. Anything with no
+     write path must NOT render as an <input>: a text box that silently discards what you
+     type is the defect this panel shipped with. */
+  function editable(id, label, val, ph) { return `<div class="fld"><label>${label}</label><input type="text" id="${id}" value="${esc(val)}" placeholder="${esc(ph)}"></div>`; }
+  /* Read-only value. "Not on file" rather than an empty box, so nothing-on-file is visibly
+     different from a field you are meant to fill in. */
+  function ro(label, val, note) {
+    return `<div class="fld"><label>${label}</label><div class="fld-ro">${val ? esc(val) : '<span class="fld-none">Not on file</span>'}</div>${note ? `<div class="fld-note">${esc(note)}</div>` : ''}</div>`;
+  }
 
   const PANELS = {
+    /* SETTINGS OWNS THE PERSON. The company — name, UEI, CAGE, address, NAICS,
+       certifications — lives in the capability statement, which is a document the customer
+       sends to contracting officers AND the record the audit engine reads to judge
+       eligibility. It is shown here read-only with one link out: one record, one editor.
+       Everything below that has no write path renders as text, never as an <input>. */
     company: () => `
-      <div class="sp-hd"><div class="sp-t">Company Profile</div><div class="sp-s">Legal entity information &amp; certifications</div></div>
+      <div class="sp-hd"><div class="sp-t">Your Account</div><div class="sp-s">Your details, and the company record the platform runs on</div></div>
       <div class="sp-bd">
+        <div class="fld-sec">Your details</div>
         <div class="fld-grid">
-          ${field('Company name', COMPANY.name)}
-          ${field('CAGE code', COMPANY.cage)}
-          ${field('SAM.gov UEI', COMPANY.uei)}
-          ${field('Business address', COMPANY.address)}
-          ${field('Primary contact', COMPANY.contact)}
-          ${field('Email', COMPANY.email)}
-          ${field('Phone', COMPANY.phone)}
+          ${editable('psFullName', 'Full name', COMPANY.contact, 'Your name')}
+          ${ro('Email', COMPANY.email, 'Your sign-in address. Changing it needs a verification step — not editable here.')}
         </div>
+        <div class="fld-sec">Company record</div>
+        <div class="fld-grid">
+          ${ro('Company name', COMPANY.name)}
+          ${ro('SAM.gov UEI', COMPANY.uei)}
+          ${ro('CAGE code', COMPANY.cage)}
+          ${ro('Business address', COMPANY.address)}
+        </div>
+        <div class="fld-sec">NAICS codes</div>
+        <div class="cert-row">${NAICS.length ? NAICS.map(n => `<span class="cert-tg on">${esc(n.code || n.k || n)}</span>`).join('') : '<span class="fld-none">None on file</span>'}</div>
+        ${NAICS.length ? '' : '<div class="note note-warn">No NAICS codes on file, so Opportunities, Teaming Partners, Contracting Officers and Wage Benchmarks have nothing to match against and will stay empty. Add them in the capability statement.</div>'}
         <div class="fld-sec">Certifications</div>
-        <div class="cert-row">${CERTS.map(c => `<button class="cert-tg ${c.on ? 'on' : ''}" data-cert="${c.k}">${c.on ? '✓ ' : ''}${c.k}</button>`).join('')}</div>
-        <div class="note"><b>Synced from SAM.gov.</b> Certifications unlock set-aside eligibility across Opportunities and Teaming. Last sync May 28, 2026.</div>
+        <div class="cert-row">${CERTS.length ? CERTS.map(c => `<span class="cert-tg on">${esc(c.k || c)}</span>`).join('') : '<span class="fld-none">None on file</span>'}</div>
+        <div class="note">The company record is edited in the <a href="/capability-statement">capability statement</a>. It is the document you send to contracting officers, and the audit engine reads the same record when it judges whether you are eligible to bid — so what is entered there shapes real verdicts.</div>
       </div>
-      <div class="sp-foot"><span class="saved">✓ Saved</span><button class="save-btn">Save changes</button></div>`,
+      <div class="sp-foot"><span class="saved" id="psSavedNote" hidden></span><button class="save-btn" id="psSaveBtn">Save changes</button></div>`,
 
     naics: () => `
       <div class="sp-hd"><div class="sp-t">NAICS Configuration</div><div class="sp-s">These codes drive every intelligence filter across FARaudit</div></div>
