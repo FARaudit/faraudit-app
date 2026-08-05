@@ -109,6 +109,9 @@ export interface OpportunityRow {
   ui_link?: string | null;
   office_path?: string | null;
   psc_code?: string | null;
+  // SAM v2 returns `description` as a noticedesc URL, not text. Carried as the
+  // URL; src/lib/sam-description.ts resolves it on demand.
+  description_url?: string | null;
   point_of_contact?: Array<{ type?: string | null; fullName?: string | null; email?: string | null; phone?: string | null }> | null;
   place_of_performance?: unknown;
   office_address?: unknown;

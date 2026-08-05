@@ -62,6 +62,7 @@ interface RawSamItem {
   responseDeadLine?: string | null;
   resourceLinks?: string[] | null;
   uiLink?: string | null;
+  description?: string | null;
   awardCeiling?: number | null;
   baseAndAllOptionsValue?: number | null;
   classificationCode?: string | null;
@@ -163,6 +164,10 @@ export function mapSamItems(raw: RawSamItem[], now: Date): OpportunityRow[] {
       // an empty array means "SAM listed none", which is a different fact.
       resource_links: Array.isArray(o.resourceLinks) ? o.resourceLinks : null,
       ui_link: o.uiLink ?? null,
+      // The noticedesc URL, not the text — resolving 200 of them per feed read
+      // would be 200 extra SAM calls. Carried here so a single notice can be
+      // resolved when the customer opens it.
+      description_url: typeof o.description === "string" ? o.description : null,
       office_path: o.fullParentPathName ?? null,
       // Free in the search call we already make. Measured on the live feed:
       // psc and point_of_contact are present on every notice; place_of_performance

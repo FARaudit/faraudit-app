@@ -592,7 +592,8 @@ function detailHTML(o) {
   if (!rows.length) return '';
   return '<div class="pc-detail">' + rows.map(function (r) {
     return '<div class="pd-row"><span class="pd-k">' + r[0] + '</span><span class="pd-v">' + r[1] + '</span></div>';
-  }).join('') + '</div>';
+  }).join('') + '<div class="pd-row"><span class="pd-k">WHAT SAM SAYS</span>' +
+     '<span class="pd-v" data-desc>\u2014</span></div></div>';
 }
 
 /* SAM returns placeOfPerformance as an object whose shape varies by notice.
@@ -613,7 +614,7 @@ function rowHTML(o) {
   const far = o.days == null ? 'later' : o.days <= 3 ? '' : o.days <= 7 ? 'far' : 'later';
   const hasSolicitation = o.stage !== 'notice';
   const auditRef = o.notice_id || o.id;
-  return '<div class="pcard' + (far ? ' ' + far : '') + (v.k === 'ASSERT' ? ' barred' : '') + '" data-id="' + esc(o.id) + '">' +
+  return '<div class="pcard' + (far ? ' ' + far : '') + (v.k === 'ASSERT' ? ' barred' : '') + '" data-id="' + esc(o.id) + '" data-notice="' + esc(o.notice_id || '') + '">' +
     /* the label states the EXCEPTION, it does not repeat the rule: with LEFT the
        row said the deadline three times (numeral, word, and the note below). */
     '<div class="pc-when"><div class="pc-d">' + (o.days == null ? '—' : o.days + '<small>d</small>') + '</div>' +
@@ -845,7 +846,33 @@ function bindDetailToggles() {
     const open = card.classList.toggle('is-open');
     b.setAttribute('aria-expanded', open ? 'true' : 'false');
     b.textContent = open ? 'Hide details' : 'Details';
+    if (open) loadDescription(card);
   });
+}
+
+/* The notice text. SAM's search returns a URL, not prose, so it is resolved per
+   notice through /api/notice-description the first time a card is opened.
+   "not published", "could not read" and "still loading" stay distinct. */
+function loadDescription(card) {
+  const slot = card.querySelector('[data-desc]');
+  if (!slot || slot.dataset.state) return;      // once per card
+  const notice = card.getAttribute('data-notice');
+  if (!notice) { slot.dataset.state = 'none'; slot.textContent = 'not published by SAM'; return; }
+  slot.dataset.state = 'loading';
+  slot.textContent = 'reading SAM\u2026';
+  fetch('/api/notice-description?noticeId=' + encodeURIComponent(notice), { credentials: 'include' })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) {
+      if (!d) { slot.dataset.state = 'err'; slot.textContent = 'could not read SAM just now'; return; }
+      if (!d.description) {
+        slot.dataset.state = 'none';
+        slot.textContent = d.reason === 'empty-body' ? 'not published by SAM' : 'could not read SAM just now';
+        return;
+      }
+      slot.dataset.state = 'ok';
+      slot.textContent = d.description.replace(/\s+/g, ' ').slice(0, 600);
+    })
+    .catch(function () { slot.dataset.state = 'err'; slot.textContent = 'could not read SAM just now'; });
 }
 
 function bindResetAll() {
@@ -854,9 +881,28 @@ function bindResetAll() {
   b.addEventListener('click', (e) => { e.preventDefault(); reset(); });
 }
 
+/* Search. Sets S.q, which the row predicate reads; composes with
+   stage/set-aside/band rather than replacing them. Escape clears the term
+   without touching the other filters. */
+function bindSearch() {
+  const el = $('searchInput');
+  if (!el) { console.warn('[dso-app] #searchInput not found — search is unbound'); return; }
+  const apply = () => {
+    const next = el.value.trim().toLowerCase();
+    if (next === S.q) return;
+    S.q = next;
+    renderAll();
+  };
+  el.addEventListener('input', apply);
+  el.addEventListener('paste', () => setTimeout(apply, 0));
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && el.value) { e.preventDefault(); el.value = ''; apply(); }
+  });
+}
+
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => { renderAll(); bindResetAll(); bindDetailToggles(); });
-} else { renderAll(); bindResetAll(); bindDetailToggles(); }
+  document.addEventListener('DOMContentLoaded', () => { renderAll(); bindResetAll(); bindDetailToggles(); bindSearch(); });
+} else { renderAll(); bindResetAll(); bindDetailToggles(); bindSearch(); }
 /* the cell floor is a webfont measurement — re-derive once the fonts land, or
    it is computed against fallback metrics and reports a generous number. */
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ renderControls(); });
