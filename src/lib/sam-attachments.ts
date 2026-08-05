@@ -69,7 +69,25 @@ const FETCH_TIMEOUT_MS = 30000;
 // the real, safe ceilings: a genuinely huge package still trims lowest-tier docs
 // in tier order rather than 400-ing. 30 lets a normal large solicitation ingest
 // in full at no extra cost.
-export const MAX_DOCS = 36;
+// 2026-08-05 — MADE ENV-OVERRIDABLE (`AUDIT_MAX_DOCS`), default UNCHANGED at 36 so nothing moves until
+// it is armed deliberately. Measured on the live W911SG27BA002 run: this cap dropped 19 of 55 documents
+// and ALL 19 WERE BINDING — UFGS Earthwork / Cast-in-Place Concrete / Electrical / Asphalt Paving, and
+// SF 1413, a form the bidder must SUBMIT. A normal defense construction pursuit ships ~52 attachments;
+// the ceiling was 36, so the engine was structurally unable to read a routine package.
+//
+// ⚠ RAISING THIS ALONE DELIVERS NOTHING, and that is measured, not predicted. The 36 survivors already
+// assemble to 1,565,625 chars against MAX_FULLSOURCE_CHARS = 1,400,000, so the char ceiling then drops 7
+// more whole documents (29 of 55 actually reach the engine). Admitting all 55 needs ~2.39M chars — 1.7×
+// the char ceiling. BOTH must move together or the drop simply relocates to a later stage where it is
+// harder to see. Pair this with `AGENTIC_MAX_FULLSOURCE_CHARS` (agentic-executor.ts), which is already
+// env-overridable. The token budget below (850k) is NOT the binding constraint: 36 docs measured ~391k,
+// and all 55 project ~598k, still under it.
+// FAIL-SAFE PARSE, and it is not decoration: `Number("-5") || 36` yields -5, because -5 is truthy — a
+// negative or fractional value would sail through and silently ingest nothing. Caught by this file's own
+// gate. Only a positive integer overrides; anything else keeps the default.
+const DEFAULT_MAX_DOCS = 36;
+const _maxDocsEnv = Number(process.env.AUDIT_MAX_DOCS);
+export const MAX_DOCS = Number.isInteger(_maxDocsEnv) && _maxDocsEnv > 0 ? _maxDocsEnv : DEFAULT_MAX_DOCS;
 export const MAX_TOTAL_INLINE_BYTES = 15 * 1024 * 1024;
 // FA-INGEST4 (2026-06-22, root-class fix on the live N4008526R0065 run): the 15MB
 // MAX_TOTAL_INLINE_BYTES gate was running PRE-DOWNLOAD inside applyBudget, summing
