@@ -27,6 +27,15 @@ const live = read("public/profile-settings-live.js");
 const route = read("src/app/api/profile/route.ts");
 const capRoute = read("src/app/api/capability-statement/route.ts");
 
+// Comments are documentation, not shipped claims. Scanning them made two checks fire on
+// their own explanation of the bug they exist to prevent — the same way the capability
+// gate did. Code only, for every check that asks "does this still ship?".
+const codeOnly = (src: string) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((l) => l.replace(/\/\/.*$/, "")).join("\n");
+const appCode = codeOnly(app);
+const liveCode = codeOnly(live);
+const htmlCode = html.replace(/<!--[\s\S]*?-->/g, "");
+
 // ── THE PAGE MAY ONLY READ FIELDS THE ROUTE RETURNS ────────────────────────────────────
 // Found 2026-08-05, live, on a real record: Settings rendered "CAGE code — Not on file"
 // while capability_statements held 8TZ42. The client read `rec.cage` and `rec.address`;
@@ -64,7 +73,15 @@ console.log("── every field the page reads is a field the route returns ─�
 }
 
 console.log("\n── the page claims no save it cannot perform ──");
-check("no 'changes save automatically' claim", !/changes save automatically/i.test(html), "the header still promises auto-save");
+// COUNT THE SURFACES. The first version of this check scanned profile-settings.html
+// only. #483 removed the claim from the HTML and it survived in ps-app.js, which
+// injects the same string at runtime — so this gate passed green over the exact lie
+// it was written to kill. A claim is not gone because it left one file.
+{
+  const everywhere = [["profile-settings.html", htmlCode], ["ps-app.js", appCode], ["profile-settings-live.js", liveCode]];
+  const carriers = everywhere.filter(([, src]) => /changes save automatically/i.test(src)).map(([f]) => f);
+  check("no 'changes save automatically' claim ON ANY SETTINGS SURFACE", carriers.length === 0, `still promised in: ${carriers.join(", ")}`);
+}
 check("no hardcoded 'Last sync <date>'", !/Last sync \w+ \d{1,2}, \d{4}/.test(app), "a literal sync date is back");
 check("no unconditional '✓ Saved' badge in the company panel", !/<span class="saved">✓ Saved<\/span>/.test(app.split("naics:")[0]), "the account panel asserts saved with nothing behind it");
 
@@ -74,6 +91,28 @@ check("PATCH refuses email and plan_tier explicitly", /READ_ONLY[\s\S]{0,200}pla
 check("PATCH echoes the PERSISTED value, not the request body", /did not persist/.test(route), "success is reported without reading the write back");
 check("the save handler believes the server echo", /body\.full_name !== full_name/.test(live), "the client trusts its own input");
 check("the save handler reports failure to the user", /Could not save|did not persist/.test(live), "a failed save is silent");
+
+console.log("\n── no control reports a save it did not perform ──");
+{
+  // Every panel but one shipped a "Save changes" button and an unconditional "Saved"
+  // badge over nothing, and every toggle called a flash() that wrote "saved just now"
+  // whether or not anything reached the server. #483 fixed one panel of four.
+  const orphanFeet = (appCode.match(/<span class="saved">✓ Saved<\/span>/g) ?? []).length;
+  check("no unconditional 'Saved' badge anywhere in the panels", orphanFeet === 0, `${orphanFeet} panels assert a save with nothing behind it`);
+  check("no optimistic toggle handler", !/classList\.toggle\('on'\);\s*flash\(\)/.test(app), "a toggle flips and reports saved without a writer");
+  check("flash() names what was saved", /function flash\(what\)/.test(app), "a generic 'saved' can be fired by a control that saves nothing");
+
+  // Billing stated a plan and two prices while the route was returning all three.
+  check("billing reads the live plan label", /planName\(\)/.test(app) && /PS\.plan_label/.test(app), "the plan name is a literal");
+  check("billing reads the live prices", /PS\.plan_price_monthly/.test(app) && /PS\.plan_price_annual/.test(app), "the price is a literal");
+  check("no hardcoded plan name or price survives", !/Design Partner<\/div>|\$1,250|\$15,000|\$2,500|\$30,000/.test(appCode), "a literal price is still rendered");
+  check("no next-billing date — nothing computes one", !/Next billing:/.test(appCode), "a billing date with no source");
+
+  // Planted positives.
+  check("S-P1 · rejects a resurrected Saved badge", /<span class="saved">✓ Saved<\/span>/.test('<span class="saved">✓ Saved</span>'));
+  check("S-P2 · rejects a resurrected literal price", /\$1,250/.test('<div class="pc-desc">$1,250 / month</div>'));
+  check("S-P3 · accepts a panel with neither", !/<span class="saved">|\$1,250/.test('<div class="pc-name">${planName()}</div>'));
+}
 
 console.log("\n── company fields are read-only, not fake inputs ──");
 const panel = app.slice(app.indexOf("company: ()"), app.indexOf("naics: ()"));
