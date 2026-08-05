@@ -1,41 +1,21 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
+import { fetchSamFeed } from "@/lib/sam-feed";
 
-// Target NAICS codes — TX/OK aerospace + machining corridor focus.
-const NAICS_CODES = "336413,332710,332721";
-// sam.gov/api/prod, NOT api.sam.gov (the latter 404s). Same fix in agents/sam-ingest/sam-client.ts and src/lib/sam.ts.
-const SAM_SEARCH_URL = "https://sam.gov/api/prod/opportunities/v2/search";
-const LOOKBACK_DAYS = 7;
-const RESULT_LIMIT = 10;
+// /api/sam-feed — the signed-in dashboard feed, fail-closed. Outcomes:
+//   200 { source: "live", solicitations }        — real upstream data (an empty list here is a real answer)
+//   401 { error: "Unauthorized" }                — not signed in
+//   503 { source: "unconfigured", error }        — SAM_API_KEY missing
+//   502 { source: "error", error }               — upstream failed or threw
+//
+// All three failure exits previously returned HTTP 200 with `{ solicitations: [] }`, and the dashboard
+// renders an empty list as "No new solicitations in target NAICS codes today." So an unreachable SAM.gov
+// was reported to a customer as a positive fact about the federal market. Rule 61: a failed dependency
+// gets a visible failure state, never a success code. The fetch logic lives in src/lib/sam-feed.ts so the
+// contract is testable without faking auth — proof: src/lib/sam-feed.honestfail.test.ts (run RED pre-fix).
 
-interface SAMOpp {
-  noticeId?: string;
-  title?: string;
-  fullParentPathName?: string;
-  responseDeadLine?: string;
-  typeOfSetAside?: string;
-  uiLink?: string;
-  postedDate?: string;
-  naicsCode?: string;
-}
-
-interface CleanedOpp {
-  noticeId: string;
-  title: string;
-  agency: string | null;
-  responseDeadline: string | null;
-  typeOfSetAside: string | null;
-  uiLink: string | null;
-  postedDate: string | null;
-  naicsCode: string | null;
-}
-
-// SAM.gov v2 expects MM/dd/yyyy for the postedFrom/postedTo params.
-function fmtSamDate(d: Date): string {
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${m}/${day}/${d.getFullYear()}`;
-}
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   // Auth gate — only authenticated users hit SAM.gov from this endpoint.
@@ -47,51 +27,13 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const SAM_KEY = process.env.SAM_API_KEY;
-  if (!SAM_KEY) {
-    // Graceful fallback — UI shows empty state with a note, no crash.
-    return NextResponse.json({ solicitations: [], note: "SAM_API_KEY not set" });
+  const outcome = await fetchSamFeed();
+  if (!outcome.ok) {
+    return NextResponse.json(
+      { source: outcome.kind === "unconfigured" ? "unconfigured" : "error", error: outcome.error, solicitations: [] },
+      { status: outcome.kind === "unconfigured" ? 503 : 502 }
+    );
   }
 
-  const today = new Date();
-  const lookback = new Date(today.getTime() - LOOKBACK_DAYS * 86400000);
-
-  const params = new URLSearchParams({
-    api_key: SAM_KEY,
-    postedFrom: fmtSamDate(lookback),
-    postedTo: fmtSamDate(today),
-    ncode: NAICS_CODES,
-    limit: String(RESULT_LIMIT)
-  });
-
-  try {
-    const res = await fetch(`${SAM_SEARCH_URL}?${params.toString()}`, {
-      signal: AbortSignal.timeout(15000),
-      headers: { Accept: "application/json" }
-    });
-
-    if (!res.ok) {
-      console.warn("[sam-feed] HTTP", res.status, await res.text().catch(() => ""));
-      return NextResponse.json({ solicitations: [] });
-    }
-
-    const data = await res.json();
-    const opps: SAMOpp[] = data.opportunitiesData || [];
-
-    const cleaned: CleanedOpp[] = opps.map((o) => ({
-      noticeId: o.noticeId || "",
-      title: o.title || "Untitled",
-      agency: o.fullParentPathName || null,
-      responseDeadline: o.responseDeadLine || null,
-      typeOfSetAside: o.typeOfSetAside || null,
-      uiLink: o.uiLink || null,
-      postedDate: o.postedDate || null,
-      naicsCode: o.naicsCode || null
-    }));
-
-    return NextResponse.json({ solicitations: cleaned });
-  } catch (err) {
-    console.warn("[sam-feed] fetch error:", err instanceof Error ? err.message : err);
-    return NextResponse.json({ solicitations: [] });
-  }
+  return NextResponse.json({ source: "live", solicitations: outcome.solicitations });
 }
