@@ -460,6 +460,26 @@ export function hasBarSignal(ob: string): boolean {
 // Read at CALL time (not module load) so the demotion toggles per-invocation, like the notice-body emitter flags.
 const ambiguousSignalDemotionEnabled = () => process.env.AUDIT_AMBIGUOUS_SIGNAL_DEMOTION === "true";
 
+// ZERO-ATTESTATION HONEST-FAIL (flag AUDIT_ZERO_ATTESTATION_INCOMPLETE, default-OFF; CEO ruling 2026-08-05,
+// in-words: "cap it — an unattested package returns INCOMPLETE").
+//
+// A package whose completeness proof produced NO attestations was reported "Coverage complete (grade 100%)" with
+// no cap. Measured, not reasoned: 2 of 111 banked records at production flag parity (both Part-12 commercial),
+// and arming this flag moves 5 of 111 verdicts, every one NEEDS_HUMAN_REVIEW → INCOMPLETE (never toward a bid).
+// Three conditions all hold in production — buildManifest returns [] (presence is header-regex; a commercial
+// package has no UCF §B..§M headers), coreMissingFor returns [] (audit-orchestrator.ts:311 exits unconditionally
+// for part12-commercial under AUDIT_COMMERCIAL_CLAUSE_APPLICABILITY), and gradeCoverageV2([]) scores 1.
+//
+// The V1 guard for exactly this — `coverageComplete = ... && required.length > 0` (audit-orchestrator.ts:2751) —
+// is computed CORRECTLY and never read: deriveVerdict's only two reads of it (audit-decide.ts:3319, :3614) sit in
+// the `else` of `if (inp.coverageV2)`, and coverageV2 is always present with GATE_V2 on. So this restores a guard
+// the engine already had rather than inventing a new pole; it lives in gateV2Outcome so BOTH call sites (the
+// shadow at :3316 and the main ladder) inherit it from one place and cannot drift apart.
+//
+// Rule 61: a failed dependency yields a VISIBLE failure state, never a plausible answer. "We examined nothing"
+// is a failed dependency, and INCOMPLETE is what the engine already says for one.
+const zeroAttestationIncompleteEnabled = () => isEnvOn(process.env.AUDIT_ZERO_ATTESTATION_INCOMPLETE);
+
 // DEMOTION TAIL VETO (flag AUDIT_DEMOTION_TAIL_VETO, default-OFF). The card-#572/#576 severed-tail belt guards the
 // benign-recital and performance-upkeep exits but NOT the ambiguous-signal demotion below it, which reads
 // hasBarSignal on the obligation TEXT ALONE. obligationsOf splits on `[.;\n]`, so a bar living in the severed tail
@@ -988,6 +1008,13 @@ export interface CoverageV2 {
    *  ride the serialized coverageV2 into the run record. Present ONLY when AUDIT_RELEASE_LEDGER is on ⇒ flag-OFF
    *  the serialized coverageV2 is byte-identical (the caveatRecital pattern). */
   releasedBoilerplate?: Array<{ section: string; obligation: string }>;
+  /** How many section attestations the completeness proof actually produced. THE POINT: `coverageGrade` reads 1 when
+   *  NOTHING was attested (`totalWeight === 0 ? 1` below), so the grade alone cannot tell "everything covered" apart
+   *  from "nothing examined" — measured reachable on 2 of 111 banked packages, both Part-12 commercial, where
+   *  buildManifest returns [] because section presence is header-regex and a commercial package carries no UCF §B..§M
+   *  headers. Present ONLY when AUDIT_ZERO_ATTESTATION_INCOMPLETE is on ⇒ flag-OFF the serialized coverageV2 is
+   *  byte-identical (the caveatRecital pattern). */
+  attestedCount?: number;
   /** Importance-weighted covered fraction in [0,1] — surfaced as a signal (never a veto). 1 when nothing required. */
   coverageGrade: number;
 }
@@ -1115,6 +1142,11 @@ export function gradeCoverageV2(attestations: SectionAttestation[], opts?: {
     ...(performanceUpkeepCaveatEnabled() ? { caveatRecital } : {}),
     // U-B — include the release ledger ONLY when the flag is on ⇒ flag-OFF serialized coverageV2 byte-identical.
     ...(releaseLedgerEnabled() ? { releasedBoilerplate } : {}),
+    // ZERO-ATTESTATION — carry the SIZE of the proof set, because `coverageGrade` below cannot express it: an empty
+    // attestation set scores 1, identically to a fully-covered package. Emitted ONLY when the flag is on ⇒ flag-OFF
+    // serialized coverageV2 byte-identical. gateV2Outcome caps on `=== 0` (never on absent — a legacy record banked
+    // before this field existed must replay unchanged, so "missing" means "unknown", not "empty").
+    ...(zeroAttestationIncompleteEnabled() ? { attestedCount: attestations.length } : {}),
     coverageGrade: totalWeight === 0 ? 1 : coveredWeight / totalWeight,
   };
 }
@@ -1301,6 +1333,12 @@ function rankDisqualifiers<T extends { obligation: string }>(entries: T[], findi
  *  `!coverageComplete → INCOMPLETE`. Order matters: genuine unreadability first (legitimate INCOMPLETE), then a
  *  genuinely-uncovered disqualifier (escalate, never silent-BID), else no cap — the false-INCOMPLETE is gone. */
 export function gateV2Outcome(cov: CoverageV2, opts?: { findings?: Array<{ kind?: string; requirement?: string; excerpt?: string }> }): GateV2Outcome {
+  // ZERO-ATTESTATION HONEST-FAIL — FIRST, so no later branch can shadow it. `=== 0` and never `!cov.attestedCount`:
+  // absent means the field was not emitted (flag off, or a record banked before it existed) and must replay
+  // unchanged, whereas 0 is a positive measurement that the proof set was empty. Reached only when the coverage
+  // proof produced nothing, so `unreadable` is necessarily empty here too — the two never compete.
+  if (cov.attestedCount === 0)
+    return { cap: "INCOMPLETE", reason: "No binding section could be certified — the completeness proof is empty (0 sections attested), so coverage cannot be reported on this package at all. The honest incomplete." };
   if (cov.unreadable.length)
     return { cap: "INCOMPLETE", reason: `Could not fully read binding content: §${cov.unreadable.join(", §")} (unread/truncated at ingest) — the honest incomplete.` };
   // step-4 retirement: flag-ON, an ungrounded-but-bar-shaped obligation no longer CAPS the verdict — it stays in
