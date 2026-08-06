@@ -131,6 +131,109 @@ the anchors the root.
 
 ---
 
+## 4a. RESOLVED 2026-08-05 evening — the root is ONE WORD, and it is not the word §4 named
+
+`scripts/audit-ai/_routing-anchor-probe.ts` (**$0** — SAM downloads only, no model call, no audit,
+no paid run; the assembled source is cached so re-runs cost nothing) reassembles `W911SG27BA002`
+through the worker's own entry points and prints every anchor's match positions. Reassembly
+reproduces the live run closely enough to trust: **2,805,331 chars vs the live 2,825,434** (0.7%,
+consistent with the package moving since 08-05), and the deterministic UCF slicer produces
+`{L:12075}` — **byte-identical to the live log's `L:12075`**.
+
+### What the anchors actually do
+
+| | V1 (LIVE — `AUDIT_COMMERCIAL_ROUTING_V2=false`) | V2 |
+|---|---|---|
+| §L | **✗ ZERO matches in 2.8M chars** | ✓ first @ 2,148,115 (76.6% in) |
+| §M | ✓ first @ 1,018,122 | ✓ same |
+| §C | ✓ first @ 13,540 | ✓ same |
+| §B | ✓ first @ 2,105,523 | ✓ first @ 1,859,337 |
+| §I | ✓ first @ 1,416,699 | ✓ same |
+| `placedKeys` | `[C,M,I,B]` | `[C,M,I,B,L]` |
+| legacy predicate (`L AND M`) | **false** ⇒ whole-source fallback | **true** ⇒ routes |
+| `commercialRoutingSafe` (#525) | **already true** | true |
+
+**§4 attributed the fallback to §M. §M was fine.** §M placed under both anchor sets. The
+`[L3-finder] §M: anchor absent / too short / ambiguous (rejected)` line in the same log comes from
+`runSectionFinder` — the **L3 agentic finder**, a separate paid subsystem that locates §L/§M the
+deterministic pass missed. Two different mechanisms, one log window. The router's failure was §L.
+
+### The root
+
+**This package is an Invitation for Bids, and the anchor set does not know the word "bidders."**
+
+- `instructions to bidders` — **22 occurrences**, first at offset **29**
+- `invitation for bids` — 20 · `\bbidder` — 293 · `\bIFB\b` — 23
+- `instructions to offerors` — **0** · `instructions to quoters` — **0**
+
+V1's §L anchor is `instructions? to (?:offerors|quoters)|submission (?:instructions|requirements)|
+section l\b`. Sealed-bid vocabulary is absent from all three alternatives, so §L never places, the
+legacy `L AND M` predicate goes false, and **routing is abandoned for every section** — which is how
+B, C and M each came to hold the entire 2.8M-char package. One missing word, whole-package blast
+radius. (`AUDIT_LOSSLESS_INGEST` is on, so this is not compression: the source is verbatim.)
+
+### The prior report is REFUTED — but arming the flag is still not the fix
+
+"v2 is inert on this package because the router cannot locate §L either" is **wrong**. V2 *does*
+place §L and *does* flip `routed` false→true, cutting per-lens volume several-fold (C 1.94M→1.68M,
+B 12.5K→273K, M unchanged at 466K, L 12K→43K).
+
+It places it in **the wrong place.** V2's §L hit at 2,148,115 is inside FAR provision boilerplate —
+*"the offeror must furnish with its offer a signed statement…"* immediately before `52.219-1` — not
+the Instructions to Bidders, which begin at offset **29**. §M's only hit is worse: offset 1,018,122
+is `509.2.3.4.1 ASR Mitigation Evaluation Criteria`, a concrete alkali-silica-reaction test
+paragraph in a materials spec. **On an IFB there is no §M at all** — award here is *"to the
+responsible bidder whose bid… will be most advantageous to the Government, considering only price."*
+A §M anchor that "succeeds" on this package is a false positive by construction.
+
+What keeps that from becoming a coverage regression is a **separately armed** flag:
+`AUDIT_ROUTING_HEAD_COVERAGE=true` injects the 13,539-char pre-first-anchor head — which is where
+the real Instructions to Bidders, the 9AM MDT 10 Sep 2026 bid opening and the award basis live —
+into §A and §L. Verified at production parity: with head coverage on, V2 yields `L:43,453` (13,539
+head + 29,912 misplaced clause slice) and `A:13,539`, so `source_selection_evaluator` [L,M] still
+reaches the award basis. **Arming `AUDIT_COMMERCIAL_ROUTING_V2` on this package therefore works only
+because a different flag is compensating for a misplaced anchor.** That is the exact shape
+`routeCommercialSections`' own decision-isolation comment (`panel-doc-class.ts:183-188`) warns
+about.
+
+### The fix — SHIPPED in #499 (`1514f5ce`) and ARMED on both surfaces 2026-08-06
+
+A positive-SHAPE anchor addition in the §L set, behind `AUDIT_IFB_SECTION_ANCHORS`. Shape allowlist,
+never a vocabulary blocklist. Three header-like shapes: the SF-1442 heading, a line-start
+`Instructions to Bidders:` title, and the UFGS section number `00 21 13`.
+
+Two things changed between this section being written and the fix shipping, and both matter:
+
+- **`invitation for bids` was DROPPED from the proposal above.** It is real IFB vocabulary, but it
+  recurs mid-content on this very package — "conforming to the invitation for bids", "Also called
+  Invitation for Bids." — so it would fragment §C mid-sentence, which is what this file's
+  header-like-only anchor doctrine exists to prevent. `bid opening` was dropped for the same reason.
+- **The heading shape had to cover OFFERORS too, and that is a SECOND defect.** The fix's own
+  non-regression control was `INSTRUCTIONS, CONDITIONS, AND NOTICES TO OFFERORS` — the negotiated
+  twin — and it FAILED ITS OWN PRECONDITION: the existing anchor wants `instructions to offerors`
+  contiguous, and that heading puts three words between them. Construction RFPs on SF-1442 lose §L
+  for exactly the reason IFBs do. Neither the run nor this section found that; the control did.
+
+Measured on the real source with the flag on: §L places at offset **71**, `routed` flips to true, and
+the dropped pre-first-anchor head falls from **13,539 chars to 71** — so the bid opening, award basis
+and 8(a) set-aside move INSIDE §L rather than depending on `AUDIT_ROUTING_HEAD_COVERAGE` to carry
+them. Zero match across all 17 banked sources carrying `input.fullSource`.
+
+**Unchanged by any of this:** routing governs UCF sections, not the 45 attachments. This is a
+cost-slope fix. It does not move `docsRead` off 17. **And it has not yet run:** the flag is armed but
+no audit has been fired since, so the routed read has never actually reached a lens.
+
+### One instrument mismatch found in passing
+
+`commercialRoutingSafe` (the #525 predicate) evaluates starvation against
+`LENS_SECTIONS_COMMERCIAL`, but that map is live **only** when `AUDIT_LENS_EMISSION_INTEGRITY` is
+on — and that flag is **not set on the worker at all**. The live map is the UCF `LENS_SECTIONS`.
+`anyLensStarvedUnderLiveMap` exists and reads the correct map; the predicate the router actually
+consults does not. Both returned the same answer here (`false` / safe), so nothing is mis-decided on
+this package — but the predicate is measuring a map production is not using.
+
+---
+
 ## 5. Stage 06 — the expert loop, line by line
 
 Ranked, from a dedicated read-only review. PROVED vs HYPOTHESIS marked.
