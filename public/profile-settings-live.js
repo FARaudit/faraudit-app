@@ -140,6 +140,104 @@
     put('hsAgencies', '—');
   }
 
+  /* ── NAICS: add and remove ──────────────────────────────────────────────────
+     The API takes the WHOLE array, so both operations send the full intended list
+     and are confirmed by SET EQUALITY against the server's echo — not by a 2xx, and
+     not against the local array. A write that silently dropped or kept a code would
+     otherwise report success. Delegated, because the panel is re-templated on every
+     nav click and theme flip, which detaches a directly-bound listener. */
+  const CODE_RE = /^\d{6}$/;
+
+  function naicsMsg(text, kind) {
+    const el = document.getElementById('psNaicsMsg');
+    if (!el) return;
+    el.hidden = !text;
+    el.textContent = text || '';
+    el.className = 'naics-msg' + (kind ? ' ' + kind : '');
+  }
+  function currentCodes() {
+    return window.PS.NAICS.map(function (n) { return String(n.code); });
+  }
+  function sameSet(a, b) {
+    if (a.length !== b.length) return false;
+    const s = new Set(a);
+    return b.every(function (c) { return s.has(c); });
+  }
+  function adoptCodes(codes) {
+    window.PS.NAICS.length = 0;                    // mutate in place — ps-app holds the reference
+    codes.forEach(function (c) { window.PS.NAICS.push({ code: String(c) }); });
+    writeHeaderStats();
+    if (window.PS_APP && typeof window.PS_APP.render === 'function') window.PS_APP.render();
+  }
+
+  async function writeCodes(next, okMsg, failMsg) {
+    const res = await fetch('/api/capability-statement', {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ naics_codes: next })
+    });
+    const body = await res.json().catch(() => null);
+    // The envelope only. Accepting `body` itself as the record reads every field as
+    // absent and reports an outage as an empty list.
+    const rec = body && body.statement;
+    if (!res.ok || !rec || !Array.isArray(rec.naics_codes)) throw new Error(failMsg);
+    const saved = rec.naics_codes.map(String);
+    if (!sameSet(saved, next)) throw new Error(failMsg);
+    adoptCodes(saved);
+    naicsMsg(okMsg, 'ok');
+  }
+
+  document.addEventListener('click', async function (e) {
+    const t = e.target && e.target.closest;
+    if (!t) return;
+
+    const rm = e.target.closest('[data-naics-rm]');
+    if (rm) {
+      const code = rm.getAttribute('data-naics-rm');
+      const next = currentCodes().filter(function (c) { return c !== code; });
+      rm.disabled = true;
+      naicsMsg('Removing ' + code + '…', 'wait');
+      try {
+        await writeCodes(next, code + ' removed.',
+          'Could not remove ' + code + ' — nothing was changed.');
+      } catch (err) {
+        naicsMsg(err.message, 'err');   // DOM untouched: the list still shows what is on file
+        rm.disabled = false;
+      }
+      return;
+    }
+
+    const addBtn = e.target.closest('#psNaicsAdd');
+    if (addBtn) {
+      const input = document.getElementById('psNaicsInput');
+      if (!input) return;
+      const code = String(input.value || '').trim();
+      const have = currentCodes();
+      if (!CODE_RE.test(code)) { naicsMsg('A NAICS code is exactly six digits.', 'err'); return; }
+      if (have.indexOf(code) >= 0) { naicsMsg(code + ' is already on your list.', 'err'); return; }
+      addBtn.disabled = true;
+      naicsMsg('Adding ' + code + '…', 'wait');
+      try {
+        await writeCodes(have.concat([code]), code + ' added.',
+          'Could not add ' + code + ' — nothing was changed.');
+      } catch (err) {
+        naicsMsg(err.message, 'err');
+      } finally {
+        addBtn.disabled = false;
+      }
+    }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return;
+    const el = e.target;
+    if (!el || el.id !== 'psNaicsInput') return;
+    e.preventDefault();
+    const add = document.getElementById('psNaicsAdd');
+    if (add) add.click();
+  });
+
   function note(msg, ok) {
     const el = document.getElementById('psSavedNote');
     if (!el) return;

@@ -126,11 +126,25 @@ check("company panel renders no <input> for company fields", !/\$\{field\('Compa
 // earlier form asserted a snapshot (only full_name had a write path), so building the
 // company writers turned an honest page red. What must never happen is an <input> the
 // save handler cannot see.
-const editableIds = [...panel.matchAll(/\$\{editable\('([^']+)'/g)].map((m) => m[1]);
+// WHOLE FILE, not just the company panel. Scoped to one panel, an input added to any
+// other tab was invisible to this check — which is exactly how an inert control ships.
+const editableIds = [...app.matchAll(/\$\{editable\('([^']+)'/g)].map((m) => m[1]);
 check("every editable field carries an id", editableIds.length > 0, "no editable fields found — did the panel move?");
 const unwritten = editableIds.filter((id) => !live.includes(id));
 check("EVERY editable field is read by the save handler", unwritten.length === 0,
   `input(s) with no writer: ${unwritten.join(", ")}`);
+// The NAICS ✕ is a <button>, not an <input>, so the editable() sweep above cannot see
+// it. An inert remove control is the same defect in different markup.
+const rmKeys = [...app.matchAll(/data-naics-rm="\$\{esc\(([^)]+)\)\}"/g)];
+check("the NAICS remove control exists", rmKeys.length > 0, "no data-naics-rm in ps-app.js");
+// Assert the BINDING, not the string. The first form matched `data-naics-rm` anywhere
+// in the file, so breaking the delegated selector while leaving a getAttribute call
+// behind kept it green — a check satisfied by a line that no longer runs.
+check("the NAICS remove control is bound by a delegated selector",
+  /closest\(\s*['"]\[data-naics-rm\]['"]\s*\)/.test(live),
+  "no closest('[data-naics-rm]') — the Remove button is not actually wired");
+check("NAICS writes are confirmed by set equality, not by a 2xx", /sameSet\s*\(/.test(live),
+  "a 200 with a discarded write would report success");
 check("email is never an input — it is auth identity, not a profile column",
   !/\$\{editable\('psEmail'/.test(panel) && /\$\{ro\('Email'/.test(panel),
   "email rendered as an editable box without a verification flow behind it");

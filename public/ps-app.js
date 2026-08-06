@@ -91,19 +91,40 @@
         </div>
         <div class="fld-sec">NAICS codes</div>
         <div class="cert-row">${NAICS.length ? NAICS.map(n => `<span class="cert-tg on">${esc(n.code || n.k || n)}</span>`).join('') : '<span class="fld-none">None on file</span>'}</div>
-        ${NAICS.length ? '' : '<div class="note note-warn">No NAICS codes on file, so Opportunities, Teaming Partners, Contracting Officers and Wage Benchmarks have nothing to match against and will stay empty. Add them in the capability statement.</div>'}
+        ${NAICS.length ? '' : '<div class="note note-warn">No NAICS codes on file, so Opportunities, Teaming Partners, Contracting Officers and Wage Benchmarks have nothing to match against and will stay empty. Add them under NAICS Configuration.</div>'}
         <div class="fld-sec">Certifications</div>
         <div class="cert-row">${CERTS.length ? CERTS.map(c => `<span class="cert-tg on">${esc(c.k || c)}</span>`).join('') : '<span class="fld-none">None on file</span>'}</div>
-        <div class="note">This is the same record the <a href="/capability-statement">capability statement</a> prints and the audit engine reads when it judges whether you are eligible to bid — so what you enter here shapes real verdicts. NAICS codes and certifications are shown here but edited elsewhere.</div>
+        <div class="note">This is the same record the <a href="/capability-statement">capability statement</a> prints and the audit engine reads when it judges whether you are eligible to bid — so what you enter here shapes real verdicts. NAICS codes are edited under NAICS Configuration. Certifications are shown here only: one clears a set-aside bar just when it is verified against SAM, so there is nothing useful to type.</div>
       </div>
       <div class="sp-foot"><span class="saved" id="psSavedNote" hidden></span><button class="save-btn" id="psSaveBtn">Save changes</button></div>`,
 
-    naics: () => `
-      <div class="sp-hd"><div class="sp-t">NAICS Configuration</div><div class="sp-s">These codes drive every intelligence filter across FARaudit</div></div>
+    /* The row carries the CODE and nothing else. There is no NAICS title anywhere in
+       this product — not in the column, not from SAM, not in any lookup — and the
+       PRIMARY / SECONDARY / MONITOR ONLY vocabulary has no source, no writer and no
+       reader. A description column filled with a dash reads as "we hold this and it is
+       blank"; a posture badge derived from array order would render an ordering
+       artifact as a business fact. Neither is shown.
+       Removal is keyed on the code, not the row index: the panel re-templates on every
+       theme flip and nav click, so an index goes stale across the round trip. */
+    naics: () => window.PS.loadError ? `
+      <div class="sp-hd"><div class="sp-t">NAICS Configuration</div><div class="sp-s">These codes scope what the platform shows you</div></div>
       <div class="sp-bd">
-        ${NAICS.map(n => `<div class="naics-row"><div class="nr-l"><span class="nr-code">${n.code}</span><span class="nr-label">${n.desc}</span></div><span class="nr-tag ${n.tag === 'PRIMARY' ? 'p' : n.tag === 'MONITOR ONLY' ? 'm' : 's'}">${n.tag}</span><button class="nr-x" title="Remove">✕</button></div>`).join('')}
-        <a class="add-btn" href="/capability-statement">Edit NAICS codes on your capability statement</a>
-        <div class="note"><b>How this works:</b> Your NAICS codes filter opportunities, contracting officers, agencies, wage benchmarks, and teaming partners. Changes take effect immediately across all pages.</div>
+        <div class="ps-failed">
+          <div class="ps-failed-t">Your NAICS codes could not be loaded</div>
+          <div class="ps-failed-s">A connection problem, not an empty list — nothing has been lost and nothing has been changed. Reload to try again.</div>
+        </div>
+      </div>` : `
+      <div class="sp-hd"><div class="sp-t">NAICS Configuration</div><div class="sp-s">These codes scope what the platform shows you</div></div>
+      <div class="sp-bd">
+        ${NAICS.length
+          ? NAICS.map(n => `<div class="naics-row"><div class="nr-l"><span class="nr-code">${esc(n.code)}</span></div><button class="nr-x" type="button" data-naics-rm="${esc(n.code)}" title="Remove" aria-label="Remove NAICS ${esc(n.code)}">✕</button></div>`).join('')
+          : '<div class="fld-none" style="padding:6px 2px 12px">No NAICS codes on file.</div>'}
+        <div class="pe-add">
+          <input type="text" id="psNaicsInput" inputmode="numeric" maxlength="6" placeholder="Six-digit NAICS code" aria-label="NAICS code to add">
+          <button class="save-btn" type="button" id="psNaicsAdd">Add code</button>
+        </div>
+        <div class="naics-msg" id="psNaicsMsg" role="status" hidden></div>
+        <div class="note"><b>How this works:</b> your NAICS codes are what Opportunities, Contracting Officers, Wage Benchmarks and Teaming Partners match against. With none on file those pages have nothing to match and stay empty. Each page picks up a change the next time it loads.</div>
       </div>
       `,
 
