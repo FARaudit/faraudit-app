@@ -101,7 +101,7 @@ export function renderV5ReportFromRow(audit: Record<string, unknown>): string {
     <div class="sb-gh">Workspace</div>
     <a class="sb-i" href="/today"><span class="ic">${SB_ICON.today}</span>Today</a>
     <a class="sb-i" href="/run-audit"><span class="ic">${SB_ICON.run}</span>Run audit</a>
-    <a class="sb-i on" href="/past-audits"><span class="ic">${SB_ICON.past}</span>Past audits</a>
+    <a class="sb-i on" href="/past-audits"><span class="ic">${SB_ICON.past}</span>Decisions</a>
     <a class="sb-i" href="/pipeline"><span class="ic">${SB_ICON.pipeline}</span>Pipeline</a>
   </nav>
   <nav class="sb-grp">
@@ -111,12 +111,12 @@ export function renderV5ReportFromRow(audit: Record<string, unknown>): string {
   </nav>
   <div class="sb-spring"></div>
   <nav class="sb-grp">
-    <a class="sb-i" href="/account"><span class="ic">${SB_ICON.account}</span>Account</a>
+    <a class="sb-i" href="/settings"><span class="ic">${SB_ICON.account}</span>Account</a>
   </nav>
 </aside>
 <div class="main">
   <header class="topbar">
-    <div class="tb-crumb"><span>Past audits</span><span class="sep">/</span><span class="cur" id="crumbSol">${sol}</span></div>
+    <div class="tb-crumb"><a href="/past-audits">Decisions</a><span class="sep">/</span><span class="cur" id="crumbSol">${sol}</span></div>
     <span class="tb-live">Live web view</span>
     <div class="tb-spring"></div>
     <div class="tb-actions">

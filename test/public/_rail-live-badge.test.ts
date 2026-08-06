@@ -607,5 +607,42 @@ console.log("\n── Part P · run-audit distinguishes failure from empty ─�
     !/function\(\)\{renderCards\(\[\]\)\}/.test("function(){renderUnreadable()}"));
 }
 
+// ── Part Q · every nav link points at a route that EXISTS ─────────────────────────────────
+// The audit report (/audit/[id], the v5 "Gate Brief") is deliberately NOT injectRail'd —
+// route.ts explains the rail assumes a grid the single-column report does not have — so it
+// ships its OWN sidebar in src/lib/v5-report/report.ts. Nothing checked that sidebar's
+// hrefs, and it carried href="/account", which 404s in production. A nav link to a route
+// that does not exist is a dead end the customer finds for us.
+console.log("\n── Part Q · nav links resolve to real routes ──");
+{
+  const APP = join(ROOT, "src", "app");
+  const routeExists = (href) => {
+    const p = href.split("?")[0].split("#")[0].replace(/^\/+/, "");
+    if (p === "") return true;
+    try { readdirSync(join(APP, p)); return true; } catch { return false; }
+  };
+  const sources = ["src/lib/v5-report/report.ts", "src/app/audit/[id]/_template.html"];
+  for (const src of sources) {
+    const html = read(src);
+    // NAV links only — scoped to the <aside> sidebar. A whole-file href sweep also
+    // catches Cloudflare's injected /cdn-cgi/l/email-protection, which is not ours
+    // and not a route; a gate that flags it is reporting on the wrong layer.
+    const aside = (html.match(/<aside[\s\S]*?<\/aside>/) ?? [""])[0];
+    const hrefs = [...aside.matchAll(/href="(\/[a-z0-9\-\/]*)"/gi)].map((m) => m[1]);
+    const uniq = [...new Set(hrefs)];
+    check(`${src} · has nav links to check`, uniq.length > 0, "no hrefs found — this leg asserts nothing");
+    const dead = uniq.filter((h) => !routeExists(h));
+    check(`${src} · every nav href resolves to a route`, dead.length === 0, `dead: ${dead.join(", ")}`);
+  }
+  // The report shell is a separate surface — its label must not drift back.
+  const rep = read("src/lib/v5-report/report.ts");
+  check("the report rail calls the ledger Decisions", !/>Past audits</.test(rep), "report rail still says 'Past audits'");
+
+  // Planted positives.
+  check("Q-P1 · REJECTS the /account link that shipped", !routeExists("/account"));
+  check("Q-P2 · ACCEPTS a route that exists", routeExists("/settings"));
+  check("Q-P3 · ACCEPTS the ledger route", routeExists("/past-audits"));
+}
+
 console.log(`\n${pass} passed · ${fail} failed`);
 if (fail > 0) process.exit(1);

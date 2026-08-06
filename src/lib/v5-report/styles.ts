@@ -57,6 +57,8 @@ body{background:var(--desk); color:var(--ink); font-family:var(--font);
 .topbar{position:sticky; top:0; z-index:30; background:rgba(255,255,255,.85);
   backdrop-filter:saturate(1.4) blur(10px); border-bottom:1px solid var(--line);
   display:flex; align-items:center; gap:14px; padding:11px 24px;}
+.tb-crumb a{color:inherit;text-decoration:none;border-radius:5px;padding:1px 4px}
+.tb-crumb a:hover{background:rgba(0,0,0,.06);text-decoration:none}
 .tb-crumb{display:flex; align-items:center; gap:8px; color:var(--ink-3); font-size:13px; min-width:0;}
 .tb-crumb .sep{opacity:.5}
 .tb-crumb .cur{color:var(--ink); font-weight:600;}
