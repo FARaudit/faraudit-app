@@ -553,9 +553,13 @@ function datesLine(o) {
   // read for this row, so the card says nothing rather than implying zero.
   const rl = o.resource_links;
   if (Array.isArray(rl)) {
-    parts.push('<span class="pc-dt"><b>Docs</b> ' + (rl.length
+    // This count comes from the FEED, which can be short of what SAM posted, so
+    // it is the best available answer rather than a settled one. data-docs lets
+    // the panel correct it in place once SAM has been asked — otherwise the row
+    // and the panel below it sit on screen disagreeing about the same notice.
+    parts.push('<span class="pc-dt"><b>Docs</b> <span data-docs>' + (rl.length
       ? esc(String(rl.length)) + (rl.length === 1 ? ' attachment' : ' attachments')
-      : 'none posted') + '</span>');
+      : 'none posted') + '</span></span>');
   }
   const leaf = officeLeaf(o.office_path, o);
   if (leaf) parts.push('<span class="pc-dt"><b>Office</b> ' + esc(leaf) + '</span>');
@@ -1019,10 +1023,14 @@ function loadAttachmentNames(card) {
       if (!rows.length) { card.dataset.attState = 'none'; return; }
       box.textContent = '';
       rows.forEach(function (el) { box.appendChild(el); });
-      // The count is rebuilt too — it would otherwise still show the feed's number
-      // while the list below it showed SAM's.
+      // Both counts are rebuilt — the disclosure's, and the DOCS figure on the
+      // collapsed row above it. Leaving either behind puts two different numbers
+      // for the same notice on screen at the same time.
+      const n = rows.length;
       const label = card.querySelector('[data-att-count]');
-      if (label) label.textContent = rows.length + (rows.length === 1 ? ' document' : ' documents');
+      if (label) label.textContent = n + (n === 1 ? ' document' : ' documents');
+      const docs = card.querySelector('[data-docs]');
+      if (docs) docs.textContent = n ? n + (n === 1 ? ' attachment' : ' attachments') : 'none posted';
       card.dataset.attState = 'ok';
     })
     .catch(function () { card.dataset.attState = 'err'; });

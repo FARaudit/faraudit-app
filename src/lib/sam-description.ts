@@ -50,21 +50,59 @@ export function isNoticedescUrl(description: string | null | undefined): boolean
   return typeof description === "string" && NOTICEDESC_URL_RE.test(description.trim());
 }
 
-// HTML → clean text: tags out, common entities decoded, whitespace collapsed.
+// The named entities SAM actually emits. Anything not listed is left ALONE
+// rather than guessed at: an unrecognised entity printed verbatim is obviously
+// wrong and gets reported, where a wrong substitution reads as real text.
+const NAMED_ENTITIES: Record<string, string> = {
+  nbsp: " ", amp: "&", lt: "<", gt: ">", quot: '"', apos: "'",
+  ndash: "–", mdash: "—", minus: "−",
+  lsquo: "‘", rsquo: "’", sbquo: "‚",
+  ldquo: "“", rdquo: "”", bdquo: "„",
+  hellip: "…", bull: "•", middot: "·",
+  deg: "°", plusmn: "±", times: "×", divide: "÷",
+  frac12: "½", frac14: "¼", frac34: "¾",
+  copy: "©", reg: "®", trade: "™",
+  sect: "§", para: "¶", dagger: "†",
+  laquo: "«", raquo: "»", euro: "€", pound: "£", cent: "¢",
+  larr: "←", rarr: "→", harr: "↔", ne: "≠", le: "≤", ge: "≥"
+};
+
+/**
+ * Decode HTML entities in ONE pass.
+ *
+ * Chained .replace() calls cannot do this correctly: decoding `&amp;` before
+ * `&lt;` turns the escaped literal `&amp;lt;` into a real `<`, so text the
+ * government deliberately escaped comes out as markup. Matching every entity in
+ * a single sweep makes that impossible — nothing a replacement produces is ever
+ * looked at again.
+ */
+export function decodeHtmlEntities(s: string): string {
+  return s.replace(/&(#[0-9]+|#[xX][0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]{1,31});/g, (whole, body: string) => {
+    if (body[0] === "#") {
+      const cp = body[1] === "x" || body[1] === "X"
+        ? parseInt(body.slice(2), 16)
+        : parseInt(body.slice(1), 10);
+      // Surrogates and out-of-range values would throw or produce mojibake;
+      // leaving the entity visible is the honest failure.
+      if (!Number.isFinite(cp) || cp < 0 || cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff)) return whole;
+      try {
+        return String.fromCodePoint(cp);
+      } catch {
+        return whole;
+      }
+    }
+    const hit = NAMED_ENTITIES[body] ?? NAMED_ENTITIES[body.toLowerCase()];
+    return hit === undefined ? whole : hit;
+  });
+}
+
+// HTML → clean text: tags out, entities decoded, whitespace collapsed.
 export function stripHtmlToText(html: string): string {
-  return html
+  const withoutTags = html
     .replace(/<br\s*\/?>/gi, " ")
     .replace(/<\/(?:p|div|li|tr|h\d)>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#0?39;|&apos;/gi, "'")
-    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
-    .replace(/\s+/g, " ")
-    .trim();
+    .replace(/<[^>]+>/g, " ");
+  return decodeHtmlEntities(withoutTags).replace(/\s+/g, " ").trim();
 }
 
 export async function resolveSamDescription(

@@ -133,9 +133,14 @@ function makeCard(feedCount = 4) {
   const label = new El("span");
   label.setAttribute("data-att-count", "");
   label.textContent = `${feedCount} documents`;
+  // The collapsed row's own count, which the feed populates and SAM corrects.
+  const docs = new El("span");
+  docs.setAttribute("data-docs", "");
+  docs.textContent = `${feedCount} attachments`;
   card.appendChild(label);
+  card.appendChild(docs);
   card.appendChild(box);
-  return { card, box, label };
+  return { card, box, label, docs };
 }
 const rowNames = (box: El) => box.children.map((a) => a.querySelector(".att-nm")?.textContent ?? "");
 const settle = () => new Promise((r) => setTimeout(r, 25));
@@ -163,13 +168,17 @@ async function main() {
   // ═══ B · THE DEFECT ═══════════════════════════════════════════════════════
   // The feed gave 4. SAM says 5. The fifth must appear.
   console.log("\nB · a document the FEED omitted still reaches the customer");
-  let { card, box, label } = makeCard(4);
+  let { card, box, label, docs } = makeCard(4);
   impl = jsonOk({ attachments: samList(5) });
   loadAttachmentNames(card); await settle();
   ok(box.children.length === 5, "the list rebuilds to SAM's count, not the feed's", `${box.children.length} rows`);
   ok(rowNames(box).some((n) => n.startsWith("Dunnage Kit")),
     "the attachment the feed omitted is now listed", rowNames(box).join(" | "));
   ok(label.textContent === "5 documents", "the count label follows SAM, not the feed", label.textContent);
+  // BOTH counts move together. Correcting only one leaves "4 attachments" on the
+  // row above a list of 5 — two numbers for the same notice, one of them wrong,
+  // visible at the same time.
+  ok(docs.textContent === "5 attachments", "the DOCS count on the collapsed row is corrected too", docs.textContent);
   ok(card.dataset.attState === "ok", "state is 'ok'");
   ok(rowNames(box)[0] === "Solicitation - N0042126R1024", "names come from SAM's list");
 
