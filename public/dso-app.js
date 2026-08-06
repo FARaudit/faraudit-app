@@ -525,6 +525,8 @@ function renderControls(){
   $('savedViews').innerHTML = views.map(v=>'<button class="view-chip'+(S.view===v.k?' active':'')+(v.n===0?' zero':'')+'" data-view="'+v.k+'"><span class="vc-t">'+v.t+'</span><span class="vc-d">'+v.d+' · '+v.n+'</span></button>').join('');
   $('savedViews').querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{S.view=S.view===b.dataset.view?null:b.dataset.view;S.stage='all';S.sa='all';S.band=null;renderAll();});
 
+  renderTrackedChip();
+
   const sorts=[['closing','Closing first'],['longest','Longest window'],['buyer','Buyer']];
   $('sortSeg').innerHTML = sorts.map(([k,l])=>'<button data-sort="'+k+'" class="'+(k===S.sort?'active':'')+'">'+l+'</button>').join('');
   $('sortSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.sort=b.dataset.sort;renderAll();});
@@ -793,6 +795,11 @@ function wireActions() {
 
 /* ── the list ── */
 function renderList() {
+  // Tracked is answered from the watch record, not from the feed, so it is
+  // handled BEFORE the feed's own empty poles below — a tracked notice that has
+  // closed is still worth showing on a day the feed returns nothing.
+  if (S.view === 'tracked') { renderTrackedList(); return; }
+
   // The feed's three honest poles are preserved verbatim from the served build:
   // an outage must never render as an empty result, and neither may be dressed
   // as the other. This is the affordance the tab exists to protect.
@@ -847,6 +854,96 @@ function renderList() {
   });
   $('plist').innerHTML = html;
   wireActions();
+}
+
+/* ── tracked ──────────────────────────────────────────────────────────────────
+   Track marks a notice you have not decided about. It is deliberately NOT
+   Pipeline (which means "I am bidding this" and carries the funnel count) and
+   NOT Decisions (which is the ledger of audits actually run). It is a state on
+   the notice, so it lives here as a view rather than as a destination.
+
+   It reads /api/watched-notices, never the feed. The feed carries only OPEN
+   notices, so filtering it would drop a tracked notice the moment it closed —
+   losing precisely the one worth telling you about. */
+function watched() {
+  const w = window.DSO && window.DSO.WATCHED;
+  return Array.isArray(w) ? w : null;          // null = read failed, not "none"
+}
+
+function renderTrackedChip() {
+  const el = $('trackedChip');
+  if (!el) return;
+  const w = watched();
+  el.hidden = false;
+  el.classList.toggle('active', S.view === 'tracked');
+  // Three states, three sentences. A read that failed must not read as "none
+  // tracked", and neither offers a filter, because filtering to nothing is a
+  // control that does nothing.
+  if (w === null) {
+    el.textContent = 'Tracked · unavailable';
+    el.disabled = true;
+    el.title = 'Could not read your tracked notices just now';
+  } else {
+    el.innerHTML = 'Tracked <span class="tc-n">' + w.length + '</span>';
+    el.disabled = w.length === 0;
+    el.title = w.length ? 'Notices you marked to come back to' : 'You have not tracked any notices yet';
+  }
+  el.onclick = () => {
+    if (el.disabled) return;
+    S.view = S.view === 'tracked' ? null : 'tracked';
+    S.stage = 'all'; S.sa = 'all'; S.band = null;
+    renderAll();
+  };
+}
+
+/* Renders the tracked list. A tracked notice still in the feed keeps its full
+   card; one the feed has dropped renders as a compact row carrying what the
+   watch record holds, and says so. Nothing is hidden for lacking feed fields. */
+function renderTrackedList() {
+  const w = watched() || [];
+  const byNotice = {};
+  ROWS.forEach((o) => { if (o.notice_id) byNotice[o.notice_id] = o; });
+
+  const live = [], gone = [];
+  w.forEach((r) => { (r && r.notice_id && byNotice[r.notice_id] ? live : gone).push(r); });
+
+  $('plistCount').innerHTML = '<b>' + w.length + '</b> tracked' +
+    (gone.length ? ' · ' + gone.length + ' no longer in the live feed' : '');
+
+  if (!w.length) {
+    $('plist').innerHTML = '<div class="empty">You have not tracked any notices yet.<br><br>' +
+      '<a href="#" id="clearAll">back to all notices</a></div>';
+    const c = $('clearAll'); if (c) c.onclick = (e) => { e.preventDefault(); S.view = null; renderAll(); };
+    return;
+  }
+
+  let html = '';
+  if (live.length) html += live.map((r) => rowHTML(byNotice[r.notice_id])).join('');
+  if (gone.length) {
+    html += '<div class="tnote">' + gone.length +
+      (gone.length === 1 ? ' tracked notice is' : ' tracked notices are') +
+      ' no longer in the live feed — the feed carries open notices only.</div>' +
+      gone.map(trackedRow).join('');
+  }
+  $('plist').innerHTML = html;
+}
+
+/* A tracked notice the feed no longer carries. Deliberately compact: the watch
+   record holds no NAICS, PSC or set-aside, and a full card padded with blanks
+   would imply we know things we do not. */
+function trackedRow(r) {
+  const closed = r.response_deadline ? Date.parse(r.response_deadline) < Date.now() : false;
+  const state = r.status === 'audited' ? 'audited'
+    : r.status === 'posted' ? 'posted'
+    : closed ? 'closed' : 'tracking';
+  const when = fmtAbs(r.response_deadline, true);
+  const bits = [r.solicitation_number, r.agency, when ? (closed ? 'closed ' + when : 'closes ' + when) : null]
+    .filter(Boolean).map(esc).join('  ·  ');
+  return '<div class="trow">' +
+    '<span class="tr-t">' + esc(r.title || r.solicitation_number || 'Untitled notice') + '</span>' +
+    '<span class="tr-s' + (state === 'closed' ? ' closed' : '') + '">' + state + '</span>' +
+    (bits ? '<span class="tr-m">' + bits + '</span>' : '') +
+    '</div>';
 }
 
 /* Clears every key in S that narrows or reorders the list. These values are the

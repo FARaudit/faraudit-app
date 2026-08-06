@@ -161,6 +161,26 @@ button{font-family:inherit}
 .pillset{width:100%;gap:6px}
 .pillset .view-chip{flex:0 0 calc((100% - 30px)/3 + 6px);box-sizing:border-box}
 .vr-right{width:100%;margin-left:0;justify-content:flex-end;margin-top:2px}
+/* Tracked sits with the controls, NOT among the saved views. The saved views are
+   rules over SAM's data — anyone with this feed gets the same three. Tracked is
+   the customer's own marks, and a row that mixes the two teaches that they are
+   the same kind of thing. Left-aligned on its line for the same reason. */
+.track-chip{margin-right:auto;display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 12px;border-radius:8px;background:var(--card);border:1px solid var(--line);cursor:pointer;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.02em;color:var(--ink-2)}
+.track-chip:hover{border-color:var(--accent-line);color:var(--accent-deep)}
+.track-chip.active{background:linear-gradient(0deg,var(--eligible-bg),var(--eligible-bg)),var(--card);border-color:var(--eligible-line);color:var(--eligible-ink)}
+/* Nothing tracked, or the read failed: still shown so the control is discoverable,
+   but not clickable — a button that filters to nothing is a dead control. */
+.track-chip[disabled]{cursor:default;opacity:.55}
+.track-chip[disabled]:hover{border-color:var(--line);color:var(--ink-2)}
+.track-chip .tc-n{color:var(--tertiary)}
+.track-chip.active .tc-n{color:inherit}
+/* A tracked notice that has left the feed still renders, as a compact row. */
+.trow{display:flex;align-items:baseline;gap:12px;padding:11px 14px;border:1px solid var(--line);border-radius:10px;background:var(--card);margin-bottom:8px;flex-wrap:wrap}
+.trow .tr-t{font-size:13px;font-weight:700;color:var(--ink);flex:1;min-width:220px}
+.trow .tr-m{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--tertiary)}
+.trow .tr-s{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:var(--card-soft);color:var(--tertiary)}
+.trow .tr-s.closed{background:var(--alarm-wash);color:var(--alarm);border:1px solid var(--alarm-line)}
+.tnote{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--tertiary);margin:2px 0 10px}
 .view-chip{display:inline-flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;padding:9px 14px;border-radius:10px;background:var(--card);border:1px solid var(--line);cursor:pointer;text-align:left;white-space:nowrap}
 .view-chip .vc-t{font-size:12px;font-weight:700;color:var(--ink);line-height:1.2;white-space:nowrap}
 .view-chip .vc-d{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--tertiary);line-height:1.25;white-space:nowrap}
@@ -458,6 +478,7 @@ button{font-family:inherit}
         <div class="ctl-field">
           <div class="pillset" id="savedViews"></div>
           <div class="vr-right">
+            <button class="track-chip" id="trackedChip" type="button" hidden></button>
             <div class="ctl-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input id="searchInput" type="text" placeholder="Filter notices…" /></div>
             <button class="reset-btn" id="resetBtn">Reset all</button>
           </div>

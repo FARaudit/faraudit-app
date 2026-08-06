@@ -369,7 +369,31 @@
   });
   obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
-  function start() { wire(); wireCerts(); }
+  /* The tracked list, read from /api/watched-notices rather than filtered out of
+     the feed. The feed carries only OPEN notices — an expired one never enters
+     it — so a filter over the feed would silently drop a tracked notice the
+     moment it closed, which is exactly the notice worth surfacing.
+
+     null means the read failed; [] means nothing is tracked. The control renders
+     those differently, because "you track nothing" and "we could not tell you"
+     are different sentences. */
+  async function wireWatched() {
+    if (!window.DSO) return;
+    try {
+      const res = await fetch('/api/watched-notices', { credentials: 'include' });
+      if (!res.ok) throw new Error('watched-notices fetch failed: ' + res.status);
+      const data = await res.json();
+      window.DSO.WATCHED = Array.isArray(data.rows) ? data.rows : [];
+    } catch (e) {
+      console.error('[opportunities-live] watched notices failed:', e);
+      window.DSO.WATCHED = null;
+    }
+    if (window.DSO_APP && typeof window.DSO_APP.render === 'function') {
+      window.DSO_APP.render();
+    }
+  }
+
+  function start() { wire(); wireCerts(); wireWatched(); }
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', start);

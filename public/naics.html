@@ -691,11 +691,8 @@ function $(id){return document.getElementById(id);}
 /* chrome: sidebar collapse */
 (function(){var KEY='faraudit-sb',h=document.documentElement;try{var s=localStorage.getItem(KEY);if(s==='closed')h.setAttribute('data-sb','closed');else if(!h.hasAttribute('data-sb'))h.setAttribute('data-sb','open');}catch(e){}
   document.addEventListener('click',function(e){var t=e.target&&e.target.closest&&e.target.closest('#sbToggle');if(!t)return;var n=h.getAttribute('data-sb')==='open'?'closed':'open';h.setAttribute('data-sb',n);try{localStorage.setItem(KEY,n);}catch(e){}});})();
-/* chrome: watching badge. The bell — panel, badge and read-state — is owned by
-   /notifications-chrome.js. */
-(function(){
-  function setW(n){document.querySelectorAll('[data-sb-watching-count]').forEach(function(e){if(n>0){e.textContent=String(n);e.style.display='';}else e.style.display='none';});}
-  fetch('/api/watched-notices',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(d)setW((d.kpi&&d.kpi.watching)||0);}).catch(function(){});})();
+/* The bell — panel, badge and read-state — is owned by /notifications-chrome.js.
+   The tracked count lives on Opportunities, where the notices are. */
 /* NAICS search-to-card */
 (function(){
   var CATS=[{id:'con',label:'Construction',color:'#7c9cc4'},{id:'eng',label:'Engineering',color:'#5bb3a6'},{id:'mfg',label:'Manufacturing',color:'#b08ad0'},{id:'mro',label:'MRO',color:'#d0a45b'},{id:'it',label:'IT & Cyber',color:'#378ADD'}];
