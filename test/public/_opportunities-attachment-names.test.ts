@@ -83,6 +83,7 @@ const linkFor = (id: string) =>
 let fileIdFromLink: (u: unknown) => string | null;
 let loadAttachmentNames: (card: any) => void;
 let lastFetchUrl: string | null = null;
+const sentUrl = (): string | null => lastFetchUrl;
 let fetchCalls = 0;
 let fetchImpl: () => Promise<any> = () => Promise.reject(new Error("not set"));
 
@@ -220,13 +221,17 @@ async function main() {
   lastFetchUrl = null;
   fetchImpl = jsonOk({ names: [] });
   loadAttachmentNames(card); await settle();
+  // Read through a getter: the stub assigns lastFetchUrl inside a closure that
+  // control-flow analysis cannot see, so a direct read here narrows to the `null`
+  // it was just set to — and every assertion below it folds into a tautology.
+  const sent = sentUrl();
   ok(
-    lastFetchUrl === "/api/notice-attachments?ids=" + encodeURIComponent(IDS.join(",")),
+    sent === "/api/notice-attachments?ids=" + encodeURIComponent(IDS.join(",")),
     "requests the route with a comma-joined id list",
-    String(lastFetchUrl)
+    String(sent)
   );
   ok(
-    !!lastFetchUrl && !lastFetchUrl.includes("http"),
+    !!sent && !sent.includes("http"),
     "sends ids only — never a SAM URL (the server rebuilds it; no SSRF surface)"
   );
 
