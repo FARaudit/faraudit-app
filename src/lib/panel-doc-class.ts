@@ -135,6 +135,53 @@ const COMMERCIAL_ANCHORS_V2: Array<{ key: string; re: RegExp }> = [
   { key: "I", re: /contract clauses|clauses incorporated (?:by reference)?|section i\b/i },
 ];
 
+// ── SEALED-BID (IFB) §L ANCHORS — flag AUDIT_IFB_SECTION_ANCHORS, default-OFF ───────────────────────────────
+// Forensic (run e5f177aa, W911SG27BA002, probed $0 by scripts/audit-ai/_routing-anchor-probe.ts): BOTH anchor
+// sets above reach §L only through "instructions to OFFERORS / QUOTERS". That is negotiated-procurement
+// vocabulary. On a sealed bid under FAR Part 14 the same content is headed "INSTRUCTIONS, CONDITIONS, AND
+// NOTICES TO BIDDERS" (SF-1442 / UFGS Section 00 21 13), and the words offeror and quoter never appear in it.
+// Measured on that package: "instructions to bidders" 22 occurrences, first at offset 29; "instructions to
+// offerors" ZERO; "instructions to quoters" ZERO. So §L never placed, the legacy §L-AND-§M predicate went
+// false, and routing was abandoned for EVERY section — B, C and M each received the whole 2.8M-char package
+// while the actual bid-opening time, award basis and set-aside sat unrouted in the first 13.5K.
+// One absent word, whole-package blast radius.
+//
+// HEADER-LIKE ONLY, per this file's anchor doctrine (L110-112). Three shapes, each a section TITLE:
+//   (a) the SF-1442 heading itself, comma-tolerant across extraction;
+//   (b) a line-start "Instructions to Bidders:" heading (optionally numbered) — the COLON is what makes it a
+//       heading, and it is why the mid-content mentions on this same package do not fire: "of this /
+//       instructions to bidders section." begins a wrapped line but carries no colon, and "See the
+//       Instructions to bidders for full details" is not at line start;
+//   (c) the UFGS section number 00 21 13, which titles that section in construction packages.
+// DELIBERATELY EXCLUDED: "invitation for bids" and "bid opening". Both are real IFB vocabulary and both recur
+// MID-CONTENT on this very package — "conforming to the invitation for bids", "Also called Invitation for
+// Bids." — so either would fragment §C mid-sentence, which is the exact failure L110-112 exists to prevent.
+// Positive SHAPE allowlist, never a bar-vocab blocklist.
+//
+// SHAPE (a) COVERS THE WHOLE SF-1442 HEADING FAMILY, not just the sealed-bid pole — and that is a SECOND
+// defect, surfaced by this fix's own non-regression control rather than by the run. The negotiated variant of
+// the identical heading reads "INSTRUCTIONS, CONDITIONS, AND NOTICES TO OFFERORS", and the existing anchor
+// does NOT match it either: it looks for the contiguous phrase "instructions to offerors", which that heading
+// does not contain — three words sit between them. So construction RFPs on SF-1442 lose §L for exactly the
+// same reason IFBs do. A fix that covered only "bidders" would have left the twin broken while looking
+// complete, so (a) accepts bidders · offerors · quoters.
+//
+// FLAG-GATED because the effect is not local. Placing §L can flip `routed` false→true, which swaps a
+// whole-source read for a routed one across the whole package — cheaper, but a different read. Verified
+// against every banked source carrying `input.fullSource` (17 distinct packages): ZERO match, so flag-ON is
+// a no-op on the entire banked corpus and the only package it changes is the IFB that motivated it.
+// Flag-OFF ⇒ the anchor sets are byte-identical to today.
+const IFB_L_ANCHOR = /instructions,?\s+conditions,?\s+and\s+notices\s+to\s+(?:bidders|offerors|quoters)|(?:^|\n)[ \t]*(?:\d+\.[ \t]*)?instructions to bidders[ \t]*:|(?:^|\n)[ \t]*section[ \t]+00[ \t]*21[ \t]*13\b/;
+const IFB_ANCHORS_ON = () => process.env.AUDIT_IFB_SECTION_ANCHORS === "true";
+
+/** The anchor set for this route, with the sealed-bid §L shapes folded in when armed. Read at CALL time, never
+ *  at module load, so the flag is honoured by a caller that sets it per-run (and by the gate). Pure given env. */
+export function commercialAnchorsFor(v2: boolean): Array<{ key: string; re: RegExp }> {
+  const base = v2 ? COMMERCIAL_ANCHORS_V2 : COMMERCIAL_ANCHORS;
+  if (!IFB_ANCHORS_ON()) return base;
+  return base.map((a) => (a.key === "L" ? { key: "L", re: new RegExp(`${a.re.source}|${IFB_L_ANCHOR.source}`, a.re.flags) } : a));
+}
+
 /** Route a commercial/non-UCF source into UCF-keyed section text by CONTENT SIGNAL (position-ordered anchor slicing),
  *  so the panel lenses still receive relevant text. Returns {sectionText, routed}. `routed` is true only when the
  *  core evaluation (M) AND submission (L) content were placed — what the lenses most need; otherwise the caller uses
@@ -144,7 +191,7 @@ export function routeCommercialSections(
   opts?: { v2?: boolean }
 ): { sectionText: Record<string, string>; routed: boolean; placedKeys: string[]; headChars: number; headCovered: boolean } {
   const src = fullSource ?? "";
-  const anchors = opts?.v2 ? COMMERCIAL_ANCHORS_V2 : COMMERCIAL_ANCHORS;
+  const anchors = commercialAnchorsFor(!!opts?.v2);
   const hits: Array<{ pos: number; key: string }> = [];
   for (const a of anchors) {
     const re = new RegExp(a.re.source, "ig");
