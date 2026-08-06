@@ -165,6 +165,22 @@ check("the NAICS remove control is bound by a delegated selector",
   "no closest('[data-naics-rm]') — the Remove button is not actually wired");
 check("NAICS writes are confirmed by set equality, not by a 2xx", /sameSet\s*\(/.test(live),
   "a 200 with a discarded write would report success");
+// NAICS LAUNDERING. The GET overlays codes derived from won audits when nothing is
+// saved, so an editor that reads the DISPLAYED array, adds one code and writes the
+// result back persists suggestions as customer-entered data. The write must be built
+// from the row, read at write time — never from page state.
+check("the route reports what is SAVED separately from what is displayed",
+  /naics_saved/.test(capRoute) && /naics_derived/.test(capRoute),
+  "the GET does not distinguish the persisted array from the derived overlay");
+// Scoped to the LOAD path. A blanket ban on `rec.naics_codes` was wrong: the PATCH
+// echo legitimately reads it, and a PATCH response carries no overlay.
+const loadPath = live.slice(0, live.indexOf("function setLivePill"));
+check("the editor seeds its list from naics_saved, not the overlay",
+  /cap\.naics_saved/.test(loadPath) && !/rec\.naics_codes/.test(loadPath),
+  "the panel is populated from the overlay — adding one code would persist the rest");
+check("NAICS writes re-read the row before mutating it",
+  /async function savedCodes\(/.test(live) && /mutate\(await savedCodes\(\)\)/.test(live),
+  "a whole-array write is built from stale page state");
 check("email is never an input — it is auth identity, not a profile column",
   !/\$\{editable\('psEmail'/.test(panel) && /\$\{ro\('Email'/.test(panel),
   "email rendered as an editable box without a verification flow behind it");

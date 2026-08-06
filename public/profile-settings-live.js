@@ -49,8 +49,14 @@
           c.cage    = rec.cage_code       || '';
           c.uei     = rec.uei             || '';
           c.address = rec.contact_address || '';
-          (Array.isArray(rec.naics_codes) ? rec.naics_codes : [])
+          // THE SAVED ARRAY, not the displayed one. statement.naics_codes is a
+          // read-time overlay that falls back to codes derived from won audits, so
+          // editing it and writing it back would persist a suggestion as the record.
+          // naics_derived is offered separately, and only becomes yours if you add it.
+          (Array.isArray(cap.naics_saved) ? cap.naics_saved : [])
             .forEach(function (n) { if (n) window.PS.NAICS.push({ code: String(n) }); });
+          window.PS.NAICS_DERIVED = (Array.isArray(cap.naics_derived) ? cap.naics_derived : [])
+            .map(String);
           (Array.isArray(rec.certifications) ? rec.certifications : [])
             .forEach(function (k) { if (k) window.PS.CERTS.push({ k: String(k), on: true }); });
         } else {
@@ -176,7 +182,26 @@
     if (window.PS_APP && typeof window.PS_APP.render === 'function') window.PS_APP.render();
   }
 
-  async function writeCodes(next, okMsg, failMsg) {
+  /* READ THE SAVED ARRAY, THEN WRITE. The panel's list is a render of a fetch that may
+     be minutes old, and the capability statement edits the same row from another tab.
+     A whole-array replace built from page state can reinstate codes deleted elsewhere,
+     or drop ones added there. The mutator is applied to what the row holds NOW, never
+     to what the screen shows. */
+  async function savedCodes() {
+    const res = await fetch('/api/capability-statement', { credentials: 'include' });
+    if (!res.ok) throw new Error('read failed');
+    const cap = await res.json();
+    if (!Array.isArray(cap && cap.naics_saved)) throw new Error('read failed');
+    return cap.naics_saved.map(String);
+  }
+
+  async function writeCodes(mutate, okMsg, failMsg) {
+    let next;
+    try {
+      next = mutate(await savedCodes());
+    } catch (_) {
+      throw new Error(failMsg);   // could not establish what is on file — write nothing
+    }
     const res = await fetch('/api/capability-statement', {
       method: 'PATCH',
       credentials: 'include',
@@ -201,15 +226,36 @@
     const rm = e.target.closest('[data-naics-rm]');
     if (rm) {
       const code = rm.getAttribute('data-naics-rm');
-      const next = currentCodes().filter(function (c) { return c !== code; });
       rm.disabled = true;
       naicsMsg('Removing ' + code + '…', 'wait');
       try {
-        await writeCodes(next, code + ' removed.',
+        await writeCodes(
+          function (saved) { return saved.filter(function (c) { return c !== code; }); },
+          code + ' removed.',
           'Could not remove ' + code + ' — nothing was changed.');
       } catch (err) {
         naicsMsg(err.message, 'err');   // DOM untouched: the list still shows what is on file
         rm.disabled = false;
+      }
+      return;
+    }
+
+    // Adopting a suggestion is an explicit click, and it saves ONLY that code —
+    // never the whole derived set, which is how a suggestion becomes a record by
+    // accident.
+    const sugg = e.target.closest('[data-naics-add]');
+    if (sugg) {
+      const code = sugg.getAttribute('data-naics-add');
+      sugg.disabled = true;
+      naicsMsg('Adding ' + code + '…', 'wait');
+      try {
+        await writeCodes(
+          function (saved) { return saved.indexOf(code) >= 0 ? saved : saved.concat([code]); },
+          code + ' added to your profile.',
+          'Could not add ' + code + ' — nothing was changed.');
+      } catch (err) {
+        naicsMsg(err.message, 'err');
+        sugg.disabled = false;
       }
       return;
     }
@@ -219,18 +265,22 @@
       const input = document.getElementById('psNaicsInput');
       if (!input) return;
       const code = String(input.value || '').trim();
-      const have = currentCodes();
       if (!CODE_RE.test(code)) { naicsMsg('A NAICS code is exactly six digits.', 'err'); return; }
-      if (have.indexOf(code) >= 0) { naicsMsg(code + ' is already on your list.', 'err'); return; }
+      if (currentCodes().indexOf(code) >= 0) { naicsMsg(code + ' is already on your list.', 'err'); return; }
       addBtn.disabled = true;
       naicsMsg('Adding ' + code + '…', 'wait');
       try {
-        await writeCodes(have.concat([code]), code + ' added.',
+        await writeCodes(
+          // Re-checked against the row, not the screen: it may have been added elsewhere.
+          function (saved) { return saved.indexOf(code) >= 0 ? saved : saved.concat([code]); },
+          code + ' added.',
           'Could not add ' + code + ' — nothing was changed.');
       } catch (err) {
         naicsMsg(err.message, 'err');
       } finally {
         addBtn.disabled = false;
+        const el = document.getElementById('psNaicsInput');
+        if (el) el.value = '';
       }
     }
   });

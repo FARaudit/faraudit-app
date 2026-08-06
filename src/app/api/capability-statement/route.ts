@@ -222,7 +222,21 @@ export async function GET(_req: NextRequest) {
     naics_codes: savedNaics.length > 0 ? savedNaics : naics
   };
 
-  return NextResponse.json({ statement: merged, stub: false });
+  // WHAT IS PERSISTED, REPORTED SEPARATELY FROM WHAT IS DISPLAYED.
+  // `statement.naics_codes` above is a read-time overlay: with nothing saved it shows
+  // codes derived from won audits. An editor that takes the array it was handed, adds
+  // one, and PATCHes the result back persists those derived codes as though the
+  // customer typed them — the display becomes the record because someone added a code.
+  // An editor must build its writes from `naics_saved`, which is the row and nothing
+  // else. `naics_derived` is what the overlay contributed: a suggestion until acted on.
+  const derived = savedNaics.length > 0 ? [] : naics.slice();
+
+  return NextResponse.json({
+    statement: merged,
+    naics_saved: savedNaics,
+    naics_derived: derived,
+    stub: false
+  });
 }
 
 export async function PATCH(req: NextRequest) {

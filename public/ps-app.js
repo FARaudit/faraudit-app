@@ -131,6 +131,12 @@
         ${NAICS.length
           ? NAICS.map(n => `<div class="naics-row"><div class="nr-l"><span class="nr-code">${esc(n.code)}</span></div><button class="nr-x" type="button" data-naics-rm="${esc(n.code)}" title="Remove" aria-label="Remove NAICS ${esc(n.code)}">✕</button></div>`).join('')
           : '<div class="fld-none" style="padding:6px 2px 12px">No NAICS codes on file.</div>'}
+        ${(window.PS.NAICS_DERIVED || []).length ? `
+        <div class="naics-sugg">
+          <div class="ns-t">From contracts you have won — not saved to your profile yet</div>
+          <div class="ns-row">${window.PS.NAICS_DERIVED.map(c => `<button class="ns-chip" type="button" data-naics-add="${esc(c)}" title="Add ${esc(c)} to your profile">${esc(c)} <span>+</span></button>`).join('')}</div>
+          <div class="ns-s">These scope nothing until you add them. Adding one saves only that code.</div>
+        </div>` : ''}
         <div class="pe-add">
           <input type="text" id="psNaicsInput" inputmode="numeric" maxlength="6" placeholder="Six-digit NAICS code" aria-label="NAICS code to add">
           <button class="save-btn" type="button" id="psNaicsAdd">Add code</button>
