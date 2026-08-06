@@ -449,7 +449,7 @@ function renderAct(){
      denominator the widget otherwise never gives — "the 7 soonest" of how many. */
   const pool = base().filter(o=>o.days!=null && verdict(o).band!=='screened').sort((a,b)=>a.days-b.days);
   const rows = pool.slice(0,7);
-  $('actSub').textContent = 'The 7 soonest deadlines you can still respond to. Ordered by days left — the only fact these notices publish that can rank them.';
+  $('actSub').textContent = 'The 7 soonest deadlines you can still respond to, ordered by days left.';
   $('actList').innerHTML = rows.map(o=>'<button class="act-row'+(o.days>7?' far':'')+'" data-id="'+esc(o.id)+'">'+
     '<span class="act-d">'+o.days+'<small>d</small></span>'+
     '<span style="min-width:0"><span class="act-title">'+esc(TITLECASE(o.title))+'</span><span class="act-agy">'+esc(officeName(o.office))+' · '+esc(o.id)+'</span></span>'+

@@ -213,7 +213,7 @@ button{font-family:inherit}
 
 /* ── widgets ── */
 .row{display:grid;gap:16px;align-items:stretch}
-.row.hero{grid-template-columns:1.42fr 1fr}
+.row.hero{grid-template-columns:1fr 1fr;gap:14px}
 /* Media rules OUT-SPECIFY their base rule (html …) — equal specificity would
    lose on source order and the narrow path would never run. */
 @media(max-width:1320px){html .row.hero{grid-template-columns:1fr}}
@@ -278,7 +278,7 @@ button{font-family:inherit}
 .act-d{font-family:"Manrope",sans-serif;font-size:22px;font-weight:800;letter-spacing:-.03em;color:var(--ink);text-align:right;line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap}
 .act-d small{font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:700;color:var(--tertiary);letter-spacing:.02em;margin-left:2.5px}
 .act-row.far .act-d{color:var(--ink-2);font-weight:700}
-.act-title{display:block;font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.act-title{display:block;font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
 .act-agy{display:block;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--tertiary);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* ── verdict + chips ── */
