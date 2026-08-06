@@ -20,7 +20,11 @@
   //   unknown     → no pill at all; never leave a stale claim standing
   window.setRailLiveBadge = function setRailLiveBadge(state, opts) {
     try {
-      var link = document.querySelector('.sb-icon[href="/opportunities"]');
+      // Opportunities is a WORKFLOW row, which rail.ts row() renders as .sb-step;
+      // only the collapsible-section rows get .sb-icon. Match both, or this
+      // returns here and no badge — live OR "Feed down" — can ever render.
+      // Gated by test/public/_rail-live-badge.test.ts Part K.
+      var link = document.querySelector('.sb-step[href="/opportunities"], .sb-icon[href="/opportunities"]');
       if (!link) return;
       var el = link.querySelector('.sb-badge');
 
