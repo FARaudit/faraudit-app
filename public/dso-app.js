@@ -438,7 +438,7 @@ function renderBands(){
       '<span class="band-go">'+(S.band===b.k?'showing ↓':b.go+' →')+'</span></button>').join('') +
     '<div class="screen-detail" id="screenDetail">'+screenReasons.map(r=>'<div class="sd-row"><span class="sd-n">'+r.n+'</span><span>'+r.t+'</span></div>').join('')+'</div>'+
     '<div class="funnel" id="funnel">'+funnel.map(f=>'<div class="fn-row '+f.cls+'"><span class="fn-n">'+(f.sign||'')+f.n+'</span><span class="fn-t">'+f.t+'</span></div>').join('')+'</div>';
-  $('triageBands').querySelectorAll('[data-band]').forEach(b=>b.onclick=()=>{ S.band = S.band===b.dataset.band?null:b.dataset.band; S.view=null; renderAll(); });
+  $('triageBands').querySelectorAll('[data-band]').forEach(b=>b.onclick=()=>{ S.band = S.band===b.dataset.band?null:b.dataset.band; S.view=null; renderAll(); revealResults(); });
   return {n, screenReasons, funnel:{read:read.length, outNaics, ineligible, remaining:rows.length}};
 }
 let LAST_BANDS = null;
@@ -492,7 +492,7 @@ function renderControls(){
     const c = k==='all'?rows.length:cnt(o=>o.stage===k);
     return '<button data-stage="'+k+'" class="'+(k===S.stage?'active':'')+(c===0?' zero':'')+'">'+l+'<span class="n">'+c+'</span></button>';
   }).join('');
-  $('stageSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.stage=b.dataset.stage;S.view=null;renderAll();});
+  $('stageSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.stage=b.dataset.stage;S.view=null;renderAll();revealResults();});
 
   const saPoles = ['all','SB','SB-Partial','SDVOSB','8(a)','HUBZone','WOSB','EDWOSB','SoleSource','Full','UNKNOWN'];
   const present = saPoles.filter(k=>k==='all'||cnt(o=>o.sa===k)>0);
@@ -505,7 +505,7 @@ function renderControls(){
   let html = present.map(k=>saBtn(k, k==='all'?rows.length:cnt(o=>o.sa===k), false)).join('');
   if(S.saOpen) html += absent.map(k=>saBtn(k,0,true)).join('');
   $('saFilters').innerHTML = html;
-  $('saFilters').querySelectorAll('[data-sa]').forEach(b=>b.onclick=()=>{S.sa=S.sa===b.dataset.sa?'all':b.dataset.sa;S.view=null;renderAll();});
+  $('saFilters').querySelectorAll('[data-sa]').forEach(b=>b.onclick=()=>{S.sa=S.sa===b.dataset.sa?'all':b.dataset.sa;S.view=null;renderAll();revealResults();});
   $('saMore').textContent = S.saOpen ? 'fewer' : '+'+absent.length+' with none in this read';
   $('saMore').onclick = ()=>{ S.saOpen = !S.saOpen; renderControls(); };
 
@@ -523,13 +523,16 @@ function renderControls(){
     {k:'upstream',t:'Upstream',          d:'pre-sol + sources sought',    n:cnt(o=>verdict(o).k==='SHAPE')}
   ];
   $('savedViews').innerHTML = views.map(v=>'<button class="view-chip'+(S.view===v.k?' active':'')+(v.n===0?' zero':'')+'" data-view="'+v.k+'"><span class="vc-t">'+v.t+'</span><span class="vc-d">'+v.d+' · '+v.n+'</span></button>').join('');
-  $('savedViews').querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{S.view=S.view===b.dataset.view?null:b.dataset.view;S.stage='all';S.sa='all';S.band=null;renderAll();});
+  $('savedViews').querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{S.view=S.view===b.dataset.view?null:b.dataset.view;S.stage='all';S.sa='all';S.band=null;renderAll();revealResults();});
 
   renderTrackedChip();
 
   const sorts=[['closing','Closing first'],['longest','Longest window'],['buyer','Buyer']];
   $('sortSeg').innerHTML = sorts.map(([k,l])=>'<button data-sort="'+k+'" class="'+(k===S.sort?'active':'')+'">'+l+'</button>').join('');
   $('sortSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.sort=b.dataset.sort;renderAll();});
+  // The tracked list is ordered by the watch record and never reads S.sort, so
+  // these three cannot act on it. Hidden there rather than shown and inert.
+  $('sortSeg').hidden = S.view === 'tracked';
 }
 /* ── sorts. Design's three, on comparators that are actually valid. ── */
 function sortRows(data) {
@@ -856,6 +859,71 @@ function renderList() {
   wireActions();
 }
 
+/* ── collapse all ─────────────────────────────────────────────────────────────
+   For the DETAILS panels opened on rows. They stay open, and after four or five
+   it stops being obvious how many are expanded or where they are. The control
+   carries the COUNT for that reason: "Collapse all" alone does not tell you that
+   six are open somewhere above.
+
+   It renders only while something is open, so it costs nothing the rest of the
+   time — and a control that would collapse nothing never appears. */
+function closeAllPanels() {
+  const open = document.querySelectorAll('#plist .pcard.is-open');
+  Array.prototype.forEach.call(open, function (card) {
+    card.classList.remove('is-open');
+    const b = card.querySelector('[data-more]');
+    if (b) { b.setAttribute('aria-expanded', 'false'); b.textContent = 'Details'; }
+  });
+  syncCollapseAll();
+  return open.length;
+}
+
+function syncCollapseAll() {
+  const b = $('collapseAll');
+  if (!b) return;
+  const n = document.querySelectorAll('#plist .pcard.is-open').length;
+  b.hidden = n === 0;
+  b.textContent = 'Collapse all (' + n + ')';
+}
+
+function bindCollapseAll() {
+  const b = $('collapseAll');
+  if (!b) { console.warn('[dso-app] #collapseAll not found — collapse all is unbound'); return; }
+  b.addEventListener('click', (e) => { e.preventDefault(); closeAllPanels(); });
+  // Escape closes every open panel, matching what the search box already does
+  // with its term. Ignored while a field has focus, so it cannot eat that.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const t = e.target;
+    const tag = t && t.tagName ? t.tagName.toLowerCase() : '';
+    if (tag === 'input' || tag === 'textarea' || tag === 'select' || (t && t.isContentEditable)) return;
+    if (closeAllPanels() > 0) e.preventDefault();
+  });
+}
+
+/* Bring the results into view after a filter is applied from the controls.
+
+   Every filter control sits above the fold and the list starts below it —
+   measured on the live page, the results header is ~229px past the viewport
+   bottom. So clicking a band filtered 196 rows down to 59, updated the count, and
+   moved nothing the customer could see. The work was done and the feedback was
+   off screen, which reads as a dead control.
+
+   Only scrolls when the header is actually out of view: someone already reading
+   the list has not asked to be moved. Honours prefers-reduced-motion. */
+function revealResults() {
+  const head = document.querySelector('.plist-head');
+  if (!head || typeof head.getBoundingClientRect !== 'function') return;
+  const r = head.getBoundingClientRect();
+  const vh = window.innerHeight || 0;
+  if (r.top >= 0 && r.bottom <= vh) return;          // already visible — leave it
+  let smooth = true;
+  try {
+    smooth = !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  } catch (e) { /* no matchMedia — a scroll still beats no scroll */ }
+  head.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
+}
+
 /* ── tracked ──────────────────────────────────────────────────────────────────
    Track marks a notice you have not decided about. It is deliberately NOT
    Pipeline (which means "I am bidding this" and carries the funnel count) and
@@ -893,6 +961,7 @@ function renderTrackedChip() {
     S.view = S.view === 'tracked' ? null : 'tracked';
     S.stage = 'all'; S.sa = 'all'; S.band = null;
     renderAll();
+    revealResults();
   };
 }
 
@@ -943,6 +1012,9 @@ function trackedRow(r) {
     '<span class="tr-t">' + esc(r.title || r.solicitation_number || 'Untitled notice') + '</span>' +
     '<span class="tr-s' + (state === 'closed' ? ' closed' : '') + '">' + state + '</span>' +
     (bits ? '<span class="tr-m">' + bits + '</span>' : '') +
+    // The only way off this list for a notice the feed no longer carries: it has
+    // no card, so it has no Track button to toggle.
+    (r.notice_id ? '<button type="button" class="tr-x" data-untrack="' + esc(r.notice_id) + '">Untrack</button>' : '') +
     '</div>';
 }
 
@@ -960,6 +1032,7 @@ function renderAll() {
   if (!S.init && ROWS.length) { S.naics = new Set(ROWS.map((o) => o.naics).filter(Boolean)); S.init = true; }
   UNMAPPED.clear();
   renderHeader(); renderKPIs(); renderBands(); renderAct(); renderControls(); renderList();
+  syncCollapseAll();
 }
 
 function onThemeChange() { renderAll(); }
@@ -989,6 +1062,7 @@ function bindDetailToggles() {
     b.setAttribute('aria-expanded', open ? 'true' : 'false');
     b.textContent = open ? 'Hide details' : 'Details';
     if (open) { loadDescription(card); loadAttachmentNames(card); }
+    syncCollapseAll();
   });
 
   /* The attachment disclosure. Same delegation, same reason — the list is rebuilt
@@ -1004,6 +1078,37 @@ function bindDetailToggles() {
     if (!box) return;
     const open = box.classList.toggle('is-open');
     t.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+
+  /* Untrack, from the compact row of a notice the feed no longer carries. The
+     row is removed only after the server confirms — an optimistic removal would
+     show the notice gone while it was still tracked, and the list is the only
+     place the customer can see it at all. */
+  host.addEventListener('click', (e) => {
+    const b = e.target && e.target.closest ? e.target.closest('[data-untrack]') : null;
+    if (!b || !host.contains(b) || b.disabled) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const id = b.getAttribute('data-untrack');
+    b.disabled = true;
+    b.textContent = 'Removing…';
+    fetch('/api/watch?noticeId=' + encodeURIComponent(id), { method: 'DELETE', credentials: 'include' })
+      .then((r) => {
+        if (!r.ok) throw new Error('untrack failed: ' + r.status);
+        const w = watched();
+        if (w) window.DSO.WATCHED = w.filter((x) => x && x.notice_id !== id);
+        // The row-level map too, or the notice's card would still read "Tracking"
+        // if it is also present in the feed. Null means the watch state was never
+        // read; leave it null rather than inventing an empty map.
+        const ids = window.DSO && window.DSO.WATCHED_NOTICE_IDS;
+        if (ids && typeof ids.delete === 'function') ids.delete(id);
+        renderAll();
+      })
+      .catch((err) => {
+        console.warn('[watch] untrack error', err);
+        b.disabled = false;
+        b.textContent = 'Untrack failed — retry';
+      });
   });
 
   /* The notice text's "show more". Same delegation for the same reason. */
@@ -1180,8 +1285,8 @@ function bindSearch() {
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => { renderAll(); bindResetAll(); bindDetailToggles(); bindSearch(); });
-} else { renderAll(); bindResetAll(); bindDetailToggles(); bindSearch(); }
+  document.addEventListener('DOMContentLoaded', () => { renderAll(); bindResetAll(); bindDetailToggles(); bindSearch(); bindCollapseAll(); });
+} else { renderAll(); bindResetAll(); bindDetailToggles(); bindSearch(); bindCollapseAll(); }
 /* the cell floor is a webfont measurement — re-derive once the fonts land, or
    it is computed against fallback metrics and reports a generous number. */
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ renderControls(); });
