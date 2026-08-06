@@ -109,6 +109,14 @@
     }
   }
 
+  /* The green LIVE pill in the topbar is a claim about THIS page's data, distinct
+     from the rail's feed badge above. It ships hidden and only a settled fetch may
+     turn it on. Gated by test/public/_rail-live-badge.test.ts Part L. */
+  function setLivePill(on) {
+    const pill = document.getElementById('livePill');
+    if (pill) pill.hidden = !on;
+  }
+
   async function wire() {
     try {
       const res = await fetch('/api/command-center-data', { credentials: 'include' });
@@ -156,8 +164,10 @@
       if (window.CC_APP && typeof window.CC_APP.render === 'function') {
         window.CC_APP.render();
       }
+      setLivePill(true);
     } catch (e) {
       console.error('[command-center-live] wire failed:', e);
+      setLivePill(false);
       // Distinguish OUTAGE from not-yet-loaded: without this the insight bar
       // would sit on "Loading your desks…" forever after a failed fetch.
       if (window.CC) {

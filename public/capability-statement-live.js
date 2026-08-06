@@ -359,6 +359,14 @@
     paintStats();
   }
 
+  /* The green LIVE pill is a claim about THIS page's data, so only a settled fetch
+     may turn it on — it ships hidden and stays hidden when the statement could not
+     be read. Gated by test/public/_rail-live-badge.test.ts Part L. */
+  function setLivePill(on) {
+    var pill = document.getElementById('livePill');
+    if (pill) pill.hidden = !on;
+  }
+
   function wire() {
     fetch(API, { credentials: 'include' })
       .then(function (r) {
@@ -374,10 +382,12 @@
         REC = d.statement;
         renderAll();
         document.body.classList.add('cs-ready');
+        setLivePill(true);
       })
       .catch(function (e) {
         console.error('[capability-statement-live]', e);
         document.body.classList.add('cs-unreadable');
+        setLivePill(false);
       });
   }
 

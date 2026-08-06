@@ -755,7 +755,7 @@ details[open]>summary .chev{transform:rotate(180deg)}
   <div class="main">
     <div class="topbar">
       <div class="crumbs"><b>Run Audit</b><span class="sep">/</span><span>New solicitation</span></div>
-      <span class="live-pill">LIVE</span>
+      <span class="live-pill" id="livePill" hidden>LIVE</span>
       <div class="search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
         <span>Search audits, notice IDs, NAICS…</span>
@@ -923,7 +923,7 @@ details[open]>summary .chev{transform:rotate(180deg)}
         </details>
         <div class="body-stack" id="bodyStack">
           <section class="blk blk-recent">
-            <div class="sec-head"><span class="k">Recently Audited</span><a class="all" href="/dashboard">View all → Past Audits</a></div>
+            <div class="sec-head"><span class="k">Recently Audited</span><a class="all" href="/dashboard">View all → Decisions</a></div>
             <div class="ra-region">
               <div class="ra-scroll">
                 <div class="ra-list">
@@ -1281,7 +1281,13 @@ var __fdPartialNoticeId=null;
   // first-run vs returning: flip section order + expand the "what runs" teaching pipeline for first-run.
   function flip(n){var firstRun=(n===0);if(stack)stack.classList.toggle('flip',firstRun);var stages=document.querySelector('.blk-stages');if(stages&&stages.tagName==='DETAILS'){if(firstRun)stages.setAttribute('open','');else stages.removeAttribute('open');}}
   function renderCards(audits){if(!audits||!audits.length){list.innerHTML='<div class="ra-empty"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg></div><div class="h">No audits yet</div><div class="s">Upload a solicitation above and your first ranked report lands here — a bid / no-bid call with the KO clarification email drafted and ready.</div></div>';flip(0);return;}list.innerHTML=audits.map(cell).join('');flip(audits.length);}
-  fetch('/api/audits?limit=20',{credentials:'include'}).then(function(r){return r.ok?r.json():{audits:[]};}).then(function(d){renderCards((d&&d.audits)||[]);}).catch(function(){renderCards([]);});})();
+  /* The green LIVE pill is a claim about THIS page's data, so only a settled fetch may
+     turn it on. It ships hidden and stays hidden on any failure.
+     Gated by test/public/_rail-live-badge.test.ts Part L. */
+  function setLivePill(on){var p=$('livePill');if(p)p.hidden=!on;}
+  /* A non-OK response is a FAILURE, not an empty history — it must not resolve to
+     {audits:[]}, which the pill and the empty state would both read as "no audits yet". */
+  fetch('/api/audits?limit=20',{credentials:'include'}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(d){var a=(d&&d.audits)||[];renderCards(a);setLivePill(true);}).catch(function(e){console.warn('[run-audit] recent audits failed:',e&&e.message);renderCards([]);setLivePill(false);});})();
 
 /* ── state-driven order: first-run (no audits) sees the pipeline strip first ── */
 (function(){var stack=$('bodyStack');var firstRun=document.querySelectorAll('.blk-recent .rac').length===0;if(stack)stack.classList.toggle('flip',firstRun);var stages=document.querySelector('.blk-stages');if(stages&&stages.tagName==='DETAILS'&&firstRun)stages.setAttribute('open','');})();

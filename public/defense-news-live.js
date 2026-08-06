@@ -29,6 +29,14 @@
     };
   }
 
+  /* The green LIVE pill is a claim about THIS page's data, so only a settled fetch
+     may turn it on. Every failure path here funnels through renderUnavailable(),
+     which turns it back off. Gated by test/public/_rail-live-badge.test.ts Part L. */
+  function setLivePill(on) {
+    var pill = document.getElementById('livePill');
+    if (pill) pill.hidden = !on;
+  }
+
   function repaint() {
     if (typeof renderTopCards === 'function') renderTopCards();
     if (typeof renderStoryFeed === 'function') renderStoryFeed();
@@ -43,6 +51,7 @@
      news day both arrive as an empty array and only one of them is a story. Built
      with textContent so a reason echoed from the route cannot inject markup. */
   function renderUnavailable(reason) {
+    setLivePill(false);
     if (typeof LIVE_ARTICLES !== 'undefined' && Array.isArray(LIVE_ARTICLES)) LIVE_ARTICLES.length = 0;
     repaint();
     var el = document.getElementById('dn-lead');
@@ -89,6 +98,7 @@
       LIVE_ARTICLES.length = 0;
       LIVE_ARTICLES.push.apply(LIVE_ARTICLES, mapped);
       repaint();
+      setLivePill(mapped.length > 0);
     } catch (e) {
       console.error('[defense-news-live] wire failed:', e);
       renderUnavailable('Defense news could not be loaded.');
