@@ -115,6 +115,37 @@ for (const f of FIELDS) {
   console.log(`   measured: ${vs.map((v) => v.toFixed(2)).join(" → ")}  · empty ${emptyWeight.toFixed(3)}`);
 }
 
+// ── the rail carries no hue ──────────────────────────────────────────────────
+// Design ruling, 2026-08-06: a red clears AA on only 5 of the 16 ramp steps, so hue
+// on the rail encodes by STAGE, not by state — the same expired clock would render
+// red at 03 and ink at 07. The rail is ink + marker; hue lives on the strip, whose
+// ground is a card and does not move.
+console.log("\n── the rail carries no hue ──");
+{
+  const js = readFileSync(resolve(process.cwd(), "public/pipeline-live.js"), "utf8");
+  const railRaw = js.slice(js.indexOf("function buildRail"), js.indexOf("function writeBanner"));
+  check("buildRail exists to check", railRaw.length > 200, "could not slice buildRail — this gate asserts nothing");
+
+  // SCAN CODE, NOT PROSE. The first form of this check matched the word "alarm" in the
+  // comment explaining why there is no alarm — so documenting the rule would have
+  // failed the rule. A gate that a comment can trip is measuring the wrong text.
+  const rail = railRaw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
+  check("comments were actually stripped before scanning", rail.length < railRaw.length,
+    "nothing was stripped — the scan is still reading prose");
+
+  const reds = rail.match(/#(?:b91c1c|dc2626|fca5a5|fef2f2|ef4444|991b1b)\b/gi) ?? [];
+  check("no red literal reaches the rail", reds.length === 0, `found ${reds.join(", ")}`);
+
+  const alarmVar = rail.match(/--alarm|\.alarm\b|\balarm\s*[:=]/g) ?? [];
+  check("the rail reads no alarm channel", alarmVar.length === 0, `found: ${alarmVar.join(", ")}`);
+
+  // ...and the marker must fire on EVERY hot clock, not only when nothing clears.
+  // The prior form was `hot && tone.mark`, which suppressed the marker exactly when a
+  // tone did clear — so the one state red existed for lost its only other signal.
+  check("the marker is unconditional on hot", /hot\s*\?\s*['"]▸/.test(rail),
+    "marker is still gated on something other than hot");
+}
+
 // ── planted positives — each check above must be able to go red ──────────────
 console.log("\n── planted positives ──");
 {

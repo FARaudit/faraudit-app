@@ -166,16 +166,12 @@
       if(ratio(c,bg) >= need){ sub = c; return true; }
       return false;
     });
-    // Alarm: the REDDEST declared tone that clears this ground — reddest first, not
-    // highest-contrast first. Picking by contrast selects the palest candidate on any
-    // mid or deep ground, so the "alarm" resolves to a near-white that is
-    // indistinguishable from ordinary ink, and because a near-white clears the
-    // threshold the fallback marker never fires either: an alarm that looks exactly
-    // like a calm clock, with nothing else to signal it. On most ramp steps NO red
-    // clears, and the honest answer is ink plus a marker — hue is never load-bearing.
-    var reds = ['#b91c1c','#dc2626','#fca5a5'], alarm = null;
-    reds.some(function(c){ if(ratio(c,bg) >= need){ alarm = c; return true; } return false; });
-    return { ink:ink, sub:sub, alarm: alarm || ink, mark: !alarm };
+    // No alarm tone is returned, and that is deliberate. A red clears AA on only 5 of
+    // the 16 ramp steps, so hue here would encode by STAGE rather than by state: the
+    // same expired clock red at one stage and not at another. Callers on a ramp get
+    // ink and weight only. Hue lives where the ground is fixed — the strip's figures
+    // take --alarm from CSS, forked per field.
+    return { ink:ink, sub:sub };
   }
 
   // Five clock kinds, not one countdown — a single uniform countdown would be a
@@ -197,7 +193,7 @@
     // pipeline table records none — only due_date is on file. Deriving "34d out" from
     // any column we DO have would be a fabricated duration, so the cell states what it
     // knows. Never alarmed: time sitting with the government is not your failure.
-    else if(kind === 'elapsed')  out = { t:'with the government', hot:false };
+    else if(kind === 'elapsed')  out = { t:'elapsed not tracked', hot:false };
     else                         out = { t:'no clock', hot:false };
     // Enforced here, not left to the data: an overdue row parked in 06/07/08 would
     // otherwise alarm a stage whose move is not the operator's.
@@ -329,8 +325,15 @@
       num.style.color = sub;
       var top = put(el('span','top'), num, el('span','scount', n));
 
-      var clock = el('span','sclock', (hot && tone.mark ? '▸ ' : '') + cl.t);
-      clock.style.color = hot ? tone.alarm : sub;
+      // HUE IS NEVER THE RAIL'S CARRIER. Reddest-that-clears is correct on a stable
+      // ground, but a red only clears AA on 5 of the 16 ramp steps, so the same
+      // state — a clock that ran out — would render red at one stage and ink at
+      // another, and a pursuit moving 03 -> 07 would change alarm treatment without
+      // changing meaning. On the rail a hot clock is ALWAYS full ink plus the marker;
+      // the ramp is the graphic, so the graphic cannot also be the alarm. Hue stays
+      // where the ground is fixed: the strip's figures, on a card.
+      var clock = el('span','sclock', (hot ? '▸ ' : '') + cl.t);
+      clock.style.color = hot ? tone.ink : sub;
       var foot = put(el('span'), el('span','sname', STAGE_LABELS[s]), clock);
 
       put(b, top, foot);
