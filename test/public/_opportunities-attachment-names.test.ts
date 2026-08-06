@@ -253,6 +253,34 @@ async function main() {
     "ATT_SHOWN is a named constant — it bounds both what is listed and what is requested"
   );
 
+  // The list columnises. Without the wrapper the grid rule has nothing to apply
+  // to, and a 23-attachment notice silently goes back to 23 stacked rows —
+  // which looks fine in a diff and wrong on the screen.
+  ok(DSO.includes('class="pd-atts"'), "the attachment list is wrapped in .pd-atts");
+  ok(
+    /\.pd-atts\{[^}]*display:grid/.test(HTML) && /\.pd-atts\{[^}]*grid-template-columns:repeat\(3,\s*1fr\)/.test(HTML),
+    "opportunities.html lays .pd-atts out as THREE equal columns"
+  );
+  // Row-major flow is what makes 4 documents read as 3 + 1 rather than columns
+  // of uneven length. grid-auto-flow defaults to row; an explicit `column` here
+  // would silently reorder the list, so assert nothing set it.
+  ok(
+    !/\.pd-atts\{[^}]*grid-auto-flow:\s*column/.test(HTML),
+    "flow stays row-major — 4 documents fill row 1 then wrap to row 2, column 1"
+  );
+  // Names must wrap, not clip: a truncated filename is worse than no filename,
+  // because it reads as authoritative while hiding which document it is.
+  ok(
+    !/\.pd-att\{[^}]*text-overflow:\s*ellipsis/.test(HTML) &&
+      /\.pd-att\{[^}]*overflow-wrap/.test(HTML),
+    "long filenames wrap rather than being cut off"
+  );
+  // The cap and the server ceiling have to stay compatible: asking for more than
+  // the route will answer would render "Document N" for the overflow forever.
+  const shown = Number(DSO.match(/const ATT_SHOWN\s*=\s*(\d+)/)?.[1] ?? 0);
+  const SERVER_MAX = 40; // MAX_ATTACHMENT_IDS in src/lib/sam-attachment-names.ts
+  ok(shown > 0 && shown <= SERVER_MAX, `ATT_SHOWN (${shown}) is within the route's ceiling (${SERVER_MAX})`);
+
   // ═══ H · falsifiability ═══════════════════════════════════════════════════
   // A gate that cannot go red proves nothing. Plant the exact defect this gate
   // exists to catch — position-matching instead of id-matching — and require

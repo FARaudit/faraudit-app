@@ -568,8 +568,14 @@ function datesLine(o) {
 
 
 /* How many attachments the panel lists before deferring to SAM.gov. It is also
-   how many names are requested, so raising it raises the per-open cost. */
-const ATT_SHOWN = 8;
+   how many names are requested, so raising it raises the per-open cost.
+
+   Held at 8 while each name cost its own row: a 23-attachment solicitation would
+   have pushed everything below it off the screen. The list is now a grid, so 24
+   names occupy about six rows, and the reason to truncate is gone — truncating
+   at 8 hid exactly what a bidder opens this panel for, since the wage
+   determination or Section M is as likely to be attachment 14 as attachment 2. */
+const ATT_SHOWN = 24;
 
 /* resource_links are opaque download URLs; the 32-hex segment is the file id,
    which is all /api/notice-attachments needs to look a name up. Returns null on
@@ -597,15 +603,20 @@ function detailHTML(o) {
   if (pop) rows.push(['Place of performance', esc(pop)]);
   const n = Array.isArray(o.resource_links) ? o.resource_links.length : null;
   if (n) {
-    rows.push(['Attachments', o.resource_links.slice(0, ATT_SHOWN).map(function (u, i) {
-      const fid = fileIdFromLink(u);
-      // Renders "Document N" immediately and stays that way unless SAM hands
-      // back a real name; the id is carried so loadAttachmentNames can upgrade
-      // it in place. A link with no readable id is still a working link.
-      return '<a class="pd-att" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer"' +
-        (fid ? ' data-att-id="' + esc(fid) + '"' : '') +
-        '>Document ' + (i + 1) + '</a>';
-    }).join('') + (n > ATT_SHOWN ? '<span class="pd-att pd-att-more">+' + (n - ATT_SHOWN) + ' more on SAM.gov</span>' : '')]);
+    // Wrapped in .pd-atts, which columnises the list. One name per row meant a
+    // 23-attachment solicitation buried the rest of the panel under it.
+    rows.push(['Attachments', '<span class="pd-atts">' +
+      o.resource_links.slice(0, ATT_SHOWN).map(function (u, i) {
+        const fid = fileIdFromLink(u);
+        // Renders "Document N" immediately and stays that way unless SAM hands
+        // back a real name; the id is carried so loadAttachmentNames can upgrade
+        // it in place. A link with no readable id is still a working link.
+        return '<a class="pd-att" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer"' +
+          (fid ? ' data-att-id="' + esc(fid) + '"' : '') +
+          '>Document ' + (i + 1) + '</a>';
+      }).join('') +
+      (n > ATT_SHOWN ? '<span class="pd-att pd-att-more">+' + (n - ATT_SHOWN) + ' more on SAM.gov</span>' : '') +
+      '</span>']);
   }
   if (!rows.length) return '';
   return '<div class="pc-detail">' + rows.map(function (r) {
