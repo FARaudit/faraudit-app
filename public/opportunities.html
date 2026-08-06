@@ -51,6 +51,11 @@
   --rule:var(--line); --tertiary:var(--mute);
 }
 *{box-sizing:border-box}
+/* The UA rule for [hidden] is display:none at specificity (0,1,0), so any class rule
+   carrying a display value outranks it. Setting or shipping .hidden is therefore only
+   a request until this rule makes it binding. */
+[hidden]{display:none!important}
+
 html,body{margin:0;padding:0;background:var(--page-bg);font-family:"Manrope",ui-sans-serif,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
 button{font-family:inherit}
 /* Default link colours are declared at ZERO specificity via :where(), so a link

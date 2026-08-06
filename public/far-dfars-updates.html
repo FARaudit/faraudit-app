@@ -33,6 +33,11 @@
   --shadow-pop:0 1px 2px rgba(0,0,0,.5), 0 28px 64px -22px rgba(0,0,0,.85);
 }
 *{box-sizing:border-box}
+/* The UA rule for [hidden] is display:none at specificity (0,1,0), so any class rule
+   carrying a display value outranks it. Setting or shipping .hidden is therefore only
+   a request until this rule makes it binding. */
+[hidden]{display:none!important}
+
 html,body{margin:0;padding:0;background:var(--page-bg);font-family:"Manrope",ui-sans-serif,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;transition:background-color .25s ease,color .25s ease}
 button{font-family:inherit}
 .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
