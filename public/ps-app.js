@@ -103,7 +103,7 @@
         </div>
         <div class="fld-sec">NAICS codes</div>
         <div class="cert-row">${NAICS.length ? NAICS.map(n => `<span class="cert-tg on">${esc(n.code || n.k || n)}</span>`).join('') : '<span class="fld-none">None on file</span>'}</div>
-        ${NAICS.length ? '' : '<div class="note note-warn">No NAICS codes on file, so Opportunities, Teaming Partners, Contracting Officers and Wage Benchmarks have nothing to match against and will stay empty. Add them under NAICS Configuration.</div>'}
+        ${NAICS.length ? '' : '<div class="note note-warn">No NAICS codes on file, so Today, Opportunities, Contracting Officers and Teaming Partners have nothing to match against and will stay empty. Add them under NAICS Configuration.</div>'}
         <div class="fld-sec">Certifications</div>
         <div class="cert-row">${CERTS.length ? CERTS.map(c => `<span class="cert-tg on">${esc(c.k || c)}</span>`).join('') : '<span class="fld-none">None on file</span>'}</div>
         <div class="note">This is the same record the <a href="/capability-statement">capability statement</a> prints and the audit engine reads when it judges whether you are eligible to bid — so what you enter here shapes real verdicts. NAICS codes are edited under NAICS Configuration. Certifications are shown here only: one clears a set-aside bar just when it is verified against SAM, so there is nothing useful to type.</div>
@@ -142,7 +142,7 @@
           <button class="save-btn" type="button" id="psNaicsAdd">Add code</button>
         </div>
         <div class="naics-msg" id="psNaicsMsg" role="status" hidden></div>
-        <div class="note"><b>How this works:</b> your NAICS codes are what Opportunities, Contracting Officers, Wage Benchmarks and Teaming Partners match against. With none on file those pages have nothing to match and stay empty. Each page picks up a change the next time it loads.</div>
+        <div class="note"><b>How this works:</b> your NAICS codes are what Today, Opportunities, Contracting Officers and Teaming Partners match against — with none on file those pages have nothing to match and stay empty. Wage Benchmarks offers them as an optional filter over a national reference table; it is not scoped by them. Each page picks up a change the next time it loads.</div>
       </div>
       `,
 
