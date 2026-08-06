@@ -19,7 +19,7 @@ checked against the live API.
 
 ---
 
-## P0-1 — `AUDIT_LENS_EFFORT=xhigh` would fail every paid audit. VERIFIED LIVE.
+## P0-1 — `AUDIT_LENS_EFFORT=xhigh` would fail every paid audit. VERIFIED LIVE. **FIXED — #504.**
 
 `audit-expert.ts:337` accepts five effort levels:
 
@@ -51,7 +51,7 @@ Minimum viable fix: drop `xhigh` from the set while the lens is sonnet-4-6.
 
 ---
 
-## P0-2 — The lens fan-out is the only unprotected concurrent stage in the engine
+## P0-2 — The lens fan-out is the only unprotected concurrent stage in the engine. **FIXED — #504.**
 
 `audit-orchestrator.ts:2535`:
 
@@ -195,8 +195,30 @@ scales with package size. Same family as the banked `parseDocRegions` non-memoiz
 - `agentic-panel.ts`, and the non-control-flow body of `agentic-sections.ts` and
   `section-boundary-detector.ts`, were scanned rather than read line by line.
 
-## The order the fixes want to land in
+## The order the fixes want to land in — BOTH LANDED, PR #504 (`9a6522ef`), 2026-08-06
 
 P0-2 first. It is the smallest diff, it is independent of everything else, and it is what makes every
-other failure in this stage survivable rather than fatal. P0-1 second — and until one of them lands,
-**`AUDIT_LENS_EFFORT` should not be armed to `xhigh` at all.**
+other failure in this stage survivable rather than fatal. P0-1 second.
+
+**Both shipped in one PR, in that order.** What the fix added beyond what this document asked for, kept
+here because the difference is the interesting part:
+
+- **Two cases still throw, deliberately.** An aborted signal stays fatal (a budget breach must fail
+  cleanly, never degrade into a thin-but-decided verdict) and a total wipeout stays fatal (five dead
+  lenses would otherwise render as an ordinary INCOMPLETE, indistinguishable from an unreadable
+  package). Making a fan-out tolerant is easy; the risk is making it tolerant of what must stay fatal,
+  and those two are the gate's load-bearing legs.
+- **Fatality keys on the signal, not the error text**, with a leg proving both directions — a
+  clean-signal failure whose message mentions a budget must not throw, and an aborted run whose message
+  does not must.
+- **The effort table is per-model and every row was queried**, not inferred. Two rows were written from
+  inference first and re-queried before shipping; they happened to be right, but a "verified" table
+  containing guesses is worse than none. `haiku-4-5` supports no level at all — a known-empty set, which
+  is a different statement from an absent key.
+- **The gate that shipped with the effort flag went red on the fix, correctly.** It asserted that all
+  five levels reach the request — the defect written down as an expectation — because a stub client can
+  only prove request *shape*, never API *acceptance*. Updated, not deleted.
+
+**Still true after the fix:** the remaining P1s and P2s below are unfixed, and `AUDIT_LENS_EFFORT`
+remains unarmed. It is now safe to arm at `low` / `medium` / `high` / `max` — never `xhigh`, which the
+code will now refuse and log rather than send.
