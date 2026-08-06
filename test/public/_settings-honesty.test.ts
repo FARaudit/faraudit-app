@@ -109,7 +109,27 @@ console.log("\n── no control reports a save it did not perform ──");
 
   // Billing stated a plan and two prices while the route was returning all three.
   check("billing reads the live plan label", /planName\(\)/.test(app) && /PS\.plan_label/.test(app), "the plan name is a literal");
-  check("billing reads the live prices", /PS\.plan_price_monthly/.test(app) && /PS\.plan_price_annual/.test(app), "the price is a literal");
+  // THE RULE INVERTED, ON PURPOSE. This previously required the page to READ two price
+  // fields — which pinned a $1,250 constant that no customer's own subscription
+  // determined. What a customer pays is agreed with their point of contact and is
+  // stored nowhere the page can read, so the page must render NO price at all. An
+  // assertion that a price is displayed is an assertion that a price is known.
+  // SCANNED THE WRONG REGION at first: planPrice() is DEFINED above `billing: ()`, so
+  // slicing from the panel never saw the function that produces the string. An unlisted
+  // price ($4,800) sailed through. Scan the whole file for a rendered currency figure.
+  // A dollar sign followed immediately by a digit. `${` cannot match (a brace is not a
+  // digit), so template interpolation is not a false positive. The quote-spanning form
+  // this replaced matched across string boundaries and fired on `' },`.
+  const currency = [...app.matchAll(/\$\d[\d,]*/g)].map((m) => m[0]);
+  check("no currency figure is rendered anywhere in the settings app",
+    currency.length === 0,
+    `price string(s) present: ${currency.join(" | ")}`);
+  check("the route returns no price field",
+    !/plan_price_monthly\s*[:,]/.test(route.split("READ_ONLY")[0]),
+    "/api/profile still hands out a price the customer's subscription does not set");
+  check("billing reads the SUBSCRIPTION, not user_metadata",
+    /from\("subscriptions"\)/.test(route) && /plan_unreadable/.test(route),
+    "the plan is not read from the row Stripe maintains, or an unreadable record is not distinguished");
   check("no hardcoded plan name or price survives", !/Design Partner<\/div>|\$1,250|\$15,000|\$2,500|\$30,000/.test(appCode), "a literal price is still rendered");
   check("no next-billing date — nothing computes one", !/Next billing:/.test(appCode), "a billing date with no source");
 

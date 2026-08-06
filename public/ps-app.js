@@ -48,17 +48,29 @@
     return `<div class="fld"><label>${label}</label><div class="fld-ro">${val ? esc(val) : '<span class="fld-none">Not on file</span>'}</div>${note ? `<div class="fld-note">${esc(note)}</div>` : ''}</div>`;
   }
 
-  // Plan name and price come from /api/profile. No field renders unless the route
-  // supplies it.
-  const money = (n) => typeof n === 'number' && isFinite(n)
-    ? '$' + n.toLocaleString('en-US') : null;
+  /* Plan comes from the subscription record, and there are three answers, not two:
+     a plan, no subscription, or a record that could not be read. An unreadable
+     billing record must never render as "no subscription". */
   function planName() {
-    return window.PS.plan_label || '<span class="fld-none">Not on file</span>';
+    if (window.PS.plan_unreadable) return '<span class="fld-none">Could not be read</span>';
+    return window.PS.plan_label ? esc(window.PS.plan_label)
+      : '<span class="fld-none">No subscription on file</span>';
   }
+  /* NO PRICE IS RENDERED. What a customer pays is agreed with their point of contact
+     and is stored nowhere this page can read, so the page states that instead of a
+     figure. A number here would be the one thing on this screen a customer might act
+     on, and it would not be theirs. */
   function planPrice() {
-    const m = money(window.PS.plan_price_monthly), y = money(window.PS.plan_price_annual);
-    if (!m && !y) return '<span class="fld-none">Price not on file</span>';
-    return [m && m + ' / month', y && 'or ' + y + ' / year'].filter(Boolean).join(' · ');
+    return 'Pricing is agreed with your point of contact.';
+  }
+  function planStatus() {
+    const s = window.PS.plan_status;
+    if (!s) return '';
+    const end = window.PS.plan_period_end;
+    const when = end && !isNaN(new Date(end).getTime())
+      ? new Date(end).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+      : null;
+    return esc(s) + (when ? ' · renews ' + when : '');
   }
 
   const PANELS = {
@@ -162,9 +174,9 @@
       </div>`,
 
     billing: () => `
-      <div class="sp-hd"><div class="sp-t">Billing &amp; Plan</div><div class="sp-s">Manage your subscription and usage</div></div>
+      <div class="sp-hd"><div class="sp-t">Billing &amp; Plan</div><div class="sp-s">Your plan, and what this page can and cannot change</div></div>
       <div class="sp-bd">
-        <div class="plan-card"><div class="pc-l"><div class="pc-kicker">Current plan</div><div class="pc-name">${planName()}</div><div class="pc-desc">${planPrice()}</div></div></div>
+        <div class="plan-card"><div class="pc-l"><div class="pc-kicker">Current plan</div><div class="pc-name">${planName()}</div>${planStatus() ? `<div class="pc-status">${planStatus()}</div>` : ''}<div class="pc-desc">${planPrice()}</div></div></div>
         <div class="fld-sec">Usage this period</div>
         ${USAGE.length
           ? `<div class="usage-list">${USAGE.map(u => `<div class="us-row"><div class="us-l">${u.l}${u.s ? `<small>${u.s}</small>` : ''}</div><span class="us-v">${u.v}</span></div>`).join('')}</div>`

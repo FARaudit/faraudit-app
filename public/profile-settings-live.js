@@ -54,10 +54,15 @@
           (Array.isArray(rec.certifications) ? rec.certifications : [])
             .forEach(function (k) { if (k) window.PS.CERTS.push({ k: String(k), on: true }); });
         } else {
-          document.body.classList.add('company-unreadable');
+          throw new Error('capability-statement: HTTP ' + capRes.status);
         }
       } catch (e) {
-        document.body.classList.add('company-unreadable');
+        // RETHROW, so the company record's failure reaches loadError. A read that did
+        // not complete may not present itself as a form to fill in: blank inputs over a
+        // live Save button write empty strings into company_name, uei, cage_code and
+        // contact_address, and a body carrying `uei` also drives the route's
+        // certification sync down its no-UEI branch, clearing verified eligibility.
+        throw e;
       }
 
       // Cleared — agencies / notifs / usage still have no source field.
@@ -75,10 +80,11 @@
       });
 
       // Scalar plan fields — exposed for billing panel reads.
-      window.PS.plan_tier          = data.plan_tier;
-      window.PS.plan_label         = data.plan_label;
-      window.PS.plan_price_monthly = data.plan_price_monthly;
-      window.PS.plan_price_annual  = data.plan_price_annual;
+      window.PS.plan_tier       = data.plan_tier;
+      window.PS.plan_label      = data.plan_label;
+      window.PS.plan_status     = data.plan_status;
+      window.PS.plan_period_end = data.plan_period_end;
+      window.PS.plan_unreadable = !!data.plan_unreadable;
 
       window.PS.loadError = false;
       writeHeaderStats();
