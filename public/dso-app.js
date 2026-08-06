@@ -58,6 +58,14 @@
   // opportunities-live.js. A self-asserted certification is never read here: it
   // cannot clear a set-aside bar, so treating one as eligibility would tell a
   // firm it may compete for a pool it is not registered under.
+  // How the feed was scoped, straight from the server: 'profile' when the
+  // customer's capability statement supplied the codes, 'no-profile-codes' when
+  // there were none on file, 'env-override' for an operator run. null means the
+  // server did not say, and the copy then claims nothing either way.
+  function FEED_SCOPE() {
+    return (window.DSO && window.DSO.FEED_SCOPE) || null;
+  }
+
   function PROFILE_CERTS() {
     const c = (window.DSO && window.DSO.CERTS) || null;
     return {
@@ -193,7 +201,7 @@ function clause(o){
 }
 
 /* ── state ── */
-const S = {naics:new Set(), init:false, stage:'all', sa:'all', view:null, band:null, q:'', sort:'closing', profile:false};
+const S = {naics:new Set(), init:false, stage:'all', sa:'all', view:null, band:null, q:'', sort:'closing'};
 
 const filters = ()=>({stage:S.stage, sa:S.sa, view:S.view, band:S.band, q:S.q});
 
@@ -404,9 +412,22 @@ function renderBands(){
     : certs.state==='verified'
       ? 'ineligible for the set-aside — none in this read are outside your registered programs'
       : 'ineligible for the set-aside — your SAM-registered programs are not known, so nothing is removed';
+  // Why nothing was removed by NAICS — four different reasons, and the funnel has
+  // to say which one. The server scopes the feed to the codes on file before it
+  // ever reaches here, so a customer WITH a profile subtracts zero because there
+  // was nothing out of scope to subtract, not because we do not know their codes.
+  // S.naics is a click-filter over the codes present in the feed, so a non-zero
+  // count here is the customer's own chip selection, never the profile.
+  const naicsLabel = outNaics
+    ? 'outside the NAICS codes you have selected'
+    : FEED_SCOPE() === 'no-profile-codes'
+      ? 'outside your NAICS codes — no profile on record, so nothing is removed'
+      : FEED_SCOPE()
+        ? 'outside your NAICS codes — the feed is already limited to them'
+        : 'outside your NAICS codes';
   const funnel = [
     {n:read.length, t:'notices in this read', cls:''},
-    {n:outNaics, t:S.profile?'outside your NAICS codes':'outside your NAICS codes — no profile on record, so nothing is removed', cls:outNaics?'minus':'minus none', sign:'−'},
+    {n:outNaics, t:naicsLabel, cls:outNaics?'minus':'minus none', sign:'−'},
     {n:ineligible, t:eligLabel, cls:ineligible?'minus':'minus none', sign:'−'},
     {n:rows.length, t:'sorted into the four bands above', cls:'sum'}
   ];
@@ -832,7 +853,7 @@ function renderList() {
    initial values of S (:196); a filter key added there belongs here too. */
 function reset() {
   S.stage = 'all'; S.sa = 'all'; S.view = null; S.band = null; S.q = '';
-  S.sort = 'closing'; S.profile = false;
+  S.sort = 'closing';
   const si = $('searchInput'); if (si) si.value = '';
   S.naics = new Set(ROWS.map((o) => o.naics).filter(Boolean));
   renderAll();
