@@ -294,6 +294,26 @@
     if (add) add.click();
   });
 
+  /* The unavailable reason is PRINTED FROM THE ROUTE, not re-authored here. One
+     sentence with one source: if agency targeting ships, the route stops saying
+     "unwired" and this panel stops saying it too, with nothing to remember to edit. */
+  async function writeAgencyState() {
+    const el = document.getElementById('agState');
+    if (!el) return;
+    try {
+      const res = await fetch('/api/agencies', { credentials: 'include' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const d = await res.json();
+      if (d && d.state === 'unwired') {
+        el.textContent = d.reason || 'Agency targeting is not built yet.';
+      } else {
+        el.textContent = 'Agency targeting reported a state this page does not recognise.';
+      }
+    } catch (_) {
+      el.textContent = 'Could not check whether agency targeting is available.';
+    }
+  }
+
   function note(msg, ok) {
     const el = document.getElementById('psSavedNote');
     if (!el) return;
@@ -398,9 +418,23 @@
   });
   obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
+  /* #agState only exists while that tab is rendered, and the panel is re-templated on
+     every nav click AND every theme flip. Watching the container catches both; binding
+     to the nav alone would miss the theme path and leave the box reading "Checking…". */
+  function watchPanels() {
+    const host = document.getElementById('setContent');
+    if (!host || typeof MutationObserver !== 'function') return;
+    const fill = function () {
+      const el = document.getElementById('agState');
+      if (el && el.dataset.filled !== '1') { el.dataset.filled = '1'; writeAgencyState(); }
+    };
+    new MutationObserver(fill).observe(host, { childList: true, subtree: true });
+    fill();
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', wire);
+    document.addEventListener('DOMContentLoaded', function () { wire(); watchPanels(); });
   } else {
-    wire();
+    wire(); watchPanels();
   }
 })();

@@ -146,37 +146,55 @@
       </div>
       `,
 
+    /* NOT BUILDABLE TODAY, so nothing here pretends otherwise. There is no agency
+       column in any table, no writer, and no reader: the Opportunities feed is scoped
+       by NAICS alone. The panel used to render per-agency monitoring switches with no
+       handler and no column to write to, above a note that counted "0 of 0 agencies
+       monitored" and claimed active agencies scope the feed, the Spending map and the
+       CO network. A greyed-out switch is still a claim that this is a setting you
+       have, so no switch is rendered at all. The unavailable reason is printed from
+       the route rather than re-authored here — one sentence, one source. */
     agencies: () => `
-      <div class="sp-hd"><div class="sp-t">Target Agencies</div><div class="sp-s">Toggle monitoring for each command &amp; installation</div></div>
+      <div class="sp-hd"><div class="sp-t">Target Agencies</div><div class="sp-s">Not yet available</div></div>
       <div class="sp-bd">
-        ${AGENCIES.map((a, i) => `<div class="ag-row"><div class="ag-l"><span class="ag-code">${a.code}</span><span class="ag-pill base">${a.base}</span><span class="ag-pill type">${a.type}</span></div><button class="ag-tg" data-ag="${i}">${tog(a.on)}</button></div>`).join('')}
-        <p class="ps-unwired">Adding an agency is not built yet. Your Opportunities feed is scoped by the NAICS codes on your capability statement.</p>
-        <div class="note"><b>${AGENCIES.filter(a => a.on).length} of ${AGENCIES.length} agencies monitored.</b> Active agencies scope your Opportunities feed, Spending map, and CO network.</div>
+        <div class="ps-notlive" id="agState">Checking…</div>
+        <div class="note">Your Opportunities feed, Spending map and Contracting Officer network are scoped by the NAICS codes on your profile. Agency-level targeting is not built, so nothing on this tab changes what you see.</div>
       </div>
       `,
 
+    /* ONE ROW, AND IT SAYS WHAT IT DOES. The digest preference persists to
+       user_preferences, but nothing reads it: there is no weekly-digest mailer, and
+       every scheduled job sends to a fixed internal address rather than to the signed
+       in customer. So the switch is real and its effect is not, and the row says so
+       instead of implying a schedule and a channel. The five other alert types were
+       template rows with no handler and no backing preference; they are gone. The bell
+       is genuinely wired — notifications are written by the watcher and read by the
+       page — so that sentence stays. */
     notifs: () => `
-      <div class="sp-hd"><div class="sp-t">Notification Preferences</div><div class="sp-s">Control what triggers alerts in your inbox</div></div>
+      <div class="sp-hd"><div class="sp-t">Notification Preferences</div><div class="sp-s">What reaches you, and what does not yet</div></div>
       <div class="sp-bd" id="alerts">
         <div class="nf-row" data-pref-row>
           <div class="nf-l">
-            <div class="nf-t">Weekly digest of watched opportunities</div>
-            <div class="nf-d">Mondays at 6am · summary of what's still pre-solicitation, what posted, and what auto-audited last week.</div>
+            <div class="nf-t">Weekly digest of watched opportunities <span class="nf-tag">Not yet sending</span></div>
+            <div class="nf-d">Your choice is saved, but the digest itself is not built — nothing is emailed on a schedule today. Set it now and it will apply when it ships.</div>
           </div>
-          <span class="nf-ch">Email</span>
           <button class="nf-tg" data-pref-tg="weekly_digest_watched"><span class="tgl"><i></i></span></button>
         </div>
-        ${NOTIFS.map((n, i) => `<div class="nf-row"><div class="nf-l"><div class="nf-t">${n.t}</div><div class="nf-d">${n.d}</div></div><span class="nf-ch">Email + In-app</span><button class="nf-tg" data-nf="${i}">${tog(n.on)}</button></div>`).join('')}
-        <div class="note">Delivered to <b>${COMPANY.email}</b>. Critical alerts also push to the bell in your top bar.</div>
+        <div class="naics-msg" id="psPrefNote" role="status" hidden></div>
+        <div class="note">Alerts on the notices you are watching are emailed to <b>${esc(COMPANY.email)}</b> as they post, and also appear on the bell in your top bar. Turning those off is not built yet.</div>
       </div>
       `,
 
+    /* NO ROLE BADGE. There is no membership table, no invitation, no seat and no role
+       model anywhere in the product — the OWNER pill was a literal typed into the array
+       one line before it rendered, and a role badge implies other roles that do not
+       exist. The seat sentence pointed at a Billing tab that holds no seat count. What
+       is true: one account, and it is yours. */
     team: () => `
-      <div class="sp-hd"><div class="sp-t">Team Members</div><div class="sp-s">Manage who has access to your FARaudit workspace</div></div>
+      <div class="sp-hd"><div class="sp-t">Team Members</div><div class="sp-s">Who can sign in to this workspace</div></div>
       <div class="sp-bd">
-        ${TEAM.map(m => `<div class="tm-row"><div class="tm-av">${m.name.split(' ').map(w => w[0]).join('')}</div><div class="tm-info"><div class="tm-name">${m.name}${m.you ? ' <span class="tm-you">You</span>' : ''}</div><div class="tm-email">${m.email}</div></div><span class="tm-role">${m.role}</span></div>`).join('')}
-        <p class="ps-unwired">Inviting teammates is not built yet. This workspace has one seat, yours.</p>
-        <div class="note">One seat, yours. Seat limits are set by your plan — see Billing.</div>
+        ${TEAM.map(m => `<div class="tm-row"><div class="tm-av">${esc(String(m.name || '?').split(' ').map(w => w[0]).join(''))}</div><div class="tm-info"><div class="tm-name">${esc(m.name)}${m.you ? ' <span class="tm-you">You</span>' : ''}</div><div class="tm-email">${esc(m.email)}</div></div></div>`).join('')}
+        <p class="ps-unwired">Inviting teammates is not built yet. This workspace has a single account, yours.</p>
       </div>`,
 
     billing: () => `
@@ -222,6 +240,7 @@
       body: JSON.stringify({ [key]: value })
     }).then(r => r.ok);
   }
+  const PREF_LABELS = { weekly_digest_watched: 'Weekly digest' };
   function wireServerPrefs() {
     var btns = $('setContent').querySelectorAll('[data-pref-tg]');
     if (!btns.length) return;
@@ -238,15 +257,23 @@
           var next = !tgl.classList.contains('on');
           tgl.classList.toggle('on', next);
           b.disabled = true;
-          savePref(key, next).then(ok => { b.disabled = false; if (ok) { prefs[key] = next; flash(); } else { tgl.classList.toggle('on', !next); } });
+          savePref(key, next).then(ok => { b.disabled = false;
+            // NAME what saved. flash() was called bare, so `what` was undefined and the
+            // note rendered hidden and empty — a confirmed save reported nothing.
+            if (ok) { prefs[key] = next; flash(PREF_LABELS[key] || key); }
+            else { tgl.classList.toggle('on', !next); flash(''); } });
         };
       });
     });
   }
   // Confirms a save that the server acknowledged, naming the field.
+  /* Reports into the panel that is actually on screen. This targeted a #savedAt that
+     exists in no settings markup, so `if (!el) return` swallowed every confirmation and
+     a successful preference save looked exactly like a click that did nothing. */
   function flash(what) {
-    const el = $('savedAt');
+    const el = $('psPrefNote');
     if (!el) return;
+    el.hidden = !what;
     el.textContent = what ? '\u2713 ' + what + ' saved' : '';
     if (what) setTimeout(() => { el.textContent = ''; }, 2600);
   }
