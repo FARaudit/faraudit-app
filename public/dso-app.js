@@ -567,21 +567,6 @@ function datesLine(o) {
 }
 
 
-/* The panel lists EVERY attachment. This bounds only how many NAMES are looked
-   up — never what is shown: past it a link still renders and still works, it
-   just stays "Document N". The lookup needs no API key and consumes no SAM
-   quota, so this is a ceiling on latency, not on cost. Must stay within the
-   attachment-name module's own MAX_ATTACHMENT_IDS; the panel gate asserts it. */
-const ATT_NAMED = 40;
-
-/* resource_links are opaque download URLs; the 32-hex segment is the file id,
-   which is all /api/notice-attachments needs to look a name up. Returns null on
-   any other shape rather than guessing at one. */
-function fileIdFromLink(u) {
-  const m = typeof u === 'string' ? u.match(/\/files\/([a-f0-9]{32})\/download\b/i) : null;
-  return m ? m[1] : null;
-}
-
 /* Detail panel. Renders only fields SAM actually returned for this row; a field
    it did not return is omitted, never shown as an empty label. Returns '' when
    the row carries none, and the caller then renders no panel and no toggle. */
@@ -598,31 +583,24 @@ function detailHTML(o) {
   }
   const pop = popText(o.place_of_performance);
   if (pop) rows.push(['Place of performance', esc(pop)]);
-  // EVERY attachment is listed, behind a disclosure. Two problems it solves at
-  // once: a 19-document notice pushed WHAT SAM SAYS off the screen, and the old
-  // cap ended in "+N more on SAM.gov" \u2014 sending the customer to another platform
-  // to read something we already had, when the wage determination or Section M is
-  // as likely to be number 14 as number 2. Collapsed, the row is one line no
-  // matter the count; open, the list scrolls inside a fixed height, so 6
-  // documents and 25 cost the panel exactly the same space.
+  // EVERY attachment is listed, behind a disclosure. Collapsed, the row is one
+  // line whatever the count; open, the list scrolls inside a fixed height, so 6
+  // documents and 25 cost the panel the same space.
   //
-  // Only NAME RESOLUTION is bounded (ATT_NAMED). Past that a link still renders
-  // as "Document N" and still works \u2014 the bound is on work, never on content.
+  // What renders here is the FEED's list, and it is a placeholder in two senses:
+  // the names are unknown, and the list can be shorter than what SAM posted.
+  // loadAttachmentNames replaces both on open. These links work in the meantime,
+  // which is why an unsuccessful replacement leaves them exactly as they are.
   const links = Array.isArray(o.resource_links) ? o.resource_links : [];
   if (links.length) {
     const list = links.map(function (u, i) {
-      const fid = fileIdFromLink(u);
-      // Renders "Document N" immediately and stays that way unless SAM hands back
-      // a real name; the id is carried so loadAttachmentNames can upgrade it in
-      // place. A link with no readable id is still a working link.
-      return '<a class="pd-att" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer"' +
-        (fid && i < ATT_NAMED ? ' data-att-id="' + esc(fid) + '"' : '') +
-        '><span class="att-nm">Document ' + (i + 1) + '</span><span class="att-ext"></span></a>';
+      return '<a class="pd-att" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' +
+        '<span class="att-nm">Document ' + (i + 1) + '</span><span class="att-ext"></span></a>';
     }).join('');
     rows.push(['Attachments',
       '<button type="button" class="att-tog" data-att-toggle aria-expanded="false">' +
         '<span class="att-car">\u25b6</span>' +
-        '<span>' + esc(String(links.length)) + (links.length === 1 ? ' document' : ' documents') + '</span>' +
+        '<span data-att-count>' + esc(String(links.length)) + (links.length === 1 ? ' document' : ' documents') + '</span>' +
       '</button>' +
       '<div class="pd-atts">' + list + '</div>']);
   }
@@ -928,46 +906,86 @@ function loadDescription(card) {
     .catch(function () { slot.dataset.state = 'err'; slot.textContent = 'could not read SAM just now'; });
 }
 
-/* Attachment filenames. SAM's resource_links carry no name in the path, and the
-   name lives in a Content-Disposition header the browser is not allowed to read
-   cross-origin — so it is resolved server-side, once per card, on first open.
+/* The attachment list, replaced with SAM's own.
 
-   "Document N" is the floor, not a loading state: a name that does not come back
-   simply stays "Document N" and the link still works. Nothing is ever renamed to
-   a guess, and a failed lookup costs the customer nothing. */
+   The feed's resource_links is what the card renders first, and it is NOT always
+   complete — SAM has listed 5 attachments where the feed carried 4. So on open
+   the panel asks SAM for the notice's real list and rebuilds from that: a
+   document the feed omitted appears, and every row carries its published name.
+
+   The feed's links stay on screen until a better answer arrives, and stay if one
+   never does. A failed read must never empty a list that had working links in it.
+
+   Built with createElement + textContent rather than an HTML string. These names
+   come from an upstream the government populates and we do not control, and a
+   filename is exactly the kind of field that eventually contains a quote mark. */
+function attachmentRow(a) {
+  const url = a && typeof a.url === 'string' ? a.url : '';
+  // Only sam.gov download URLs are ever rendered. The server builds these from a
+  // validated id, so this is defence in depth against a shape change upstream.
+  if (!/^https:\/\/sam\.gov\/api\/prod\/opps\/v3\/opportunities\/resources\/files\/[a-f0-9]{32}\/download$/i.test(url)) return null;
+  const nm = a && typeof a.name === 'string' && a.name ? a.name : null;
+
+  const el = document.createElement('a');
+  el.className = 'pd-att';
+  el.href = url;
+  el.target = '_blank';
+  el.rel = 'noopener noreferrer';
+  if (nm) el.title = nm;
+
+  // The extension moves to its own muted slot: repeated down a list of 19 it is
+  // noise, and every row ending in the same four characters is what made SAM's
+  // naming read as a wall. The full name stays in the title, so nothing is lost.
+  let base = nm, ext = '';
+  if (nm) {
+    const dot = nm.lastIndexOf('.');
+    if (dot > 0 && dot > nm.length - 7) { base = nm.slice(0, dot); ext = nm.slice(dot + 1).toLowerCase(); }
+  }
+  const n = document.createElement('span');
+  n.className = 'att-nm';
+  n.textContent = base || 'Document';
+  el.appendChild(n);
+
+  // Access-restricted files must be requested from the KO — worth knowing BEFORE
+  // planning a bid around a document you cannot open.
+  if (a && a.restricted) {
+    const lock = document.createElement('span');
+    lock.className = 'att-lock';
+    lock.textContent = 'request access';
+    lock.title = 'Access must be requested from the contracting officer';
+    el.appendChild(lock);
+  }
+
+  const x = document.createElement('span');
+  x.className = 'att-ext';
+  x.textContent = ext;
+  el.appendChild(x);
+  return el;
+}
+
 function loadAttachmentNames(card) {
-  const links = card.querySelectorAll('a.pd-att[data-att-id]');
-  if (!links.length || card.dataset.attState) return;   // once per card
+  const box = card.querySelector('.pd-atts');
+  if (!box || card.dataset.attState) return;            // once per card
+  const notice = card.getAttribute('data-notice');
+  if (!notice) { card.dataset.attState = 'none'; return; }
   card.dataset.attState = 'loading';
-  const ids = Array.prototype.map.call(links, function (a) { return a.getAttribute('data-att-id'); });
-  fetch('/api/notice-attachments?ids=' + encodeURIComponent(ids.join(',')), { credentials: 'include' })
+  fetch('/api/notice-attachments?noticeId=' + encodeURIComponent(notice), { credentials: 'include' })
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (d) {
-      const names = d && Array.isArray(d.names) ? d.names : null;
-      if (!names) { card.dataset.attState = 'err'; return; }
-      // Match by id, not by position — the route preserves order, but relying on
-      // that would put the wrong name on a link the moment it stops.
-      const byId = {};
-      names.forEach(function (e) { if (e && e.id && e.name) byId[e.id] = e.name; });
-      let named = 0;
-      Array.prototype.forEach.call(links, function (a) {
-        const nm = byId[a.getAttribute('data-att-id')];
-        if (!nm) return;
-        // The extension moves to its own muted slot: repeated down a list of 19
-        // it is noise, and every row ending in the same four characters is what
-        // made SAM's naming read as a wall. The full name stays in the title, so
-        // nothing is lost.
-        const dot = nm.lastIndexOf('.');
-        const hasExt = dot > 0 && dot > nm.length - 7;
-        const nameEl = a.querySelector('.att-nm');
-        const extEl = a.querySelector('.att-ext');
-        if (nameEl) nameEl.textContent = hasExt ? nm.slice(0, dot) : nm;
-        else a.textContent = nm;
-        if (extEl) extEl.textContent = hasExt ? nm.slice(dot + 1).toLowerCase() : '';
-        a.setAttribute('title', nm);
-        named++;
-      });
-      card.dataset.attState = named ? 'ok' : 'none';
+      // null means the read failed. [] means SAM listed none — a real answer, but
+      // one we still refuse to act on destructively: if the feed handed us links,
+      // they are real links, so they stay.
+      const list = d && Array.isArray(d.attachments) ? d.attachments : null;
+      if (!list || !list.length) { card.dataset.attState = list ? 'none' : 'err'; return; }
+      const rows = list.map(attachmentRow).filter(Boolean);
+      if (!rows.length) { card.dataset.attState = 'none'; return; }
+      box.textContent = '';
+      rows.forEach(function (el) { box.appendChild(el); });
+      // The count is rebuilt too — it would otherwise still show the feed's number
+      // while the list below it showed SAM's.
+      const label = card.querySelector('[data-att-count]');
+      if (label) label.textContent = rows.length + (rows.length === 1 ? ' document' : ' documents');
+      card.dataset.attState = 'ok';
     })
     .catch(function () { card.dataset.attState = 'err'; });
 }
