@@ -196,16 +196,32 @@ because a different flag is compensating for a misplaced anchor.** That is the e
 `routeCommercialSections`' own decision-isolation comment (`panel-doc-class.ts:183-188`) warns
 about.
 
-### What the fix is
+### The fix — SHIPPED in #499 (`1514f5ce`) and ARMED on both surfaces 2026-08-06
 
-A positive-SHAPE anchor addition for sealed-bid packages — `instructions,? conditions,? and notices
-to bidders` · `instructions to bidders` · `invitation for bids` — in the §L set. Shape allowlist,
-never a vocabulary blocklist. It places §L at offset 29 where the content actually is, which makes
-the routing correct on its own rather than correct-by-compensation, and it does not depend on
-`AUDIT_ROUTING_HEAD_COVERAGE` staying armed.
+A positive-SHAPE anchor addition in the §L set, behind `AUDIT_IFB_SECTION_ANCHORS`. Shape allowlist,
+never a vocabulary blocklist. Three header-like shapes: the SF-1442 heading, a line-start
+`Instructions to Bidders:` title, and the UFGS section number `00 21 13`.
+
+Two things changed between this section being written and the fix shipping, and both matter:
+
+- **`invitation for bids` was DROPPED from the proposal above.** It is real IFB vocabulary, but it
+  recurs mid-content on this very package — "conforming to the invitation for bids", "Also called
+  Invitation for Bids." — so it would fragment §C mid-sentence, which is what this file's
+  header-like-only anchor doctrine exists to prevent. `bid opening` was dropped for the same reason.
+- **The heading shape had to cover OFFERORS too, and that is a SECOND defect.** The fix's own
+  non-regression control was `INSTRUCTIONS, CONDITIONS, AND NOTICES TO OFFERORS` — the negotiated
+  twin — and it FAILED ITS OWN PRECONDITION: the existing anchor wants `instructions to offerors`
+  contiguous, and that heading puts three words between them. Construction RFPs on SF-1442 lose §L
+  for exactly the reason IFBs do. Neither the run nor this section found that; the control did.
+
+Measured on the real source with the flag on: §L places at offset **71**, `routed` flips to true, and
+the dropped pre-first-anchor head falls from **13,539 chars to 71** — so the bid opening, award basis
+and 8(a) set-aside move INSIDE §L rather than depending on `AUDIT_ROUTING_HEAD_COVERAGE` to carry
+them. Zero match across all 17 banked sources carrying `input.fullSource`.
 
 **Unchanged by any of this:** routing governs UCF sections, not the 45 attachments. This is a
-cost-slope fix. It does not move `docsRead` off 17.
+cost-slope fix. It does not move `docsRead` off 17. **And it has not yet run:** the flag is armed but
+no audit has been fired since, so the routed read has never actually reached a lens.
 
 ### One instrument mismatch found in passing
 
