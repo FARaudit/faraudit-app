@@ -245,7 +245,20 @@ export async function runAgenticExpert(
     // observe (pure logging) then execute the tools the expert called, deterministically, feeding results back.
     trace.push({ turn, tools: out.toolCalls.map((tc) => ({ name: tc.name, input: tc.input })) });
     for (const tc of out.toolCalls) {
-      if (tc.name === "read_section" && tc.input?.key) sectionsRead.add(String(tc.input.key).toUpperCase());
+      // Record the section only when the read actually RETURNED it. This used to add on the mere tool CALL,
+      // without executing readSection, so a section the lens asked for and that does not exist entered
+      // sectionsRead — and membership there is what moves a section out of completenessOf's `unread` branch.
+      // Driven in isolation that certifies an ABSENT section `read_no_obligation` ⇒ covered. Production
+      // cannot reach it, because buildManifest only ever requires sections readSection reports present, so
+      // an absent section is never in `required` — but completenessOf is exported public API and the
+      // divergence from read_document two lines below was the kind that stops being harmless quietly.
+      // TRUNCATION is deliberately NOT filtered here (unlike read_document): a truncated section IS read,
+      // and completenessOf handles it at the proof layer via its own readSection(...).truncated, which
+      // yields the more specific "[truncated] §X exceeds the lens read-cap" than a bare `unread` would.
+      if (tc.name === "read_section" && tc.input?.key) {
+        const res = runAuditTool(ctx, "read_section", tc.input) as { present?: boolean; key?: string };
+        if (res?.present && res.key) sectionsRead.add(res.key.toUpperCase());
+      }
       // Track the RESOLVED attachment name (readDocument fuzzy-matches, so record what it actually read) — the
       // provably-read set that gates a "no operative obligation" attestation in documentsCovered (Brain #347).
       // A TRUNCATED read is NOT provably-read-WHOLE (Gauntlet #349 blocker F1): an obligation past the read cap is
