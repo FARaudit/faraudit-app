@@ -334,23 +334,23 @@ button{font-family:inherit}
       <section class="kpi-strip">
         <div class="kpi" data-tone="blue">
           <div class="kpi-top"><p class="lbl">In Flight</p><span class="kpi-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg></span></div>
-          <div class="kpi-val">19</div>
-          <div class="foot">active pursuits across <b>7 stages</b></div>
+          <div class="kpi-val">&mdash;</div>
+          <div class="foot">&nbsp;</div>
         </div>
         <div class="kpi">
           <div class="kpi-top"><p class="lbl">Pipeline Value</p><span class="kpi-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></span></div>
-          <div class="kpi-val">$239.7<span class="unit">M</span></div>
-          <div class="foot">total ceiling, weighted by stage</div>
+          <div class="kpi-val">&mdash;</div>
+          <div class="foot">&nbsp;</div>
         </div>
         <div class="kpi" data-tone="red">
           <div class="kpi-top"><p class="lbl">P0 · Action Now</p><span class="kpi-ico red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span></div>
-          <div class="kpi-val">3</div>
-          <div class="foot">critical deadlines — <b>1 CO overdue</b></div>
+          <div class="kpi-val">&mdash;</div>
+          <div class="foot">&nbsp;</div>
         </div>
         <div class="kpi" data-tone="amber">
           <div class="kpi-top"><p class="lbl">Due ≤ 7 Days</p><span class="kpi-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span></div>
-          <div class="kpi-val">7</div>
-          <div class="foot">submissions closing this week</div>
+          <div class="kpi-val">&mdash;</div>
+          <div class="foot">&nbsp;</div>
         </div>
       </section>
 
@@ -359,7 +359,7 @@ button{font-family:inherit}
         <div class="funnel-head">
           <span class="t">Stages</span>
           <span class="rule"></span>
-          <button class="allbtn" id="allBtn" type="button">Show all 19 →</button>
+          <button class="allbtn" id="allBtn" type="button" hidden></button>
         </div>
         <div class="stage-rail" id="rail"></div>
       </section>
@@ -373,120 +373,6 @@ button{font-family:inherit}
   </main>
 </div>
 
-<script>
-const STAGE_NAMES = ['Pre-Sol Synopsis','Sources Sought','Solicitation','Proposal Dev','Submission','Evaluation','Award','Post-Award'];
-const STAGE_FULL = ['Pre-Solicitation Synopsis','Sources Sought / RFI','Solicitation Released','Proposal Development','Submission','Government Evaluation','Award & Performance','Post-Award'];
-
-const PURSUITS = [
-  // stage 1 (2)
-  {id:'HQ0034-26-R-2058', stage:1, pri:'p2', title:'DARPA — Resilient Tactical Edge Compute, Phase 2 SBIR', agency:'DARPA · Microsystems Technology Office', due:75, dueLabel:'Est. RFP 75d', ceiling:12.0, m3k:'CO Posture', m3v:'Synopsis posted'},
-  {id:'HQ0808-26-R-0001', stage:1, pri:'p2', title:'DTRA — Strategic Threat Reduction Modeling Support', agency:'Defense Threat Reduction Agency', due:60, dueLabel:'Est. RFP 60d', ceiling:9.4, m3k:'CO Posture', m3v:'Market research'},
-  // stage 2 (1)
-  {id:'N00164-26-Q-0788', stage:2, pri:'p1', title:'NSWC Crane — Energetic Materials R&D Support', agency:'Dept. of the Navy · NSWC Crane', due:9, dueLabel:'RFI due 9d', ceiling:5.5, m3k:'Influence', m3v:'Response drafted'},
-  // stage 3 (4)
-  {id:'N00024-26-R-2207', stage:3, pri:'p0', title:'SPY-6 Radar Sustainment Engineering — Phase IV CDRL Refresh', agency:'Dept. of the Navy · NAVSEA · PEO IWS 2.0', due:1, dueLabel:'1d left', ceiling:18.4, m3k:'CO Response', m3v:'Overdue', m3tone:'overdue'},
-  {id:'FA2517-26-R-0033', stage:3, pri:'p0', title:'Space Force — Ground Station Software Modernization, GPS III', agency:'U.S. Space Force · SSC · Peterson SFB', due:4, dueLabel:'4d left', ceiling:24.6, m3k:'CO Response', m3v:'~3.5 days'},
-  {id:'FA8730-26-Q-0114', stage:3, pri:'p0', title:'F-35 Mission Systems — Software Test Harness Refactor & CI Pipeline', agency:'Dept. of the Air Force · AFLCMC · Hanscom AFB', due:5, dueLabel:'5d left', ceiling:7.9, m3k:'CO Response', m3v:'~1.8 days'},
-  {id:'W912DY-26-R-0089', stage:3, pri:'p1', title:'USACE Huntsville — Cyber Resilience Assessment, Critical Infrastructure', agency:'Dept. of the Army · USACE Huntsville (CEHNC)', due:6, dueLabel:'6d left', ceiling:3.2, m3k:'CO Response', m3v:'~4.1 days'},
-  // stage 4 (6)
-  {id:'HC1028-26-R-1015', stage:4, pri:'p1', title:'DISA — Cloud Migration Services, JWCC Task Order', agency:'Defense Information Systems Agency', due:11, dueLabel:'Submit 11d', ceiling:32.0, m3k:'Status', m3v:'Pricing 70%'},
-  {id:'W56KGY-26-R-0014', stage:4, pri:'p1', title:'CECOM — Tactical Network Sustainment Support, APG', agency:'Dept. of the Army · CECOM · Aberdeen', due:13, dueLabel:'Submit 13d', ceiling:14.2, m3k:'Status', m3v:'Color review 6d'},
-  {id:'W519TC-26-R-0066', stage:4, pri:'p2', title:'NETCOM — Enterprise Network Services Sustainment', agency:'Dept. of the Army · NETCOM · Fort Huachuca', due:16, dueLabel:'Submit 16d', ceiling:21.5, m3k:'Status', m3v:'BOE in progress'},
-  {id:'SP4701-26-Q-0942', stage:4, pri:'p2', title:'DLA Aviation — Predictive Maintenance Analytics, H-60', agency:'Defense Logistics Agency · Aviation', due:18, dueLabel:'Submit 18d', ceiling:6.8, m3k:'Status', m3v:'Teaming LOI'},
-  {id:'N40192-26-Q-1188', stage:4, pri:'p2', title:'NAVFAC Pacific — Energetics Storage Inspection, Guam', agency:'Dept. of the Navy · NAVFAC Pacific', due:20, dueLabel:'Submit 20d', ceiling:8.7, m3k:'Status', m3v:'Site visit 5d'},
-  {id:'W912DR-26-R-0117', stage:4, pri:'p2', title:'USACE Baltimore — Cantonment Area Construction Mgmt', agency:'Dept. of the Army · USACE Baltimore', due:22, dueLabel:'Submit 22d', ceiling:11.3, m3k:'Status', m3v:'Pricing 40%'},
-  // stage 5 (3)
-  {id:'SP0700-26-R-0210', stage:5, pri:'p1', title:'DLA Troop Support — Field Feeding Equipment, FY26', agency:'Defense Logistics Agency · Troop Support', due:2, dueLabel:'Submit 2d', ceiling:4.9, m3k:'Checklist', m3v:'Final QC', m3tone:'warn'},
-  {id:'N00178-26-R-3071', stage:5, pri:'p2', title:'NSWC Indian Head — Energetics Material Handling, Bldg. 4042', agency:'Dept. of the Navy · NSWC Indian Head', due:3, dueLabel:'Submit 3d', ceiling:5.6, m3k:'Checklist', m3v:'Reps & certs', m3tone:'warn'},
-  {id:'W58RGZ-26-Q-0418', stage:5, pri:'p2', title:'AMCOM — Aviation Ground Support Equipment Calibration', agency:'Dept. of the Army · AMCOM · Redstone', due:6, dueLabel:'Submit 6d', ceiling:3.4, m3k:'Checklist', m3v:'SAM verified'},
-  // stage 6 (2)
-  {id:'N00421-26-R-0145', stage:6, pri:'p1', title:'NAWCAD Pax River — Flight Test Instrumentation Support', agency:'Dept. of the Navy · NAWCAD · Patuxent River', due:25, dueLabel:'Award est. 25d', ceiling:16.7, m3k:'Eval', m3v:'Clarifications'},
-  {id:'FA8501-26-R-0077', stage:6, pri:'p2', title:'AFSC Robins — Depot Software Sustainment, C-130', agency:'Dept. of the Air Force · AFSC · Robins AFB', due:34, dueLabel:'Award est. 34d', ceiling:13.1, m3k:'Eval', m3v:'Awaiting CO'},
-  // stage 7 (1)
-  {id:'W58RGZ-26-R-0030', stage:7, pri:'p1', title:'AMCOM — Aviation Logistics Support Services', agency:'Dept. of the Army · AMCOM · Redstone Arsenal', due:14, dueLabel:'PoP start 14d', ceiling:19.8, m3k:'Onboarding', m3v:'WAWF setup'}
-];
-
-let activeStage = 3;
-
-function counts(){ const c=[0,0,0,0,0,0,0,0]; PURSUITS.forEach(p=>c[p.stage-1]++); return c; }
-function p0counts(){ const c=[0,0,0,0,0,0,0,0]; PURSUITS.forEach(p=>{ if(p.pri==='p0') c[p.stage-1]++; }); return c; }
-function stageValue(s){ return PURSUITS.filter(p=>p.stage===s).reduce((a,p)=>a+p.ceiling,0); }
-
-/* build rail */
-function buildRail(){
-  const c=counts(), p0=p0counts(), max=Math.max(...c,1);
-  document.getElementById('rail').innerHTML = STAGE_NAMES.map((name,i)=>{
-    const n=c[i], empty=n===0, h=Math.max(8, Math.round(n/max*28));
-    const isActive = (activeStage===i+1) && !empty;
-    return `<button class="stage-cell${isActive?' active':''}${empty?' empty':''}" data-stage="${i+1}" type="button"${empty?' disabled':''}>
-      <span class="stage-num">${String(i+1).padStart(2,'0')}</span>
-      <span class="stage-name">${name}</span>
-      <span class="stage-bottom"><span class="stage-num-big">${n}</span><span class="vol"><i style="height:${empty?6:h}px"></i></span></span>
-      ${p0[i]>0?`<span class="stage-p0">${p0[i]} P0</span>`:''}
-    </button>`;
-  }).join('');
-  document.querySelectorAll('.stage-cell:not(.empty)').forEach(b=>b.addEventListener('click',()=>{ activeStage=+b.dataset.stage; showAll=false; render(); }));
-}
-
-let showAll=false;
-
-function render(){
-  buildRail();
-  const banner=document.getElementById('banner');
-  const cards=document.getElementById('cards');
-  let list;
-  if(showAll){
-    list=[...PURSUITS];
-    banner.innerHTML = `<span>Showing <b>all 19 pursuits</b> across 7 active stages</span><span class="bval">Total ceiling <b>$239.7M</b></span>`;
-  } else {
-    list=PURSUITS.filter(p=>p.stage===activeStage);
-    const val=stageValue(activeStage);
-    banner.innerHTML = `<span>Showing <b>Stage ${String(activeStage).padStart(2,'0')} — ${STAGE_FULL[activeStage-1]}</b> · ${list.length} pursuit${list.length!==1?'s':''}</span><span class="bval">Stage ceiling <b>$${val.toFixed(1)}M</b></span>`;
-  }
-  // sort: p0 first, then by due asc
-  const order={p0:0,p1:1,p2:2};
-  list.sort((a,b)=> (order[a.pri]-order[b.pri]) || (a.due-b.due));
-
-  if(list.length===0){
-    cards.innerHTML = `<div class="empty-stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg><div class="t">No pursuits in this stage</div><div class="s">Post-award tracking is on the FARaudit roadmap.</div></div>`;
-    return;
-  }
-
-  cards.innerHTML = list.map(p=>{
-    const urg = p.due<=7 ? (p.due<=2?'crit':'warn') : 'ok';
-    const urgW = p.due<=30 ? Math.max(8, Math.round((1 - p.due/30)*100)) : 6;
-    const slug=p.id.toLowerCase();
-    const m3tone = p.m3tone? ' '+p.m3tone : '';
-    return `<article class="pcard ${p.pri}">
-      <div class="pcard-head">
-        <div>
-          <div class="pcard-id">${p.id}</div>
-          <h2 class="pcard-title">${p.title}</h2>
-          <p class="pcard-agency">${p.agency}</p>
-        </div>
-        <span class="risk-badge ${p.pri}">${p.pri.toUpperCase()}</span>
-      </div>
-      <div class="urg">
-        <div class="urg-bar"><i class="${urg}" style="width:${urgW}%"></i></div>
-        <div class="urg-row"><span>Next milestone</span><span class="due ${urg}">${p.dueLabel}</span></div>
-      </div>
-      <div class="pcard-meta">
-        <div class="item"><span class="k">Stage</span><span class="v"><span class="stage-pill">${String(p.stage).padStart(2,'0')} · ${STAGE_NAMES[p.stage-1]}</span></span></div>
-        <div class="item"><span class="k">Ceiling</span><span class="v amount">$${p.ceiling.toFixed(1)}M</span></div>
-        <div class="item"><span class="k">${p.m3k}</span><span class="v${m3tone}">${p.m3v}</span></div>
-      </div>
-      <div class="pcard-actions">
-        <a class="btn-open" href="/audit/${slug}">Open Audit<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-        <a class="btn-view" href="https://sam.gov/opp/${p.id}/view" target="_blank" rel="noreferrer">View Solicitation<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6"/><path d="M20 4l-8 8"/><path d="M19 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h6"/></svg></a>
-      </div>
-    </article>`;
-  }).join('');
-}
-
-document.getElementById('allBtn').addEventListener('click',function(){ showAll=true; render(); });
-
-render();
-</script>
 
 <script src="pipeline-live.js"></script>
 <script>/* theme + sidebar toggles */

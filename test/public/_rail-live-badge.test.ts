@@ -616,7 +616,7 @@ console.log("\n── Part P · run-audit distinguishes failure from empty ─�
 console.log("\n── Part Q · nav links resolve to real routes ──");
 {
   const APP = join(ROOT, "src", "app");
-  const routeExists = (href) => {
+  const routeExists = (href: string) => {
     const p = href.split("?")[0].split("#")[0].replace(/^\/+/, "");
     if (p === "") return true;
     try { readdirSync(join(APP, p)); return true; } catch { return false; }
