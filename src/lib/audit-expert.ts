@@ -50,6 +50,70 @@ export function isGrounded(ctx: AuditToolContext, f: RawFinding): boolean {
 // eligibility/§I clauses/flow-downs — the natural home for security-requirements / set-aside / clause attachments.
 const COVERAGE_LENS_KEY = process.env.AUDIT_COVERAGE_LENS_KEY || "contracts_attorney";
 
+/** One lens's completed run. Named so the fan-out settler below can construct a well-formed DEGRADED
+ *  instance without duplicating the shape by hand (a hand-copied shape drifts the moment a field is added). */
+export interface ExpertRun {
+  findings: TypedFinding[]; turns: number; dropped: number; droppedInReadSource: number;
+  converged: boolean; sectionsRead: string[]; docsRead: string[]; attestations: string[];
+  trace: Array<{ turn: number; tools: Array<{ name: string; input: Record<string, unknown> }> }>;
+}
+
+/** A lens that FAILED, in the shape the orchestrator indexes positionally. Deliberately identical to the
+ *  never-converged return at the bottom of runAgenticExpert: empty everything, `converged: false`. That is
+ *  what makes the degradation honest — coverage sees a lens that read nothing, so it counts nothing as
+ *  covered, and the package falls to INCOMPLETE rather than to a confident verdict over four fifths of a panel. */
+const degradedRun = (): ExpertRun => ({
+  findings: [], turns: 0, dropped: 0, droppedInReadSource: 0, converged: false,
+  sectionsRead: [], docsRead: [], attestations: [], trace: [],
+});
+
+/** Settle the parallel lens fan-out.
+ *
+ *  WHY THIS EXISTS. The fan-out ran under `Promise.all`, which rejects on the FIRST rejection — so any single
+ *  lens failure (an API 400 on an unsupported parameter, a transient 5xx, a malformed tool response) discarded
+ *  the other four lenses' completed work and failed the whole PAID audit. The panel in the same stage already
+ *  used `Promise.allSettled` and the verifier's `Promise.all` wraps elements that each catch, so the expensive
+ *  half of stage 06 was the only unprotected concurrent stage in the engine.
+ *
+ *  TWO CASES STILL THROW, and they are the point of this function rather than exceptions to it:
+ *
+ *  (1) THE SIGNAL IS ABORTED. `runAgenticExpert` throws on `signal.aborted` deliberately — a wall-clock budget
+ *      breach must reject the whole audit "to a clean terminal failure", never fall through to an empty
+ *      findings return "which would masquerade as a real INCOMPLETE/no-charge verdict". Swallowing that into
+ *      per-lens degradation would convert a budget breach into a thin-but-decided verdict, which is precisely
+ *      the failure the throw was written to prevent. Checked on the SIGNAL, not on the error message: an
+ *      error string is a claim, and matching on one would silently stop working if the message were reworded.
+ *
+ *  (2) EVERY LENS FAILED. A total wipeout is not degradation — it is the stage not running. Zero findings and
+ *      zero sections read would render as an ordinary INCOMPLETE, indistinguishable in the report from a
+ *      package that was genuinely unreadable. Same doctrine as (1): fail loudly rather than emit a
+ *      verdict-shaped artifact from a stage that produced nothing.
+ *
+ *  Pure given its inputs (no clock, no env, no I/O) → $0 gate-testable, which is the whole reason the settle
+ *  logic is a named function instead of three lines inline in a 2,600-line orchestrator. */
+export function settleLensRuns(
+  settled: Array<PromiseSettledResult<ExpertRun>>,
+  lensKeys: string[],
+  opts: { aborted: boolean },
+): { runs: ExpertRun[]; failed: Array<{ key: string; reason: string }> } {
+  const failed: Array<{ key: string; reason: string }> = [];
+  settled.forEach((r, i) => {
+    if (r.status === "rejected") {
+      const reason = r.reason instanceof Error ? r.reason.message : String(r.reason);
+      failed.push({ key: lensKeys[i] ?? `lens#${i}`, reason });
+    }
+  });
+  if (failed.length > 0 && opts.aborted) {
+    throw new Error(`agentic expert phase aborted (overall budget exceeded) — ${failed.length} lens(es) rejected: ${failed.map((f) => f.key).join(", ")}`);
+  }
+  if (failed.length > 0 && failed.length === settled.length) {
+    throw new Error(`agentic expert phase produced nothing: ALL ${settled.length} lenses failed — ${failed.map((f) => `${f.key}: ${f.reason}`).join(" · ")}`);
+  }
+  // Positional: the orchestrator indexes runs[i] against experts[i], so a failure must OCCUPY its slot.
+  const runs = settled.map((r) => (r.status === "fulfilled" ? r.value : degradedRun()));
+  return { runs, failed };
+}
+
 /** Run ONE agentic expert as a tool-using react loop. Returns grounded TypedFindings (facts), or [] if it
  *  never converged. Pure control flow + deterministic grounding; the only nondeterminism is inside the
  *  injected model call, and its output is hard-gated by isGrounded before anything is accepted. */
@@ -57,7 +121,7 @@ export async function runAgenticExpert(
   spec: ExpertSpec,
   ctx: AuditToolContext,
   opts: { callModel: CallModel; maxTurns?: number; signal?: AbortSignal },
-): Promise<{ findings: TypedFinding[]; turns: number; dropped: number; droppedInReadSource: number; converged: boolean; sectionsRead: string[]; docsRead: string[]; attestations: string[]; trace: Array<{ turn: number; tools: Array<{ name: string; input: Record<string, unknown> }> }> }> {
+): Promise<ExpertRun> {
   const baseMaxTurns = opts.maxTurns ?? 8;
   const priorToolResults: ToolResult[][] = [];
   // PURE-OBSERVER trace (Brain card-48 guardrail 1): logging only, ZERO behavior change. Records every tool
@@ -223,6 +287,35 @@ export async function runAgenticExpert(
  *  by (Gauntlet #349 F3). Flag-OFF returns the definition unchanged. */
 export const strictFindingsToolEnabled = () => process.env.AUDIT_STRICT_FINDINGS_TOOL === "true";
 
+/** Effort levels each model actually accepts, transcribed from the LIVE Models API capability record
+ *  (`GET /v1/models/<id>` → `capabilities.effort.<level>.supported`) on 2026-08-06 — not from documentation
+ *  and not from recollection. Every row was queried; none was inferred from a neighbouring row. The one that
+ *  matters is sonnet-4-6: `xhigh` is FALSE there, and sonnet-4-6 is the lens model, so the previous flat
+ *  five-level allowlist would have 400'd every lens call. haiku-4-5 supports NO level at all, which is why the
+ *  empty set is a real entry rather than an omission — an absent key and an empty set mean different things
+ *  here, and only the empty set says "asked, and the answer was none".
+ *
+ *  UNKNOWN MODEL ⇒ `undefined` ⇒ the caller OMITS the field rather than guessing. That is the fail-safe
+ *  direction: omitting degrades to the API default (`high`, i.e. today's behaviour), while guessing wrong
+ *  costs a whole paid run. It matters because the lens model is overridable at runtime — `AUDIT_LENS_MODEL`
+ *  (model-registry.ts) and `input.expertModel` can both put a model here that this table has never seen.
+ *
+ *  This table is a snapshot of a live fact and will go stale as models ship. It fails toward inertness, and
+ *  the caller logs by name whenever a level is dropped, so a stale row costs a no-op and a log line — never
+ *  a rejected run. Re-verify with the capability query rather than editing from memory. */
+const EFFORT_SUPPORT: Record<string, ReadonlySet<string>> = {
+  "claude-sonnet-4-6": new Set(["low", "medium", "high", "max"]),           // xhigh FALSE — the live lens model
+  "claude-opus-5": new Set(["low", "medium", "high", "xhigh", "max"]),
+  "claude-sonnet-5": new Set(["low", "medium", "high", "xhigh", "max"]),
+  "claude-opus-4-8": new Set(["low", "medium", "high", "xhigh", "max"]),
+  "claude-haiku-4-5": new Set([]),                                          // effort UNSUPPORTED ENTIRELY
+};
+
+/** The effort levels `model` accepts, or undefined when we have no verified record for it. Pure. */
+export function effortLevelsFor(model: string): ReadonlySet<string> | undefined {
+  return EFFORT_SUPPORT[model];
+}
+
 /** The `submit_findings` tool — its input_schema FORCES a typed findings array (structured output via a
  *  strict tool). The expert calls it to terminate its loop; the harness parses the validated input. */
 export const SUBMIT_FINDINGS_TOOL = {
@@ -334,10 +427,27 @@ export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: 
     // that reads even fewer is not a saving — it is the known defect getting worse for less money. Any
     // comparison of effort levels MUST read docsRead and the finding count alongside cost, or it scores a
     // coverage regression as a win.
-    const EFFORT_LEVELS = new Set(["low", "medium", "high", "xhigh", "max"]);
+    //
+    // ⚠ THE LEVEL SET IS PER-MODEL, AND THE FLAT ALLOWLIST THAT SHIPPED HERE WAS WRONG. It accepted all five
+    // levels for every model. `xhigh` arrived with Opus 4.7 and is NOT supported on claude-sonnet-4-6 — which is
+    // exactly what modelFor("lens") resolves to. Verified against the live Models API, not the documentation:
+    //   claude-sonnet-4-6 → effort.xhigh.supported = FALSE (low/medium/high/max true)
+    //   claude-opus-5     → all five true
+    // So `AUDIT_LENS_EFFORT=xhigh` passed the allowlist and would have been rejected by the API with a 400 on
+    // every one of the five parallel lens calls. The old guard could not catch it: it was written against
+    // TYPOS ("a typo degrades to today rather than to a 400 on an unknown enum"), and `xhigh` is not a typo —
+    // it is a real level for a different model. A stub-client gate proves the field reaches the request; only
+    // the model's own capability record proves the request is acceptable.
     const lensEffort = process.env.AUDIT_LENS_EFFORT;
     const req: Record<string, unknown> = { model, max_tokens: opts?.maxTokens ?? 4096, temperature: 0, system: systemField, tools, messages };
-    if (lensEffort && EFFORT_LEVELS.has(lensEffort)) req.output_config = { effort: lensEffort };
+    if (lensEffort) {
+      const supported = effortLevelsFor(model);
+      if (supported?.has(lensEffort)) req.output_config = { effort: lensEffort };
+      // OMIT + SAY SO. Silently dropping the field would make the flag look armed while doing nothing, which is
+      // the "a flag name is not a behaviour" trap; sending it anyway trades a silent no-op for a dead paid run.
+      // Omitting is the safe direction (degrades to today's default `high`), so the log is what keeps it honest.
+      else console.warn(`[expert] AUDIT_LENS_EFFORT="${lensEffort}" NOT APPLIED — ${supported ? `model ${model} does not support that level (supported: ${[...supported].join(", ")})` : `no capability record for model ${model}`}. Running at the API default (high).`);
+    }
     if (forceSubmit) req.tool_choice = { type: "tool", name: "submit_findings" }; // last turn → must produce findings
     // Pass the overall-budget signal so a breach cancels the in-flight paid call (stops
     // spend) instead of abandoning a Promise that keeps costing. Absent signal = no-op.
