@@ -388,6 +388,26 @@ export function railScript(): string {
   );
 }
 
+/** Restore the saved appearance BEFORE the first paint.
+ *
+ *  Every page ships `<html data-theme="light" data-sb="open">` and re-applies the
+ *  saved value from a script at the END of the body — on past-audits.html that is
+ *  93% of the way through the document. A customer on dark therefore got a full
+ *  LIGHT paint of the page and the rail, then a flip; a customer with the rail
+ *  collapsed got it painted open, then snapped shut. Both read as the app changing
+ *  its mind about what it looks like while you watch.
+ *
+ *  Same lesson as the stylesheet below, one layer up: a decision that governs the
+ *  first paint has to be made before the first paint. Blocking and tiny, in <head>,
+ *  ahead of the rail's own sheet. The bottom-of-body script still runs and is
+ *  idempotent — it also owns the toggle, which needs its button to exist. */
+export function railThemeBoot(): string {
+  return `<script id="sb-theme-boot">(function(){try{var d=document.documentElement;` +
+    `var t=localStorage.getItem('faraudit-theme');if(t==='light'||t==='dark')d.setAttribute('data-theme',t);` +
+    `var s=localStorage.getItem('faraudit-sb');if(s==='closed'||s==='mini'||s==='open')d.setAttribute('data-sb',s);` +
+    `}catch(e){}})();</script>`;
+}
+
 // Replace the page's stale <aside class="sidebar">…</aside> with the shared rail,
 // and inject the CSS + script once (before </body>). Safe no-op if markers absent.
 export function injectRail(html: string, activeKey: string, counts: RailCounts = {}): string {
@@ -398,6 +418,13 @@ export function injectRail(html: string, activeKey: string, counts: RailCounts =
   // oversized icons on the page's palette — and repainted when the sheet finally
   // parsed. Every page's own styles are in <head>, so the rail still comes last and
   // still wins; it just wins before the first paint instead of after it.
+  // Appearance first — it decides what the very first paint looks like, so it goes
+  // in ahead of the rail's own stylesheet.
+  if (out.includes('id="sb-theme-boot"') === false) {
+    out = out.includes("</head>")
+      ? out.replace("</head>", `${railThemeBoot()}</head>`)
+      : railThemeBoot() + out;
+  }
   if (out.includes('id="sb-phase5"') === false) {
     out = out.includes("</head>")
       ? out.replace("</head>", `${railStyle()}</head>`)

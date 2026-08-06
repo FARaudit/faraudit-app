@@ -15,7 +15,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import vm from "vm";
-import { renderRail, railStyle, railScript, injectRail, railFonts } from "@/lib/nav/rail";
+import { renderRail, railStyle, railScript, injectRail, railFonts, railThemeBoot } from "@/lib/nav/rail";
 
 let pass = 0; let fail = 0;
 const check = (label: string, ok: boolean, detail = "") => {
@@ -512,6 +512,99 @@ console.log("\n── Part L · the LIVE pill is driven, not decorative ──")
     !near(`sun.style.display='none';` + "x".repeat(1000) + `getElementById('livePill')`, "livePill"));
   check("L-P6 · ACCEPTS a hide adjacent to the pill",
     near(`var p = document.getElementById('livePill'); p.hidden = !on;`, "livePill"));
+}
+
+// ── Part M · appearance is settled BEFORE the first paint ─────────────────────────────────
+// Written RED 2026-08-06. Every page ships <html data-theme="light" data-sb="open"> and
+// re-applies the saved value from a script at the END of the body — 93% through the
+// document on past-audits.html. A customer on dark got a full LIGHT paint of the page and
+// the rail, then a flip; a collapsed rail painted open, then snapped shut. Reported as
+// "it opens a different sidebar view". The restore now rides in <head> via injectRail, so
+// one fix covers all 17 pages instead of 17 edits that would drift apart.
+console.log("\n── Part M · no flash of the wrong appearance ──");
+{
+  const boot = railThemeBoot();
+  check("a head-boot script exists", /id="sb-theme-boot"/.test(boot), "no boot script to inject");
+  check("it restores BOTH theme and rail state", /faraudit-theme/.test(boot) && /faraudit-sb/.test(boot), boot.slice(0, 120));
+  check("it only ever sets values it recognises", /'light'\|\|.*'dark'|t==='light'/.test(boot), "an arbitrary stored string would reach the DOM");
+
+  // The property that matters is POSITION: before </head>, and before the rail stylesheet.
+  const pages = readdirSync(join(ROOT, "public")).filter((n) => n.endsWith(".html"));
+  const served = pages.map((p) => ({ p, html: injectRail(read(join("public", p)), "past-audits") }));
+  const late = served.filter(({ html }) => {
+    const i = html.indexOf('id="sb-theme-boot"');
+    const h = html.indexOf("</head>");
+    return i === -1 || h === -1 || i > h;
+  });
+  check(`every served page settles appearance in <head> (${served.length} pages)`, late.length === 0, late.map((x) => x.p).join(", "));
+  const one = served.find((s) => s.p === "past-audits.html")!;
+  check("boot runs BEFORE the rail stylesheet", one.html.indexOf('id="sb-theme-boot"') < one.html.indexOf('id="sb-phase5"'), "stylesheet wins the race");
+  check("injecting twice does not duplicate the boot",
+    (injectRail(one.html, "past-audits").match(/id="sb-theme-boot"/g) || []).length === 1, "boot injected twice");
+
+  // Planted positives — the position check must go RED on the shipped arrangement.
+  const posOf = (h: string) => { const i = h.indexOf('id="sb-theme-boot"'); const e = h.indexOf("</head>"); return i !== -1 && e !== -1 && i < e; };
+  check("M-P1 · REJECTS a boot script left at the end of the body",
+    !posOf(`<head><style>x</style></head><body>…<script id="sb-theme-boot"></script></body>`));
+  check("M-P2 · ACCEPTS a boot script in the head", posOf(`<head><script id="sb-theme-boot"></script></head><body></body>`));
+  check("M-P3 · REJECTS a page with no boot script at all", !posOf(`<head></head><body></body>`));
+}
+
+// ── Part N · the Decisions ledger shows the field it filters on ───────────────────────────
+// Narrowing by Set-aside changed the rows with nothing ON the row saying why — the CEO's
+// own report. A filter whose field the table does not display is one the customer has to
+// take on trust. Column count and colspan move together or the empty state under-fills.
+console.log("\n── Part N · Decisions ledger columns ──");
+{
+  const page = read("public/past-audits.html");
+  const js = read("public/dashboard-live.js");
+  const ths = [...page.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map((m) => m[1].replace(/<[^>]*>/g, "").trim());
+  check("the ledger has a Set-aside column", ths.some((t) => /set-aside/i.test(t)), ths.join(" | "));
+  check("it is sortable", /data-sort="setAside"/.test(page), "header is not wired to a sort key");
+  check("the sort comparator knows the key", /sortKey === "setAside"/.test(js), "clicking it would fall through to the id sort");
+  check("the row builder emits a matching cell", /cell-setaside/.test(js), "header with no cell shifts every column right");
+  check("the cell decodes the SAM code the slicer decodes", /setAsideLabel\(a\.setAside\)/.test(js), "row would show SDVOSBC beside a slicer reading SDVOSB");
+
+  // colspan must equal the header count, or the empty/loading/error rows under-fill.
+  const colspans = [...js.matchAll(/colspan="(\d+)"/g)].map((m) => Number(m[1]));
+  check(`every colspan equals the ${ths.length} columns`, colspans.length > 0 && colspans.every((c) => c === ths.length),
+    `columns=${ths.length} colspans=${[...new Set(colspans)].join(",")}`);
+
+  // Planted positives.
+  check("N-P1 · REJECTS a colspan that lags the header count", ![9].every((c) => c === ths.length));
+  check("N-P2 · ACCEPTS a colspan that matches", [ths.length].every((c) => c === ths.length));
+}
+
+// ── Part O · a crumb that looks like a link IS one ─────────────────────────────────────────
+// "Decisions / Bid Decision Ledger" rendered as plain <span>s on every page — the first
+// crumb reads as a way back and did nothing. Reported as "no way back".
+console.log("\n── Part O · breadcrumbs navigate ──");
+{
+  for (const page of ["past-audits.html", "run-audit.html"]) {
+    const crumbs = (read(join("public", page)).match(/<div class="crumbs">[\s\S]*?<\/div>/) ?? [""])[0];
+    check(`${page} · a crumb bar exists to check`, crumbs.length > 0, "no .crumbs block found");
+    check(`${page} · its leading crumbs are links`, (crumbs.match(/<a href="\//g) || []).length >= 2, crumbs.slice(0, 160));
+    check(`${page} · the LAST crumb is not a link (you are already there)`,
+      !/<a[^>]*>[^<]*<\/a>\s*<\/div>$/.test(crumbs.trim()), crumbs.slice(-90));
+  }
+  check("O-P1 · REJECTS the all-span bar that shipped",
+    (`<div class="crumbs"><b>Decisions</b><span class="sep">/</span><span>Ledger</span></div>`.match(/<a href="\//g) || []).length < 2);
+  check("O-P2 · ACCEPTS a bar with real links",
+    (`<div class="crumbs"><a href="/today"><b>D</b></a><span class="sep">/</span><a href="/past-audits"><b>X</b></a><span>Y</span></div>`.match(/<a href="\//g) || []).length >= 2);
+}
+
+// ── Part P · "no audits yet" is never said about a request that failed ────────────────────
+console.log("\n── Part P · run-audit distinguishes failure from empty ──");
+{
+  const ra = read("public/run-audit.html");
+  check("a non-OK response throws rather than becoming {audits:[]}",
+    /if\(!r\.ok\)throw/.test(ra), "a failed fetch still resolves to an empty history");
+  check("the failure has its OWN renderer", /function renderUnreadable\(\)/.test(ra), "failure reuses the first-run empty state");
+  check("the failure path calls it", /catch\(function\(e\)\{[^}]*renderUnreadable\(\)/.test(ra), "renderer exists with no caller");
+  check("the failure copy does not claim an empty history",
+    !/renderUnreadable[\s\S]{0,400}No audits yet/.test(ra), "failure state still says 'No audits yet'");
+  check("P-P1 · REJECTS a catch that renders the first-run empty state",
+    !/function\(\)\{renderCards\(\[\]\)\}/.test("function(){renderUnreadable()}"));
 }
 
 console.log(`\n${pass} passed · ${fail} failed`);

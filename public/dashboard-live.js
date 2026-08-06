@@ -254,6 +254,12 @@
       + '<td class="cell-title" title="' + esc(a.title) + '">' + esc(a.title) + '</td>'
       + '<td class="cell-agency">' + esc(a.agency) + '</td>'
       + '<td>' + (a.type && a.type !== "\u2014" ? '<span class="doctype">' + esc(a.type) + '</span>' : '<span class="cell-date">\u2014</span>') + '</td>'
+      // Set-aside earns a column because it is filterable: narrowing the ledger by a
+      // set-aside changed the rows with nothing ON the row saying why. A filter whose
+      // field the table does not show is a filter the customer has to take on trust.
+      + '<td class="cell-setaside">' + (a.setAside && a.setAside !== "\u2014"
+          ? '<span class="sacell" title="' + esc(a.setAside) + '">' + esc(setAsideLabel(a.setAside)) + '</span>'
+          : '<span class="cell-date">\u2014</span>') + '</td>'
       + '<td class="cell-due">' + esc(a.due) + '</td>'
       + '<td class="cell-date">' + esc(a.date) + '</td>'
       + '<td><span class="vcell" data-pole="' + esc(a._s) + '"><i class="pd ' + esc(a._s) + '"></i>' + esc(SL[a._s]) + '</span></td>'
@@ -316,7 +322,7 @@
       if (STATE.sortKey === "audited") {
         return cmpNumUndatedLast(x.age, y.age, STATE.sortDir);
       }
-      if (STATE.sortKey === "agency" || STATE.sortKey === "type" || STATE.sortKey === "rec" || STATE.sortKey === "status") {
+      if (STATE.sortKey === "agency" || STATE.sortKey === "type" || STATE.sortKey === "setAside" || STATE.sortKey === "rec" || STATE.sortKey === "status") {
         var xa = (x[STATE.sortKey] || "").toString().toLowerCase();
         var ya = (y[STATE.sortKey] || "").toString().toLowerCase();
         return STATE.sortDir * xa.localeCompare(ya);
@@ -335,7 +341,7 @@
     // Rule 61 — a failed load is a VISIBLE failure state, never an empty ledger
     // (an empty ledger reads as "no audits yet", which the page cannot vouch for).
     if (STATE.loadError) {
-      body.innerHTML = '<tr><td colspan="9" style="padding:36px 16px;text-align:center;color:var(--mute);font-size:13px">'
+      body.innerHTML = '<tr><td colspan="10" style="padding:36px 16px;text-align:center;color:var(--mute);font-size:13px">'
         + 'Could not load your audits (' + esc(STATE.loadError) + '). Reload to try again.'
         + '</td></tr>';
       var vce = document.getElementById("visCount");
@@ -350,13 +356,13 @@
     var visible = mset.filter(rowMatchesFilter);
 
     if (sorted.length === 0) {
-      body.innerHTML = '<tr><td colspan="9" style="padding:36px 16px;text-align:center;color:var(--mute);font-size:13px">'
+      body.innerHTML = '<tr><td colspan="10" style="padding:36px 16px;text-align:center;color:var(--mute);font-size:13px">'
         + 'No audits yet — <a href="/audit" style="color:var(--blue-600);font-weight:600;text-decoration:none">run your first audit →</a>'
         + '</td></tr>';
     } else if (visible.length === 0) {
       // R10 — honest empty: name the combination, offer clear. Never a blank
       // region that looks like data loaded.
-      body.innerHTML = '<tr><td colspan="9" style="padding:34px 18px;text-align:center">'
+      body.innerHTML = '<tr><td colspan="10" style="padding:34px 18px;text-align:center">'
         + '<span style="display:block;font-size:13px;font-weight:700;color:var(--ink);margin-bottom:5px">No audits match this combination</span>'
         + '<span style="display:block;font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--mute)">' + esc(describeFilters().join(" + ") || "no filters") + ' \u2014 <a href="#" class="cc-clear-filters" style="color:var(--blue-600);font-weight:600;text-decoration:none">clear filters</a></span>'
         + '</td></tr>';
@@ -824,7 +830,7 @@
     // Loading state before the fetch — the markup ships placeholders, never numbers.
     var body = document.getElementById("ledgerBody");
     if (body) {
-      body.innerHTML = '<tr><td colspan="9" style="padding:22px 12px;color:var(--mute)">Loading your audits…</td></tr>';
+      body.innerHTML = '<tr><td colspan="10" style="padding:22px 12px;color:var(--mute)">Loading your audits…</td></tr>';
     }
 
     // Fetch and map. Rule 61 — a failed request becomes a VISIBLE failure state,
