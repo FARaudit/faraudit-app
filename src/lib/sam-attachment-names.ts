@@ -44,6 +44,25 @@ const CONCURRENCY = 8;
 
 export const SAM_FILE_ID_RE = /^[a-f0-9]{32}$/i;
 
+// Bounded so a long-lived serverless instance cannot grow this without limit.
+// Eviction is oldest-first insertion order, which Map preserves.
+const CACHE_MAX = 5000;
+const NAME_CACHE = new Map<string, string>();
+
+function cacheName(fileId: string, name: string): void {
+  if (NAME_CACHE.has(fileId)) return;
+  if (NAME_CACHE.size >= CACHE_MAX) {
+    const oldest = NAME_CACHE.keys().next();
+    if (!oldest.done) NAME_CACHE.delete(oldest.value);
+  }
+  NAME_CACHE.set(fileId, name);
+}
+
+/** Test seam: lets a gate prove the cache actually prevents a second fetch. */
+export function __resetAttachmentNameCache(): void {
+  NAME_CACHE.clear();
+}
+
 /** The one URL shape this module will ever fetch, rebuilt from a bare id. */
 export function downloadUrlForFileId(fileId: string): string {
   return `https://sam.gov/api/prod/opps/v3/opportunities/resources/files/${fileId}/download`;
@@ -103,7 +122,7 @@ export interface AttachmentName {
   reason?: string;
 }
 
-async function resolveOne(fileId: string, apiKey: string): Promise<AttachmentName> {
+async function resolveOne(fileId: string): Promise<AttachmentName> {
   const miss = (reason: string): AttachmentName => ({ id: fileId, name: null, reason });
   if (!SAM_FILE_ID_RE.test(fileId)) return miss("bad-file-id");
 
@@ -111,7 +130,10 @@ async function resolveOne(fileId: string, apiKey: string): Promise<AttachmentNam
     // Built here from a validated id — no caller-supplied URL ever reaches
     // fetch(). assertAllowedSamUrl is belt-and-braces on that.
     const url = assertAllowedSamUrl(downloadUrlForFileId(fileId), "initial");
-    url.searchParams.set("api_key", apiKey);
+    // NO api_key. Measured 2026-08-06 across 60 attachments spanning 4 NAICS —
+    // including a CUI-marked file — the 303 carries content-disposition with and
+    // without the key, byte-identical, 60/60 both ways. Sending it bought nothing
+    // and put a credential on a request that does not need one.
 
     const res = await fetch(url.toString(), {
       redirect: "manual",
@@ -154,19 +176,37 @@ async function resolveOne(fileId: string, apiKey: string): Promise<AttachmentNam
  * the caller the other twenty-two names.
  */
 export async function resolveAttachmentNames(fileIds: string[]): Promise<AttachmentName[]> {
-  const apiKey = process.env.SAM_API_KEY;
   const ids = fileIds.slice(0, MAX_ATTACHMENT_IDS);
-  if (!apiKey) return ids.map((id) => ({ id, name: null, reason: "no-api-key" }));
-
   const out: AttachmentName[] = new Array(ids.length);
+
+  // A resolved name is immutable: the file behind a SAM file id does not get
+  // renamed. So a hit costs nothing and repeat opens of the same notice — the
+  // normal case while someone works a shortlist — make no upstream request at
+  // all. Only successes are cached; a failure must stay retryable, or one bad
+  // minute would pin a notice to "Document N" for the life of the process.
+  const missing: string[] = [];
+  for (let i = 0; i < ids.length; i++) {
+    const hit = NAME_CACHE.get(ids[i]);
+    if (hit) out[i] = { id: ids[i], name: hit };
+    else missing.push(ids[i]);
+  }
+  if (missing.length === 0) return out;
+
+  const resolved = new Map<string, AttachmentName>();
   let cursor = 0;
-  const workers = Array.from({ length: Math.min(CONCURRENCY, ids.length) }, async () => {
+  const workers = Array.from({ length: Math.min(CONCURRENCY, missing.length) }, async () => {
     for (;;) {
       const i = cursor++;
-      if (i >= ids.length) return;
-      out[i] = await resolveOne(ids[i], apiKey);
+      if (i >= missing.length) return;
+      const r = await resolveOne(missing[i]);
+      resolved.set(missing[i], r);
+      if (r.name) cacheName(missing[i], r.name);
     }
   });
   await Promise.all(workers);
+
+  for (let i = 0; i < ids.length; i++) {
+    if (!out[i]) out[i] = resolved.get(ids[i]) ?? { id: ids[i], name: null, reason: "unresolved" };
+  }
   return out;
 }

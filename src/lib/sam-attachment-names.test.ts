@@ -116,5 +116,60 @@ check("path traversal rejected", SAM_FILE_ID_RE.test("../../../etc/passwd"), fal
 check("url-in-id rejected", SAM_FILE_ID_RE.test("https://evil.example.com/x"), false);
 check("id with a query string rejected", SAM_FILE_ID_RE.test(ID + "?x=1"), false);
 
-console.log(failures === 0 ? "\nPASS — all checks green" : `\nFAIL — ${failures} check(s) red`);
-process.exit(failures === 0 ? 0 : 1);
+// ─── the cache ───────────────────────────────────────────────────────────────
+// A cache is the classic thing that ships doing nothing: the code reads fine, the
+// names still appear, and every open still hits the network. So count the actual
+// fetches. The second half matters as much as the first — caching a FAILURE
+// would pin a notice to "Document N" for the life of the process.
+async function cacheChecks() {
+  const { resolveAttachmentNames, __resetAttachmentNameCache } = await import("./sam-attachment-names");
+  const ID_A = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+  const ID_B = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+  const realFetch = globalThis.fetch;
+  let calls = 0;
+
+  const reply = (cd: string | null, status = 303) =>
+    ({
+      status,
+      headers: { get: (k: string) => (k.toLowerCase() === "content-disposition" ? cd : null) },
+      body: null
+    }) as unknown as Response;
+
+  console.log("\n[cache] a resolved name is fetched once; a FAILURE stays retryable");
+  try {
+    __resetAttachmentNameCache();
+
+    // A names, B fails.
+    globalThis.fetch = (async (input: any) => {
+      calls++;
+      const u = String(typeof input === "string" ? input : input?.url ?? "");
+      return u.includes(ID_A) ? reply('attachment; filename="Section M.docx"') : reply(null, 404);
+    }) as typeof fetch;
+
+    const first = await resolveAttachmentNames([ID_A, ID_B]);
+    const callsAfterFirst = calls;
+    check("first pass names A", first[0].name, "Section M.docx");
+    check("first pass leaves B null", first[1].name, null);
+    check("first pass made 2 requests", callsAfterFirst, 2);
+
+    const second = await resolveAttachmentNames([ID_A, ID_B]);
+    check("second pass still names A", second[0].name, "Section M.docx");
+    // Exactly one more request: A served from cache, B retried.
+    check("A is cached — only B is re-fetched", calls - callsAfterFirst, 1);
+    check("a failed lookup is NOT cached (stays retryable)", second[1].name, null);
+
+    // Now let B succeed on retry — proves the failure really was retryable.
+    globalThis.fetch = (async () => { calls++; return reply('attachment; filename="Wage Determination.pdf"'); }) as typeof fetch;
+    const third = await resolveAttachmentNames([ID_A, ID_B]);
+    check("B resolves on a later attempt", third[1].name, "Wage Determination.pdf");
+    check("A still served from cache", third[0].name, "Section M.docx");
+  } finally {
+    globalThis.fetch = realFetch;
+    __resetAttachmentNameCache();
+  }
+}
+
+cacheChecks().then(() => {
+  console.log(failures === 0 ? "\nPASS — all checks green" : `\nFAIL — ${failures} check(s) red`);
+  process.exit(failures === 0 ? 0 : 1);
+});

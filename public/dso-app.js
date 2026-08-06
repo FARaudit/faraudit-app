@@ -567,9 +567,12 @@ function datesLine(o) {
 }
 
 
-/* How many attachments the panel lists before deferring to SAM.gov. It is also
-   how many names are requested, so raising it raises the per-open cost. */
-const ATT_SHOWN = 8;
+/* The panel lists EVERY attachment. This bounds only how many NAMES are looked
+   up — never what is shown: past it a link still renders and still works, it
+   just stays "Document N". The lookup needs no API key and consumes no SAM
+   quota, so this is a ceiling on latency, not on cost. Must stay within the
+   attachment-name module's own MAX_ATTACHMENT_IDS; the panel gate asserts it. */
+const ATT_NAMED = 40;
 
 /* resource_links are opaque download URLs; the 32-hex segment is the file id,
    which is all /api/notice-attachments needs to look a name up. Returns null on
@@ -595,18 +598,35 @@ function detailHTML(o) {
   }
   const pop = popText(o.place_of_performance);
   if (pop) rows.push(['Place of performance', esc(pop)]);
-  const n = Array.isArray(o.resource_links) ? o.resource_links.length : null;
-  if (n) {
-    rows.push(['Attachments', o.resource_links.slice(0, ATT_SHOWN).map(function (u, i) {
+  // EVERY attachment is listed, behind a disclosure. Two problems it solves at
+  // once: a 19-document notice pushed WHAT SAM SAYS off the screen, and the old
+  // cap ended in "+N more on SAM.gov" \u2014 sending the customer to another platform
+  // to read something we already had, when the wage determination or Section M is
+  // as likely to be number 14 as number 2. Collapsed, the row is one line no
+  // matter the count; open, the list scrolls inside a fixed height, so 6
+  // documents and 25 cost the panel exactly the same space.
+  //
+  // Only NAME RESOLUTION is bounded (ATT_NAMED). Past that a link still renders
+  // as "Document N" and still works \u2014 the bound is on work, never on content.
+  const links = Array.isArray(o.resource_links) ? o.resource_links : [];
+  if (links.length) {
+    const list = links.map(function (u, i) {
       const fid = fileIdFromLink(u);
-      // Renders "Document N" immediately and stays that way unless SAM hands
-      // back a real name; the id is carried so loadAttachmentNames can upgrade
-      // it in place. A link with no readable id is still a working link.
+      // Renders "Document N" immediately and stays that way unless SAM hands back
+      // a real name; the id is carried so loadAttachmentNames can upgrade it in
+      // place. A link with no readable id is still a working link.
       return '<a class="pd-att" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer"' +
-        (fid ? ' data-att-id="' + esc(fid) + '"' : '') +
-        '>Document ' + (i + 1) + '</a>';
-    }).join('') + (n > ATT_SHOWN ? '<span class="pd-att pd-att-more">+' + (n - ATT_SHOWN) + ' more on SAM.gov</span>' : '')]);
+        (fid && i < ATT_NAMED ? ' data-att-id="' + esc(fid) + '"' : '') +
+        '><span class="att-nm">Document ' + (i + 1) + '</span><span class="att-ext"></span></a>';
+    }).join('');
+    rows.push(['Attachments',
+      '<button type="button" class="att-tog" data-att-toggle aria-expanded="false">' +
+        '<span class="att-car">\u25b6</span>' +
+        '<span>' + esc(String(links.length)) + (links.length === 1 ? ' document' : ' documents') + '</span>' +
+      '</button>' +
+      '<div class="pd-atts">' + list + '</div>']);
   }
+
   if (!rows.length) return '';
   return '<div class="pc-detail">' + rows.map(function (r) {
     return '<div class="pd-row"><span class="pd-k">' + r[0] + '</span><span class="pd-v">' + r[1] + '</span></div>';
@@ -866,6 +886,21 @@ function bindDetailToggles() {
     b.textContent = open ? 'Hide details' : 'Details';
     if (open) { loadDescription(card); loadAttachmentNames(card); }
   });
+
+  /* The attachment disclosure. Same delegation, same reason — the list is rebuilt
+     on every render, so a handler bound to the button itself would not survive a
+     filter change. Names are already resolved by the time this opens (they load
+     with the panel), so expanding never shows a flash of "Document N". */
+  host.addEventListener('click', (e) => {
+    const t = e.target && e.target.closest ? e.target.closest('[data-att-toggle]') : null;
+    if (!t || !host.contains(t)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const box = t.parentNode ? t.parentNode.querySelector('.pd-atts') : null;
+    if (!box) return;
+    const open = box.classList.toggle('is-open');
+    t.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
 }
 
 /* The notice text. SAM's search returns a URL, not prose, so it is resolved per
@@ -918,7 +953,17 @@ function loadAttachmentNames(card) {
       Array.prototype.forEach.call(links, function (a) {
         const nm = byId[a.getAttribute('data-att-id')];
         if (!nm) return;
-        a.textContent = nm;
+        // The extension moves to its own muted slot: repeated down a list of 19
+        // it is noise, and every row ending in the same four characters is what
+        // made SAM's naming read as a wall. The full name stays in the title, so
+        // nothing is lost.
+        const dot = nm.lastIndexOf('.');
+        const hasExt = dot > 0 && dot > nm.length - 7;
+        const nameEl = a.querySelector('.att-nm');
+        const extEl = a.querySelector('.att-ext');
+        if (nameEl) nameEl.textContent = hasExt ? nm.slice(0, dot) : nm;
+        else a.textContent = nm;
+        if (extEl) extEl.textContent = hasExt ? nm.slice(dot + 1).toLowerCase() : '';
         a.setAttribute('title', nm);
         named++;
       });
