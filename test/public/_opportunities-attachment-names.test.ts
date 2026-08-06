@@ -57,6 +57,11 @@ class El {
   constructor(tag: string) { this.tagName = tag; }
   setAttribute(k: string, v: string) { this.attrs[k] = v; }
   getAttribute(k: string) { return Object.prototype.hasOwnProperty.call(this.attrs, k) ? this.attrs[k] : null; }
+  // Anchors in this shim carry no children, so the .att-nm / .att-ext lookup
+  // finds nothing and loadAttachmentNames falls back to setting textContent.
+  // That fallback is deliberate in the shipped code — it is what keeps the
+  // function working on a link that was rendered before the split existed.
+  querySelector(_sel: string): El | null { return null; }
   // The only selector used is 'a.pd-att[data-att-id]'.
   querySelectorAll(sel: string) {
     if (sel !== "a.pd-att[data-att-id]") throw new Error(`shim does not implement selector ${sel}`);
@@ -247,39 +252,71 @@ async function main() {
   ok(DSO.includes('class="pd-att"'), "detailHTML renders anchors with class pd-att");
   ok(DSO.includes("data-att-id"), "detailHTML carries data-att-id");
   ok(/loadAttachmentNames\(card\)/.test(DSO), "loadAttachmentNames is actually CALLED (not just defined)");
-  ok(/\.pd-att\{[^}]*display:block/.test(HTML), "opportunities.html styles .pd-att as a block");
-  ok(
-    /const ATT_SHOWN\s*=\s*\d+/.test(DSO),
-    "ATT_SHOWN is a named constant — it bounds both what is listed and what is requested"
-  );
-
-  // The list columnises. Without the wrapper the grid rule has nothing to apply
-  // to, and a 23-attachment notice silently goes back to 23 stacked rows —
-  // which looks fine in a diff and wrong on the screen.
+  ok(/\.pd-att\{[^}]*display:flex/.test(HTML), "opportunities.html lays each attachment row out as a flex row");
   ok(DSO.includes('class="pd-atts"'), "the attachment list is wrapped in .pd-atts");
-  ok(
-    /\.pd-atts\{[^}]*display:grid/.test(HTML) && /\.pd-atts\{[^}]*grid-template-columns:repeat\(3,\s*1fr\)/.test(HTML),
-    "opportunities.html lays .pd-atts out as THREE equal columns"
-  );
-  // Row-major flow is what makes 4 documents read as 3 + 1 rather than columns
-  // of uneven length. grid-auto-flow defaults to row; an explicit `column` here
-  // would silently reorder the list, so assert nothing set it.
-  ok(
-    !/\.pd-atts\{[^}]*grid-auto-flow:\s*column/.test(HTML),
-    "flow stays row-major — 4 documents fill row 1 then wrap to row 2, column 1"
-  );
+
+  // ── the disclosure ─────────────────────────────────────────────────────────
+  // Collapsed, the row is one line whatever the count. Open, the list scrolls
+  // inside a fixed height. Both halves matter: without the height cap a 25-doc
+  // notice just moves the wall one click away, which is the whole reason the
+  // flat list was rejected.
+  ok(DSO.includes("data-att-toggle"), "the attachment list sits behind a disclosure toggle");
+  ok(/\.pd-atts\{[^}]*display:none/.test(HTML), "the list is COLLAPSED by default");
+  ok(/\.pd-atts\.is-open\{display:block\}/.test(HTML), "opening it reveals the list");
+  const capMatch = HTML.match(/\.pd-atts\{[^}]*max-height:(\d+)px/);
+  ok(!!capMatch, "the open list has a bounded height");
+  ok(/\.pd-atts\{[^}]*overflow-y:auto/.test(HTML),
+    `the open list scrolls inside that height (${capMatch ? capMatch[1] + "px" : "unset"}) — 6 documents and 25 cost the same space`);
+  // A <button> with aria-expanded, not a clickable span: this is the one new
+  // control on the panel and it has to be reachable by keyboard.
+  ok(/<button type="button" class="att-tog" data-att-toggle aria-expanded="false">/.test(DSO),
+    "the toggle is a real button carrying aria-expanded");
+  ok(/t\.setAttribute\('aria-expanded'/.test(DSO), "aria-expanded is kept in sync when toggled");
+  // The count has to come from the links themselves. A hardcoded or stale number
+  // would misreport the package size on a decision screen.
+  ok(/links\.length \+ \(links\.length === 1 \? ' document' : ' documents'\)|esc\(String\(links\.length\)\)/.test(DSO),
+    "the collapsed label counts the actual links");
+  // Extension split out — repeated down 19 rows it is what made the list read as
+  // a wall. The full name must survive in the title attribute.
+  ok(DSO.includes('class="att-nm"') && DSO.includes('class="att-ext"'),
+    "filename and extension render in separate slots");
+  ok(/a\.setAttribute\('title', nm\)/.test(DSO),
+    "the FULL filename is preserved in the title, so splitting it loses nothing");
   // Names must wrap, not clip: a truncated filename is worse than no filename,
   // because it reads as authoritative while hiding which document it is.
+  // Scoped to the attachment rules only. The page legitimately ellipsises
+  // elsewhere (act-card titles, the collapsed sidebar), so a file-wide search
+  // condemns healthy CSS — the count-floor mistake in selector form.
+  const attCss = (HTML.match(/\.pd-att[^{]*\{[^}]*\}/g) || []).join(" ");
   ok(
-    !/\.pd-att\{[^}]*text-overflow:\s*ellipsis/.test(HTML) &&
-      /\.pd-att\{[^}]*overflow-wrap/.test(HTML),
+    attCss.length > 0 &&
+      !/text-overflow:\s*ellipsis/.test(attCss) &&
+      /overflow-wrap/.test(attCss),
     "long filenames wrap rather than being cut off"
   );
-  // The cap and the server ceiling have to stay compatible: asking for more than
-  // the route will answer would render "Document N" for the overflow forever.
-  const shown = Number(DSO.match(/const ATT_SHOWN\s*=\s*(\d+)/)?.[1] ?? 0);
+
+  // ── nothing is hidden behind a link to a competitor ───────────────────────
+  // The panel previously ended in "+N more on SAM.gov", which sent the customer
+  // off-platform to read something we already had. EVERY link must render; only
+  // NAME lookup is bounded.
+  // Checked against CODE, not comments. The comment explaining why the exit ramp
+  // was removed necessarily quotes it, and a naive source search would then go
+  // red forever — a gate that fails on its own documentation teaches people to
+  // delete the documentation.
+  const dsoCode = DSO.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  ok(!/more on SAM\.gov/i.test(dsoCode), "no '+N more on SAM.gov' exit ramp remains in code");
+  ok(
+    !/resource_links\.slice\(/.test(DSO),
+    "the attachment list is not sliced — every attachment renders"
+  );
+  const named = Number(DSO.match(/const ATT_NAMED\s*=\s*(\d+)/)?.[1] ?? 0);
   const SERVER_MAX = 40; // MAX_ATTACHMENT_IDS in src/lib/sam-attachment-names.ts
-  ok(shown > 0 && shown <= SERVER_MAX, `ATT_SHOWN (${shown}) is within the route's ceiling (${SERVER_MAX})`);
+  ok(named > 0 && named <= SERVER_MAX,
+    `ATT_NAMED (${named}) is within the route's ceiling (${SERVER_MAX})`);
+  // Past the naming ceiling a link must still render — as "Document N", unnamed
+  // but working. Losing that turns a bound on WORK into a bound on CONTENT.
+  ok(/i < ATT_NAMED/.test(DSO),
+    "ATT_NAMED gates only the data-att-id (the name lookup), never the link itself");
 
   // ═══ H · falsifiability ═══════════════════════════════════════════════════
   // A gate that cannot go red proves nothing. Plant the exact defect this gate
