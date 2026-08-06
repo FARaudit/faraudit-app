@@ -564,7 +564,7 @@
     // Gated by test/public/_rail-live-badge.test.ts Part K.
     var link = document.querySelector('.sb-step[href="/past-audits"], .sb-icon[href="/past-audits"], .sb-step[href="/dashboard"], .sb-icon[href="/dashboard"]');
     if (!link) return;
-    link.setAttribute("title", "Past Audits — " + open + " open (response deadline not yet passed) of " + total + " total");
+    link.setAttribute("title", "Decisions — " + open + " open (response deadline not yet passed) of " + total + " total");
     var el = link.querySelector(".sb-badge");
     if (!el) {
       // The served rail renders no pill when it has no real number — create it
@@ -579,7 +579,7 @@
     el.textContent = String(open);
     el.setAttribute("title", open + " open — response deadline not yet passed (of " + total + " total)");
     var tip = link.querySelector(".sb-tip");
-    if (tip) tip.textContent = "Past Audits · " + open + " open";
+    if (tip) tip.textContent = "Decisions · " + open + " open";
   }
 
   function writeAll() {

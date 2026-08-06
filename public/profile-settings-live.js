@@ -83,12 +83,22 @@
       if (window.PS_APP && typeof window.PS_APP.render === 'function') {
         window.PS_APP.render();
       }
+      setLivePill(true);
     } catch (e) {
       console.error('[profile-settings-live] wire failed:', e);
       document.body.classList.add('data-error');
+      setLivePill(false);
     } finally {
       document.body.classList.remove('is-loading');
     }
+  }
+
+  /* The green LIVE pill is a claim about THIS page's data, so only a settled fetch
+     may turn it on — it ships hidden and stays hidden when the profile could not be
+     loaded. Gated by test/public/_rail-live-badge.test.ts Part L. */
+  function setLivePill(on) {
+    const pill = document.getElementById('livePill');
+    if (pill) pill.hidden = !on;
   }
 
   /* SAVE — the person, and only the person.

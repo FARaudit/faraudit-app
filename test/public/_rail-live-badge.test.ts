@@ -429,27 +429,59 @@ console.log("\n── Part K · badge selectors resolve against the real rail �
 // `hidden` from measured load state.
 console.log("\n── Part L · the LIVE pill is driven, not decorative ──");
 {
-  const pillOf = (html: string) => (html.match(/<span class="live-pill"[^>]*>/) ?? [])[0] ?? "";
+  // Only a pill whose TEXT claims liveness is in scope. how-it-works.html reuses the
+  // .live-pill style for "Example" and "7 of 8" labels — honest text, no claim to drive.
+  // Matching the class alone made that page a false positive in this section's skip list.
+  const pillOf = (html: string) => (html.match(/<span class="live-pill"[^>]*>\s*LIVE\s*</i) ?? [])[0] ?? "";
   const hasId = (tag: string) => /\sid="[^"]+"/.test(tag);
-  // A writer must both address the pill and be able to turn it OFF.
-  const driverFor = (id: string) => {
-    for (const f of readdirSync(join(ROOT, "public")).filter((n) => n.endsWith(".js"))) {
-      const src = read(join("public", f));
-      if (src.includes(id) && /\.hidden\s*=|display\s*=\s*['"]none['"]|removeAttribute\(\s*['"]hidden/.test(src)) return f;
-    }
-    return "";
+  // A writer must both address the pill and be able to turn it OFF — and it must be a
+  // script THIS page loads. Scanning all of public/*.js let any other page's writer
+  // satisfy the check: breaking pipeline-live.js left this green because dashboard-live.js
+  // still matched. Scoped to the page's own <script src> list plus its inline scripts,
+  // which is where run-audit.html drives its pill.
+  const bodiesFor = (page: string) => {
+    const html = read(join("public", page));
+    const bodies = [...html.matchAll(/<script src="\/?([^"?]+\.js)"/g)]
+      .map((m) => { try { return read(join("public", m[1])); } catch { return ""; } });
+    // Inline scripts go in as SEPARATE blocks, never as one blob of the whole file: the
+    // page's own theme toggle contains `display='none'` and the markup contains the pill
+    // id, so a whole-file scan is satisfied by two unrelated lines. The id and the hide
+    // must appear in the SAME executable unit.
+    bodies.push(...[...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]));
+    return bodies;
   };
+  const CAN_HIDE = /\.hidden\s*=|display\s*=\s*['"]none['"]|removeAttribute\(\s*['"]hidden/;
+  // Proximity, not co-occurrence. run-audit.html ships ONE inline script holding the whole
+  // page: its theme toggle contains `display='none'` and its ledger code contains the pill
+  // id, so "both strings appear somewhere in this block" is satisfied by two unrelated
+  // lines. The hide must sit within reach of the pill reference that it acts on.
+  const NEAR = 300;
+  const driverFor = (id: string, page: string) =>
+    bodiesFor(page).some((b) => {
+      for (let i = b.indexOf(id); i !== -1; i = b.indexOf(id, i + 1)) {
+        if (CAN_HIDE.test(b.slice(Math.max(0, i - NEAR), i + NEAR))) return true;
+      }
+      return false;
+    });
 
   // COVERED — pages whose pill this suite holds to the contract.
   const COVERED = ["past-audits.html", "cmmc-readiness.html", "contracting-officers.html",
-    "defense-agencies.html", "gao-protests.html", "teaming-partners.html", "wage-benchmarks.html"];
+    "defense-agencies.html", "gao-protests.html", "teaming-partners.html", "wage-benchmarks.html",
+    "capability-statement.html", "defense-news.html", "pipeline.html", "profile-settings.html",
+    "run-audit.html", "today.html"];
+  // A page whose own content is STATIC carries no pill at all — a badge there could only
+  // ever assert liveness it has no fetch to back. acquisition-stages has no page fetch;
+  // naics ships its reference table as a hardcoded `var DATA=[…]`.
+  for (const page of ["acquisition-stages.html", "naics.html"]) {
+    check(`${page} · carries no LIVE pill (its content is static)`, pillOf(read(join("public", page))) === "", "a LIVE pill returned to a static page");
+  }
   for (const page of COVERED) {
     const tag = pillOf(read(join("public", page)));
     check(`${page} · pill exists to check`, tag.length > 0, "no live-pill found — this leg asserts nothing");
     check(`${page} · pill carries an id`, hasId(tag), tag);
     const id = (tag.match(/id="([^"]+)"/) ?? [])[1] ?? "";
     check(`${page} · pill ships hidden`, /\shidden/.test(tag), tag);
-    check(`${page} · a writer can turn #${id} off`, driverFor(id) !== "", `no served script sets hidden on #${id}`);
+    check(`${page} · a script IT loads can turn #${id} off`, driverFor(id, page), `no script this page loads sets hidden on #${id}`);
   }
 
   // NAMED SKIP — an absent check must SAY it is absent. These pages ship a live-pill with no
@@ -468,6 +500,18 @@ console.log("\n── Part L · the LIVE pill is driven, not decorative ──")
     !/\.hidden\s*=|display\s*=\s*['"]none['"]|removeAttribute\(\s*['"]hidden/.test(`var p=document.getElementById('livePill'); p.textContent='LIVE';`));
   check("L-P4 · ACCEPTS a writer bound to load state",
     /\.hidden\s*=/.test(`pill.hidden = !live;`));
+  // The two ways this section passed for the WRONG reason while being developed, now
+  // pinned so neither can come back: a whole-repo scan, and mere co-occurrence.
+  const near = (b: string, id: string) => {
+    for (let i = b.indexOf(id); i !== -1; i = b.indexOf(id, i + 1)) {
+      if (CAN_HIDE.test(b.slice(Math.max(0, i - NEAR), i + NEAR))) return true;
+    }
+    return false;
+  };
+  check("L-P5 · REJECTS a hide 1000 chars from the pill (co-occurrence is not ownership)",
+    !near(`sun.style.display='none';` + "x".repeat(1000) + `getElementById('livePill')`, "livePill"));
+  check("L-P6 · ACCEPTS a hide adjacent to the pill",
+    near(`var p = document.getElementById('livePill'); p.hidden = !on;`, "livePill"));
 }
 
 console.log(`\n${pass} passed · ${fail} failed`);

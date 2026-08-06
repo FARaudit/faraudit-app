@@ -58,12 +58,21 @@
       + '</article>';
   }
 
+  /* The green LIVE pill is a claim about THIS page's data, so only a settled fetch
+     may turn it on — it ships hidden and stays hidden on any failure or empty
+     result. Gated by test/public/_rail-live-badge.test.ts Part L. */
+  function setLivePill(on){
+    var pill = document.getElementById('livePill');
+    if(pill) pill.hidden = !on;
+  }
+
   function wirePipeline(){
     fetch('/api/pipeline')
       .then(function(r){ if(!r.ok) throw new Error('status ' + r.status); return r.json(); })
       .then(function(data){
         var cards = data.pipeline || [];
-        if(!cards.length){ console.warn('[pipeline-live] 0 cards returned'); return; }
+        if(!cards.length){ setLivePill(false); console.warn('[pipeline-live] 0 cards returned'); return; }
+        setLivePill(true);
 
         var grid = document.querySelector('.cards-grid');
         if(grid) grid.innerHTML = cards.map(buildCard).join('');
@@ -78,7 +87,7 @@
 
         console.log('[pipeline-live] rendered ' + cards.length + ' cards from /api/pipeline');
       })
-      .catch(function(e){ console.warn('[pipeline-live] failed:', e.message); });
+      .catch(function(e){ setLivePill(false); console.warn('[pipeline-live] failed:', e.message); });
   }
 
   if(document.readyState === 'loading'){
