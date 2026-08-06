@@ -83,7 +83,11 @@ export async function GET() {
       // customer can fix in place) from "codes on file, empty window" (a real
       // zero-result window). Identical as a row count; they must not render alike.
       fetchLiveOpportunitiesScoped(supabase).catch(() => null),
-      fetchRecentAudits(supabase, user.id, 200).catch(() => []),
+      // null (not []) on failure, matching the live feed and pipeline above.
+      // fetchRecentAudits THROWS on a Postgres error by design; catching it into
+      // [] re-introduced one layer up the exact swallow that queries.ts deleted
+      // from fetchKOs, where "no rows" and "the read failed" became one answer.
+      fetchRecentAudits(supabase, user.id, 200).catch(() => null),
       // Pipeline rows for the user — feeds Active Pursuits funnel, .ps-mid/.ps-right
       // aggregates, sidebar Pipeline danger badge, and since-bar pursuitsAdvanced.
       //
@@ -134,8 +138,13 @@ export async function GET() {
       return !isNaN(ms) && ms > nowMs && ms <= nowMs + dayMs;
     }).length;
 
-    const audits = (recentAudits as any[]) || [];
-    const newTraps = audits.filter((a) => {
+    // Same shape as the pipeline aggregates below: null means the read failed,
+    // and every count derived from it stays null rather than becoming a zero
+    // nobody measured.
+    const auditRows: any[] | null = (recentAudits as any[] | null);
+    const auditsAvailable = auditRows !== null;
+    const audits: any[] = auditRows ?? [];
+    const newTraps = !auditsAvailable ? null : audits.filter((a) => {
       const tsRaw = a.completed_at || a.created_at;
       const ts = tsRaw ? new Date(tsRaw).getTime() : NaN;
       if (isNaN(ts) || (nowMs - ts) > dayMs) return false;
@@ -229,8 +238,8 @@ export async function GET() {
     const ingestStatus = liveOpps ? "Live" : "Unavailable";
 
     // ── Quick Audit panel ──
-    const recentAudits4 = audits.slice(0, 4);
-    const auditsThisWeek = audits.filter((a) => {
+    const recentAudits4 = !auditsAvailable ? null : audits.slice(0, 4);
+    const auditsThisWeek = !auditsAvailable ? null : audits.filter((a) => {
       const ts = a.completed_at ? new Date(a.completed_at).getTime() : NaN;
       return !isNaN(ts) && (nowMs - ts) < weekMs;
     }).length;
@@ -250,7 +259,7 @@ export async function GET() {
       trapCount:        homeStats?.total_traps_caught   ?? counters.traps,
       deadlineSoon:     liveOpps ? deadlineSoon7d : (homeStats?.expiring_7d ?? 0),
       auditsThisMonth:  homeStats?.audit_activity_month ?? counters.audits,
-      auditTotal:       audits.length,
+      auditTotal:       auditsAvailable ? audits.length : null,
       // null = live fetch failed (client renders "unavailable", not "empty")
       opportunities:    liveOpps,
       // "no NAICS on file" is a profile the customer can fix in place; "empty
