@@ -120,13 +120,89 @@
   }
 
   function countsByStage(){
-    var c = {}; STAGES.forEach(function(s){ c[s] = { n:0, p0:0 }; });
+    var c = {}; STAGES.forEach(function(s){ c[s] = { n:0, p0:0, over:0, week:0, cliff:0 }; });
     STATE.rows.forEach(function(r){
       var s = stageOf(r); if(!s) return;
+      var d = daysOf(r);
       c[s].n++;
-      if(isP0(daysOf(r))) c[s].p0++;
+      if(isP0(d)) c[s].p0++;
+      if(d !== null && d < 0) c[s].over++;
+      if(isDueWeek(d)) c[s].week++;
+      if(d !== null && d >= 0 && d <= 3) c[s].cliff++;
     });
     return c;
+  }
+
+  // ── ground and ink ────────────────────────────────────────────
+  // A ramp cell can be near-white or near-navy, so ink is derived against the
+  // ground it actually lands on rather than declared once for all eight.
+  function hx(h){
+    var c = String(h).replace('#','').trim();
+    if(c.length === 3) c = c.split('').map(function(x){ return x + x; }).join('');
+    return [0,2,4].map(function(i){ return parseInt(c.substr(i,2),16); });
+  }
+  function lum(h){
+    var a = hx(h).map(function(v){ v /= 255; return v <= .03928 ? v/12.92 : Math.pow((v+.055)/1.055, 2.4); });
+    return .2126*a[0] + .7152*a[1] + .0722*a[2];
+  }
+  function ratio(a,b){ var l1 = lum(a), l2 = lum(b); return (Math.max(l1,l2)+.05)/(Math.min(l1,l2)+.05); }
+  function mix(a,b,t){
+    var pa = hx(a), pb = hx(b);
+    return '#' + [0,1,2].map(function(i){
+      return ('0' + Math.round(pa[i]*t + pb[i]*(1-t)).toString(16)).slice(-2);
+    }).join('');
+  }
+  function cssv(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+  function inkFor(bg){
+    var dark = '#0A1628', light = '#ffffff';
+    var rd = ratio(dark,bg), rl = ratio(light,bg), ink = rd >= rl ? dark : light;
+    // A SUBDUED INK IS NOT A FIXED ALPHA. rgba(navy,.62) clears 4.5 on white and
+    // lands at 1.80:1 on the accent — one token, two grounds, which is the defect.
+    // Step down from the ink and stop at the last value that still clears HERE.
+    var sub = ink, need = 4.5;
+    [.55,.65,.75,.85].some(function(t){
+      var c = mix(ink, bg, t);
+      if(ratio(c,bg) >= need){ sub = c; return true; }
+      return false;
+    });
+    // Alarm: the REDDEST declared tone that clears this ground — reddest first, not
+    // highest-contrast first. Picking by contrast selects the palest candidate on any
+    // mid or deep ground, so the "alarm" resolves to a near-white that is
+    // indistinguishable from ordinary ink, and because a near-white clears the
+    // threshold the fallback marker never fires either: an alarm that looks exactly
+    // like a calm clock, with nothing else to signal it. On most ramp steps NO red
+    // clears, and the honest answer is ink plus a marker — hue is never load-bearing.
+    var reds = ['#b91c1c','#dc2626','#fca5a5'], alarm = null;
+    reds.some(function(c){ if(ratio(c,bg) >= need){ alarm = c; return true; } return false; });
+    return { ink:ink, sub:sub, alarm: alarm || ink, mark: !alarm };
+  }
+
+  // Five clock kinds, not one countdown — a single uniform countdown would be a
+  // lie in six of the eight cells.
+  var CLOCK = { '01':'none','02':'hard','03':'hard','04':'internal',
+                '05':'cliff','06':'elapsed','07':'hard','08':'none' };
+  // Red means a clock that ran out, and only where the move is the reader's.
+  // Stuck is not red, because it is not your move.
+  var ACT = ['01','02','03','04','05'];
+
+  function clockLine(s, k){
+    if(k.n === 0) return { t:'none', hot:false };
+    var kind = CLOCK[s], out;
+    if(kind === 'cliff')         out = k.cliff ? { t:k.cliff + ' in 72h', hot:true } : { t:'none in 72h', hot:false };
+    else if(k.over)              out = { t:k.over + ' past due', hot:true };
+    else if(kind === 'hard')     out = k.week  ? { t:k.week + ' in window', hot:true } : { t:'none in window', hot:false };
+    else if(kind === 'internal') out = k.p0    ? { t:k.p0 + ' at P0', hot:false } : { t:'in production', hot:false };
+    // 06 Evaluation. "Elapsed, not remaining" needs a stage-entry timestamp, and the
+    // pipeline table records none — only due_date is on file. Deriving "34d out" from
+    // any column we DO have would be a fabricated duration, so the cell states what it
+    // knows. Never alarmed: time sitting with the government is not your failure.
+    else if(kind === 'elapsed')  out = { t:'with the government', hot:false };
+    else                         out = { t:'no clock', hot:false };
+    // Enforced here, not left to the data: an overdue row parked in 06/07/08 would
+    // otherwise alarm a stage whose move is not the operator's.
+    if(ACT.indexOf(s) < 0) out.hot = false;
+    return out;
   }
 
   function visibleRows(){
@@ -135,40 +211,91 @@
   }
 
   // ── writers ──────────────────────────────────────────────────────────────
+  // K1 SPLIT LEDGER. Two things you HAVE, a fence, two things that NEED you. A
+  // demand differs from an inventory count by border weight, label ink and figure
+  // colour — three channels, none load-bearing alone. And nothing is alarmed when
+  // there is nothing to do: at zero a demand drops back to a 1px line and loses
+  // --alarm, because a strip that looks urgent on an empty pipeline teaches the
+  // operator to ignore it.
+  function splitUnit(str){
+    var m = String(str).match(/^(.*?)([MK])$/);
+    return m ? { v:m[1], u:m[2] } : { v:String(str), u:'' };
+  }
+  function kbox(kind, lab, val, unit, foot, live){
+    var d = el('div','kpi');
+    d.dataset.kind = kind;
+    if(live) d.dataset.live = live;
+    var v = el('span','kval', val);
+    v.dataset.v = val;                       // what the figure claims, for measurement
+    if(unit) v.appendChild(el('span','u', unit));
+    var f = el('span','kfoot');
+    foot.forEach(function(part){
+      f.appendChild(typeof part === 'string' ? document.createTextNode(part) : part);
+    });
+    return put(d, el('span','klab', lab), v, f);
+  }
+  function khint(text, right){
+    return el('span','hint' + (right ? ' r' : ''), text);
+  }
+  function kfence(){ return put(el('span','fence'), el('i')); }
+
   function writeKPIs(){
-    var k = document.querySelectorAll('.kpi-strip .kpi');
-    function set(i, val, foot){
-      if(!k[i]) return;
-      var v = k[i].querySelector('.kpi-val'); if(v) v.textContent = val;
-      var f = k[i].querySelector('.foot');    if(f) f.textContent = foot;
-    }
-    // A failed request supports NO claim about the portfolio — not even zero.
+    var strip = document.getElementById('kstrip');
+    if(!strip) return;
+
+    // A failed request supports NO claim about the portfolio — not even zero, and
+    // certainly not a demand. Both demand cards go data-live="no" so the strip
+    // cannot look urgent about a portfolio it failed to read.
     if(STATE.loadError){
-      for(var i=0;i<4;i++) set(i, '—', 'could not load');
+      strip.replaceChildren(
+        khint('What you have'), khint('What needs you', true),
+        kbox('have','In flight','—','',['could not load']),
+        kbox('have','Pipeline value','—','',['could not load']),
+        kfence(),
+        kbox('need','P0 · action now','—','',['could not load'],'no'),
+        kbox('need','Due ≤ 7 days','—','',['could not load'],'no'));
       return;
     }
+
     var rows = STATE.rows;
     var occupied = STAGES.filter(function(s){
       return rows.some(function(r){ return stageOf(r) === s; });
     }).length;
-    set(0, String(rows.length),
-        'active pursuits across ' + occupied + ' stage' + (occupied === 1 ? '' : 's'));
-
-    // Sum only the ceilings actually on file, and SAY how many that was. A total
-    // of $0 over rows that simply have no ceiling recorded reads as "worth
-    // nothing", which is a claim the data does not make.
+    // Sum only the ceilings actually on file, and SAY how many that was. A total of
+    // $0 over rows that simply have no ceiling recorded reads as "worth nothing",
+    // which is a claim the data does not make — so absent renders as an em dash.
     var withVal = rows.filter(function(r){ return Number(r.estimated_value) > 0; });
-    var total = withVal.reduce(function(a,r){ return a + Number(r.estimated_value); }, 0);
-    set(1, withVal.length ? fmtValue(total) : '—',
-        withVal.length
-          ? 'stated ceiling · ' + withVal.length + ' of ' + rows.length + ' pursuits have one'
-          : (rows.length ? 'no ceiling recorded on any pursuit' : 'no pursuits yet'));
+    var total   = withVal.reduce(function(a,r){ return a + Number(r.estimated_value); }, 0);
+    var money   = withVal.length ? splitUnit(fmtValue(total)) : { v:'—', u:'' };
 
-    var days = rows.map(daysOf);
+    var days    = rows.map(daysOf);
+    var p0      = days.filter(isP0).length;
+    var week    = days.filter(isDueWeek).length;
     var overdue = days.filter(function(d){ return d !== null && d < 0; }).length;
-    set(2, String(days.filter(isP0).length),
-        overdue ? overdue + ' overdue · rest due within 2 days' : 'overdue or due within 2 days');
-    set(3, String(days.filter(isDueWeek).length), 'submissions closing within 7 days');
+
+    strip.replaceChildren(
+      khint('What you have'), khint('What needs you', true),
+
+      kbox('have','In flight', String(rows.length), '',
+        rows.length
+          ? ['active pursuits across ', el('b',null,occupied), ' stage' + (occupied === 1 ? '' : 's')]
+          : ['nothing ingested yet']),
+
+      kbox('have','Pipeline value', money.v, money.u,
+        withVal.length
+          ? ['stated ceiling · ', el('b',null,withVal.length), ' of ' + rows.length + ' pursuits have one']
+          : (rows.length ? ['no ceiling recorded on any pursuit'] : ['no pursuits yet'])),
+
+      kfence(),
+
+      kbox('need','P0 · action now', String(p0), '',
+        p0 ? (overdue ? ['critical — ', el('b',null,overdue + ' past due')] : ['critical, none past due'])
+           : ['nothing at P0'],
+        p0 > 0 ? 'yes' : 'no'),
+
+      kbox('need','Due ≤ 7 days', String(week), '',
+        week ? ['closing this week'] : ['nothing closing this week'],
+        week > 0 ? 'yes' : 'no'));
   }
 
   function buildRail(){
@@ -176,21 +303,37 @@
     if(!rail) return;
     if(STATE.loadError){ rail.replaceChildren(); return; }
     var c = countsByStage();
-    var max = Math.max.apply(null, STAGES.map(function(s){ return c[s].n; }).concat([1]));
-    var cells = STAGES.map(function(s){
-      var n = c[s].n, empty = n === 0;
-      var b = el('button','stage-cell' + (STATE.stage === s ? ' active' : '') + (empty ? ' empty' : ''));
+    var muted = cssv('--mute') || '#64748b';
+    var cells = STAGES.map(function(s, i){
+      var k = c[s], n = k.n, empty = n === 0;
+      // The ramp is read from the CSS custom properties, so it follows the field:
+      // deeper toward award on white, brighter toward award on navy.
+      var bg = cssv('--ramp-' + (i+1)) || '#ffffff';
+      var tone = inkFor(bg);
+      var ink = empty ? muted : tone.ink;
+      var sub = empty ? muted : tone.sub;
+      var cl  = clockLine(s, k);
+      var hot = cl.hot && !empty;
+
+      var b = el('button','cell' + (empty ? ' is-empty' : '') +
+                          (STATE.stage === s && !empty ? ' is-active' : ''));
       b.type = 'button';
       b.dataset.stage = s;
       if(empty) b.disabled = true;
-      var bottom = el('span','stage-bottom');
-      var vol = el('span','vol');
-      var bar = el('i');
-      bar.style.height = (empty ? 6 : Math.max(8, Math.round(n / max * 28))) + 'px';
-      put(vol, bar);
-      put(bottom, el('span','stage-num-big', n), vol);
-      put(b, el('span','stage-num', s), el('span','stage-name', STAGE_LABELS[s]), bottom);
-      if(c[s].p0 > 0) b.appendChild(el('span','stage-p0', c[s].p0 + ' P0'));
+      // An empty cell is STRUCTURALLY empty: no ramp fill at all, just the 1px inset
+      // outline from CSS. It is not a ramp step, so it does not paint one.
+      if(!empty) b.style.background = bg;
+      b.style.color = ink;
+
+      var num = el('span','snum', s);
+      num.style.color = sub;
+      var top = put(el('span','top'), num, el('span','scount', n));
+
+      var clock = el('span','sclock', (hot && tone.mark ? '▸ ' : '') + cl.t);
+      clock.style.color = hot ? tone.alarm : sub;
+      var foot = put(el('span'), el('span','sname', STAGE_LABELS[s]), clock);
+
+      put(b, top, foot);
       // Bound here, on the node that exists NOW. buildRail() replaces this subtree
       // on every render, so a listener attached elsewhere would be silently dropped.
       if(!empty) b.addEventListener('click', function(){
@@ -293,9 +436,23 @@
     setLivePill(!STATE.loadError && STATE.rows.length > 0);
   }
 
+  // The rail's grounds and every ink derived from them are computed AT RENDER from
+  // the live custom properties, so a theme flip after first paint would otherwise
+  // leave the light-field ramp painted on a navy card. Watch the attribute the
+  // toggle actually writes rather than reaching into that script.
+  function watchField(){
+    if(typeof MutationObserver !== 'function') return;
+    var last = document.documentElement.getAttribute('data-theme');
+    new MutationObserver(function(){
+      var now = document.documentElement.getAttribute('data-theme');
+      if(now !== last){ last = now; render(); }
+    }).observe(document.documentElement, { attributes:true, attributeFilter:['data-theme'] });
+  }
+
   function wirePipeline(){
     var b = document.getElementById('allBtn');
     if(b) b.addEventListener('click', function(){ STATE.stage = null; render(); });
+    watchField();
 
     fetch('/api/pipeline', { credentials: 'include' })
       .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
