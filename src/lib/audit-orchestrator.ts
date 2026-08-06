@@ -12,7 +12,7 @@
 //
 // callModel + verify are INJECTED → the whole cycle is unit-testable with stubs ($0). The real run is PAID.
 
-import { runAgenticExpert, isGrounded, type CallModel, type ExpertSpec } from "./audit-expert";
+import { runAgenticExpert, settleLensRuns, isGrounded, type CallModel, type ExpertSpec } from "./audit-expert";
 import { readSection, sectionFullText, procurementPart, requiresProposalSections, materializeSections, parseDocRegions, resolvePrimary, normalizeForSearch, phrasePresentInNormalized, ATTACHMENT_COVERAGE_ENABLED, lensDiscoveryEnabled, type AuditToolContext } from "./audit-tools";
 import { constructionRequired, constructionCoreMissing, constructionCoverage } from "./audit-construction-manifest";
 import { recomputeGrounding } from "./audit-grounding-recompute";
@@ -2532,7 +2532,16 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     allConverged = true;
   } else {
     const _tExp = Date.now();
-    const runs = await Promise.all(experts.map((spec) => runAgenticExpert(spec, ctx, { callModel, maxTurns, signal })));
+    // FAN-OUT DEGRADATION. `Promise.all` rejected on the FIRST rejection, so one lens failing threw away four
+    // completed lenses and the whole PAID run. `settleLensRuns` keeps what succeeded and still THROWS on the two
+    // cases that must stay fatal — an aborted signal (budget breach) and a total wipeout. See its header.
+    const _settled = await Promise.allSettled(experts.map((spec) => runAgenticExpert(spec, ctx, { callModel, maxTurns, signal })));
+    const { runs, failed: _lensFailed } = settleLensRuns(_settled, experts.map((s) => s.key), { aborted: !!signal?.aborted });
+    // NAMED, never a count: which lens degraded and why is the whole diagnostic value. A bare "4/5 succeeded"
+    // cannot tell an unsupported-parameter 400 from a transient 5xx, and those want opposite responses.
+    if (_lensFailed.length > 0) {
+      console.warn(`[expert] DEGRADED — ${_lensFailed.length} of ${experts.length} lens(es) failed and contributed NOTHING (coverage counts them unread ⇒ the package falls toward INCOMPLETE): ${_lensFailed.map((f) => `${f.key}: ${f.reason}`).join(" · ")}`);
+    }
     console.log(`[timing] expert-phase ${Date.now() - _tExp}ms · turns/lens ${experts.map((s, i) => `${s.key}:${runs[i].turns}`).join(" ")} · docsRead=${runs.reduce((n, r) => n + r.docsRead.length, 0)}`);
     // GROUNDING-BACKSTOP TELEMETRY (verdict-inert). runAgenticExpert has always returned `dropped`; until now
     // NOTHING read it, so findings deleted by the grounding backstop left no trace anywhere — no log, no field,
