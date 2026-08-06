@@ -32,6 +32,9 @@ export interface StructuredCallOpts {
    *  the prefix is under the model minimum (~1024 tok Sonnet / 2048 Haiku), so passing
    *  a short prefix is safe — it just isn't cached. */
   cachedSystemPrefix?: string;
+  /** Omit the cache_control breakpoint on the prefix while still SENDING it. For a prefix that is unique
+   *  per call (no possible second reader) a breakpoint is a pure 25% surcharge. Defaults true. */
+  cachePrefix?: boolean;
   /** Per-run usage tally (concurrency-safe — each audit owns its own callback). Emitted alongside the legacy
    *  global sink. Best-effort: a throw here never affects the call result. */
   onUsage?: (u: StructuredUsage) => void;
@@ -95,13 +98,19 @@ export async function callStructuredClaude(opts: StructuredCallOpts): Promise<St
   const schema = sanitizeSchema(opts.schema);
   const timeoutMs = opts.timeoutMs ?? (Number(process.env.CLAUDE_TIMEOUT_MS) || 240000);
   const label = opts.label ?? "structured call";
-  // When a cached prefix is supplied, send `system` as a two-block array: the shared
-  // prefix FIRST with a cache_control breakpoint (the first call writes the cache, the
-  // rest read it), then the per-call role block uncached. Otherwise send the plain
-  // string. cache_control is GA — no extra beta header needed.
+  // When a prefix is supplied, send `system` as a two-block array: the prefix FIRST, then the per-call role
+  // block. cache_control is GA — no extra beta header needed.
+  //
+  // `cachePrefix: false` keeps the two-block shape AND the prefix content but omits the breakpoint. That
+  // distinction is the whole point: the prefix is how a caller delivers its assigned source, so deleting the
+  // field to stop caching would BLIND the model rather than just stop billing it. cache_control is metadata,
+  // never content — the prompt the model reads is byte-identical either way; only the price of those input
+  // tokens changes (1.25× write vs 1.0× plain). Use it when the prefix is unique per call and therefore has no
+  // possible second reader, where a breakpoint is a pure 25% surcharge. Defaults TRUE ⇒ existing callers unchanged.
+  const cachePrefix = opts.cachePrefix !== false;
   const systemField = opts.cachedSystemPrefix
     ? [
-        { type: "text", text: opts.cachedSystemPrefix, cache_control: { type: "ephemeral" } },
+        { type: "text", text: opts.cachedSystemPrefix, ...(cachePrefix ? { cache_control: { type: "ephemeral" } } : {}) },
         { type: "text", text: system },
       ]
     : system;
