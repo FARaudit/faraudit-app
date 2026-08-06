@@ -45,6 +45,21 @@ console.log("── the document invents nothing ──");
   check("no invented contract values", !/\$18\.4M|\$24\.6M|\$7\.9M/.test(html), "a fabricated award value is still on the page");
   check("no invented contact details", !/contracts@faraudit-defense\.com|\(703\) 555-0142/.test(html), "a fabricated contact is still on the page");
   check("no hardcoded completeness figure", !/>82%<|>82</.test(html), "the health ring asserts a number nothing computed");
+
+  // THE TEXT WAS ONLY HALF OF IT. The number came out of the markup while the ARC
+  // stayed frozen at stroke-dashoffset="33.9" — 82% of a 188.5 circumference — so a
+  // record at 42% drew a ring at 82%, and the ring is what is seen first. Geometry is
+  // a claim too, and this gate read only the words.
+  const ring = (html.match(/<circle[^>]*class="health-ring-fg"[^>]*>/) ?? [""])[0];
+  check("the completeness ring is identifiable", ring.length > 0,
+    "no .health-ring-fg circle — the arc cannot be checked");
+  const dash = parseFloat((ring.match(/stroke-dasharray="([\d.]+)"/) ?? ["", "0"])[1]);
+  const off = parseFloat((ring.match(/stroke-dashoffset="([\d.]+)"/) ?? ["", "-1"])[1]);
+  check("the ring ships EMPTY, not at some pre-drawn fraction", dash > 0 && off === dash,
+    `dasharray=${dash} dashoffset=${off} — an arc drawn before any record was read`);
+  check("a script sets the ring from the counted percentage",
+    /health-ring-fg/.test(live) && /stroke-dashoffset/.test(live),
+    "nothing computes the arc, so it can only ever show what the markup drew");
   check("no version stamp with no source", !/v1\.0 · auto-synced|v1\.0 · generated today|11:42 AM CT/.test(html), "a generated-at claim with nothing behind it");
 }
 
