@@ -382,5 +382,93 @@ console.log("\n── Part I · no page forks the field colour ──");
   check("I-P2 · accepts two pages on the same field colour", !distinct("--page-bg:#eef2f7", "--page-bg:#eef2f7"));
 }
 
+// ── Part K · a badge writer's SELECTOR must match the rail it writes into ──────────────────
+// Written RED 2026-08-06. Part A proved the rail ships no badge and Part B proved the setter
+// has a non-live branch — both true, both passing, while BOTH writers were dead on arrival:
+// they queried `.sb-icon[href="…"]`, and rail.ts row() renders WORKFLOW rows as `.sb-step`.
+// The selector matched nothing on every route, so `if (!link) return` fired every time and no
+// badge — live, "Feed down", or the Past Audits open-count — has ever rendered. Asserting on
+// the setter's SOURCE could not see this; only resolving the selector against real rail
+// markup can. This is the check that had to exist.
+console.log("\n── Part K · badge selectors resolve against the real rail ──");
+{
+  const railHtml = renderRail("opportunities") + renderRail("past-audits");
+  // rail.ts row(): `<a class="sb-step on" href="/x">` — class attribute precedes href.
+  const matchesRail = (selector: string, html: string) =>
+    selector.split(",").some((alt) => {
+      const m = alt.trim().match(/^\.([\w-]+)\[href="([^"]+)"\]$/);
+      if (!m) return false;
+      const [, cls, href] = m;
+      return new RegExp(`<a class="[^"]*\\b${cls}\\b[^"]*" href="${href.replace(/\//g, "\\/")}"`).test(html);
+    });
+  // Pull the literal each writer actually passes to querySelector.
+  const selectorIn = (src: string) => (src.match(/querySelector\(\s*'([^']*\[href=[^']*)'/) ?? [])[1] ?? "";
+
+  const badgeSel = selectorIn(read("public/rail-live-badge.js"));
+  check("rail-live-badge.js · a querySelector literal was found to test", badgeSel.length > 0, "selector not located — this gate would assert nothing");
+  check("rail-live-badge.js · its selector matches a real rail row", matchesRail(badgeSel, railHtml), badgeSel);
+
+  const dashSel = selectorIn(read("public/dashboard-live.js"));
+  check("dashboard-live.js · a querySelector literal was found to test", dashSel.length > 0, "selector not located — this gate would assert nothing");
+  check("dashboard-live.js · its selector matches a real rail row", matchesRail(dashSel, railHtml), dashSel);
+
+  // Planted positives — the check must be able to go RED on the exact defect it was written for.
+  check("K-P1 · REJECTS the shipped-and-dead `.sb-icon[href=\"/opportunities\"]`", !matchesRail('.sb-icon[href="/opportunities"]', railHtml));
+  check("K-P2 · REJECTS the shipped-and-dead `.sb-icon[href=\"/past-audits\"]`", !matchesRail('.sb-icon[href="/past-audits"]', railHtml));
+  check("K-P3 · ACCEPTS the corrected `.sb-step[href=\"/opportunities\"]`", matchesRail('.sb-step[href="/opportunities"]', railHtml));
+  // A section row genuinely IS .sb-icon — the check must not simply reject that class.
+  check("K-P4 · ACCEPTS `.sb-icon[href=\"/cmmc\"]`, a real section row", matchesRail('.sb-icon[href="/cmmc"]', railHtml));
+  check("K-P5 · REJECTS a route the rail does not carry", !matchesRail('.sb-step[href="/not-a-route"]', railHtml));
+}
+
+// ── Part L · a LIVE pill must be DRIVEN, not decorative ───────────────────────────────────
+// Part G guards the CSS: `.live-pill[hidden]` exists, so a pill CAN be hidden. Nothing
+// proved any pill IS hidden by anything. A page shipping `<span class="live-pill">LIVE</span>`
+// with no id passes Part G perfectly and still paints a pulsing green "LIVE" over a failed
+// load. The property that matters is ownership: an id to address, and a writer that sets
+// `hidden` from measured load state.
+console.log("\n── Part L · the LIVE pill is driven, not decorative ──");
+{
+  const pillOf = (html: string) => (html.match(/<span class="live-pill"[^>]*>/) ?? [])[0] ?? "";
+  const hasId = (tag: string) => /\sid="[^"]+"/.test(tag);
+  // A writer must both address the pill and be able to turn it OFF.
+  const driverFor = (id: string) => {
+    for (const f of readdirSync(join(ROOT, "public")).filter((n) => n.endsWith(".js"))) {
+      const src = read(join("public", f));
+      if (src.includes(id) && /\.hidden\s*=|display\s*=\s*['"]none['"]|removeAttribute\(\s*['"]hidden/.test(src)) return f;
+    }
+    return "";
+  };
+
+  // COVERED — pages whose pill this suite holds to the contract.
+  const COVERED = ["past-audits.html", "cmmc-readiness.html", "contracting-officers.html",
+    "defense-agencies.html", "gao-protests.html", "teaming-partners.html", "wage-benchmarks.html"];
+  for (const page of COVERED) {
+    const tag = pillOf(read(join("public", page)));
+    check(`${page} · pill exists to check`, tag.length > 0, "no live-pill found — this leg asserts nothing");
+    check(`${page} · pill carries an id`, hasId(tag), tag);
+    const id = (tag.match(/id="([^"]+)"/) ?? [])[1] ?? "";
+    check(`${page} · pill ships hidden`, /\shidden/.test(tag), tag);
+    check(`${page} · a writer can turn #${id} off`, driverFor(id) !== "", `no served script sets hidden on #${id}`);
+  }
+
+  // NAMED SKIP — an absent check must SAY it is absent. These pages ship a live-pill with no
+  // id and therefore no writer: the badge is permanently on. Listed, not silently excluded,
+  // so this section can never read as "every pill is honest".
+  const UNCOVERED = readdirSync(join(ROOT, "public"))
+    .filter((n) => n.endsWith(".html"))
+    .filter((n) => { const t = pillOf(read(join("public", n))); return t.length > 0 && !hasId(t); });
+  console.log(`   ⚠ NAMED SKIP · ${UNCOVERED.length} page(s) ship an undriven live-pill: ${UNCOVERED.join(", ") || "none"}`);
+  check("the uncovered set is enumerated, not assumed empty", Array.isArray(UNCOVERED), "skip list not computed");
+
+  // Planted positives — the contract check must go RED on the exact shipped defect.
+  check("L-P1 · REJECTS the static pill past-audits shipped", !hasId(`<span class="live-pill">`));
+  check("L-P2 · ACCEPTS a pill with an id", hasId(`<span class="live-pill" id="livePill" hidden>`));
+  check("L-P3 · REJECTS a writer that can never turn the pill off",
+    !/\.hidden\s*=|display\s*=\s*['"]none['"]|removeAttribute\(\s*['"]hidden/.test(`var p=document.getElementById('livePill'); p.textContent='LIVE';`));
+  check("L-P4 · ACCEPTS a writer bound to load state",
+    /\.hidden\s*=/.test(`pill.hidden = !live;`));
+}
+
 console.log(`\n${pass} passed · ${fail} failed`);
 if (fail > 0) process.exit(1);

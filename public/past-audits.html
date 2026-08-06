@@ -150,8 +150,6 @@ button{font-family:inherit}
 [data-theme="dark"] .pole.is-active .pl,[data-theme="dark"] .pole.is-active .pn{color:var(--accent-light)}
 .pole[data-empty="1"] .pl,.pole[data-empty="1"] .pn{color:var(--mute-2)}
 .pole[data-seg="inflight"]{border-left:3px solid var(--line)}
-.railnote{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute);letter-spacing:.02em}
-.railnote b{color:var(--ink-2);font-weight:700}
 .pd{width:9px;height:9px;border-radius:2px;flex:none;background:var(--mute-2)}
 .pd.bid{background:var(--green-500)}
 .pd.caution{background:var(--amber-600)}
@@ -187,8 +185,6 @@ tr[data-pole="inflight"] .cell-id::before,tr[data-pole="failed"] .cell-id::befor
 .kpi .agg .t{display:inline-flex;align-items:center;gap:5px;color:var(--ink-2);font-weight:700}
 .kpi .agg .op{color:var(--mute-2)}
 .kpi .agg .den{color:var(--mute)}
-.integ{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute);line-height:1.6;padding:12px 22px;border-top:1px solid var(--line);background:var(--card-soft)}
-.integ b{color:var(--ink-2);font-weight:700}
 .pa-filterbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 12px}
 .pa-slicer{position:relative;display:inline-flex;align-items:center;height:34px;padding:0 30px 0 12px;border:1px solid var(--line);border-radius:9px;background:var(--card-soft);transition:border-color .14s,background .14s,box-shadow .14s}
 .pa-slicer:hover{border-color:var(--mute-2)}
@@ -371,7 +367,7 @@ tr.hidden{display:none}
   <main class="main">
     <div class="topbar">
       <div class="crumbs"><b>Past Audits</b><span class="sep">/</span><span>Bid Decision Ledger</span></div>
-      <span class="live-pill">LIVE</span>
+      <span class="live-pill" id="livePill" hidden>LIVE</span>
       <div class="search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
         <span>Search audits, notice IDs, NAICS…</span>
@@ -478,7 +474,7 @@ tr.hidden{display:none}
           </label>
           <button class="pa-filter-clear" id="paClear" type="button" hidden>Clear</button>
         </div>
-        <div class="railnote" id="railNote"></div></div>
+        </div>
 
         <div class="table-wrap">
           <table class="dash" id="ledgerTable">
@@ -498,7 +494,6 @@ tr.hidden{display:none}
             <tbody id="ledgerBody"></tbody>
           </table>
         </div>
-        <div class="integ" id="integ"></div>
       </section>
     </div>
   </main>

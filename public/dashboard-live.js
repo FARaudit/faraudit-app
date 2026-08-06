@@ -158,6 +158,22 @@
     { k: "inflight", label: "In flight" }, { k: "failed", label: "Run failed" }
   ];
   var SL = {}; SEG.forEach(function (s) { SL[s.k] = s.label; });
+
+  // Set-aside decode: show the SAM display name, filter on the raw value. Module
+  // scope so the slicer and the filter readout name a set-aside identically —
+  // one decode, two surfaces.
+  var SETASIDE_LABELS = { SBA: "Small Business", "8A": "8(a)", "8AN": "8(a)", HZC: "HUBZone", HZS: "HUBZone", SDVOSBC: "SDVOSB", SDVOSBS: "SDVOSB", WOSBC: "WOSB", WOSBSS: "WOSB", EDWOSBC: "EDWOSB", EDWOSBSS: "EDWOSB", VOSBC: "VOSB", VOSBS: "VOSB" };
+  function setAsideLabel(v) { if (v == null || v === "—" || v === "" || v === "NONE" || v === "None" || v === "none") return "—"; return SETASIDE_LABELS[v] || v; }
+  // The ledger renders an absent field as "—". An absence is still a value the
+  // slicer must be able to name, or those rows are reachable from "All" and from
+  // nothing else.
+  var BLANK = "—", BLANK_LABEL = "— none on file";
+  // Time is a ROLLING window, not a calendar period: "Last year" means the last
+  // 365 days. On a young account the longer windows select everything, so each
+  // option carries its own count and the readout names the window.
+  var TIME_HOURS = { "30": 720, quarter: 2160, year: 8760 };
+  var TIME_LABELS = { "30": "last 30 days", quarter: "last quarter", year: "last year" };
+  var TIME_OPTION_TEXT = { "30": "Last 30 days", quarter: "Last quarter", year: "Last year" };
   var RECMAP = { "Bid": "bid", "Bid \u00b7 caution": "caution", "No-bid": "nobid", "Ineligible": "inelig", "Needs review": "review", "Incomplete": "incomplete" };
   function segOf(rec, status) {
     if (rec && RECMAP[rec]) return RECMAP[rec];
@@ -254,8 +270,8 @@
   function rowMatchesBar(a) {
     var f = STATE.f;
     if (f.time !== "all") {
-      var maxH = f.time === "30" ? 720 : (f.time === "quarter" ? 2160 : 8760);
-      if (!(a.age <= maxH)) return false;
+      var maxH = TIME_HOURS[f.time];
+      if (maxH != null && !(a.age <= maxH)) return false;
     }
     if (f.window !== "all" && a._w !== f.window) return false;
     if (f.agency !== "all" && a.agency !== f.agency) return false;
@@ -357,20 +373,43 @@
   }
 
   // R6 — the filter description lands in the EXISTING readout; no second count.
+  // EVERY constraining slicer names itself here. This readout is the only
+  // place that says WHY the ledger shows fewer rows than it holds, so a slicer
+  // missing from this list is a constraint the customer cannot see.
   function describeFilters() {
     var bits = [];
     if (STATE.seg !== "all") bits.push(SL[STATE.seg]);
+    if (STATE.f.time !== "all") bits.push(TIME_LABELS[STATE.f.time] || STATE.f.time);
     if (STATE.f.window !== "all") bits.push({ open: "still open", passed: "window passed", none: "no due date" }[STATE.f.window]);
-    ["agency", "type", "naics", "setAside"].forEach(function (k) { if (STATE.f[k] !== "all") bits.push(STATE.f[k]); });
+    ["agency", "type", "naics", "setAside"].forEach(function (k) {
+      var v = STATE.f[k];
+      if (v === "all") return;
+      // Name it the way the dropdown names it: one filter, one word.
+      bits.push(v === BLANK ? BLANK_LABEL : (k === "setAside" ? setAsideLabel(v) : v));
+    });
     if (STATE.search) bits.push('"' + STATE.search + '"');
     return bits;
   }
 
+  // The green LIVE pill asserts the ledger is showing live data, so it may render
+  // ONLY when a request actually answered. Never a static span: a pill that cannot
+  // go dark would keep pulsing green over the failure state where the KPIs read
+  // "\u2014". Same #livePill contract the other live pages honour.
+  function writeLivePill() {
+    var pill = document.getElementById("livePill");
+    if (!pill) return;
+    var live = !STATE.loadError && STATE.rows.length > 0;
+    pill.hidden = !live;
+    pill.setAttribute("title", live
+      ? "Loaded live from your audit history \u00b7 " + STATE.rows.length + " record" + (STATE.rows.length === 1 ? "" : "s")
+      : "");
+  }
+
   // Self-checks C1–C5 — computed on every render so a broken port reports itself.
+  // Reported to the CONSOLE, never into the page: check tallies and pixel widths
+  // are engineering instrumentation and belong where engineering looks.
   function writeSelfCheck(visible) {
-    var el = document.getElementById("integ");
-    if (!el) return;
-    if (STATE.loadError) { el.innerHTML = "Self-check suspended \u2014 audits could not be loaded."; return; }
+    if (STATE.loadError) { console.log("[dashboard-live] self-check suspended \u2014 audits could not be loaded"); return; }
     var rows = STATE.rows.filter(function (a) { return rowMatchesSearch(a) && rowMatchesBar(a); });
     var c = segCounts(rows);
     var railSum = SEG.reduce(function (a, g) { return a + c[g.k]; }, 0);
@@ -406,9 +445,12 @@
     var c5 = flagged === pv;
     var checks = [c1, c2, c3, c4, c5];
     var pass = checks.filter(Boolean).length;
-    el.innerHTML = "Self-check \u00b7 <b>" + pass + " of " + checks.length + "</b> computed checks pass"
-      + (pass < checks.length ? ' \u00b7 <b style="color:var(--red-600)">' + (checks.length - pass) + " FAIL</b>" : "")
-      + " \u2014 rail sums to the ledger count (" + railSum + "=" + rows.length + "), every row in exactly one segment, nothing clipped, active states are tints not fills, every passed deadline flagged (" + flagged + "/" + pv + ").";
+    var line = "[dashboard-live] self-check " + pass + "/" + checks.length + " pass"
+      + " \u2014 rail sums to the ledger count (" + railSum + "=" + rows.length + "), every row in exactly one segment,"
+      + " nothing clipped, active states are tints not fills, every passed deadline flagged (" + flagged + "/" + pv + ").";
+    // A failing self-check is a defect, not a footnote \u2014 raise it at error level.
+    if (pass < checks.length) console.error(line + " " + (checks.length - pass) + " FAIL", { c1: c1, c2: c2, c3: c3, c4: c4, c5: c5 });
+    else console.log(line);
   }
 
   function writeKPIs() {
@@ -481,16 +523,13 @@
     });
     // R3 — the band prints its own measured width + one-row threshold so a wrapped
     // rail is never mistaken for a defect.
-    var rn = document.getElementById("railNote");
-    if (rn) {
-      var wrap0 = rail.style.flexWrap; rail.style.flexWrap = "nowrap";
-      var natural = rail.scrollWidth; rail.style.flexWrap = wrap0;
-      var railRows = Math.max(1, Math.round(rail.getBoundingClientRect().height / 39));
-      var tbl = document.querySelector("table.dash"), twrap = document.querySelector(".table-wrap");
-      rn.innerHTML = "Control band <b>" + rail.clientWidth + "px</b> \u00b7 one row at <b>\u2265" + natural + "px</b> \u00b7 "
-        + (railRows === 1 ? "<b>one row</b> here" : "<b>" + railRows + " rows</b> here \u2014 the band is narrower than the rail needs, nothing is hidden")
-        + (tbl && twrap ? " \u00b7 table needs <b>" + tbl.scrollWidth + "px</b>, has <b>" + twrap.clientWidth + "px</b>" : "");
-    }
+    var wrap0 = rail.style.flexWrap; rail.style.flexWrap = "nowrap";
+    var natural = rail.scrollWidth; rail.style.flexWrap = wrap0;
+    var railRows = Math.max(1, Math.round(rail.getBoundingClientRect().height / 39));
+    var tbl = document.querySelector("table.dash"), twrap = document.querySelector(".table-wrap");
+    console.log("[dashboard-live] control band " + rail.clientWidth + "px \u00b7 one row at \u2265" + natural + "px \u00b7 "
+      + railRows + " row(s) here"
+      + (tbl && twrap ? " \u00b7 table needs " + tbl.scrollWidth + "px, has " + twrap.clientWidth + "px" : ""));
   }
 
   function writeHeaderSub() {
@@ -519,7 +558,11 @@
     if (STATE.loadError) return; // markup ships an empty badge — leave it empty, never "0"
     var open = STATE.rows.filter(function (r) { return r.dueTs !== Infinity && r.dueTs > Date.now(); }).length;
     var total = STATE.rows.length;
-    var link = document.querySelector('.sb-icon[href="/past-audits"], .sb-icon[href="/dashboard"]');
+    // The rail renders WORKFLOW rows (Opportunities · Audit · Decisions · Pipeline)
+    // as .sb-step and collapsible-section rows as .sb-icon (rail.ts row()). Match
+    // both classes, or this returns at the next line and no badge renders.
+    // Gated by test/public/_rail-live-badge.test.ts Part K.
+    var link = document.querySelector('.sb-step[href="/past-audits"], .sb-icon[href="/past-audits"], .sb-step[href="/dashboard"], .sb-icon[href="/dashboard"]');
     if (!link) return;
     link.setAttribute("title", "Past Audits — " + open + " open (response deadline not yet passed) of " + total + " total");
     var el = link.querySelector(".sb-badge");
@@ -541,6 +584,7 @@
 
   function writeAll() {
     populateFilterBar();
+    writeLivePill();
     writeSidebarBadge();
     // Expose needs-attention count for a later Today rollup
     // (do NOT build Today here). failed OR deadline-passed.
@@ -667,17 +711,23 @@
   // Populate the dynamic filter-bar selects (agency/type)
   // from the live rows. Rec/Status/Time options are static in the markup.
   function populateFilterBar() {
+    // The options must PARTITION the set they claim to filter: every option's
+    // count must sum to the total. A field with no value on file gets its own
+    // option, or those rows are selectable from "All" and from nowhere else.
     function distinct(key) {
-      var seen = {}, out = [];
+      var seen = {}, out = [], blank = false;
       STATE.rows.forEach(function (r) {
         var v = r[key];
-        if (v != null && v !== "—" && !seen[v]) { seen[v] = 1; out.push(v); }
+        if (v == null || v === "" || v === BLANK) { blank = true; return; }
+        if (!seen[v]) { seen[v] = 1; out.push(v); }
       });
-      return out.sort();
+      out.sort();
+      if (blank) out.push(BLANK); // last — it is an absence, not a category
+      return out;
     }
-    // Set-aside decode: show the SAM display name, filter on the raw value.
-    var SETASIDE_LABELS = { SBA: "Small Business", "8A": "8(a)", "8AN": "8(a)", HZC: "HUBZone", HZS: "HUBZone", SDVOSBC: "SDVOSB", SDVOSBS: "SDVOSB", WOSBC: "WOSB", WOSBSS: "WOSB", EDWOSBC: "EDWOSB", EDWOSBSS: "EDWOSB", VOSBC: "VOSB", VOSBS: "VOSB" };
-    function setAsideLabel(v) { if (v == null || v === "—" || v === "" || v === "NONE" || v === "None" || v === "none") return "—"; return SETASIDE_LABELS[v] || v; }
+    function withBlank(labelFn) {
+      return function (v) { return v === BLANK ? BLANK_LABEL : (labelFn ? labelFn(v) : v); };
+    }
     function fill(id, values, allLabel, labelFn) {
       var el = document.getElementById(id);
       if (!el) return;
@@ -699,11 +749,25 @@
         + '<option value="none">No date (' + wc.none + ')</option>';
       fw.value = cur;
     }
-    fill("fAgency", distinct("agency"), "All agencies");
-    fill("fType", distinct("type"), "All types");
+    // Time options carry counts from the SAME TIME_HOURS the filter reads (R8) —
+    // a rolling window that cannot narrow this history now says so BEFORE it is
+    // clicked, instead of appearing to do nothing. Built with Option(), not
+    // innerHTML: these are computed numbers going into a control.
+    var ft = document.getElementById("fTime");
+    if (ft) {
+      var curT = ft.value || "all";
+      ft.replaceChildren(new Option("All time", "all"));
+      ["30", "quarter", "year"].forEach(function (k) {
+        var n = STATE.rows.filter(function (r) { return r.age <= TIME_HOURS[k]; }).length;
+        ft.add(new Option(TIME_OPTION_TEXT[k] + " (" + n + ")", k));
+      });
+      ft.value = curT;
+    }
+    fill("fAgency", distinct("agency"), "All agencies", withBlank());
+    fill("fType", distinct("type"), "All types", withBlank());
     // NAICS: bare code — no title in the audits row payload ("no title on file → bare code").
-    fill("fNaics", distinct("naics"), "All NAICS");
-    fill("fSetAside", distinct("setAside"), "All set-asides", setAsideLabel);
+    fill("fNaics", distinct("naics"), "All NAICS", withBlank());
+    fill("fSetAside", distinct("setAside"), "All set-asides", withBlank(setAsideLabel));
   }
 
   // Pill "active" state + Clear visibility. A slicer glows
