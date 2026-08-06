@@ -80,13 +80,27 @@
       window.PS.plan_price_monthly = data.plan_price_monthly;
       window.PS.plan_price_annual  = data.plan_price_annual;
 
+      window.PS.loadError = false;
+      writeHeaderStats();
+
       if (window.PS_APP && typeof window.PS_APP.render === 'function') {
         window.PS_APP.render();
       }
       setLivePill(true);
     } catch (e) {
       console.error('[profile-settings-live] wire failed:', e);
-      document.body.classList.add('data-error');
+      // A failed read is a FAILURE, not an empty account. Nothing may be left
+      // standing from before, and the header counters may not keep claiming a
+      // total nobody could read.
+      window.PS.loadError = true;
+      window.PS.NAICS.length = 0;
+      window.PS.CERTS.length = 0;
+      window.PS.TEAM.length  = 0;
+      Object.keys(window.PS.COMPANY).forEach(function (k) { window.PS.COMPANY[k] = ''; });
+      writeHeaderStats();
+      if (window.PS_APP && typeof window.PS_APP.render === 'function') {
+        window.PS_APP.render();
+      }
       setLivePill(false);
     } finally {
       document.body.classList.remove('is-loading');
@@ -108,6 +122,24 @@
      confirms, and says the word "saved" in exactly one case — a 2xx whose echoed value
      matches what was sent. Delegated, because ps-app.js re-templates the panel on render
      and on every theme flip, which detaches any directly-bound listener. */
+  /* The three header counters shipped as LITERALS in the markup — 3 NAICS, 6 Agencies,
+     2 Certs — and no script on this page ever touched them. They matched nobody's
+     account, and the Agencies figure contradicted the Agencies tab, which reads zero
+     from the same page load. A number nothing computes is decoration wearing the
+     costume of a measurement.
+     Agencies renders an em dash, not 0: agency scoping has no source at all, and 0 is
+     a count. Absent is not zero. */
+  function writeHeaderStats() {
+    const err = !!window.PS.loadError;
+    const put = function (id, val) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    };
+    put('hsNaics', err ? '—' : String(window.PS.NAICS.length));
+    put('hsCerts', err ? '—' : String(window.PS.CERTS.length));
+    put('hsAgencies', '—');
+  }
+
   function note(msg, ok) {
     const el = document.getElementById('psSavedNote');
     if (!el) return;
@@ -116,29 +148,87 @@
     el.classList.toggle('is-error', !ok);
   }
 
+  /* The account spans TWO records: full_name is auth identity (/api/profile), the rest
+     is the capability statement (/api/capability-statement). One button, two writes, so
+     "Saved" may only be said when BOTH landed. A partial save reports which half landed
+     and which did not — saying "✓ Saved" over a half-write is the same lie as saying it
+     over no write at all, and harder to notice.
+     Every field is confirmed against the SERVER'S ECHO, never against the input box. */
+  const CAP_FIELDS = [
+    { id: 'psCompanyName', col: 'company_name',    label: 'Company name' },
+    { id: 'psUei',         col: 'uei',             label: 'SAM.gov UEI' },
+    { id: 'psCage',        col: 'cage_code',       label: 'CAGE code' },
+    { id: 'psAddress',     col: 'contact_address', label: 'Business address' }
+  ];
+
   document.addEventListener('click', async function (e) {
     const btn = e.target && e.target.closest && e.target.closest('#psSaveBtn');
     if (!btn) return;
-    const input = document.getElementById('psFullName');
-    if (!input) return;
-    const full_name = input.value.trim();
+    const nameInput = document.getElementById('psFullName');
+    if (!nameInput) return;
+    const full_name = nameInput.value.trim();
+
+    const patch = {};
+    CAP_FIELDS.forEach(function (f) {
+      const el = document.getElementById(f.id);
+      if (el) patch[f.col] = el.value.trim();
+    });
+
     btn.disabled = true;
     note('Saving…', true);
+    const failed = [];
     try {
-      const res = await fetch('/api/profile', {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ full_name })
-      });
-      const body = await res.json().catch(() => null);
-      if (!res.ok) { note((body && body.error) || ('Could not save (HTTP ' + res.status + ')'), false); return; }
-      // Believe the SERVER's echo, not the input box. The route reads the value back from
-      // the persisted user before returning it, so a mismatch here means it did not land.
-      if (!body || body.full_name !== full_name) { note('Save did not persist — reload and try again', false); return; }
-      window.PS.COMPANY.contact = body.full_name;
-      document.querySelectorAll('.sb-avatar-name').forEach(function (el) { el.textContent = body.full_name; });
-      note('✓ Saved', true);
+      // ── identity ──
+      try {
+        const res = await fetch('/api/profile', {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ full_name })
+        });
+        const body = await res.json().catch(() => null);
+        if (!res.ok || !body || body.full_name !== full_name) {
+          failed.push('Full name');
+        } else {
+          window.PS.COMPANY.contact = body.full_name;
+          document.querySelectorAll('.sb-avatar-name, .user-chip .nm').forEach(function (el) {
+            el.textContent = body.full_name;
+          });
+        }
+      } catch (_) { failed.push('Full name'); }
+
+      // ── company record ──
+      if (Object.keys(patch).length) {
+        try {
+          const res = await fetch('/api/capability-statement', {
+            method: 'PATCH',
+            credentials: 'include',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(patch)
+          });
+          const body = await res.json().catch(() => null);
+          const rec = body && (body.statement || body);
+          if (!res.ok || !rec || typeof rec !== 'object') {
+            CAP_FIELDS.forEach(function (f) { failed.push(f.label); });
+          } else {
+            // Per FIELD, against the echo. An empty box is stored as null, so compare
+            // the round-trip the way the server stores it, not the way the box reads.
+            CAP_FIELDS.forEach(function (f) {
+              const want = patch[f.col] === '' ? null : patch[f.col];
+              const got  = rec[f.col] === undefined ? null : rec[f.col];
+              if ((got || null) !== (want || null)) { failed.push(f.label); return; }
+              if (f.col === 'company_name')    window.PS.COMPANY.name    = patch[f.col];
+              if (f.col === 'uei')             window.PS.COMPANY.uei     = patch[f.col];
+              if (f.col === 'cage_code')       window.PS.COMPANY.cage    = patch[f.col];
+              if (f.col === 'contact_address') window.PS.COMPANY.address = patch[f.col];
+            });
+          }
+        } catch (_) { CAP_FIELDS.forEach(function (f) { failed.push(f.label); }); }
+      }
+
+      if (!failed.length) note('✓ Saved', true);
+      else if (failed.length >= CAP_FIELDS.length + 1) note('Nothing saved — reload and try again', false);
+      else note('Partly saved · did NOT save: ' + failed.join(', '), false);
     } catch (err) {
       note('Could not reach the server', false);
     } finally {

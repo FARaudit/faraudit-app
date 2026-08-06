@@ -90,7 +90,12 @@ check("/api/profile exposes PATCH", /export async function PATCH/.test(route), "
 check("PATCH refuses email and plan_tier explicitly", /READ_ONLY[\s\S]{0,200}plan_tier/.test(route) && /rejected/.test(route), "a dropped field would report success");
 check("PATCH echoes the PERSISTED value, not the request body", /did not persist/.test(route), "success is reported without reading the write back");
 check("the save handler believes the server echo", /body\.full_name !== full_name/.test(live), "the client trusts its own input");
-check("the save handler reports failure to the user", /Could not save|did not persist/.test(live), "a failed save is silent");
+// Keyed on BEHAVIOUR, not on one phrase. The previous form matched two exact strings,
+// so rewording the handler turned the gate red while the handler still reported
+// failure correctly — and, worse, a handler that dropped reporting entirely could
+// pass by keeping the words.
+check("the save handler reports failure to the user",
+  /note\((?:[^)]*?),\s*false\)/.test(live), "no note(..., false) failure path — a failed save is silent");
 
 console.log("\n── no control reports a save it did not perform ──");
 {
@@ -117,8 +122,18 @@ console.log("\n── no control reports a save it did not perform ──");
 console.log("\n── company fields are read-only, not fake inputs ──");
 const panel = app.slice(app.indexOf("company: ()"), app.indexOf("naics: ()"));
 check("company panel renders no <input> for company fields", !/\$\{field\('Company name'/.test(panel) && !/\$\{field\('SAM\.gov UEI'/.test(panel), "a company field is still an editable box with no writer");
-check("company fields render through the read-only helper", /\$\{ro\('Company name'/.test(panel) && /\$\{ro\('SAM\.gov UEI'/.test(panel), "company fields are not marked read-only");
-check("exactly one editable field — the person's name", (panel.match(/\$\{editable\(/g) ?? []).length === 1, `${(panel.match(/\$\{editable\(/g) ?? []).length} editable fields`);
+// THE DURABLE RULE IS NOT "ONE INPUT" — it is that every input has a writer. The
+// earlier form asserted a snapshot (only full_name had a write path), so building the
+// company writers turned an honest page red. What must never happen is an <input> the
+// save handler cannot see.
+const editableIds = [...panel.matchAll(/\$\{editable\('([^']+)'/g)].map((m) => m[1]);
+check("every editable field carries an id", editableIds.length > 0, "no editable fields found — did the panel move?");
+const unwritten = editableIds.filter((id) => !live.includes(id));
+check("EVERY editable field is read by the save handler", unwritten.length === 0,
+  `input(s) with no writer: ${unwritten.join(", ")}`);
+check("email is never an input — it is auth identity, not a profile column",
+  !/\$\{editable\('psEmail'/.test(panel) && /\$\{ro\('Email'/.test(panel),
+  "email rendered as an editable box without a verification flow behind it");
 check("company record links out to its real editor", /href="\/capability-statement"/.test(panel), "no route to where the company is actually edited");
 check("empty NAICS states the consequence", /stay empty/.test(panel), "an empty feed is not explained");
 

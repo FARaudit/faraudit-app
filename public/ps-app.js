@@ -15,47 +15,17 @@
 
   // Promote mock data to window.PS so profile-settings-live.js can mutate in place.
   // Mutate keys/array contents — never reassign the namespace or its arrays.
+  // NOTHING HERE IS A COMPANY. Every field starts empty and is filled only by
+  // profile-settings-live.js from the account's own record. A page that carries a
+  // company in its source can show that company when the fetch fails, and the
+  // customer reads it as theirs.
+  //
+  // loadError is the third state: empty, failure and data are three different
+  // answers and none may wear another's clothes.
   window.PS = window.PS || {
-    COMPANY: {
-      name: 'Apex Precision Machining LLC', cage: '7R4X2', uei: 'APX7R4X2000000',
-      address: '2847 Industrial Blvd, San Antonio TX 78219', contact: 'Jose Rodriguez, CEO',
-      email: 'jose@apexprecision.com', phone: '(210) 555-0147'
-    },
-    CERTS: [
-      { k: 'Small Business · NAICS 336413 (≤1,250 employees)', on: true }, { k: 'WOSB', on: false },
-      { k: 'SDVOSB', on: false }, { k: '8(a)', on: false }, { k: 'HUBZone', on: false }
-    ],
-    NAICS: [
-      { code: '336413', desc: 'Aircraft Engine & Parts Mfg', tag: 'PRIMARY' },
-      { code: '332710', desc: 'Machine Shops', tag: 'SECONDARY' },
-      { code: '332721', desc: 'Precision Turned Product Mfg', tag: 'SECONDARY' },
-      { code: '332722', desc: 'Bolt/Nut/Screw/Rivet Mfg', tag: 'SECONDARY' },
-      { code: '336411', desc: 'Aircraft Mfg', tag: 'MONITOR ONLY' }
-    ],
-    AGENCIES: [
-      { code: '502 CONS/CL', base: 'JBSA Lackland', type: 'Air Force', on: true },
-      { code: '502 CONS/PKC', base: 'JBSA Randolph', type: 'Air Force', on: true },
-      { code: '772 ESS/PK', base: 'Wright-Patterson', type: 'Engineering', on: true },
-      { code: 'OC-ALC/76 CONS', base: 'Tinker AFB', type: 'Maintenance', on: true },
-      { code: 'WR-ALC/402 SCMG', base: 'Robins AFB', type: 'Manufacturing', on: true },
-      { code: 'DLA Aviation', base: 'Richmond VA', type: 'Logistics', on: true },
-      { code: 'OO-ALC/309th', base: 'Hill AFB', type: 'Overhaul', on: false }
-    ],
-    NOTIFS: [
-      { t: 'New Pre-Solicitation Synopsis in your NAICS', d: 'Sources Sought / RFI alerts as soon as they hit SAM.gov', on: true },
-      { t: 'New Sources Sought / RFI in your NAICS', d: 'Combined market research stage notifications', on: true },
-      { t: 'New solicitation posted in your NAICS', d: 'Full RFP / RFQ / IFB stage alerts', on: true },
-      { t: 'HIGH impact FAR/DFARS change', d: 'Regulatory changes affecting your active contracts', on: true },
-      { t: 'GAO protest filed on a solicitation you bid', d: 'Award protest activity on contracts you participated in', on: true },
-      { t: 'Contracting officer responsiveness changes', d: 'Score shifts for COs in your network', on: false }
-    ],
-    TEAM: [{ name: 'Jose Rodriguez', email: 'jose@apexprecision.com', role: 'OWNER', you: true }],
-    USAGE: [
-      { l: 'Audits this month', v: '19 of 25' },
-      { l: 'Solicitations tracked', v: '12' },
-      { l: 'Synopsis alerts sent', s: 'Pre-sol + Sources Sought · 9 NAICS', v: '34' },
-      { l: 'Team members', s: 'Single-seat license', v: '1 of 1' }
-    ]
+    loadError: false,
+    COMPANY: { name: '', cage: '', uei: '', address: '', contact: '', email: '', phone: '' },
+    CERTS: [], NAICS: [], AGENCIES: [], NOTIFS: [], TEAM: [], USAGE: []
   };
   const COMPANY = window.PS.COMPANY;
   const CERTS = window.PS.CERTS;
@@ -97,7 +67,14 @@
        sends to contracting officers AND the record the audit engine reads to judge
        eligibility. It is shown here read-only with one link out: one record, one editor.
        Everything below that has no write path renders as text, never as an <input>. */
-    company: () => `
+    company: () => window.PS.loadError ? `
+      <div class="sp-hd"><div class="sp-t">Your Account</div><div class="sp-s">Your details, and the company record the platform runs on</div></div>
+      <div class="sp-bd">
+        <div class="ps-failed">
+          <div class="ps-failed-t">Your company record could not be loaded</div>
+          <div class="ps-failed-s">A connection problem, not an empty record — nothing has been lost and nothing has been changed. Reload to try again.</div>
+        </div>
+      </div>` : `
       <div class="sp-hd"><div class="sp-t">Your Account</div><div class="sp-s">Your details, and the company record the platform runs on</div></div>
       <div class="sp-bd">
         <div class="fld-sec">Your details</div>
@@ -107,17 +84,17 @@
         </div>
         <div class="fld-sec">Company record</div>
         <div class="fld-grid">
-          ${ro('Company name', COMPANY.name)}
-          ${ro('SAM.gov UEI', COMPANY.uei)}
-          ${ro('CAGE code', COMPANY.cage)}
-          ${ro('Business address', COMPANY.address)}
+          ${editable('psCompanyName', 'Company name', COMPANY.name, 'Registered legal name')}
+          ${editable('psUei', 'SAM.gov UEI', COMPANY.uei, '12-character UEI')}
+          ${editable('psCage', 'CAGE code', COMPANY.cage, '5-character CAGE')}
+          ${editable('psAddress', 'Business address', COMPANY.address, 'Street, city, state ZIP')}
         </div>
         <div class="fld-sec">NAICS codes</div>
         <div class="cert-row">${NAICS.length ? NAICS.map(n => `<span class="cert-tg on">${esc(n.code || n.k || n)}</span>`).join('') : '<span class="fld-none">None on file</span>'}</div>
         ${NAICS.length ? '' : '<div class="note note-warn">No NAICS codes on file, so Opportunities, Teaming Partners, Contracting Officers and Wage Benchmarks have nothing to match against and will stay empty. Add them in the capability statement.</div>'}
         <div class="fld-sec">Certifications</div>
         <div class="cert-row">${CERTS.length ? CERTS.map(c => `<span class="cert-tg on">${esc(c.k || c)}</span>`).join('') : '<span class="fld-none">None on file</span>'}</div>
-        <div class="note">The company record is edited in the <a href="/capability-statement">capability statement</a>. It is the document you send to contracting officers, and the audit engine reads the same record when it judges whether you are eligible to bid — so what is entered there shapes real verdicts.</div>
+        <div class="note">This is the same record the <a href="/capability-statement">capability statement</a> prints and the audit engine reads when it judges whether you are eligible to bid — so what you enter here shapes real verdicts. NAICS codes and certifications are shown here but edited elsewhere.</div>
       </div>
       <div class="sp-foot"><span class="saved" id="psSavedNote" hidden></span><button class="save-btn" id="psSaveBtn">Save changes</button></div>`,
 

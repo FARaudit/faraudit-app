@@ -33,6 +33,11 @@
   --shadow-pop:0 1px 2px rgba(0,0,0,.5), 0 28px 64px -22px rgba(0,0,0,.85);
 }
 *{box-sizing:border-box}
+/* The UA rule for [hidden] is display:none at specificity (0,1,0), so any class rule
+   carrying a display value outranks it. Setting .hidden from script is therefore only
+   a request until this rule makes it binding. Load-bearing: the LIVE pill is gated by
+   .hidden alone, and it claims this page is showing live data. */
+[hidden]{display:none!important}
 html,body{margin:0;padding:0;background:var(--page-bg);font-family:"Manrope",ui-sans-serif,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;transition:background-color .25s ease,color .25s ease}
 button{font-family:inherit}
 .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
@@ -304,6 +309,11 @@ button{font-family:inherit}
 .nr-primary{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--accent-deep);background:var(--accent-pale);padding:3px 8px;border-radius:5px}
 [data-theme="dark"] .nr-primary{background:rgba(55,138,221,.18);color:var(--accent-light)}
 .nr-make{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--mute);background:none;border:0;cursor:pointer;text-decoration:underline}
+.ps-failed{padding:26px 22px;border:1px solid var(--red-200);border-radius:12px;background:var(--red-50)}
+.ps-failed-t{font-size:15px;font-weight:800;color:var(--red-700);margin-bottom:6px}
+.ps-failed-s{font-size:13px;color:var(--ink-2);line-height:1.55;max-width:64ch}
+[data-theme="dark"] .ps-failed{background:rgba(220,38,38,.10);border-color:rgba(220,38,38,.32)}
+[data-theme="dark"] .ps-failed-t{color:#fca5a5}
 .nr-x{width:24px;height:24px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--mute-2);cursor:pointer;font-size:11px}
 .nr-x:hover{border-color:var(--red-200);color:var(--red-600)}
 .impact-box{padding:14px;border-radius:11px;background:rgba(55,138,221,0.05);border:1px solid var(--accent-light)}
@@ -484,19 +494,19 @@ button{font-family:inherit}
         <div class="heading">
           <p class="eyebrow">Account</p>
           <h1>Profile &amp; Settings</h1>
-          <p class="sub">Your details and the company record the platform runs on. Company details are edited in the <a href="/capability-statement">capability statement</a>.</p>
+          <p class="sub">Your details and the company record the platform runs on. The same record prints on your <a href="/capability-statement">capability statement</a>.</p>
         </div>
         <div class="hdr-stat">
-          <div class="hs"><span class="v" id="hsNaics">3</span><span class="l">NAICS</span></div>
-          <div class="hs"><span class="v warm" id="hsAgencies">6</span><span class="l">Agencies</span></div>
-          <div class="hs"><span class="v" id="hsCerts">2</span><span class="l">Certs</span></div>
+          <div class="hs"><span class="v" id="hsNaics">—</span><span class="l">NAICS</span></div>
+          <div class="hs"><span class="v warm" id="hsAgencies">—</span><span class="l">Agencies</span></div>
+          <div class="hs"><span class="v" id="hsCerts">—</span><span class="l">Certs</span></div>
         </div>
       </header>
 
       <!-- signature: how your profile powers the platform -->
       <div class="prof-banner">
         <div class="pb-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 00-4 12.7V17a1 1 0 001 1h6a1 1 0 001-1v-2.3A7 7 0 0012 2z"/><path d="M9 21h6"/></svg></div>
-        <div class="pb-text"><b>This profile drives all 16 desks.</b> Your NAICS filter Opportunities, Spending, COs, Wage &amp; Teaming · your agencies scope the feeds · your certs unlock set-asides. Change one thing here and the whole platform re-scopes.</div>
+        <div class="pb-text"><b>This record scopes the platform.</b> Your NAICS codes filter Opportunities, Contracting Officers, Wage Benchmarks and Teaming Partners · a certification clears a set-aside bar only once it is verified against SAM, so typing one changes nothing on its own.</div>
         <a class="pb-link" href="today.html">View your Today <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
       </div>
 
