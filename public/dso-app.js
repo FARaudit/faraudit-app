@@ -609,7 +609,11 @@ function detailHTML(o) {
   return '<div class="pc-detail">' + rows.map(function (r) {
     return '<div class="pd-row"><span class="pd-k">' + r[0] + '</span><span class="pd-v">' + r[1] + '</span></div>';
   }).join('') + '<div class="pd-row"><span class="pd-k">WHAT SAM SAYS</span>' +
-     '<span class="pd-v" data-desc>\u2014</span></div></div>';
+     '<span class="pd-v"><span class="pd-desc" data-desc>\u2014</span>' +
+     // Revealed only when the text actually overflows its clamp \u2014 a "show more"
+     // on a three-line notice is a control that does nothing.
+     '<button type="button" class="desc-more" data-desc-more aria-expanded="false" hidden>show more</button>' +
+     '</span></div></div>';
 }
 
 /* SAM returns placeOfPerformance as an object whose shape varies by notice.
@@ -879,6 +883,20 @@ function bindDetailToggles() {
     const open = box.classList.toggle('is-open');
     t.setAttribute('aria-expanded', open ? 'true' : 'false');
   });
+
+  /* The notice text's "show more". Same delegation for the same reason. */
+  host.addEventListener('click', (e) => {
+    const t = e.target && e.target.closest ? e.target.closest('[data-desc-more]') : null;
+    if (!t || !host.contains(t)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const card = t.closest('.pcard');
+    const slot = card ? card.querySelector('[data-desc]') : null;
+    if (!slot) return;
+    const full = slot.classList.toggle('is-full');
+    t.setAttribute('aria-expanded', full ? 'true' : 'false');
+    t.textContent = full ? 'show less' : 'show more';
+  });
 }
 
 /* The notice text. SAM's search returns a URL, not prose, so it is resolved per
@@ -901,9 +919,29 @@ function loadDescription(card) {
         return;
       }
       slot.dataset.state = 'ok';
-      slot.textContent = d.description.replace(/\s+/g, ' ').slice(0, 600);
+      // The WHOLE description, clamped by CSS rather than cut by character count.
+      // Slicing ended sentences mid-word with nothing to say more was there, and
+      // what it removed is the part of a notice that carries the scope.
+      slot.textContent = d.description.replace(/\s+/g, ' ');
+      revealDescToggle(card);
     })
     .catch(function () { slot.dataset.state = 'err'; slot.textContent = 'could not read SAM just now'; });
+}
+
+/* The "show more" under the notice text appears only when the clamp is actually
+   hiding something. Measured from the rendered box rather than the character
+   count, because the clamp is five LINES and how much prose that holds depends
+   on the panel's width. */
+function revealDescToggle(card) {
+  const slot = card.querySelector('[data-desc]');
+  const btn = card.querySelector('[data-desc-more]');
+  if (!slot || !btn) return;
+  slot.classList.remove('is-full');
+  btn.setAttribute('aria-expanded', 'false');
+  btn.textContent = 'show more';
+  // +2px absorbs sub-pixel line-height rounding, which would otherwise offer to
+  // expand a description that is already fully visible.
+  btn.hidden = slot.scrollHeight <= slot.clientHeight + 2;
 }
 
 /* The attachment list, replaced with SAM's own.
