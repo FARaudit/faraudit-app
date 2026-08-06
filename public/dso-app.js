@@ -567,6 +567,18 @@ function datesLine(o) {
 }
 
 
+/* How many attachments the panel lists before deferring to SAM.gov. It is also
+   how many names are requested, so raising it raises the per-open cost. */
+const ATT_SHOWN = 8;
+
+/* resource_links are opaque download URLs; the 32-hex segment is the file id,
+   which is all /api/notice-attachments needs to look a name up. Returns null on
+   any other shape rather than guessing at one. */
+function fileIdFromLink(u) {
+  const m = typeof u === 'string' ? u.match(/\/files\/([a-f0-9]{32})\/download\b/i) : null;
+  return m ? m[1] : null;
+}
+
 /* Detail panel. Renders only fields SAM actually returned for this row; a field
    it did not return is omitted, never shown as an empty label. Returns '' when
    the row carries none, and the caller then renders no panel and no toggle. */
@@ -585,9 +597,15 @@ function detailHTML(o) {
   if (pop) rows.push(['Place of performance', esc(pop)]);
   const n = Array.isArray(o.resource_links) ? o.resource_links.length : null;
   if (n) {
-    rows.push(['Attachments', o.resource_links.slice(0, 8).map(function (u, i) {
-      return '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">Document ' + (i + 1) + '</a>';
-    }).join(' · ') + (n > 8 ? ' · +' + (n - 8) + ' more' : '')]);
+    rows.push(['Attachments', o.resource_links.slice(0, ATT_SHOWN).map(function (u, i) {
+      const fid = fileIdFromLink(u);
+      // Renders "Document N" immediately and stays that way unless SAM hands
+      // back a real name; the id is carried so loadAttachmentNames can upgrade
+      // it in place. A link with no readable id is still a working link.
+      return '<a class="pd-att" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer"' +
+        (fid ? ' data-att-id="' + esc(fid) + '"' : '') +
+        '>Document ' + (i + 1) + '</a>';
+    }).join('') + (n > ATT_SHOWN ? '<span class="pd-att pd-att-more">+' + (n - ATT_SHOWN) + ' more on SAM.gov</span>' : '')]);
   }
   if (!rows.length) return '';
   return '<div class="pc-detail">' + rows.map(function (r) {
@@ -846,7 +864,7 @@ function bindDetailToggles() {
     const open = card.classList.toggle('is-open');
     b.setAttribute('aria-expanded', open ? 'true' : 'false');
     b.textContent = open ? 'Hide details' : 'Details';
-    if (open) loadDescription(card);
+    if (open) { loadDescription(card); loadAttachmentNames(card); }
   });
 }
 
@@ -873,6 +891,40 @@ function loadDescription(card) {
       slot.textContent = d.description.replace(/\s+/g, ' ').slice(0, 600);
     })
     .catch(function () { slot.dataset.state = 'err'; slot.textContent = 'could not read SAM just now'; });
+}
+
+/* Attachment filenames. SAM's resource_links carry no name in the path, and the
+   name lives in a Content-Disposition header the browser is not allowed to read
+   cross-origin — so it is resolved server-side, once per card, on first open.
+
+   "Document N" is the floor, not a loading state: a name that does not come back
+   simply stays "Document N" and the link still works. Nothing is ever renamed to
+   a guess, and a failed lookup costs the customer nothing. */
+function loadAttachmentNames(card) {
+  const links = card.querySelectorAll('a.pd-att[data-att-id]');
+  if (!links.length || card.dataset.attState) return;   // once per card
+  card.dataset.attState = 'loading';
+  const ids = Array.prototype.map.call(links, function (a) { return a.getAttribute('data-att-id'); });
+  fetch('/api/notice-attachments?ids=' + encodeURIComponent(ids.join(',')), { credentials: 'include' })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) {
+      const names = d && Array.isArray(d.names) ? d.names : null;
+      if (!names) { card.dataset.attState = 'err'; return; }
+      // Match by id, not by position — the route preserves order, but relying on
+      // that would put the wrong name on a link the moment it stops.
+      const byId = {};
+      names.forEach(function (e) { if (e && e.id && e.name) byId[e.id] = e.name; });
+      let named = 0;
+      Array.prototype.forEach.call(links, function (a) {
+        const nm = byId[a.getAttribute('data-att-id')];
+        if (!nm) return;
+        a.textContent = nm;
+        a.setAttribute('title', nm);
+        named++;
+      });
+      card.dataset.attState = named ? 'ok' : 'none';
+    })
+    .catch(function () { card.dataset.attState = 'err'; });
 }
 
 function bindResetAll() {
