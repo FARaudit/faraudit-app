@@ -54,11 +54,27 @@ async function requestUnder(env: string | undefined): Promise<Req> {
 async function main() {
 console.log("── lens effort ──");
 
-// ── THE CORE ASSERTION: a known level reaches the wire ────────────────────────────────────────
-for (const level of ["low", "medium", "high", "xhigh", "max"]) {
+// ── THE CORE ASSERTION: a level THIS MODEL SUPPORTS reaches the wire ──────────────────────────
+// `xhigh` was in this list until 2026-08-06 and this gate passed, because it drives a STUB client and
+// therefore proves only that the field reaches the request object — never that the API accepts it. The live
+// Models API reports `effort.xhigh.supported = false` on claude-sonnet-4-6, the model these requests are
+// built for, so the old loop asserted that a request guaranteed to 400 was constructed correctly. Shape is
+// not acceptance; a gate that cannot tell them apart certifies the defect.
+for (const level of ["low", "medium", "high", "max"]) {
   const req = await requestUnder(level);
-  ok(`AUDIT_LENS_EFFORT="${level}" reaches the request as output_config.effort`,
+  ok(`AUDIT_LENS_EFFORT="${level}" reaches the request as output_config.effort (supported on sonnet-4-6)`,
     JSON.stringify(req.output_config) === JSON.stringify({ effort: level }));
+}
+
+// ── A REAL LEVEL THE MODEL DOES NOT SUPPORT MUST BE OMITTED, NOT SENT ─────────────────────────
+// This is the case the typo loop below cannot cover: `xhigh` is not a typo, it is a valid level for Opus
+// 4.7+. Arming it would have produced a 400 on all five parallel lens calls. Omitting degrades to the API
+// default (high) — the safe direction — and the caller logs the drop by name so the flag cannot look armed
+// while doing nothing.
+{
+  const req = await requestUnder("xhigh");
+  ok("AUDIT_LENS_EFFORT=\"xhigh\" is OMITTED on sonnet-4-6 (real level, unsupported model — would 400 every lens)",
+    !("output_config" in req));
 }
 
 // ── DEFAULT UNCHANGED — the whole point of shipping this dark ─────────────────────────────────
