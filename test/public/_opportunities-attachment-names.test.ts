@@ -1,23 +1,19 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Gate — the DETAILS panel's attachment filenames.
+// Gate — the DETAILS panel's attachment list.
 //
-// SAM publishes real names ("M1_SECTION M - Evaluation Factors for Award.docx")
-// but only in a Content-Disposition header, so they are resolved server-side and
-// patched into the panel after it opens. That leaves a specific failure the
-// customer would never catch: a name landing on the WRONG link. The panel is
-// where someone decides whether to spend $1.25–1.50 on an audit, and "Section M
-// is attached" is exactly the kind of claim that must not be misplaced.
+// The panel renders the feed's `resource_links` first, then replaces that list
+// with SAM's own. It has to, because the feed is not always complete: notice
+// 98d55b83… carried 4 links where SAM listed 5, so `Dunnage Kit for POL
+// Airlift.pdf` never reached a customer deciding whether to bid. THAT is the
+// defect this gate exists for, and section B drives it directly.
 //
-// So this gate drives the SHIPPED functions out of public/dso-app.js — extracted
-// by name, the same way _opportunities-row-integrity.test.ts does — rather than
-// a copy. A rename on either side of the seam goes red here.
+// The opposite failure matters just as much: a read that fails must never empty
+// a list that had working links in it. Sections C and D hold that line.
 //
-// WHAT IS REAL AND WHAT IS STUBBED. The functions are the shipped ones. `fetch`
-// is stubbed, because the point is to drive the response shapes the route can
-// actually return (nulls, 401, reject, id mismatch) which a live call cannot be
-// made to produce on demand. The DOM is a minimal shim over the four APIs these
-// functions touch; the same eight cases were also run against a real browser DOM
-// on 2026-08-06 and agreed exactly, so the shim is not carrying the result.
+// Drives the SHIPPED functions out of public/dso-app.js, extracted by name the
+// same way _opportunities-row-integrity.test.ts does. `fetch` and the DOM are
+// shimmed — the point is to drive response shapes a live call cannot be made to
+// produce on demand.
 //
 // Run: npx tsx test/public/_opportunities-attachment-names.test.ts
 // ─────────────────────────────────────────────────────────────────────────────
@@ -46,300 +42,243 @@ function extractFn(src: string, name: string): string {
   return src.slice(start, i + 1) + `\n;__out.${name} = ${name};`;
 }
 
-// ── a DOM shim covering only what these two functions touch ─────────────────
+// ── a DOM shim covering only what these functions touch ─────────────────────
 class El {
-  className = "";
   tagName: string;
+  className = "";
+  href = ""; target = ""; rel = ""; title = "";
   dataset: Record<string, string> = {};
-  private attrs: Record<string, string> = {};
-  textContent = "";
   children: El[] = [];
+  private attrs: Record<string, string> = {};
+  private _text = "";
   constructor(tag: string) { this.tagName = tag; }
+  set textContent(v: string) { this._text = v; if (v === "") this.children = []; }
+  get textContent(): string {
+    return this.children.length ? this.children.map((c) => c.textContent).join("") : this._text;
+  }
+  appendChild(c: El) { this.children.push(c); return c; }
   setAttribute(k: string, v: string) { this.attrs[k] = v; }
   getAttribute(k: string) { return Object.prototype.hasOwnProperty.call(this.attrs, k) ? this.attrs[k] : null; }
-  // Anchors in this shim carry no children, so the .att-nm / .att-ext lookup
-  // finds nothing and loadAttachmentNames falls back to setting textContent.
-  // That fallback is deliberate in the shipped code — it is what keeps the
-  // function working on a link that was rendered before the split existed.
-  querySelector(_sel: string): El | null { return null; }
-  // The only selector used is 'a.pd-att[data-att-id]'.
-  querySelectorAll(sel: string) {
-    if (sel !== "a.pd-att[data-att-id]") throw new Error(`shim does not implement selector ${sel}`);
-    return this.children.filter(
-      (c) => c.tagName === "a" && c.className.split(/\s+/).includes("pd-att") && c.getAttribute("data-att-id") !== null
-    );
+  querySelector(sel: string): El | null {
+    const want = sel.replace(/^\./, "").replace(/^\[|\]$/g, "");
+    const hit = (e: El): El | null => {
+      if (e.className.split(/\s+/).includes(want)) return e;
+      if (sel.startsWith("[") && e.getAttribute(want) !== null) return e;
+      for (const c of e.children) { const r = hit(c); if (r) return r; }
+      return null;
+    };
+    for (const c of this.children) { const r = hit(c); if (r) return r; }
+    return null;
   }
 }
 
+const ROOT_NOTICE = "fc06f70293264e82a61d9d6699f1af4c";
 const IDS = [
   "41a807a93262480ab32a2a68fe60d060",
   "0b53312d536249470667842538686aaa",
-  "1d319a3844db445fb1a8abcc89cb74cc"
+  "1d319a3844db445fb1a8abcc89cb74cc",
+  "6ad63607833b47b3a88dede662a223c5",
+  "da47a2a00f624c8b803facc899fba5c4"
 ];
-// Transcribed from the live probe, not invented.
-const REAL = [
+const url = (id: string) => `https://sam.gov/api/prod/opps/v3/opportunities/resources/files/${id}/download`;
+const NAMES = [
+  "Solicitation - N0042126R1024.pdf",
   "M1_SECTION M - Evaluation Factors for Award.docx",
-  "Att 10_SBPCD.docx",
-  "Solicitation - N0042126R1024.pdf"
+  "Att 07_WD 2015-4279 Rev32.pdf",
+  "C1_Cost Workbook.xlsx",
+  "Dunnage Kit for POL Airlift.pdf"
 ];
-const linkFor = (id: string) =>
-  `https://sam.gov/api/prod/opps/v3/opportunities/resources/files/${id}/download`;
 
-let fileIdFromLink: (u: unknown) => string | null;
+let attachmentRow: (a: any) => El | null;
 let loadAttachmentNames: (card: any) => void;
-let lastFetchUrl: string | null = null;
-const sentUrl = (): string | null => lastFetchUrl;
-let fetchCalls = 0;
-let fetchImpl: () => Promise<any> = () => Promise.reject(new Error("not set"));
+let lastUrl: string | null = null;
+let calls = 0;
+let impl: () => Promise<any> = () => Promise.reject(new Error("not set"));
 
 try {
   const sandbox: any = {
-    __out: {},
-    console,
-    Array,
-    encodeURIComponent,
-    fetch: (u: string) => { fetchCalls++; lastFetchUrl = u; return fetchImpl(); }
+    __out: {}, console, Array, encodeURIComponent, JSON,
+    document: { createElement: (t: string) => new El(t) },
+    fetch: (u: string) => { calls++; lastUrl = u; return impl(); }
   };
   vm.createContext(sandbox);
-  vm.runInContext(extractFn(DSO, "fileIdFromLink") + "\n" + extractFn(DSO, "loadAttachmentNames"), sandbox);
-  fileIdFromLink = sandbox.__out.fileIdFromLink;
+  sandbox.esc = (s: string) => String(s == null ? "" : s);
+  vm.runInContext(extractFn(DSO, "attachmentRow") + "\n" + extractFn(DSO, "loadAttachmentNames"), sandbox);
+  attachmentRow = sandbox.__out.attachmentRow;
   loadAttachmentNames = sandbox.__out.loadAttachmentNames;
 } catch (e: any) {
-  console.log(`\n  ✗ FATAL — cannot load the attachment-name seam: ${e.message}`);
-  console.log(`    fileIdFromLink(u) and loadAttachmentNames(card) must stay top-level`);
+  console.log(`\n  ✗ FATAL — cannot load the attachment seam: ${e.message}`);
+  console.log(`    attachmentRow(a) and loadAttachmentNames(card) must stay top-level`);
   console.log(`    functions in public/dso-app.js for this gate to reach them.\n`);
   process.exit(1);
 }
 
-function makeCard() {
+// A card as detailHTML renders it: the FEED's links, before SAM is consulted.
+function makeCard(feedCount = 4) {
   const card = new El("div");
   card.className = "pcard";
-  for (let i = 0; i < IDS.length; i++) {
+  card.setAttribute("data-notice", ROOT_NOTICE);
+  const box = new El("div");
+  box.className = "pd-atts";
+  for (let i = 0; i < feedCount; i++) {
     const a = new El("a");
     a.className = "pd-att";
-    a.setAttribute("href", linkFor(IDS[i]));
-    a.setAttribute("data-att-id", IDS[i]);
-    a.textContent = `Document ${i + 1}`;
-    card.children.push(a);
+    a.href = url(IDS[i]);
+    const n = new El("span");
+    n.className = "att-nm";
+    n.textContent = `Document ${i + 1}`;
+    a.appendChild(n);
+    box.appendChild(a);
   }
-  return card;
+  const label = new El("span");
+  label.setAttribute("data-att-count", "");
+  label.textContent = `${feedCount} documents`;
+  card.appendChild(label);
+  card.appendChild(box);
+  return { card, box, label };
 }
-const texts = (c: El) => c.children.map((a) => a.textContent);
-const UNTOUCHED = ["Document 1", "Document 2", "Document 3"];
-const settle = () => new Promise((r) => setTimeout(r, 20));
-const jsonOk = (body: any) => () => Promise.resolve({ ok: true, json: () => Promise.resolve(body) });
+const rowNames = (box: El) => box.children.map((a) => a.querySelector(".att-nm")?.textContent ?? "");
+const settle = () => new Promise((r) => setTimeout(r, 25));
+const jsonOk = (b: any) => () => Promise.resolve({ ok: true, json: () => Promise.resolve(b) });
+const samList = (n: number) =>
+  Array.from({ length: n }, (_, i) => ({ id: IDS[i], name: NAMES[i], url: url(IDS[i]), restricted: false }));
 
 async function main() {
-  // ═══ A · the id extractor ═════════════════════════════════════════════════
-  console.log("\nA · fileIdFromLink — the id is the only thing sent to the server");
-  ok(fileIdFromLink(linkFor(IDS[0])) === IDS[0], "canonical link yields its 32-hex id");
-  ok(fileIdFromLink("https://sam.gov/whatever") === null, "non-canonical link yields null, not a guess");
-  ok(fileIdFromLink(null) === null, "null input yields null");
-  ok(fileIdFromLink(12345) === null, "non-string input yields null");
-  ok(
-    fileIdFromLink("https://evil.example.com/files/" + IDS[0] + "/download") === IDS[0],
-    "id is extracted by shape (host is the SERVER's problem, not this function's)"
-  );
+  // ═══ A · a single row ═════════════════════════════════════════════════════
+  console.log("\nA · attachmentRow — only a real SAM download URL becomes a link");
+  const good = attachmentRow({ id: IDS[0], name: "Section M.docx", url: url(IDS[0]), restricted: false })!;
+  ok(!!good, "a canonical URL renders");
+  ok(good.querySelector(".att-nm")?.textContent === "Section M", "extension is split off the name");
+  ok(good.querySelector(".att-ext")?.textContent === "docx", "extension gets its own muted slot");
+  ok(good.title === "Section M.docx", "the FULL filename is preserved in the title");
+  ok(attachmentRow({ url: "https://evil.example.com/x", name: "x.pdf" }) === null, "a non-SAM URL is refused");
+  ok(attachmentRow({ url: "https://sam.gov/../../etc/passwd", name: "x" }) === null, "a traversal URL is refused");
+  ok(attachmentRow({ name: "no url.pdf" }) === null, "a row with no URL is refused");
+  const noname = attachmentRow({ id: IDS[0], url: url(IDS[0]), name: null })!;
+  ok(noname.querySelector(".att-nm")?.textContent === "Document", "a nameless file still renders as a link");
+  const locked = attachmentRow({ id: IDS[0], name: "CUI.pdf", url: url(IDS[0]), restricted: true })!;
+  ok(locked.querySelector(".att-lock")?.textContent === "request access",
+    "an access-restricted file is FLAGGED, not hidden");
 
-  // ═══ B · the happy path ═══════════════════════════════════════════════════
-  console.log("\nB · names arrive — the links are renamed to what SAM published");
-  let card = makeCard();
-  fetchImpl = jsonOk({ names: IDS.map((id, i) => ({ id, name: REAL[i] })) });
+  // ═══ B · THE DEFECT ═══════════════════════════════════════════════════════
+  // The feed gave 4. SAM says 5. The fifth must appear.
+  console.log("\nB · a document the FEED omitted still reaches the customer");
+  let { card, box, label } = makeCard(4);
+  impl = jsonOk({ attachments: samList(5) });
   loadAttachmentNames(card); await settle();
-  ok(JSON.stringify(texts(card)) === JSON.stringify(REAL), "all three renamed", texts(card).join(" | "));
+  ok(box.children.length === 5, "the list rebuilds to SAM's count, not the feed's", `${box.children.length} rows`);
+  ok(rowNames(box).some((n) => n.startsWith("Dunnage Kit")),
+    "the attachment the feed omitted is now listed", rowNames(box).join(" | "));
+  ok(label.textContent === "5 documents", "the count label follows SAM, not the feed", label.textContent);
   ok(card.dataset.attState === "ok", "state is 'ok'");
+  ok(rowNames(box)[0] === "Solicitation - N0042126R1024", "names come from SAM's list");
 
-  // ═══ C · every failure direction keeps "Document N" ═══════════════════════
-  // This is the failure contract: an unread name must cost the customer nothing.
-  // A link that still works and says "Document 2" is correct; a blank or a
-  // guessed name is not.
-  console.log("\nC · every failure direction falls back to 'Document N' — never blank, never a guess");
+  // ═══ C · a failed read must not destroy a working list ════════════════════
+  console.log("\nC · a failed read NEVER empties a list that had working links");
   const failures: Array<[string, () => Promise<any>, string]> = [
-    ["route returns nulls", jsonOk({ names: IDS.map((id) => ({ id, name: null, reason: "http-400" })) }), "none"],
+    ["attachments is null (read failed)", jsonOk({ attachments: null, reason: "http-500" }), "err"],
     ["network rejects", () => Promise.reject(new Error("offline")), "err"],
     ["401 session expired", () => Promise.resolve({ ok: false, status: 401, json: () => Promise.resolve({}) }), "err"],
-    ["body has no names[]", jsonOk({ reason: "bad-file-id" }), "err"],
-    ["names is not an array", jsonOk({ names: "nope" }), "err"],
-    ["empty names[]", jsonOk({ names: [] }), "none"]
+    ["body has no attachments key", jsonOk({ reason: "bad-notice-id" }), "err"],
+    ["attachments is not an array", jsonOk({ attachments: "nope" }), "err"],
+    ["SAM listed none", jsonOk({ attachments: [] }), "none"]
   ];
-  for (const [label, impl, expectState] of failures) {
-    card = makeCard();
-    fetchImpl = impl;
-    loadAttachmentNames(card); await settle();
+  for (const [labelText, i, expectState] of failures) {
+    const m = makeCard(4);
+    impl = i;
+    loadAttachmentNames(m.card); await settle();
     ok(
-      JSON.stringify(texts(card)) === JSON.stringify(UNTOUCHED) && card.dataset.attState === expectState,
-      label,
-      `state=${card.dataset.attState}`
+      m.box.children.length === 4 &&
+        JSON.stringify(rowNames(m.box)) === JSON.stringify(["Document 1", "Document 2", "Document 3", "Document 4"]) &&
+        m.card.dataset.attState === expectState,
+      labelText,
+      `${m.box.children.length} rows kept, state=${m.card.dataset.attState}`
     );
   }
 
-  // ═══ D · the misplacement failure ═════════════════════════════════════════
-  // The one a customer could not detect: a real filename on the wrong link.
-  console.log("\nD · a name is never placed on a link it does not belong to");
-  card = makeCard();
-  fetchImpl = jsonOk({ names: REAL.map((name) => ({ id: "deadbeef".repeat(4), name })) });
-  loadAttachmentNames(card); await settle();
-  ok(
-    JSON.stringify(texts(card)) === JSON.stringify(UNTOUCHED),
-    "ids that match nothing rename nothing (matched by id, NOT by position)",
-    texts(card).join(" | ")
-  );
+  // ═══ D · a poisoned response cannot blank the panel ═══════════════════════
+  console.log("\nD · rows that fail validation do not take the existing list with them");
+  const m2 = makeCard(4);
+  impl = jsonOk({ attachments: [{ id: "x", name: "evil", url: "https://evil.example.com/a" }] });
+  loadAttachmentNames(m2.card); await settle();
+  ok(m2.box.children.length === 4 && m2.card.dataset.attState === "none",
+    "an all-invalid list leaves the feed's links in place", `${m2.box.children.length} rows`);
 
-  card = makeCard();
-  // Same names, REVERSED order, correct ids. Position-matching would mis-assign
-  // all three; id-matching puts each name back on its own link.
-  fetchImpl = jsonOk({ names: IDS.map((id, i) => ({ id, name: REAL[i] })).reverse() });
-  loadAttachmentNames(card); await settle();
-  ok(
-    JSON.stringify(texts(card)) === JSON.stringify(REAL),
-    "a reordered response still lands each name on its own link",
-    texts(card).join(" | ")
-  );
+  const m3 = makeCard(4);
+  impl = jsonOk({ attachments: [
+    { id: IDS[0], name: NAMES[0], url: url(IDS[0]), restricted: false },
+    { id: "x", name: "evil", url: "javascript:alert(1)" }
+  ] });
+  loadAttachmentNames(m3.card); await settle();
+  ok(m3.box.children.length === 1 && rowNames(m3.box)[0] === "Solicitation - N0042126R1024",
+    "a mixed list keeps the valid row and drops the bad one", rowNames(m3.box).join(" | "));
 
-  console.log("\nE · a partial answer keeps the rest honest");
-  card = makeCard();
-  fetchImpl = jsonOk({
-    names: [
-      { id: IDS[0], name: null, reason: "http-500" },
-      { id: IDS[1], name: REAL[1] },
-      { id: IDS[2], name: null, reason: "no-filename-header" }
-    ]
-  });
-  loadAttachmentNames(card); await settle();
-  ok(
-    JSON.stringify(texts(card)) === JSON.stringify(["Document 1", REAL[1], "Document 3"]),
-    "only the resolved one is renamed; the others stay 'Document N'",
-    texts(card).join(" | ")
-  );
+  // ═══ E · cost ═════════════════════════════════════════════════════════════
+  console.log("\nE · one request per card, keyed by NOTICE not by file id");
+  const m4 = makeCard(4);
+  calls = 0; lastUrl = null;
+  impl = jsonOk({ attachments: samList(5) });
+  loadAttachmentNames(m4.card); loadAttachmentNames(m4.card); await settle();
+  loadAttachmentNames(m4.card); await settle();
+  ok(calls === 1, "three opens produced exactly one request", `calls=${calls}`);
+  ok(lastUrl === "/api/notice-attachments?noticeId=" + ROOT_NOTICE,
+    "asks by noticeId — the only key that can surface a feed-omitted file", String(lastUrl));
+  const m5 = makeCard(0);
+  calls = 0;
+  loadAttachmentNames(m5.card); await settle();
+  ok(calls === 1, "a card with no feed links STILL asks — SAM may have documents the feed lacked");
 
-  // ═══ F · cost ═════════════════════════════════════════════════════════════
-  console.log("\nF · one request per card, no matter how often it is opened");
-  card = makeCard();
-  fetchCalls = 0;
-  fetchImpl = jsonOk({ names: IDS.map((id, i) => ({ id, name: REAL[i] })) });
-  loadAttachmentNames(card); loadAttachmentNames(card); await settle();
-  loadAttachmentNames(card); await settle();
-  ok(fetchCalls === 1, "three opens produced exactly one request", `calls=${fetchCalls}`);
-
-  card = makeCard();
-  fetchCalls = 0;
-  lastFetchUrl = null;
-  fetchImpl = jsonOk({ names: [] });
-  loadAttachmentNames(card); await settle();
-  // Read through a getter: the stub assigns lastFetchUrl inside a closure that
-  // control-flow analysis cannot see, so a direct read here narrows to the `null`
-  // it was just set to — and every assertion below it folds into a tautology.
-  const sent = sentUrl();
-  ok(
-    sent === "/api/notice-attachments?ids=" + encodeURIComponent(IDS.join(",")),
-    "requests the route with a comma-joined id list",
-    String(sent)
-  );
-  ok(
-    !!sent && !sent.includes("http"),
-    "sends ids only — never a SAM URL (the server rebuilds it; no SSRF surface)"
-  );
-
-  // A card with no attachments must not call the route at all.
-  const bare = new El("div");
-  bare.className = "pcard";
-  fetchCalls = 0;
-  loadAttachmentNames(bare); await settle();
-  ok(fetchCalls === 0, "a card with no attachments makes no request");
-
-  // ═══ G · the markup + CSS the panel depends on ════════════════════════════
-  console.log("\nG · the shipped markup and stylesheet still carry this seam");
-  ok(DSO.includes('class="pd-att"'), "detailHTML renders anchors with class pd-att");
-  ok(DSO.includes("data-att-id"), "detailHTML carries data-att-id");
+  // ═══ F · markup + CSS ═════════════════════════════════════════════════════
+  console.log("\nF · the shipped markup and stylesheet still carry this seam");
   ok(/loadAttachmentNames\(card\)/.test(DSO), "loadAttachmentNames is actually CALLED (not just defined)");
-  ok(/\.pd-att\{[^}]*display:flex/.test(HTML), "opportunities.html lays each attachment row out as a flex row");
-  ok(DSO.includes('class="pd-atts"'), "the attachment list is wrapped in .pd-atts");
-
-  // ── the disclosure ─────────────────────────────────────────────────────────
-  // Collapsed, the row is one line whatever the count. Open, the list scrolls
-  // inside a fixed height. Both halves matter: without the height cap a 25-doc
-  // notice just moves the wall one click away, which is the whole reason the
-  // flat list was rejected.
-  ok(DSO.includes("data-att-toggle"), "the attachment list sits behind a disclosure toggle");
+  ok(DSO.includes("data-att-toggle"), "the list sits behind a disclosure toggle");
+  ok(DSO.includes("data-att-count"), "the count label is addressable so it can follow SAM");
   ok(/\.pd-atts\{[^}]*display:none/.test(HTML), "the list is COLLAPSED by default");
   ok(/\.pd-atts\.is-open\{display:block\}/.test(HTML), "opening it reveals the list");
-  const capMatch = HTML.match(/\.pd-atts\{[^}]*max-height:(\d+)px/);
-  ok(!!capMatch, "the open list has a bounded height");
-  ok(/\.pd-atts\{[^}]*overflow-y:auto/.test(HTML),
-    `the open list scrolls inside that height (${capMatch ? capMatch[1] + "px" : "unset"}) — 6 documents and 25 cost the same space`);
-  // A <button> with aria-expanded, not a clickable span: this is the one new
-  // control on the panel and it has to be reachable by keyboard.
+  const cap = HTML.match(/\.pd-atts\{[^}]*max-height:(\d+)px/);
+  ok(!!cap && /\.pd-atts\{[^}]*overflow-y:auto/.test(HTML),
+    `the open list scrolls inside a fixed height (${cap ? cap[1] + "px" : "unset"}) — 6 documents and 25 cost the same space`);
   ok(/<button type="button" class="att-tog" data-att-toggle aria-expanded="false">/.test(DSO),
     "the toggle is a real button carrying aria-expanded");
-  ok(/t\.setAttribute\('aria-expanded'/.test(DSO), "aria-expanded is kept in sync when toggled");
-  // The count has to come from the links themselves. A hardcoded or stale number
-  // would misreport the package size on a decision screen.
-  ok(/links\.length \+ \(links\.length === 1 \? ' document' : ' documents'\)|esc\(String\(links\.length\)\)/.test(DSO),
-    "the collapsed label counts the actual links");
-  // Extension split out — repeated down 19 rows it is what made the list read as
-  // a wall. The full name must survive in the title attribute.
-  ok(DSO.includes('class="att-nm"') && DSO.includes('class="att-ext"'),
-    "filename and extension render in separate slots");
-  ok(/a\.setAttribute\('title', nm\)/.test(DSO),
-    "the FULL filename is preserved in the title, so splitting it loses nothing");
-  // Names must wrap, not clip: a truncated filename is worse than no filename,
-  // because it reads as authoritative while hiding which document it is.
-  // Scoped to the attachment rules only. The page legitimately ellipsises
-  // elsewhere (act-card titles, the collapsed sidebar), so a file-wide search
-  // condemns healthy CSS — the count-floor mistake in selector form.
+  ok(/\.pd-att \.att-lock\{/.test(HTML), "the access-restricted flag is styled");
   const attCss = (HTML.match(/\.pd-att[^{]*\{[^}]*\}/g) || []).join(" ");
-  ok(
-    attCss.length > 0 &&
-      !/text-overflow:\s*ellipsis/.test(attCss) &&
-      /overflow-wrap/.test(attCss),
-    "long filenames wrap rather than being cut off"
-  );
+  ok(!/text-overflow:\s*ellipsis/.test(attCss) && /overflow-wrap/.test(attCss),
+    "long filenames wrap rather than being cut off");
+  // No exit ramp. Checked against CODE — the comment explaining the removal
+  // necessarily quotes it, and a gate that fails on its own documentation
+  // teaches people to delete the documentation.
+  const code = DSO.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  ok(!/more on SAM\.gov/i.test(code), "no '+N more on SAM.gov' exit ramp remains in code");
+  ok(!/resource_links\.slice\(/.test(code), "the feed list is not sliced — every link renders");
+  // The upstream is government-populated and we do not control it; a filename is
+  // exactly the field that eventually contains a quote mark.
+  ok(!/box\.innerHTML\s*=/.test(code), "rows are built with DOM methods, not an innerHTML string");
 
-  // ── nothing is hidden behind a link to a competitor ───────────────────────
-  // The panel previously ended in "+N more on SAM.gov", which sent the customer
-  // off-platform to read something we already had. EVERY link must render; only
-  // NAME lookup is bounded.
-  // Checked against CODE, not comments. The comment explaining why the exit ramp
-  // was removed necessarily quotes it, and a naive source search would then go
-  // red forever — a gate that fails on its own documentation teaches people to
-  // delete the documentation.
-  const dsoCode = DSO.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-  ok(!/more on SAM\.gov/i.test(dsoCode), "no '+N more on SAM.gov' exit ramp remains in code");
-  ok(
-    !/resource_links\.slice\(/.test(DSO),
-    "the attachment list is not sliced — every attachment renders"
-  );
-  const named = Number(DSO.match(/const ATT_NAMED\s*=\s*(\d+)/)?.[1] ?? 0);
-  const SERVER_MAX = 40; // MAX_ATTACHMENT_IDS in src/lib/sam-attachment-names.ts
-  ok(named > 0 && named <= SERVER_MAX,
-    `ATT_NAMED (${named}) is within the route's ceiling (${SERVER_MAX})`);
-  // Past the naming ceiling a link must still render — as "Document N", unnamed
-  // but working. Losing that turns a bound on WORK into a bound on CONTENT.
-  ok(/i < ATT_NAMED/.test(DSO),
-    "ATT_NAMED gates only the data-att-id (the name lookup), never the link itself");
-
-  // ═══ H · falsifiability ═══════════════════════════════════════════════════
-  // A gate that cannot go red proves nothing. Plant the exact defect this gate
-  // exists to catch — position-matching instead of id-matching — and require
-  // that the D-section check rejects it.
-  console.log("\nH · gate falsifiability (planted positive)");
-  const planted: any = { __out: {}, console, Array, encodeURIComponent, fetch: () => fetchImpl() };
+  // ═══ G · falsifiability ═══════════════════════════════════════════════════
+  // A gate that cannot go red proves nothing. Plant the exact defect this file
+  // exists for — keeping the feed's list instead of SAM's — and require B to
+  // reject it.
+  console.log("\nG · gate falsifiability (planted positive)");
+  const planted: any = {
+    __out: {}, console, Array, encodeURIComponent, JSON,
+    document: { createElement: (t: string) => new El(t) },
+    fetch: () => impl()
+  };
   vm.createContext(planted);
   vm.runInContext(
+    extractFn(DSO, "attachmentRow") + "\n" +
     extractFn(DSO, "loadAttachmentNames").replace(
-      "const nm = byId[a.getAttribute('data-att-id')];",
-      "const nm = (names[__i++] || {}).name;"
-    ).replace(
-      "let named = 0;",
-      "let named = 0; let __i = 0;"
+      "const rows = list.map(attachmentRow).filter(Boolean);",
+      "const rows = [];"   // the regression: never rebuild from SAM's list
     ),
     planted
   );
-  const badCard = makeCard();
-  fetchImpl = jsonOk({ names: IDS.map((id, i) => ({ id, name: REAL[i] })).reverse() });
-  planted.__out.loadAttachmentNames(badCard); await settle();
-  const plantedMisplaces = JSON.stringify(texts(badCard)) !== JSON.stringify(REAL);
-  ok(plantedMisplaces, "a position-matching implementation IS caught by the D check", texts(badCard).join(" | "));
+  const bad = makeCard(4);
+  impl = jsonOk({ attachments: samList(5) });
+  planted.__out.loadAttachmentNames(bad.card); await settle();
+  ok(bad.box.children.length === 4,
+    "an implementation that ignores SAM's list IS caught by the B check",
+    `${bad.box.children.length} rows — the omitted document would stay hidden`);
 
   console.log(`\n${fail === 0 ? "✅ ALL PASS" : `❌ ${fail} RED`} — ${pass} check(s) green`);
   process.exit(fail === 0 ? 0 : 1);
