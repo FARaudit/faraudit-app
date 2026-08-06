@@ -161,11 +161,15 @@ button{font-family:inherit}
 .pillset{width:100%;gap:6px}
 .pillset .view-chip{flex:0 0 calc((100% - 30px)/3 + 6px);box-sizing:border-box}
 .vr-right{width:100%;margin-left:0;justify-content:flex-end;margin-top:2px}
-/* Tracked sits with the controls, NOT among the saved views. The saved views are
-   rules over SAM's data — anyone with this feed gets the same three. Tracked is
-   the customer's own marks, and a row that mixes the two teaches that they are
-   the same kind of thing. Left-aligned on its line for the same reason. */
-.track-chip{margin-right:auto;display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 12px;border-radius:8px;background:var(--card);border:1px solid var(--line);cursor:pointer;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.02em;color:var(--ink-2)}
+/* Tracked lives on the ALL NOTICES header, with the other list-scoped controls,
+   not up among the saved views. Two reasons: the saved views are rules over SAM's
+   data — anyone with this feed gets the same three — while Tracked is the
+   customer's own marks; and it changes what the list below shows, which is what
+   everything else on this row does. It also keeps the filter panel to three
+   chips instead of a fourth stranded on its own line. */
+.track-chip{margin-left:auto;display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 12px;border-radius:8px;background:var(--card);border:1px solid var(--line);cursor:pointer;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.02em;color:var(--ink-2)}
+/* Once Tracked owns the auto margin, Collapse all rides beside it. */
+.plist-head .track-chip ~ .collapse-all{margin-left:0}
 .track-chip:hover{border-color:var(--accent-line);color:var(--accent-deep)}
 .track-chip.active{background:linear-gradient(0deg,var(--eligible-bg),var(--eligible-bg)),var(--card);border-color:var(--eligible-line);color:var(--eligible-ink)}
 /* Nothing tracked, or the read failed: still shown so the control is discoverable,
@@ -180,7 +184,19 @@ button{font-family:inherit}
 .trow .tr-m{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--tertiary)}
 .trow .tr-s{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:var(--card-soft);color:var(--tertiary)}
 .trow .tr-s.closed{background:var(--alarm-wash);color:var(--alarm);border:1px solid var(--alarm-line)}
+/* A tracked notice has to be removable from the place it is shown. Without this
+   a closed notice could be tracked and never untracked — the row carries no
+   Track button, because it is not a feed card. */
+.trow .tr-x{margin-left:auto;flex:none;padding:0;border:0;background:none;cursor:pointer;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--tertiary)}
+.trow .tr-x:hover{color:var(--alarm);text-decoration:underline}
+.trow .tr-x[disabled]{cursor:default;opacity:.5;text-decoration:none}
 .tnote{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--tertiary);margin:2px 0 10px}
+/* Shown only while something is open, and it carries the COUNT — the problem is
+   losing track of how many panels you left expanded, which a bare label does not
+   solve. Costs no space when nothing is open. */
+.collapse-all{margin-left:auto;margin-right:12px;padding:0;border:0;background:none;cursor:pointer;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.02em;color:var(--tertiary)}
+.collapse-all:hover{color:var(--accent-deep);text-decoration:underline}
+.collapse-all[hidden]{display:none}
 .view-chip{display:inline-flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;padding:9px 14px;border-radius:10px;background:var(--card);border:1px solid var(--line);cursor:pointer;text-align:left;white-space:nowrap}
 .view-chip .vc-t{font-size:12px;font-weight:700;color:var(--ink);line-height:1.2;white-space:nowrap}
 .view-chip .vc-d{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--tertiary);line-height:1.25;white-space:nowrap}
@@ -197,7 +213,7 @@ button{font-family:inherit}
 
 /* ── widgets ── */
 .row{display:grid;gap:16px;align-items:stretch}
-.row.hero{grid-template-columns:1.42fr 1fr}
+.row.hero{grid-template-columns:1fr 1fr;gap:14px}
 /* Media rules OUT-SPECIFY their base rule (html …) — equal specificity would
    lose on source order and the narrow path would never run. */
 @media(max-width:1320px){html .row.hero{grid-template-columns:1fr}}
@@ -262,7 +278,7 @@ button{font-family:inherit}
 .act-d{font-family:"Manrope",sans-serif;font-size:22px;font-weight:800;letter-spacing:-.03em;color:var(--ink);text-align:right;line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap}
 .act-d small{font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:700;color:var(--tertiary);letter-spacing:.02em;margin-left:2.5px}
 .act-row.far .act-d{color:var(--ink-2);font-weight:700}
-.act-title{display:block;font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.act-title{display:block;font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
 .act-agy{display:block;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--tertiary);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* ── verdict + chips ── */
@@ -478,7 +494,6 @@ button{font-family:inherit}
         <div class="ctl-field">
           <div class="pillset" id="savedViews"></div>
           <div class="vr-right">
-            <button class="track-chip" id="trackedChip" type="button" hidden></button>
             <div class="ctl-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input id="searchInput" type="text" placeholder="Filter notices…" /></div>
             <button class="reset-btn" id="resetBtn">Reset all</button>
           </div>
@@ -508,6 +523,8 @@ button{font-family:inherit}
       <section class="widget">
         <header class="widget-head plist-head" style="align-items:center">
           <div class="wh-text"><h3>All notices</h3><p class="wh-sub plist-count" id="plistCount"></p></div>
+          <button class="track-chip" id="trackedChip" type="button" hidden></button>
+          <button class="collapse-all" id="collapseAll" type="button" hidden></button>
           <div class="seg" id="sortSeg"></div>
         </header>
         <div class="plist" id="plist"></div>

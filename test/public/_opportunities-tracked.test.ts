@@ -137,10 +137,30 @@ try {
   fail++;
 }
 
+console.log("\nB2 · a tracked notice can be removed from the place it is shown");
+// Without this a closed notice is a one-way door: the compact row carries no
+// Track button, because it is not a feed card.
+ok(/data-untrack=/.test(closedRow), "the compact row carries an Untrack control");
+ok(closedRow.includes(CLOSED.notice_id), "keyed on the notice id the DELETE needs");
+ok(/closest\('\[data-untrack\]'\)/.test(CODE), "a delegated handler listens for it");
+ok(/method: 'DELETE'/.test(CODE) && /\/api\/watch\?noticeId=/.test(CODE),
+  "it calls DELETE /api/watch?noticeId= — the endpoint the row button already uses");
+// The row must survive a failed delete: this list is the only place the customer
+// can see a notice the feed has dropped.
+ok(/Untrack failed/.test(CODE), "a failed removal says so and re-enables the control");
+ok(!/WATCHED\.delete\(id\)/.test(CODE),
+  "it does not call an out-of-scope WATCHED — that guard would never fire");
+ok(/window\.DSO\.WATCHED_NOTICE_IDS/.test(CODE),
+  "it clears the row-level watch map so a card in the feed stops reading 'Tracking'");
+// A record with no notice_id cannot be deleted, so it must not offer the control.
+const noId = trackedRow({ title: "Orphan record", response_deadline: null });
+ok(!/data-untrack/.test(noId), "a record with no notice id offers no Untrack it could not honour");
+ok(noId.includes("Orphan record"), "but it is still LISTED — unremovable is not the same as invisible");
+
 console.log("\nD · it is not wired into Pipeline or Decisions");
 ok(!/S\.view === 'tracked'[^]{0,400}pipeline/i.test(CODE),
   "the tracked view does not touch pipeline state");
-ok(/\.track-chip\{/.test(HTML), "the control has its own style, distinct from .view-chip");
+ok(/\.track-chip\{/.test(HTML) && /plist-head[\s\S]{0,200}?trackedChip/.test(HTML), "the control sits on the All notices header with the other list-scoped controls");
 ok(!/data-view="tracked"/.test(CODE),
   "it is NOT a saved view — those are rules over SAM's data, this is the customer's own marks");
 
