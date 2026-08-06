@@ -75,6 +75,11 @@ function proseLiterals(src: string): string[] {
   while ((m = re.exec(src)) !== null) {
     const v = m[1];
     if (!v.includes(" ")) continue;            // enum token / class name
+    // Whitespace-only is not copy. `.replace(/_+/g, ' ')` passes the space test
+    // above while carrying no words at all, so it was reported as "invented copy"
+    // — noise that would recur for any separator argument. Prose has at least one
+    // non-space character; this excludes nothing a human reads.
+    if (!/\S/.test(v)) continue;
     if (/^[a-z-]+$/.test(v)) continue;         // defensive: kebab wiring
     out.push(v);
   }

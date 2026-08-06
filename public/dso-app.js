@@ -189,6 +189,19 @@ const deptName   = (d)=>{ if(DEPT_NAME[d]) return DEPT_NAME[d]; UNMAPPED.add(d);
 const OFFICE_SHORT = officeName;
 const TITLECASE = (s)=>s.replace(/[A-Za-z][A-Za-z'()./-]*/g,w=>/^[A-Z0-9'()./-]{1,4}$/.test(w)?w:w[0]+w.slice(1).toLowerCase());
 
+/* DLA machine-generates notice titles from its catalogue, joining every part with
+   underscores: "Cylinder Assembly,A_End_Item_B-02_NSN_1650015171308FW_PN_…" is a
+   single token to a browser. Other buyers write theirs by hand ("MH-65 9 Frame
+   D-ring Kit"), so this normalises one publisher's habit, not a SAM-wide format.
+
+   DISPLAY ONLY, and deliberately the least it can do: underscores become spaces
+   and nothing else moves. No part is dropped, reordered, or promoted to a field —
+   inferring structure from an unstructured government title is how a wrong name
+   ends up on a notice someone is deciding whether to bid. The exact string SAM
+   published stays in the title attribute at both render sites, so the raw value
+   is always one hover away. */
+const READABLE = (s)=> typeof s === 'string' ? s.replace(/_+/g,' ').replace(/\s{2,}/g,' ').trim() : '';
+
 /* ── the per-row clause: composed from the row's OWN facts, never a template
    branch. The live page produced 5 strings for 197 rows, one of them on 78%. ── */
 function clause(o){
@@ -452,7 +465,7 @@ function renderAct(){
   $('actSub').textContent = 'The 7 soonest deadlines you can still respond to, ordered by days left.';
   $('actList').innerHTML = rows.map(o=>'<button class="act-row'+(o.days>7?' far':'')+'" data-id="'+esc(o.id)+'">'+
     '<span class="act-d">'+o.days+'<small>d</small></span>'+
-    '<span style="min-width:0"><span class="act-title">'+esc(TITLECASE(o.title))+'</span><span class="act-agy">'+esc(officeName(o.office))+' · '+esc(o.id)+'</span></span>'+
+    '<span style="min-width:0"><span class="act-title" title="'+esc(o.title||'')+'">'+esc(TITLECASE(READABLE(o.title)))+'</span><span class="act-agy">'+esc(officeName(o.office))+' · '+esc(o.id)+'</span></span>'+
     '<span class="vd '+verdict(o).cls+'">'+verdict(o).word+'</span></button>').join('');
   $('actFoot').textContent = pool.length > rows.length
     ? 'showing the '+rows.length+' soonest · '+pool.length+' notices in this read carry a published deadline'
@@ -670,7 +683,7 @@ function rowHTML(o) {
     '<div class="pc-when"><div class="pc-d">' + (o.days == null ? '—' : o.days + '<small>d</small>') + '</div>' +
       (o.days == null ? '<div class="pc-dl">NO DEADLINE</div>' : '') + '</div>' +
     '<div class="pc-main">' +
-      '<div class="pc-title">' + esc(TITLECASE(o.title)) + '</div>' +
+      '<div class="pc-title" title="' + esc(o.title || '') + '">' + esc(TITLECASE(READABLE(o.title))) + '</div>' +
       '<div class="pc-buyer">' + (officeName(o.office) === deptName(o.agency) ? '<b>' + esc(officeName(o.office)) + '</b>' : '<b>' + esc(officeName(o.office)) + '</b> · ' + esc(deptName(o.agency))) + '</div>' +
       '<div class="pc-id">' + esc(o.id) + '</div>' +
       '<div class="pc-chips"><span class="chip naics">' + esc(o.naics || 'NAICS —') + '</span>' +
