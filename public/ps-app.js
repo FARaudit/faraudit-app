@@ -62,19 +62,75 @@
      column breaks. Missing values render as an empty cell holding its place. */
   function naicsRow(code) {
     var m = naicsMeta(code);
-    var ref = window.NAICS_REF;
-    var doms = (ref && ref.OASIS && ref.OASIS[String(code)]) || null;
     return `<div class="naics-row"><div class="nr-l">`
       + `<span class="nr-code">${esc(code)}</span>`
       + (m ? `<span class="nr-title">${esc(m.title)}</span>`
            : `<span class="nr-unknown">not in the reference table</span>`)
-      + (doms
-        ? `<span class="nr-oasis" title="On the GSA OASIS+ vehicle, this code carries work in: ${esc(doms.join(', '))}">OASIS+ ${doms.length}</span>`
-        : `<span class="nr-gap"></span>`)
       + (m && m.size
         ? `<span class="nr-size" title="SBA size standard — the solicitation's own stated standard governs when it differs">${esc(m.size)}</span>`
         : `<span class="nr-gap"></span>`)
       + `</div><button class="nr-x" type="button" data-naics-rm="${esc(code)}" title="Remove" aria-label="Remove NAICS ${esc(code)}">✕</button></div>`;
+  }
+
+  /* A chip is GREEN only when SAM established the program. Anything else reads as
+     carried-but-unverified, because a set-aside bar is cleared by the registration, not
+     by the profile — and a chip that looks the same either way is the profile
+     attesting on SAM's behalf. */
+  /* THREE STATES, NOT TWO — the programs do not all work the same way.
+     8(a), HUBZone, WOSB/EDWOSB and SDVOSB/VOSB are CERTIFIED by SBA (SDVOSB through
+     VetCert, which replaced the VA's CVE process); self-certification is no longer
+     accepted for any of them, so SAM is the authority and a green chip means SAM said
+     so. "Small business" is different in kind: it is SELF-REPRESENTED in SAM against the
+     size standard for the firm's NAICS code, so it can never appear in SBA's certified
+     programs and must not be shown as failing a check it is not subject to. */
+  function isSelfRepresented(name) {
+    return /small\s*business/i.test(String(name || ''));
+  }
+  function certChip(c) {
+    var name = esc(c.k || c);
+    if (c.on) return `<span class="cert-tg on" title="Established in SAM under this firm's UEI">${name}</span>`;
+    if (isSelfRepresented(c.k || c)) {
+      return `<span class="cert-tg" title="Self-represented in SAM against the size standard for your NAICS codes — this is not an SBA-certified program, so there is nothing for SAM to establish">${name}</span>`;
+    }
+    return `<span class="cert-tg" title="Carried on your profile — not established in SAM under the UEI on file">${name}</span>`;
+  }
+  /* The reason is stated ONCE, from the SAM state, and only when there is something
+     unverified to explain. A null state is our own read failing: say nothing rather than
+     tell a customer their certification is unverified because we could not check. */
+  function certNote() {
+    var st = window.PS.CERT_STATE;
+    // Self-represented entries are excluded: they are not awaiting a check, so counting
+    // them would make the note appear over a profile with nothing wrong with it.
+    var anyUnverified = (window.PS.CERTS || []).some(function (c) {
+      return !c.on && !isSelfRepresented(c.k || c);
+    });
+    if (!st || !anyUnverified) return '';
+    var why = st === 'uei-not-found'
+        ? 'SAM has no registration under the UEI on your profile, so none of these is established there.'
+      : st === 'no-uei'
+        ? 'No UEI is on file, so there is nothing for SAM to establish these against.'
+      : st === 'registration-inactive'
+        ? 'The SAM registration under this UEI has lapsed, so it establishes nothing until it is renewed.'
+      : st === 'verified'
+        ? 'SAM was read successfully; the unfilled ones are not registered under this UEI.'
+      : '';
+    if (!why) return '';
+    /* SAY WHAT WAS READ, AND WHAT WOULD CHANGE IT. The state is named against the UEI it
+       was checked for, and the sentence after it says how the row fills in — on its own,
+       from the registration, with nothing here to type. Without that, an unpromoted row
+       is indistinguishable from a fault. */
+    var uei = window.PS.COMPANY && window.PS.COMPANY.uei;
+    var stamp = st === 'uei-not-found' ? 'Not found in SAM'
+      : st === 'no-uei' ? 'No UEI on file'
+      : st === 'registration-inactive' ? 'SAM registration lapsed'
+      : 'Read from SAM';
+    return `<div class="cert-state"><span class="cs-dot"></span>`
+      + `<span class="cs-t">${esc(stamp)}</span>`
+      + (uei ? `<span class="cs-u">${esc(uei)}</span>` : '')
+      + `</div>`
+      + `<div class="fld-note" style="margin-top:6px">${esc(why)} `
+      + `These are read from your SAM registration and fill in on their own — there is nothing to type here. `
+      + `A set-aside bar is cleared by the registration, not by this list.</div>`;
   }
 
   function editable(id, label, val, ph) { return `<div class="fld"><label>${label}</label><input type="text" id="${id}" value="${esc(val)}" placeholder="${esc(ph)}"></div>`; }
@@ -141,7 +197,8 @@
         <div class="cert-row">${NAICS.length ? NAICS.map(n => `<span class="cert-tg on">${esc(n.code || n.k || n)}</span>`).join('') : '<span class="fld-none">None on file</span>'}</div>
         ${NAICS.length ? '' : '<div class="note note-warn">No NAICS codes on file, so Today, Opportunities, Contracting Officers and Teaming Partners have nothing to match against and will stay empty. Add them under NAICS Configuration.</div>'}
         <div class="fld-sec">Certifications</div>
-        <div class="cert-row">${CERTS.length ? CERTS.map(c => `<span class="cert-tg on">${esc(c.k || c)}</span>`).join('') : '<span class="fld-none">None on file</span>'}</div>
+        <div class="cert-row">${CERTS.length ? CERTS.map(c => certChip(c)).join('') : '<span class="fld-none">None on file</span>'}</div>
+        ${certNote()}
         <div class="note">This is the same record the <a href="/capability-statement">capability statement</a> prints and the audit engine reads when it judges whether you are eligible to bid — so what you enter here shapes real verdicts. NAICS codes are edited under NAICS Configuration. Certifications are shown here only: one clears a set-aside bar just when it is verified against SAM, so there is nothing useful to type.</div>
       </div>
       <div class="sp-foot"><span class="saved" id="psSavedNote" hidden></span><button class="save-btn" id="psSaveBtn">Save changes</button></div>`,
@@ -165,7 +222,8 @@
       <div class="sp-hd"><div class="sp-t">NAICS Configuration</div><div class="sp-s">These codes scope what the platform shows you</div></div>
       <div class="sp-bd">
         ${NAICS.length
-          ? NAICS.map(n => naicsRow(n.code)).join('')
+          ? `<div class="naics-head"><span>Code</span><span>Description</span><span class="nh-r">Size standard</span><span></span></div>`
+            + NAICS.map(n => naicsRow(n.code)).join('')
           : '<div class="fld-none" style="padding:6px 2px 12px">No NAICS codes on file.</div>'}
         ${(window.PS.NAICS_DERIVED || []).length ? `
         <div class="naics-sugg">

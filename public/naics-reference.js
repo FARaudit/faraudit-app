@@ -48,33 +48,9 @@
   ];
   var SYN={'238150':'ballistic glass window glazing curtain wall blast','237310':'paving roads asphalt bridge street','236220':'building renovation tenant improvement','238210':'electrical wiring power','238220':'plumbing hvac heating cooling mechanical','541512':'it software systems integration network','541511':'software programming development coding','541330':'engineering design a&e civil structural','488190':'aircraft ground support flightline aviation','811219':'calibration instrument electronic repair','332710':'machining cnc fabrication parts','336412':'jet engine turbine afterburner aircraft','334511':'radar navigation sensor electronics','518210':'cloud hosting data center fedramp','561210':'base operations facilities janitorial grounds'};
 
-  /* OASIS+ domain reach, per NAICS code — from GSA's published NAICS-codes-by-domain
-     table for the OASIS+ vehicle. Deliberately NOT used as the browse grouping: the
-     domains OVERLAP (541690 appears in all eight, 541330 in six), so grouping by them
-     would list one code under six headings. It is shown as reach instead — what work a
-     code can carry on that vehicle — which is the question a services contractor is
-     actually asking. Absent means the code is not on OASIS+, which is a fact about the
-     vehicle, not about the code. */
-  var OASIS = {
-    '336611': ['Technical & Engineering', 'Logistics', 'Enterprise Solutions'],
-    '488190': ['Technical & Engineering', 'Facilities', 'Logistics'],
-    '541310': ['Technical & Engineering'],
-    '541330': ['Technical & Engineering', 'Research & Development', 'Intelligence Services', 'Environmental', 'Facilities', 'Logistics', 'Enterprise Solutions'],
-    '541611': ['Management & Advisory', 'Technical & Engineering', 'Research & Development', 'Intelligence Services', 'Facilities', 'Enterprise Solutions'],
-    '541690': ['Management & Advisory', 'Technical & Engineering', 'Research & Development', 'Intelligence Services', 'Environmental', 'Facilities', 'Logistics', 'Enterprise Solutions'],
-    '541715': ['Research & Development', 'Intelligence Services', 'Enterprise Solutions'],
-    '561210': ['Environmental', 'Facilities', 'Logistics', 'Enterprise Solutions'],
-    '562910': ['Environmental', 'Enterprise Solutions'],
-    '238210': ['Facilities'],
-    '238220': ['Facilities'],
-    '238990': ['Facilities'],
-    '561720': ['Facilities'],
-    '561730': ['Facilities'],
-    '811310': ['Facilities']
-  };
 
   window.NAICS_REF = {
-    CATS: CATS, DATA: DATA, SYN: SYN, OASIS: OASIS,
+    CATS: CATS, DATA: DATA, SYN: SYN,
     // code -> row, for the O(1) lookup both consumers need.
     byCode: DATA.reduce(function (m, r) { m[r[0]] = r; return m; }, {}),
     /* Free-text match over code, title and the synonym list. Returns rows, never a
