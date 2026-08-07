@@ -301,6 +301,112 @@
     if (add) add.click();
   });
 
+  /* SEARCH IS A CONVENIENCE OVER A CURATED TABLE, NEVER A GATE.
+     A six-digit code is unreadable on its own, so typing a word offers the codes this
+     product carries a title and a size standard for. That table is a subset — SAM has
+     roughly a thousand codes — so free entry is untouched: six digits still add
+     directly, whether or not the table knows them. A search that finds nothing means
+     the table does not carry the code, which is NOT the same as the code being invalid,
+     and the empty state says exactly that.
+     Results are built with DOM nodes, not markup: these strings are reference data
+     going into a control the customer clicks. */
+  function naicsResults() {
+    const box = document.getElementById('psNaicsResults');
+    const input = document.getElementById('psNaicsInput');
+    if (!box || !input) return;
+    const q = input.value.trim();
+    const ref = window.NAICS_REF;
+    input.setAttribute('aria-expanded', 'false');
+    box.replaceChildren();
+    if (!ref || typeof ref.search !== 'function') { box.hidden = true; return; }
+    // Six digits is an answer, not a query — leave the customer to press Add.
+    if (/^\d{6}$/.test(q)) { box.hidden = true; return; }
+
+    const saved = (window.PS.NAICS || []).map(function (n) { return String(n.code); });
+    box.hidden = false;
+
+    /* NOTHING TYPED YET IS NOT AN EMPTY STATE. The panel has the room, and a customer
+       who does not already know their six-digit code cannot be helped by a blank box —
+       so the table is BROWSABLE, grouped the way the NAICS directory groups it. One
+       taxonomy across both surfaces; a second grouping here would be a second thing to
+       keep true. */
+    if (!q) {
+      (ref.CATS || []).forEach(function (cat) {
+        const rows = (ref.DATA || []).filter(function (r) {
+          return r[1] === cat.id && saved.indexOf(r[0]) === -1;
+        });
+        if (!rows.length) return;
+        const h = document.createElement('div');
+        h.className = 'nf-group';
+        h.textContent = cat.label;
+        box.appendChild(h);
+        rows.forEach(function (r) { box.appendChild(hitButton(r)); });
+      });
+      if (!box.children.length) {
+        const all = document.createElement('p');
+        all.className = 'nf-none';
+        all.textContent = 'Every code in the reference table is already on your profile. '
+          + 'It carries a subset of NAICS — any other six-digit code can still be typed in and added.';
+        box.appendChild(all);
+      }
+      return;
+    }
+
+    const hits = ref.search(q).filter(function (r) { return saved.indexOf(r[0]) === -1; });
+    input.setAttribute('aria-expanded', 'true');
+
+    if (!hits.length) {
+      const none = document.createElement('p');
+      none.className = 'nf-none';
+      none.textContent = 'No match in the reference table. It carries a subset of NAICS — '
+        + 'if you know the six-digit code, type it and add it directly.';
+      box.appendChild(none);
+      return;
+    }
+    hits.slice(0, 10).forEach(function (r) { box.appendChild(hitButton(r)); });
+  }
+
+  /* One row builder for both the browse list and the search hits, so they cannot drift
+     apart. A code with no sourced size standard simply carries no figure. */
+  function hitButton(r) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'nf-hit';
+    b.setAttribute('data-naics-add', r[0]);
+    b.setAttribute('role', 'option');
+    const code = document.createElement('span'); code.className = 'nf-code'; code.textContent = r[0];
+    const title = document.createElement('span'); title.className = 'nf-title'; title.textContent = r[2];
+    b.appendChild(code); b.appendChild(title);
+
+    // Every row emits every cell, present or not — an omitted cell shifts the ones after
+    // it and the column breaks.
+    const ref = window.NAICS_REF;
+    const doms = (ref && ref.OASIS && ref.OASIS[r[0]]) || null;
+    const reach = document.createElement('span');
+    if (doms) {
+      reach.className = 'nr-oasis';
+      reach.textContent = 'OASIS+ ' + doms.length;
+      reach.title = 'On the GSA OASIS+ vehicle, this code carries work in: ' + doms.join(', ');
+    } else {
+      reach.className = 'nr-gap';
+    }
+    b.appendChild(reach);
+
+    const size = document.createElement('span');
+    if (r[3]) {
+      size.className = 'nf-size';
+      size.textContent = r[3] + ' ' + (r[4] === 'emp' ? 'employees' : 'revenue');
+      size.title = 'SBA size standard — the solicitation’s own stated standard governs when it differs';
+    } else {
+      size.className = 'nr-gap';
+    }
+    b.appendChild(size);
+    return b;
+  }
+  document.addEventListener('input', function (e) {
+    if (e.target && e.target.id === 'psNaicsInput') naicsResults();
+  });
+
   /* The unavailable reason is PRINTED FROM THE ROUTE, not re-authored here. One
      sentence with one source: if agency targeting ships, the route stops saying
      "unwired" and this panel stops saying it too, with nothing to remember to edit. */
@@ -445,6 +551,11 @@
         } catch (_) { CAP_FIELDS.forEach(function (f) { failed.push(f.label); }); }
       }
 
+      // The server confirmed every field, so the record and the boxes now agree — the
+      // pending-edit set has nothing left to protect and must not outlive the write.
+      if (!failed.length && window.PS_APP && typeof window.PS_APP.clearDirty === 'function') {
+        window.PS_APP.clearDirty();
+      }
       if (!failed.length) note('✓ Saved', true);
       else if (failed.length >= CAP_FIELDS.length + 1) note('Nothing saved — reload and try again', false);
       else note('Partly saved · did NOT save: ' + failed.join(', '), false);
@@ -472,6 +583,12 @@
     const fill = function () {
       const el = document.getElementById('agState');
       if (el && el.dataset.filled !== '1') { el.dataset.filled = '1'; writeAgencyState(); }
+      // The NAICS browse list is part of the panel, not a response to typing — it has to
+      // be there the moment the tab renders, and again after every add or remove
+      // re-templates it, or the customer meets an empty box on the tab whose whole job
+      // is helping them find a code.
+      const ni = document.getElementById('psNaicsInput');
+      if (ni && ni.dataset.browsed !== '1') { ni.dataset.browsed = '1'; naicsResults(); }
     };
     new MutationObserver(fill).observe(host, { childList: true, subtree: true });
     fill();

@@ -41,6 +41,42 @@
   /* An editable field carries an id so the save handler can read it back. Anything with no
      write path must NOT render as an <input>: a text box that silently discards what you
      type is the defect this panel shipped with. */
+  /* A SIX-DIGIT CODE IS NOT A DESCRIPTION. Read from the ONE reference table
+     (/naics-reference.js), the same one the NAICS directory renders from.
+     That table is a CURATED subset — SAM carries roughly a thousand codes — so a miss
+     is expected and is NOT an error: the row shows the code alone and says the table
+     does not carry it, rather than inventing a title or refusing a code the customer
+     is entitled to save. The size standard is a REFERENCE figure from 13 CFR 121.201;
+     the solicitation's own stated standard governs when it differs. */
+  function naicsMeta(code) {
+    var ref = window.NAICS_REF;
+    var r = ref && ref.byCode && ref.byCode[String(code)];
+    if (!r) return null;
+    // A title with no size standard is a real state: the table carries the code's name
+    // but no primary-sourced 13 CFR 121.201 threshold for it. Show the name, claim no
+    // figure — a guessed threshold is the one error here that could flip a verdict.
+    return { title: r[2], size: r[3] ? r[3] + ' ' + (r[4] === 'emp' ? 'employees' : 'revenue') : '' };
+  }
+  /* EVERY ROW EMITS EVERY CELL. The grid gives code / title / reach / size their own
+     tracks, so a row that omits an absent value shifts every cell after it and the
+     column breaks. Missing values render as an empty cell holding its place. */
+  function naicsRow(code) {
+    var m = naicsMeta(code);
+    var ref = window.NAICS_REF;
+    var doms = (ref && ref.OASIS && ref.OASIS[String(code)]) || null;
+    return `<div class="naics-row"><div class="nr-l">`
+      + `<span class="nr-code">${esc(code)}</span>`
+      + (m ? `<span class="nr-title">${esc(m.title)}</span>`
+           : `<span class="nr-unknown">not in the reference table</span>`)
+      + (doms
+        ? `<span class="nr-oasis" title="On the GSA OASIS+ vehicle, this code carries work in: ${esc(doms.join(', '))}">OASIS+ ${doms.length}</span>`
+        : `<span class="nr-gap"></span>`)
+      + (m && m.size
+        ? `<span class="nr-size" title="SBA size standard — the solicitation's own stated standard governs when it differs">${esc(m.size)}</span>`
+        : `<span class="nr-gap"></span>`)
+      + `</div><button class="nr-x" type="button" data-naics-rm="${esc(code)}" title="Remove" aria-label="Remove NAICS ${esc(code)}">✕</button></div>`;
+  }
+
   function editable(id, label, val, ph) { return `<div class="fld"><label>${label}</label><input type="text" id="${id}" value="${esc(val)}" placeholder="${esc(ph)}"></div>`; }
   /* Read-only value. "Not on file" rather than an empty box, so nothing-on-file is visibly
      different from a field you are meant to fill in. */
@@ -129,7 +165,7 @@
       <div class="sp-hd"><div class="sp-t">NAICS Configuration</div><div class="sp-s">These codes scope what the platform shows you</div></div>
       <div class="sp-bd">
         ${NAICS.length
-          ? NAICS.map(n => `<div class="naics-row"><div class="nr-l"><span class="nr-code">${esc(n.code)}</span></div><button class="nr-x" type="button" data-naics-rm="${esc(n.code)}" title="Remove" aria-label="Remove NAICS ${esc(n.code)}">✕</button></div>`).join('')
+          ? NAICS.map(n => naicsRow(n.code)).join('')
           : '<div class="fld-none" style="padding:6px 2px 12px">No NAICS codes on file.</div>'}
         ${(window.PS.NAICS_DERIVED || []).length ? `
         <div class="naics-sugg">
@@ -138,9 +174,12 @@
           <div class="ns-s">These scope nothing until you add them. Adding one saves only that code.</div>
         </div>` : ''}
         <div class="pe-add">
-          <input type="text" id="psNaicsInput" inputmode="numeric" maxlength="6" placeholder="Six-digit NAICS code" aria-label="NAICS code to add">
+          <input type="text" id="psNaicsInput" maxlength="60" placeholder="Six-digit code, or search — &quot;software&quot;, &quot;construction&quot;" aria-label="NAICS code to add, or a word to search for one" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="psNaicsResults">
           <button class="save-btn" type="button" id="psNaicsAdd">Add code</button>
         </div>
+        <!-- Search results. Typing a word finds codes; typing six digits still adds
+             directly, because the reference table is a convenience and not an allowlist. -->
+        <div class="naics-find" id="psNaicsResults" role="listbox" aria-label="Matching NAICS codes" hidden></div>
         <div class="naics-msg" id="psNaicsMsg" role="status" hidden></div>
         <div class="note"><b>How this works:</b> your NAICS codes are what Today, Opportunities, Contracting Officers and Teaming Partners match against — with none on file those pages have nothing to match and stay empty. Wage Benchmarks offers them as an optional filter over a national reference table; it is not scoped by them. Each page picks up a change the next time it loads.</div>
       </div>
@@ -213,8 +252,31 @@
     $('setNav').innerHTML = NAV.map(n => `<button class="sn ${n.key === active ? 'active' : ''}" data-k="${n.key}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="${n.icon}"/></svg>${n.label}</button>`).join('');
     $('setNav').querySelectorAll('.sn').forEach(b => b.onclick = () => { active = b.dataset.k; renderNav(); renderPanel(); });
   }
+  /* WHAT THE CUSTOMER TYPED SURVIVES A RE-RENDER.
+     Every panel is re-templated from window.PS, and each input carries its value from
+     that state — so a re-render between typing and saving rebuilds the box and restores
+     the stored value. A theme flip, a tab click, or the initial load settling is enough.
+     Nothing is announced: the edit is simply gone, and the next save writes the old
+     value back under a "✓ Saved".
+
+     Only DIRTY fields are restored. An input the customer never touched must take the
+     freshly rendered value, or a re-render following a successful save — or the load
+     that first fills these boxes — would put a stale one back. */
+  var DIRTY = {};
+  document.addEventListener('input', function (e) {
+    var t = e.target;
+    if (t && t.id && t.closest && t.closest('#setContent')) DIRTY[t.id] = t.value;
+  });
+  /* Cleared once the server has confirmed the write: from then on the rendered value IS
+     the customer's value, and holding the old edit would fight the record. */
+  function clearDirty() { DIRTY = {}; }
+
   function renderPanel() {
     $('setContent').innerHTML = `<div class="set-panel">${PANELS[active]()}</div>`;
+    Object.keys(DIRTY).forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el && el.value !== DIRTY[id]) el.value = DIRTY[id];
+    });
     // Server-backed preferences bind below, by key. The company panel's Save binds in
     // profile-settings-live.js. Nothing else on the page is interactive.
     wireServerPrefs();
@@ -289,6 +351,6 @@
   }
 
   function init() { renderNav(); renderPanel(); }
-  window.PS_APP = { render: init, onThemeChange: () => renderPanel() };
+  window.PS_APP = { render: init, onThemeChange: () => renderPanel(), clearDirty: clearDirty };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
