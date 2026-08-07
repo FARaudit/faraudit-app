@@ -86,11 +86,26 @@
   function isSelfRepresented(name) {
     return /small\s*business/i.test(String(name || ''));
   }
+  /* ISSUED SOMEWHERE THIS RECORD DOES NOT READ. Service-disabled and veteran-owned
+     status is certified by VA VetCert. SAM's SBA certification list carries 8(a),
+     HUBZone, WOSB and EDWOSB and nothing else, so SDVOSB and VOSB are not merely
+     unestablished under this UEI — they are unestablishable from this source at ANY
+     UEI. Grouping them with the programs that DO fill in would promise a check that
+     never runs, which is the same untruth as a chip that looks held when it is not.
+     Both spellings are matched explicitly: a word boundary cannot find "vosb" inside
+     "sdvosb", and "wosb" must never match either of them. */
+  function isVetCertProgram(name) {
+    return /\bsdvosb\b|\bvosb\b|service[\s-]?disabled|veteran[\s-]?owned/i.test(String(name || ''));
+  }
   function certChip(c) {
     var name = esc(c.k || c);
+    var k = c.k || c;
     if (c.on) return `<span class="cert-tg on" title="Established in SAM under this firm's UEI">${name}</span>`;
-    if (isSelfRepresented(c.k || c)) {
-      return `<span class="cert-tg" title="Self-represented in SAM against the size standard for your NAICS codes — this is not an SBA-certified program, so there is nothing for SAM to establish">${name}</span>`;
+    if (isSelfRepresented(k)) {
+      return `<span class="cert-tg is-elsewhere" title="Self-represented in SAM against the size standard for your NAICS codes — this is not an SBA-certified program, so there is nothing for SAM to establish">${name}</span>`;
+    }
+    if (isVetCertProgram(k)) {
+      return `<span class="cert-tg is-elsewhere" title="Issued by VA VetCert. SAM's SBA certification list does not carry service-disabled or veteran-owned status, so this one does not fill in here under any UEI">${name}</span>`;
     }
     return `<span class="cert-tg" title="Carried on your profile — not established in SAM under the UEI on file">${name}</span>`;
   }
@@ -101,10 +116,17 @@
   function certCaption() {
     var certs = window.PS.CERTS || [];
     if (!certs.length) return '';
-    var carried = certs.filter(function (c) { return !c.on && !isSelfRepresented(c.k || c); }).length;
-    var selfRep = certs.filter(function (c) { return !c.on && isSelfRepresented(c.k || c); }).length;
+    var carried = 0, vetCert = 0, selfRep = 0;
+    certs.forEach(function (c) {
+      if (c.on) return;
+      var k = c.k || c;
+      if (isSelfRepresented(k)) selfRep++;
+      else if (isVetCertProgram(k)) vetCert++;
+      else carried++;
+    });
     var bits = [];
     if (carried) bits.push(carried + ' carried on your profile, not established in SAM');
+    if (vetCert) bits.push(vetCert + ' issued by VA VetCert, which SAM does not publish');
     if (selfRep) bits.push(selfRep + ' self-represented against your size standard');
     if (!bits.length) return '';
     return `<div class="fld-note" style="margin-top:8px">${esc(bits.join(' · '))}.</div>`;
@@ -115,12 +137,20 @@
      tell a customer their certification is unverified because we could not check. */
   function certNote() {
     var st = window.PS.CERT_STATE;
-    // Self-represented entries are excluded: they are not awaiting a check, so counting
-    // them would make the note appear over a profile with nothing wrong with it.
-    var anyUnverified = (window.PS.CERTS || []).some(function (c) {
-      return !c.on && !isSelfRepresented(c.k || c);
+    if (!st) return '';
+    var certs = window.PS.CERTS || [];
+    /* THE STAMP AND THE EXPLANATION ANSWER DIFFERENT QUESTIONS, so they are decided
+       separately. The stamp reports what SAM said about the registration — a fact about
+       the record, true whatever this row happens to hold. The sentence under it explains
+       an unfilled chip, and may only be shown when a chip is genuinely waiting on SAM.
+       Self-represented entries are not subject to the check, and VetCert programs are
+       issued by a body this record does not read; counting either would tell a customer
+       their row fills in from a registration that will never carry it. */
+    var awaitingSam = certs.some(function (c) {
+      var k = c.k || c;
+      return !c.on && !isSelfRepresented(k) && !isVetCertProgram(k);
     });
-    if (!st || !anyUnverified) return '';
+    var anyVetCert = certs.some(function (c) { return !c.on && isVetCertProgram(c.k || c); });
     var why = st === 'uei-not-found'
         ? 'SAM has no registration under the UEI on your profile, so none of these is established there.'
       : st === 'no-uei'
@@ -143,13 +173,24 @@
       : st === 'no-uei' ? 'No UEI on file'
       : st === 'registration-inactive' ? 'SAM registration lapsed'
       : 'Registered in SAM';
+    var lines = [];
+    if (awaitingSam) {
+      lines.push(why
+        + ' These are read from your SAM registration and fill in on their own — there is nothing to type here.'
+        + ' A set-aside bar is cleared by the registration, not by this list.');
+    }
+    /* Named where it DOES come from. "Not established in SAM" would be true and useless:
+       it reads as a step still outstanding, when the answer is that this row is not the
+       place that program is ever settled. */
+    if (anyVetCert) {
+      lines.push('Service-disabled and veteran-owned status is issued by VA VetCert, which SAM does not publish,'
+        + ' so those stay unfilled here whatever your registration says.');
+    }
     return `<div class="cert-state${ok ? ' is-ok' : ''}"><span class="cs-dot"></span>`
       + `<span class="cs-t">${esc(stamp)}</span>`
       + (uei ? `<span class="cs-u">${esc(uei)}</span>` : '')
       + `</div>`
-      + `<div class="fld-note" style="margin-top:6px">${esc(why)} `
-      + `These are read from your SAM registration and fill in on their own — there is nothing to type here. `
-      + `A set-aside bar is cleared by the registration, not by this list.</div>`;
+      + (lines.length ? `<div class="fld-note" style="margin-top:6px">${esc(lines.join(' '))}</div>` : '');
   }
 
   function editable(id, label, val, ph) { return `<div class="fld"><label>${label}</label><input type="text" id="${id}" value="${esc(val)}" placeholder="${esc(ph)}"></div>`; }
