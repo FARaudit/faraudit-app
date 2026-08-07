@@ -94,6 +94,22 @@
     }
     return `<span class="cert-tg" title="Carried on your profile — not established in SAM under the UEI on file">${name}</span>`;
   }
+  /* AN UNPROMOTED CHIP HAS TO SAY WHAT IT IS. Grey conveys "not established", but a row
+     of grey chips with no caption leaves the reader to guess whether they are examples,
+     placeholders, or their own record. They are none of those: they are entries carried
+     on the statement that SAM has not established. Name that, once, above the row. */
+  function certCaption() {
+    var certs = window.PS.CERTS || [];
+    if (!certs.length) return '';
+    var carried = certs.filter(function (c) { return !c.on && !isSelfRepresented(c.k || c); }).length;
+    var selfRep = certs.filter(function (c) { return !c.on && isSelfRepresented(c.k || c); }).length;
+    var bits = [];
+    if (carried) bits.push(carried + ' carried on your profile, not established in SAM');
+    if (selfRep) bits.push(selfRep + ' self-represented against your size standard');
+    if (!bits.length) return '';
+    return `<div class="fld-note" style="margin-top:8px">${esc(bits.join(' · '))}.</div>`;
+  }
+
   /* The reason is stated ONCE, from the SAM state, and only when there is something
      unverified to explain. A null state is our own read failing: say nothing rather than
      tell a customer their certification is unverified because we could not check. */
@@ -120,11 +136,14 @@
        from the registration, with nothing here to type. Without that, an unpromoted row
        is indistinguishable from a fault. */
     var uei = window.PS.COMPANY && window.PS.COMPANY.uei;
+    // The dot carries the state, so a registration that IS good must not wear the colour
+    // reserved for one that is not.
+    var ok = st === 'verified';
     var stamp = st === 'uei-not-found' ? 'Not found in SAM'
       : st === 'no-uei' ? 'No UEI on file'
       : st === 'registration-inactive' ? 'SAM registration lapsed'
-      : 'Read from SAM';
-    return `<div class="cert-state"><span class="cs-dot"></span>`
+      : 'Registered in SAM';
+    return `<div class="cert-state${ok ? ' is-ok' : ''}"><span class="cs-dot"></span>`
       + `<span class="cs-t">${esc(stamp)}</span>`
       + (uei ? `<span class="cs-u">${esc(uei)}</span>` : '')
       + `</div>`
@@ -198,6 +217,7 @@
         ${NAICS.length ? '' : '<div class="note note-warn">No NAICS codes on file, so Today, Opportunities, Contracting Officers and Teaming Partners have nothing to match against and will stay empty. Add them under NAICS Configuration.</div>'}
         <div class="fld-sec">Certifications</div>
         <div class="cert-row">${CERTS.length ? CERTS.map(c => certChip(c)).join('') : '<span class="fld-none">None on file</span>'}</div>
+        ${certCaption()}
         ${certNote()}
         <div class="note">This is the same record the <a href="/capability-statement">capability statement</a> prints and the audit engine reads when it judges whether you are eligible to bid — so what you enter here shapes real verdicts. NAICS codes are edited under NAICS Configuration. Certifications are shown here only: one clears a set-aside bar just when it is verified against SAM, so there is nothing useful to type.</div>
       </div>

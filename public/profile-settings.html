@@ -325,6 +325,10 @@ button{font-family:inherit}
 .cert-state .cs-dot{width:7px;height:7px;border-radius:50%;background:var(--amber-500,#d97706);flex:none}
 .cert-state .cs-t{font-size:11px;font-weight:700;color:var(--ink-2)}
 .cert-state .cs-u{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute)}
+/* A registration that IS good must not wear the colour reserved for one that is not. */
+.cert-state.is-ok{border-color:var(--green-200)}
+.cert-state.is-ok .cs-dot{background:var(--green-500,#10b981)}
+.cert-state.is-ok .cs-t{color:var(--green-700,#047857)}
 .naics-row .nr-l{display:contents}
 .nr-title{font-size:13px;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nr-size{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--mute);background:var(--line-3);border:1px solid var(--line-2);padding:3px 8px;border-radius:5px;white-space:nowrap;text-align:right}
