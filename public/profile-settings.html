@@ -309,18 +309,31 @@ button{font-family:inherit}
 /* A code carries its title and its SBA size standard, so the row is readable without
    looking anything up. The size standard is a reference figure — the solicitation's own
    stated standard governs when it differs, which is why it is muted, not asserted. */
-.nr-title{font-size:13px;color:var(--ink);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.nr-size{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--mute);background:var(--line-3);border:1px solid var(--line-2);padding:3px 8px;border-radius:5px;white-space:nowrap;flex:none}
-.nr-unknown{font-size:12px;color:var(--mute);font-style:italic}
+/* COLUMNS, SO THE LIST READS DOWN AS WELL AS ACROSS. A flex row sizes each cell to its
+   own content, which puts every title at a different x — unreadable once there are more
+   than three. One grid template on the saved rows and the picker rows keeps code, title,
+   reach and size standard on the same four axes in both lists. */
+.naics-row{display:grid;grid-template-columns:72px minmax(0,1fr) auto auto 30px;align-items:center;gap:14px}
+.naics-row .nr-l{display:contents}
+.nr-title{font-size:13px;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nr-size{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--mute);background:var(--line-3);border:1px solid var(--line-2);padding:3px 8px;border-radius:5px;white-space:nowrap;text-align:right}
+.nr-unknown{font-size:12px;color:var(--mute);font-style:italic;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Reach on the OASIS+ vehicle. A count, not eight names — the names are in the tooltip,
+   because a row that wraps stops being a column. */
+.nr-oasis{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:800;letter-spacing:.04em;color:var(--accent-deep);background:var(--accent-pale);border:1px solid var(--accent-light);padding:3px 7px;border-radius:5px;white-space:nowrap;cursor:help}
+.nr-gap{display:block}
 /* Search results — a picker over the reference table, never a gate on what can be added. */
 .naics-find{display:flex;flex-direction:column;gap:6px;margin:2px 0 6px;max-height:420px;overflow:auto}
 .nf-group{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);padding:12px 2px 2px}
 .nf-group:first-child{padding-top:2px}
-.nf-hit{display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:10px 13px;border:1px solid var(--line-2);border-radius:10px;background:var(--card);cursor:pointer;font-family:inherit;transition:border-color .14s,background .14s}
+/* Same four axes as the saved rows above, so the eye does not have to re-find the
+   columns when it moves from what you hold to what you could add. */
+.nf-hit{display:grid;grid-template-columns:72px minmax(0,1fr) auto auto;align-items:center;gap:14px;width:100%;text-align:left;padding:10px 13px;border:1px solid var(--line-2);border-radius:10px;background:var(--card);cursor:pointer;font-family:inherit;transition:border-color .14s,background .14s}
 .nf-hit:hover{border-color:var(--accent);background:var(--accent-pale)}
-.nf-hit .nf-code{font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:800;color:var(--ink);flex:none}
-.nf-hit .nf-title{font-size:13px;color:var(--ink);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.nf-hit .nf-size{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--mute);white-space:nowrap;flex:none}
+.nf-hit .nf-code{font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:800;color:var(--ink)}
+.nf-hit .nf-title{font-size:13px;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nf-hit .nf-size{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--mute);white-space:nowrap;text-align:right}
+.nf-hit .nr-oasis{justify-self:end}
 .nf-none{margin:0;padding:10px 2px;font-size:12px;line-height:1.5;color:var(--mute)}
 .nr-primary{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--accent-deep);background:var(--accent-pale);padding:3px 8px;border-radius:5px}
 [data-theme="dark"] .nr-primary{background:rgba(55,138,221,.18);color:var(--accent-light)}

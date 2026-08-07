@@ -57,13 +57,23 @@
     // figure — a guessed threshold is the one error here that could flip a verdict.
     return { title: r[2], size: r[3] ? r[3] + ' ' + (r[4] === 'emp' ? 'employees' : 'revenue') : '' };
   }
+  /* EVERY ROW EMITS EVERY CELL. The grid gives code / title / reach / size their own
+     tracks, so a row that omits an absent value shifts every cell after it and the
+     column breaks. Missing values render as an empty cell holding its place. */
   function naicsRow(code) {
     var m = naicsMeta(code);
-    return `<div class="naics-row"><div class="nr-l"><span class="nr-code">${esc(code)}</span>`
-      + (m
-        ? `<span class="nr-title">${esc(m.title)}</span>`
-        + (m.size ? `<span class="nr-size" title="SBA size standard — the solicitation's own stated standard governs when it differs">${esc(m.size)}</span>` : '')
-        : `<span class="nr-unknown">not in the reference table</span>`)
+    var ref = window.NAICS_REF;
+    var doms = (ref && ref.OASIS && ref.OASIS[String(code)]) || null;
+    return `<div class="naics-row"><div class="nr-l">`
+      + `<span class="nr-code">${esc(code)}</span>`
+      + (m ? `<span class="nr-title">${esc(m.title)}</span>`
+           : `<span class="nr-unknown">not in the reference table</span>`)
+      + (doms
+        ? `<span class="nr-oasis" title="On the GSA OASIS+ vehicle, this code carries work in: ${esc(doms.join(', '))}">OASIS+ ${doms.length}</span>`
+        : `<span class="nr-gap"></span>`)
+      + (m && m.size
+        ? `<span class="nr-size" title="SBA size standard — the solicitation's own stated standard governs when it differs">${esc(m.size)}</span>`
+        : `<span class="nr-gap"></span>`)
       + `</div><button class="nr-x" type="button" data-naics-rm="${esc(code)}" title="Remove" aria-label="Remove NAICS ${esc(code)}">✕</button></div>`;
   }
 

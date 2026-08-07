@@ -377,12 +377,30 @@
     const code = document.createElement('span'); code.className = 'nf-code'; code.textContent = r[0];
     const title = document.createElement('span'); title.className = 'nf-title'; title.textContent = r[2];
     b.appendChild(code); b.appendChild(title);
+
+    // Every row emits every cell, present or not — an omitted cell shifts the ones after
+    // it and the column breaks.
+    const ref = window.NAICS_REF;
+    const doms = (ref && ref.OASIS && ref.OASIS[r[0]]) || null;
+    const reach = document.createElement('span');
+    if (doms) {
+      reach.className = 'nr-oasis';
+      reach.textContent = 'OASIS+ ' + doms.length;
+      reach.title = 'On the GSA OASIS+ vehicle, this code carries work in: ' + doms.join(', ');
+    } else {
+      reach.className = 'nr-gap';
+    }
+    b.appendChild(reach);
+
+    const size = document.createElement('span');
     if (r[3]) {
-      const size = document.createElement('span'); size.className = 'nf-size';
+      size.className = 'nf-size';
       size.textContent = r[3] + ' ' + (r[4] === 'emp' ? 'employees' : 'revenue');
       size.title = 'SBA size standard — the solicitation’s own stated standard governs when it differs';
-      b.appendChild(size);
+    } else {
+      size.className = 'nr-gap';
     }
+    b.appendChild(size);
     return b;
   }
   document.addEventListener('input', function (e) {
