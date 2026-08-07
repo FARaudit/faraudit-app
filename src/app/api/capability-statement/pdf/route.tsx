@@ -51,7 +51,11 @@ interface CapStmt {
 }
 
 function CapDoc({ stmt, generatedAt }: { stmt: CapStmt; generatedAt: string }): React.ReactElement {
-  const company = stmt.company_name || "Your Company";
+  // No fallback. A capability statement is a document the customer sends to a
+  // contracting officer under their own name; printing a placeholder on the letterhead
+  // puts words in their mouth on government-facing paper. The GET refuses to render at
+  // all when the name is unset, so this is never reached empty.
+  const company = stmt.company_name as string;
   const naics = stmt.naics_codes || [];
   const certs = stmt.certifications || [];
   const past = stmt.past_performance || [];
@@ -86,35 +90,50 @@ function CapDoc({ stmt, generatedAt }: { stmt: CapStmt; generatedAt: string }): 
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionEyebrow}>CORE COMPETENCIES</Text>
-          <Text style={styles.body}>{stmt.core_competencies || "—"}</Text>
-        </View>
+        {/* A SECTION WITH NOTHING IN IT IS NOT PRINTED. An eyebrow over an em dash
+            reads to a contracting officer as "asked and answered: nothing" — and on
+            CERTIFICATIONS, "None recorded." is a statement about the firm's standing
+            that the absence of a row does not support. Omit the heading instead. */}
+        {stmt.core_competencies ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionEyebrow}>CORE COMPETENCIES</Text>
+            <Text style={styles.body}>{stmt.core_competencies}</Text>
+          </View>
+        ) : null}
 
-        <View style={styles.section}>
-          <Text style={styles.sectionEyebrow}>CERTIFICATIONS</Text>
-          <Text style={styles.body}>{certs.length > 0 ? certs.join(" · ") : "None recorded."}</Text>
-        </View>
+        {certs.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionEyebrow}>CERTIFICATIONS</Text>
+            <Text style={styles.body}>{certs.join(" · ")}</Text>
+          </View>
+        ) : null}
 
-        <View style={styles.section}>
-          <Text style={styles.sectionEyebrow}>DIFFERENTIATORS</Text>
-          <Text style={styles.body}>{stmt.differentiators || "—"}</Text>
-        </View>
+        {stmt.differentiators ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionEyebrow}>DIFFERENTIATORS</Text>
+            <Text style={styles.body}>{stmt.differentiators}</Text>
+          </View>
+        ) : null}
 
+        {/* Our product marketing does not belong in a document the customer sends to a
+            contracting officer, so an empty section is simply absent. A row with no
+            title and no notice id identifies no contract and is skipped rather than
+            printed as a dash. */}
+        {past.filter((p) => p.title || p.notice_id).length > 0 ? (
         <View style={styles.section}>
           <Text style={styles.sectionEyebrow}>PAST PERFORMANCE</Text>
-          {past.length === 0 && <Text style={styles.small}>Past performance populates automatically as you win contracts through FARaudit.</Text>}
-          {past.slice(0, 12).map((p, i) => (
+          {past.filter((p) => p.title || p.notice_id).slice(0, 12).map((p, i) => (
             <View key={i} style={styles.pastRow} wrap={false}>
-              <Text style={{ fontSize: 11, fontWeight: 700, color: "#0f172a" }}>{p.title || p.notice_id || "—"}</Text>
+              <Text style={{ fontSize: 11, fontWeight: 700, color: "#0f172a" }}>{p.title || p.notice_id}</Text>
               <Text style={styles.small}>
-                {p.agency || "—"}{p.naics_code ? ` · NAICS ${p.naics_code}` : ""}
+                {p.agency || ""}{p.naics_code ? ` · NAICS ${p.naics_code}` : ""}
                 {p.contract_value ? ` · ${p.contract_value}` : ""}
                 {p.period ? ` · ${p.period}` : ""}
               </Text>
             </View>
           ))}
         </View>
+        ) : null}
 
         <Text
           style={styles.footer}
@@ -138,12 +157,23 @@ export async function GET(_req: NextRequest) {
     .maybeSingle();
   if (!stmt) return NextResponse.json({ error: "no capability statement saved yet" }, { status: 404 });
 
+  // REFUSE rather than substitute. This document goes to a contracting officer under
+  // the customer's name; rendering one headed with a placeholder is worse than not
+  // rendering one at all, because the customer cannot see the letterhead before it is
+  // sent on their behalf.
+  if (!String((stmt as CapStmt).company_name || "").trim()) {
+    return NextResponse.json(
+      { error: "Add your company name before exporting — a capability statement is sent under it." },
+      { status: 409 }
+    );
+  }
+
   const generatedAt = new Date().toISOString().slice(0, 10);
   const buffer = await renderToBuffer(<CapDoc stmt={stmt as CapStmt} generatedAt={generatedAt} />);
   const ab = new ArrayBuffer(buffer.byteLength);
   new Uint8Array(ab).set(buffer);
 
-  const slug = String(((stmt as CapStmt).company_name) || "capability").replace(/[^A-Za-z0-9_-]+/g, "_");
+  const slug = String((stmt as CapStmt).company_name).replace(/[^A-Za-z0-9_-]+/g, "_");
   const filename = `FARaudit-${slug}-CapabilityStatement-${generatedAt}.pdf`;
 
   return new Response(ab, {

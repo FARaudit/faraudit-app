@@ -90,7 +90,12 @@ check("/api/profile exposes PATCH", /export async function PATCH/.test(route), "
 check("PATCH refuses email and plan_tier explicitly", /READ_ONLY[\s\S]{0,200}plan_tier/.test(route) && /rejected/.test(route), "a dropped field would report success");
 check("PATCH echoes the PERSISTED value, not the request body", /did not persist/.test(route), "success is reported without reading the write back");
 check("the save handler believes the server echo", /body\.full_name !== full_name/.test(live), "the client trusts its own input");
-check("the save handler reports failure to the user", /Could not save|did not persist/.test(live), "a failed save is silent");
+// Keyed on BEHAVIOUR, not on one phrase. The previous form matched two exact strings,
+// so rewording the handler turned the gate red while the handler still reported
+// failure correctly — and, worse, a handler that dropped reporting entirely could
+// pass by keeping the words.
+check("the save handler reports failure to the user",
+  /note\((?:[^)]*?),\s*false\)/.test(live), "no note(..., false) failure path — a failed save is silent");
 
 console.log("\n── no control reports a save it did not perform ──");
 {
@@ -104,7 +109,27 @@ console.log("\n── no control reports a save it did not perform ──");
 
   // Billing stated a plan and two prices while the route was returning all three.
   check("billing reads the live plan label", /planName\(\)/.test(app) && /PS\.plan_label/.test(app), "the plan name is a literal");
-  check("billing reads the live prices", /PS\.plan_price_monthly/.test(app) && /PS\.plan_price_annual/.test(app), "the price is a literal");
+  // THE RULE INVERTED, ON PURPOSE. This previously required the page to READ two price
+  // fields — which pinned a $1,250 constant that no customer's own subscription
+  // determined. What a customer pays is agreed with their point of contact and is
+  // stored nowhere the page can read, so the page must render NO price at all. An
+  // assertion that a price is displayed is an assertion that a price is known.
+  // SCANNED THE WRONG REGION at first: planPrice() is DEFINED above `billing: ()`, so
+  // slicing from the panel never saw the function that produces the string. An unlisted
+  // price ($4,800) sailed through. Scan the whole file for a rendered currency figure.
+  // A dollar sign followed immediately by a digit. `${` cannot match (a brace is not a
+  // digit), so template interpolation is not a false positive. The quote-spanning form
+  // this replaced matched across string boundaries and fired on `' },`.
+  const currency = [...app.matchAll(/\$\d[\d,]*/g)].map((m) => m[0]);
+  check("no currency figure is rendered anywhere in the settings app",
+    currency.length === 0,
+    `price string(s) present: ${currency.join(" | ")}`);
+  check("the route returns no price field",
+    !/plan_price_monthly\s*[:,]/.test(route.split("READ_ONLY")[0]),
+    "/api/profile still hands out a price the customer's subscription does not set");
+  check("billing reads the SUBSCRIPTION, not user_metadata",
+    /from\("subscriptions"\)/.test(route) && /plan_unreadable/.test(route),
+    "the plan is not read from the row Stripe maintains, or an unreadable record is not distinguished");
   check("no hardcoded plan name or price survives", !/Design Partner<\/div>|\$1,250|\$15,000|\$2,500|\$30,000/.test(appCode), "a literal price is still rendered");
   check("no next-billing date — nothing computes one", !/Next billing:/.test(appCode), "a billing date with no source");
 
@@ -117,8 +142,48 @@ console.log("\n── no control reports a save it did not perform ──");
 console.log("\n── company fields are read-only, not fake inputs ──");
 const panel = app.slice(app.indexOf("company: ()"), app.indexOf("naics: ()"));
 check("company panel renders no <input> for company fields", !/\$\{field\('Company name'/.test(panel) && !/\$\{field\('SAM\.gov UEI'/.test(panel), "a company field is still an editable box with no writer");
-check("company fields render through the read-only helper", /\$\{ro\('Company name'/.test(panel) && /\$\{ro\('SAM\.gov UEI'/.test(panel), "company fields are not marked read-only");
-check("exactly one editable field — the person's name", (panel.match(/\$\{editable\(/g) ?? []).length === 1, `${(panel.match(/\$\{editable\(/g) ?? []).length} editable fields`);
+// THE DURABLE RULE IS NOT "ONE INPUT" — it is that every input has a writer. The
+// earlier form asserted a snapshot (only full_name had a write path), so building the
+// company writers turned an honest page red. What must never happen is an <input> the
+// save handler cannot see.
+// WHOLE FILE, not just the company panel. Scoped to one panel, an input added to any
+// other tab was invisible to this check — which is exactly how an inert control ships.
+const editableIds = [...app.matchAll(/\$\{editable\('([^']+)'/g)].map((m) => m[1]);
+check("every editable field carries an id", editableIds.length > 0, "no editable fields found — did the panel move?");
+const unwritten = editableIds.filter((id) => !live.includes(id));
+check("EVERY editable field is read by the save handler", unwritten.length === 0,
+  `input(s) with no writer: ${unwritten.join(", ")}`);
+// The NAICS ✕ is a <button>, not an <input>, so the editable() sweep above cannot see
+// it. An inert remove control is the same defect in different markup.
+const rmKeys = [...app.matchAll(/data-naics-rm="\$\{esc\(([^)]+)\)\}"/g)];
+check("the NAICS remove control exists", rmKeys.length > 0, "no data-naics-rm in ps-app.js");
+// Assert the BINDING, not the string. The first form matched `data-naics-rm` anywhere
+// in the file, so breaking the delegated selector while leaving a getAttribute call
+// behind kept it green — a check satisfied by a line that no longer runs.
+check("the NAICS remove control is bound by a delegated selector",
+  /closest\(\s*['"]\[data-naics-rm\]['"]\s*\)/.test(live),
+  "no closest('[data-naics-rm]') — the Remove button is not actually wired");
+check("NAICS writes are confirmed by set equality, not by a 2xx", /sameSet\s*\(/.test(live),
+  "a 200 with a discarded write would report success");
+// NAICS LAUNDERING. The GET overlays codes derived from won audits when nothing is
+// saved, so an editor that reads the DISPLAYED array, adds one code and writes the
+// result back persists suggestions as customer-entered data. The write must be built
+// from the row, read at write time — never from page state.
+check("the route reports what is SAVED separately from what is displayed",
+  /naics_saved/.test(capRoute) && /naics_derived/.test(capRoute),
+  "the GET does not distinguish the persisted array from the derived overlay");
+// Scoped to the LOAD path. A blanket ban on `rec.naics_codes` was wrong: the PATCH
+// echo legitimately reads it, and a PATCH response carries no overlay.
+const loadPath = live.slice(0, live.indexOf("function setLivePill"));
+check("the editor seeds its list from naics_saved, not the overlay",
+  /cap\.naics_saved/.test(loadPath) && !/rec\.naics_codes/.test(loadPath),
+  "the panel is populated from the overlay — adding one code would persist the rest");
+check("NAICS writes re-read the row before mutating it",
+  /async function savedCodes\(/.test(live) && /mutate\(await savedCodes\(\)\)/.test(live),
+  "a whole-array write is built from stale page state");
+check("email is never an input — it is auth identity, not a profile column",
+  !/\$\{editable\('psEmail'/.test(panel) && /\$\{ro\('Email'/.test(panel),
+  "email rendered as an editable box without a verification flow behind it");
 check("company record links out to its real editor", /href="\/capability-statement"/.test(panel), "no route to where the company is actually edited");
 check("empty NAICS states the consequence", /stay empty/.test(panel), "an empty feed is not explained");
 
