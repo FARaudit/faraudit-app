@@ -174,12 +174,21 @@
   // slicer must be able to name, or those rows are reachable from "All" and from
   // nothing else.
   var BLANK = "—", BLANK_LABEL = "— none on file";
-  // Time is a ROLLING window, not a calendar period: "Last year" means the last
-  // 365 days. On a young account the longer windows select everything, so each
-  // option carries its own count and the readout names the window.
-  var TIME_HOURS = { "30": 720, quarter: 2160, year: 8760 };
-  var TIME_LABELS = { "30": "last 30 days", quarter: "last quarter", year: "last year" };
-  var TIME_OPTION_TEXT = { "30": "Last 30 days", quarter: "Last quarter", year: "Last year" };
+  // A ROLLING WINDOW IS NAMED IN DAYS; A CALENDAR PERIOD IS NAMED BY ITS YEAR.
+  // A window called "last year" that means the trailing 365 days selects everything
+  // on an account younger than a year, and a control that returns every row reads as
+  // a control that does nothing. So the rolling options say "30 days" and "90 days",
+  // and real years are offered beside them under the value form "y:2026" — derived
+  // from the data, like the agency and NAICS slicers. Each option carries its own
+  // count, and a year the account has no audits in is never offered.
+  var TIME_HOURS = { "30": 720, "90": 2160 };
+  var TIME_LABELS = { "30": "last 30 days", "90": "last 90 days" };
+  var TIME_OPTION_TEXT = { "30": "Last 30 days", "90": "Last 90 days" };
+  var YEAR_PREFIX = "y:";
+  function timeLabel(v) {
+    if (v.indexOf(YEAR_PREFIX) === 0) return v.slice(YEAR_PREFIX.length);
+    return TIME_LABELS[v] || v;
+  }
   // EVERY LABEL POLE_REC CAN RETURN NEEDS A KEY HERE. A label with no key is not a
   // missing colour \u2014 segOf() sends it to "inflight", which is a different claim.
   var RECMAP = { "Bid": "bid", "Bid \u00b7 caution": "caution", "No-bid": "nobid", "Ineligible": "inelig", "Needs review": "review", "Incomplete": "incomplete", "Out of scope": "oos", "Unresolved": "unresolved" };
@@ -230,6 +239,14 @@
       // relative "1w ago" label is gone; age survives only for the time filter.
       date:   dueLabel(audit.completed_at || audit.created_at),
       age:    ago.ageHours,
+      // The CALENDAR year this audit was run, so the time slicer can offer real years
+      // rather than only rolling windows. Null when the timestamp will not parse: an
+      // unreadable date belongs to no year, and must not be filed under whichever one
+      // happens to be selected.
+      year:   (function () {
+        var t = new Date(audit.completed_at || audit.created_at).getTime();
+        return isNaN(t) ? null : String(new Date(t).getFullYear());
+      })(),
       type:   audit.document_type || "—",
       due:    dueLabel(audit.response_deadline),
       dueTs:  dueTs,
@@ -284,8 +301,15 @@
   function rowMatchesBar(a) {
     var f = STATE.f;
     if (f.time !== "all") {
-      var maxH = TIME_HOURS[f.time];
-      if (maxH != null && !(a.age <= maxH)) return false;
+      if (f.time.indexOf(YEAR_PREFIX) === 0) {
+        // A calendar year is an equality test on the year the audit was run, not a
+        // window. A row whose timestamp would not parse carries no year and is
+        // excluded rather than counted into whichever year happens to be selected.
+        if (a.year !== f.time.slice(YEAR_PREFIX.length)) return false;
+      } else {
+        var maxH = TIME_HOURS[f.time];
+        if (maxH != null && !(a.age <= maxH)) return false;
+      }
     }
     if (f.window !== "all" && a._w !== f.window) return false;
     if (f.agency !== "all" && a.agency !== f.agency) return false;
@@ -406,7 +430,7 @@
   function describeFilters() {
     var bits = [];
     if (STATE.seg !== "all") bits.push(SL[STATE.seg]);
-    if (STATE.f.time !== "all") bits.push(TIME_LABELS[STATE.f.time] || STATE.f.time);
+    if (STATE.f.time !== "all") bits.push(timeLabel(STATE.f.time));
     if (STATE.f.window !== "all") bits.push({ open: "still open", passed: "window passed", none: "no due date" }[STATE.f.window]);
     ["agency", "type", "naics", "setAside"].forEach(function (k) {
       var v = STATE.f[k];
@@ -823,9 +847,16 @@
     if (ft) {
       var curT = ft.value || "all";
       ft.replaceChildren(new Option("All time", "all"));
-      ["30", "quarter", "year"].forEach(function (k) {
+      ["30", "90"].forEach(function (k) {
         var n = STATE.rows.filter(function (r) { return r.age <= TIME_HOURS[k]; }).length;
         ft.add(new Option(TIME_OPTION_TEXT[k] + " (" + n + ")", k));
+      });
+      // Calendar years present in the data, newest first. Offering a year the account
+      // has no audits in would be a control that can only ever return nothing.
+      var years = {};
+      STATE.rows.forEach(function (r) { if (r.year) years[r.year] = (years[r.year] || 0) + 1; });
+      Object.keys(years).sort().reverse().forEach(function (y) {
+        ft.add(new Option(y + " (" + years[y] + ")", YEAR_PREFIX + y));
       });
       ft.value = curT;
     }
