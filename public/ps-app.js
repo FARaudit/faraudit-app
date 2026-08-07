@@ -52,13 +52,17 @@
     var ref = window.NAICS_REF;
     var r = ref && ref.byCode && ref.byCode[String(code)];
     if (!r) return null;
-    return { title: r[2], size: r[3] + ' ' + (r[4] === 'emp' ? 'employees' : 'revenue') };
+    // A title with no size standard is a real state: the table carries the code's name
+    // but no primary-sourced 13 CFR 121.201 threshold for it. Show the name, claim no
+    // figure — a guessed threshold is the one error here that could flip a verdict.
+    return { title: r[2], size: r[3] ? r[3] + ' ' + (r[4] === 'emp' ? 'employees' : 'revenue') : '' };
   }
   function naicsRow(code) {
     var m = naicsMeta(code);
     return `<div class="naics-row"><div class="nr-l"><span class="nr-code">${esc(code)}</span>`
       + (m
-        ? `<span class="nr-title">${esc(m.title)}</span><span class="nr-size" title="SBA size standard — the solicitation's own stated standard governs when it differs">${esc(m.size)}</span>`
+        ? `<span class="nr-title">${esc(m.title)}</span>`
+        + (m.size ? `<span class="nr-size" title="SBA size standard — the solicitation's own stated standard governs when it differs">${esc(m.size)}</span>` : '')
         : `<span class="nr-unknown">not in the reference table</span>`)
       + `</div><button class="nr-x" type="button" data-naics-rm="${esc(code)}" title="Remove" aria-label="Remove NAICS ${esc(code)}">✕</button></div>`;
   }

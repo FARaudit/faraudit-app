@@ -318,12 +318,41 @@
     const ref = window.NAICS_REF;
     input.setAttribute('aria-expanded', 'false');
     box.replaceChildren();
+    if (!ref || typeof ref.search !== 'function') { box.hidden = true; return; }
     // Six digits is an answer, not a query — leave the customer to press Add.
-    if (!q || /^\d{6}$/.test(q) || !ref || typeof ref.search !== 'function') { box.hidden = true; return; }
+    if (/^\d{6}$/.test(q)) { box.hidden = true; return; }
 
     const saved = (window.PS.NAICS || []).map(function (n) { return String(n.code); });
-    const hits = ref.search(q).filter(function (r) { return saved.indexOf(r[0]) === -1; });
     box.hidden = false;
+
+    /* NOTHING TYPED YET IS NOT AN EMPTY STATE. The panel has the room, and a customer
+       who does not already know their six-digit code cannot be helped by a blank box —
+       so the table is BROWSABLE, grouped the way the NAICS directory groups it. One
+       taxonomy across both surfaces; a second grouping here would be a second thing to
+       keep true. */
+    if (!q) {
+      (ref.CATS || []).forEach(function (cat) {
+        const rows = (ref.DATA || []).filter(function (r) {
+          return r[1] === cat.id && saved.indexOf(r[0]) === -1;
+        });
+        if (!rows.length) return;
+        const h = document.createElement('div');
+        h.className = 'nf-group';
+        h.textContent = cat.label;
+        box.appendChild(h);
+        rows.forEach(function (r) { box.appendChild(hitButton(r)); });
+      });
+      if (!box.children.length) {
+        const all = document.createElement('p');
+        all.className = 'nf-none';
+        all.textContent = 'Every code in the reference table is already on your profile. '
+          + 'It carries a subset of NAICS — any other six-digit code can still be typed in and added.';
+        box.appendChild(all);
+      }
+      return;
+    }
+
+    const hits = ref.search(q).filter(function (r) { return saved.indexOf(r[0]) === -1; });
     input.setAttribute('aria-expanded', 'true');
 
     if (!hits.length) {
@@ -334,19 +363,27 @@
       box.appendChild(none);
       return;
     }
-    hits.slice(0, 8).forEach(function (r) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'nf-hit';
-      b.setAttribute('data-naics-add', r[0]);
-      b.setAttribute('role', 'option');
-      const code = document.createElement('span'); code.className = 'nf-code'; code.textContent = r[0];
-      const title = document.createElement('span'); title.className = 'nf-title'; title.textContent = r[2];
+    hits.slice(0, 10).forEach(function (r) { box.appendChild(hitButton(r)); });
+  }
+
+  /* One row builder for both the browse list and the search hits, so they cannot drift
+     apart. A code with no sourced size standard simply carries no figure. */
+  function hitButton(r) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'nf-hit';
+    b.setAttribute('data-naics-add', r[0]);
+    b.setAttribute('role', 'option');
+    const code = document.createElement('span'); code.className = 'nf-code'; code.textContent = r[0];
+    const title = document.createElement('span'); title.className = 'nf-title'; title.textContent = r[2];
+    b.appendChild(code); b.appendChild(title);
+    if (r[3]) {
       const size = document.createElement('span'); size.className = 'nf-size';
       size.textContent = r[3] + ' ' + (r[4] === 'emp' ? 'employees' : 'revenue');
-      b.appendChild(code); b.appendChild(title); b.appendChild(size);
-      box.appendChild(b);
-    });
+      size.title = 'SBA size standard — the solicitation’s own stated standard governs when it differs';
+      b.appendChild(size);
+    }
+    return b;
   }
   document.addEventListener('input', function (e) {
     if (e.target && e.target.id === 'psNaicsInput') naicsResults();
@@ -528,6 +565,12 @@
     const fill = function () {
       const el = document.getElementById('agState');
       if (el && el.dataset.filled !== '1') { el.dataset.filled = '1'; writeAgencyState(); }
+      // The NAICS browse list is part of the panel, not a response to typing — it has to
+      // be there the moment the tab renders, and again after every add or remove
+      // re-templates it, or the customer meets an empty box on the tab whose whole job
+      // is helping them find a code.
+      const ni = document.getElementById('psNaicsInput');
+      if (ni && ni.dataset.browsed !== '1') { ni.dataset.browsed = '1'; naicsResults(); }
     };
     new MutationObserver(fill).observe(host, { childList: true, subtree: true });
     fill();
