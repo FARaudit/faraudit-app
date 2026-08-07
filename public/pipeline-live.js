@@ -32,7 +32,23 @@
     '07':'Award & Performance','08':'Post-Award'
   };
 
-  var STATE = { rows: [], loadError: null, stage: null };
+  // auditByRef is TRI-STATE on purpose. null means the audit list has not been read,
+  // or could not be — which is NOT the same as a pursuit having no audit. A card may
+  // only say "No audit on file" once that list has actually arrived.
+  var STATE = { rows: [], loadError: null, stage: null, auditByRef: null };
+
+  // The engine's poles, in the words the Decisions ledger uses for them. A pole with
+  // no entry here is shown verbatim rather than mapped to a neighbour's word.
+  var VERDICT_LABEL = {
+    BID: 'Bid', BID_WITH_CAUTION: 'Bid · caution', NO_BID: 'No-bid',
+    INELIGIBLE: 'Ineligible', NEEDS_HUMAN_REVIEW: 'Needs review',
+    INCOMPLETE: 'Incomplete', OUT_OF_SCOPE: 'Out of scope'
+  };
+  function auditFor(row){
+    if(!STATE.auditByRef) return undefined;                  // not known yet
+    var k = String(row && row.solicitation_number || '').trim().toUpperCase();
+    return STATE.auditByRef[k] || null;                      // null = known to have none
+  }
 
   // ── tiny DOM builders — the only way anything reaches the page ────────────
   function el(tag, cls, text){
@@ -220,6 +236,24 @@
       n.style.cssText = 'margin-top:8px;font-size:11px;opacity:.65;line-height:1.5';
       card.appendChild(n);
     }
+    /* THE DETAIL A PURSUIT HAS IS ITS AUDIT. Three states, and they are different
+       answers: a report to open, no audit on file, or an audit list this page could
+       not read — in which case the card says nothing rather than guessing. The
+       no-audit case is deliberately NOT a link: the only page that would run one
+       starts a paid run, and a card is not the place to send someone into that. */
+    var found = auditFor(c);
+    if (found) {
+      var pole  = String(found.v3_verdict || '').toUpperCase().replace(/[\s-]+/g, '_');
+      var label = VERDICT_LABEL[pole]
+        || (String(found.status || '').toLowerCase() === 'complete' ? (pole || 'Unresolved') : 'In flight');
+      var open  = el('a', 'pcard-open');
+      open.href = '/audit/' + encodeURIComponent(String(c.solicitation_number));
+      put(open, el('span', 'po-v', label), el('span', 'po-go', 'Open audit →'));
+      card.appendChild(open);
+    } else if (found === null) {
+      card.appendChild(el('p', 'pcard-none', 'No audit on file for this pursuit.'));
+    }
+
     card.appendChild(statusNode);
     return card;
   }
@@ -577,6 +611,7 @@
         if(unknown.length) console.warn('[pipeline-live] ' + unknown.length + ' row(s) carry an unrecognised stage code');
         render();
         console.log('[pipeline-live] rendered ' + STATE.rows.length + ' pursuits');
+        return loadAudits();
       })
       .catch(function(e){
         // A failed request is a FAILURE, never an empty pipeline. No earlier
@@ -585,6 +620,36 @@
         STATE.rows = [];
         render();
         console.warn('[pipeline-live] failed:', STATE.loadError);
+      });
+  }
+
+  /* A pursuit's detail already exists: it is the audit report. /audit/[id] resolves a
+     solicitation number as a slug and returns the most recent audit for it, so a card
+     needs no id lookup to link there — only the knowledge of WHETHER one exists.
+     Read separately from the pipeline, and deliberately not fatal: a pursuit list that
+     rendered must not be torn down because the audit list failed. On failure
+     auditByRef stays null and the cards claim nothing either way. */
+  function loadAudits(){
+    return fetch('/api/audits?limit=201', { credentials: 'include' })
+      .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(data){
+        var list = (data && (data.audits || data.rows || data.data)) || [];
+        var map = {};
+        list.forEach(function(a){
+          [a.solicitation_number, a.notice_id].forEach(function(k){
+            if(!k) return;
+            var key = String(k).trim().toUpperCase();
+            var prev = map[key];
+            // Most recent wins — a package audited repeatedly opens its latest report.
+            if(!prev || new Date(a.completed_at || a.created_at) > new Date(prev.completed_at || prev.created_at)) map[key] = a;
+          });
+        });
+        STATE.auditByRef = map;
+        render();
+      })
+      .catch(function(e){
+        STATE.auditByRef = null;
+        console.warn('[pipeline-live] audit lookup failed:', (e && e.message) || e);
       });
   }
 

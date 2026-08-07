@@ -209,6 +209,14 @@ button{font-family:inherit}
 .pcard-rm.is-armed:hover{color:#fff;background:var(--red-700);border-color:var(--red-700)}
 .pcard-cancel{appearance:none;background:transparent;border:1px solid var(--line);color:var(--mute);border-radius:6px;padding:4px 9px;font-family:inherit;font-size:10px;font-weight:600;letter-spacing:.02em;cursor:pointer}
 .pcard-cancel:hover{color:var(--ink);border-color:var(--mute)}
+/* Open-the-audit row. Carries the verdict, so the card answers "what did we decide"
+   without being opened, and the whole row is the target. */
+.pcard-open{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;text-decoration:none;background:var(--line-3);transition:border-color .14s,background .14s}
+.pcard-open:hover{border-color:var(--blue-300,#93c5fd);background:var(--card)}
+.pcard-open .po-v{font-size:12px;font-weight:700;color:var(--ink)}
+.pcard-open .po-go{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;letter-spacing:.02em;color:var(--mute)}
+.pcard-open:hover .po-go{color:var(--blue-700,#1d4ed8)}
+.pcard-none{margin:2px 0 0;font-size:11px;line-height:1.5;color:var(--mute)}
 .pcard-msg{margin:0;font-size:11px;line-height:1.5;color:var(--red-700);font-weight:600}
 /* The confirmation prompt is a question, not a failure — it must not wear the colour
    the page uses to report that something went wrong. */

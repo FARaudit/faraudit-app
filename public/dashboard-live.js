@@ -174,19 +174,26 @@
   // slicer must be able to name, or those rows are reachable from "All" and from
   // nothing else.
   var BLANK = "—", BLANK_LABEL = "— none on file";
-  // A ROLLING WINDOW IS NAMED IN DAYS; A CALENDAR PERIOD IS NAMED BY ITS YEAR.
-  // A window called "last year" that means the trailing 365 days selects everything
-  // on an account younger than a year, and a control that returns every row reads as
-  // a control that does nothing. So the rolling options say "30 days" and "90 days",
-  // and real years are offered beside them under the value form "y:2026" — derived
-  // from the data, like the agency and NAICS slicers. Each option carries its own
-  // count, and a year the account has no audits in is never offered.
-  var TIME_HOURS = { "30": 720, "90": 2160 };
-  var TIME_LABELS = { "30": "last 30 days", "90": "last 90 days" };
-  var TIME_OPTION_TEXT = { "30": "Last 30 days", "90": "Last 90 days" };
-  var YEAR_PREFIX = "y:";
+  // FEDERAL FISCAL PERIODS, PLUS ONE HONEST ROLLING WINDOW.
+  // Government business is planned and reported on the fiscal year — 1 Oct to 30 Sep —
+  // so those are the periods a contractor compares across: FY26 Q4 against FY25 Q4,
+  // not "the last 90 days", which straddles every boundary it crosses and can answer
+  // no question about a quarter at all. A rolling window is kept only for recency, and
+  // it is named in days so it never reads as a period. Periods are derived from the
+  // data, like the agency and NAICS slicers; each option carries its own count, and a
+  // period the account has no audits in is never offered.
+  var TIME_HOURS = { "30": 720 };
+  var TIME_LABELS = { "30": "last 30 days" };
+  var TIME_OPTION_TEXT = { "30": "Last 30 days" };
+  var FY_PREFIX = "fy:", FQ_PREFIX = "fq:";
+  // Q1 Oct-Dec · Q2 Jan-Mar · Q3 Apr-Jun · Q4 Jul-Sep. Q4 is the year-end surge.
+  function fyLabel(fy) { return "FY" + String(fy).slice(2); }
   function timeLabel(v) {
-    if (v.indexOf(YEAR_PREFIX) === 0) return v.slice(YEAR_PREFIX.length);
+    if (v.indexOf(FY_PREFIX) === 0) return fyLabel(v.slice(FY_PREFIX.length));
+    if (v.indexOf(FQ_PREFIX) === 0) {
+      var p = v.slice(FQ_PREFIX.length).split("-");
+      return fyLabel(p[0]) + " Q" + p[1];
+    }
     return TIME_LABELS[v] || v;
   }
   // EVERY LABEL POLE_REC CAN RETURN NEEDS A KEY HERE. A label with no key is not a
@@ -239,13 +246,21 @@
       // relative "1w ago" label is gone; age survives only for the time filter.
       date:   dueLabel(audit.completed_at || audit.created_at),
       age:    ago.ageHours,
-      // The CALENDAR year this audit was run, so the time slicer can offer real years
-      // rather than only rolling windows. Null when the timestamp will not parse: an
-      // unreadable date belongs to no year, and must not be filed under whichever one
-      // happens to be selected.
-      year:   (function () {
+      // THE FEDERAL FISCAL PERIOD, NOT THE CALENDAR ONE. FY2026 runs 1 Oct 2025 to
+      // 30 Sep 2026, and Q4 (Jul-Sep) is the year-end obligation surge every capture
+      // and finance plan is built around. A calendar year splits that surge from the
+      // fiscal year it belongs to, and a rolling window straddles the boundaries
+      // entirely — neither can answer "how does this quarter compare with the last".
+      // Null when the timestamp will not parse: an unreadable date belongs to no
+      // period, and must not be filed under whichever one happens to be selected.
+      fiscal: (function () {
         var t = new Date(audit.completed_at || audit.created_at).getTime();
-        return isNaN(t) ? null : String(new Date(t).getFullYear());
+        if (isNaN(t)) return null;
+        var d = new Date(t), m = d.getMonth();               // 0 = Jan
+        return {
+          fy: d.getFullYear() + (m >= 9 ? 1 : 0),            // Oct-Dec belong to the NEXT FY
+          q:  m >= 9 ? 1 : m <= 2 ? 2 : m <= 5 ? 3 : 4       // Q1 Oct-Dec · Q2 Jan-Mar · Q3 Apr-Jun · Q4 Jul-Sep
+        };
       })(),
       type:   audit.document_type || "—",
       due:    dueLabel(audit.response_deadline),
@@ -301,11 +316,15 @@
   function rowMatchesBar(a) {
     var f = STATE.f;
     if (f.time !== "all") {
-      if (f.time.indexOf(YEAR_PREFIX) === 0) {
-        // A calendar year is an equality test on the year the audit was run, not a
-        // window. A row whose timestamp would not parse carries no year and is
-        // excluded rather than counted into whichever year happens to be selected.
-        if (a.year !== f.time.slice(YEAR_PREFIX.length)) return false;
+      // A fiscal period is an equality test on the period the audit was run in, not a
+      // window. A row whose timestamp would not parse carries no period and is excluded
+      // rather than counted into whichever one happens to be selected.
+      if (f.time.indexOf(FY_PREFIX) === 0) {
+        if (!a.fiscal || String(a.fiscal.fy) !== f.time.slice(FY_PREFIX.length)) return false;
+      } else if (f.time.indexOf(FQ_PREFIX) === 0) {
+        if (!a.fiscal) return false;
+        var pq = f.time.slice(FQ_PREFIX.length).split("-");
+        if (String(a.fiscal.fy) !== pq[0] || String(a.fiscal.q) !== pq[1]) return false;
       } else {
         var maxH = TIME_HOURS[f.time];
         if (maxH != null && !(a.age <= maxH)) return false;
@@ -540,7 +559,13 @@
       setKPI(3, "—", "could not load");
       return;
     }
-    var rows = STATE.rows;
+    // THE STRIP DESCRIBES THE LEDGER UNDERNEATH IT. Reading STATE.rows here while the
+    // table reads the filtered set puts two different populations on one screen: slice
+    // to a fiscal quarter and the tiles still answer for the whole account, which is
+    // the number a reader takes away. Same predicate as the ledger, so they cannot
+    // disagree; when a filter is on, the first tile names the total it came from.
+    var rows = STATE.rows.filter(function (a) { return rowMatchesSearch(a) && rowMatchesBar(a); });
+    var filtered = rows.length !== STATE.rows.length;
     var c = segCounts(rows);
     // "of N with a verdict" — out-of-scope and unresolved rows carry one the engine
     // actually issued, so they belong in the denominator. Only in-flight and failed
@@ -550,7 +575,9 @@
     var open = openAgg.sols;
     var last30 = rows.filter(function (r) { return r.age <= 720; }).length;
     function pdi(k) { return '<i class="pd ' + k + '"></i>'; }
-    setKPI(0, String(rows.length), "<b>" + last30 + "</b> in the last 30 days");
+    setKPI(0, String(rows.length), filtered
+      ? '<span class="agg"><span class="den">of <b>' + STATE.rows.length + '</b> total — this view is filtered</span></span>'
+      : "<b>" + last30 + "</b> in the last 30 days");
     // R4 — the aggregate names the poles it sums; no unnamed percentage, ever.
     setKPI(1, String(c.bid + c.caution), '<span class="agg"><span class="t">' + pdi("bid") + "Bid " + c.bid + '</span><span class="op">+</span><span class="t">' + pdi("caution") + "Bid\u00b7caution " + c.caution + '</span><span class="den">\u00b7 of ' + verdicts + ' with a verdict</span></span>');
     setKPI(2, String(c.nobid + c.inelig), '<span class="agg"><span class="t">' + pdi("nobid") + "No-bid " + c.nobid + '</span><span class="op">+</span><span class="t">' + pdi("inelig") + "Ineligible " + c.inelig + '</span><span class="den">\u00b7 committal declines</span></span>');
@@ -847,16 +874,25 @@
     if (ft) {
       var curT = ft.value || "all";
       ft.replaceChildren(new Option("All time", "all"));
-      ["30", "90"].forEach(function (k) {
+      ["30"].forEach(function (k) {
         var n = STATE.rows.filter(function (r) { return r.age <= TIME_HOURS[k]; }).length;
         ft.add(new Option(TIME_OPTION_TEXT[k] + " (" + n + ")", k));
       });
-      // Calendar years present in the data, newest first. Offering a year the account
-      // has no audits in would be a control that can only ever return nothing.
-      var years = {};
-      STATE.rows.forEach(function (r) { if (r.year) years[r.year] = (years[r.year] || 0) + 1; });
-      Object.keys(years).sort().reverse().forEach(function (y) {
-        ft.add(new Option(y + " (" + years[y] + ")", YEAR_PREFIX + y));
+      // Fiscal periods present in the data: each FY newest first, and under it only the
+      // quarters that actually hold audits. Offering FY25 Q2 to an account with nothing
+      // in it is a control that can only ever return an empty ledger.
+      var fyN = {}, fqN = {};
+      STATE.rows.forEach(function (r) {
+        if (!r.fiscal) return;
+        fyN[r.fiscal.fy] = (fyN[r.fiscal.fy] || 0) + 1;
+        fqN[r.fiscal.fy + "-" + r.fiscal.q] = (fqN[r.fiscal.fy + "-" + r.fiscal.q] || 0) + 1;
+      });
+      Object.keys(fyN).sort(function (a, b) { return b - a; }).forEach(function (fy) {
+        ft.add(new Option(fyLabel(fy) + " (" + fyN[fy] + ")", FY_PREFIX + fy));
+        [4, 3, 2, 1].forEach(function (q) {
+          var key = fy + "-" + q;
+          if (fqN[key]) ft.add(new Option("   " + fyLabel(fy) + " Q" + q + " (" + fqN[key] + ")", FQ_PREFIX + key));
+        });
       });
       ft.value = curT;
     }
