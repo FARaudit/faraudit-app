@@ -35,7 +35,11 @@
   // auditByRef is TRI-STATE on purpose. null means the audit list has not been read,
   // or could not be — which is NOT the same as a pursuit having no audit. A card may
   // only say "No audit on file" once that list has actually arrived.
-  var STATE = { rows: [], loadError: null, stage: null, auditByRef: null };
+  // `loaded` records that a read SETTLED successfully, which is not the same as it
+  // having returned rows. Without it an empty-but-healthy pipeline is indistinguishable
+  // from one that never loaded, and the LIVE pill stays dark on a page that is in fact
+  // showing live data — telling a customer with no pursuits that the page is stale.
+  var STATE = { rows: [], loadError: null, loaded: false, stage: null, auditByRef: null };
 
   // The engine's poles, in the words the Decisions ledger uses for them. A pole with
   // no entry here is shown verbatim rather than mapped to a neighbour's word.
@@ -75,6 +79,18 @@
     if (n >= 1e6) { var m = n/1e6; return '$' + (m % 1 === 0 ? m : m.toFixed(1)) + 'M'; }
     if (n >= 1e3) { var k = n/1e3; return '$' + (k % 1 === 0 ? k : k.toFixed(1)) + 'K'; }
     return '$' + n.toLocaleString();
+  }
+
+  /* THE one ceiling derivation, so the card and the KPI strip cannot disagree.
+     The strip counted `Number(v) > 0` while the card rendered on plain truthiness, so
+     a legacy pre-formatted value — "$18.4M", which fmtValue passes through unchanged —
+     printed "Ceiling $18.4M" on a card while the strip above it read "no ceiling
+     recorded on any pursuit". One page, two contradictory claims about the same row.
+     A value that will not read as a number is not a ceiling this page can stand
+     behind, so neither surface claims one. */
+  function ceilingOf(row){
+    var n = Number(row && row.estimated_value);
+    return isFinite(n) && n > 0 ? n : null;
   }
 
   // THE one urgency derivation. Null means no due date on file — which is not
@@ -198,6 +214,61 @@
       });
   }
 
+  /* CAPTURE IS A SEQUENCE, SO A PURSUIT MUST BE ABLE TO MOVE ALONG IT.
+     This page draws eight stages; a pursuit that cannot leave the one it entered at
+     keeps feeding the "P0 · action now" count with no in-product action able to clear
+     it, leaving removal as the only exit.
+
+     An unrecognised stage code is shown but not offered as a choice, so moving to a
+     real stage is a repair rather than a silent rewrite. The row count returned by the
+     write is the success test, since a zero-row update answers 200. */
+  function stageControl(row, code, statusNode){
+    var sel = el('select','stage-sel');
+    sel.setAttribute('aria-label', 'Stage for ' + (row.title || row.solicitation_number || 'this pursuit'));
+    if(!code){
+      var unknown = document.createElement('option');
+      unknown.value = ''; unknown.textContent = 'unrecognised stage';
+      unknown.disabled = true; unknown.selected = true;
+      sel.appendChild(unknown);
+    }
+    STAGES.forEach(function(s){
+      var o = document.createElement('option');
+      o.value = s; o.textContent = s + ' · ' + STAGE_LABELS[s];
+      if(s === code) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.onchange = function(){
+      var next = sel.value;
+      if(!next || next === code) return;
+      sel.disabled = true;
+      statusNode.hidden = true;
+      statusNode.className = 'pcard-msg';
+      fetch('/api/pipeline?solicitationNumber=' + encodeURIComponent(String(row.solicitation_number || '')), {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ stageCode: next })
+      })
+        .then(function(r){
+          return r.json().catch(function(){ return {}; }).then(function(j){ return { ok:r.ok, status:r.status, body:j }; });
+        })
+        .then(function(res){
+          if(!res.ok) throw new Error((res.body && res.body.error) || ('HTTP ' + res.status));
+          if(!res.body || Number(res.body.moved) < 1) throw new Error('nothing was moved');
+          return loadPipeline();
+        })
+        .catch(function(e){
+          sel.disabled = false;
+          sel.value = code || '';
+          statusNode.className = 'pcard-msg';
+          statusNode.textContent = 'Could not move — ' + ((e && e.message) || 'request failed') + '.';
+          statusNode.hidden = false;
+          console.warn('[pipeline-live] stage move failed:', e);
+        });
+    };
+    return sel;
+  }
+
   function buildCard(c){
     var d = daysOf(c);
     var code = stageOf(c);
@@ -224,10 +295,10 @@
     put(head, idBlock, actions);
 
     var meta = el('div','pcard-meta');
-    var stagePill = el('span','stage-pill', code ? code + ' · ' + STAGE_LABELS[code] : 'unrecognised stage');
-    put(meta, metaItem('Stage', put(el('span','v'), stagePill)));
+    put(meta, metaItem('Stage', put(el('span','v'), stageControl(c, code, statusNode))));
     put(meta, metaItem('Due', dueNode(d)));
-    if(c.estimated_value) put(meta, metaItem('Ceiling', el('span','v amount', fmtValue(c.estimated_value))));
+    var ceil = ceilingOf(c);
+    if(ceil !== null) put(meta, metaItem('Ceiling', el('span','v amount', fmtValue(ceil))));
     if(c.naics) put(meta, metaItem('NAICS', el('span','v', c.naics)));
 
     put(card, head, meta);
@@ -399,8 +470,8 @@
     // Sum only the ceilings actually on file, and SAY how many that was. A total of
     // $0 over rows that simply have no ceiling recorded reads as "worth nothing",
     // which is a claim the data does not make — so absent renders as an em dash.
-    var withVal = rows.filter(function(r){ return Number(r.estimated_value) > 0; });
-    var total   = withVal.reduce(function(a,r){ return a + Number(r.estimated_value); }, 0);
+    var withVal = rows.filter(function(r){ return ceilingOf(r) !== null; });
+    var total   = withVal.reduce(function(a,r){ return a + ceilingOf(r); }, 0);
     var money   = withVal.length ? splitUnit(fmtValue(total)) : { v:'—', u:'' };
 
     var days    = rows.map(daysOf);
@@ -492,8 +563,8 @@
     if(!elm) return;
     if(STATE.loadError){ elm.replaceChildren(); return; }
     var rows = visibleRows();
-    var withVal = rows.filter(function(r){ return Number(r.estimated_value) > 0; });
-    var total = withVal.reduce(function(a,r){ return a + Number(r.estimated_value); }, 0);
+    var withVal = rows.filter(function(r){ return ceilingOf(r) !== null; });
+    var total = withVal.reduce(function(a,r){ return a + ceilingOf(r); }, 0);
 
     var left = el('span');
     var strong = el('b');
@@ -575,7 +646,7 @@
     writeBanner();
     writeCards();
     writeShowAll();
-    setLivePill(!STATE.loadError && STATE.rows.length > 0);
+    setLivePill(!STATE.loadError && STATE.loaded);
   }
 
   // The rail's grounds and every ink derived from them are computed AT RENDER from
@@ -606,6 +677,7 @@
       .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(function(data){
         STATE.loadError = null;
+        STATE.loaded = true;
         STATE.rows = (data && data.pipeline) || [];
         var unknown = STATE.rows.filter(function(r){ return !stageOf(r); });
         if(unknown.length) console.warn('[pipeline-live] ' + unknown.length + ' row(s) carry an unrecognised stage code');
@@ -617,6 +689,7 @@
         // A failed request is a FAILURE, never an empty pipeline. No earlier
         // render may be left standing underneath a broken fetch.
         STATE.loadError = (e && e.message) || 'network error';
+        STATE.loaded = false;
         STATE.rows = [];
         render();
         console.warn('[pipeline-live] failed:', STATE.loadError);

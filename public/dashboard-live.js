@@ -290,7 +290,7 @@
       : (a.status === "pending" ? "running" : "complete");
     if (a._w === "passed") stInner += '<span class="deadline-tag">Deadline passed</span>';
     return '<tr data-pole="' + esc(a._s) + '" data-rec="' + esc(a.rec || "") + '" data-sol="' + esc(a.id) + '" data-uuid="' + esc(a.uuid) + '"' + (a.attn ? ' class="needs-attention" data-attn="' + esc(a.attnType) + '"' : "") + '>'
-      + '<td class="cell-id">' + esc(a.id) + attnFlag + '</td>'
+      + '<td class="cell-id">' + esc(a.id) + attnFlag + repeatChip(a) + '</td>'
       + '<td class="cell-title" title="' + esc(a.title) + '">' + esc(a.title) + '</td>'
       + '<td class="cell-agency">' + esc(a.agency) + '</td>'
       + '<td>' + (a.type && a.type !== "\u2014" ? '<span class="doctype">' + esc(a.type) + '</span>' : '<span class="cell-date">\u2014</span>') + '</td>'
@@ -334,7 +334,8 @@
     if (f.agency !== "all" && a.agency !== f.agency) return false;
     if (f.type   !== "all" && a.type   !== f.type)   return false;
     if (f.naics  !== "all" && a.naics  !== f.naics)  return false;
-    if (f.setAside !== "all" && a.setAside !== f.setAside) return false;
+    // The option value is the pipe-joined set of raw codes that share one label.
+    if (f.setAside !== "all" && f.setAside.split("|").indexOf(a.setAside) === -1) return false;
     return true;
   }
   function rowMatchesSearch(a) {
@@ -484,7 +485,21 @@
     var c = segCounts(rows);
     var railSum = SEG.reduce(function (a, g) { return a + c[g.k]; }, 0);
     var c1 = railSum === rows.length;
-    var dbl = STATE.rows.filter(function (r) { return r.rec && RECMAP[r.rec] && (r.status === "failed" || r.status === "pending"); }).length;
+    // C2 READS THE RENDERED ROW, NOT THE FIELD THE PARTITION WAS BUILT FROM.
+    // Testing `rec` on both sides is vacuous: recommendationBucket() returns null unless
+    // the run is complete, so the count was 0 by construction and the check could never
+    // go red — it reported a pass it had not earned. This compares the verdict pole
+    // PRINTED in the row against the run state printed beside it, so a divergence in
+    // buildRowHTML is visible: no row may show a decided pole while its status says the
+    // run did not finish.
+    var VERDICT_SEG = {};
+    SEG.forEach(function (s) { if (s.k !== "inflight" && s.k !== "failed") VERDICT_SEG[s.k] = 1; });
+    var dbl = [].filter.call(document.querySelectorAll("#ledgerBody tr"), function (tr) {
+      var seg = tr.getAttribute("data-pole") || "";
+      var stc = tr.querySelector(".stcell");
+      var st = stc ? stc.textContent : "";
+      return VERDICT_SEG[seg] && /fail|pending|in flight/i.test(st);
+    }).length;
     var c2 = dbl === 0;
     var rail = document.getElementById("poleRail"), c3 = true;
     if (rail) {
@@ -516,7 +531,7 @@
     var checks = [c1, c2, c3, c4, c5];
     var pass = checks.filter(Boolean).length;
     var line = "[dashboard-live] self-check " + pass + "/" + checks.length + " pass"
-      + " \u2014 rail sums to the ledger count (" + railSum + "=" + rows.length + "), every row in exactly one segment,"
+      + " \u2014 rail sums to the ledger count (" + railSum + "=" + rows.length + "), no rendered row shows a decided pole on an unfinished run (" + dbl + "),"
       + " nothing clipped, active states are tints not fills, every passed deadline flagged (" + flagged + "/" + pv + ").";
     // A failing self-check is a defect, not a footnote \u2014 raise it at error level.
     if (pass < checks.length) console.error(line + " " + (checks.length - pass) + " FAIL", { c1: c1, c2: c2, c3: c3, c4: c4, c5: c5 });
@@ -537,6 +552,52 @@
       if (!seen[k]) { seen[k] = true; sols++; }
     });
     return { sols: sols, runs: runs };
+  }
+
+  /* A ROW IS ONE RUN, AND THE READER MUST BE TOLD WHEN IT IS NOT THE ONLY ONE.
+     Repeat audits of one package are routine, and each renders as its own row. Without
+     a marker, a single "Bid · caution" line reads as the decision on that package when
+     it may be one run of ten whose others did not clear — and this is the line a
+     bid/no-bid gets defended on.
+
+     Each row carries its position in that package's run history (newest = 1) and whether
+     the verdicts across those runs agree. Verdict-less runs are excluded from the
+     disagreement test: a failed run is not a dissenting opinion. */
+  /* Rendered next to the notice id, so the qualifier travels with the row rather than
+     living in a tooltip nobody opens. Silent when the package was audited once — a
+     "1 of 1" chip on every row is noise that trains the eye to skip the ones that
+     matter. `esc` is applied because the verdict words reach an attribute. */
+  function repeatChip(a) {
+    if (!a.runCount || a.runCount < 2) return "";
+    var cls = a.runsDisagree ? "rpt rpt-split" : "rpt";
+    var tip = a.runsDisagree
+      ? "This solicitation was audited " + a.runCount + " times and the runs did not agree: "
+        + (a.runVerdicts || []).join(", ") + ". This row is run " + a.runIndex + " of " + a.runCount + ", newest first."
+      : "This solicitation was audited " + a.runCount + " times. This row is run "
+        + a.runIndex + " of " + a.runCount + ", newest first.";
+    return '<span class="' + cls + '" title="' + esc(tip) + '">'
+      + esc(a.runIndex + "/" + a.runCount) + (a.runsDisagree ? " ⚠" : "") + '</span>';
+  }
+
+  function annotateRepeats(rows) {
+    var byId = {};
+    rows.forEach(function (r) { (byId[r.id] = byId[r.id] || []).push(r); });
+    Object.keys(byId).forEach(function (id) {
+      var group = byId[id];
+      // rows arrive newest-first from the query, so index 0 is the latest run.
+      var verdicts = {}, nVerdicts = 0;
+      group.forEach(function (r) {
+        if (!r.rec) return;
+        if (!verdicts[r.rec]) { verdicts[r.rec] = 1; nVerdicts++; }
+      });
+      group.forEach(function (r, i) {
+        r.runIndex = i + 1;
+        r.runCount = group.length;
+        r.runsDisagree = nVerdicts > 1;
+        r.runVerdicts = Object.keys(verdicts);
+      });
+    });
+    return rows;
   }
 
   function writeKPIs() {
@@ -842,6 +903,45 @@
       if (blank) out.push(BLANK); // last — it is an absence, not a category
       return out;
     }
+    /* ONE OPTION PER LABEL, CARRYING EVERY RAW VALUE THAT PRODUCES IT.
+       SAM ships several codes for one programme — 8A and 8AN both read "8(a)", HZC and
+       HZS both "HUBZone", WOSBC and WOSBSS both "WOSB" — so keying options on the raw
+       value renders two visually identical rows that filter different subsets, and a
+       customer picking one silently sees half their set-aside. The option value is the
+       pipe-joined set, so selecting it selects the programme rather than one spelling.
+       Absences merge too: setAsideLabel() maps "NONE" to the same dash an empty field
+       renders, which otherwise produced a "—" option beside a "— none on file" one. */
+    function distinctByLabel(key, labelFn) {
+      var byLabel = {}, order = [], blankRaw = [];
+      STATE.rows.forEach(function (r) {
+        var v = r[key];
+        var isBlank = (v == null || v === "" || v === BLANK);
+        var lbl = isBlank ? BLANK : String(labelFn(v));
+        if (isBlank || lbl === BLANK) {
+          var raw = isBlank ? BLANK : v;
+          if (blankRaw.indexOf(raw) === -1) blankRaw.push(raw);
+          return;
+        }
+        if (!byLabel[lbl]) { byLabel[lbl] = []; order.push(lbl); }
+        if (byLabel[lbl].indexOf(v) === -1) byLabel[lbl].push(v);
+      });
+      order.sort();
+      var pairs = order.map(function (l) { return { value: byLabel[l].join("|"), label: l }; });
+      // Absence last — it is not a category.
+      if (blankRaw.length) pairs.push({ value: blankRaw.join("|"), label: BLANK_LABEL });
+      return pairs;
+    }
+    // Built with Option(), not innerHTML — these are customer values going into a
+    // control, and the DOM API cannot be talked into markup.
+    function fillPairs(id, pairs, allLabel) {
+      var sel = document.getElementById(id);
+      if (!sel) return;
+      var cur = sel.value;
+      sel.replaceChildren(new Option(allLabel, "all"));
+      pairs.forEach(function (p) { sel.add(new Option(p.label, p.value)); });
+      var stillThere = pairs.some(function (p) { return p.value === cur; });
+      if (cur && (cur === "all" || stillThere)) sel.value = cur;
+    }
     function withBlank(labelFn) {
       return function (v) { return v === BLANK ? BLANK_LABEL : (labelFn ? labelFn(v) : v); };
     }
@@ -900,7 +1000,7 @@
     fill("fType", distinct("type"), "All types", withBlank());
     // NAICS: bare code — no title in the audits row payload ("no title on file → bare code").
     fill("fNaics", distinct("naics"), "All NAICS", withBlank());
-    fill("fSetAside", distinct("setAside"), "All set-asides", withBlank(setAsideLabel));
+    fillPairs("fSetAside", distinctByLabel("setAside", setAsideLabel), "All set-asides");
   }
 
   // Pill "active" state + Clear visibility. A slicer glows
@@ -983,7 +1083,7 @@
         var audits = (data && data.audits) || [];
         STATE.loadError = null;
         STATE.truncated = audits.length > LEDGER_CAP;
-        STATE.rows = audits.slice(0, LEDGER_CAP).map(mapAuditToRow);
+        STATE.rows = annotateRepeats(audits.slice(0, LEDGER_CAP).map(mapAuditToRow));
       }
     } catch (e) {
       console.warn("[dashboard-live] fetch failed", e);

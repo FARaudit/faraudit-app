@@ -10,7 +10,16 @@ export async function GET(req: NextRequest) {
     const supabase = await createServerClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const limit = parseInt(req.nextUrl.searchParams.get("limit") ?? "50");
+    // A CALLER'S BAD `limit` IS NOT A SERVER ERROR. parseInt on an absent, non-numeric,
+    // zero or negative value yields NaN or <= 0, and supabase-js turns .limit(NaN) and
+    // .limit(0) into an unsatisfiable PostgREST Range header — 416, PGRST103
+    // "Requested range not satisfiable" — which this route's catch reported as a 500
+    // and the ledger rendered as its could-not-load state. Clamp to a usable window,
+    // and cap it so one request cannot ask for the whole table.
+    const parsedLimit = Number.parseInt(req.nextUrl.searchParams.get("limit") ?? "", 10);
+    const limit = Number.isFinite(parsedLimit) && parsedLimit > 0
+      ? Math.min(parsedLimit, 500)
+      : 50;
     // Rule 61 — a query failure must surface as a failure (500 → the page's visible
     // error state), never as an empty list a customer reads as "no audits yet."
     const rows = await fetchRecentAudits(supabase, user.id, limit);

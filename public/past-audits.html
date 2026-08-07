@@ -169,6 +169,11 @@ button{font-family:inherit}
 .pd.unresolved{background:var(--mute-2);opacity:.55}
 .pd.inflight{background:transparent;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--mute-2)}
 .pd.failed{background:transparent;border-radius:50%;border:1.5px dashed var(--mute-2)}
+/* Repeat-run marker. Quiet when the runs agree; carries the warning tone only when
+   they do not, because that is the case a reader must not miss. */
+.rpt{display:inline-block;margin-left:6px;padding:1px 5px;border-radius:4px;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:600;letter-spacing:.02em;background:var(--line-3);color:var(--mute);vertical-align:middle;white-space:nowrap}
+.rpt-split{background:var(--amber-50);color:var(--amber-800);border:1px solid var(--amber-200)}
+[data-theme="dark"] .rpt-split{background:rgba(217,119,6,.18);color:#fcd34d;border-color:rgba(252,211,77,.30)}
 tr[data-pole="bid"] .cell-id::before{background:var(--green-500)}
 tr[data-pole="caution"] .cell-id::before{background:var(--amber-600)}
 tr[data-pole="nobid"] .cell-id::before{background:var(--red-600)}
