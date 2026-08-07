@@ -217,6 +217,16 @@ export async function GET(_req: NextRequest) {
         created_at: null,
         updated_at: null
       },
+      // THE STUB CARRIES THE SAME TWO KEYS THE SAVED BRANCH DOES.
+      // Without them an editor cannot tell "nothing saved" from "read failed": the
+      // client requires naics_saved to be an array and treats its absence as an
+      // outage, so a brand-new account could never add its FIRST code — "Could not
+      // add 541611 — nothing was changed", permanently, on a page correctly showing
+      // "No NAICS codes on file". There is no row yet, so nothing is saved and
+      // everything autopopulate found is a suggestion — which is exactly what the
+      // saved branch computes when its list is empty.
+      naics_saved: [],
+      naics_derived: naics,
       stub: true
     });
   }

@@ -193,6 +193,18 @@ button{font-family:inherit}
 .risk-badge.p2{background:var(--line-3);color:var(--mute);border:1px solid var(--line)}
 [data-theme="dark"] .risk-badge.p0{background:rgba(220,38,38,0.20);color:#fca5a5;border-color:rgba(220,38,38,0.40)}
 [data-theme="dark"] .risk-badge.p1{background:rgba(217,119,6,0.18);color:#fcd34d;border-color:rgba(252,211,77,0.30)}
+/* remove control — quiet until the card is hovered or the button is focused, so a
+   destructive action is reachable without competing with the priority badge. It stays
+   visible on touch, where there is no hover to reveal it. */
+.pcard-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.pcard-rm{appearance:none;background:transparent;border:1px solid var(--line);color:var(--mute);border-radius:6px;padding:4px 9px;font-family:inherit;font-size:10px;font-weight:600;letter-spacing:.02em;cursor:pointer;opacity:0;transition:opacity .14s,color .14s,border-color .14s}
+.pcard:hover .pcard-rm,.pcard-rm:focus-visible{opacity:1}
+.pcard-rm:hover{color:var(--red-700);border-color:var(--red-200);background:var(--red-50)}
+.pcard-rm:disabled{cursor:default;opacity:1;color:var(--mute);background:transparent}
+@media (hover:none){.pcard-rm{opacity:1}}
+[data-theme="dark"] .pcard-rm:hover{color:#fca5a5;border-color:rgba(220,38,38,0.40);background:rgba(220,38,38,0.16)}
+.pcard-msg{margin:0;font-size:11px;line-height:1.5;color:var(--red-700);font-weight:600}
+[data-theme="dark"] .pcard-msg{color:#fca5a5}
 /* urgency meter */
 .urg{display:flex;flex-direction:column;gap:5px}
 .urg-bar{height:5px;border-radius:3px;background:var(--line-3);overflow:hidden}

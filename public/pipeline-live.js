@@ -87,6 +87,55 @@
     return put(el('div','item'), el('span','k',label), valueNode);
   }
 
+  /* REMOVAL BELONGS ON THE PAGE THAT SHOWS THE PURSUIT.
+     The Opportunities feed is SAM-live — it drops expired notices and caps at 200 —
+     so a control that lives only on a feed card cannot reach a pursuit whose deadline
+     has passed, nor one whose reference is an upload key rather than a SAM number.
+     This page holds every row the customer has, so it is the one surface that can
+     always reach them.
+
+     DELETE keys on solicitation_number and is scoped to the capture stages, so it can
+     legitimately match nothing. It reports `removed`, the count of rows it deleted, and
+     that count is the success test: a zero-row delete is a 200 that changed nothing. */
+  function removePursuit(row, btn, statusNode){
+    var ref = String(row && row.solicitation_number || '').trim();
+    if(!ref){
+      statusNode.textContent = 'This pursuit has no reference to remove it by.';
+      statusNode.hidden = false;
+      return;
+    }
+    var name = row.title || ref;
+    if(!window.confirm('Remove "' + name + '" from your pipeline?\n\nThis deletes the pursuit. It does not delete any audit or report.')) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Removing…';
+    statusNode.hidden = true;
+    statusNode.textContent = '';
+
+    fetch('/api/pipeline?solicitationNumber=' + encodeURIComponent(ref), {
+      method: 'DELETE',
+      credentials: 'include'
+    })
+      .then(function(r){
+        return r.json().catch(function(){ return {}; }).then(function(j){
+          return { ok: r.ok, status: r.status, body: j };
+        });
+      })
+      .then(function(res){
+        if(!res.ok) throw new Error((res.body && res.body.error) || ('HTTP ' + res.status));
+        // A 200 is not a removal. Only the row count is.
+        if(!res.body || Number(res.body.removed) < 1) throw new Error('nothing was removed');
+        return loadPipeline();
+      })
+      .catch(function(e){
+        btn.disabled = false;
+        btn.textContent = 'Remove';
+        statusNode.textContent = 'Could not remove — ' + ((e && e.message) || 'request failed') + '.';
+        statusNode.hidden = false;
+        console.warn('[pipeline-live] remove failed:', e);
+      });
+  }
+
   function buildCard(c){
     var d = daysOf(c);
     var code = stageOf(c);
@@ -101,7 +150,15 @@
       el('div','pcard-id', c.solicitation_number || '—'),
       el('h2','pcard-title', c.title || 'Untitled'),
       el('p','pcard-agency', c.agency || '—'));
-    put(head, idBlock, riskNode(d));
+    // The status line lives on the card, so a refused removal is reported next to
+    // the thing that was not removed rather than in a toast that outlives the row.
+    var statusNode = el('p','pcard-msg');
+    statusNode.hidden = true;
+    var rm = el('button','pcard-rm','Remove');
+    rm.type = 'button';
+    rm.setAttribute('aria-label', 'Remove ' + (c.title || c.solicitation_number || 'pursuit') + ' from pipeline');
+    rm.addEventListener('click', function(){ removePursuit(c, rm, statusNode); });
+    put(head, idBlock, put(el('div','pcard-actions'), riskNode(d), rm));
 
     var meta = el('div','pcard-meta');
     var stagePill = el('span','stage-pill', code ? code + ' · ' + STAGE_LABELS[code] : 'unrecognised stage');
@@ -116,6 +173,7 @@
       n.style.cssText = 'margin-top:8px;font-size:11px;opacity:.65;line-height:1.5';
       card.appendChild(n);
     }
+    card.appendChild(statusNode);
     return card;
   }
 
@@ -456,8 +514,14 @@
     var b = document.getElementById('allBtn');
     if(b) b.addEventListener('click', function(){ STATE.stage = null; render(); });
     watchField();
+    loadPipeline();
+  }
 
-    fetch('/api/pipeline', { credentials: 'include' })
+  // The ONE read. Removal re-reads through this rather than splicing STATE.rows,
+  // so what the page shows after a delete is what the server actually holds — a
+  // local splice would render a removal the database may not have performed.
+  function loadPipeline(){
+    return fetch('/api/pipeline', { credentials: 'include' })
       .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(function(data){
         STATE.loadError = null;
