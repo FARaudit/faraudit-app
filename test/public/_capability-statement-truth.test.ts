@@ -125,6 +125,24 @@ console.log("\n── the save believes the server, and every counted field can 
   check("website and address have contact rows", /Business address<\/div>/.test(html) && /Website<\/div>/.test(html), "a counted field has no input");
 }
 
+// A PAST-PERFORMANCE VALUE MAY ONLY BE A RECORDED AWARD. ceiling_value_estimate is a
+// lens's reading of the SOLICITATION and was filling contract_value on both autopopulate
+// paths — rendering in a past-performance row and printing in the PDF as an award figure
+// a contracting officer would read as fact.
+console.log("\n── no estimated ceiling is presented as an award value ──");
+{
+  const capSrc = readFileSync(join(process.cwd(), "src/app/api/capability-statement/route.ts"), "utf8");
+  const code = capSrc.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
+  check("comments were stripped before scanning", code.length < capSrc.length,
+    "scanning prose, not code");
+  const bad = [...code.matchAll(/contract_value:[^\n]*ceiling_value_estimate[^\n]*/g)].map((m) => m[0].trim());
+  check("contract_value is never filled from ceiling_value_estimate", bad.length === 0,
+    bad.join(" | "));
+  check("a recorded actual is still allowed through",
+    /contract_value:\s*o\.contract_value_actual/.test(code),
+    "the real award figure was removed too — suppression went too far");
+}
+
 console.log("\n── planted positives ──");
 check("P1 · rejects a resurrected fabricated award", /SPY-6 Radar Sustainment/.test('<span class="perf-title">SPY-6 Radar Sustainment — Phase IV</span>'));
 check("P2 · rejects a hardcoded completeness figure", />82%</.test('<span class="pct">82%</span>'));

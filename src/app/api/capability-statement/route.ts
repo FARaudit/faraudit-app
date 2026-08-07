@@ -118,7 +118,14 @@ async function autopopulate(supabase: Awaited<ReturnType<typeof createServerClie
       title: a.title,
       agency: a.agency,
       naics_code: a.naics_code,
-      contract_value: (ov.ceiling_value_estimate as string | number | null) ?? null,
+      // NOT A CONTRACT VALUE. ceiling_value_estimate is a lens's reading of the
+      // SOLICITATION's ceiling, not what this award was worth, and it was rendering in
+      // a past-performance row and printing in the PDF as though it were. A contracting
+      // officer reads a figure in that column as the award, has no way to tell it came
+      // from a model, and cannot audit a qualifier we would attach to it. An absent
+      // value costs the customer a number the record never held; a wrong one costs
+      // their credibility on paper they sent under their own name.
+      contract_value: null,
       period: (ov.period_of_performance as string | null) ?? null,
       awarded_at: a.outcome_date,
       cpars_rating: null,
@@ -131,14 +138,16 @@ async function autopopulate(supabase: Awaited<ReturnType<typeof createServerClie
     if (!a) continue; // outcome row references an audit the caller can't see
     const existing = byId.get(o.audit_id);
     const ov = a.overview_json || {};
-    const fallbackValue = (ov.ceiling_value_estimate as string | number | null) ?? null;
+    // Same reason as the legacy path above: an estimated solicitation ceiling is not
+    // this award's value. Only a recorded actual, or a figure already persisted on the
+    // statement, may fill this column.
     byId.set(o.audit_id, {
       audit_id: o.audit_id,
       notice_id: existing?.notice_id ?? a.notice_id,
       title: existing?.title ?? a.title,
       agency: existing?.agency ?? a.agency,
       naics_code: existing?.naics_code ?? a.naics_code,
-      contract_value: o.contract_value_actual ?? existing?.contract_value ?? fallbackValue,
+      contract_value: o.contract_value_actual ?? existing?.contract_value ?? null,
       period: existing?.period ?? ((ov.period_of_performance as string | null) ?? null),
       awarded_at: o.outcome_recorded_at ?? existing?.awarded_at ?? a.outcome_date,
       cpars_rating: o.cpars_rating ?? existing?.cpars_rating ?? null,
