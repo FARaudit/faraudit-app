@@ -680,6 +680,7 @@ details[open]>summary .chev{transform:rotate(180deg)}
   </div>
 </div>
 
+<script src="/naics-reference.js"></script>
 <script>
 /* FARaudit — NAICS code reference. Search-to-card.
    "My codes" reads the real Capability-Statement naics_codes; there is no
@@ -699,36 +700,10 @@ function $(id){return document.getElementById(id);}
    The tracked count lives on Opportunities, where the notices are. */
 /* NAICS search-to-card */
 (function(){
-  var CATS=[{id:'con',label:'Construction',color:'#7c9cc4'},{id:'eng',label:'Engineering',color:'#5bb3a6'},{id:'mfg',label:'Manufacturing',color:'#b08ad0'},{id:'mro',label:'MRO',color:'#d0a45b'},{id:'it',label:'IT & Cyber',color:'#378ADD'}];
+  var REF=window.NAICS_REF||{CATS:[],DATA:[],SYN:{}};
+  var CATS=REF.CATS,DATA=REF.DATA,SYN=REF.SYN;
   var CM={};CATS.forEach(function(c){CM[c.id]=c;});
-  var DATA=[
-   ['236220','con','Commercial & Institutional Building Construction','$45M','rev','bv','far','Construction — Statement of Requirement, not a SOW'],
-   ['237310','con','Highway, Street & Bridge Construction','$45M','rev','bv','agar','Construction — drawings + specs; USDA roads common'],
-   ['238210','con','Electrical Contractors','$19M','rev','lpta','far','Trade sub — Davis-Bacon wage determination applies'],
-   ['238220','con','Plumbing, Heating & Air-Conditioning','$19M','rev','lpta','far','Trade sub — Davis-Bacon wage determination applies'],
-   ['238150','con','Glass & Glazing Contractors','$19M','rev','lpta','affars','Trade sub — ballistic / blast specs common on AF work'],
-   ['561210','con','Facilities Support Services','$47M','rev','bv','dfars','Services — expect a PWS attachment on SAM.gov'],
-   ['541330','eng','Engineering Services','$25.5M','rev','bv','dfars','Services — expect PWS/SOO; SCA may apply'],
-   ['541310','eng','Architectural Services','$12.5M','rev','bv','far','Brooks Act — qualifications-based selection'],
-   ['541512','eng','Computer Systems Design Services','$34M','rev','bv','dfars','IT services — expect CMMC + DFARS 252.204-7012'],
-   ['541715','eng','R&D — Physical, Engineering & Life Sciences','1,000','emp','bv','dfars','R&D — SBIR / STTR pathways common'],
-   ['541380','eng','Testing Laboratories & Services','$19M','rev','bv','far','Services — expect QASP + test plan'],
-   ['332710','mfg','Machine Shops','500','emp','lpta','dfars','Supply buy — no SOW; look for the TDP'],
-   ['332999','mfg','All Other Misc. Fabricated Metal Product Mfg','750','emp','lpta','dfars','Supply buy — TDP + drawings expected'],
-   ['336412','mfg','Aircraft Engine & Engine Parts Manufacturing','1,500','emp','bv','affars','Supply buy — source approval (SAR) likely'],
-   ['336413','mfg','Other Aircraft Parts & Auxiliary Equipment Mfg','1,250','emp','bv','dfars','Supply buy — source approval (SAR) likely'],
-   ['334511','mfg','Search, Detection & Navigation Instruments','1,250','emp','bv','dfars','Supply buy — ITAR / export control likely'],
-   ['488190','mro','Other Support Activities for Air Transportation','$40M','rev','bv','affars','Services — expect PWS; work performed on-base'],
-   ['811219','mro','Other Electronic & Precision Equipment Repair','$22M','rev','lpta','dfars','Repair — expect a repair / overhaul spec'],
-   ['336611','mro','Ship Building & Repairing','1,300','emp','bv','dfars','Repair — NAVSEA standard items apply'],
-   ['811310','mro','Commercial & Industrial Machinery Repair','$12.5M','rev','lpta','far','Repair — expect equipment list + SOW'],
-   ['541511','it','Custom Computer Programming Services','$34M','rev','bv','dfars','IT services — CMMC + DFARS 7012 likely'],
-   ['541519','it','Other Computer Related Services','$34M','rev','bv','dfars','IT services — verify required CMMC level'],
-   ['541513','it','Computer Facilities Management Services','$34M','rev','bv','dfars','IT services — expect PWS + SLAs'],
-   ['518210','it','Data Processing, Hosting & Related Services','$40M','rev','bv','dfars','Cloud — FedRAMP authorization likely']
-  ];
   var STDU={rev:'revenue',emp:'employees'},EVAL={bv:['Best Value','bv'],lpta:['LPTA','lpta']},CLAUSE={far:'FAR',dfars:'FAR+DFARS',agar:'FAR+AGAR',affars:'FAR+AFFARS'};
-  var SYN={'238150':'ballistic glass window glazing curtain wall blast','237310':'paving roads asphalt bridge street','236220':'building renovation tenant improvement','238210':'electrical wiring power','238220':'plumbing hvac heating cooling mechanical','541512':'it software systems integration network','541511':'software programming development coding','541330':'engineering design a&e civil structural','488190':'aircraft ground support flightline aviation','811219':'calibration instrument electronic repair','332710':'machining cnc fabrication parts','336412':'jet engine turbine afterburner aircraft','334511':'radar navigation sensor electronics','518210':'cloud hosting data center fedramp','561210':'base operations facilities janitorial grounds'};
   var pills=$('nxPills'),cards=$('nxCards'),res=$('nxRes'),empty=$('nxEmpty'),search=$('nxSearch');
   if(!pills||!cards)return;
   var MINE={},mineCount=0,active='all',q='';

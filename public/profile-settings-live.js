@@ -301,6 +301,57 @@
     if (add) add.click();
   });
 
+  /* SEARCH IS A CONVENIENCE OVER A CURATED TABLE, NEVER A GATE.
+     A six-digit code is unreadable on its own, so typing a word offers the codes this
+     product carries a title and a size standard for. That table is a subset — SAM has
+     roughly a thousand codes — so free entry is untouched: six digits still add
+     directly, whether or not the table knows them. A search that finds nothing means
+     the table does not carry the code, which is NOT the same as the code being invalid,
+     and the empty state says exactly that.
+     Results are built with DOM nodes, not markup: these strings are reference data
+     going into a control the customer clicks. */
+  function naicsResults() {
+    const box = document.getElementById('psNaicsResults');
+    const input = document.getElementById('psNaicsInput');
+    if (!box || !input) return;
+    const q = input.value.trim();
+    const ref = window.NAICS_REF;
+    input.setAttribute('aria-expanded', 'false');
+    box.replaceChildren();
+    // Six digits is an answer, not a query — leave the customer to press Add.
+    if (!q || /^\d{6}$/.test(q) || !ref || typeof ref.search !== 'function') { box.hidden = true; return; }
+
+    const saved = (window.PS.NAICS || []).map(function (n) { return String(n.code); });
+    const hits = ref.search(q).filter(function (r) { return saved.indexOf(r[0]) === -1; });
+    box.hidden = false;
+    input.setAttribute('aria-expanded', 'true');
+
+    if (!hits.length) {
+      const none = document.createElement('p');
+      none.className = 'nf-none';
+      none.textContent = 'No match in the reference table. It carries a subset of NAICS — '
+        + 'if you know the six-digit code, type it and add it directly.';
+      box.appendChild(none);
+      return;
+    }
+    hits.slice(0, 8).forEach(function (r) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'nf-hit';
+      b.setAttribute('data-naics-add', r[0]);
+      b.setAttribute('role', 'option');
+      const code = document.createElement('span'); code.className = 'nf-code'; code.textContent = r[0];
+      const title = document.createElement('span'); title.className = 'nf-title'; title.textContent = r[2];
+      const size = document.createElement('span'); size.className = 'nf-size';
+      size.textContent = r[3] + ' ' + (r[4] === 'emp' ? 'employees' : 'revenue');
+      b.appendChild(code); b.appendChild(title); b.appendChild(size);
+      box.appendChild(b);
+    });
+  }
+  document.addEventListener('input', function (e) {
+    if (e.target && e.target.id === 'psNaicsInput') naicsResults();
+  });
+
   /* The unavailable reason is PRINTED FROM THE ROUTE, not re-authored here. One
      sentence with one source: if agency targeting ships, the route stops saying
      "unwired" and this panel stops saying it too, with nothing to remember to edit. */
@@ -445,6 +496,11 @@
         } catch (_) { CAP_FIELDS.forEach(function (f) { failed.push(f.label); }); }
       }
 
+      // The server confirmed every field, so the record and the boxes now agree — the
+      // pending-edit set has nothing left to protect and must not outlive the write.
+      if (!failed.length && window.PS_APP && typeof window.PS_APP.clearDirty === 'function') {
+        window.PS_APP.clearDirty();
+      }
       if (!failed.length) note('✓ Saved', true);
       else if (failed.length >= CAP_FIELDS.length + 1) note('Nothing saved — reload and try again', false);
       else note('Partly saved · did NOT save: ' + failed.join(', '), false);
