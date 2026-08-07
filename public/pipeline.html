@@ -247,6 +247,13 @@ button{font-family:inherit}
 [data-theme="dark"] .pcard-meta .item .v.overdue{color:#fca5a5}[data-theme="dark"] .pcard-meta .item .v.warn{color:#fcd34d}
 .stage-pill{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;background:rgba(55,138,221,0.08);border:1px solid var(--accent-light);color:var(--accent-deep);font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;width:max-content}
 [data-theme="dark"] .stage-pill{background:rgba(55,138,221,0.15);color:var(--accent-light);border-color:rgba(181,212,244,0.30)}
+/* The stage is a control, so it looks like the pill it replaced but behaves like a
+   select — the pursuit can be moved along the sequence the rail above it draws. */
+.stage-sel{appearance:none;display:inline-flex;padding:3px 22px 3px 9px;border-radius:999px;background:rgba(55,138,221,0.08);border:1px solid var(--accent-light);color:var(--accent-deep);font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;width:max-content;cursor:pointer;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23185FA5' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>");background-repeat:no-repeat;background-position:right 7px center;background-size:9px}
+.stage-sel:hover{border-color:var(--accent)}
+.stage-sel:disabled{opacity:.6;cursor:default}
+[data-theme="dark"] .stage-sel{background-color:rgba(55,138,221,0.15);color:var(--accent-light);border-color:rgba(181,212,244,0.30)}
 .stage-pill::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--accent)}
 
 .pcard-actions{display:flex;gap:8px;flex-wrap:wrap}

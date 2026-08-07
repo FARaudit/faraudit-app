@@ -6,9 +6,29 @@ import { buildV4Data } from "@/lib/v4-report/build-data";
 import { REPORT_CSS } from "@/lib/v4-report/styles";
 import { FONT_CSS } from "@/lib/v4-report/fonts";
 import { shouldGateExport } from "@/lib/audit-display";
+import { TODAY, WORKFLOW, SECTIONS, type RailItem } from "@/lib/nav/rail";
 
 const esc = (s: unknown): string =>
   String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/* THE SAME LIST OF DESTINATIONS THE REST OF THE PRODUCT USES.
+   This shell wrote its own four links — "Run audit" at /run-audit and "Past audits" —
+   against the shared rail's fifteen at /audit and "Decisions". This renderer is the
+   fallback behind AUDIT_REPORT_V5, so the fork is dormant rather than gone: the moment
+   that flag is turned off, every report reverts to a navigation the rest of the app
+   stopped using. Items come from the rail; the markup keeps this shell's own classes,
+   and the rail's icon paths sit in the existing 16px .an-i slot. */
+function appNav(activeKey: string): string {
+  const row = (i: RailItem) =>
+    `<a class="an-item${i.key === activeKey ? " on" : ""}" href="${i.href}">`
+    + `<span class="an-i"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8">${i.icon}</svg></span>`
+    + `${esc(i.label)}</a>`;
+  const group = (label: string | null, items: RailItem[]) =>
+    `<div class="an-sect">${label ? `<div class="an-h">${esc(label)}</div>` : ""}${items.map(row).join("")}</div>`;
+  return group(null, [TODAY])
+    + group("Workflow", WORKFLOW)
+    + SECTIONS.map((s) => group(s.label, s.items)).join("");
+}
 
 function railItems(sections: V4Section[]): string {
   return sections
@@ -69,13 +89,7 @@ export function renderV4ReportFromRow(audit: Record<string, unknown>): string {
 <div class="stage">
   <aside class="appnav" id="appnav">
     <div class="an-brand"><span class="an-mk">F</span><span class="an-wm">FAR<span class="au">audit</span></span></div>
-    <div class="an-sect">
-      <div class="an-h">Workspace</div>
-      <a class="an-item" href="/today"><span class="an-i">▦</span>Today</a>
-      <a class="an-item" href="/run-audit"><span class="an-i">◷</span>Run audit</a>
-      <a class="an-item on" href="/past-audits"><span class="an-i">▤</span>Past audits</a>
-      <a class="an-item" href="/pipeline"><span class="an-i">⤳</span>Pipeline</a>
-    </div>
+    ${appNav("past-audits")}
     <div class="an-sect an-report">
       <div class="an-h">This audit</div>
       <div class="rail-list" id="railListC">${rail}</div>
