@@ -342,6 +342,33 @@
     { id: 'psAddress',     col: 'contact_address', label: 'Business address' }
   ];
 
+  /* SHAPE ONLY, AND THE MESSAGE SAYS SO.
+     These two identifiers reach the audit engine's bidder profile, so what is typed
+     here is believed when the engine reasons about eligibility. A UEI is twelve
+     characters and a CAGE is five, and an identifier of the wrong length cannot be
+     either — that is checkable, so it is checked before the write rather than stored
+     and trusted.
+
+     This does NOT check that the identifier EXISTS. A UEI's final character is a
+     checksum over the first eleven, and confirming an entity is SAM's job — so the
+     message says "is 12 characters", never "is valid". Empty stays legal: clearing a
+     field is a real edit. */
+  function shapeError(col, v) {
+    if (!v) return null;
+    if (col === 'uei') {
+      if (v.length !== 12) return 'SAM.gov UEI is 12 characters — this one is ' + v.length + '.';
+      if (!/^[A-Za-z0-9]+$/.test(v)) return 'SAM.gov UEI is letters and digits only.';
+      if (v.charAt(0) === '0') return 'SAM.gov UEI does not start with a zero.';
+      // The letters I and O are excluded so they cannot be misread as 1 and 0.
+      if (/[IOio]/.test(v)) return 'SAM.gov UEI never contains the letter I or O.';
+    }
+    if (col === 'cage_code') {
+      if (v.length !== 5) return 'CAGE code is 5 characters — this one is ' + v.length + '.';
+      if (!/^[A-Za-z0-9]+$/.test(v)) return 'CAGE code is letters and digits only.';
+    }
+    return null;
+  }
+
   document.addEventListener('click', async function (e) {
     const btn = e.target && e.target.closest && e.target.closest('#psSaveBtn');
     if (!btn) return;
@@ -354,6 +381,17 @@
       const el = document.getElementById(f.id);
       if (el) patch[f.col] = el.value.trim();
     });
+
+    // Refuse the whole write rather than land a half of it: the two records are saved
+    // separately, so sending identity first and failing the company record afterwards
+    // would leave the account in a state the customer did not ask for.
+    const shapeProblems = CAP_FIELDS
+      .map(function (f) { return shapeError(f.col, patch[f.col]); })
+      .filter(Boolean);
+    if (shapeProblems.length) {
+      note(shapeProblems.join(' '), false);
+      return;
+    }
 
     btn.disabled = true;
     note('Saving…', true);
