@@ -70,7 +70,7 @@
           window.PS.NAICS_DERIVED = (Array.isArray(cap.naics_derived) ? cap.naics_derived : [])
             .map(String);
           (Array.isArray(rec.certifications) ? rec.certifications : [])
-            .forEach(function (k) { if (k) window.PS.CERTS.push({ k: String(k), on: true }); });
+            .forEach(function (k) { if (k) window.PS.CERTS.push({ k: String(k), on: false }); });
         } else {
           throw new Error('capability-statement: HTTP ' + capRes.status);
         }
@@ -106,6 +106,7 @@
         window.PS_APP.render();
       }
       setLivePill(true);
+      markVerifiedCerts();
     } catch (e) {
       console.error('[profile-settings-live] wire failed:', e);
       // A failed read is a FAILURE, not an empty account. Nothing may be left
@@ -340,6 +341,7 @@
         h.className = 'nf-group';
         h.textContent = cat.label;
         box.appendChild(h);
+        box.appendChild(headRow());
         rows.forEach(function (r) { box.appendChild(hitButton(r)); });
       });
       if (!box.children.length) {
@@ -366,6 +368,20 @@
     hits.slice(0, 10).forEach(function (r) { box.appendChild(hitButton(r)); });
   }
 
+  /* Column headers, on the same grid as the rows beneath them, so the eye is told what
+     each column is once per group rather than inferring it. */
+  function headRow() {
+    const h = document.createElement('div');
+    h.className = 'nf-head';
+    ['Code', 'Description', 'Size standard'].forEach(function (t, i) {
+      const s = document.createElement('span');
+      if (i === 2) s.className = 'nh-r';
+      s.textContent = t;
+      h.appendChild(s);
+    });
+    return h;
+  }
+
   /* One row builder for both the browse list and the search hits, so they cannot drift
      apart. A code with no sourced size standard simply carries no figure. */
   function hitButton(r) {
@@ -378,20 +394,8 @@
     const title = document.createElement('span'); title.className = 'nf-title'; title.textContent = r[2];
     b.appendChild(code); b.appendChild(title);
 
-    // Every row emits every cell, present or not — an omitted cell shifts the ones after
-    // it and the column breaks.
-    const ref = window.NAICS_REF;
-    const doms = (ref && ref.OASIS && ref.OASIS[r[0]]) || null;
-    const reach = document.createElement('span');
-    if (doms) {
-      reach.className = 'nr-oasis';
-      reach.textContent = 'OASIS+ ' + doms.length;
-      reach.title = 'On the GSA OASIS+ vehicle, this code carries work in: ' + doms.join(', ');
-    } else {
-      reach.className = 'nr-gap';
-    }
-    b.appendChild(reach);
-
+    // Every row emits every cell, present or not — an omitted cell shifts the ones
+    // after it and the column breaks.
     const size = document.createElement('span');
     if (r[3]) {
       size.className = 'nf-size';
@@ -447,6 +451,43 @@
     { id: 'psCage',        col: 'cage_code',       label: 'CAGE code' },
     { id: 'psAddress',     col: 'contact_address', label: 'Business address' }
   ];
+
+  /* A CERTIFICATION CHIP MAY ONLY LOOK HELD IF SAM SAYS IT IS HELD.
+     Two stores back this row and they are not the same thing. `certifications` is a
+     list carried on the statement; `attributes_v2` is what cert-sync writes from the SAM
+     entity and what the AUDIT ENGINE reads for set-aside eligibility. Only the second is
+     cleared when a UEI stops resolving — so a profile can display established-looking
+     chips while the engine holds no verified eligibility at all, which is the page
+     attesting something SAM does not.
+
+     Every chip now starts unverified and is promoted only by the verified record. The
+     state is read from /api/certifications, the same producer the engine consumes, so
+     the page and the engine cannot disagree about the same firm.
+
+     A read that FAILS leaves the state null and the chips unpromoted-but-unqualified:
+     our own outage must not tell a customer their certification is unverified. */
+  function normalizeCert(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ''); }
+  async function markVerifiedCerts() {
+    try {
+      const res = await fetch('/api/certifications', { credentials: 'include' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const d = await res.json();
+      const established = (d && d.establishedPrograms) || [];
+      const labels = established.map(function (p) {
+        return normalizeCert(p && (p.label || p.attr || p.program) || p);
+      });
+      window.PS.CERT_STATE = (d && d.state) || null;
+      window.PS.CERTS.forEach(function (c) {
+        const n = normalizeCert(c.k);
+        c.on = labels.some(function (l) { return l && (l === n || n.indexOf(l) !== -1 || l.indexOf(n) !== -1); });
+      });
+    } catch (e) {
+      // Our failure, not the customer's. Say nothing about verification.
+      window.PS.CERT_STATE = null;
+      console.warn('[profile-settings-live] certification state unavailable:', (e && e.message) || e);
+    }
+    if (window.PS_APP && typeof window.PS_APP.render === 'function') window.PS_APP.render();
+  }
 
   /* SHAPE ONLY, AND THE MESSAGE SAYS SO.
      These two identifiers reach the audit engine's bidder profile, so what is typed
