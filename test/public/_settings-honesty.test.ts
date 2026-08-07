@@ -105,7 +105,17 @@ console.log("\n── no control reports a save it did not perform ──");
   const orphanFeet = (appCode.match(/<span class="saved">✓ Saved<\/span>/g) ?? []).length;
   check("no unconditional 'Saved' badge anywhere in the panels", orphanFeet === 0, `${orphanFeet} panels assert a save with nothing behind it`);
   check("no optimistic toggle handler", !/classList\.toggle\('on'\);\s*flash\(\)/.test(app), "a toggle flips and reports saved without a writer");
-  check("flash() names what was saved", /function flash\(what\)/.test(app), "a generic 'saved' can be fired by a control that saves nothing");
+  // THE RULE IS THE FIRST PARAMETER, NOT THE ARITY. This pinned `function flash(what)`
+  // exactly, so adding an outcome argument read as a regression while the property it
+  // guards — that flash cannot be called bare and report a nameless "saved" — was
+  // untouched. `\b` still rejects `function flash()`.
+  check("flash() names what was saved", /function flash\(what\b/.test(app), "a generic 'saved' can be fired by a control that saves nothing");
+  // A REFUSED SAVE IS REPORTED. Reverting the control is not a report: a toggle that
+  // silently snaps back is indistinguishable from a dead one, so the failure branch has
+  // to put a message on screen rather than clear it.
+  check("a refused preference save is reported, not just reverted",
+    /Could not save/.test(app) && !/flash\(''\)/.test(app),
+    "the failure branch hides the note instead of naming the refusal");
 
   // Billing stated a plan and two prices while the route was returning all three.
   check("billing reads the live plan label", /planName\(\)/.test(app) && /PS\.plan_label/.test(app), "the plan name is a literal");

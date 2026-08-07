@@ -155,6 +155,12 @@
     { k: "bid", label: "Bid" }, { k: "caution", label: "Bid \u00b7 caution" },
     { k: "nobid", label: "No-bid" }, { k: "inelig", label: "Ineligible" },
     { k: "review", label: "Needs review" }, { k: "incomplete", label: "Incomplete" },
+    // POLE_REC can emit these two, so they are segments in their own right. Out of
+    // scope IS a verdict — the report renders it "Outside scope · no charge" — and
+    // OUT_OF_SCOPE is a deterministic pole on construction design-build packages.
+    // Without a segment each, segOf() sends them to "inflight", which asserts the
+    // opposite: that no verdict was issued.
+    { k: "oos", label: "Out of scope" }, { k: "unresolved", label: "Unresolved" },
     { k: "inflight", label: "In flight" }, { k: "failed", label: "Run failed" }
   ];
   var SL = {}; SEG.forEach(function (s) { SL[s.k] = s.label; });
@@ -174,7 +180,9 @@
   var TIME_HOURS = { "30": 720, quarter: 2160, year: 8760 };
   var TIME_LABELS = { "30": "last 30 days", quarter: "last quarter", year: "last year" };
   var TIME_OPTION_TEXT = { "30": "Last 30 days", quarter: "Last quarter", year: "Last year" };
-  var RECMAP = { "Bid": "bid", "Bid \u00b7 caution": "caution", "No-bid": "nobid", "Ineligible": "inelig", "Needs review": "review", "Incomplete": "incomplete" };
+  // EVERY LABEL POLE_REC CAN RETURN NEEDS A KEY HERE. A label with no key is not a
+  // missing colour \u2014 segOf() sends it to "inflight", which is a different claim.
+  var RECMAP = { "Bid": "bid", "Bid \u00b7 caution": "caution", "No-bid": "nobid", "Ineligible": "inelig", "Needs review": "review", "Incomplete": "incomplete", "Out of scope": "oos", "Unresolved": "unresolved" };
   function segOf(rec, status) {
     if (rec && RECMAP[rec]) return RECMAP[rec];
     return status === "failed" ? "failed" : "inflight";
@@ -322,7 +330,20 @@
       if (STATE.sortKey === "audited") {
         return cmpNumUndatedLast(x.age, y.age, STATE.sortDir);
       }
-      if (STATE.sortKey === "agency" || STATE.sortKey === "type" || STATE.sortKey === "setAside" || STATE.sortKey === "rec" || STATE.sortKey === "status") {
+      // SORT THE COLUMN THAT IS ON SCREEN. The Verdict cell renders SL[_s], the pole;
+      // `rec` is null on any audit that is not `complete`, so sorting it collapses every
+      // failed and in-flight row into one empty group that leads an ascending sort.
+      // Sort the rendered label, and hold rows carrying no verdict at the end in BOTH
+      // directions rather than letting them lead.
+      if (STATE.sortKey === "rec") {
+        var xl = (SL[x._s] || "").toString().toLowerCase();
+        var yl = (SL[y._s] || "").toString().toLowerCase();
+        if (!xl && !yl) return 0;
+        if (!xl) return 1;
+        if (!yl) return -1;
+        return STATE.sortDir * xl.localeCompare(yl);
+      }
+      if (STATE.sortKey === "agency" || STATE.sortKey === "type" || STATE.sortKey === "setAside" || STATE.sortKey === "status") {
         var xa = (x[STATE.sortKey] || "").toString().toLowerCase();
         var ya = (y[STATE.sortKey] || "").toString().toLowerCase();
         return STATE.sortDir * xa.localeCompare(ya);
@@ -459,6 +480,22 @@
     else console.log(line);
   }
 
+  /* ONE SOLICITATION IS ONE THING YOU CAN BID, HOWEVER MANY TIMES IT WAS AUDITED.
+     This ledger holds one row per audit RUN, and repeat runs on the same package are
+     routine — a single package can carry ten. Any figure a customer plans against is
+     therefore counted over `r.id` (solicitation_number || notice_id), never over rows.
+     Returns both numbers so a caller can show the runs rather than hide them. */
+  function distinctSolicitations(rows, pred) {
+    var seen = {}, sols = 0, runs = 0;
+    rows.forEach(function (r) {
+      if (pred && !pred(r)) return;
+      runs++;
+      var k = String(r.id);
+      if (!seen[k]) { seen[k] = true; sols++; }
+    });
+    return { sols: sols, runs: runs };
+  }
+
   function writeKPIs() {
     var kpis = document.querySelectorAll(".kpi-strip .kpi");
     function setKPI(i, val, footHTML) {
@@ -481,15 +518,20 @@
     }
     var rows = STATE.rows;
     var c = segCounts(rows);
-    var verdicts = c.bid + c.caution + c.nobid + c.inelig + c.review + c.incomplete;
-    var open = rows.filter(function (r) { return r._w === "open"; }).length;
+    // "of N with a verdict" — out-of-scope and unresolved rows carry one the engine
+    // actually issued, so they belong in the denominator. Only in-flight and failed
+    // runs do not.
+    var verdicts = c.bid + c.caution + c.nobid + c.inelig + c.review + c.incomplete + c.oos + c.unresolved;
+    var openAgg = distinctSolicitations(rows, function (r) { return r._w === "open"; });
+    var open = openAgg.sols;
     var last30 = rows.filter(function (r) { return r.age <= 720; }).length;
     function pdi(k) { return '<i class="pd ' + k + '"></i>'; }
     setKPI(0, String(rows.length), "<b>" + last30 + "</b> in the last 30 days");
     // R4 — the aggregate names the poles it sums; no unnamed percentage, ever.
     setKPI(1, String(c.bid + c.caution), '<span class="agg"><span class="t">' + pdi("bid") + "Bid " + c.bid + '</span><span class="op">+</span><span class="t">' + pdi("caution") + "Bid\u00b7caution " + c.caution + '</span><span class="den">\u00b7 of ' + verdicts + ' with a verdict</span></span>');
     setKPI(2, String(c.nobid + c.inelig), '<span class="agg"><span class="t">' + pdi("nobid") + "No-bid " + c.nobid + '</span><span class="op">+</span><span class="t">' + pdi("inelig") + "Ineligible " + c.inelig + '</span><span class="den">\u00b7 committal declines</span></span>');
-    setKPI(3, String(open), 'response window still open \u2014 <b>you can still bid</b>');
+    setKPI(3, String(open), 'solicitation' + (open === 1 ? '' : 's') + ' \u2014 response window still open, <b>you can still bid</b>'
+      + (openAgg.runs !== open ? '<span class="den">\u00b7 ' + openAgg.runs + ' audit runs</span>' : ''));
   }
 
   function writeDistribution() {
@@ -550,8 +592,15 @@
     // the view is actually complete; past the cap, say what is shown instead.
     sub.innerHTML = STATE.truncated
       ? 'Your <b>' + n + ' most recent</b> audits, newest first — older audits are not listed on this page.'
-      : 'Every solicitation FARaudit has audited for you — <b>'
-        + n + ' record' + (n === 1 ? '' : 's') + '</b>, newest first.';
+      // THE NOUN AND THE NUMBER HAVE TO AGREE. "Every solicitation … N records" reads
+      // as N packages, and N is runs. Name both, so a repeat run stays visible instead
+      // of counting as another pursuit.
+      : (function () {
+          var s = distinctSolicitations(STATE.rows).sols;
+          return 'Every solicitation FARaudit has audited for you — <b>'
+            + s + ' solicitation' + (s === 1 ? '' : 's') + '</b> across <b>'
+            + n + ' audit' + (n === 1 ? '' : 's') + '</b>, newest first.';
+        })();
   }
 
   // Live sidebar badge: replace the rail's placeholder count on the
@@ -562,15 +611,20 @@
   // response-deadline-not-yet-passed, and bind open/total live with explanatory titles.
   function writeSidebarBadge() {
     if (STATE.loadError) return; // markup ships an empty badge — leave it empty, never "0"
-    var open = STATE.rows.filter(function (r) { return r.dueTs !== Infinity && r.dueTs > Date.now(); }).length;
-    var total = STATE.rows.length;
+    // SAME COUNT AS THE STILL-OPEN TILE, SAME UNIT. The rail rides on every page, so a
+    // count derived here independently of writeKPIs contradicts the tile it mirrors.
+    var openAgg = distinctSolicitations(STATE.rows, function (r) {
+      return r.dueTs !== Infinity && r.dueTs > Date.now();
+    });
+    var open = openAgg.sols;
+    var total = distinctSolicitations(STATE.rows).sols;
     // The rail renders WORKFLOW rows (Opportunities · Audit · Decisions · Pipeline)
     // as .sb-step and collapsible-section rows as .sb-icon (rail.ts row()). Match
     // both classes, or this returns at the next line and no badge renders.
     // Gated by test/public/_rail-live-badge.test.ts Part K.
     var link = document.querySelector('.sb-step[href="/past-audits"], .sb-icon[href="/past-audits"], .sb-step[href="/dashboard"], .sb-icon[href="/dashboard"]');
     if (!link) return;
-    link.setAttribute("title", "Decisions — " + open + " open (response deadline not yet passed) of " + total + " total");
+    link.setAttribute("title", "Decisions — " + open + " open (response deadline not yet passed) of " + total + " solicitations audited");
     var el = link.querySelector(".sb-badge");
     if (!el) {
       // The served rail renders no pill when it has no real number — create it
@@ -583,7 +637,7 @@
     }
     el.style.display = "";
     el.textContent = String(open);
-    el.setAttribute("title", open + " open — response deadline not yet passed (of " + total + " total)");
+    el.setAttribute("title", open + " open — response deadline not yet passed (of " + total + " solicitations audited)");
     var tip = link.querySelector(".sb-tip");
     if (tip) tip.textContent = "Decisions · " + open + " open";
   }

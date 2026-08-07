@@ -21,6 +21,18 @@
       c.contact = data.full_name  || '';
       c.phone   = '';   // no source field anywhere yet
 
+      // PLAN SCALARS ARE ASSIGNED HERE, BEFORE THE CAPABILITY-STATEMENT READ.
+      // They come from /api/profile, which has already succeeded by this line. The
+      // capability-statement read below rethrows on failure, so anything assigned after
+      // it is undefined whenever that record is unreadable — and an undefined plan
+      // renders as "No subscription on file", which is a different claim from "could
+      // not be read". Billing's three-answer guard only works if these are set.
+      window.PS.plan_tier       = data.plan_tier;
+      window.PS.plan_label      = data.plan_label;
+      window.PS.plan_status     = data.plan_status;
+      window.PS.plan_period_end = data.plan_period_end;
+      window.PS.plan_unreadable = !!data.plan_unreadable;
+
       // The COMPANY record HAS a source — capability_statements — and it is the same record
       // the audit engine reads. Settings shows it READ-ONLY; the capability statement tab
       // edits it. A failed read leaves the fields empty and flags the body, because "not on
@@ -85,12 +97,7 @@
         you:   true
       });
 
-      // Scalar plan fields — exposed for billing panel reads.
-      window.PS.plan_tier       = data.plan_tier;
-      window.PS.plan_label      = data.plan_label;
-      window.PS.plan_status     = data.plan_status;
-      window.PS.plan_period_end = data.plan_period_end;
-      window.PS.plan_unreadable = !!data.plan_unreadable;
+      // Plan scalars were assigned before the capability-statement read, above.
 
       window.PS.loadError = false;
       writeHeaderStats();

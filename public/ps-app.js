@@ -260,8 +260,11 @@
           savePref(key, next).then(ok => { b.disabled = false;
             // NAME what saved. flash() was called bare, so `what` was undefined and the
             // note rendered hidden and empty — a confirmed save reported nothing.
-            if (ok) { prefs[key] = next; flash(PREF_LABELS[key] || key); }
-            else { tgl.classList.toggle('on', !next); flash(''); } });
+            if (ok) { prefs[key] = next; flash(PREF_LABELS[key] || key, true); }
+            // A REFUSED SAVE NAMES ITSELF. Reverting the switch is not a message: the
+            // route rate-limits at 30/min, and a toggle that will not move with nothing
+            // on screen is indistinguishable from a dead control.
+            else { tgl.classList.toggle('on', !next); flash(PREF_LABELS[key] || key, false); } });
         };
       });
     });
@@ -270,12 +273,19 @@
   /* Reports into the panel that is actually on screen. This targeted a #savedAt that
      exists in no settings markup, so `if (!el) return` swallowed every confirmation and
      a successful preference save looked exactly like a click that did nothing. */
-  function flash(what) {
+  function flash(what, ok) {
     const el = $('psPrefNote');
     if (!el) return;
-    el.hidden = !what;
-    el.textContent = what ? '\u2713 ' + what + ' saved' : '';
-    if (what) setTimeout(() => { el.textContent = ''; }, 2600);
+    if (!what) { el.hidden = true; el.textContent = ''; return; }
+    el.hidden = false;
+    // A failure stays on screen. Clearing it on a timer would return the row to the
+    // same silence the customer just failed to escape.
+    if (ok === false) {
+      el.textContent = '\u2715 Could not save ' + what + ' \u2014 nothing was changed.';
+      return;
+    }
+    el.textContent = '\u2713 ' + what + ' saved';
+    setTimeout(() => { el.textContent = ''; el.hidden = true; }, 2600);
   }
 
   function init() { renderNav(); renderPanel(); }
