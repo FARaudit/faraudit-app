@@ -530,8 +530,14 @@
     // R4 — the aggregate names the poles it sums; no unnamed percentage, ever.
     setKPI(1, String(c.bid + c.caution), '<span class="agg"><span class="t">' + pdi("bid") + "Bid " + c.bid + '</span><span class="op">+</span><span class="t">' + pdi("caution") + "Bid\u00b7caution " + c.caution + '</span><span class="den">\u00b7 of ' + verdicts + ' with a verdict</span></span>');
     setKPI(2, String(c.nobid + c.inelig), '<span class="agg"><span class="t">' + pdi("nobid") + "No-bid " + c.nobid + '</span><span class="op">+</span><span class="t">' + pdi("inelig") + "Ineligible " + c.inelig + '</span><span class="den">\u00b7 committal declines</span></span>');
-    setKPI(3, String(open), 'solicitation' + (open === 1 ? '' : 's') + ' \u2014 response window still open, <b>you can still bid</b>'
-      + (openAgg.runs !== open ? '<span class="den">\u00b7 ' + openAgg.runs + ' audit runs</span>' : ''));
+    // THIS FOOTER IS A SENTENCE, SO IT SHIPS AS ONE BLOCK. `.foot` is flex/nowrap and
+    // `.t` is flex too, so every element handed to either becomes its own column and a
+    // sentence arrives on screen as fragments side by side. `.den` is the block child,
+    // which lets the line wrap as prose and keeps the emphasis inline.
+    setKPI(3, String(open), '<span class="agg"><span class="den">solicitation' + (open === 1 ? '' : 's')
+      + ' \u2014 response window still open, <b>you can still bid</b>'
+      + (openAgg.runs !== open ? ' \u00b7 ' + openAgg.runs + ' audit runs' : '')
+      + '</span></span>');
   }
 
   function writeDistribution() {
