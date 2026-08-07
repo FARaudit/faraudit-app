@@ -97,16 +97,58 @@
      DELETE keys on solicitation_number and is scoped to the capture stages, so it can
      legitimately match nothing. It reports `removed`, the count of rows it deleted, and
      that count is the success test: a zero-row delete is a 200 that changed nothing. */
+  /* THE QUESTION IS ASKED ON THE CARD, NOT BY THE BROWSER.
+     A native confirm() is host chrome: it announces the domain, cannot be styled, is
+     unreadable to the page, and takes the whole window to ask one question about one
+     row. Arming in place keeps the question beside the pursuit it concerns, so the
+     customer can still see which one they are about to remove while deciding. Cancel
+     and Escape both put it back. */
+  function armRemove(row, btn, statusNode, actions){
+    if(actions.querySelector('.pcard-cancel')) return;   // already armed
+    var resting = btn.textContent;
+
+    var cancel = el('button','pcard-cancel','Cancel');
+    cancel.type = 'button';
+    actions.appendChild(cancel);
+
+    btn.classList.add('is-armed');
+    btn.textContent = 'Remove';
+    statusNode.className = 'pcard-msg ask';
+    statusNode.textContent = 'Remove this pursuit? Its audit and report are kept.';
+    statusNode.hidden = false;
+
+    function disarm(){
+      document.removeEventListener('keydown', onKey);
+      if(cancel.parentNode) cancel.parentNode.removeChild(cancel);
+      btn.classList.remove('is-armed');
+      btn.textContent = resting;
+      statusNode.hidden = true;
+      statusNode.textContent = '';
+      statusNode.className = 'pcard-msg';
+      btn.onclick = function(){ armRemove(row, btn, statusNode, actions); };
+    }
+    function onKey(e){ if(e.key === 'Escape') disarm(); }
+
+    document.addEventListener('keydown', onKey);
+    cancel.onclick = disarm;
+    btn.onclick = function(){
+      document.removeEventListener('keydown', onKey);
+      if(cancel.parentNode) cancel.parentNode.removeChild(cancel);
+      removePursuit(row, btn, statusNode);
+    };
+    btn.focus();
+  }
+
   function removePursuit(row, btn, statusNode){
     var ref = String(row && row.solicitation_number || '').trim();
     if(!ref){
+      statusNode.className = 'pcard-msg';
       statusNode.textContent = 'This pursuit has no reference to remove it by.';
       statusNode.hidden = false;
       return;
     }
-    var name = row.title || ref;
-    if(!window.confirm('Remove "' + name + '" from your pipeline?\n\nThis deletes the pursuit. It does not delete any audit or report.')) return;
 
+    btn.classList.remove('is-armed');
     btn.disabled = true;
     btn.textContent = 'Removing…';
     statusNode.hidden = true;
@@ -130,6 +172,10 @@
       .catch(function(e){
         btn.disabled = false;
         btn.textContent = 'Remove';
+        // Back to resting, so a refusal can be read and then retried deliberately
+        // rather than leaving a half-armed control on the card.
+        btn.onclick = function(){ armRemove(row, btn, statusNode, btn.parentNode); };
+        statusNode.className = 'pcard-msg';
         statusNode.textContent = 'Could not remove — ' + ((e && e.message) || 'request failed') + '.';
         statusNode.hidden = false;
         console.warn('[pipeline-live] remove failed:', e);
@@ -157,8 +203,9 @@
     var rm = el('button','pcard-rm','Remove');
     rm.type = 'button';
     rm.setAttribute('aria-label', 'Remove ' + (c.title || c.solicitation_number || 'pursuit') + ' from pipeline');
-    rm.addEventListener('click', function(){ removePursuit(c, rm, statusNode); });
-    put(head, idBlock, put(el('div','pcard-actions'), riskNode(d), rm));
+    var actions = put(el('div','pcard-actions'), riskNode(d), rm);
+    rm.onclick = function(){ armRemove(c, rm, statusNode, actions); };
+    put(head, idBlock, actions);
 
     var meta = el('div','pcard-meta');
     var stagePill = el('span','stage-pill', code ? code + ' · ' + STAGE_LABELS[code] : 'unrecognised stage');

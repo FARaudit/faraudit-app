@@ -203,8 +203,18 @@ button{font-family:inherit}
 .pcard-rm:disabled{cursor:default;opacity:1;color:var(--mute);background:transparent}
 @media (hover:none){.pcard-rm{opacity:1}}
 [data-theme="dark"] .pcard-rm:hover{color:#fca5a5;border-color:rgba(220,38,38,0.40);background:rgba(220,38,38,0.16)}
+/* Armed: the control commits to being destructive and stops depending on hover, so
+   the question cannot be left half-asked on a card the pointer has moved off. */
+.pcard-rm.is-armed{opacity:1;color:#fff;background:var(--red-600);border-color:var(--red-600)}
+.pcard-rm.is-armed:hover{color:#fff;background:var(--red-700);border-color:var(--red-700)}
+.pcard-cancel{appearance:none;background:transparent;border:1px solid var(--line);color:var(--mute);border-radius:6px;padding:4px 9px;font-family:inherit;font-size:10px;font-weight:600;letter-spacing:.02em;cursor:pointer}
+.pcard-cancel:hover{color:var(--ink);border-color:var(--mute)}
 .pcard-msg{margin:0;font-size:11px;line-height:1.5;color:var(--red-700);font-weight:600}
+/* The confirmation prompt is a question, not a failure — it must not wear the colour
+   the page uses to report that something went wrong. */
+.pcard-msg.ask{color:var(--mute);font-weight:500}
 [data-theme="dark"] .pcard-msg{color:#fca5a5}
+[data-theme="dark"] .pcard-msg.ask{color:var(--mute)}
 /* urgency meter */
 .urg{display:flex;flex-direction:column;gap:5px}
 .urg-bar{height:5px;border-radius:3px;background:var(--line-3);overflow:hidden}
@@ -365,7 +375,8 @@ button{font-family:inherit}
           <h1>Pipeline</h1>
           <p class="sub">Every pursuit in flight, across <b>8 acquisition stages</b> — synopsis to award.</p>
         </div>
-        <a class="cta-primary" href="/audit">
+        <!-- Opportunities holds the only POST to /api/pipeline. -->
+        <a class="cta-primary" href="/opportunities">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 5v14M5 12h14"/></svg>
           Add Solicitation
         </a>
