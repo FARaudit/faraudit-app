@@ -107,6 +107,26 @@
     }
     return `<span class="cert-tg" title="Carried on your profile — not established in SAM under the UEI on file">${name}</span>`;
   }
+  /* AN EMPTY ROW HAS FIVE CAUSES AND THEY ARE NOT THE SAME ANSWER. "None on file" reads as
+     "you hold none" in every one of them, and one of them is OUR OWN READ FAILING — telling a
+     customer they hold nothing because we could not look is the fabrication this product
+     exists to refuse. The stamp below already names the state, so this line carries what
+     follows from it: the action where there is one, and the answer where the zero is real.
+     The unread case is the only one that must not read as a quantity at all. */
+  function certEmpty() {
+    var st = window.PS.CERT_STATE;
+    var msg = st === 'no-uei'
+        ? 'Add your SAM.gov UEI above and the programs SBA has registered you under appear here on their own.'
+      : st === 'uei-not-found'
+        ? 'SAM lists no programs under the UEI on file.'
+      : st === 'registration-inactive'
+        ? 'None until the SAM registration is renewed.'
+      : st === 'verified'
+        ? 'Your active SAM registration carries no SBA socioeconomic programs.'
+      : 'Not known — SAM could not be read just now, so this row is unanswered rather than empty.';
+    return `<span class="fld-none">${esc(msg)}</span>`;
+  }
+
   /* AN UNPROMOTED CHIP HAS TO SAY WHAT IT IS. Grey conveys "not established", but a row
      of grey chips with no caption leaves the reader to guess whether they are examples,
      placeholders, or their own record. They are none of those: they are entries carried
@@ -255,10 +275,10 @@
         <div class="cert-row">${NAICS.length ? NAICS.map(n => `<span class="cert-tg on">${esc(n.code || n.k || n)}</span>`).join('') : '<span class="fld-none">None on file</span>'}</div>
         ${NAICS.length ? '' : '<div class="note note-warn">No NAICS codes on file, so Today, Opportunities, Contracting Officers and Teaming Partners have nothing to match against and will stay empty. Add them under NAICS Configuration.</div>'}
         <div class="fld-sec">Certifications on your capability statement</div>
-        <div class="cert-row">${CERTS.length ? CERTS.map(c => certChip(c)).join('') : '<span class="fld-none">None on file</span>'}</div>
+        <div class="cert-row">${CERTS.length ? CERTS.map(c => certChip(c)).join('') : certEmpty()}</div>
         ${certCaption()}
         ${certNote()}
-        <div class="note">This is the same record the <a href="/capability-statement">capability statement</a> prints and the audit engine reads when it judges whether you are eligible to bid — so what it holds shapes real verdicts. NAICS codes are edited under NAICS Configuration. Certifications are carried on the company record and cannot be added or removed from any screen today; a chip fills in only when SAM establishes that program under the UEI above.</div>
+        <div class="note">This is the same record the <a href="/capability-statement">capability statement</a> prints and the audit engine reads when it judges whether you are eligible to bid — so what it holds shapes real verdicts. NAICS codes are edited under NAICS Configuration. Certifications are not typed anywhere: the programs SBA has registered under the UEI above appear here on their own.</div>
       </div>
       <div class="sp-foot"><span class="saved" id="psSavedNote" hidden></span><button class="save-btn" id="psSaveBtn">Save changes</button></div>`,
 

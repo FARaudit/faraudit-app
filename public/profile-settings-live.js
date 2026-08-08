@@ -469,11 +469,27 @@
         const n = normalizeCert(c.k);
         c.on = labels.some(function (l) { return l && (l === n || n.indexOf(l) !== -1 || l.indexOf(n) !== -1); });
       });
+      /* SAM'S OWN RECORDS JOIN THE ROW, they do not merely promote it. Promotion can only
+         turn green an entry the company record already carried, and NO screen writes that
+         column — so a firm SBA has registered read "None on file" beneath a stamp saying
+         "Registered in SAM". The REGISTRATIONS are rendered, never the containment-derived
+         programs: an SDVOSB registration establishes VOSB eligibility, but it is not a
+         second registration and must not print as one. */
+      ((d && d.records) || []).forEach(function (r) {
+        const name = String((r && (r.label || r.attr)) || '').trim();
+        if (!name) return;
+        const n = normalizeCert(name);
+        if (window.PS.CERTS.some(function (c) { return normalizeCert(c.k) === n; })) return;
+        window.PS.CERTS.push({ k: name, on: true });
+      });
     } catch (e) {
       // Our failure, not the customer's. Say nothing about verification.
       window.PS.CERT_STATE = null;
       console.warn('[profile-settings-live] certification state unavailable:', (e && e.message) || e);
     }
+    // The counter is DERIVED from the row, and the row just changed — writeHeaderStats ran
+    // before this read, so without a second call the strip reports a total the page contradicts.
+    writeHeaderStats();
     if (window.PS_APP && typeof window.PS_APP.render === 'function') window.PS_APP.render();
   }
 
