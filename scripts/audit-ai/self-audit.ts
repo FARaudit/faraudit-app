@@ -18,6 +18,26 @@ const LIB = join(ROOT, "src", "lib");
 type Result = { name: string; ok: boolean; skipped?: boolean; detail: string };
 const results: Result[] = [];
 const add = (name: string, ok: boolean, detail: string, skipped = false) => results.push({ name, ok, detail, skipped });
+/** Every suite under src/lib, RECURSIVELY, as paths relative to src/lib.
+ *
+ *  This used to be a flat `readdirSync(LIB)`, which does not descend — so the twelve suites living in
+ *  src/lib/{bd-os,email,v4-report,v5-report}/ were never run by this audit or by CI. Nine of them cover the
+ *  v4/v5 report renderers, which is customer-facing output. They all pass today; that is luck, not proof,
+ *  because nothing has been checking. A suite that never runs is indistinguishable from a suite that does
+ *  not exist, and the harness reported "153/153 passed" either way.
+ *
+ *  Discovery stays a walk rather than a list for the same reason the served-surface gates in CI do: a suite
+ *  added in a new subdirectory enforces the day it lands, not the day someone remembers to register it. */
+function libSuites(dir = LIB, prefix = ""): string[] {
+  const out: string[] = [];
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const rel = prefix ? join(prefix, e.name) : e.name;
+    if (e.isDirectory()) out.push(...libSuites(join(dir, e.name), rel));
+    else if (e.name.endsWith(".test.ts")) out.push(rel);
+  }
+  return out.sort();
+}
+
 const only = process.argv.slice(2).filter((a) => !a.startsWith("-"));
 const want = (k: string) => only.length === 0 || only.includes(k);
 
@@ -28,7 +48,7 @@ const want = (k: string) => only.length === 0 || only.includes(k);
  *  Every other non-zero exit is still a hard failure. The skip cannot spread quietly: a suite has to call
  *  requireCorpus() to earn it. */
 if (want("suites")) {
-  const files = readdirSync(LIB).filter((f) => f.endsWith(".test.ts")).sort();
+  const files = libSuites();
   const failed: string[] = [], skipped: string[] = [];
   for (const f of files) {
     try { execFileSync("npx", ["tsx", join(LIB, f)], { stdio: "pipe", cwd: ROOT }); }
