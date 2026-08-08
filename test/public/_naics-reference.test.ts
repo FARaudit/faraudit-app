@@ -128,6 +128,29 @@ console.log("\n── the settings picker names itself as suggestions, not the t
   check("N-P5 · rejects the stale subset copy", /carries a subset of NAICS/.test("It carries a subset of NAICS — type it in."));
 }
 
+
+// THE OVERLAY AND THE GENERATED FILE MUST AGREE ON EVERY CATEGORY. The categories are the one
+// part of this table that is NOT derived from 13 CFR — they are hand-authored in overlay.json —
+// so nothing else would catch an edit landing in one file and not the other. That drift is silent:
+// the picker groups by the GENERATED value while a future regeneration would restore the overlay's.
+{
+  const overlay = JSON.parse(read("scripts/naics/overlay.json")) as { rows: Record<string, { cat?: string }> };
+  const gen = read("public/naics-reference.js");
+  const mismatched: string[] = [];
+  let compared = 0;
+  for (const [code, row] of Object.entries(overlay.rows)) {
+    if (!row || typeof row.cat !== "string" || !row.cat) continue;
+    const m = gen.match(new RegExp(`\\['${code}','([a-z]*)'`));
+    if (!m) { mismatched.push(`${code} absent from the generated file`); continue; }
+    compared++;
+    if (m[1] !== row.cat) mismatched.push(`${code}: overlay ${row.cat} vs generated ${m[1]}`);
+  }
+  check("every overlay category compared against the generated file", compared > 0,
+    "nothing was compared — this leg is inert");
+  check("overlay and generated file agree on every category",
+    mismatched.length === 0, mismatched.join(" · "));
+}
+
 console.log("\n── planted positives ──");
 check("N-P1 · the duplicate check catches a repeat", (() => { const c = ["1", "2", "1"]; return c.filter((x, i) => c.indexOf(x) !== i).length === 1; })());
 check("N-P2 · the sector check catches a misfile", !inSector("332710", "23"));

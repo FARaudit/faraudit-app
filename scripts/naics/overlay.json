@@ -166,7 +166,7 @@
    "note": "R&D — SBIR / STTR pathways common"
   },
   "561210": {
-   "cat": "con",
+   "cat": "mro",
    "eval": "bv",
    "clause": "dfars",
    "note": "Services — expect a PWS attachment on SAM.gov"
