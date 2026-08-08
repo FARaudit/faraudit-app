@@ -783,7 +783,10 @@ function $(id){return document.getElementById(id);}
   if(search)search.addEventListener('input',function(){q=this.value.trim().toLowerCase();render();});
   buildPills();render();
   fetch('/api/capability-statement',{credentials:'include'}).then(function(r){return r.ok?r.json():null;}).then(function(d){
-    var n=(d&&d.statement&&Array.isArray(d.statement.naics_codes))?d.statement.naics_codes:[];n.forEach(function(c){MINE[String(c).trim()]=1;});mineCount=Object.keys(MINE).length;
+    // naics_saved is the ROW. statement.naics_codes is a read-time overlay that falls back to
+    // codes derived from won audits, so reading it badged suggestions "My codes" for a customer
+    // who had saved none. Both response shapes carry naics_saved, the stub included.
+    var n=(d&&Array.isArray(d.naics_saved))?d.naics_saved:[];n.forEach(function(c){MINE[String(c).trim()]=1;});mineCount=Object.keys(MINE).length;
     if(mineCount>0)active='mine';buildPills();render();}).catch(function(){});
 })();
 })();

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
 import { syncCertifications } from "@/lib/cert-sync";
+import { suggestedNaics } from "@/lib/naics-suggestions";
 
 export const dynamic = "force-dynamic";
 
@@ -248,7 +249,9 @@ export async function GET(_req: NextRequest) {
   // customer typed them — the display becomes the record because someone added a code.
   // An editor must build its writes from `naics_saved`, which is the row and nothing
   // else. `naics_derived` is what the overlay contributed: a suggestion until acted on.
-  const derived = savedNaics.length > 0 ? [] : naics.slice();
+  // SUBTRACT what is already saved; do not suppress the whole set once anything is. Rule and
+  // rationale live in src/lib/naics-suggestions.ts, where they can be driven by a test.
+  const derived = suggestedNaics(savedNaics, naics);
 
   return NextResponse.json({
     statement: merged,
