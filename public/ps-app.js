@@ -351,26 +351,27 @@
       <div class="sp-bd" id="alerts">
         <div class="nf-row" data-pref-row>
           <div class="nf-l">
-            <div class="nf-t">Weekly digest of watched opportunities <span class="nf-tag">Not yet sending</span></div>
-            <div class="nf-d">Your choice is saved, but the digest itself is not built — nothing is emailed on a schedule today. Set it now and it will apply when it ships.</div>
+            <div class="nf-t">Weekly digest of watched opportunities</div>
+            <div class="nf-d">Monday mornings: what posted that week, what you newly tracked, and anything closing within a fortnight. A quiet week sends nothing — an empty digest reads like a broken pipeline.</div>
           </div>
           <button class="nf-tg" data-pref-tg="weekly_digest_watched"><span class="tgl"><i></i></span></button>
         </div>
+        <div class="nf-row" data-pref-row>
+          <div class="nf-l">
+            <div class="nf-t">Email me when a watched notice posts</div>
+            <div class="nf-d">Sent to <b>${esc(COMPANY.email)}</b> as it posts, carrying the auto-audit verdict.</div>
+          </div>
+          <button class="nf-tg" data-pref-tg="alerts_email_enabled"><span class="tgl"><i></i></span></button>
+        </div>
+        <div class="nf-row" data-pref-row>
+          <div class="nf-l">
+            <div class="nf-t">Show those alerts on the bell</div>
+            <div class="nf-d">The same events in your top bar, whether or not the email is on.</div>
+          </div>
+          <button class="nf-tg" data-pref-tg="alerts_in_app_enabled"><span class="tgl"><i></i></span></button>
+        </div>
         <div class="naics-msg" id="psPrefNote" role="status" hidden></div>
-        <div class="note">Alerts on the notices you are watching are emailed to <b>${esc(COMPANY.email)}</b> as they post, and also appear on the bell in your top bar. Turning those off is not built yet.</div>
-      </div>
-      `,
-
-    /* NO ROLE BADGE. There is no membership table, no invitation, no seat and no role
-       model anywhere in the product — the OWNER pill was a literal typed into the array
-       one line before it rendered, and a role badge implies other roles that do not
-       exist. The seat sentence pointed at a Billing tab that holds no seat count. What
-       is true: one account, and it is yours. */
-    team: () => `
-      <div class="sp-hd"><div class="sp-t">Team Members</div><div class="sp-s">Who can sign in to this workspace</div></div>
-      <div class="sp-bd">
-        ${TEAM.map(m => `<div class="tm-row"><div class="tm-av">${esc(String(m.name || '?').split(' ').map(w => w[0]).join(''))}</div><div class="tm-info"><div class="tm-name">${esc(m.name)}${m.you ? ' <span class="tm-you">You</span>' : ''}</div><div class="tm-email">${esc(m.email)}</div></div></div>`).join('')}
-        <p class="ps-unwired">Inviting teammates is not built yet. This workspace has a single account, yours.</p>
+        <div class="note">These apply to the notices you are watching. A switch you have never touched is ON, and if we cannot read your preferences we deliver rather than go quiet — missing a solicitation costs more than one unwanted email.</div>
       </div>`,
 
     billing: () => `
@@ -439,7 +440,7 @@
       body: JSON.stringify({ [key]: value })
     }).then(r => r.ok);
   }
-  const PREF_LABELS = { weekly_digest_watched: 'Weekly digest' };
+  const PREF_LABELS = { weekly_digest_watched: 'Weekly digest', alerts_email_enabled: 'Alert emails', alerts_in_app_enabled: 'Bell alerts' };
   function wireServerPrefs() {
     var btns = $('setContent').querySelectorAll('[data-pref-tg]');
     if (!btns.length) return;
