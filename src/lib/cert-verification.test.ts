@@ -129,11 +129,16 @@ ok(verdictFor(expired, true) !== "satisfies",
 
 // ═══ V7 · planted positives ══════════════════════════════════════════════════
 console.log("\nV7 · planted positives — this gate must be able to fail");
-// P1 · today's exposure, reproduced. With the flag OFF the typed string clears the
-// bar. This asserts the discipline is genuinely flag-dependent — if this ever stops
-// being true the flag has been hard-wired and this gate needs rewriting, not muting.
-ok(verdictFor(asserted, false) === "satisfies",
-   `P1 flag OFF reproduces the exposure (a typed cert satisfies)`, `got ${verdictFor(asserted, false)}`);
+// P1 · REWRITTEN 2026-08-08, on the instruction this leg's own author left: "if this ever
+// stops being true the flag has been hard-wired and this gate needs rewriting, not muting."
+// It has. On the CEO ruling, the three `!profileSchemaV2Enabled() ||` escapes in firmStatus
+// are gone, so the discipline is no longer flag-dependent and the exposure cannot be
+// reproduced by unsetting a variable. The leg P1 actually played — proving this gate can
+// FAIL — is preserved below by P1b, which goes red if the guard becomes a blanket wall.
+ok(verdictFor(asserted, false) !== "satisfies",
+   `P1 a typed cert is refused with the flag OFF too — the escape is gone`, `got ${verdictFor(asserted, false)}`);
+ok(verdictFor(verified, false) === "satisfies",
+   `P1b the guard is not a blanket wall — a SAM record clears its bar, flag OFF`, `got ${verdictFor(verified, false)}`);
 // P2 · an authoritative source the engine does not recognize must not sneak through.
 const bogus = [{ attr: "se:sdvosb", source: "trust_me", verifiedAt: NOW, expiresAt: FUTURE }];
 ok(verdictFor(bogus, true) !== "satisfies", `P2 an unrecognized provenance source does not satisfy`);

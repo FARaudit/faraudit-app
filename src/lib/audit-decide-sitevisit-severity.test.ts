@@ -94,9 +94,19 @@ console.log("\n-- 5 · OVER-FIRE GUARD: benign site-visit-ENCOURAGED (gate_to_cl
 
 console.log("\n-- 6 · PROVABLY-SATISFIED EXCLUDED: a bar the firm's profile PROVES it holds is not promoted (ultracode P1) --");
 {
+  // EXPECTATION CORRECTED 2026-08-08. This asserted that a profile carrying the string
+  // "clearance:secret-fcl" removes an FCL show-stopper — which is vector B2 verbatim, the false-BID
+  // path the V2 panel was convened to close. It stayed green only because CI runs the suite with
+  // AUDIT_PROFILE_SCHEMA_V2 unset; run it with production's value on unmodified main and it already
+  // fails. Under the 2026-08-08 ruling the escape is gone on every path.
+  //
+  // Note the outcome does not depend on provenance here: NON_SELF_CLEARABLE_BAR_RE refuses the
+  // self-clear for STRUCTURAL bars — clearance, FCL, QPL, size — even from an authoritative record,
+  // because such a bar is resolved by holding the thing, not by a profile saying so. So the honest
+  // assertion is that the bar IS promoted, and the firm is told about it.
   const profile = { satisfiedAttributes: ["clearance:secret-fcl"] } as BidderProfile;
   const d = deriveVerdict(base({ findings: [eligBar()], bidderProfile: profile, noticeBodyBarUngrounded: true, siteVisitSeverityFloor: true }));
-  assert(d.showStoppers.length === 0, "firmStatus=satisfies eligibility_bar NOT promoted (firm holds it -> not a blocker)");
+  assert(d.showStoppers.length === 1, "a structural FCL bar is promoted even when the profile claims the clearance");
 }
 
 console.log("\n-- 7 · CURABLE EXCLUDED: a curableInWindow=true bar is a gate to clear, never a show-stopper (ultracode P1) --");
