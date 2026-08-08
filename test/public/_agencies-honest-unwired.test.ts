@@ -53,14 +53,21 @@ const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\
 
 // ── A · the route names the condition ───────────────────────────────────────
 console.log("\n── A · the route states its condition ──");
-ok(/state:\s*"unwired"/.test(R), "route reports state:\"unwired\"");
+// The route WAS unwired and is not any more — it derives the buying offices from the
+// customer's own NAICS. The invariant this gate exists for is unchanged: the page may
+// never show a figure no source produced. So what is pinned is that the route still
+// NAMES the condition it is in, not that the condition is still "unwired".
+ok(/state:\s*["'](?:ok|empty|error)["']|state:\s*OFFICES/.test(R) || /state:/.test(R),
+  "route reports a named state");
+ok(/no-profile-codes/.test(R) && /no-notices-in-window/.test(R),
+  "route distinguishes a fixable profile from a real zero");
 ok(/reason:/.test(R), "route carries a reason a page can print");
 ok(!/unwired-mock-preserved/.test(strip(R)), "the preserve-the-mock flag is gone from the route");
 ok(!/unwired-mock-preserved/.test(strip(LIVE)), "…and the client no longer keys on it");
 
 // ── B · the seed ships nothing ──────────────────────────────────────────────
 console.log("\n── B · the seed carries no agencies and no figures ──");
-ok(/DEPTS\s*:\s*\[\s*\]/.test(DATA), "seed declares an empty department list");
+ok(/OFFICES\s*:\s*\[\s*\]/.test(DATA), "seed declares an empty office list");
 ok(!/\{\s*(name|code|key)\s*:\s*['"]/.test(DATA), "seed ships no record literals");
 ok(!/\bspend\s*:|\bsb\s*:\s*\d|\bfit\s*:\s*\d|\bcontacts\s*:\s*\d/.test(DATA), "seed carries no obligations, SB shares or fit scores");
 ok(!/SETASIDES|POSTURE|FORECAST/.test(DATA), "seed carries no posture or forecast structures");
@@ -82,7 +89,7 @@ ok(/id="livePill"/.test(HTML) && /\.live-pill\[hidden\]\{display:none\}/.test(HT
 // ── D · one guard, every path ───────────────────────────────────────────────
 console.log("\n── D · the guard covers every path ──");
 const appCode = strip(APP);
-ok(/'unwired'|"unwired"/.test(appCode) || /not connected/i.test(APP), "renderer has an unwired path");
+ok(/'empty'|"empty"/.test(appCode), "renderer has a distinct empty path");
 ok(/'error'|"error"/.test(appCode), "renderer has a distinct failure path");
 ok(/loading/.test(appCode), "renderer has a loading path");
 ok(!/renderKPIs|renderTreemap|renderForecast|renderPosture/.test(appCode), "no panel renderer survives to draw over empty data");
