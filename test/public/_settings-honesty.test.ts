@@ -372,9 +372,31 @@ console.log("\n── an unfilled chip may not promise a check that never runs �
     !/VetCert/.test("Certifications are not typed anywhere: the programs SBA has registered under the UEI above appear here on their own."));
 }
 
+// EVERY SWITCH MUST HAVE A HANDLER. PR #514 removed seven controls that wrote nowhere; the
+// way that comes back is a toggle shipped ahead of the thing it governs. So each
+// data-pref-tg key must (a) be accepted by the preferences API and (b) be READ by something
+// that acts on it. A key the API stores and nothing consults is decoration.
+{
+  const keys = [...appCode.matchAll(/data-pref-tg="([a-z_]+)"/g)].map((m) => m[1]);
+  check("the panel actually declares toggles to check", keys.length > 0, "no toggles found — this leg is inert");
+  const prefRoute = read("src/app/api/preferences/route.ts");
+  const consumers = [
+    "src/lib/watcher-tick.ts",
+    "src/app/api/cron/watched-digest/route.ts",
+  ].map((f) => { try { return read(f); } catch { return ""; } }).join("\n");
+  for (const k of keys) {
+    check(`'${k}' is accepted by the preferences API`, new RegExp(`"${k}"`).test(prefRoute),
+      "the toggle writes to a key the API will silently drop");
+    check(`'${k}' is READ by something that acts on it`, new RegExp(k).test(consumers),
+      "a switch with no handler — the #514 defect");
+  }
+}
+
 console.log("\n── planted positives ──");
 check("P1 · rejects a resurrected auto-save claim", /changes save automatically/i.test('<b id="savedAt">changes save automatically</b>'));
 check("P2 · accepts copy with no such claim", !/changes save automatically/i.test("<p>Your details and the company record.</p>"));
+check("P4 · rejects a toggle whose key no consumer reads",
+  !/nonexistent_pref_key/.test("watcher reads alerts_email_enabled and alerts_in_app_enabled"));
 check("P3 · rejects a fake input for a company field", /\$\{field\('Company name'/.test("${field('Company name', COMPANY.name)}"));
 
 console.log(`\n${pass} passed · ${fail} failed`);
