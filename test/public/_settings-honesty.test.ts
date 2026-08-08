@@ -197,6 +197,86 @@ check("email is never an input — it is auth identity, not a profile column",
 check("company record links out to its real editor", /href="\/capability-statement"/.test(panel), "no route to where the company is actually edited");
 check("empty NAICS states the consequence", /stay empty/.test(panel), "an empty feed is not explained");
 
+console.log("\n── an unfilled chip may not promise a check that never runs ──");
+// The row had TWO visual states over FOUR real kinds. 8(a), HUBZone, WOSB and EDWOSB are
+// the whole of SAM's SBA certification vocabulary, so those genuinely fill in when a
+// registration resolves. SDVOSB and VOSB are issued by VA VetCert and appear in that list
+// at NO UEI — grouping them with the first set told a customer to wait for an answer that
+// is never coming. "Small business" is a third kind again: self-represented per
+// solicitation, with no certification to establish.
+{
+  check("the source still records that SAM cannot establish SDVOSB",
+    /never establish se:sdvosb|NO SDVOSB CODE/i.test(read("src/lib/cert-verification.ts")),
+    "if a VetCert source was added, this panel's dead-end state must be revisited");
+
+  check("a VetCert predicate exists", /function isVetCertProgram\(/.test(appCode), "no predicate — the kinds are collapsed again");
+  check("the chip renderer branches on it", /isVetCertProgram\(k\)/.test(appCode), "the predicate exists but no chip uses it");
+  check("the dead-end chip is visually distinct from a pending one",
+    /cert-tg is-elsewhere/.test(appCode) && /\.cert-tg\.is-elsewhere\s*\{/.test(htmlCode),
+    "same grey as an awaiting-SAM chip, so it still reads as pending");
+
+  // TWO VISUAL STATES, ONE MEANING EACH: plain grey says "waiting on SAM, this fills in";
+  // dashed says "not settled here at all". Self-represented size class belongs with the
+  // second — `canonicalizeEligibilityAttr` only ever yields se:*, so a small-business
+  // chip can no more turn green than a VetCert one. Rendering it plain grey beside 8(a)
+  // promises the same fill-in from a check that likewise never runs.
+  {
+    const chipFn = appCode.slice(appCode.indexOf("function certChip("), appCode.indexOf("function certCaption("));
+    const plainGrey = [...chipFn.matchAll(/class="cert-tg"/g)].length;
+    check("only the awaiting-SAM chip is plain grey", plainGrey === 1,
+      `${plainGrey} branches render plain grey — a kind that never fills in looks like one that does`);
+    check("the self-represented chip is marked as not-settled-here",
+      /isSelfRepresented\(k\)\)\s*\{[\s\S]{0,120}cert-tg is-elsewhere/.test(chipFn),
+      "small business renders as pending, beside programs that really do fill in");
+    check("V-P5 · rejects a self-represented chip rendered plain grey",
+      !/cert-tg is-elsewhere/.test('return `<span class="cert-tg" title="Self-represented in SAM">${name}</span>`;'));
+  }
+
+  // EXECUTED, not grepped. A gate that only proves the regex is present cannot tell a
+  // correct one from a wrong one, and BOTH error directions matter here: a miss leaves the
+  // false promise, and a false positive sends a program SAM really does establish to a
+  // dead end it does not belong in.
+  // [\s\S] rather than `.` with the `s` flag: dotAll needs an es2018 target and the
+  // repo's tsc rejects it, so the flag would pass under tsx and fail the build.
+  const src = appCode.match(/function isVetCertProgram\(name\)\s*\{\s*return\s*(\/[\s\S]+?\/i)\.test/);
+  check("the predicate's pattern was located", !!src, "could not extract the regex to execute it");
+  if (src) {
+    const re = new RegExp(src[1].slice(1, src[1].lastIndexOf("/")), "i");
+    const mustMatch = ["SDVOSB", "VOSB", "sdvosb", "Service-Disabled Veteran-Owned Small Business", "Veteran Owned Small Business"];
+    const mustNot = ["WOSB", "EDWOSB", "Women-Owned Small Business", "Economically Disadvantaged Women-Owned Small Business", "Small Business (SBA)", "8(a)", "HUBZone"];
+    for (const s of mustMatch) check(`VetCert · matches "${s}"`, re.test(s), "would keep promising a SAM check that never runs");
+    for (const s of mustNot) check(`VetCert · does NOT match "${s}"`, !re.test(s), "a program SAM DOES establish sent to a dead-end state");
+  }
+
+  // The caption must count the kinds apart, or the numbers restate the collapsed row.
+  check("the caption counts VetCert separately from carried-and-unestablished",
+    /issued by VA VetCert/.test(appCode) && /carried on your profile, not established in SAM/.test(appCode),
+    "one bucket again — the count cannot distinguish the two");
+
+  // THE PROMISE IS THE THING BEING GATED. "fill in on their own" may only appear when a
+  // chip is genuinely waiting on SAM, which excludes both other kinds.
+  check("the fill-in-on-their-own promise is gated on a chip that awaits SAM",
+    /awaitingSam/.test(appCode) && /if\s*\(awaitingSam\)/.test(appCode),
+    "the promise is unconditional, so a VetCert-only row is told to wait");
+  check("awaitingSam excludes BOTH other kinds",
+    /!isSelfRepresented\(k\)\s*&&\s*!isVetCertProgram\(k\)/.test(appCode),
+    "a kind that is not awaiting SAM still triggers the promise");
+
+  // ...and the stamp must NOT be gated on the row, or a true fact about the registration
+  // disappears whenever the row happens to hold only VetCert entries.
+  const noteFn = appCode.slice(appCode.indexOf("function certNote()"), appCode.indexOf("function editable("));
+  check("the SAM state stamp survives a row with nothing awaiting SAM",
+    !/if\s*\(!st\s*\|\|\s*!any/.test(noteFn) && /cert-state/.test(noteFn),
+    "the stamp is gated on the chips, so 'Not found in SAM' vanishes on a VetCert-only profile");
+
+  // Planted positives — per leg, not per section.
+  const probe = /\bsdvosb\b|\bvosb\b|service[\s-]?disabled|veteran[\s-]?owned/i;
+  check("V-P1 · a naive /vosb/ WOULD wrongly match nothing here but a bare one is caught", !probe.test("WOSB"));
+  check("V-P2 · the executed check rejects a predicate that matches WOSB", /wosb/i.test("WOSB"), "control: the string really does contain wosb");
+  check("V-P3 · rejects a collapsed caption", !/issued by VA VetCert/.test("1 carried on your profile, not established in SAM."));
+  check("V-P4 · rejects an ungated promise", !/if\s*\(awaitingSam\)/.test("lines.push(why + ' These are read from your SAM registration');"));
+}
+
 console.log("\n── planted positives ──");
 check("P1 · rejects a resurrected auto-save claim", /changes save automatically/i.test('<b id="savedAt">changes save automatically</b>'));
 check("P2 · accepts copy with no such claim", !/changes save automatically/i.test("<p>Your details and the company record.</p>"));
