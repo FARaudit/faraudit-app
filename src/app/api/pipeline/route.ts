@@ -48,7 +48,13 @@ interface PostBody {
   stageCode?: string | null;       // '01' pre-sol · '02' sources sought · '03' solicitation
 }
 
+// The stages a notice may ENTER the pipeline at, from the Opportunities feed.
 const CAPTURE_STAGES = ["01", "02", "03"];
+// Every stage a pursuit can occupy once it is here. Removal and stage moves scope to
+// this, not to CAPTURE_STAGES: a pursuit advanced to 04 or beyond is still the
+// customer's row, and scoping DELETE to the entry stages left it silently unmatched —
+// a 200 reporting `removed: 0` about a row sitting in plain sight.
+const ALL_STAGES = ["01", "02", "03", "04", "05", "06", "07", "08"];
 
 export async function POST(req: Request) {
   try {
@@ -115,6 +121,52 @@ export async function POST(req: Request) {
   }
 }
 
+/* PATCH /api/pipeline?solicitationNumber=X  { stageCode }
+   A pursuit had no way to move. Capture is a sequence — synopsis to award — and the
+   page rendered eight stages while the API could only place a row at entry and delete
+   it. So a deadline passed and the pursuit stayed at "03 Solicitation" forever, and the
+   "P0 · action now" count it fed was permanent with no in-product action that could
+   clear it. The only honest options were to remove the pursuit or to leave it wrong.
+
+   Returns `moved`, the count of rows actually updated, because a zero-row PostgREST
+   write answers 200 and a caller reading only the status reports a move that did not
+   happen. */
+export async function PATCH(req: Request) {
+  try {
+    const supabase = await createServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const ref = String(new URL(req.url).searchParams.get("solicitationNumber") ?? "").trim();
+    if (!ref) return NextResponse.json({ error: "solicitationNumber required" }, { status: 400 });
+
+    let body: { stageCode?: string } = {};
+    try { body = (await req.json()) as { stageCode?: string }; } catch {
+      return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
+    }
+    const stage = String(body.stageCode ?? "").trim();
+    // An unrecognised stage is refused rather than clamped to a default: silently
+    // filing a pursuit under a stage the caller did not ask for is a fabricated move.
+    if (!ALL_STAGES.includes(stage)) {
+      return NextResponse.json({ error: `stageCode must be one of ${ALL_STAGES.join(", ")}` }, { status: 400 });
+    }
+
+    const { data, error } = await supabase
+      .from("pipeline")
+      .update({ stage })
+      .eq("user_id", user.id)
+      .eq("solicitation_number", ref)
+      .select("id, stage");
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    const rows = data ?? [];
+    return NextResponse.json({ ok: true, moved: rows.length, stage: rows[0]?.stage ?? null });
+  } catch (err) {
+    console.error("[api/pipeline PATCH]", err);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}
+
 export async function DELETE(req: Request) {
   try {
     const supabase = await createServerClient();
@@ -129,7 +181,7 @@ export async function DELETE(req: Request) {
       .delete()
       .eq("user_id", user.id)
       .eq("solicitation_number", ref)
-      .in("stage", CAPTURE_STAGES)
+      .in("stage", ALL_STAGES)
       .select("id");
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

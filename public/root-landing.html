@@ -9,6 +9,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <style>
+/* The UA rule for [hidden] is display:none at specificity (0,1,0), so any class rule
+   carrying a display value outranks it. Setting or shipping .hidden is therefore only
+   a request until this rule makes it binding. */
+[hidden]{display:none!important}
+
   /* ═══════════════════════════════════════════════════════
      FARaudit landing — post-sign design tokens (dark navy)
      Pulled verbatim from the Command Center system.

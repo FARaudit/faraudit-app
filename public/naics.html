@@ -30,6 +30,11 @@
   --shadow:0 1px 2px rgba(0,0,0,.5), 0 18px 40px -20px rgba(0,0,0,.7);
 }
 *{box-sizing:border-box}
+/* The UA rule for [hidden] is display:none at specificity (0,1,0), so any class rule
+   carrying a display value outranks it. Setting or shipping .hidden is therefore only
+   a request until this rule makes it binding. */
+[hidden]{display:none!important}
+
 html,body{margin:0;padding:0;background:var(--page-bg);color:var(--ink);font-family:"Manrope",ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
 .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
 button{font-family:inherit;cursor:pointer}
@@ -239,7 +244,11 @@ details[open]>summary .chev{transform:rotate(180deg)}
 .nx-legend b{color:var(--accent-on);font-weight:700}
 .nx-pills{display:flex;gap:7px;padding:12px 16px;border-bottom:1px solid var(--line-2);flex-wrap:wrap}
 .npill{height:28px;padding:0 12px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--mute);font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:7px}
-.npill .ct{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute-2)}
+.npill .ct{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute-2);flex:none}
+/* Sector names are the regulation's own and run to seventy characters. The pill is a
+   fixed 28px, so an untruncated label overflows its box and lands on its neighbours.
+   The label truncates and carries the full name in its tooltip; the count never shrinks. */
+.npill .plabel{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:18ch;min-width:0}
 .npill:hover{border-color:var(--mute-2);color:var(--ink-2)}
 .npill.on{background:var(--accent-soft);border-color:var(--accent-hair);color:var(--accent-on)}
 .npill.on .ct{color:var(--accent)}
@@ -659,14 +668,14 @@ details[open]>summary .chev{transform:rotate(180deg)}
 
       <div class="view on" id="view-naics">
         <h1 class="page-h">NAICS Code Reference</h1>
-        <p class="page-sub">Search any NAICS code, keyword, or type of work — try “ballistic glass” or “paving.” Defense-relevant codes with current SBA size standards; your registered codes show first once your Capability Statement is set.</p>
+        <p class="page-sub">Search any NAICS code, keyword, or type of work — try “ballistic glass” or “paving.” Every NAICS code carrying an SBA size standard, from 13 CFR 121.201; your registered codes show first once your Capability Statement is set.</p>
         <div class="naics card">
           <div class="nx-top">
             <div class="nx-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input id="nxSearch" type="text" placeholder="Search code or keyword — e.g. 541512 or “machine shop”…" autocomplete="off" /></div>
-            <span class="nx-legend"><span class="mon"></span><b>Defense-relevant</b>&nbsp;· SBA size standards</span>
+            <span class="nx-legend"><span class="mon"></span><b>Your codes</b>&nbsp;· SBA size standards</span>
           </div>
           <div class="nx-pills" id="nxPills"></div>
-          <div class="nx-resbar"><span class="res" id="nxRes"></span><span class="note">size std = SBA threshold (tbl 3/2023)</span></div>
+          <div class="nx-resbar"><span class="res" id="nxRes"></span><span class="note">size std = SBA threshold, 13 CFR 121.201</span></div>
           <div class="nx-cards" id="nxCards"></div>
           <div class="nx-empty" id="nxEmpty">No codes match — try the 6-digit code or a keyword like “repair” or “IT.”</div>
         </div>
@@ -675,6 +684,7 @@ details[open]>summary .chev{transform:rotate(180deg)}
   </div>
 </div>
 
+<script src="/naics-reference.js"></script>
 <script>
 /* FARaudit — NAICS code reference. Search-to-card.
    "My codes" reads the real Capability-Statement naics_codes; there is no
@@ -694,54 +704,80 @@ function $(id){return document.getElementById(id);}
    The tracked count lives on Opportunities, where the notices are. */
 /* NAICS search-to-card */
 (function(){
-  var CATS=[{id:'con',label:'Construction',color:'#7c9cc4'},{id:'eng',label:'Engineering',color:'#5bb3a6'},{id:'mfg',label:'Manufacturing',color:'#b08ad0'},{id:'mro',label:'MRO',color:'#d0a45b'},{id:'it',label:'IT & Cyber',color:'#378ADD'}];
+  var REF=window.NAICS_REF||{CATS:[],DATA:[],SYN:{},SECTORS:[]};
+  var CATS=REF.CATS,DATA=REF.DATA,SYN=REF.SYN,SECTORS=REF.SECTORS||[];
   var CM={};CATS.forEach(function(c){CM[c.id]=c;});
-  var DATA=[
-   ['236220','con','Commercial & Institutional Building Construction','$45M','rev','bv','far','Construction — Statement of Requirement, not a SOW'],
-   ['237310','con','Highway, Street & Bridge Construction','$45M','rev','bv','agar','Construction — drawings + specs; USDA roads common'],
-   ['238210','con','Electrical Contractors','$19M','rev','lpta','far','Trade sub — Davis-Bacon wage determination applies'],
-   ['238220','con','Plumbing, Heating & Air-Conditioning','$19M','rev','lpta','far','Trade sub — Davis-Bacon wage determination applies'],
-   ['238150','con','Glass & Glazing Contractors','$19M','rev','lpta','affars','Trade sub — ballistic / blast specs common on AF work'],
-   ['561210','con','Facilities Support Services','$47M','rev','bv','dfars','Services — expect a PWS attachment on SAM.gov'],
-   ['541330','eng','Engineering Services','$25.5M','rev','bv','dfars','Services — expect PWS/SOO; SCA may apply'],
-   ['541310','eng','Architectural Services','$12.5M','rev','bv','far','Brooks Act — qualifications-based selection'],
-   ['541512','eng','Computer Systems Design Services','$34M','rev','bv','dfars','IT services — expect CMMC + DFARS 252.204-7012'],
-   ['541715','eng','R&D — Physical, Engineering & Life Sciences','1,000','emp','bv','dfars','R&D — SBIR / STTR pathways common'],
-   ['541380','eng','Testing Laboratories & Services','$19M','rev','bv','far','Services — expect QASP + test plan'],
-   ['332710','mfg','Machine Shops','500','emp','lpta','dfars','Supply buy — no SOW; look for the TDP'],
-   ['332999','mfg','All Other Misc. Fabricated Metal Product Mfg','750','emp','lpta','dfars','Supply buy — TDP + drawings expected'],
-   ['336412','mfg','Aircraft Engine & Engine Parts Manufacturing','1,500','emp','bv','affars','Supply buy — source approval (SAR) likely'],
-   ['336413','mfg','Other Aircraft Parts & Auxiliary Equipment Mfg','1,250','emp','bv','dfars','Supply buy — source approval (SAR) likely'],
-   ['334511','mfg','Search, Detection & Navigation Instruments','1,250','emp','bv','dfars','Supply buy — ITAR / export control likely'],
-   ['488190','mro','Other Support Activities for Air Transportation','$40M','rev','bv','affars','Services — expect PWS; work performed on-base'],
-   ['811219','mro','Other Electronic & Precision Equipment Repair','$22M','rev','lpta','dfars','Repair — expect a repair / overhaul spec'],
-   ['336611','mro','Ship Building & Repairing','1,300','emp','bv','dfars','Repair — NAVSEA standard items apply'],
-   ['811310','mro','Commercial & Industrial Machinery Repair','$12.5M','rev','lpta','far','Repair — expect equipment list + SOW'],
-   ['541511','it','Custom Computer Programming Services','$34M','rev','bv','dfars','IT services — CMMC + DFARS 7012 likely'],
-   ['541519','it','Other Computer Related Services','$34M','rev','bv','dfars','IT services — verify required CMMC level'],
-   ['541513','it','Computer Facilities Management Services','$34M','rev','bv','dfars','IT services — expect PWS + SLAs'],
-   ['518210','it','Data Processing, Hosting & Related Services','$40M','rev','bv','dfars','Cloud — FedRAMP authorization likely']
-  ];
   var STDU={rev:'revenue',emp:'employees'},EVAL={bv:['Best Value','bv'],lpta:['LPTA','lpta']},CLAUSE={far:'FAR',dfars:'FAR+DFARS',agar:'FAR+AGAR',affars:'FAR+AFFARS'};
-  var SYN={'238150':'ballistic glass window glazing curtain wall blast','237310':'paving roads asphalt bridge street','236220':'building renovation tenant improvement','238210':'electrical wiring power','238220':'plumbing hvac heating cooling mechanical','541512':'it software systems integration network','541511':'software programming development coding','541330':'engineering design a&e civil structural','488190':'aircraft ground support flightline aviation','811219':'calibration instrument electronic repair','332710':'machining cnc fabrication parts','336412':'jet engine turbine afterburner aircraft','334511':'radar navigation sensor electronics','518210':'cloud hosting data center fedramp','561210':'base operations facilities janitorial grounds'};
   var pills=$('nxPills'),cards=$('nxCards'),res=$('nxRes'),empty=$('nxEmpty'),search=$('nxSearch');
   if(!pills||!cards)return;
   var MINE={},mineCount=0,active='all',q='';
-  function buildPills(){var ph='<button class="npill'+(active==='mine'?' on':'')+'" data-c="mine"><span class="pdot"></span>My codes <span class="ct">'+mineCount+'</span></button>'+'<button class="npill'+(active==='all'?' on':'')+'" data-c="all">All <span class="ct">'+DATA.length+'</span></button>';
-    CATS.forEach(function(c){var n=DATA.filter(function(r){return r[1]===c.id;}).length;ph+='<button class="npill'+(active===c.id?' on':'')+'" data-c="'+c.id+'">'+c.label+' <span class="ct">'+n+'</span></button>';});pills.innerHTML=ph;}
+  /* Pills are BUILT AS NODES, not markup. Sector labels are transcribed from 13 CFR
+     121.201 by the generator rather than written here, so they are external text going
+     into the page; textContent cannot carry markup out of them however the source changes. */
+  function pill(id,label,count,dot){
+    var b=document.createElement('button');
+    b.className='npill'+(active===id?' on':'');b.setAttribute('data-c',id);
+    if(dot){var d=document.createElement('span');d.className='pdot';b.appendChild(d);}
+    var lb=document.createElement('span');lb.className='plabel';lb.textContent=label;b.appendChild(lb);
+    b.title=label;
+    var ct=document.createElement('span');ct.className='ct';ct.textContent=String(count);b.appendChild(ct);
+    return b;
+  }
+  function buildPills(){
+    pills.replaceChildren();
+    pills.appendChild(pill('mine','My codes',mineCount,true));
+    pills.appendChild(pill('all','All',DATA.length,false));
+    SECTORS.forEach(function(s){
+      var n=DATA.filter(function(r){return r[8]===s.id;}).length;
+      if(n)pills.appendChild(pill(s.id,s.label,n,false));
+    });
+  }
+  /* THE SOURCED FACTS RENDER ON EVERY ROW; THE EDITORIAL ONES ONLY WHERE WRITTEN.
+     Code, title and size standard are transcribed from 13 CFR 121.201 and are present on
+     every row. Category, typical terms and the note are editorial and cover a subset of
+     codes; where one is absent its block is omitted rather than defaulted, so nothing on
+     screen states an evaluation method or a threshold that no source carries.
+     Built as nodes: the titles are external text. */
+  function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
+  function fact(k,vNode){var f=el('div','fact');f.appendChild(el('span','fk',k));var v=el('span','fv');v.appendChild(vNode);f.appendChild(v);return f;}
+  function card(r){
+    var cat=CM[r[1]],ev=EVAL[r[5]],cl=CLAUSE[r[6]],yours=MINE[r[0]];
+    var d=el('div','ncard'+(yours?' mon':''));
+    var top=el('div','ncard-top');
+    var code=el('span','ncard-code');code.appendChild(el('span','mdot'));code.appendChild(document.createTextNode(r[0]));top.appendChild(code);
+    if(yours)top.appendChild(el('span','ncard-mine','Yours'));
+    if(cat){var ct=el('span','ncard-cat');var dot=el('span','cd');dot.style.background=cat.color;ct.appendChild(dot);ct.appendChild(document.createTextNode(cat.label));top.appendChild(ct);}
+    d.appendChild(top);
+    d.appendChild(el('div','ncard-title',r[2]));
+    var facts=el('div','ncard-facts');
+    var sv=el('span');sv.appendChild(el('span','sv2',r[3]));sv.appendChild(document.createTextNode(' '+(STDU[r[4]]||'')));
+    facts.appendChild(fact('Size standard',sv));
+    if(ev&&cl){var terms=el('span');terms.appendChild(el('span','nchip '+ev[1],ev[0]));
+      var c2=el('span','nchip cl-'+r[6]);c2.appendChild(el('span','cd'));c2.appendChild(document.createTextNode(cl));terms.appendChild(c2);
+      facts.appendChild(fact('Typical terms',terms));
+      facts.appendChild(el('div','fnote','directional — confirm per solicitation'));}
+    d.appendChild(facts);
+    if(r[7]){var ins=el('div','ncard-insight');ins.appendChild(el('span','ai-spark'));
+      var b=el('div','ins-body');b.appendChild(el('span','ins-k','What to expect'));b.appendChild(el('p',null,r[7]));ins.appendChild(b);d.appendChild(ins);}
+    return d;
+  }
   function render(){
     if(active==='mine'&&mineCount===0){empty.style.display='none';cards.innerHTML='<div class="nx-empty" style="display:block;grid-column:1/-1">Set your <b>Capability Statement</b> NAICS codes to see <b>My codes</b> here. <a href="/capability-statement" style="color:var(--accent-on);font-weight:700;text-decoration:none">Set it up →</a></div>';res.innerHTML='No registered codes yet';return;}
     var scope=(q&&active==='mine')?'all':active;
-    var rows=DATA.filter(function(r){if(scope==='mine'&&!MINE[r[0]])return false;if(scope!=='mine'&&scope!=='all'&&r[1]!==scope)return false;
-      if(q&&r[0].indexOf(q)<0&&r[2].toLowerCase().indexOf(q)<0&&r[7].toLowerCase().indexOf(q)<0&&CM[r[1]].label.toLowerCase().indexOf(q)<0&&(SYN[r[0]]||'').indexOf(q)<0)return false;return true;});
-    cards.innerHTML=rows.map(function(r){var c=CM[r[1]],ev=EVAL[r[5]],yours=MINE[r[0]];
-      return '<div class="ncard'+(yours?' mon':'')+'"><div class="ncard-top"><span class="ncard-code"><span class="mdot"></span>'+r[0]+'</span>'+(yours?'<span class="ncard-mine">Yours</span>':'')+'<span class="ncard-cat"><span class="cd" style="background:'+c.color+'"></span>'+c.label+'</span></div>'+
-        '<div class="ncard-title">'+r[2]+'</div><div class="ncard-facts"><div class="fact"><span class="fk">Size standard</span><span class="fv"><span class="sv2">'+r[3]+'</span> '+STDU[r[4]]+'</span></div>'+
-        '<div class="fact"><span class="fk">Typical terms</span><span class="fv"><span class="nchip '+ev[1]+'">'+ev[0]+'</span><span class="nchip cl-'+r[6]+'"><span class="cd"></span>'+CLAUSE[r[6]]+'</span></span></div><div class="fnote">directional — confirm per solicitation</div></div>'+
-        '<div class="ncard-insight"><span class="ai-spark"></span><div class="ins-body"><span class="ins-k">What to expect</span><p>'+r[7]+'</p></div></div></div>';}).join('');
+    var rows=DATA.filter(function(r){if(scope==='mine'&&!MINE[r[0]])return false;if(scope!=='mine'&&scope!=='all'&&r[8]!==scope)return false;
+      /* NULL-SAFE ON EVERY EDITORIAL FIELD. Most of the table has no note and no
+         category — those exist for a few dozen defense-relevant codes — so a filter that
+         calls .toLowerCase() on them unconditionally throws on the other nine hundred. */
+      if(q){var cl=CM[r[1]]?CM[r[1]].label.toLowerCase():'';
+        if(r[0].indexOf(q)<0&&r[2].toLowerCase().indexOf(q)<0&&(r[7]||'').toLowerCase().indexOf(q)<0&&cl.indexOf(q)<0&&(SYN[r[0]]||'').indexOf(q)<0)return false;}
+      return true;});
+    cards.replaceChildren();
+    var frag=document.createDocumentFragment();
+    rows.forEach(function(r){frag.appendChild(card(r));});
+    cards.appendChild(frag);
     empty.style.display=rows.length?'none':'block';
     if(active==='mine'&&!q)res.innerHTML='Showing your <b>'+mineCount+'</b> registered code'+(mineCount===1?'':'s')+' · search any NAICS';
-    else if(active==='all'&&!q)res.innerHTML='<b>'+DATA.length+'</b> defense-relevant codes · search a code, keyword, or type of work';
+    else if(active==='all'&&!q)res.innerHTML='<b>'+DATA.length+'</b> codes with an SBA size standard · search a code, keyword, or type of work';
     else res.innerHTML='<b>'+rows.length+'</b> result'+(rows.length===1?'':'s');}
   pills.addEventListener('click',function(e){var b=e.target.closest('.npill');if(!b)return;active=b.dataset.c;buildPills();render();});
   if(search)search.addEventListener('input',function(){q=this.value.trim().toLowerCase();render();});

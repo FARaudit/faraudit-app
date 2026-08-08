@@ -164,6 +164,18 @@
     var pct = el('.pct');
     if (pct) pct.textContent = c.pct + '%';
 
+    /* THE ARC IS DRAWN FROM THE SAME NUMBER AS THE LABEL. The ring shipped with a
+       fixed stroke-dashoffset, so it always drew the same arc no matter what the
+       record held — a page reading 42% inside a ring drawn at 82%. Of the two, the
+       ring is what is seen first. Circumference is the declared dasharray, so the two
+       cannot drift apart here. */
+    var ring = el('.health-ring-fg');
+    if (ring) {
+      var circ = parseFloat(ring.getAttribute('stroke-dasharray')) || 0;
+      var frac = Math.max(0, Math.min(1, c.pct / 100));
+      ring.setAttribute('stroke-dashoffset', String(circ * (1 - frac)));
+    }
+
     var cap = el('.health-cap');
     if (cap) {
       clear(cap);

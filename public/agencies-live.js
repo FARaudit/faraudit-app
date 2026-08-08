@@ -19,15 +19,21 @@
           state: 'error',
           reason: res.status === 401
             ? 'Your session expired, so this page could not ask for agency data.'
-            : 'The agency service answered HTTP ' + res.status + '.'
+            : (data && data.reason) || 'The agency service answered HTTP ' + res.status + '.'
         };
-      } else if (data.state === 'unwired') {
-        window.DAG.STATUS = { state: 'unwired', reason: data.reason || '' };
-      } else if (Array.isArray(data.DEPTS) && data.DEPTS.length > 0) {
-        window.DAG.DEPTS = data.DEPTS;
+      } else if (data.state === 'error') {
+        window.DAG.STATUS = { state: 'error', reason: data.reason || '' };
+      } else if (Array.isArray(data.OFFICES) && data.OFFICES.length > 0) {
+        window.DAG.OFFICES = data.OFFICES;
+        window.DAG.META = data.meta || null;
         window.DAG.STATUS = { state: 'ok', reason: '' };
       } else {
-        window.DAG.STATUS = { state: 'unwired', reason: data.reason || '' };
+        /* EMPTY IS NOT ONE STATE. A customer with no NAICS on file has a profile they can
+           fix; a customer whose codes drew nothing this window has a real zero result.
+           Rendering both as "nothing here" hides the one the customer can act on. */
+        window.DAG.OFFICES = [];
+        window.DAG.META = data.meta || null;
+        window.DAG.STATUS = { state: 'empty', reason: data.reason || '' };
       }
     } catch (e) {
       window.DAG.STATUS = { state: 'error', reason: e && e.message ? e.message : 'The request failed.' };

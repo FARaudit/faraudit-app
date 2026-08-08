@@ -90,7 +90,12 @@ check("/api/profile exposes PATCH", /export async function PATCH/.test(route), "
 check("PATCH refuses email and plan_tier explicitly", /READ_ONLY[\s\S]{0,200}plan_tier/.test(route) && /rejected/.test(route), "a dropped field would report success");
 check("PATCH echoes the PERSISTED value, not the request body", /did not persist/.test(route), "success is reported without reading the write back");
 check("the save handler believes the server echo", /body\.full_name !== full_name/.test(live), "the client trusts its own input");
-check("the save handler reports failure to the user", /Could not save|did not persist/.test(live), "a failed save is silent");
+// Keyed on BEHAVIOUR, not on one phrase. The previous form matched two exact strings,
+// so rewording the handler turned the gate red while the handler still reported
+// failure correctly — and, worse, a handler that dropped reporting entirely could
+// pass by keeping the words.
+check("the save handler reports failure to the user",
+  /note\((?:[^)]*?),\s*false\)/.test(live), "no note(..., false) failure path — a failed save is silent");
 
 console.log("\n── no control reports a save it did not perform ──");
 {
@@ -100,11 +105,41 @@ console.log("\n── no control reports a save it did not perform ──");
   const orphanFeet = (appCode.match(/<span class="saved">✓ Saved<\/span>/g) ?? []).length;
   check("no unconditional 'Saved' badge anywhere in the panels", orphanFeet === 0, `${orphanFeet} panels assert a save with nothing behind it`);
   check("no optimistic toggle handler", !/classList\.toggle\('on'\);\s*flash\(\)/.test(app), "a toggle flips and reports saved without a writer");
-  check("flash() names what was saved", /function flash\(what\)/.test(app), "a generic 'saved' can be fired by a control that saves nothing");
+  // THE RULE IS THE FIRST PARAMETER, NOT THE ARITY. This pinned `function flash(what)`
+  // exactly, so adding an outcome argument read as a regression while the property it
+  // guards — that flash cannot be called bare and report a nameless "saved" — was
+  // untouched. `\b` still rejects `function flash()`.
+  check("flash() names what was saved", /function flash\(what\b/.test(app), "a generic 'saved' can be fired by a control that saves nothing");
+  // A REFUSED SAVE IS REPORTED. Reverting the control is not a report: a toggle that
+  // silently snaps back is indistinguishable from a dead one, so the failure branch has
+  // to put a message on screen rather than clear it.
+  check("a refused preference save is reported, not just reverted",
+    /Could not save/.test(app) && !/flash\(''\)/.test(app),
+    "the failure branch hides the note instead of naming the refusal");
 
   // Billing stated a plan and two prices while the route was returning all three.
   check("billing reads the live plan label", /planName\(\)/.test(app) && /PS\.plan_label/.test(app), "the plan name is a literal");
-  check("billing reads the live prices", /PS\.plan_price_monthly/.test(app) && /PS\.plan_price_annual/.test(app), "the price is a literal");
+  // THE RULE INVERTED, ON PURPOSE. This previously required the page to READ two price
+  // fields — which pinned a $1,250 constant that no customer's own subscription
+  // determined. What a customer pays is agreed with their point of contact and is
+  // stored nowhere the page can read, so the page must render NO price at all. An
+  // assertion that a price is displayed is an assertion that a price is known.
+  // SCANNED THE WRONG REGION at first: planPrice() is DEFINED above `billing: ()`, so
+  // slicing from the panel never saw the function that produces the string. An unlisted
+  // price ($4,800) sailed through. Scan the whole file for a rendered currency figure.
+  // A dollar sign followed immediately by a digit. `${` cannot match (a brace is not a
+  // digit), so template interpolation is not a false positive. The quote-spanning form
+  // this replaced matched across string boundaries and fired on `' },`.
+  const currency = [...app.matchAll(/\$\d[\d,]*/g)].map((m) => m[0]);
+  check("no currency figure is rendered anywhere in the settings app",
+    currency.length === 0,
+    `price string(s) present: ${currency.join(" | ")}`);
+  check("the route returns no price field",
+    !/plan_price_monthly\s*[:,]/.test(route.split("READ_ONLY")[0]),
+    "/api/profile still hands out a price the customer's subscription does not set");
+  check("billing reads the SUBSCRIPTION, not user_metadata",
+    /from\("subscriptions"\)/.test(route) && /plan_unreadable/.test(route),
+    "the plan is not read from the row Stripe maintains, or an unreadable record is not distinguished");
   check("no hardcoded plan name or price survives", !/Design Partner<\/div>|\$1,250|\$15,000|\$2,500|\$30,000/.test(appCode), "a literal price is still rendered");
   check("no next-billing date — nothing computes one", !/Next billing:/.test(appCode), "a billing date with no source");
 
@@ -117,10 +152,130 @@ console.log("\n── no control reports a save it did not perform ──");
 console.log("\n── company fields are read-only, not fake inputs ──");
 const panel = app.slice(app.indexOf("company: ()"), app.indexOf("naics: ()"));
 check("company panel renders no <input> for company fields", !/\$\{field\('Company name'/.test(panel) && !/\$\{field\('SAM\.gov UEI'/.test(panel), "a company field is still an editable box with no writer");
-check("company fields render through the read-only helper", /\$\{ro\('Company name'/.test(panel) && /\$\{ro\('SAM\.gov UEI'/.test(panel), "company fields are not marked read-only");
-check("exactly one editable field — the person's name", (panel.match(/\$\{editable\(/g) ?? []).length === 1, `${(panel.match(/\$\{editable\(/g) ?? []).length} editable fields`);
+// THE DURABLE RULE IS NOT "ONE INPUT" — it is that every input has a writer. The
+// earlier form asserted a snapshot (only full_name had a write path), so building the
+// company writers turned an honest page red. What must never happen is an <input> the
+// save handler cannot see.
+// WHOLE FILE, not just the company panel. Scoped to one panel, an input added to any
+// other tab was invisible to this check — which is exactly how an inert control ships.
+const editableIds = [...app.matchAll(/\$\{editable\('([^']+)'/g)].map((m) => m[1]);
+check("every editable field carries an id", editableIds.length > 0, "no editable fields found — did the panel move?");
+const unwritten = editableIds.filter((id) => !live.includes(id));
+check("EVERY editable field is read by the save handler", unwritten.length === 0,
+  `input(s) with no writer: ${unwritten.join(", ")}`);
+// The NAICS ✕ is a <button>, not an <input>, so the editable() sweep above cannot see
+// it. An inert remove control is the same defect in different markup.
+const rmKeys = [...app.matchAll(/data-naics-rm="\$\{esc\(([^)]+)\)\}"/g)];
+check("the NAICS remove control exists", rmKeys.length > 0, "no data-naics-rm in ps-app.js");
+// Assert the BINDING, not the string. The first form matched `data-naics-rm` anywhere
+// in the file, so breaking the delegated selector while leaving a getAttribute call
+// behind kept it green — a check satisfied by a line that no longer runs.
+check("the NAICS remove control is bound by a delegated selector",
+  /closest\(\s*['"]\[data-naics-rm\]['"]\s*\)/.test(live),
+  "no closest('[data-naics-rm]') — the Remove button is not actually wired");
+check("NAICS writes are confirmed by set equality, not by a 2xx", /sameSet\s*\(/.test(live),
+  "a 200 with a discarded write would report success");
+// NAICS LAUNDERING. The GET overlays codes derived from won audits when nothing is
+// saved, so an editor that reads the DISPLAYED array, adds one code and writes the
+// result back persists suggestions as customer-entered data. The write must be built
+// from the row, read at write time — never from page state.
+check("the route reports what is SAVED separately from what is displayed",
+  /naics_saved/.test(capRoute) && /naics_derived/.test(capRoute),
+  "the GET does not distinguish the persisted array from the derived overlay");
+// Scoped to the LOAD path. A blanket ban on `rec.naics_codes` was wrong: the PATCH
+// echo legitimately reads it, and a PATCH response carries no overlay.
+const loadPath = live.slice(0, live.indexOf("function setLivePill"));
+check("the editor seeds its list from naics_saved, not the overlay",
+  /cap\.naics_saved/.test(loadPath) && !/rec\.naics_codes/.test(loadPath),
+  "the panel is populated from the overlay — adding one code would persist the rest");
+check("NAICS writes re-read the row before mutating it",
+  /async function savedCodes\(/.test(live) && /mutate\(await savedCodes\(\)\)/.test(live),
+  "a whole-array write is built from stale page state");
+check("email is never an input — it is auth identity, not a profile column",
+  !/\$\{editable\('psEmail'/.test(panel) && /\$\{ro\('Email'/.test(panel),
+  "email rendered as an editable box without a verification flow behind it");
 check("company record links out to its real editor", /href="\/capability-statement"/.test(panel), "no route to where the company is actually edited");
 check("empty NAICS states the consequence", /stay empty/.test(panel), "an empty feed is not explained");
+
+console.log("\n── an unfilled chip may not promise a check that never runs ──");
+// The row had TWO visual states over FOUR real kinds. 8(a), HUBZone, WOSB and EDWOSB are
+// the whole of SAM's SBA certification vocabulary, so those genuinely fill in when a
+// registration resolves. SDVOSB and VOSB are issued by VA VetCert and appear in that list
+// at NO UEI — grouping them with the first set told a customer to wait for an answer that
+// is never coming. "Small business" is a third kind again: self-represented per
+// solicitation, with no certification to establish.
+{
+  check("the source still records that SAM cannot establish SDVOSB",
+    /never establish se:sdvosb|NO SDVOSB CODE/i.test(read("src/lib/cert-verification.ts")),
+    "if a VetCert source was added, this panel's dead-end state must be revisited");
+
+  check("a VetCert predicate exists", /function isVetCertProgram\(/.test(appCode), "no predicate — the kinds are collapsed again");
+  check("the chip renderer branches on it", /isVetCertProgram\(k\)/.test(appCode), "the predicate exists but no chip uses it");
+  check("the dead-end chip is visually distinct from a pending one",
+    /cert-tg is-elsewhere/.test(appCode) && /\.cert-tg\.is-elsewhere\s*\{/.test(htmlCode),
+    "same grey as an awaiting-SAM chip, so it still reads as pending");
+
+  // TWO VISUAL STATES, ONE MEANING EACH: plain grey says "waiting on SAM, this fills in";
+  // dashed says "not settled here at all". Self-represented size class belongs with the
+  // second — `canonicalizeEligibilityAttr` only ever yields se:*, so a small-business
+  // chip can no more turn green than a VetCert one. Rendering it plain grey beside 8(a)
+  // promises the same fill-in from a check that likewise never runs.
+  {
+    const chipFn = appCode.slice(appCode.indexOf("function certChip("), appCode.indexOf("function certCaption("));
+    const plainGrey = [...chipFn.matchAll(/class="cert-tg"/g)].length;
+    check("only the awaiting-SAM chip is plain grey", plainGrey === 1,
+      `${plainGrey} branches render plain grey — a kind that never fills in looks like one that does`);
+    check("the self-represented chip is marked as not-settled-here",
+      /isSelfRepresented\(k\)\)\s*\{[\s\S]{0,120}cert-tg is-elsewhere/.test(chipFn),
+      "small business renders as pending, beside programs that really do fill in");
+    check("V-P5 · rejects a self-represented chip rendered plain grey",
+      !/cert-tg is-elsewhere/.test('return `<span class="cert-tg" title="Self-represented in SAM">${name}</span>`;'));
+  }
+
+  // EXECUTED, not grepped. A gate that only proves the regex is present cannot tell a
+  // correct one from a wrong one, and BOTH error directions matter here: a miss leaves the
+  // false promise, and a false positive sends a program SAM really does establish to a
+  // dead end it does not belong in.
+  // [\s\S] rather than `.` with the `s` flag: dotAll needs an es2018 target and the
+  // repo's tsc rejects it, so the flag would pass under tsx and fail the build.
+  const src = appCode.match(/function isVetCertProgram\(name\)\s*\{\s*return\s*(\/[\s\S]+?\/i)\.test/);
+  check("the predicate's pattern was located", !!src, "could not extract the regex to execute it");
+  if (src) {
+    const re = new RegExp(src[1].slice(1, src[1].lastIndexOf("/")), "i");
+    const mustMatch = ["SDVOSB", "VOSB", "sdvosb", "Service-Disabled Veteran-Owned Small Business", "Veteran Owned Small Business"];
+    const mustNot = ["WOSB", "EDWOSB", "Women-Owned Small Business", "Economically Disadvantaged Women-Owned Small Business", "Small Business (SBA)", "8(a)", "HUBZone"];
+    for (const s of mustMatch) check(`VetCert · matches "${s}"`, re.test(s), "would keep promising a SAM check that never runs");
+    for (const s of mustNot) check(`VetCert · does NOT match "${s}"`, !re.test(s), "a program SAM DOES establish sent to a dead-end state");
+  }
+
+  // The caption must count the kinds apart, or the numbers restate the collapsed row.
+  check("the caption counts VetCert separately from carried-and-unestablished",
+    /issued by VA VetCert/.test(appCode) && /carried on your profile, not established in SAM/.test(appCode),
+    "one bucket again — the count cannot distinguish the two");
+
+  // THE PROMISE IS THE THING BEING GATED. "fill in on their own" may only appear when a
+  // chip is genuinely waiting on SAM, which excludes both other kinds.
+  check("the fill-in-on-their-own promise is gated on a chip that awaits SAM",
+    /awaitingSam/.test(appCode) && /if\s*\(awaitingSam\)/.test(appCode),
+    "the promise is unconditional, so a VetCert-only row is told to wait");
+  check("awaitingSam excludes BOTH other kinds",
+    /!isSelfRepresented\(k\)\s*&&\s*!isVetCertProgram\(k\)/.test(appCode),
+    "a kind that is not awaiting SAM still triggers the promise");
+
+  // ...and the stamp must NOT be gated on the row, or a true fact about the registration
+  // disappears whenever the row happens to hold only VetCert entries.
+  const noteFn = appCode.slice(appCode.indexOf("function certNote()"), appCode.indexOf("function editable("));
+  check("the SAM state stamp survives a row with nothing awaiting SAM",
+    !/if\s*\(!st\s*\|\|\s*!any/.test(noteFn) && /cert-state/.test(noteFn),
+    "the stamp is gated on the chips, so 'Not found in SAM' vanishes on a VetCert-only profile");
+
+  // Planted positives — per leg, not per section.
+  const probe = /\bsdvosb\b|\bvosb\b|service[\s-]?disabled|veteran[\s-]?owned/i;
+  check("V-P1 · a naive /vosb/ WOULD wrongly match nothing here but a bare one is caught", !probe.test("WOSB"));
+  check("V-P2 · the executed check rejects a predicate that matches WOSB", /wosb/i.test("WOSB"), "control: the string really does contain wosb");
+  check("V-P3 · rejects a collapsed caption", !/issued by VA VetCert/.test("1 carried on your profile, not established in SAM."));
+  check("V-P4 · rejects an ungated promise", !/if\s*\(awaitingSam\)/.test("lines.push(why + ' These are read from your SAM registration');"));
+}
 
 console.log("\n── planted positives ──");
 check("P1 · rejects a resurrected auto-save claim", /changes save automatically/i.test('<b id="savedAt">changes save automatically</b>'));

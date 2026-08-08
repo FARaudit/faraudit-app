@@ -3,12 +3,19 @@ import { createServerClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
-const PLAN_CONFIG = {
-  design_partner: { label: "Design Partner", price_monthly: 1250, price_annual: 15000 },
-  standard:       { label: "Standard",       price_monthly: 2500, price_annual: 30000 }
-} as const;
-
-type PlanTier = keyof typeof PLAN_CONFIG;
+// A LABEL FOR A TIER IS NOT A PRICE. What a customer pays is agreed with their point
+// of contact and is not stored anywhere this route can read, so this route returns no
+// price at all. It previously returned $1,250/month for every account, from a literal
+// nothing could ever change — a number under a LIVE badge that no customer's own
+// subscription determined.
+//
+// The tier NAME comes from the subscription Stripe actually wrote. No subscription
+// means no plan, which renders as an empty state, not as a default.
+const TIER_LABELS: Record<string, string> = {
+  design_partner: "Design Partner",
+  standard: "Standard",
+  growth: "Growth"
+};
 
 export async function GET() {
   const supabase = await createServerClient();
@@ -21,18 +28,39 @@ export async function GET() {
     (typeof meta.name === "string" && meta.name) ||
     "";
 
-  // TODO: user profile table needed — until then, default tier comes from user_metadata.plan_tier
-  const tierFromMeta = typeof meta.plan_tier === "string" ? (meta.plan_tier as PlanTier) : "design_partner";
-  const plan_tier: PlanTier = tierFromMeta in PLAN_CONFIG ? tierFromMeta : "design_partner";
-  const plan = PLAN_CONFIG[plan_tier];
+  // Read the row the Stripe webhook maintains. A failed read is reported as unknown,
+  // never as "no subscription" — an outage and an account that has not subscribed are
+  // different answers and must not share a face.
+  let plan_tier: string | null = null;
+  let plan_label: string | null = null;
+  let plan_status: string | null = null;
+  let plan_period_end: string | null = null;
+  let plan_unreadable = false;
+
+  const sub = await supabase
+    .from("subscriptions")
+    .select("tier, status, current_period_end")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (sub.error) {
+    plan_unreadable = true;
+  } else if (sub.data) {
+    plan_tier = typeof sub.data.tier === "string" ? sub.data.tier : null;
+    plan_label = plan_tier ? (TIER_LABELS[plan_tier] ?? plan_tier) : null;
+    plan_status = typeof sub.data.status === "string" ? sub.data.status : null;
+    plan_period_end =
+      typeof sub.data.current_period_end === "string" ? sub.data.current_period_end : null;
+  }
 
   return NextResponse.json({
     email: user.email || "",
     full_name,
     plan_tier,
-    plan_label: plan.label,
-    plan_price_monthly: plan.price_monthly,
-    plan_price_annual: plan.price_annual
+    plan_label,
+    plan_status,
+    plan_period_end,
+    plan_unreadable
   });
 }
 
@@ -61,7 +89,14 @@ export async function PATCH(req: Request) {
   }
   const patch = body as Record<string, unknown>;
 
-  const READ_ONLY = ["email", "plan_tier", "plan_label", "plan_price_monthly", "plan_price_annual"];
+  // Billing fields are refused by NAME, including the two price keys this route no
+  // longer returns: a client that still sends one must be told it is not editable
+  // here, not have it silently ignored.
+  const READ_ONLY = [
+    "email",
+    "plan_tier", "plan_label", "plan_status", "plan_period_end",
+    "plan_price_monthly", "plan_price_annual"
+  ];
   const rejected = READ_ONLY.filter((k) => k in patch);
   if (rejected.length) {
     return NextResponse.json(

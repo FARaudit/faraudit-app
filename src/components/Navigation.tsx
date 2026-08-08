@@ -344,11 +344,16 @@ export default function Navigation(_: { initialPinned: boolean }) {
         ))}
       </div>
 
+      {/* NO PRICE, NO TIER, NO COUNTDOWN. `Design Partner · $1,250/mo` and `Free
+          during T1 sprint` were literals typed into this rail — the same figure the
+          settings surface deleted, because what a customer pays is agreed with their
+          point of contact and is stored nowhere this app can read. A number here is
+          the one thing on the rail a customer might act on, and it would not be
+          theirs. "Upgrade to Standard" named a tier that does not exist either.
+          Billing is what the settings page can actually read, so point at it. */}
       <div className={styles.footer}>
-        <div className={styles.plan}>Design Partner · $1,250/mo</div>
-        <div className={styles.days}>Free during T1 sprint</div>
-        <a href="/pricing" className={styles.upgrade}>
-          Upgrade to Standard
+        <a href="/settings" className={styles.upgrade}>
+          Billing &amp; plan
         </a>
       </div>
     </aside>

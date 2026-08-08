@@ -27,6 +27,15 @@
   --shadow:0 1px 2px rgba(15,23,42,.06), 0 8px 24px -12px rgba(15,23,42,.10);
   --shadow-sm:0 1px 3px rgba(0,0,0,0.08);
   --shadow-pop:0 24px 60px -22px rgba(15,23,42,.28), 0 6px 16px -6px rgba(15,23,42,.12);
+  /* Stage-rail ground ramp. Eight steps, ALL EIGHT forked per field — a ramp is a ground
+     claim, so it forks with the ground exactly like ink does. Monotonic against THIS
+     field's card, and step 1 must outweigh an empty cell's outline, or a stage holding
+     pursuits renders fainter than one holding nothing. */
+  --ramp-1:#bfd9f7; --ramp-2:#9bc2ed; --ramp-3:#7dafe5; --ramp-4:#609ddd;
+  --ramp-5:#378ADD; --ramp-6:#185FA5; --ramp-7:#142545; --ramp-8:#0A1628;
+  /* ONE role, TWO values: a mid-red fails on a dark card and a pale red fails on white,
+     so --alarm forks with the field rather than shipping one token to both. */
+  --alarm:#b91c1c;
 }
 [data-theme="dark"]{
   --page-bg:#02060c; --bg:#050d1a; --card:#0c1b30; --card-soft:#0a1729;
@@ -35,9 +44,19 @@
   --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px -12px rgba(0,0,0,.6);
   --shadow-sm:0 1px 3px rgba(0,0,0,0.5);
   --shadow-pop:0 1px 2px rgba(0,0,0,.5), 0 28px 64px -22px rgba(0,0,0,.85);
+  /* On navy the ramp BRIGHTENS toward award. Direction may invert between fields;
+     depth-order may not. Steps 5-8 are unchanged from the first pass. */
+  --ramp-1:#173d63; --ramp-2:#1c4a7a; --ramp-3:#20568e; --ramp-4:#2562a1;
+  --ramp-5:#2a6fb8; --ramp-6:#4f95d8; --ramp-7:#86bdec; --ramp-8:#c3ddf7;
+  --alarm:#fca5a5;
 }
 
 *{box-sizing:border-box}
+/* The UA rule for [hidden] is display:none at specificity (0,1,0), so any class rule
+   carrying a display value outranks it. Setting .hidden from script is therefore only
+   a request until this rule makes it binding. Load-bearing: the LIVE pill and the
+   show-all control are both gated by .hidden alone. */
+[hidden]{display:none!important}
 html,body{margin:0;padding:0;background:var(--page-bg);font-family:"Manrope",ui-sans-serif,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;transition:background-color .25s ease,color .25s ease}
 button{font-family:inherit}
 .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
@@ -79,30 +98,35 @@ button{font-family:inherit}
 .cta-primary svg{width:15px;height:15px}
 
 /* ═══ KPI STRIP ═══ */
-.kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-sm);padding:18px 20px;display:flex;flex-direction:column;gap:10px}
-.kpi-top{display:flex;align-items:center;justify-content:space-between}
-.kpi .lbl{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin:0}
-.kpi-ico{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;flex-shrink:0}
-.kpi-ico svg{width:15px;height:15px}
-.kpi-ico.blue{background:rgba(55,138,221,.1);color:var(--accent-deep)}
-.kpi-ico.green{background:var(--green-50);color:var(--green-700)}
-.kpi-ico.red{background:var(--red-50);color:var(--red-700)}
-.kpi-ico.amber{background:var(--amber-50);color:var(--amber-700)}
-[data-theme="dark"] .kpi-ico.blue{background:rgba(55,138,221,.16);color:var(--accent-light)}
-[data-theme="dark"] .kpi-ico.green{background:rgba(16,185,129,.16);color:#6ee7b7}
-[data-theme="dark"] .kpi-ico.red{background:rgba(220,38,38,.16);color:#fca5a5}
-[data-theme="dark"] .kpi-ico.amber{background:rgba(217,119,6,.16);color:#fcd34d}
-.kpi-val{font-family:"Manrope",sans-serif;font-size:36px;font-weight:700;letter-spacing:-.03em;color:var(--ink);line-height:.95;display:flex;align-items:baseline;gap:6px}
-.kpi-val .unit{font-size:15px;font-weight:600;color:var(--mute);letter-spacing:0}
-.kpi[data-tone="red"] .kpi-val{color:var(--red-600)}
-.kpi[data-tone="amber"] .kpi-val{color:var(--amber-700)}
-.kpi[data-tone="blue"] .kpi-val{color:var(--accent-deep)}
-[data-theme="dark"] .kpi[data-tone="red"] .kpi-val{color:#fca5a5}
-[data-theme="dark"] .kpi[data-tone="amber"] .kpi-val{color:#fcd34d}
-[data-theme="dark"] .kpi[data-tone="blue"] .kpi-val{color:var(--accent-light)}
-.kpi .foot{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute)}
-.kpi .foot b{color:var(--ink-2);font-weight:700}
+/* ══ K1 SPLIT LEDGER ══
+   `In flight` and `Pipeline value` are things you HAVE; `P0 · action now` and
+   `Due <= 7 days` are things that NEED you. The old strip drew all four identically and
+   spent four hues on them, with red and amber both meaning "act now" — one hue, two
+   meanings. The split is carried by three channels, none load-bearing alone: border
+   weight, label ink, figure colour. And NOTHING IS ALARMED WHEN THERE IS NOTHING TO DO —
+   at zero a demand drops to a 1px line, its label falls back to --mute and the figure
+   loses --alarm. A strip that looks urgent on an empty pipeline teaches the operator to
+   ignore it. */
+.kpi-strip{display:grid;grid-template-columns:1fr 1fr 22px 1fr 1fr;gap:13px;align-items:stretch}
+.kpi-strip .hint{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-2);grid-column:1/3}
+.kpi-strip .hint.r{grid-column:4/6}
+.kpi-strip .fence{display:flex;justify-content:center}
+.kpi-strip .fence i{width:1px;background:var(--line);display:block}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:11px}
+.kpi .klab{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--mute)}
+.kpi .kval{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-weight:700;letter-spacing:-.035em;line-height:.92;display:flex;align-items:baseline;gap:5px;font-size:36px;color:var(--ink)}
+.kpi .kval .u{font-size:.45em;font-weight:600;letter-spacing:0}
+.kpi .kfoot{font-family:"IBM Plex Mono",monospace;font-size:11.5px;line-height:1.35;color:var(--mute)}
+.kpi .kfoot b{font-weight:700}
+.kpi[data-kind="need"]{border-color:var(--ink);border-width:1.5px}
+.kpi[data-kind="need"] .klab{color:var(--ink)}
+.kpi[data-kind="need"] .kfoot{color:var(--ink-2)}
+.kpi[data-kind="need"][data-live="yes"] .kval{color:var(--alarm)}
+.kpi[data-kind="need"][data-live="no"]{border-color:var(--line);border-width:1px}
+.kpi[data-kind="need"][data-live="no"] .klab{color:var(--mute)}
+/* the four-hue icon tiles, the tone-coloured figures and the 10.5px footnote are gone:
+   K1 carries have-vs-need on border weight, label ink and figure colour instead, and
+   every run in the strip now sits at or above the 11px floor. */
 
 /* ═══ STAGE FUNNEL RAIL ═══ */
 .funnel{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-sm);padding:18px 18px 14px}
@@ -112,30 +136,35 @@ button{font-family:inherit}
 .funnel-head .allbtn{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:700;color:var(--accent-deep);background:none;border:0;cursor:pointer;letter-spacing:.02em}
 .funnel-head .allbtn:hover{text-decoration:underline}
 [data-theme="dark"] .funnel-head .allbtn{color:var(--accent-light)}
-.stage-rail{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;position:relative}
-.stage-cell{display:flex;flex-direction:column;gap:8px;padding:13px 12px 12px;border-radius:11px;background:transparent;border:1px solid transparent;cursor:pointer;transition:background .14s, border-color .14s;min-width:0;text-align:left;font:inherit}
-.stage-cell:hover{background:var(--card-soft);border-color:var(--line)}
-.stage-cell.active{background:rgba(55,138,221,0.07);border-color:var(--accent-light);box-shadow:0 0 0 1px var(--accent-light)}
-[data-theme="dark"] .stage-cell.active{background:rgba(55,138,221,0.14);border-color:rgba(55,138,221,0.40)}
-.stage-cell .stage-num{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;color:var(--mute-2)}
-.stage-cell.active .stage-num{color:var(--accent-deep)}
-[data-theme="dark"] .stage-cell.active .stage-num{color:var(--accent-light)}
-.stage-cell .stage-name{font-size:11px;font-weight:700;letter-spacing:-.005em;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
-.stage-cell.active .stage-name{color:var(--ink)}
-.stage-cell .stage-bottom{display:flex;align-items:flex-end;justify-content:space-between;gap:6px;margin-top:2px}
-.stage-cell .stage-num-big{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:600;color:var(--ink);letter-spacing:-.02em;line-height:1}
-.stage-cell.active .stage-num-big{color:var(--accent-deep)}
-[data-theme="dark"] .stage-cell.active .stage-num-big{color:var(--accent-light)}
-.stage-cell.empty .stage-num-big{color:var(--mute-2);opacity:.5}
-/* volume bar */
-.vol{flex:1;display:flex;align-items:flex-end;height:28px;max-width:34px}
-.vol i{width:100%;border-radius:3px 3px 0 0;background:var(--accent-light);opacity:.55;transition:opacity .15s, background .15s}
-.stage-cell.active .vol i{background:var(--accent);opacity:1}
-.stage-cell:hover .vol i{opacity:.8}
-.stage-cell.empty .vol i{background:var(--mute-2);opacity:.2}
-.stage-p0{display:inline-flex;align-items:center;gap:4px;margin-top:6px;font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.06em;color:var(--red-700);text-transform:uppercase}
-.stage-p0::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--red-500)}
-[data-theme="dark"] .stage-p0{color:#fca5a5}
+/* ══ RIBBON STAGE RAIL ══
+   Three phases, not eight peers: 01-05 are your move, 06 is waiting on the government,
+   07-08 are decided. Direction is drawn ONCE at the phase level — chevrons between three
+   groups read as flow; between eight cells they read as decoration.
+   Deleted here vs the previous rail:
+     · the volume bar — max(8,round(n/max*28)) could not separate 0, 1 and 2, and drew a
+       6px stub for an empty stage, rendering zero as a small quantity;
+     · .stage-num at 9.5px and .stage-p0 at 8.5px, both under the 11px floor;
+     · .stage-name nowrap+ellipsis in a one-eighth column — the name now WRAPS.
+   P0 moved off alarm colour onto ink weight: red means a clock that ran out, not a
+   priority label, and one colour carries one meaning. */
+.phcap{display:grid;grid-template-columns:5fr 1fr 2fr;gap:7px;margin:0 0 9px;padding:0 2px}
+.phcap span{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-2)}
+.stage-rail{display:flex;align-items:stretch}
+.stage-rail .cell{position:relative;flex:1 1 0;min-width:0;height:104px;display:flex;flex-direction:column;justify-content:space-between;
+ padding:12px 15px 12px 26px;margin-left:-13px;text-align:left;font:inherit;border:0;cursor:pointer;
+ clip-path:polygon(0 0,calc(100% - 13px) 0,100% 50%,calc(100% - 13px) 100%,0 100%,13px 50%)}
+.stage-rail .cell:first-child{margin-left:0;padding-left:15px;clip-path:polygon(0 0,calc(100% - 13px) 0,100% 50%,calc(100% - 13px) 100%,0 100%)}
+.stage-rail .cell:last-child{clip-path:polygon(0 0,100% 0,100% 100%,0 100%,15px 50%)}
+.stage-rail .cell:disabled{cursor:default}
+.stage-rail .cell .top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.stage-rail .snum{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.11em}
+.stage-rail .sname{font-size:12.5px;font-weight:700;letter-spacing:-.008em;line-height:1.2;display:block;overflow-wrap:normal;word-break:keep-all;hyphens:none}
+.stage-rail .scount{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-weight:600;letter-spacing:-.03em;line-height:.9;font-size:27px}
+.stage-rail .sclock{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;line-height:1.3}
+.stage-rail .cell.is-empty{background:transparent!important;box-shadow:inset 0 0 0 1px var(--line)}
+.stage-rail .cell.is-active{box-shadow:inset 0 4px 0 0 #0A1628}
+[data-theme="dark"] .stage-rail .cell.is-active{box-shadow:inset 0 4px 0 0 #c3ddf7}
+.stage-rail .cell.is-empty.is-active{box-shadow:inset 0 0 0 1px var(--line)}
 
 /* stage banner */
 .stage-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 18px;background:rgba(55,138,221,0.05);border:1px solid var(--accent-light);border-radius:11px;font-size:13px;color:var(--ink-2)}
@@ -164,6 +193,36 @@ button{font-family:inherit}
 .risk-badge.p2{background:var(--line-3);color:var(--mute);border:1px solid var(--line)}
 [data-theme="dark"] .risk-badge.p0{background:rgba(220,38,38,0.20);color:#fca5a5;border-color:rgba(220,38,38,0.40)}
 [data-theme="dark"] .risk-badge.p1{background:rgba(217,119,6,0.18);color:#fcd34d;border-color:rgba(252,211,77,0.30)}
+/* remove control — quiet until the card is hovered or the button is focused, so a
+   destructive action is reachable without competing with the priority badge. It stays
+   visible on touch, where there is no hover to reveal it. */
+.pcard-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.pcard-rm{appearance:none;background:transparent;border:1px solid var(--line);color:var(--mute);border-radius:6px;padding:4px 9px;font-family:inherit;font-size:10px;font-weight:600;letter-spacing:.02em;cursor:pointer;opacity:0;transition:opacity .14s,color .14s,border-color .14s}
+.pcard:hover .pcard-rm,.pcard-rm:focus-visible{opacity:1}
+.pcard-rm:hover{color:var(--red-700);border-color:var(--red-200);background:var(--red-50)}
+.pcard-rm:disabled{cursor:default;opacity:1;color:var(--mute);background:transparent}
+@media (hover:none){.pcard-rm{opacity:1}}
+[data-theme="dark"] .pcard-rm:hover{color:#fca5a5;border-color:rgba(220,38,38,0.40);background:rgba(220,38,38,0.16)}
+/* Armed: the control commits to being destructive and stops depending on hover, so
+   the question cannot be left half-asked on a card the pointer has moved off. */
+.pcard-rm.is-armed{opacity:1;color:#fff;background:var(--red-600);border-color:var(--red-600)}
+.pcard-rm.is-armed:hover{color:#fff;background:var(--red-700);border-color:var(--red-700)}
+.pcard-cancel{appearance:none;background:transparent;border:1px solid var(--line);color:var(--mute);border-radius:6px;padding:4px 9px;font-family:inherit;font-size:10px;font-weight:600;letter-spacing:.02em;cursor:pointer}
+.pcard-cancel:hover{color:var(--ink);border-color:var(--mute)}
+/* Open-the-audit row. Carries the verdict, so the card answers "what did we decide"
+   without being opened, and the whole row is the target. */
+.pcard-open{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;text-decoration:none;background:var(--line-3);transition:border-color .14s,background .14s}
+.pcard-open:hover{border-color:var(--blue-300,#93c5fd);background:var(--card)}
+.pcard-open .po-v{font-size:12px;font-weight:700;color:var(--ink)}
+.pcard-open .po-go{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;letter-spacing:.02em;color:var(--mute)}
+.pcard-open:hover .po-go{color:var(--blue-700,#1d4ed8)}
+.pcard-none{margin:2px 0 0;font-size:11px;line-height:1.5;color:var(--mute)}
+.pcard-msg{margin:0;font-size:11px;line-height:1.5;color:var(--red-700);font-weight:600}
+/* The confirmation prompt is a question, not a failure — it must not wear the colour
+   the page uses to report that something went wrong. */
+.pcard-msg.ask{color:var(--mute);font-weight:500}
+[data-theme="dark"] .pcard-msg{color:#fca5a5}
+[data-theme="dark"] .pcard-msg.ask{color:var(--mute)}
 /* urgency meter */
 .urg{display:flex;flex-direction:column;gap:5px}
 .urg-bar{height:5px;border-radius:3px;background:var(--line-3);overflow:hidden}
@@ -188,6 +247,13 @@ button{font-family:inherit}
 [data-theme="dark"] .pcard-meta .item .v.overdue{color:#fca5a5}[data-theme="dark"] .pcard-meta .item .v.warn{color:#fcd34d}
 .stage-pill{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;background:rgba(55,138,221,0.08);border:1px solid var(--accent-light);color:var(--accent-deep);font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;width:max-content}
 [data-theme="dark"] .stage-pill{background:rgba(55,138,221,0.15);color:var(--accent-light);border-color:rgba(181,212,244,0.30)}
+/* The stage is a control, so it looks like the pill it replaced but behaves like a
+   select — the pursuit can be moved along the sequence the rail above it draws. */
+.stage-sel{appearance:none;display:inline-flex;padding:3px 22px 3px 9px;border-radius:999px;background:rgba(55,138,221,0.08);border:1px solid var(--accent-light);color:var(--accent-deep);font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;width:max-content;cursor:pointer;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23185FA5' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>");background-repeat:no-repeat;background-position:right 7px center;background-size:9px}
+.stage-sel:hover{border-color:var(--accent)}
+.stage-sel:disabled{opacity:.6;cursor:default}
+[data-theme="dark"] .stage-sel{background-color:rgba(55,138,221,0.15);color:var(--accent-light);border-color:rgba(181,212,244,0.30)}
 .stage-pill::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--accent)}
 
 .pcard-actions{display:flex;gap:8px;flex-wrap:wrap}
@@ -324,43 +390,26 @@ button{font-family:inherit}
           <h1>Pipeline</h1>
           <p class="sub">Every pursuit in flight, across <b>8 acquisition stages</b> — synopsis to award.</p>
         </div>
-        <a class="cta-primary" href="/audit">
+        <!-- Opportunities holds the only POST to /api/pipeline. -->
+        <a class="cta-primary" href="/opportunities">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 5v14M5 12h14"/></svg>
           Add Solicitation
         </a>
       </header>
 
-      <!-- portfolio KPIs -->
-      <section class="kpi-strip">
-        <div class="kpi" data-tone="blue">
-          <div class="kpi-top"><p class="lbl">In Flight</p><span class="kpi-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg></span></div>
-          <div class="kpi-val">19</div>
-          <div class="foot">active pursuits across <b>7 stages</b></div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-top"><p class="lbl">Pipeline Value</p><span class="kpi-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></span></div>
-          <div class="kpi-val">$239.7<span class="unit">M</span></div>
-          <div class="foot">total ceiling, weighted by stage</div>
-        </div>
-        <div class="kpi" data-tone="red">
-          <div class="kpi-top"><p class="lbl">P0 · Action Now</p><span class="kpi-ico red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span></div>
-          <div class="kpi-val">3</div>
-          <div class="foot">critical deadlines — <b>1 CO overdue</b></div>
-        </div>
-        <div class="kpi" data-tone="amber">
-          <div class="kpi-top"><p class="lbl">Due ≤ 7 Days</p><span class="kpi-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span></div>
-          <div class="kpi-val">7</div>
-          <div class="foot">submissions closing this week</div>
-        </div>
-      </section>
+      <!-- portfolio KPIs — K1 split ledger, built entirely by pipeline-live.js.
+           NOTHING here may state a figure before the fetch settles: markup that carries a
+           number is a claim the page has not yet earned. -->
+      <section class="kpi-strip" id="kstrip"></section>
 
       <!-- 8-stage funnel -->
       <section class="funnel">
         <div class="funnel-head">
           <span class="t">Stages</span>
           <span class="rule"></span>
-          <button class="allbtn" id="allBtn" type="button">Show all 19 →</button>
+          <button class="allbtn" id="allBtn" type="button" hidden></button>
         </div>
+        <div class="phcap" id="phcap"><span>Your move 01–05</span><span>Waiting 06</span><span>Decided 07–08</span></div>
         <div class="stage-rail" id="rail"></div>
       </section>
 
@@ -373,120 +422,6 @@ button{font-family:inherit}
   </main>
 </div>
 
-<script>
-const STAGE_NAMES = ['Pre-Sol Synopsis','Sources Sought','Solicitation','Proposal Dev','Submission','Evaluation','Award','Post-Award'];
-const STAGE_FULL = ['Pre-Solicitation Synopsis','Sources Sought / RFI','Solicitation Released','Proposal Development','Submission','Government Evaluation','Award & Performance','Post-Award'];
-
-const PURSUITS = [
-  // stage 1 (2)
-  {id:'HQ0034-26-R-2058', stage:1, pri:'p2', title:'DARPA — Resilient Tactical Edge Compute, Phase 2 SBIR', agency:'DARPA · Microsystems Technology Office', due:75, dueLabel:'Est. RFP 75d', ceiling:12.0, m3k:'CO Posture', m3v:'Synopsis posted'},
-  {id:'HQ0808-26-R-0001', stage:1, pri:'p2', title:'DTRA — Strategic Threat Reduction Modeling Support', agency:'Defense Threat Reduction Agency', due:60, dueLabel:'Est. RFP 60d', ceiling:9.4, m3k:'CO Posture', m3v:'Market research'},
-  // stage 2 (1)
-  {id:'N00164-26-Q-0788', stage:2, pri:'p1', title:'NSWC Crane — Energetic Materials R&D Support', agency:'Dept. of the Navy · NSWC Crane', due:9, dueLabel:'RFI due 9d', ceiling:5.5, m3k:'Influence', m3v:'Response drafted'},
-  // stage 3 (4)
-  {id:'N00024-26-R-2207', stage:3, pri:'p0', title:'SPY-6 Radar Sustainment Engineering — Phase IV CDRL Refresh', agency:'Dept. of the Navy · NAVSEA · PEO IWS 2.0', due:1, dueLabel:'1d left', ceiling:18.4, m3k:'CO Response', m3v:'Overdue', m3tone:'overdue'},
-  {id:'FA2517-26-R-0033', stage:3, pri:'p0', title:'Space Force — Ground Station Software Modernization, GPS III', agency:'U.S. Space Force · SSC · Peterson SFB', due:4, dueLabel:'4d left', ceiling:24.6, m3k:'CO Response', m3v:'~3.5 days'},
-  {id:'FA8730-26-Q-0114', stage:3, pri:'p0', title:'F-35 Mission Systems — Software Test Harness Refactor & CI Pipeline', agency:'Dept. of the Air Force · AFLCMC · Hanscom AFB', due:5, dueLabel:'5d left', ceiling:7.9, m3k:'CO Response', m3v:'~1.8 days'},
-  {id:'W912DY-26-R-0089', stage:3, pri:'p1', title:'USACE Huntsville — Cyber Resilience Assessment, Critical Infrastructure', agency:'Dept. of the Army · USACE Huntsville (CEHNC)', due:6, dueLabel:'6d left', ceiling:3.2, m3k:'CO Response', m3v:'~4.1 days'},
-  // stage 4 (6)
-  {id:'HC1028-26-R-1015', stage:4, pri:'p1', title:'DISA — Cloud Migration Services, JWCC Task Order', agency:'Defense Information Systems Agency', due:11, dueLabel:'Submit 11d', ceiling:32.0, m3k:'Status', m3v:'Pricing 70%'},
-  {id:'W56KGY-26-R-0014', stage:4, pri:'p1', title:'CECOM — Tactical Network Sustainment Support, APG', agency:'Dept. of the Army · CECOM · Aberdeen', due:13, dueLabel:'Submit 13d', ceiling:14.2, m3k:'Status', m3v:'Color review 6d'},
-  {id:'W519TC-26-R-0066', stage:4, pri:'p2', title:'NETCOM — Enterprise Network Services Sustainment', agency:'Dept. of the Army · NETCOM · Fort Huachuca', due:16, dueLabel:'Submit 16d', ceiling:21.5, m3k:'Status', m3v:'BOE in progress'},
-  {id:'SP4701-26-Q-0942', stage:4, pri:'p2', title:'DLA Aviation — Predictive Maintenance Analytics, H-60', agency:'Defense Logistics Agency · Aviation', due:18, dueLabel:'Submit 18d', ceiling:6.8, m3k:'Status', m3v:'Teaming LOI'},
-  {id:'N40192-26-Q-1188', stage:4, pri:'p2', title:'NAVFAC Pacific — Energetics Storage Inspection, Guam', agency:'Dept. of the Navy · NAVFAC Pacific', due:20, dueLabel:'Submit 20d', ceiling:8.7, m3k:'Status', m3v:'Site visit 5d'},
-  {id:'W912DR-26-R-0117', stage:4, pri:'p2', title:'USACE Baltimore — Cantonment Area Construction Mgmt', agency:'Dept. of the Army · USACE Baltimore', due:22, dueLabel:'Submit 22d', ceiling:11.3, m3k:'Status', m3v:'Pricing 40%'},
-  // stage 5 (3)
-  {id:'SP0700-26-R-0210', stage:5, pri:'p1', title:'DLA Troop Support — Field Feeding Equipment, FY26', agency:'Defense Logistics Agency · Troop Support', due:2, dueLabel:'Submit 2d', ceiling:4.9, m3k:'Checklist', m3v:'Final QC', m3tone:'warn'},
-  {id:'N00178-26-R-3071', stage:5, pri:'p2', title:'NSWC Indian Head — Energetics Material Handling, Bldg. 4042', agency:'Dept. of the Navy · NSWC Indian Head', due:3, dueLabel:'Submit 3d', ceiling:5.6, m3k:'Checklist', m3v:'Reps & certs', m3tone:'warn'},
-  {id:'W58RGZ-26-Q-0418', stage:5, pri:'p2', title:'AMCOM — Aviation Ground Support Equipment Calibration', agency:'Dept. of the Army · AMCOM · Redstone', due:6, dueLabel:'Submit 6d', ceiling:3.4, m3k:'Checklist', m3v:'SAM verified'},
-  // stage 6 (2)
-  {id:'N00421-26-R-0145', stage:6, pri:'p1', title:'NAWCAD Pax River — Flight Test Instrumentation Support', agency:'Dept. of the Navy · NAWCAD · Patuxent River', due:25, dueLabel:'Award est. 25d', ceiling:16.7, m3k:'Eval', m3v:'Clarifications'},
-  {id:'FA8501-26-R-0077', stage:6, pri:'p2', title:'AFSC Robins — Depot Software Sustainment, C-130', agency:'Dept. of the Air Force · AFSC · Robins AFB', due:34, dueLabel:'Award est. 34d', ceiling:13.1, m3k:'Eval', m3v:'Awaiting CO'},
-  // stage 7 (1)
-  {id:'W58RGZ-26-R-0030', stage:7, pri:'p1', title:'AMCOM — Aviation Logistics Support Services', agency:'Dept. of the Army · AMCOM · Redstone Arsenal', due:14, dueLabel:'PoP start 14d', ceiling:19.8, m3k:'Onboarding', m3v:'WAWF setup'}
-];
-
-let activeStage = 3;
-
-function counts(){ const c=[0,0,0,0,0,0,0,0]; PURSUITS.forEach(p=>c[p.stage-1]++); return c; }
-function p0counts(){ const c=[0,0,0,0,0,0,0,0]; PURSUITS.forEach(p=>{ if(p.pri==='p0') c[p.stage-1]++; }); return c; }
-function stageValue(s){ return PURSUITS.filter(p=>p.stage===s).reduce((a,p)=>a+p.ceiling,0); }
-
-/* build rail */
-function buildRail(){
-  const c=counts(), p0=p0counts(), max=Math.max(...c,1);
-  document.getElementById('rail').innerHTML = STAGE_NAMES.map((name,i)=>{
-    const n=c[i], empty=n===0, h=Math.max(8, Math.round(n/max*28));
-    const isActive = (activeStage===i+1) && !empty;
-    return `<button class="stage-cell${isActive?' active':''}${empty?' empty':''}" data-stage="${i+1}" type="button"${empty?' disabled':''}>
-      <span class="stage-num">${String(i+1).padStart(2,'0')}</span>
-      <span class="stage-name">${name}</span>
-      <span class="stage-bottom"><span class="stage-num-big">${n}</span><span class="vol"><i style="height:${empty?6:h}px"></i></span></span>
-      ${p0[i]>0?`<span class="stage-p0">${p0[i]} P0</span>`:''}
-    </button>`;
-  }).join('');
-  document.querySelectorAll('.stage-cell:not(.empty)').forEach(b=>b.addEventListener('click',()=>{ activeStage=+b.dataset.stage; showAll=false; render(); }));
-}
-
-let showAll=false;
-
-function render(){
-  buildRail();
-  const banner=document.getElementById('banner');
-  const cards=document.getElementById('cards');
-  let list;
-  if(showAll){
-    list=[...PURSUITS];
-    banner.innerHTML = `<span>Showing <b>all 19 pursuits</b> across 7 active stages</span><span class="bval">Total ceiling <b>$239.7M</b></span>`;
-  } else {
-    list=PURSUITS.filter(p=>p.stage===activeStage);
-    const val=stageValue(activeStage);
-    banner.innerHTML = `<span>Showing <b>Stage ${String(activeStage).padStart(2,'0')} — ${STAGE_FULL[activeStage-1]}</b> · ${list.length} pursuit${list.length!==1?'s':''}</span><span class="bval">Stage ceiling <b>$${val.toFixed(1)}M</b></span>`;
-  }
-  // sort: p0 first, then by due asc
-  const order={p0:0,p1:1,p2:2};
-  list.sort((a,b)=> (order[a.pri]-order[b.pri]) || (a.due-b.due));
-
-  if(list.length===0){
-    cards.innerHTML = `<div class="empty-stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg><div class="t">No pursuits in this stage</div><div class="s">Post-award tracking is on the FARaudit roadmap.</div></div>`;
-    return;
-  }
-
-  cards.innerHTML = list.map(p=>{
-    const urg = p.due<=7 ? (p.due<=2?'crit':'warn') : 'ok';
-    const urgW = p.due<=30 ? Math.max(8, Math.round((1 - p.due/30)*100)) : 6;
-    const slug=p.id.toLowerCase();
-    const m3tone = p.m3tone? ' '+p.m3tone : '';
-    return `<article class="pcard ${p.pri}">
-      <div class="pcard-head">
-        <div>
-          <div class="pcard-id">${p.id}</div>
-          <h2 class="pcard-title">${p.title}</h2>
-          <p class="pcard-agency">${p.agency}</p>
-        </div>
-        <span class="risk-badge ${p.pri}">${p.pri.toUpperCase()}</span>
-      </div>
-      <div class="urg">
-        <div class="urg-bar"><i class="${urg}" style="width:${urgW}%"></i></div>
-        <div class="urg-row"><span>Next milestone</span><span class="due ${urg}">${p.dueLabel}</span></div>
-      </div>
-      <div class="pcard-meta">
-        <div class="item"><span class="k">Stage</span><span class="v"><span class="stage-pill">${String(p.stage).padStart(2,'0')} · ${STAGE_NAMES[p.stage-1]}</span></span></div>
-        <div class="item"><span class="k">Ceiling</span><span class="v amount">$${p.ceiling.toFixed(1)}M</span></div>
-        <div class="item"><span class="k">${p.m3k}</span><span class="v${m3tone}">${p.m3v}</span></div>
-      </div>
-      <div class="pcard-actions">
-        <a class="btn-open" href="/audit/${slug}">Open Audit<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-        <a class="btn-view" href="https://sam.gov/opp/${p.id}/view" target="_blank" rel="noreferrer">View Solicitation<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6"/><path d="M20 4l-8 8"/><path d="M19 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h6"/></svg></a>
-      </div>
-    </article>`;
-  }).join('');
-}
-
-document.getElementById('allBtn').addEventListener('click',function(){ showAll=true; render(); });
-
-render();
-</script>
 
 <script src="pipeline-live.js"></script>
 <script>/* theme + sidebar toggles */
