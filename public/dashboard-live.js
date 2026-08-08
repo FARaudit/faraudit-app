@@ -155,6 +155,12 @@
     { k: "bid", label: "Bid" }, { k: "caution", label: "Bid \u00b7 caution" },
     { k: "nobid", label: "No-bid" }, { k: "inelig", label: "Ineligible" },
     { k: "review", label: "Needs review" }, { k: "incomplete", label: "Incomplete" },
+    // POLE_REC can emit these two, so they are segments in their own right. Out of
+    // scope IS a verdict — the report renders it "Outside scope · no charge" — and
+    // OUT_OF_SCOPE is a deterministic pole on construction design-build packages.
+    // Without a segment each, segOf() sends them to "inflight", which asserts the
+    // opposite: that no verdict was issued.
+    { k: "oos", label: "Out of scope" }, { k: "unresolved", label: "Unresolved" },
     { k: "inflight", label: "In flight" }, { k: "failed", label: "Run failed" }
   ];
   var SL = {}; SEG.forEach(function (s) { SL[s.k] = s.label; });
@@ -168,13 +174,31 @@
   // slicer must be able to name, or those rows are reachable from "All" and from
   // nothing else.
   var BLANK = "—", BLANK_LABEL = "— none on file";
-  // Time is a ROLLING window, not a calendar period: "Last year" means the last
-  // 365 days. On a young account the longer windows select everything, so each
-  // option carries its own count and the readout names the window.
-  var TIME_HOURS = { "30": 720, quarter: 2160, year: 8760 };
-  var TIME_LABELS = { "30": "last 30 days", quarter: "last quarter", year: "last year" };
-  var TIME_OPTION_TEXT = { "30": "Last 30 days", quarter: "Last quarter", year: "Last year" };
-  var RECMAP = { "Bid": "bid", "Bid \u00b7 caution": "caution", "No-bid": "nobid", "Ineligible": "inelig", "Needs review": "review", "Incomplete": "incomplete" };
+  // FEDERAL FISCAL PERIODS, PLUS ONE HONEST ROLLING WINDOW.
+  // Government business is planned and reported on the fiscal year — 1 Oct to 30 Sep —
+  // so those are the periods a contractor compares across: FY26 Q4 against FY25 Q4,
+  // not "the last 90 days", which straddles every boundary it crosses and can answer
+  // no question about a quarter at all. A rolling window is kept only for recency, and
+  // it is named in days so it never reads as a period. Periods are derived from the
+  // data, like the agency and NAICS slicers; each option carries its own count, and a
+  // period the account has no audits in is never offered.
+  var TIME_HOURS = { "30": 720 };
+  var TIME_LABELS = { "30": "last 30 days" };
+  var TIME_OPTION_TEXT = { "30": "Last 30 days" };
+  var FY_PREFIX = "fy:", FQ_PREFIX = "fq:";
+  // Q1 Oct-Dec · Q2 Jan-Mar · Q3 Apr-Jun · Q4 Jul-Sep. Q4 is the year-end surge.
+  function fyLabel(fy) { return "FY" + String(fy).slice(2); }
+  function timeLabel(v) {
+    if (v.indexOf(FY_PREFIX) === 0) return fyLabel(v.slice(FY_PREFIX.length));
+    if (v.indexOf(FQ_PREFIX) === 0) {
+      var p = v.slice(FQ_PREFIX.length).split("-");
+      return fyLabel(p[0]) + " Q" + p[1];
+    }
+    return TIME_LABELS[v] || v;
+  }
+  // EVERY LABEL POLE_REC CAN RETURN NEEDS A KEY HERE. A label with no key is not a
+  // missing colour \u2014 segOf() sends it to "inflight", which is a different claim.
+  var RECMAP = { "Bid": "bid", "Bid \u00b7 caution": "caution", "No-bid": "nobid", "Ineligible": "inelig", "Needs review": "review", "Incomplete": "incomplete", "Out of scope": "oos", "Unresolved": "unresolved" };
   function segOf(rec, status) {
     if (rec && RECMAP[rec]) return RECMAP[rec];
     return status === "failed" ? "failed" : "inflight";
@@ -222,6 +246,22 @@
       // relative "1w ago" label is gone; age survives only for the time filter.
       date:   dueLabel(audit.completed_at || audit.created_at),
       age:    ago.ageHours,
+      // THE FEDERAL FISCAL PERIOD, NOT THE CALENDAR ONE. FY2026 runs 1 Oct 2025 to
+      // 30 Sep 2026, and Q4 (Jul-Sep) is the year-end obligation surge every capture
+      // and finance plan is built around. A calendar year splits that surge from the
+      // fiscal year it belongs to, and a rolling window straddles the boundaries
+      // entirely — neither can answer "how does this quarter compare with the last".
+      // Null when the timestamp will not parse: an unreadable date belongs to no
+      // period, and must not be filed under whichever one happens to be selected.
+      fiscal: (function () {
+        var t = new Date(audit.completed_at || audit.created_at).getTime();
+        if (isNaN(t)) return null;
+        var d = new Date(t), m = d.getMonth();               // 0 = Jan
+        return {
+          fy: d.getFullYear() + (m >= 9 ? 1 : 0),            // Oct-Dec belong to the NEXT FY
+          q:  m >= 9 ? 1 : m <= 2 ? 2 : m <= 5 ? 3 : 4       // Q1 Oct-Dec · Q2 Jan-Mar · Q3 Apr-Jun · Q4 Jul-Sep
+        };
+      })(),
       type:   audit.document_type || "—",
       due:    dueLabel(audit.response_deadline),
       dueTs:  dueTs,
@@ -250,10 +290,16 @@
       : (a.status === "pending" ? "running" : "complete");
     if (a._w === "passed") stInner += '<span class="deadline-tag">Deadline passed</span>';
     return '<tr data-pole="' + esc(a._s) + '" data-rec="' + esc(a.rec || "") + '" data-sol="' + esc(a.id) + '" data-uuid="' + esc(a.uuid) + '"' + (a.attn ? ' class="needs-attention" data-attn="' + esc(a.attnType) + '"' : "") + '>'
-      + '<td class="cell-id">' + esc(a.id) + attnFlag + '</td>'
+      + '<td class="cell-id">' + esc(a.id) + attnFlag + repeatChip(a) + '</td>'
       + '<td class="cell-title" title="' + esc(a.title) + '">' + esc(a.title) + '</td>'
       + '<td class="cell-agency">' + esc(a.agency) + '</td>'
       + '<td>' + (a.type && a.type !== "\u2014" ? '<span class="doctype">' + esc(a.type) + '</span>' : '<span class="cell-date">\u2014</span>') + '</td>'
+      // Set-aside earns a column because it is filterable: narrowing the ledger by a
+      // set-aside changed the rows with nothing ON the row saying why. A filter whose
+      // field the table does not show is a filter the customer has to take on trust.
+      + '<td class="cell-setaside">' + (a.setAside && a.setAside !== "\u2014"
+          ? '<span class="sacell" title="' + esc(a.setAside) + '">' + esc(setAsideLabel(a.setAside)) + '</span>'
+          : '<span class="cell-date">\u2014</span>') + '</td>'
       + '<td class="cell-due">' + esc(a.due) + '</td>'
       + '<td class="cell-date">' + esc(a.date) + '</td>'
       + '<td><span class="vcell" data-pole="' + esc(a._s) + '"><i class="pd ' + esc(a._s) + '"></i>' + esc(SL[a._s]) + '</span></td>'
@@ -270,14 +316,26 @@
   function rowMatchesBar(a) {
     var f = STATE.f;
     if (f.time !== "all") {
-      var maxH = TIME_HOURS[f.time];
-      if (maxH != null && !(a.age <= maxH)) return false;
+      // A fiscal period is an equality test on the period the audit was run in, not a
+      // window. A row whose timestamp would not parse carries no period and is excluded
+      // rather than counted into whichever one happens to be selected.
+      if (f.time.indexOf(FY_PREFIX) === 0) {
+        if (!a.fiscal || String(a.fiscal.fy) !== f.time.slice(FY_PREFIX.length)) return false;
+      } else if (f.time.indexOf(FQ_PREFIX) === 0) {
+        if (!a.fiscal) return false;
+        var pq = f.time.slice(FQ_PREFIX.length).split("-");
+        if (String(a.fiscal.fy) !== pq[0] || String(a.fiscal.q) !== pq[1]) return false;
+      } else {
+        var maxH = TIME_HOURS[f.time];
+        if (maxH != null && !(a.age <= maxH)) return false;
+      }
     }
     if (f.window !== "all" && a._w !== f.window) return false;
     if (f.agency !== "all" && a.agency !== f.agency) return false;
     if (f.type   !== "all" && a.type   !== f.type)   return false;
     if (f.naics  !== "all" && a.naics  !== f.naics)  return false;
-    if (f.setAside !== "all" && a.setAside !== f.setAside) return false;
+    // The option value is the pipe-joined set of raw codes that share one label.
+    if (f.setAside !== "all" && f.setAside.split("|").indexOf(a.setAside) === -1) return false;
     return true;
   }
   function rowMatchesSearch(a) {
@@ -316,7 +374,20 @@
       if (STATE.sortKey === "audited") {
         return cmpNumUndatedLast(x.age, y.age, STATE.sortDir);
       }
-      if (STATE.sortKey === "agency" || STATE.sortKey === "type" || STATE.sortKey === "rec" || STATE.sortKey === "status") {
+      // SORT THE COLUMN THAT IS ON SCREEN. The Verdict cell renders SL[_s], the pole;
+      // `rec` is null on any audit that is not `complete`, so sorting it collapses every
+      // failed and in-flight row into one empty group that leads an ascending sort.
+      // Sort the rendered label, and hold rows carrying no verdict at the end in BOTH
+      // directions rather than letting them lead.
+      if (STATE.sortKey === "rec") {
+        var xl = (SL[x._s] || "").toString().toLowerCase();
+        var yl = (SL[y._s] || "").toString().toLowerCase();
+        if (!xl && !yl) return 0;
+        if (!xl) return 1;
+        if (!yl) return -1;
+        return STATE.sortDir * xl.localeCompare(yl);
+      }
+      if (STATE.sortKey === "agency" || STATE.sortKey === "type" || STATE.sortKey === "setAside" || STATE.sortKey === "status") {
         var xa = (x[STATE.sortKey] || "").toString().toLowerCase();
         var ya = (y[STATE.sortKey] || "").toString().toLowerCase();
         return STATE.sortDir * xa.localeCompare(ya);
@@ -335,7 +406,7 @@
     // Rule 61 — a failed load is a VISIBLE failure state, never an empty ledger
     // (an empty ledger reads as "no audits yet", which the page cannot vouch for).
     if (STATE.loadError) {
-      body.innerHTML = '<tr><td colspan="9" style="padding:36px 16px;text-align:center;color:var(--mute);font-size:13px">'
+      body.innerHTML = '<tr><td colspan="10" style="padding:36px 16px;text-align:center;color:var(--mute);font-size:13px">'
         + 'Could not load your audits (' + esc(STATE.loadError) + '). Reload to try again.'
         + '</td></tr>';
       var vce = document.getElementById("visCount");
@@ -350,13 +421,13 @@
     var visible = mset.filter(rowMatchesFilter);
 
     if (sorted.length === 0) {
-      body.innerHTML = '<tr><td colspan="9" style="padding:36px 16px;text-align:center;color:var(--mute);font-size:13px">'
+      body.innerHTML = '<tr><td colspan="10" style="padding:36px 16px;text-align:center;color:var(--mute);font-size:13px">'
         + 'No audits yet — <a href="/audit" style="color:var(--blue-600);font-weight:600;text-decoration:none">run your first audit →</a>'
         + '</td></tr>';
     } else if (visible.length === 0) {
       // R10 — honest empty: name the combination, offer clear. Never a blank
       // region that looks like data loaded.
-      body.innerHTML = '<tr><td colspan="9" style="padding:34px 18px;text-align:center">'
+      body.innerHTML = '<tr><td colspan="10" style="padding:34px 18px;text-align:center">'
         + '<span style="display:block;font-size:13px;font-weight:700;color:var(--ink);margin-bottom:5px">No audits match this combination</span>'
         + '<span style="display:block;font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--mute)">' + esc(describeFilters().join(" + ") || "no filters") + ' \u2014 <a href="#" class="cc-clear-filters" style="color:var(--blue-600);font-weight:600;text-decoration:none">clear filters</a></span>'
         + '</td></tr>';
@@ -379,7 +450,7 @@
   function describeFilters() {
     var bits = [];
     if (STATE.seg !== "all") bits.push(SL[STATE.seg]);
-    if (STATE.f.time !== "all") bits.push(TIME_LABELS[STATE.f.time] || STATE.f.time);
+    if (STATE.f.time !== "all") bits.push(timeLabel(STATE.f.time));
     if (STATE.f.window !== "all") bits.push({ open: "still open", passed: "window passed", none: "no due date" }[STATE.f.window]);
     ["agency", "type", "naics", "setAside"].forEach(function (k) {
       var v = STATE.f[k];
@@ -414,7 +485,21 @@
     var c = segCounts(rows);
     var railSum = SEG.reduce(function (a, g) { return a + c[g.k]; }, 0);
     var c1 = railSum === rows.length;
-    var dbl = STATE.rows.filter(function (r) { return r.rec && RECMAP[r.rec] && (r.status === "failed" || r.status === "pending"); }).length;
+    // C2 READS THE RENDERED ROW, NOT THE FIELD THE PARTITION WAS BUILT FROM.
+    // Testing `rec` on both sides is vacuous: recommendationBucket() returns null unless
+    // the run is complete, so the count was 0 by construction and the check could never
+    // go red — it reported a pass it had not earned. This compares the verdict pole
+    // PRINTED in the row against the run state printed beside it, so a divergence in
+    // buildRowHTML is visible: no row may show a decided pole while its status says the
+    // run did not finish.
+    var VERDICT_SEG = {};
+    SEG.forEach(function (s) { if (s.k !== "inflight" && s.k !== "failed") VERDICT_SEG[s.k] = 1; });
+    var dbl = [].filter.call(document.querySelectorAll("#ledgerBody tr"), function (tr) {
+      var seg = tr.getAttribute("data-pole") || "";
+      var stc = tr.querySelector(".stcell");
+      var st = stc ? stc.textContent : "";
+      return VERDICT_SEG[seg] && /fail|pending|in flight/i.test(st);
+    }).length;
     var c2 = dbl === 0;
     var rail = document.getElementById("poleRail"), c3 = true;
     if (rail) {
@@ -446,11 +531,73 @@
     var checks = [c1, c2, c3, c4, c5];
     var pass = checks.filter(Boolean).length;
     var line = "[dashboard-live] self-check " + pass + "/" + checks.length + " pass"
-      + " \u2014 rail sums to the ledger count (" + railSum + "=" + rows.length + "), every row in exactly one segment,"
+      + " \u2014 rail sums to the ledger count (" + railSum + "=" + rows.length + "), no rendered row shows a decided pole on an unfinished run (" + dbl + "),"
       + " nothing clipped, active states are tints not fills, every passed deadline flagged (" + flagged + "/" + pv + ").";
     // A failing self-check is a defect, not a footnote \u2014 raise it at error level.
     if (pass < checks.length) console.error(line + " " + (checks.length - pass) + " FAIL", { c1: c1, c2: c2, c3: c3, c4: c4, c5: c5 });
     else console.log(line);
+  }
+
+  /* ONE SOLICITATION IS ONE THING YOU CAN BID, HOWEVER MANY TIMES IT WAS AUDITED.
+     This ledger holds one row per audit RUN, and repeat runs on the same package are
+     routine — a single package can carry ten. Any figure a customer plans against is
+     therefore counted over `r.id` (solicitation_number || notice_id), never over rows.
+     Returns both numbers so a caller can show the runs rather than hide them. */
+  function distinctSolicitations(rows, pred) {
+    var seen = {}, sols = 0, runs = 0;
+    rows.forEach(function (r) {
+      if (pred && !pred(r)) return;
+      runs++;
+      var k = String(r.id);
+      if (!seen[k]) { seen[k] = true; sols++; }
+    });
+    return { sols: sols, runs: runs };
+  }
+
+  /* A ROW IS ONE RUN, AND THE READER MUST BE TOLD WHEN IT IS NOT THE ONLY ONE.
+     Repeat audits of one package are routine, and each renders as its own row. Without
+     a marker, a single "Bid · caution" line reads as the decision on that package when
+     it may be one run of ten whose others did not clear — and this is the line a
+     bid/no-bid gets defended on.
+
+     Each row carries its position in that package's run history (newest = 1) and whether
+     the verdicts across those runs agree. Verdict-less runs are excluded from the
+     disagreement test: a failed run is not a dissenting opinion. */
+  /* Rendered next to the notice id, so the qualifier travels with the row rather than
+     living in a tooltip nobody opens. Silent when the package was audited once — a
+     "1 of 1" chip on every row is noise that trains the eye to skip the ones that
+     matter. `esc` is applied because the verdict words reach an attribute. */
+  function repeatChip(a) {
+    if (!a.runCount || a.runCount < 2) return "";
+    var cls = a.runsDisagree ? "rpt rpt-split" : "rpt";
+    var tip = a.runsDisagree
+      ? "This solicitation was audited " + a.runCount + " times and the runs did not agree: "
+        + (a.runVerdicts || []).join(", ") + ". This row is run " + a.runIndex + " of " + a.runCount + ", newest first."
+      : "This solicitation was audited " + a.runCount + " times. This row is run "
+        + a.runIndex + " of " + a.runCount + ", newest first.";
+    return '<span class="' + cls + '" title="' + esc(tip) + '">'
+      + esc(a.runIndex + "/" + a.runCount) + (a.runsDisagree ? " ⚠" : "") + '</span>';
+  }
+
+  function annotateRepeats(rows) {
+    var byId = {};
+    rows.forEach(function (r) { (byId[r.id] = byId[r.id] || []).push(r); });
+    Object.keys(byId).forEach(function (id) {
+      var group = byId[id];
+      // rows arrive newest-first from the query, so index 0 is the latest run.
+      var verdicts = {}, nVerdicts = 0;
+      group.forEach(function (r) {
+        if (!r.rec) return;
+        if (!verdicts[r.rec]) { verdicts[r.rec] = 1; nVerdicts++; }
+      });
+      group.forEach(function (r, i) {
+        r.runIndex = i + 1;
+        r.runCount = group.length;
+        r.runsDisagree = nVerdicts > 1;
+        r.runVerdicts = Object.keys(verdicts);
+      });
+    });
+    return rows;
   }
 
   function writeKPIs() {
@@ -473,17 +620,36 @@
       setKPI(3, "—", "could not load");
       return;
     }
-    var rows = STATE.rows;
+    // THE STRIP DESCRIBES THE LEDGER UNDERNEATH IT. Reading STATE.rows here while the
+    // table reads the filtered set puts two different populations on one screen: slice
+    // to a fiscal quarter and the tiles still answer for the whole account, which is
+    // the number a reader takes away. Same predicate as the ledger, so they cannot
+    // disagree; when a filter is on, the first tile names the total it came from.
+    var rows = STATE.rows.filter(function (a) { return rowMatchesSearch(a) && rowMatchesBar(a); });
+    var filtered = rows.length !== STATE.rows.length;
     var c = segCounts(rows);
-    var verdicts = c.bid + c.caution + c.nobid + c.inelig + c.review + c.incomplete;
-    var open = rows.filter(function (r) { return r._w === "open"; }).length;
+    // "of N with a verdict" — out-of-scope and unresolved rows carry one the engine
+    // actually issued, so they belong in the denominator. Only in-flight and failed
+    // runs do not.
+    var verdicts = c.bid + c.caution + c.nobid + c.inelig + c.review + c.incomplete + c.oos + c.unresolved;
+    var openAgg = distinctSolicitations(rows, function (r) { return r._w === "open"; });
+    var open = openAgg.sols;
     var last30 = rows.filter(function (r) { return r.age <= 720; }).length;
     function pdi(k) { return '<i class="pd ' + k + '"></i>'; }
-    setKPI(0, String(rows.length), "<b>" + last30 + "</b> in the last 30 days");
+    setKPI(0, String(rows.length), filtered
+      ? '<span class="agg"><span class="den">of <b>' + STATE.rows.length + '</b> total — this view is filtered</span></span>'
+      : "<b>" + last30 + "</b> in the last 30 days");
     // R4 — the aggregate names the poles it sums; no unnamed percentage, ever.
     setKPI(1, String(c.bid + c.caution), '<span class="agg"><span class="t">' + pdi("bid") + "Bid " + c.bid + '</span><span class="op">+</span><span class="t">' + pdi("caution") + "Bid\u00b7caution " + c.caution + '</span><span class="den">\u00b7 of ' + verdicts + ' with a verdict</span></span>');
     setKPI(2, String(c.nobid + c.inelig), '<span class="agg"><span class="t">' + pdi("nobid") + "No-bid " + c.nobid + '</span><span class="op">+</span><span class="t">' + pdi("inelig") + "Ineligible " + c.inelig + '</span><span class="den">\u00b7 committal declines</span></span>');
-    setKPI(3, String(open), 'response window still open \u2014 <b>you can still bid</b>');
+    // THIS FOOTER IS A SENTENCE, SO IT SHIPS AS ONE BLOCK. `.foot` is flex/nowrap and
+    // `.t` is flex too, so every element handed to either becomes its own column and a
+    // sentence arrives on screen as fragments side by side. `.den` is the block child,
+    // which lets the line wrap as prose and keeps the emphasis inline.
+    setKPI(3, String(open), '<span class="agg"><span class="den">solicitation' + (open === 1 ? '' : 's')
+      + ' \u2014 response window still open, <b>you can still bid</b>'
+      + (openAgg.runs !== open ? ' \u00b7 ' + openAgg.runs + ' audit runs' : '')
+      + '</span></span>');
   }
 
   function writeDistribution() {
@@ -544,8 +710,15 @@
     // the view is actually complete; past the cap, say what is shown instead.
     sub.innerHTML = STATE.truncated
       ? 'Your <b>' + n + ' most recent</b> audits, newest first — older audits are not listed on this page.'
-      : 'Every solicitation FARaudit has audited for you — <b>'
-        + n + ' record' + (n === 1 ? '' : 's') + '</b>, newest first.';
+      // THE NOUN AND THE NUMBER HAVE TO AGREE. "Every solicitation … N records" reads
+      // as N packages, and N is runs. Name both, so a repeat run stays visible instead
+      // of counting as another pursuit.
+      : (function () {
+          var s = distinctSolicitations(STATE.rows).sols;
+          return 'Every solicitation FARaudit has audited for you — <b>'
+            + s + ' solicitation' + (s === 1 ? '' : 's') + '</b> across <b>'
+            + n + ' audit' + (n === 1 ? '' : 's') + '</b>, newest first.';
+        })();
   }
 
   // Live sidebar badge: replace the rail's placeholder count on the
@@ -556,15 +729,20 @@
   // response-deadline-not-yet-passed, and bind open/total live with explanatory titles.
   function writeSidebarBadge() {
     if (STATE.loadError) return; // markup ships an empty badge — leave it empty, never "0"
-    var open = STATE.rows.filter(function (r) { return r.dueTs !== Infinity && r.dueTs > Date.now(); }).length;
-    var total = STATE.rows.length;
+    // SAME COUNT AS THE STILL-OPEN TILE, SAME UNIT. The rail rides on every page, so a
+    // count derived here independently of writeKPIs contradicts the tile it mirrors.
+    var openAgg = distinctSolicitations(STATE.rows, function (r) {
+      return r.dueTs !== Infinity && r.dueTs > Date.now();
+    });
+    var open = openAgg.sols;
+    var total = distinctSolicitations(STATE.rows).sols;
     // The rail renders WORKFLOW rows (Opportunities · Audit · Decisions · Pipeline)
     // as .sb-step and collapsible-section rows as .sb-icon (rail.ts row()). Match
     // both classes, or this returns at the next line and no badge renders.
     // Gated by test/public/_rail-live-badge.test.ts Part K.
     var link = document.querySelector('.sb-step[href="/past-audits"], .sb-icon[href="/past-audits"], .sb-step[href="/dashboard"], .sb-icon[href="/dashboard"]');
     if (!link) return;
-    link.setAttribute("title", "Decisions — " + open + " open (response deadline not yet passed) of " + total + " total");
+    link.setAttribute("title", "Decisions — " + open + " open (response deadline not yet passed) of " + total + " solicitations audited");
     var el = link.querySelector(".sb-badge");
     if (!el) {
       // The served rail renders no pill when it has no real number — create it
@@ -577,7 +755,7 @@
     }
     el.style.display = "";
     el.textContent = String(open);
-    el.setAttribute("title", open + " open — response deadline not yet passed (of " + total + " total)");
+    el.setAttribute("title", open + " open — response deadline not yet passed (of " + total + " solicitations audited)");
     var tip = link.querySelector(".sb-tip");
     if (tip) tip.textContent = "Decisions · " + open + " open";
   }
@@ -725,6 +903,45 @@
       if (blank) out.push(BLANK); // last — it is an absence, not a category
       return out;
     }
+    /* ONE OPTION PER LABEL, CARRYING EVERY RAW VALUE THAT PRODUCES IT.
+       SAM ships several codes for one programme — 8A and 8AN both read "8(a)", HZC and
+       HZS both "HUBZone", WOSBC and WOSBSS both "WOSB" — so keying options on the raw
+       value renders two visually identical rows that filter different subsets, and a
+       customer picking one silently sees half their set-aside. The option value is the
+       pipe-joined set, so selecting it selects the programme rather than one spelling.
+       Absences merge too: setAsideLabel() maps "NONE" to the same dash an empty field
+       renders, which otherwise produced a "—" option beside a "— none on file" one. */
+    function distinctByLabel(key, labelFn) {
+      var byLabel = {}, order = [], blankRaw = [];
+      STATE.rows.forEach(function (r) {
+        var v = r[key];
+        var isBlank = (v == null || v === "" || v === BLANK);
+        var lbl = isBlank ? BLANK : String(labelFn(v));
+        if (isBlank || lbl === BLANK) {
+          var raw = isBlank ? BLANK : v;
+          if (blankRaw.indexOf(raw) === -1) blankRaw.push(raw);
+          return;
+        }
+        if (!byLabel[lbl]) { byLabel[lbl] = []; order.push(lbl); }
+        if (byLabel[lbl].indexOf(v) === -1) byLabel[lbl].push(v);
+      });
+      order.sort();
+      var pairs = order.map(function (l) { return { value: byLabel[l].join("|"), label: l }; });
+      // Absence last — it is not a category.
+      if (blankRaw.length) pairs.push({ value: blankRaw.join("|"), label: BLANK_LABEL });
+      return pairs;
+    }
+    // Built with Option(), not innerHTML — these are customer values going into a
+    // control, and the DOM API cannot be talked into markup.
+    function fillPairs(id, pairs, allLabel) {
+      var sel = document.getElementById(id);
+      if (!sel) return;
+      var cur = sel.value;
+      sel.replaceChildren(new Option(allLabel, "all"));
+      pairs.forEach(function (p) { sel.add(new Option(p.label, p.value)); });
+      var stillThere = pairs.some(function (p) { return p.value === cur; });
+      if (cur && (cur === "all" || stillThere)) sel.value = cur;
+    }
     function withBlank(labelFn) {
       return function (v) { return v === BLANK ? BLANK_LABEL : (labelFn ? labelFn(v) : v); };
     }
@@ -757,9 +974,25 @@
     if (ft) {
       var curT = ft.value || "all";
       ft.replaceChildren(new Option("All time", "all"));
-      ["30", "quarter", "year"].forEach(function (k) {
+      ["30"].forEach(function (k) {
         var n = STATE.rows.filter(function (r) { return r.age <= TIME_HOURS[k]; }).length;
         ft.add(new Option(TIME_OPTION_TEXT[k] + " (" + n + ")", k));
+      });
+      // Fiscal periods present in the data: each FY newest first, and under it only the
+      // quarters that actually hold audits. Offering FY25 Q2 to an account with nothing
+      // in it is a control that can only ever return an empty ledger.
+      var fyN = {}, fqN = {};
+      STATE.rows.forEach(function (r) {
+        if (!r.fiscal) return;
+        fyN[r.fiscal.fy] = (fyN[r.fiscal.fy] || 0) + 1;
+        fqN[r.fiscal.fy + "-" + r.fiscal.q] = (fqN[r.fiscal.fy + "-" + r.fiscal.q] || 0) + 1;
+      });
+      Object.keys(fyN).sort(function (a, b) { return b - a; }).forEach(function (fy) {
+        ft.add(new Option(fyLabel(fy) + " (" + fyN[fy] + ")", FY_PREFIX + fy));
+        [4, 3, 2, 1].forEach(function (q) {
+          var key = fy + "-" + q;
+          if (fqN[key]) ft.add(new Option("   " + fyLabel(fy) + " Q" + q + " (" + fqN[key] + ")", FQ_PREFIX + key));
+        });
       });
       ft.value = curT;
     }
@@ -767,7 +1000,7 @@
     fill("fType", distinct("type"), "All types", withBlank());
     // NAICS: bare code — no title in the audits row payload ("no title on file → bare code").
     fill("fNaics", distinct("naics"), "All NAICS", withBlank());
-    fill("fSetAside", distinct("setAside"), "All set-asides", withBlank(setAsideLabel));
+    fillPairs("fSetAside", distinctByLabel("setAside", setAsideLabel), "All set-asides");
   }
 
   // Pill "active" state + Clear visibility. A slicer glows
@@ -824,7 +1057,7 @@
     // Loading state before the fetch — the markup ships placeholders, never numbers.
     var body = document.getElementById("ledgerBody");
     if (body) {
-      body.innerHTML = '<tr><td colspan="9" style="padding:22px 12px;color:var(--mute)">Loading your audits…</td></tr>';
+      body.innerHTML = '<tr><td colspan="10" style="padding:22px 12px;color:var(--mute)">Loading your audits…</td></tr>';
     }
 
     // Fetch and map. Rule 61 — a failed request becomes a VISIBLE failure state,
@@ -850,7 +1083,7 @@
         var audits = (data && data.audits) || [];
         STATE.loadError = null;
         STATE.truncated = audits.length > LEDGER_CAP;
-        STATE.rows = audits.slice(0, LEDGER_CAP).map(mapAuditToRow);
+        STATE.rows = annotateRepeats(audits.slice(0, LEDGER_CAP).map(mapAuditToRow));
       }
     } catch (e) {
       console.warn("[dashboard-live] fetch failed", e);

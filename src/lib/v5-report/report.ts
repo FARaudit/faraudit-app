@@ -8,6 +8,7 @@ import { buildV4Data } from "@/lib/v4-report/build-data";
 import { REPORT_V5_CSS, REPORT_V5_SEAL_CSS } from "@/lib/v5-report/styles";
 import { FONTS_CSS } from "@/lib/v5-report/fonts";
 import { shouldGateExport } from "@/lib/audit-display";
+import { TODAY, WORKFLOW, SECTIONS, type RailItem } from "@/lib/nav/rail";
 
 const esc = (s: unknown): string =>
   String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -16,6 +17,29 @@ function railItems(sections: V5RenderResult["sections"]): string {
   return `<div class="rail-h">On this page</div>` + sections
     .map((s) => `<a href="#${esc(s.id)}" data-rail="${esc(s.id)}"><span class="rdot"></span>${esc(s.label)}</a>`)
     .join("");
+}
+
+/* ONE LIST OF DESTINATIONS, RENDERED IN THIS REPORT'S OWN SKIN.
+   The <aside> below used to be written by hand: seven links against the rail's fifteen,
+   and "Run audit" pointing at /run-audit while the rail says "Audit" at /audit. Two
+   navigations in one product is the fork src/lib/nav/rail.ts exists to prevent, and a
+   customer who opened a report lost every Readiness, Market-intel and Reference
+   destination without being told they had gone.
+   injectRail() is still NOT used here, for the reason the route documents: it carries
+   the site's grid and this report is its own document. So the ITEMS come from the rail
+   and the MARKUP stays local — one source for where you can go, one owner for how it
+   looks on this page. Icons are the rail's own paths, re-wrapped at this report's
+   1.8 stroke weight. */
+function railNav(activeKey: string): string {
+  const icon = (i: RailItem) =>
+    `<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">${i.icon}</svg></span>`;
+  const row = (i: RailItem) =>
+    `<a class="sb-i${i.key === activeKey ? " on" : ""}" href="${i.href}">${icon(i)}${esc(i.label)}</a>`;
+  const group = (label: string | null, items: RailItem[]) =>
+    `<nav class="sb-grp">${label ? `<div class="sb-gh">${esc(label)}</div>` : ""}${items.map(row).join("")}</nav>`;
+  return group(null, [TODAY])
+    + group("Workflow", WORKFLOW)
+    + SECTIONS.map((s) => group(s.label, s.items)).join("");
 }
 
 const SB_ICON = {
@@ -97,26 +121,15 @@ export function renderV5ReportFromRow(audit: Record<string, unknown>): string {
 <div class="app">
 <aside class="sidebar">
   <div class="sb-brand"><span class="dot">◆</span> FARaudit</div>
-  <nav class="sb-grp">
-    <div class="sb-gh">Workspace</div>
-    <a class="sb-i" href="/today"><span class="ic">${SB_ICON.today}</span>Today</a>
-    <a class="sb-i" href="/run-audit"><span class="ic">${SB_ICON.run}</span>Run audit</a>
-    <a class="sb-i on" href="/past-audits"><span class="ic">${SB_ICON.past}</span>Past audits</a>
-    <a class="sb-i" href="/pipeline"><span class="ic">${SB_ICON.pipeline}</span>Pipeline</a>
-  </nav>
-  <nav class="sb-grp">
-    <div class="sb-gh">Intelligence</div>
-    <a class="sb-i" href="/opportunities"><span class="ic">${SB_ICON.opps}</span>Opportunities</a>
-    <a class="sb-i" href="/defense-news"><span class="ic">${SB_ICON.news}</span>Defense news</a>
-  </nav>
+  ${railNav("past-audits")}
   <div class="sb-spring"></div>
   <nav class="sb-grp">
-    <a class="sb-i" href="/account"><span class="ic">${SB_ICON.account}</span>Account</a>
+    <a class="sb-i" href="/settings"><span class="ic">${SB_ICON.account}</span>Profile &amp; settings</a>
   </nav>
 </aside>
 <div class="main">
   <header class="topbar">
-    <div class="tb-crumb"><span>Past audits</span><span class="sep">/</span><span class="cur" id="crumbSol">${sol}</span></div>
+    <div class="tb-crumb"><a href="/past-audits">Decisions</a><span class="sep">/</span><span class="cur" id="crumbSol">${sol}</span></div>
     <span class="tb-live">Live web view</span>
     <div class="tb-spring"></div>
     <div class="tb-actions">

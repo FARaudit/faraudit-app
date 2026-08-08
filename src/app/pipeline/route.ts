@@ -1,13 +1,13 @@
-/* GET /pipeline — serves the static Pipeline HTML
-   (public/pipeline-design.html) behind the existing Supabase auth gate.
+/* GET /pipeline — serves public/pipeline.html behind the existing Supabase
+   auth gate, with the nav rail injected by injectRail().
 
-   Mirror of /command-center/route.ts and /dashboard/route.ts — the design
-   is a complete standalone document with its own <html data-theme=…>
-   so it has to be served as a raw HTTP response, which only a Route
-   Handler can do.
+   Mirror of /command-center/route.ts and /dashboard/route.ts — the page is a
+   complete standalone document with its own <html data-theme=…> so it has to
+   be served as a raw HTTP response, which only a Route Handler can do.
 
-   The static page is currently mock-data only. Live data injection will
-   come AFTER pixel-perfect approval, same staged approach as CC.   */
+   This route composes only: auth → read file → inject rail → respond. It
+   holds no pipeline data of its own. The page's data wiring lives in the
+   page: public/pipeline-live.js fetches /api/pipeline client-side.   */
 
 import { redirect } from "next/navigation";
 import { readFile } from "node:fs/promises";

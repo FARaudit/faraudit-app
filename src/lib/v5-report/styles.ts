@@ -23,12 +23,26 @@ export const REPORT_V5_CSS = `/* ===============================================
   --ink:#141b24; --ink-2:#3d4a59; --ink-3:#6b7887;
   --line:#e2e7ee; --line-2:#eef2f6;
   --sheet:#ffffff; --desk:#eaedf2;
-  --sidebar:#0d1622; --sidebar-2:#16202e; --sidebar-ink:#aebccd;
+  /* THE RAIL WEARS THE APP'S SKIN, NOT THE REPORT'S OWN. These are the values the
+     shared rail computes on every other page — #fff ground, #0A1628 ink. A hard-dark
+     rail beside a light app reads as a different product even when every destination
+     matches. --sidebar-on is the hover/active ink and cannot be a fixed #fff: white
+     on a light hover ground is an invisible label. */
+  --sidebar:#ffffff; --sidebar-2:#eef2f7; --sidebar-ink:#0A1628; --sidebar-on:#0A1628;
+  --sidebar-line:#e2e7ee; --sidebar-head:#64748b;
 
   --font: 'Space Grotesk', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
   --r: 14px;
   --shadow: 0 1px 2px rgba(16,26,40,.05), 0 8px 26px rgba(16,26,40,.07);
+}
+
+/* The rail follows the app's theme rather than pinning one, so toggling appearance
+   does not leave the report's navigation lit differently from the page it came from.
+   Values are the shared rail's own dark pair: #0A1628 ground, #D6E3F2 ink. */
+:root[data-theme="dark"]{
+  --sidebar:#0A1628; --sidebar-2:#16202e; --sidebar-ink:#D6E3F2; --sidebar-on:#ffffff;
+  --sidebar-line:rgba(255,255,255,.08); --sidebar-head:#7d8da0;
 }
 
 *{box-sizing:border-box}
@@ -38,16 +52,19 @@ body{background:var(--desk); color:var(--ink); font-family:var(--font);
 .mono{font-family:var(--mono); font-feature-settings:"tnum" 1;}
 
 /* ---- app shell ----------------------------------------------------------- */
-.app{display:grid; grid-template-columns:236px 1fr; min-height:100vh;}
+/* 252px is the shared rail's width on every other page — the report used 236px, so the
+   navigation shifted horizontally as you moved between them. */
+.app{display:grid; grid-template-columns:252px 1fr; min-height:100vh;}
 .sidebar{background:var(--sidebar); color:var(--sidebar-ink); padding:20px 16px;
+  border-right:1px solid var(--sidebar-line);
   display:flex; flex-direction:column; gap:22px; position:sticky; top:0; height:100vh; overflow:auto;}
-.sb-brand{display:flex; align-items:center; gap:9px; color:#fff; font-weight:700; letter-spacing:-.01em; font-size:16px;}
+.sb-brand{display:flex; align-items:center; gap:9px; color:var(--sidebar-on); font-weight:700; letter-spacing:-.01em; font-size:16px;}
 .sb-brand .dot{width:22px;height:22px;border-radius:6px;background:linear-gradient(150deg,var(--accent),#5b93ea);display:grid;place-items:center;color:#fff;font-size:12px;}
 .sb-grp{display:flex; flex-direction:column; gap:2px;}
-.sb-gh{font-size:11px; text-transform:uppercase; letter-spacing:.13em; color:#5d6f84; padding:4px 10px; font-weight:600;}
+.sb-gh{font-size:11px; text-transform:uppercase; letter-spacing:.13em; color:var(--sidebar-head); padding:4px 10px; font-weight:600;}
 .sb-i{display:flex; align-items:center; gap:9px; padding:8px 10px; border-radius:9px; color:var(--sidebar-ink); text-decoration:none; font-size:13.5px; cursor:pointer;}
-.sb-i:hover{background:var(--sidebar-2); color:#fff;}
-.sb-i.on{background:var(--sidebar-2); color:#fff;}
+.sb-i:hover{background:var(--sidebar-2); color:var(--sidebar-on);}
+.sb-i.on{background:var(--sidebar-2); color:var(--sidebar-on); font-weight:600;}
 .sb-i .ic{width:16px;height:16px;opacity:.8;flex:none;}
 .sb-i .ic svg{width:100%;height:100%;}
 .sb-spring{flex:1}
@@ -57,6 +74,8 @@ body{background:var(--desk); color:var(--ink); font-family:var(--font);
 .topbar{position:sticky; top:0; z-index:30; background:rgba(255,255,255,.85);
   backdrop-filter:saturate(1.4) blur(10px); border-bottom:1px solid var(--line);
   display:flex; align-items:center; gap:14px; padding:11px 24px;}
+.tb-crumb a{color:inherit;text-decoration:none;border-radius:5px;padding:1px 4px}
+.tb-crumb a:hover{background:rgba(0,0,0,.06);text-decoration:none}
 .tb-crumb{display:flex; align-items:center; gap:8px; color:var(--ink-3); font-size:13px; min-width:0;}
 .tb-crumb .sep{opacity:.5}
 .tb-crumb .cur{color:var(--ink); font-weight:600;}

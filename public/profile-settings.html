@@ -33,6 +33,11 @@
   --shadow-pop:0 1px 2px rgba(0,0,0,.5), 0 28px 64px -22px rgba(0,0,0,.85);
 }
 *{box-sizing:border-box}
+/* The UA rule for [hidden] is display:none at specificity (0,1,0), so any class rule
+   carrying a display value outranks it. Setting .hidden from script is therefore only
+   a request until this rule makes it binding. Load-bearing: the LIVE pill is gated by
+   .hidden alone, and it claims this page is showing live data. */
+[hidden]{display:none!important}
 html,body{margin:0;padding:0;background:var(--page-bg);font-family:"Manrope",ui-sans-serif,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;transition:background-color .25s ease,color .25s ease}
 button{font-family:inherit}
 .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
@@ -287,6 +292,7 @@ button{font-family:inherit}
 .cert-tg{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;padding:7px 14px;border-radius:9px;border:1px solid var(--line);background:var(--card-soft);color:var(--ink-2);cursor:pointer;transition:all .14s}
 .cert-tg.on{background:var(--green-50);border-color:var(--green-200);color:var(--green-700)}
 [data-theme="dark"] .cert-tg.on{background:rgba(16,185,129,.16);color:#6ee7b7;border-color:rgba(16,185,129,.3)}
+.cert-tg.is-elsewhere{border-style:dashed;background:transparent}
 .note{font-size:12px;color:var(--ink-2);line-height:1.55;padding:11px 14px;background:var(--card-soft);border:1px solid var(--line-2);border-radius:10px}
 .note b{color:var(--ink)}
 .sp-foot{display:flex;align-items:center;justify-content:flex-end;gap:14px;padding:14px 22px;border-top:1px solid var(--line-2);background:var(--card-soft)}
@@ -301,9 +307,74 @@ button{font-family:inherit}
 .nr-l{display:flex;align-items:center;gap:11px;flex:1;min-width:0}
 .nr-code{font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:800;color:var(--ink)}
 .nr-label{font-size:12px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* A code carries its title and its SBA size standard, so the row is readable without
+   looking anything up. The size standard is a reference figure — the solicitation's own
+   stated standard governs when it differs, which is why it is muted, not asserted. */
+/* COLUMNS, SO THE LIST READS DOWN AS WELL AS ACROSS. A flex row sizes each cell to its
+   own content, which puts every title at a different x — unreadable once there are more
+   than three. One grid template on the saved rows and the picker rows keeps code, title,
+   reach and size standard on the same four axes in both lists. */
+.naics-row{display:grid;grid-template-columns:84px minmax(0,1fr) 150px 30px;align-items:center;gap:18px}
+/* Headers sit on the row grid, so the label and the value it names share an axis. */
+.naics-head,.nf-head{display:grid;align-items:center;gap:18px;padding:2px 14px 6px;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
+.naics-head{grid-template-columns:84px minmax(0,1fr) 150px 30px}
+.nf-head{grid-template-columns:84px minmax(0,1fr) 150px;padding-top:4px}
+.nh-r{text-align:right}
+/* What SAM answered, against the UEI it was asked about. Unpromoted chips need a stated
+   reason beside them, or the record's real state is indistinguishable from a fault. */
+.cert-state{display:inline-flex;align-items:center;gap:8px;margin-top:10px;padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:var(--card-soft)}
+.cert-state .cs-dot{width:7px;height:7px;border-radius:50%;background:var(--amber-500,#d97706);flex:none}
+.cert-state .cs-t{font-size:11px;font-weight:700;color:var(--ink-2)}
+.cert-state .cs-u{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute)}
+/* A registration that IS good must not wear the colour reserved for one that is not. */
+.cert-state.is-ok{border-color:var(--green-200)}
+.cert-state.is-ok .cs-dot{background:var(--green-500,#10b981)}
+.cert-state.is-ok .cs-t{color:var(--green-700,#047857)}
+.naics-row .nr-l{display:contents}
+.nr-title{font-size:13px;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nr-size{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--mute);background:var(--line-3);border:1px solid var(--line-2);padding:3px 8px;border-radius:5px;white-space:nowrap;text-align:right}
+.nr-unknown{font-size:12px;color:var(--mute);font-style:italic;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nr-gap{display:block}
+/* Search results — a picker over the reference table, never a gate on what can be added. */
+.naics-find{display:flex;flex-direction:column;gap:6px;margin:2px 0 6px;max-height:420px;overflow:auto}
+/* The category sits on the same left edge as the code column beneath it (14px = the
+   row's 13px padding plus its 1px border), so the list has one axis rather than three. */
+.nf-group{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);padding:16px 14px 0;border-top:1px solid var(--line-2);margin-top:8px}
+.nf-group:first-child{border-top:none;margin-top:0;padding-top:4px}
+.nf-group:first-child{padding-top:2px}
+/* Same four axes as the saved rows above, so the eye does not have to re-find the
+   columns when it moves from what you hold to what you could add. */
+.nf-hit{display:grid;grid-template-columns:84px minmax(0,1fr) 150px;align-items:center;gap:18px;width:100%;text-align:left;padding:10px 13px;border:1px solid var(--line-2);border-radius:10px;background:var(--card);cursor:pointer;font-family:inherit;transition:border-color .14s,background .14s}
+.nf-hit:hover{border-color:var(--accent);background:var(--accent-pale)}
+.nf-hit .nf-code{font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:800;color:var(--ink)}
+.nf-hit .nf-title{font-size:13px;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nf-hit .nf-size{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--mute);white-space:nowrap;text-align:right}
+.nf-none{margin:0;padding:10px 2px;font-size:12px;line-height:1.5;color:var(--mute)}
 .nr-primary{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--accent-deep);background:var(--accent-pale);padding:3px 8px;border-radius:5px}
 [data-theme="dark"] .nr-primary{background:rgba(55,138,221,.18);color:var(--accent-light)}
 .nr-make{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--mute);background:none;border:0;cursor:pointer;text-decoration:underline}
+.ps-failed{padding:26px 22px;border:1px solid var(--red-200);border-radius:12px;background:var(--red-50)}
+.ps-failed-t{font-size:15px;font-weight:800;color:var(--red-700);margin-bottom:6px}
+.ps-failed-s{font-size:13px;color:var(--ink-2);line-height:1.55;max-width:64ch}
+[data-theme="dark"] .ps-failed{background:rgba(220,38,38,.10);border-color:rgba(220,38,38,.32)}
+[data-theme="dark"] .ps-failed-t{color:#fca5a5}
+.pe-add{display:flex;gap:9px;align-items:center;margin:14px 0 4px}
+.pe-add input{flex:1;max-width:240px;height:36px;padding:0 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:13px}
+.pe-add input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(55,138,221,.15)}
+.pc-status{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--mute);margin-top:3px;text-transform:capitalize}
+.ps-notlive{padding:14px 16px;border:1px dashed var(--line);border-radius:10px;background:var(--card-soft);font-size:13px;color:var(--ink-2);line-height:1.55}
+.nf-tag{display:inline-block;margin-left:8px;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--amber-800);background:var(--amber-50);border:1px solid var(--amber-200);border-radius:5px;padding:1px 6px;vertical-align:middle}
+[data-theme="dark"] .nf-tag{color:#fcd34d;background:rgba(217,119,6,.16);border-color:rgba(217,119,6,.35)}
+.naics-sugg{margin:16px 0 4px;padding:12px 14px;border:1px dashed var(--line);border-radius:10px;background:var(--card-soft)}
+.ns-t{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin-bottom:9px}
+.ns-row{display:flex;flex-wrap:wrap;gap:7px}
+.ns-chip{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;padding:5px 10px;border-radius:7px;border:1px solid var(--line);background:var(--card);color:var(--ink-2);cursor:pointer}
+.ns-chip:hover{border-color:var(--accent);color:var(--accent-deep)}.ns-chip span{color:var(--mute-2);font-weight:700}
+.ns-s{font-size:11.5px;color:var(--mute);margin-top:9px;line-height:1.45}
+.naics-msg{margin:8px 2px 0;font-family:'IBM Plex Mono',monospace;font-size:11.5px;line-height:1.4}
+.naics-msg.ok{color:var(--green-700)}.naics-msg.err{color:var(--red-600)}.naics-msg.wait{color:var(--mute)}
+[data-theme="dark"] .naics-msg.ok{color:#6ee7b7}[data-theme="dark"] .naics-msg.err{color:#fca5a5}
+.naics-row .nr-x{margin-left:auto}
 .nr-x{width:24px;height:24px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--mute-2);cursor:pointer;font-size:11px}
 .nr-x:hover{border-color:var(--red-200);color:var(--red-600)}
 .impact-box{padding:14px;border-radius:11px;background:rgba(55,138,221,0.05);border:1px solid var(--accent-light)}
@@ -484,20 +555,19 @@ button{font-family:inherit}
         <div class="heading">
           <p class="eyebrow">Account</p>
           <h1>Profile &amp; Settings</h1>
-          <p class="sub">Your details and the company record the platform runs on. Company details are edited in the <a href="/capability-statement">capability statement</a>.</p>
+          <p class="sub">Your details and the company record the platform runs on. The same record prints on your <a href="/capability-statement">capability statement</a>.</p>
         </div>
         <div class="hdr-stat">
-          <div class="hs"><span class="v" id="hsNaics">3</span><span class="l">NAICS</span></div>
-          <div class="hs"><span class="v warm" id="hsAgencies">6</span><span class="l">Agencies</span></div>
-          <div class="hs"><span class="v" id="hsCerts">2</span><span class="l">Certs</span></div>
+          <div class="hs"><span class="v" id="hsNaics">—</span><span class="l">NAICS</span></div>
+          <div class="hs"><span class="v" id="hsCerts">—</span><span class="l">Certs</span></div>
         </div>
       </header>
 
       <!-- signature: how your profile powers the platform -->
       <div class="prof-banner">
         <div class="pb-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 00-4 12.7V17a1 1 0 001 1h6a1 1 0 001-1v-2.3A7 7 0 0012 2z"/><path d="M9 21h6"/></svg></div>
-        <div class="pb-text"><b>This profile drives all 16 desks.</b> Your NAICS filter Opportunities, Spending, COs, Wage &amp; Teaming · your agencies scope the feeds · your certs unlock set-asides. Change one thing here and the whole platform re-scopes.</div>
-        <a class="pb-link" href="today.html">View your Today <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <div class="pb-text"><b>This record scopes the platform.</b> Your NAICS codes filter Today, Opportunities, Contracting Officers and Teaming Partners, and mark your codes on the NAICS directory. Wage Benchmarks offers them as an optional filter over a national reference table · a certification clears a set-aside bar only once it is verified against SAM, so typing one changes nothing on its own.</div>
+        <a class="pb-link" href="/today">View your Today <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
       </div>
 
       <section class="set-layout">
@@ -510,6 +580,9 @@ button{font-family:inherit}
 </div>
 
 <script src="/vendor/d3.min.js"></script>
+<!-- The ONE NAICS reference, shared with the NAICS directory. Loads before ps-app.js,
+     which reads window.NAICS_REF while rendering a row. -->
+<script src="/naics-reference.js"></script>
 <script src="ps-app.js"></script>
 <script src="profile-settings-live.js"></script>
 <script>
