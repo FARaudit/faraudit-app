@@ -421,9 +421,27 @@ console.log("\n── an unfilled chip may not promise a check that never runs �
     "no account of what happens between tracking and the email");
 }
 
+// EVERY NAV KEY MUST HAVE A PANEL. Found by the CEO clicking Team Members and getting
+// nothing: `PANELS[active] is not a function`. The panel had been deleted by an over-broad
+// edit to its NEIGHBOUR, and shipped — every content check in this file still passed,
+// because they all assert what a panel SAYS and none asserted that it EXISTS. A tab that
+// renders nothing is the loudest possible defect and it was the one thing unguarded.
+{
+  const nav = [...appCode.matchAll(/\{\s*key:\s*['"]([a-z]+)['"]/g)].map((m) => m[1]);
+  check("the NAV list was located", nav.length >= 3, `found ${nav.length} nav entries`);
+  const panels = new Set([...appCode.matchAll(/^\s{4}([a-z]+):\s*\(\)\s*=>/gm)].map((m) => m[1]));
+  check("at least one panel was located", panels.size > 0, "the PANELS scan found nothing — this leg is inert");
+  for (const k of nav) {
+    check(`nav key '${k}' has a panel function`, panels.has(k),
+      "clicking this tab throws PANELS[active] is not a function and the panel never changes");
+  }
+}
+
 console.log("\n── planted positives ──");
 check("P5 · rejects a panel that names no origin",
   !/\bTrack\b/.test("These apply to the notices you are watching."));
+check("P6 · rejects a nav key with no panel",
+  !new Set(["company","naics"]).has("team"));
 check("P1 · rejects a resurrected auto-save claim", /changes save automatically/i.test('<b id="savedAt">changes save automatically</b>'));
 check("P2 · accepts copy with no such claim", !/changes save automatically/i.test("<p>Your details and the company record.</p>"));
 check("P4 · rejects a toggle whose key no consumer reads",
