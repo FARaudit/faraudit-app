@@ -108,6 +108,26 @@ check("no stale hardcoded size-standard vintage", !/tbl\s*\d\/\d{4}/.test(pageCo
 check("the count is not described as a curated set", !/defense-relevant codes/.test(pageCode), "copy still claims a curated subset over the full regulation");
 check("N-P0 · the copy check can still see shipped text", /codes with an SBA size standard/.test(pageCode), "stripping comments removed the copy too — the check would pass on an empty string");
 
+console.log("\n── the settings picker names itself as suggestions, not the table ──");
+// The picker browses the CURATED categories, which cover a few dozen codes. That is the
+// right shape for a dropdown — nobody browses a thousand rows — but with the reference
+// now carrying the whole regulation, an unlabelled list of two dozen reads as the whole
+// of NAICS. Search spans every row; the copy has to say so.
+{
+  const live = read("public/profile-settings-live.js");
+  check("the picker labels its list as common/suggested, not as the reference",
+    /Common defense codes/.test(live), "an unlabelled short list reads as the entire table");
+  check("it states how to reach the codes it is not showing",
+    /Search or type any six-digit code to reach the other/.test(live), "no route offered to the rest of the table");
+  check("the remainder is COMPUTED, not typed",
+    /\.length - \(ref\.DATA \|\| \[\]\)\.filter/.test(live), "a hand-typed count goes stale the next time SBA revises");
+  check("no copy still calls the reference a subset of NAICS",
+    !/carries a subset of NAICS/.test(live), "stale copy understates what the table now holds");
+  check("the no-match message explains what absence means",
+    /so a code that is absent is one SBA does not size/.test(live), "absence reads as a gap in our data rather than a fact about SBA");
+  check("N-P5 · rejects the stale subset copy", /carries a subset of NAICS/.test("It carries a subset of NAICS — type it in."));
+}
+
 console.log("\n── planted positives ──");
 check("N-P1 · the duplicate check catches a repeat", (() => { const c = ["1", "2", "1"]; return c.filter((x, i) => c.indexOf(x) !== i).length === 1; })());
 check("N-P2 · the sector check catches a misfile", !inSector("332710", "23"));

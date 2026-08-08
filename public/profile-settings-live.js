@@ -326,12 +326,21 @@
     const saved = (window.PS.NAICS || []).map(function (n) { return String(n.code); });
     box.hidden = false;
 
-    /* NOTHING TYPED YET IS NOT AN EMPTY STATE. The panel has the room, and a customer
-       who does not already know their six-digit code cannot be helped by a blank box —
-       so the table is BROWSABLE, grouped the way the NAICS directory groups it. One
-       taxonomy across both surfaces; a second grouping here would be a second thing to
-       keep true. */
+    /* NOTHING TYPED YET IS NOT AN EMPTY STATE. A customer who does not already know
+       their six-digit code cannot be helped by a blank box, so the panel opens on
+       SUGGESTIONS — the defense-relevant codes we group by hand.
+       These are a short list, not the table. The reference carries every NAICS code
+       with an SBA size standard, and search reaches all of them; browsing a thousand
+       rows inside a dropdown would help nobody. So the list says what it is, and the
+       line beneath it says where the rest are, rather than letting a customer read a
+       few dozen suggestions as the whole of NAICS. */
     if (!q) {
+      const lead = document.createElement('p');
+      lead.className = 'nf-none';
+      lead.textContent = 'Common defense codes. Search or type any six-digit code to reach the other '
+        + ((ref.DATA || []).length - (ref.DATA || []).filter(function (r) { return r[1]; }).length)
+        + ' — the reference carries every NAICS code with an SBA size standard.';
+      box.appendChild(lead);
       (ref.CATS || []).forEach(function (cat) {
         const rows = (ref.DATA || []).filter(function (r) {
           return r[1] === cat.id && saved.indexOf(r[0]) === -1;
@@ -344,11 +353,11 @@
         box.appendChild(headRow());
         rows.forEach(function (r) { box.appendChild(hitButton(r)); });
       });
-      if (!box.children.length) {
+      if (box.children.length === 1) {
         const all = document.createElement('p');
         all.className = 'nf-none';
-        all.textContent = 'Every code in the reference table is already on your profile. '
-          + 'It carries a subset of NAICS — any other six-digit code can still be typed in and added.';
+        all.textContent = 'Every suggested code is already on your profile. '
+          + 'Search or type any six-digit code to add another.';
         box.appendChild(all);
       }
       return;
@@ -360,7 +369,8 @@
     if (!hits.length) {
       const none = document.createElement('p');
       none.className = 'nf-none';
-      none.textContent = 'No match in the reference table. It carries a subset of NAICS — '
+      none.textContent = 'No match in the reference table. It carries every NAICS code with an '
+        + 'SBA size standard, so a code that is absent is one SBA does not size — '
         + 'if you know the six-digit code, type it and add it directly.';
       box.appendChild(none);
       return;
