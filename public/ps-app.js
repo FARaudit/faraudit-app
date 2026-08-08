@@ -371,7 +371,7 @@
           <button class="nf-tg" data-pref-tg="alerts_in_app_enabled"><span class="tgl"><i></i></span></button>
         </div>
         <div class="naics-msg" id="psPrefNote" role="status" hidden></div>
-        <div class="note">These apply to the notices you are watching. A switch you have never touched is ON, and if we cannot read your preferences we deliver rather than go quiet — missing a solicitation costs more than one unwanted email.</div>
+        <div class="note"><b>Where these come from:</b> press <b>Track</b> on any notice in <a href="/opportunities">Opportunities</a>. From then on we re-check that notice against SAM every hour, and the moment its documents post we run the audit and tell you — by email, on the bell, or both, depending on the switches above. The weekly digest is the same activity gathered into one Monday summary.<br><br>A switch you have never touched is ON, and if we cannot read your preferences we deliver rather than go quiet — missing a solicitation costs more than one unwanted email.</div>
       </div>`,
 
     billing: () => `
