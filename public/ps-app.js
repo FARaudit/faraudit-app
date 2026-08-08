@@ -1,12 +1,11 @@
 /* FARaudit · Profile & Settings (best-in-class) — config surface.
-   Data matches the confirmed original (company, NAICS, agencies, pricing). */
+   Data matches the confirmed original (company, NAICS, pricing). */
 (function () {
   const $ = (id) => document.getElementById(id);
 
   const NAV = [
     { key: 'company', label: 'Company Profile', icon: 'M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6' },
     { key: 'naics', label: 'NAICS Configuration', icon: 'M4 19V5M4 19h16M8 16v-5M13 16V8M18 16v-3' },
-    { key: 'agencies', label: 'Target Agencies', icon: 'M3 21h18M5 21V8l7-5 7 5v13' },
     { key: 'notifs', label: 'Notifications', icon: 'M6 8a6 6 0 1112 0c0 7 3 8 3 8H3s3-1 3-8zM10 21a2 2 0 004 0' },
     { key: 'team', label: 'Team Members', icon: 'M7 9a3 3 0 100-6 3 3 0 000 6zM17 9a3 3 0 100-6 3 3 0 000 6zM2 20c0-3 2.5-5 5-5M22 20c0-3-2.5-5-5-5' },
     { key: 'billing', label: 'Billing & Plan', icon: 'M2 7h20v12H2zM2 11h20' }
@@ -25,12 +24,11 @@
   window.PS = window.PS || {
     loadError: false,
     COMPANY: { name: '', cage: '', uei: '', address: '', contact: '', email: '', phone: '' },
-    CERTS: [], NAICS: [], AGENCIES: [], NOTIFS: [], TEAM: [], USAGE: []
+    CERTS: [], NAICS: [], NOTIFS: [], TEAM: [], USAGE: []
   };
   const COMPANY = window.PS.COMPANY;
   const CERTS = window.PS.CERTS;
   const NAICS = window.PS.NAICS;
-  const AGENCIES = window.PS.AGENCIES;
   const NOTIFS = window.PS.NOTIFS;
   const TEAM = window.PS.TEAM;
   const USAGE = window.PS.USAGE;
@@ -304,21 +302,14 @@
       </div>
       `,
 
-    /* NOT BUILDABLE TODAY, so nothing here pretends otherwise. There is no agency
-       column in any table, no writer, and no reader: the Opportunities feed is scoped
-       by NAICS alone. The panel used to render per-agency monitoring switches with no
-       handler and no column to write to, above a note that counted "0 of 0 agencies
-       monitored" and claimed active agencies scope the feed, the Spending map and the
-       CO network. A greyed-out switch is still a claim that this is a setting you
-       have, so no switch is rendered at all. The unavailable reason is printed from
-       the route rather than re-authored here — one sentence, one source. */
-    agencies: () => `
-      <div class="sp-hd"><div class="sp-t">Target Agencies</div><div class="sp-s">Not yet available</div></div>
-      <div class="sp-bd">
-        <div class="ps-notlive" id="agState">Checking…</div>
-        <div class="note">Your Opportunities feed, Spending map and Contracting Officer network are scoped by the NAICS codes on your profile. Agency-level targeting is not built, so nothing on this tab changes what you see.</div>
-      </div>
-      `,
+    /* RETIRED — Target Agencies. It asked the customer to name the agencies they cared
+       about, and nothing stored or read the answer. The deeper problem was the question:
+       a small business with no capture team does not know which offices to name, and
+       finding that out is what they are here for. Declaring was replaced by deriving —
+       Defense Agencies now ranks the buying offices already issuing work against their
+       NAICS codes, so a customer who declares nothing still gets the answer. Removed
+       rather than labelled because the capability shipped elsewhere, not because it is
+       still coming. */
 
     /* ONE ROW, AND IT SAYS WHAT IT DOES. The digest preference persists to
        user_preferences, but nothing reads it: there is no weekly-digest mailer, and

@@ -83,8 +83,7 @@
         throw e;
       }
 
-      // Cleared — agencies / notifs / usage still have no source field.
-      window.PS.AGENCIES.length = 0;
+      // Cleared — notifs / usage still have no source field.
       window.PS.NOTIFS.length   = 0;
       window.PS.USAGE.length    = 0;
 
@@ -142,13 +141,13 @@
      confirms, and says the word "saved" in exactly one case — a 2xx whose echoed value
      matches what was sent. Delegated, because ps-app.js re-templates the panel on render
      and on every theme flip, which detaches any directly-bound listener. */
-  /* The three header counters shipped as LITERALS in the markup — 3 NAICS, 6 Agencies,
+  /* The header counters shipped as LITERALS in the markup — 3 NAICS, 6 Agencies,
      2 Certs — and no script on this page ever touched them. They matched nobody's
-     account, and the Agencies figure contradicted the Agencies tab, which reads zero
-     from the same page load. A number nothing computes is decoration wearing the
-     costume of a measurement.
-     Agencies renders an em dash, not 0: agency scoping has no source at all, and 0 is
-     a count. Absent is not zero. */
+     account. A number nothing computes is decoration wearing the costume of a
+     measurement, so each one now reads the array it claims to count.
+     The Agencies counter is gone with the tab: agency targeting is derived on Defense
+     Agencies from the customer's NAICS, so there is no per-profile agency figure for
+     this strip to report. */
   function writeHeaderStats() {
     const err = !!window.PS.loadError;
     const put = function (id, val) {
@@ -157,7 +156,6 @@
     };
     put('hsNaics', err ? '—' : String(window.PS.NAICS.length));
     put('hsCerts', err ? '—' : String(window.PS.CERTS.length));
-    put('hsAgencies', '—');
   }
 
   /* ── NAICS: add and remove ──────────────────────────────────────────────────
@@ -421,26 +419,6 @@
     if (e.target && e.target.id === 'psNaicsInput') naicsResults();
   });
 
-  /* The unavailable reason is PRINTED FROM THE ROUTE, not re-authored here. One
-     sentence with one source: if agency targeting ships, the route stops saying
-     "unwired" and this panel stops saying it too, with nothing to remember to edit. */
-  async function writeAgencyState() {
-    const el = document.getElementById('agState');
-    if (!el) return;
-    try {
-      const res = await fetch('/api/agencies', { credentials: 'include' });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const d = await res.json();
-      if (d && d.state === 'unwired') {
-        el.textContent = d.reason || 'Agency targeting is not built yet.';
-      } else {
-        el.textContent = 'Agency targeting reported a state this page does not recognise.';
-      }
-    } catch (_) {
-      el.textContent = 'Could not check whether agency targeting is available.';
-    }
-  }
-
   function note(msg, ok) {
     const el = document.getElementById('psSavedNote');
     if (!el) return;
@@ -625,15 +603,14 @@
   });
   obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
-  /* #agState only exists while that tab is rendered, and the panel is re-templated on
-     every nav click AND every theme flip. Watching the container catches both; binding
-     to the nav alone would miss the theme path and leave the box reading "Checking…". */
+  /* The NAICS controls only exist while that tab is rendered, and the panel is
+     re-templated on every nav click AND every theme flip. Watching the container catches
+     both; binding to the nav alone would miss the theme path and leave the browse box
+     empty on the surface whose whole job is helping the customer find a code. */
   function watchPanels() {
     const host = document.getElementById('setContent');
     if (!host || typeof MutationObserver !== 'function') return;
     const fill = function () {
-      const el = document.getElementById('agState');
-      if (el && el.dataset.filled !== '1') { el.dataset.filled = '1'; writeAgencyState(); }
       // The NAICS browse list is part of the panel, not a response to typing — it has to
       // be there the moment the tab renders, and again after every add or remove
       // re-templates it, or the customer meets an empty box on the tab whose whole job

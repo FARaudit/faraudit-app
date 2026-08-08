@@ -1,32 +1,163 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
+import { fetchLiveOpportunitiesScoped, WINDOW_DAYS } from "@/lib/bd-os/live-opportunities";
+import { fetchRecentAudits } from "@/lib/bd-os/queries";
 
 export const dynamic = "force-dynamic";
 
-// Fork B architecture wiring for /defense-agencies.
+// GET /api/agencies — the buying offices issuing work against THIS customer's NAICS.
 //
-// TODO: fetchAgencyOrgMap(supabase, userNaics[]) — derive hierarchical
-// {DEPTS, SETASIDES, POSTURE, FORECAST} from defense_spending_intel
-// .agency_breakdown (per-NAICS × agency). Needs a parent→child agency taxonomy
-// (either a defense_agencies_hierarchy migration or a static lookup in
-// queries.ts). Posture and quarterly forecast need further aggregation.
+// WHAT THIS IS NOT. The previous shape of this route reported state:"unwired" against a
+// planned agency org map with obligated dollars, small-business shares, set-aside posture
+// and a quarterly forecast. None of that is measured anywhere in the product, and the seed
+// that used to render it was invented. That TODO is left below rather than deleted — it is
+// a real intended capability, not a fabrication — but it is not what this route serves.
 //
-// Until that ships this route reports state:"unwired" and the page states it,
-// which is the same contract /api/defense-spending serves. The previous
-// `_source: "unwired-mock-preserved"` flag existed to make agencies-live.js a
-// no-op so the client-side seed KEPT RENDERING: obligated dollars per command,
-// small-business shares, set-aside posture and a quarterly forecast, none of
-// which is measured anywhere in the product. Rule 61 — a missing dependency is
-// a visible failure state, never sample data.
+// WHY DERIVED AND NOT DECLARED. A settings form asking a customer to name target agencies
+// presumes the knowledge they are buying: a small sub with no capture team does not know
+// which offices to name, and finding out is the product. So nothing here is typed. The
+// offices come from the customer's own NAICS codes, ranked by what those codes actually
+// attract, and a customer who has declared nothing still sees the full ranking.
+//
+// ONE UNIT, SHARED WITH THE FEED. `resolveAgency()` keeps the top two segments of SAM's
+// dotted path and joins them " · " — department, then the buying office. That second
+// segment is what Opportunities already counts in "N departments · N buying offices", so
+// this route splits on the same separator and counts the same way. A deeper office leaf
+// exists (`resolveOfficeLeaf`, used on the audit masthead) but is NOT carried on feed rows;
+// keying on it here would make this page disagree with Opportunities about the same firm.
+//
+// THE WINDOW IS THE WINDOW. Nothing persists notice history — the SAM feed is live and
+// drops expired notices — so this ranks what is open now, over WINDOW_DAYS. It is not a
+// 90-day count and the response says so, because a rank that silently reshuffles is worse
+// than one that admits its span.
+//
+// TODO (unbuilt, and deliberately not implied anywhere on the page): agency org hierarchy
+// with obligated dollars, small-business share and quarterly forecast, from
+// defense_spending_intel.agency_breakdown plus a parent→child taxonomy. Needs a source
+// that is not connected. Until then this route serves what is measured and nothing else.
+
+type Office = {
+  department: string;
+  office: string;
+  notices: number;
+  naics: string[];
+  audited: number;
+  decided: number;
+  in_pipeline: number;
+  next_deadline: string | null;
+  set_asides: string[];
+};
+
+/** Split resolveAgency()'s "Department · Office". Only the FIRST separator splits, so an
+ *  office whose own name contains " · " stays intact. Mirrors opportunities-live.js. */
+function splitAgency(s: string | null): [string, string] {
+  const v = String(s ?? "").trim();
+  if (!v) return ["", ""];
+  const i = v.indexOf(" · ");
+  if (i < 0) return [v, ""];
+  return [v.slice(0, i).trim(), v.slice(i + 3).trim()];
+}
 
 export async function GET() {
   const supabase = await createServerClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  let rows;
+  let scope;
+  try {
+    const out = await fetchLiveOpportunitiesScoped(supabase);
+    rows = out.rows;
+    scope = out.scope;
+  } catch (e) {
+    // Rule 61 — a failed dependency is a visible failure state, never a plausible one.
+    // "SAM did not answer" and "no office is buying your codes" are different facts and
+    // the page must not render them the same way.
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return NextResponse.json(
+      { state: "error", reason: `live feed unavailable: ${msg}`, window_days: WINDOW_DAYS },
+      { status: 503 }
+    );
+  }
+
+  // The customer's own audits, keyed by the same department · office string, so "you have
+  // worked this office before" is a fact about their record rather than a guess.
+  let audits: Awaited<ReturnType<typeof fetchRecentAudits>> = [];
+  try {
+    audits = await fetchRecentAudits(supabase, user.id, 500);
+  } catch {
+    // A missing audit history degrades the ranking's annotations, not the ranking. Counts
+    // stay zero and the page says nothing about audits rather than claiming none exist.
+    audits = [];
+  }
+  const auditedByOffice = new Map<string, { audited: number; decided: number }>();
+  for (const a of audits) {
+    const key = String(a.agency ?? "").trim();
+    if (!key) continue;
+    const cur = auditedByOffice.get(key) ?? { audited: 0, decided: 0 };
+    cur.audited += 1;
+    // A decision is a recorded outcome or a committal verdict — not merely a completed run.
+    if (a.outcome || a.recommendation) cur.decided += 1;
+    auditedByOffice.set(key, cur);
+  }
+
+  const byKey = new Map<string, Office>();
+  for (const r of rows) {
+    const raw = String(r.agency ?? "").trim();
+    if (!raw) continue;
+    const [department, office] = splitAgency(raw);
+    const cur = byKey.get(raw) ?? {
+      department,
+      office,
+      notices: 0,
+      naics: [],
+      audited: 0,
+      decided: 0,
+      in_pipeline: 0,
+      next_deadline: null,
+      set_asides: [],
+    };
+    cur.notices += 1;
+    if (r.naics_code && !cur.naics.includes(r.naics_code)) cur.naics.push(r.naics_code);
+    if (r.set_aside && !cur.set_asides.includes(r.set_aside)) cur.set_asides.push(r.set_aside);
+    if (r.in_pipeline) cur.in_pipeline += 1;
+    // Soonest response deadline still ahead of us — the reason to look at this office today.
+    if (r.response_deadline) {
+      if (!cur.next_deadline || r.response_deadline < cur.next_deadline) cur.next_deadline = r.response_deadline;
+    }
+    byKey.set(raw, cur);
+  }
+  for (const [raw, o] of byKey) {
+    const hit = auditedByOffice.get(raw);
+    if (hit) { o.audited = hit.audited; o.decided = hit.decided; }
+  }
+
+  const OFFICES = [...byKey.values()].sort(
+    (a, b) => b.notices - a.notices || a.office.localeCompare(b.office)
+  );
+  const departments = new Set(OFFICES.map((o) => o.department).filter(Boolean)).size;
+
+  // `reason` is null iff there is something to show. The empty cases are named separately
+  // because they need different words and a different next action: no codes on file is a
+  // profile the customer can fix; an empty window is a real zero result.
+  const reason =
+    OFFICES.length > 0
+      ? null
+      : scope.source === "no-profile-codes"
+        ? "no-profile-codes"
+        : "no-notices-in-window";
 
   return NextResponse.json({
-    state: "unwired",
-    reason:
-      "Agency org and posture data is not connected to this view yet. Nothing is shown rather than showing obligations, set-aside shares and forecasts that were never measured."
+    state: OFFICES.length > 0 ? "ok" : "empty",
+    reason,
+    OFFICES,
+    meta: {
+      window_days: WINDOW_DAYS,
+      notices: rows.length,
+      departments,
+      offices: OFFICES.length,
+      naics_scope: scope.codes,
+      scope_source: scope.source,
+    },
   });
 }
