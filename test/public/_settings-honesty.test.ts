@@ -288,6 +288,41 @@ console.log("\n── an unfilled chip may not promise a check that never runs �
     !/nothing useful to type/i.test(companyPanel),
     "the page calls a value inert that the engine acts on");
 
+  // THE ROW MUST BE FED BY SAM, NOT ONLY BY THE CARRIED LIST. Promotion alone can only turn
+  // green an entry the company record already holds, and no screen writes that column — so a
+  // registered firm read "None on file" under a stamp saying "Registered in SAM".
+  const markFn = liveCode.slice(liveCode.indexOf("async function markVerifiedCerts()"), liveCode.indexOf("function shapeError("));
+  check("SAM's records are ADDED to the row, not merely matched against it",
+    /CERTS\.push\(/.test(markFn),
+    "the row can still only display what the record already carried");
+  check("the row renders REGISTRATIONS, not containment-derived programs",
+    /d\.records/.test(markFn) && !/establishedPrograms[\s\S]{0,80}CERTS\.push/.test(markFn),
+    "an SDVOSB registration would print VOSB as a second registration");
+  check("the header count is recomputed after the SAM read",
+    /writeHeaderStats\(\)/.test(markFn),
+    "the strip reports a total the row below it contradicts");
+
+  // AN EMPTY ROW HAS FIVE CAUSES. Collapsing them tells four of those five customers something
+  // untrue, and the fifth — our own read failing — is told they hold nothing.
+  check("the empty row is state-derived, not a fixed string",
+    /certEmpty\(\)/.test(appCode) && !/cert-row">\$\{CERTS\.length \? [\s\S]{0,80}None on file/.test(appCode),
+    "one message for five different answers");
+  for (const st of ["no-uei", "uei-not-found", "registration-inactive", "verified"]) {
+    check(`certEmpty branches on '${st}'`, new RegExp(`'${st}'`).test(appCode), "that cause collapses into the default");
+  }
+  {
+    const emptyFn = appCode.slice(appCode.indexOf("function certEmpty()"), appCode.indexOf("function certCaption("));
+    // The unread case may not read as a quantity, and may not be the same sentence as the real zero.
+    const real = emptyFn.match(/'verified'\s*\?\s*'([^']+)'/);
+    const unread = emptyFn.match(/:\s*'([^']*could not be read[^']*)'/);
+    check("the unread case is worded as UNKNOWN, not as zero",
+      !!unread && /not known|unanswered|unknown/i.test(unread[1]) && !/^none\b/i.test(unread[1]),
+      "our outage is reported to the customer as 'you hold none'");
+    check("the unread case and the real zero are DIFFERENT sentences",
+      !!real && !!unread && real[1] !== unread[1],
+      "'we could not look' and 'you have none' render identically");
+  }
+
   // Planted positives — per leg, not per section.
   const probe = /\bsdvosb\b|\bvosb\b|service[\s-]?disabled|veteran[\s-]?owned/i;
   check("V-P1 · a naive /vosb/ WOULD wrongly match nothing here but a bare one is caught", !probe.test("WOSB"));
@@ -298,6 +333,12 @@ console.log("\n── an unfilled chip may not promise a check that never runs �
     /certifications on your <a href="\/capability-statement">/.test('and certifications on your <a href="/capability-statement">capability statement</a>.'));
   check("V-P6 · rejects a note calling the typed value inert",
     /nothing useful to type/i.test("so there is nothing useful to type."));
+  check("V-P7 · rejects a promote-only marker that never adds a row",
+    !/CERTS\.push\(/.test("window.PS.CERTS.forEach(function (c) { c.on = labels.some(fn); });"));
+  check("V-P8 · rejects a fixed empty string in the cert row",
+    /None on file/.test('<div class="cert-row">${CERTS.length ? x : \'<span class="fld-none">None on file</span>\'}</div>'));
+  check("V-P9 · rejects an unread message that asserts zero",
+    /^none\b/i.test("None on file"));
 }
 
 console.log("\n── planted positives ──");
