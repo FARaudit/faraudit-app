@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { buildWatchedDigest, buildWatchedDigestEmail, type WatchedRow } from "@/lib/watched-digest";
+import { poleToRecommendation } from "@/lib/verdict-pole";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -68,7 +69,32 @@ export async function GET(req: NextRequest) {
       // A READ FAILURE IS NOT A QUIET WEEK. Skip, count, keep going.
       if (rowErr) { errors++; failures.push(`${userId}: rows ${rowErr.message}`); continue; }
 
-      const digest = buildWatchedDigest((rows ?? []) as WatchedRow[], { nowIso, appBaseUrl: appBase() });
+      // THE VERDICT IS WHY THE EMAIL IS WORTH OPENING, so it is carried per row — but it is
+      // derived by `poleToRecommendation`, the SAME function the watched-notices page uses,
+      // rather than read off the stale `recommendation` column. Two derivations of one
+      // verdict is how an email comes to say GO while the screen says something else.
+      //
+      // A FAILED VERDICT READ IS NOT A VERDICT. If this lookup fails the rows keep
+      // `verdict: null` and the email renders no badge at all — an absent badge is honest,
+      // a defaulted one would be an invented answer about whether the customer may bid.
+      const withVerdicts = (rows ?? []) as WatchedRow[];
+      const auditIds = withVerdicts.map((r) => r.audit_id).filter((v): v is string => !!v);
+      if (auditIds.length) {
+        const { data: auditRows, error: aErr } = await db
+          .from("audits").select("id, recommendation, compliance_json").in("id", auditIds);
+        if (aErr) {
+          console.warn(`[watched-digest] verdict lookup failed (${aErr.message}) — rows render without a badge`);
+        } else {
+          const byId = new Map((auditRows ?? []).map((a) => [String((a as { id: unknown }).id), a]));
+          for (const r of withVerdicts) {
+            const a = r.audit_id ? byId.get(String(r.audit_id)) : null;
+            if (!a) continue;
+            const row = a as { recommendation: string | null; compliance_json: Record<string, unknown> | null };
+            r.verdict = poleToRecommendation({ compliance_json: row.compliance_json, recommendation: row.recommendation });
+          }
+        }
+      }
+      const digest = buildWatchedDigest(withVerdicts, { nowIso, appBaseUrl: appBase() });
       if (!digest) { quiet++; continue; }
 
       const { data: u, error: uErr } = await db.auth.admin.getUserById(userId);
@@ -76,7 +102,7 @@ export async function GET(req: NextRequest) {
       if (uErr || !toEmail) { noEmail++; failures.push(`${userId}: no address`); continue; }
 
       if (!process.env.RESEND_API_KEY) { errors++; failures.push("RESEND_API_KEY not configured"); continue; }
-      const { subject, html, text } = buildWatchedDigestEmail(digest, settingsUrl);
+      const { subject, html, text } = buildWatchedDigestEmail(digest, settingsUrl, nowIso);
       const { Resend } = await import("resend");
       const res = await new Resend(process.env.RESEND_API_KEY).emails.send({
         from: "FARaudit Watching <alerts@faraudit.com>",

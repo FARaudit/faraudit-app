@@ -43,7 +43,7 @@ console.log("\n── what goes where ──");
 {
   const d = buildWatchedDigest([posted({ response_deadline: "not-a-date" })], OPTS)!;
   ok(d.closingSoon.length === 0, "an unparseable deadline is omitted, never guessed into a section");
-  ok(d.posted[0].deadline === "not-a-date" && !/Invalid/.test(buildWatchedDigestEmail(d, "u").html),
+  ok(d.posted[0].deadline === "not-a-date" && !/Invalid/.test(buildWatchedDigestEmail(d, "u", NOW).html),
     "…and the email renders without inventing a date");
 }
 {
@@ -56,15 +56,53 @@ ok(buildWatchedDigest([posted()], { ...OPTS, nowIso: "not-a-clock" }) === null,
 console.log("\n── the email ──");
 {
   const d = buildWatchedDigest([posted(), { status: "watching", created_at: days(-1), title: "Base ops" }], OPTS)!;
-  const e = buildWatchedDigestEmail(d, "https://www.faraudit.com/settings");
-  ok(/1 posted/.test(e.subject) && /1 newly tracked/.test(e.subject),
-    "the subject names the week rather than reading the same every time", e.subject);
+  const e = buildWatchedDigestEmail(d, "https://www.faraudit.com/settings", NOW);
+  // Keyed on the PROPERTY, not the wording: the subject must lead with what happened and
+  // must differ between weeks. Pinning the literal string made an improved subject read as
+  // a regression while the property it guards was untouched.
+  ok(/posted/i.test(e.subject), "a week with a posting leads with it", e.subject);
+  {
+    const closingOnly = buildWatchedDigest(
+      [{ status: "watching", created_at: days(-90), response_deadline: days(4) }], OPTS)!;
+    const b = buildWatchedDigestEmail(closingOnly, "u", NOW);
+    ok(b.subject !== e.subject, "a different week produces a different subject", b.subject);
+    ok(/closing soon/i.test(b.subject), "a deadline-only week leads with the deadline", b.subject);
+  }
   ok(/faraudit\.com\/settings/.test(e.text), "the footer says how to switch it off");
   ok(/\/audit\/a1/.test(e.html), "a posted row links to its audit");
 }
 {
   const d = buildWatchedDigest([posted({ title: "<script>alert(1)</script>" })], OPTS)!;
-  ok(!/<script>/.test(buildWatchedDigestEmail(d, "u").html), "a title is escaped, not injected");
+  ok(!/<script>/.test(buildWatchedDigestEmail(d, "u", NOW).html), "a title is escaped, not injected");
+}
+
+console.log("\n── the verdict badge ──");
+{
+  const withV = buildWatchedDigest([posted({ verdict: "BID_WITH_CAUTION" })], OPTS)!;
+  const e = buildWatchedDigestEmail(withV, "u", NOW);
+  ok(/CAUTION/.test(e.html), "a caution verdict renders its badge");
+  ok(/\[BID WITH CAUTION\]/.test(e.text), "the plaintext half carries it too");
+}
+{
+  // AN UNKNOWN VERDICT RENDERS NOTHING. A neutral chip would be a verdict of its own, and
+  // the one thing this email must never do is invent an answer about eligibility.
+  const unknown = buildWatchedDigest([posted({ verdict: "SOMETHING_NEW" })], OPTS)!;
+  const e = buildWatchedDigestEmail(unknown, "u", NOW);
+  ok(!/SOMETHING_NEW/.test(e.html), "an unrecognized verdict is not printed raw");
+  ok(!/border-radius:5px/.test(e.html), "…and no badge is rendered at all");
+}
+{
+  const none = buildWatchedDigest([posted({ verdict: null })], OPTS)!;
+  ok(!/border-radius:5px/.test(buildWatchedDigestEmail(none, "u", NOW).html),
+    "no audit yet → no badge, rather than a neutral one");
+}
+{
+  // REVIEW must not wear an answer's colour — an honest "we could not settle this" that
+  // looks like a GO is the confident-wrong failure this product exists to refuse.
+  const rev = buildWatchedDigestEmail(buildWatchedDigest([posted({ verdict: "NEEDS_HUMAN_REVIEW" })], OPTS)!, "u", NOW).html;
+  const go = buildWatchedDigestEmail(buildWatchedDigest([posted({ verdict: "GO" })], OPTS)!, "u", NOW).html;
+  ok(/REVIEW/.test(rev) && !/#047857/.test(rev), "review is grey, never green");
+  ok(/#047857/.test(go), "…and a real GO still is green");
 }
 
 console.log("\n── planted positives — this gate must be able to fail ──");

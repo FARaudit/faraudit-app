@@ -26,10 +26,16 @@ export interface WatchedRow {
   response_deadline?: string | null;
   last_checked_at?: string | null;
   created_at?: string | null;
+  /** Supplied by the caller, never derived here — see DigestItem.verdict. */
+  verdict?: string | null;
 }
 
 export interface DigestItem {
   title: string;
+  /** GO | CAUTION | DECLINE | NEEDS_HUMAN_REVIEW — derived by the caller from the SAME
+   *  poleToRecommendation the watched-notices page uses, so the email and the screen can
+   *  never disagree about one notice. Absent when the row has no completed audit. */
+  verdict?: string | null;
   agency: string | null;
   solicitationNumber: string | null;
   deadline: string | null;
@@ -55,6 +61,7 @@ const item = (r: WatchedRow, appBaseUrl: string): DigestItem => ({
   solicitationNumber: r.solicitation_number ? String(r.solicitation_number) : null,
   deadline: r.response_deadline ? String(r.response_deadline) : null,
   auditUrl: r.audit_id ? `${appBaseUrl.replace(/\/$/, "")}/audit/${r.audit_id}` : null,
+  verdict: r.verdict ?? null,
 });
 
 export interface BuildDigestOptions {
@@ -127,52 +134,160 @@ const fmtDate = (iso: string | null): string | null => {
   return new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 };
 
-function section(heading: string, items: DigestItem[]): { html: string; text: string } {
-  if (!items.length) return { html: "", text: "" };
-  const rows = items.map((i) => {
-    const meta = [i.agency, i.solicitationNumber].filter(Boolean).map(esc).join(" · ");
-    const due = fmtDate(i.deadline);
-    const link = i.auditUrl ? `<a href="${esc(i.auditUrl)}" style="color:#185FA5;text-decoration:none;font-weight:600">Open the audit</a>` : "";
-    return `<tr><td style="padding:10px 0;border-bottom:1px solid #e6eef7">
-      <div style="font:600 14px/1.4 -apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#0A1628">${esc(i.title)}</div>
-      ${meta ? `<div style="font:12px/1.5 -apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#5b6b7f">${meta}</div>` : ""}
-      ${due ? `<div style="font:12px/1.5 -apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#5b6b7f">Responses due ${esc(due)}</div>` : ""}
-      ${link}</td></tr>`;
-  }).join("");
-  const text = items.map((i) => {
-    const bits = [i.title, i.agency, i.solicitationNumber].filter(Boolean).join(" · ");
-    const due = fmtDate(i.deadline);
-    return `  - ${bits}${due ? ` (due ${due})` : ""}${i.auditUrl ? `\n    ${i.auditUrl}` : ""}`;
-  }).join("\n");
-  return {
-    html: `<h2 style="font:700 13px/1.4 -apple-system,Segoe UI,Helvetica,Arial,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:#185FA5;margin:26px 0 6px">${esc(heading)}</h2><table width="100%" cellpadding="0" cellspacing="0" role="presentation">${rows}</table>`,
-    text: `${heading.toUpperCase()}\n${text}\n`,
+const BRAND = {
+  ink: "#0A1628",        // primary navy
+  rule: "#185FA5",       // brand blue — rules and anchors
+  accent: "#378ADD",     // mid blue — callouts
+  pale: "#E6F1FB",       // pale blue — section wash
+  line: "#dbe5f0",
+  mute: "#5b6b7f",
+  page: "#eef3f9",
+};
+const SANS = "-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif";
+
+/** Days until a deadline, or null when it is unparseable/past. Drives the urgency chip. */
+function daysUntil(iso: string | null, nowIso: string): number | null {
+  const d = parse(iso), n = parse(nowIso);
+  if (Number.isNaN(d) || Number.isNaN(n) || d <= n) return null;
+  return Math.ceil((d - n) / 86_400_000);
+}
+
+/** THE VERDICT IS THE PRODUCT, so it gets the strongest position in the row. Colour is
+ *  earned, never decorative: green only for a clean GO, amber for caution, red for a
+ *  decline, and GREY for needs-human-review — an honest "we could not settle this" must
+ *  never wear the same colour as an answer. An unknown or absent verdict renders NOTHING
+ *  rather than a neutral chip, because an empty badge reads as a verdict of its own. */
+function verdictBadge(v: string | null | undefined): string {
+  const k = String(v ?? "").trim().toUpperCase().replace(/[\s-]+/g, "_");
+  const map: Record<string, { label: string; fg: string; bg: string; br: string }> = {
+    GO:                  { label: "GO",       fg: "#047857", bg: "#ecfdf5", br: "#a7f3d0" },
+    BID:                 { label: "GO",       fg: "#047857", bg: "#ecfdf5", br: "#a7f3d0" },
+    BID_WITH_CAUTION:    { label: "CAUTION",  fg: "#b45309", bg: "#fffbeb", br: "#fde68a" },
+    CAUTION:             { label: "CAUTION",  fg: "#b45309", bg: "#fffbeb", br: "#fde68a" },
+    NO_BID:              { label: "DECLINE",  fg: "#b91c1c", bg: "#fef2f2", br: "#fecaca" },
+    DECLINE:             { label: "DECLINE",  fg: "#b91c1c", bg: "#fef2f2", br: "#fecaca" },
+    INELIGIBLE:          { label: "DECLINE",  fg: "#b91c1c", bg: "#fef2f2", br: "#fecaca" },
+    NEEDS_HUMAN_REVIEW:  { label: "REVIEW",   fg: "#475569", bg: "#f1f5f9", br: "#cbd5e1" },
+    INCOMPLETE:          { label: "REVIEW",   fg: "#475569", bg: "#f1f5f9", br: "#cbd5e1" },
   };
+  const m = map[k];
+  if (!m) return "";
+  return `<span style="display:inline-block;font:700 10px/1 ${SANS};letter-spacing:.08em;padding:5px 9px;border-radius:5px;color:${m.fg};background:${m.bg};border:1px solid ${m.br}">${m.label}</span>`;
+}
+
+/** ONE ROW. A table, not a div: Outlook ignores flex and margin collapses differently in
+ *  every client, so the layout that survives is the one built from table cells. */
+function row(i: DigestItem, nowIso: string): string {
+  const meta = [i.agency, i.solicitationNumber].filter(Boolean).map(esc).join(" &middot; ");
+  const due = fmtDate(i.deadline);
+  const left = daysUntil(i.deadline, nowIso);
+  // The urgency chip earns its colour: red is spent only inside a week.
+  const chip = left === null ? "" :
+    `<span style="display:inline-block;font:600 11px/1 ${SANS};padding:4px 8px;border-radius:99px;` +
+    (left <= 7
+      ? "color:#b91c1c;background:#fef2f2;border:1px solid #fecaca"
+      : `color:${BRAND.rule};background:${BRAND.pale};border:1px solid ${BRAND.line}`) +
+    `">${left} day${left === 1 ? "" : "s"} left</span>`;
+  return `<tr><td style="padding:14px 0;border-bottom:1px solid ${BRAND.line}">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
+      <td style="font:600 15px/1.35 ${SANS};color:${BRAND.ink};padding-right:10px">${esc(i.title)}</td>
+      <td align="right" style="white-space:nowrap;vertical-align:top">${verdictBadge(i.verdict)}${verdictBadge(i.verdict) && chip ? "&nbsp;" : ""}${chip}</td>
+    </tr></table>
+    ${meta ? `<div style="font:12px/1.6 ${SANS};color:${BRAND.mute};margin-top:3px">${meta}</div>` : ""}
+    ${due ? `<div style="font:12px/1.6 ${SANS};color:${BRAND.mute}">Responses due ${esc(due)}</div>` : ""}
+    ${i.auditUrl ? `<div style="margin-top:8px"><a href="${esc(i.auditUrl)}" style="font:600 12px/1 ${SANS};color:#fff;background:${BRAND.rule};text-decoration:none;padding:9px 14px;border-radius:6px;display:inline-block">Open the audit</a></div>` : ""}
+  </td></tr>`;
+}
+
+function section(heading: string, items: DigestItem[], nowIso: string): { html: string; text: string } {
+  if (!items.length) return { html: "", text: "" };
+  const html = `<tr><td style="padding:26px 28px 0">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
+        <td style="font:700 11px/1 ${SANS};letter-spacing:.10em;text-transform:uppercase;color:${BRAND.rule};padding-bottom:2px">${esc(heading)}</td>
+        <td align="right" style="font:700 11px/1 ${SANS};color:${BRAND.mute}">${items.length}</td>
+      </tr></table>
+      <div style="height:2px;background:${BRAND.rule};width:26px;margin:8px 0 2px"></div>
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">${items.map((i) => row(i, nowIso)).join("")}</table>
+    </td></tr>`;
+  const text = `${heading.toUpperCase()} (${items.length})\n` + items.map((i) => {
+    const bits = [i.title, i.agency, i.solicitationNumber].filter(Boolean).join(" \u00b7 ");
+    const due = fmtDate(i.deadline);
+    const v = i.verdict ? `[${String(i.verdict).toUpperCase().replace(/_/g, " ")}] ` : "";
+    return `  - ${v}${bits}${due ? ` (due ${due})` : ""}${i.auditUrl ? `\n    ${i.auditUrl}` : ""}`;
+  }).join("\n") + "\n";
+  return { html, text };
 }
 
 export interface WatchedDigestEmail { subject: string; html: string; text: string }
 
-/** Digest → the email. Pure; the subject NAMES the week's headline rather than being generic,
- *  because a subject that reads the same every week is the first thing a customer filters. */
-export function buildWatchedDigestEmail(d: WatchedDigest, settingsUrl: string): WatchedDigestEmail {
+/** Digest → the email. Pure. The subject NAMES the week's headline rather than being
+ *  generic, because a subject that reads the same every week is the first thing filtered. */
+export function buildWatchedDigestEmail(d: WatchedDigest, settingsUrl: string, nowIso?: string): WatchedDigestEmail {
+  const now = nowIso ?? new Date(0).toISOString();
   const counts: string[] = [];
   if (d.posted.length) counts.push(`${d.posted.length} posted`);
   if (d.newlyTracked.length) counts.push(`${d.newlyTracked.length} newly tracked`);
   if (d.closingSoon.length) counts.push(`${d.closingSoon.length} closing soon`);
-  const subject = `Your watched opportunities — ${counts.join(", ")}`;
+
+  // THE SUBJECT LEADS WITH THE ACTION, not the newsletter name. "Posted" is the event a
+  // customer is waiting for, so it goes first when it happened at all; otherwise the
+  // nearest deadline is the reason to open. A subject identical every week gets filtered.
+  const soonest = d.closingSoon
+    .map((i) => daysUntil(i.deadline, now)).filter((n): n is number => n !== null).sort((a, b) => a - b)[0];
+  const subject = d.posted.length
+    ? `${d.posted.length} watched ${d.posted.length === 1 ? "notice has" : "notices have"} posted — audit ready`
+    : soonest !== undefined
+      ? `${d.closingSoon.length} closing soon — the first in ${soonest} day${soonest === 1 ? "" : "s"}`
+      : `Your watched opportunities — ${counts.join(", ")}`;
+
+  const stat = (n: number, label: string, tone: string) => `<td width="33%" align="center" style="padding:14px 6px">
+      <div style="font:700 26px/1 ${SANS};color:${tone}">${n}</div>
+      <div style="font:600 10px/1.3 ${SANS};letter-spacing:.08em;text-transform:uppercase;color:${BRAND.mute};margin-top:5px">${label}</div></td>`;
 
   const secs = [
-    section("Posted this week", d.posted),
-    section("Newly tracked", d.newlyTracked),
-    section("Closing soon", d.closingSoon),
+    section("Posted this week", d.posted, now),
+    section("Newly tracked", d.newlyTracked, now),
+    section("Closing soon", d.closingSoon, now),
   ];
-  const foot = `You are receiving this because the weekly digest is switched on in your notification preferences. Turn it off at ${settingsUrl}`;
-  const html = `<div style="background:#f4f7fb;padding:24px"><div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e6eef7;border-radius:10px;padding:24px">
-    <div style="font:700 18px/1.3 -apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#0A1628">Your watched opportunities</div>
-    <div style="font:13px/1.5 -apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#5b6b7f;margin-top:4px">The last ${d.windowDays} days${d.stillWatching ? ` · ${d.stillWatching} still being watched` : ""}</div>
+  const foot = `You receive this because the weekly digest is on in your notification preferences.`;
+
+  const html = `<!doctype html><html><body style="margin:0;padding:0;background:${BRAND.page}">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(counts.join(" &middot; "))} across the notices you are watching.</div>
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:${BRAND.page};padding:28px 12px">
+<tr><td align="center">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;background:#fff;border:1px solid ${BRAND.line};border-radius:14px;overflow:hidden">
+
+    <tr><td style="background:${BRAND.ink};padding:20px 28px">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
+        <td style="font:700 17px/1 ${SANS};color:#fff;letter-spacing:-.01em">FAR<span style="color:${BRAND.accent}">audit</span></td>
+        <td align="right" style="font:600 10px/1 ${SANS};letter-spacing:.14em;text-transform:uppercase;color:${BRAND.pale}">Weekly digest</td>
+      </tr></table></td></tr>
+
+    <tr><td style="padding:26px 28px 4px">
+      <div style="font:700 22px/1.25 ${SANS};color:${BRAND.ink};letter-spacing:-.01em">Your watched opportunities</div>
+      <div style="font:13px/1.6 ${SANS};color:${BRAND.mute};margin-top:5px">The last ${d.windowDays} days${d.stillWatching ? ` &middot; ${d.stillWatching} still being watched` : ""}</div>
+    </td></tr>
+
+    <tr><td style="padding:14px 22px 0">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:${BRAND.pale};border:1px solid ${BRAND.line};border-radius:10px"><tr>
+        ${stat(d.posted.length, "Posted", BRAND.ink)}
+        ${stat(d.newlyTracked.length, "Newly tracked", BRAND.ink)}
+        ${stat(d.closingSoon.length, "Closing soon", d.closingSoon.length ? "#b45309" : BRAND.ink)}
+      </tr></table></td></tr>
+
     ${secs.map((s) => s.html).join("")}
-    <div style="font:11px/1.6 -apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#8a97a8;margin-top:28px;border-top:1px solid #e6eef7;padding-top:12px">${esc(foot)}</div>
-  </div></div>`;
-  const text = `YOUR WATCHED OPPORTUNITIES\nThe last ${d.windowDays} days${d.stillWatching ? ` · ${d.stillWatching} still being watched` : ""}\n\n${secs.map((s) => s.text).filter(Boolean).join("\n")}\n${foot}\n`;
+
+    <tr><td align="center" style="padding:26px 28px 4px">
+      <a href="${esc(settingsUrl.replace(/\/settings$/, "/pipeline"))}" style="font:600 13px/1 ${SANS};color:#fff;background:${BRAND.ink};text-decoration:none;padding:13px 22px;border-radius:8px;display:inline-block">See everything you are watching</a>
+    </td></tr>
+
+    <tr><td style="padding:22px 28px 26px">
+      <div style="border-top:1px solid ${BRAND.line};padding-top:14px;font:11px/1.7 ${SANS};color:#8a97a8">
+        ${esc(foot)}<br><a href="${esc(settingsUrl)}" style="color:${BRAND.rule};text-decoration:none;font-weight:600">Manage notifications</a>
+      </div></td></tr>
+  </table>
+</td></tr></table></body></html>`;
+
+  const text = `YOUR WATCHED OPPORTUNITIES\nThe last ${d.windowDays} days${d.stillWatching ? ` \u00b7 ${d.stillWatching} still being watched` : ""}\n\n${d.posted.length} posted \u00b7 ${d.newlyTracked.length} newly tracked \u00b7 ${d.closingSoon.length} closing soon\n\n${secs.map((s) => s.text).filter(Boolean).join("\n")}\n${foot}\n${settingsUrl}\n`;
   return { subject, html, text };
 }
