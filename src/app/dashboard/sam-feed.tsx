@@ -36,21 +36,45 @@ function fmtDeadline(d: string | null): string | null {
 
 export default function SAMFeed() {
   const [rows, setRows] = useState<SAMRow[] | null>(null);
+  // THREE states, not two. `rows: []` now means ONLY "SAM answered and had nothing" — the one case where
+  // "no new solicitations today" is a true sentence. Anything else sets `failed`. Fixing the route alone
+  // would have been inert: a 502 still RESOLVES the promise, `r.json()` still parses, `d.solicitations`
+  // is still an array, so this component would have gone on printing the same false sentence.
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     fetch("/api/sam-feed", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((d) => {
-        if (!cancelled) setRows(Array.isArray(d.solicitations) ? d.solicitations : []);
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`sam-feed HTTP ${r.status}`);
+        const d = await r.json();
+        // A 200 that is not `source: "live"` is not upstream data either — never infer success from shape.
+        if (d?.source !== "live" || !Array.isArray(d.solicitations)) throw new Error("sam-feed: not live data");
+        return d.solicitations as SAMRow[];
+      })
+      .then((s) => {
+        if (!cancelled) setRows(s);
       })
       .catch(() => {
-        if (!cancelled) setRows([]);
+        // NOT `setRows([])` — an empty array is a plausible answer, and that is exactly why it must never
+        // be what an error produces.
+        if (!cancelled) setFailed(true);
       });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  if (failed) {
+    return (
+      <div className="border border-border bg-surface p-10 text-center">
+        <p className="text-text-2">Couldn&apos;t reach SAM.gov just now.</p>
+        <p className="text-xs text-text-3 mt-2 font-mono">
+          This is a connection problem on our side — it does not mean nothing was posted. Refresh to retry.
+        </p>
+      </div>
+    );
+  }
 
   if (rows === null) {
     return (
