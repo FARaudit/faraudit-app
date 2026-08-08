@@ -4,7 +4,10 @@ import { checkRateLimit } from "@/lib/rate-limit";
 
 export const maxDuration = 10;
 
-const ALLOWED = new Set(["sidebar_pinned", "display_name", "timezone", "alerts_enabled", "theme", "weekly_digest_watched"]);
+// `alerts_email_enabled` / `alerts_in_app_enabled` are accepted here ONLY because watcher-tick
+// now reads them before it sends. A preference the API stores and nothing consults is the #514
+// defect wearing a different hat — the switch is the last thing built, never the first.
+const ALLOWED = new Set(["sidebar_pinned", "display_name", "timezone", "alerts_enabled", "theme", "weekly_digest_watched", "alerts_email_enabled", "alerts_in_app_enabled"]);
 const VALID_THEMES = new Set(["dark", "auto"]);
 
 export async function GET() {
