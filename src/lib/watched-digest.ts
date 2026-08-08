@@ -201,7 +201,7 @@ function row(i: DigestItem, nowIso: string): string {
 
 function section(heading: string, items: DigestItem[], nowIso: string): { html: string; text: string } {
   if (!items.length) return { html: "", text: "" };
-  const html = `<tr><td style="padding:26px 28px 0">
+  const html = `<tr><td style="padding:26px 34px 0">
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
         <td style="font:700 11px/1 ${SANS};letter-spacing:.10em;text-transform:uppercase;color:${BRAND.rule};padding-bottom:2px">${esc(heading)}</td>
         <td align="right" style="font:700 11px/1 ${SANS};color:${BRAND.mute}">${items.length}</td>
@@ -255,20 +255,20 @@ export function buildWatchedDigestEmail(d: WatchedDigest, settingsUrl: string, n
 <div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(counts.join(" &middot; "))} across the notices you are watching.</div>
 <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:${BRAND.page};padding:28px 12px">
 <tr><td align="center">
-  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;background:#fff;border:1px solid ${BRAND.line};border-radius:14px;overflow:hidden">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:680px;background:#fff;border:1px solid ${BRAND.line};border-radius:14px;overflow:hidden">
 
-    <tr><td style="background:${BRAND.ink};padding:20px 28px">
+    <tr><td style="background:${BRAND.ink};padding:20px 34px">
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
         <td style="font:700 17px/1 ${SANS};color:#fff;letter-spacing:-.01em">FAR<span style="color:${BRAND.accent}">audit</span></td>
         <td align="right" style="font:600 10px/1 ${SANS};letter-spacing:.14em;text-transform:uppercase;color:${BRAND.pale}">Weekly digest</td>
       </tr></table></td></tr>
 
-    <tr><td style="padding:26px 28px 4px">
+    <tr><td style="padding:26px 34px 4px">
       <div style="font:700 22px/1.25 ${SANS};color:${BRAND.ink};letter-spacing:-.01em">Your watched opportunities</div>
       <div style="font:13px/1.6 ${SANS};color:${BRAND.mute};margin-top:5px">The last ${d.windowDays} days${d.stillWatching ? ` &middot; ${d.stillWatching} still being watched` : ""}</div>
     </td></tr>
 
-    <tr><td style="padding:14px 22px 0">
+    <tr><td style="padding:16px 28px 0">
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:${BRAND.pale};border:1px solid ${BRAND.line};border-radius:10px"><tr>
         ${stat(d.posted.length, "Posted", BRAND.ink)}
         ${stat(d.newlyTracked.length, "Newly tracked", BRAND.ink)}
@@ -277,11 +277,11 @@ export function buildWatchedDigestEmail(d: WatchedDigest, settingsUrl: string, n
 
     ${secs.map((s) => s.html).join("")}
 
-    <tr><td align="center" style="padding:26px 28px 4px">
+    <tr><td align="center" style="padding:26px 34px 4px">
       <a href="${esc(settingsUrl.replace(/\/settings$/, "/pipeline"))}" style="font:600 13px/1 ${SANS};color:#fff;background:${BRAND.ink};text-decoration:none;padding:13px 22px;border-radius:8px;display:inline-block">See everything you are watching</a>
     </td></tr>
 
-    <tr><td style="padding:22px 28px 26px">
+    <tr><td style="padding:22px 34px 28px">
       <div style="border-top:1px solid ${BRAND.line};padding-top:14px;font:11px/1.7 ${SANS};color:#8a97a8">
         ${esc(foot)}<br><a href="${esc(settingsUrl)}" style="color:${BRAND.rule};text-decoration:none;font-weight:600">Manage notifications</a>
       </div></td></tr>
