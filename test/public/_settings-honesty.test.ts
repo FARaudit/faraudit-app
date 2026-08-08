@@ -321,6 +321,19 @@ console.log("\n── an unfilled chip may not promise a check that never runs �
     check("the unread case and the real zero are DIFFERENT sentences",
       !!real && !!unread && real[1] !== unread[1],
       "'we could not look' and 'you have none' render identically");
+
+    // THE STATES THAT SPEAK FOR SAM MUST NAME WHAT SAM CANNOT CARRY. Its SBA list holds 8(a),
+    // HUBZone, WOSB and EDWOSB only, so an unqualified "your programs appear here" promises a
+    // VetCert firm something no registration delivers, and the real zero then reads as "you
+    // hold none" to a firm that holds one. The caption already says this — but it needs a chip
+    // to exist before it renders, and these are exactly the states where none does.
+    const noUei = emptyFn.match(/'no-uei'\s*\?\s*'([^']+)'/);
+    check("the no-UEI invitation names the VetCert boundary",
+      !!noUei && /VetCert/.test(noUei[1]),
+      "a service-disabled firm is invited to add a UEI that can never surface its status");
+    check("the real-zero answer names the VetCert boundary",
+      !!real && /VetCert/.test(real[1]),
+      "'no socioeconomic programs' lands as 'you hold none' on a VetCert firm");
   }
 
   // Planted positives — per leg, not per section.
@@ -339,6 +352,8 @@ console.log("\n── an unfilled chip may not promise a check that never runs �
     /None on file/.test('<div class="cert-row">${CERTS.length ? x : \'<span class="fld-none">None on file</span>\'}</div>'));
   check("V-P9 · rejects an unread message that asserts zero",
     /^none\b/i.test("None on file"));
+  check("V-P10 · rejects an empty-state promise that omits the VetCert boundary",
+    !/VetCert/.test("Add your SAM.gov UEI above and the programs SBA has registered you under appear here on their own."));
 }
 
 console.log("\n── planted positives ──");

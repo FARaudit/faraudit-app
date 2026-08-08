@@ -112,17 +112,24 @@
      customer they hold nothing because we could not look is the fabrication this product
      exists to refuse. The stamp below already names the state, so this line carries what
      follows from it: the action where there is one, and the answer where the zero is real.
-     The unread case is the only one that must not read as a quantity at all. */
+     The unread case is the only one that must not read as a quantity at all.
+
+     THE TWO STATES THAT SPEAK FOR SAM MUST NAME WHAT SAM CANNOT CARRY. Its SBA list holds
+     8(a), HUBZone, WOSB and EDWOSB and nothing else, so "the programs you are registered
+     under appear here" promises a service-disabled or veteran-owned firm something no
+     registration can deliver — and the real-zero message then lands as "you hold none" on a
+     firm that holds VetCert. The boundary is stated in the empty state, not only in the
+     caption that needs a chip to exist before it renders. */
   function certEmpty() {
     var st = window.PS.CERT_STATE;
     var msg = st === 'no-uei'
-        ? 'Add your SAM.gov UEI above and the programs SBA has registered you under appear here on their own.'
+        ? 'Add your SAM.gov UEI above and any 8(a), HUBZone, WOSB or EDWOSB registration appears here on its own. Service-disabled and veteran-owned status is issued by VA VetCert, which SAM does not publish.'
       : st === 'uei-not-found'
         ? 'SAM lists no programs under the UEI on file.'
       : st === 'registration-inactive'
         ? 'None until the SAM registration is renewed.'
       : st === 'verified'
-        ? 'Your active SAM registration carries no SBA socioeconomic programs.'
+        ? 'Your active SAM registration carries no SBA socioeconomic programs. Service-disabled and veteran-owned status is issued separately by VA VetCert and does not appear here.'
       : 'Not known — SAM could not be read just now, so this row is unanswered rather than empty.';
     return `<span class="fld-none">${esc(msg)}</span>`;
   }
