@@ -269,12 +269,35 @@ console.log("\n── an unfilled chip may not promise a check that never runs �
     !/if\s*\(!st\s*\|\|\s*!any/.test(noteFn) && /cert-state/.test(noteFn),
     "the stamp is gated on the chips, so 'Not found in SAM' vanishes on a VetCert-only profile");
 
+  // THE NOTE MAY NOT SEND THE CUSTOMER TO AN EDITOR THAT DOES NOT EXIST. No screen in the
+  // product writes capability_statements.certifications: the statement page only prints the
+  // list, profile-editor is NAICS-only by design, and this panel renders chips, not inputs.
+  // A sentence routing the reader to the statement to change them describes a product we do
+  // not ship — the defect PR #514 removed, restated in prose instead of an <input>.
+  const companyPanel = appCode.slice(appCode.indexOf("company: () =>"), appCode.indexOf("/* The row carries the CODE"));
+  check("the note does not route certifications to an editor",
+    !/certifications on your <a href="\/capability-statement">/.test(companyPanel),
+    "the note points at a page with no certification control");
+  check("no certification write path exists to point at",
+    !/certifications/.test(read("public/capability-statement.html")),
+    "a control appeared — the note above may now name it");
+
+  // ...and it may not claim the typed value is inert. It is not: the audit engine reads the
+  // same column and canonicalizes it into a satisfied eligibility attribute.
+  check("the note does not claim there is nothing useful to type",
+    !/nothing useful to type/i.test(companyPanel),
+    "the page calls a value inert that the engine acts on");
+
   // Planted positives — per leg, not per section.
   const probe = /\bsdvosb\b|\bvosb\b|service[\s-]?disabled|veteran[\s-]?owned/i;
   check("V-P1 · a naive /vosb/ WOULD wrongly match nothing here but a bare one is caught", !probe.test("WOSB"));
   check("V-P2 · the executed check rejects a predicate that matches WOSB", /wosb/i.test("WOSB"), "control: the string really does contain wosb");
   check("V-P3 · rejects a collapsed caption", !/issued by VA VetCert/.test("1 carried on your profile, not established in SAM."));
   check("V-P4 · rejects an ungated promise", !/if\s*\(awaitingSam\)/.test("lines.push(why + ' These are read from your SAM registration');"));
+  check("V-P5 · rejects a note routing certifications to the statement",
+    /certifications on your <a href="\/capability-statement">/.test('and certifications on your <a href="/capability-statement">capability statement</a>.'));
+  check("V-P6 · rejects a note calling the typed value inert",
+    /nothing useful to type/i.test("so there is nothing useful to type."));
 }
 
 console.log("\n── planted positives ──");

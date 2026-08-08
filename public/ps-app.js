@@ -258,7 +258,7 @@
         <div class="cert-row">${CERTS.length ? CERTS.map(c => certChip(c)).join('') : '<span class="fld-none">None on file</span>'}</div>
         ${certCaption()}
         ${certNote()}
-        <div class="note">This is the same record the <a href="/capability-statement">capability statement</a> prints and the audit engine reads when it judges whether you are eligible to bid — so what you enter here shapes real verdicts. NAICS codes are edited under NAICS Configuration, and certifications on your <a href="/capability-statement">capability statement</a>. They are shown here only: one clears a set-aside bar just when it is verified against SAM, so there is nothing useful to type.</div>
+        <div class="note">This is the same record the <a href="/capability-statement">capability statement</a> prints and the audit engine reads when it judges whether you are eligible to bid — so what it holds shapes real verdicts. NAICS codes are edited under NAICS Configuration. Certifications are carried on the company record and cannot be added or removed from any screen today; a chip fills in only when SAM establishes that program under the UEI above.</div>
       </div>
       <div class="sp-foot"><span class="saved" id="psSavedNote" hidden></span><button class="save-btn" id="psSaveBtn">Save changes</button></div>`,
 
