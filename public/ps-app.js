@@ -285,7 +285,7 @@
         <div class="cert-row">${CERTS.length ? CERTS.map(c => certChip(c)).join('') : certEmpty()}</div>
         ${certCaption()}
         ${certNote()}
-        <div class="note">This is the same record the <a href="/capability-statement">capability statement</a> prints and the audit engine reads when it judges whether you are eligible to bid — so what it holds shapes real verdicts. NAICS codes are edited under NAICS Configuration. Certifications are not typed anywhere: the programs SBA has registered under the UEI above appear here on their own.</div>
+        <div class="note">This is the same record the <a href="/capability-statement">capability statement</a> prints and the audit engine reads when it judges whether you are eligible to bid — so what it holds shapes real verdicts. NAICS codes are edited under NAICS Configuration. Certifications are not typed anywhere: any 8(a), HUBZone, WOSB or EDWOSB registration under the UEI above appears here on its own. Service-disabled and veteran-owned status is issued by VA VetCert, which SAM does not publish.</div>
       </div>
       <div class="sp-foot"><span class="saved" id="psSavedNote" hidden></span><button class="save-btn" id="psSaveBtn">Save changes</button></div>`,
 

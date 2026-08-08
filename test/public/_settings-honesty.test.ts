@@ -282,6 +282,20 @@ console.log("\n── an unfilled chip may not promise a check that never runs �
     !/certifications/.test(read("public/capability-statement.html")),
     "a control appeared — the note above may now name it");
 
+  // THE NOTE OUTLIVES THE EMPTY STATE, so it carries the boundary too. Once one chip exists
+  // the empty message is gone, and a firm holding HUBZone in SAM plus SDVOSB from VetCert
+  // would read "your registrations appear here" beside a single chip — the same promise the
+  // empty state was just fixed for, in the one case where the row is NOT empty.
+  {
+    const anchor = "Certifications are not typed anywhere";
+    const at = companyPanel.indexOf(anchor);
+    check("the certifications note exists to be checked", at !== -1, "anchor moved — this leg is inert");
+    const noteText = at === -1 ? "" : companyPanel.slice(at, companyPanel.indexOf("</div>", at));
+    check("the note names the VetCert boundary",
+      /VetCert/.test(noteText),
+      "a VetCert firm reads its one SAM chip as the whole answer");
+  }
+
   // ...and it may not claim the typed value is inert. It is not: the audit engine reads the
   // same column and canonicalizes it into a satisfied eligibility attribute.
   check("the note does not claim there is nothing useful to type",
@@ -354,6 +368,8 @@ console.log("\n── an unfilled chip may not promise a check that never runs �
     /^none\b/i.test("None on file"));
   check("V-P10 · rejects an empty-state promise that omits the VetCert boundary",
     !/VetCert/.test("Add your SAM.gov UEI above and the programs SBA has registered you under appear here on their own."));
+  check("V-P11 · rejects a note that omits it",
+    !/VetCert/.test("Certifications are not typed anywhere: the programs SBA has registered under the UEI above appear here on their own."));
 }
 
 console.log("\n── planted positives ──");
