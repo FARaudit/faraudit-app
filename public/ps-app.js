@@ -374,6 +374,13 @@
         <div class="note"><b>Where these come from:</b> press <b>Track</b> on any notice in <a href="/opportunities">Opportunities</a>. From then on we re-check that notice against SAM every hour, and the moment its documents post we run the audit and tell you — by email, on the bell, or both, depending on the switches above. The weekly digest is the same activity gathered into one Monday summary.<br><br>A switch you have never touched is ON, and if we cannot read your preferences we deliver rather than go quiet — missing a solicitation costs more than one unwanted email.</div>
       </div>`,
 
+    team: () => `
+      <div class="sp-hd"><div class="sp-t">Team Members</div><div class="sp-s">Who can sign in to this workspace</div></div>
+      <div class="sp-bd">
+        ${TEAM.map(m => `<div class="tm-row"><div class="tm-av">${esc(String(m.name || '?').split(' ').map(w => w[0]).join(''))}</div><div class="tm-info"><div class="tm-name">${esc(m.name)}${m.you ? ' <span class="tm-you">You</span>' : ''}</div><div class="tm-email">${esc(m.email)}</div></div></div>`).join('')}
+        <p class="ps-unwired">Inviting teammates is not built yet. This workspace has a single account, yours.</p>
+      </div>`,
+
     billing: () => `
       <div class="sp-hd"><div class="sp-t">Billing &amp; Plan</div><div class="sp-s">Your plan, and what this page can and cannot change</div></div>
       <div class="sp-bd">
