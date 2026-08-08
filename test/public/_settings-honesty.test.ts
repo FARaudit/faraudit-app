@@ -236,7 +236,9 @@ console.log("\n── an unfilled chip may not promise a check that never runs �
   // correct one from a wrong one, and BOTH error directions matter here: a miss leaves the
   // false promise, and a false positive sends a program SAM really does establish to a
   // dead end it does not belong in.
-  const src = appCode.match(/function isVetCertProgram\(name\)\s*\{\s*return\s*(\/.+?\/i)\.test/s);
+  // [\s\S] rather than `.` with the `s` flag: dotAll needs an es2018 target and the
+  // repo's tsc rejects it, so the flag would pass under tsx and fail the build.
+  const src = appCode.match(/function isVetCertProgram\(name\)\s*\{\s*return\s*(\/[\s\S]+?\/i)\.test/);
   check("the predicate's pattern was located", !!src, "could not extract the regex to execute it");
   if (src) {
     const re = new RegExp(src[1].slice(1, src[1].lastIndexOf("/")), "i");
