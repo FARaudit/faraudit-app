@@ -10,7 +10,7 @@
 //
 // The rule this pins: a control may only claim what the code can do. An input with
 // no write path is a lie the moment a customer types in it.
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 let pass = 0; let fail = 0;
@@ -380,6 +380,21 @@ console.log("\n── an unfilled chip may not promise a check that never runs �
   const keys = [...appCode.matchAll(/data-pref-tg="([a-z_]+)"/g)].map((m) => m[1]);
   check("the panel actually declares toggles to check", keys.length > 0, "no toggles found — this leg is inert");
   const prefRoute = read("src/app/api/preferences/route.ts");
+  // ...AND THE COLUMN MUST EXIST. This gate shipped #541 green while two of its three
+  // toggles wrote nowhere: PostgREST silently DROPS an unknown column, so the PATCH
+  // answered 2xx, the switch moved, and the value vanished. Reading the key and being
+  // able to STORE it are different claims, and only one was being checked.
+  {
+    const migrations = readdirSync(join(ROOT, "supabase/migrations"))
+      .filter((f) => f.endsWith(".sql"))
+      .map((f) => readFileSync(join(ROOT, "supabase/migrations", f), "utf8")).join("\n");
+    for (const k of [...appCode.matchAll(/data-pref-tg="([a-z_]+)"/g)].map((m) => m[1])) {
+      check(`'${k}' has a migration that adds the column`,
+        new RegExp(`ADD COLUMN IF NOT EXISTS ${k}\\b`).test(migrations),
+        "PostgREST drops an unknown column — the PATCH would report success and store nothing");
+    }
+  }
+
   const consumers = [
     "src/lib/watcher-tick.ts",
     "src/app/api/cron/watched-digest/route.ts",
