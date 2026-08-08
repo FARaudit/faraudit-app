@@ -1,0 +1,210 @@
+{
+ "cats": [
+  {
+   "id": "con",
+   "label": "Construction",
+   "color": "#7c9cc4"
+  },
+  {
+   "id": "eng",
+   "label": "Engineering",
+   "color": "#5bb3a6"
+  },
+  {
+   "id": "mfg",
+   "label": "Manufacturing",
+   "color": "#b08ad0"
+  },
+  {
+   "id": "mro",
+   "label": "MRO",
+   "color": "#d0a45b"
+  },
+  {
+   "id": "it",
+   "label": "IT & Cyber",
+   "color": "#378ADD"
+  }
+ ],
+ "rows": {
+  "236220": {
+   "cat": "con",
+   "eval": "bv",
+   "clause": "far",
+   "note": "Construction — Statement of Requirement, not a SOW"
+  },
+  "237310": {
+   "cat": "con",
+   "eval": "bv",
+   "clause": "agar",
+   "note": "Construction — drawings + specs; USDA roads common"
+  },
+  "238150": {
+   "cat": "con",
+   "eval": "lpta",
+   "clause": "affars",
+   "note": "Trade sub — ballistic / blast specs common on AF work"
+  },
+  "238210": {
+   "cat": "con",
+   "eval": "lpta",
+   "clause": "far",
+   "note": "Trade sub — Davis-Bacon wage determination applies"
+  },
+  "238220": {
+   "cat": "con",
+   "eval": "lpta",
+   "clause": "far",
+   "note": "Trade sub — Davis-Bacon wage determination applies"
+  },
+  "332710": {
+   "cat": "mfg",
+   "eval": "lpta",
+   "clause": "dfars",
+   "note": "Supply buy — no SOW; look for the TDP"
+  },
+  "332999": {
+   "cat": "mfg",
+   "eval": "lpta",
+   "clause": "dfars",
+   "note": "Supply buy — TDP + drawings expected"
+  },
+  "334511": {
+   "cat": "mfg",
+   "eval": "bv",
+   "clause": "dfars",
+   "note": "Supply buy — ITAR / export control likely"
+  },
+  "336412": {
+   "cat": "mfg",
+   "eval": "bv",
+   "clause": "affars",
+   "note": "Supply buy — source approval (SAR) likely"
+  },
+  "336413": {
+   "cat": "mfg",
+   "eval": "bv",
+   "clause": "dfars",
+   "note": "Supply buy — source approval (SAR) likely"
+  },
+  "336611": {
+   "cat": "mro",
+   "eval": "bv",
+   "clause": "dfars",
+   "note": "Repair — NAVSEA standard items apply"
+  },
+  "488190": {
+   "cat": "mro",
+   "eval": "bv",
+   "clause": "affars",
+   "note": "Services — expect PWS; work performed on-base"
+  },
+  "518210": {
+   "cat": "it",
+   "eval": "bv",
+   "clause": "dfars",
+   "note": "Cloud — FedRAMP authorization likely"
+  },
+  "541310": {
+   "cat": "eng",
+   "eval": "bv",
+   "clause": "far",
+   "note": "Brooks Act — qualifications-based selection"
+  },
+  "541330": {
+   "cat": "eng",
+   "eval": "bv",
+   "clause": "dfars",
+   "note": "Services — expect PWS/SOO; SCA may apply"
+  },
+  "541380": {
+   "cat": "eng",
+   "eval": "bv",
+   "clause": "far",
+   "note": "Services — expect QASP + test plan"
+  },
+  "541511": {
+   "cat": "it",
+   "eval": "bv",
+   "clause": "dfars",
+   "note": "IT services — CMMC + DFARS 7012 likely"
+  },
+  "541512": {
+   "cat": "eng",
+   "eval": "bv",
+   "clause": "dfars",
+   "note": "IT services — expect CMMC + DFARS 252.204-7012"
+  },
+  "541513": {
+   "cat": "it",
+   "eval": "bv",
+   "clause": "dfars",
+   "note": "IT services — expect PWS + SLAs"
+  },
+  "541519": {
+   "cat": "it",
+   "eval": "bv",
+   "clause": "dfars",
+   "note": "IT services — verify required CMMC level"
+  },
+  "541611": {
+   "cat": "eng",
+   "eval": "bv",
+   "clause": "far",
+   "note": "Services — expect a PWS"
+  },
+  "541690": {
+   "cat": "eng",
+   "eval": "bv",
+   "clause": "far",
+   "note": "Services — expect a PWS"
+  },
+  "541715": {
+   "cat": "eng",
+   "eval": "bv",
+   "clause": "dfars",
+   "note": "R&D — SBIR / STTR pathways common"
+  },
+  "561210": {
+   "cat": "con",
+   "eval": "bv",
+   "clause": "dfars",
+   "note": "Services — expect a PWS attachment on SAM.gov"
+  },
+  "562910": {
+   "cat": "mro",
+   "eval": "bv",
+   "clause": "far",
+   "note": "Environmental — site-specific scope"
+  },
+  "811210": {
+   "cat": "mro",
+   "eval": "lpta",
+   "clause": "dfars",
+   "note": "Repair — expect a repair / overhaul spec"
+  },
+  "811310": {
+   "cat": "mro",
+   "eval": "lpta",
+   "clause": "far",
+   "note": "Repair — expect equipment list + SOW"
+  }
+ },
+ "syn": {
+  "236220": "building renovation tenant improvement",
+  "237310": "paving roads asphalt bridge street",
+  "238150": "ballistic glass window glazing curtain wall blast",
+  "238210": "electrical wiring power",
+  "238220": "plumbing hvac heating cooling mechanical",
+  "332710": "machining cnc fabrication parts",
+  "334511": "radar navigation sensor electronics",
+  "336412": "jet engine turbine afterburner aircraft",
+  "488190": "aircraft ground support flightline aviation",
+  "518210": "cloud hosting data center fedramp",
+  "541330": "engineering design a&e civil structural",
+  "541511": "software programming development coding",
+  "541512": "it software systems integration network",
+  "561210": "base operations facilities janitorial grounds",
+  "811210": "calibration instrument electronic repair"
+ }
+}
