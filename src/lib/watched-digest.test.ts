@@ -105,6 +105,22 @@ console.log("\n── the verdict badge ──");
   ok(/#047857/.test(go), "…and a real GO still is green");
 }
 
+console.log("\n── the preheader ──");
+{
+  // THE ONE LINE EVERY CLIENT SHOWS BEFORE THE EMAIL IS OPENED. It joined with the HTML
+  // ENTITY "&middot;" and then ran esc() over the result, which escapes the ampersand — so
+  // the inbox preview read the literal text "&middot;". Caught in a real Gmail snippet.
+  const d = buildWatchedDigest([posted(), { status: "watching", created_at: days(-1) }], OPTS)!;
+  const h = buildWatchedDigestEmail(d, "u", NOW).html;
+  const pre = h.slice(h.indexOf('opacity:0">') + 11, h.indexOf("</div>", h.indexOf('opacity:0">')));
+  ok(pre.length > 0, "a preheader is emitted at all", pre);
+  ok(!/&(amp;)?[a-z]+;/i.test(pre), "the preheader carries no raw HTML entity", pre);
+  ok(!/&(amp;)?[a-z]+;/i.test(buildWatchedDigestEmail(d, "u", NOW).text), "nor does the plaintext half");
+  // PLANTED: the check must recognise the defect it was written for.
+  ok(/&(amp;)?[a-z]+;/i.test("2 newly tracked &amp;middot; 2 closing soon"),
+    "PLANTED: an escaped entity is still detectable by this check");
+}
+
 console.log("\n── planted positives — this gate must be able to fail ──");
 ok(buildWatchedDigest([posted()], OPTS)!.posted.length === 1,
   "P1 the posted fixture really does land in the posted section — the nulls above are a decision, not an empty fixture");

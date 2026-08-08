@@ -252,7 +252,7 @@ export function buildWatchedDigestEmail(d: WatchedDigest, settingsUrl: string, n
   const foot = `You receive this because the weekly digest is on in your notification preferences.`;
 
   const html = `<!doctype html><html><body style="margin:0;padding:0;background:${BRAND.page}">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(counts.join(" &middot; "))} across the notices you are watching.</div>
+<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(counts.join(" \u00b7 "))} across the notices you are watching.</div>
 <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:${BRAND.page};padding:28px 12px">
 <tr><td align="center">
   <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:680px;background:#fff;border:1px solid ${BRAND.line};border-radius:14px;overflow:hidden">
