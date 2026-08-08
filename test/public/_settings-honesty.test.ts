@@ -407,7 +407,23 @@ console.log("\n── an unfilled chip may not promise a check that never runs �
   }
 }
 
+// THE TAB MUST SAY WHERE ITS SUBJECT COMES FROM. Found by the CEO using the product: the
+// panel governs "the notices you are watching" and never said how a notice BECOMES watched,
+// so the link between pressing Track in Opportunities and receiving an email existed only in
+// the code. A control whose input is undiscoverable is only half-shipped.
+{
+  const notifs = appCode.slice(appCode.indexOf("notifs: () =>"), appCode.indexOf("team: () =>"));
+  check("the notifications panel names Track as the origin", /\bTrack\b/.test(notifs),
+    "the tab never says how a notice becomes watched");
+  check("...and links to where that is done", /href="\/opportunities"/.test(notifs),
+    "the reader is told the mechanism but not where to find it");
+  check("...and says what actually reaches them", /every hour/.test(notifs) && /run the audit/.test(notifs),
+    "no account of what happens between tracking and the email");
+}
+
 console.log("\n── planted positives ──");
+check("P5 · rejects a panel that names no origin",
+  !/\bTrack\b/.test("These apply to the notices you are watching."));
 check("P1 · rejects a resurrected auto-save claim", /changes save automatically/i.test('<b id="savedAt">changes save automatically</b>'));
 check("P2 · accepts copy with no such claim", !/changes save automatically/i.test("<p>Your details and the company record.</p>"));
 check("P4 · rejects a toggle whose key no consumer reads",
