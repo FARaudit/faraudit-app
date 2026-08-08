@@ -7,6 +7,13 @@
       "runtimeArgs": ["run", "dev"],
       "port": 3000,
       "autoPort": true
+    },
+    {
+      "name": "public-assets",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8811", "--directory", "public"],
+      "port": 8811,
+      "autoPort": true
     }
   ]
 }

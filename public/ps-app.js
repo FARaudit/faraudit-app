@@ -256,11 +256,11 @@
         <div class="fld-sec">NAICS codes</div>
         <div class="cert-row">${NAICS.length ? NAICS.map(n => `<span class="cert-tg on">${esc(n.code || n.k || n)}</span>`).join('') : '<span class="fld-none">None on file</span>'}</div>
         ${NAICS.length ? '' : '<div class="note note-warn">No NAICS codes on file, so Today, Opportunities, Contracting Officers and Teaming Partners have nothing to match against and will stay empty. Add them under NAICS Configuration.</div>'}
-        <div class="fld-sec">Certifications</div>
+        <div class="fld-sec">Certifications on your capability statement</div>
         <div class="cert-row">${CERTS.length ? CERTS.map(c => certChip(c)).join('') : '<span class="fld-none">None on file</span>'}</div>
         ${certCaption()}
         ${certNote()}
-        <div class="note">This is the same record the <a href="/capability-statement">capability statement</a> prints and the audit engine reads when it judges whether you are eligible to bid — so what you enter here shapes real verdicts. NAICS codes are edited under NAICS Configuration. Certifications are shown here only: one clears a set-aside bar just when it is verified against SAM, so there is nothing useful to type.</div>
+        <div class="note">This is the same record the <a href="/capability-statement">capability statement</a> prints and the audit engine reads when it judges whether you are eligible to bid — so what you enter here shapes real verdicts. NAICS codes are edited under NAICS Configuration, and certifications on your <a href="/capability-statement">capability statement</a>. They are shown here only: one clears a set-aside bar just when it is verified against SAM, so there is nothing useful to type.</div>
       </div>
       <div class="sp-foot"><span class="saved" id="psSavedNote" hidden></span><button class="save-btn" id="psSaveBtn">Save changes</button></div>`,
 
