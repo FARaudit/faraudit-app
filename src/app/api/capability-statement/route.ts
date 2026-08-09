@@ -4,6 +4,7 @@ import { syncCertifications } from "@/lib/cert-sync";
 import { suggestedNaics } from "@/lib/naics-suggestions";
 import { PAST_PERFORMANCE_LIMIT } from "@/lib/capability-statement-limits";
 import { naicsLines } from "@/lib/capability-statement-naics";
+import { agencyOptions } from "@/lib/capability-statement-tailoring";
 
 export const dynamic = "force-dynamic";
 
@@ -241,6 +242,7 @@ export async function GET(_req: NextRequest) {
       past_performance_total: pastTotal,
       past_performance_limit: PAST_PERFORMANCE_LIMIT,
       naics_titles: naicsTitles(naics),
+      tailored_agencies: agencyOptions(past),
       stub: true
     });
   }
@@ -277,6 +279,9 @@ export async function GET(_req: NextRequest) {
     // quote 13 CFR 121.201 through one path — and so the page does not pull a 90 KB
     // table to print three lines. A code the regulation does not carry is simply absent.
     naics_titles: naicsTitles(merged.naics_codes),
+    // Editions the record can support: an agency appears only because a win with it is
+    // recorded. Offering the rest would name relevance the history does not back.
+    tailored_agencies: agencyOptions(past),
     stub: false
   });
 }

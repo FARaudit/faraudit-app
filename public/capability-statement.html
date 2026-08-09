@@ -174,6 +174,16 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
 .perf-summary{grid-column:1/-1;font-size:12px;color:var(--ink-2);line-height:1.55;margin-top:4px}
 .perf-more{font-size:11.5px;color:var(--mute);line-height:1.5;padding-top:2px}
 
+/* tailored versions — editions the award history can support */
+.ver-intro{font-size:12px;color:var(--mute);line-height:1.5;margin:0 0 10px}
+.ver-list{display:flex;flex-direction:column;gap:6px}
+.ver-opt{display:flex;align-items:center;gap:9px;width:100%;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--card-soft);font-family:inherit;font-size:12.5px;font-weight:600;color:var(--ink-2);cursor:pointer;text-align:left;transition:border-color .14s,color .14s,background .14s}
+.ver-opt:hover{border-color:var(--accent-light);color:var(--accent-deep)}
+.ver-opt.is-active{border-color:var(--accent);color:var(--accent-deep);background:rgba(55,138,221,0.06)}
+[data-theme="dark"] .ver-opt.is-active,[data-theme="dark"] .ver-opt:hover{color:var(--accent-light)}
+.ver-opt .vc{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--mute)}
+.ver-opt.is-active .vc{color:var(--accent)}
+
 /* award history — full width, below the grid */
 .award-history{margin-top:20px}
 .ah-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:12px}
@@ -580,7 +590,8 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
 
           <section class="side-card">
             <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/></svg>Tailored versions</h3>
-            <p class="cs-unwired">Agency-specific editions are not built yet. This statement is the single version.</p>
+            <p class="ver-intro"></p>
+            <div class="ver-list"></div>
           </section>
 
         </aside>

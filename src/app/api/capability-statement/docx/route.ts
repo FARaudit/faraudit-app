@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase-server";
 import { PAST_PERFORMANCE_EXPORT_LIMIT } from "@/lib/capability-statement-limits";
 import { formatPhone } from "@/lib/capability-statement-format";
 import { naicsLines } from "@/lib/capability-statement-naics";
+import { orderForAgency, resolveAgency } from "@/lib/capability-statement-tailoring";
 import {
   Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle, HeadingLevel
 } from "docx";
@@ -61,7 +62,7 @@ const body = (text: string) =>
     children: [new TextRun({ text, size: 21, color: INK })]
   });
 
-function build(stmt: CapStmt): Document {
+function build(stmt: CapStmt, agency: string | null): Document {
   const company = String(stmt.company_name || "").trim();
   const children: Paragraph[] = [];
 
@@ -70,6 +71,13 @@ function build(stmt: CapStmt): Document {
     spacing: { after: 40 },
     children: [new TextRun({ text: "CAPABILITY STATEMENT", size: 15, color: MUTE, characterSpacing: 40 })]
   }));
+  // A statement about which edition this is, not a claim about the firm.
+  if (agency) {
+    children.push(new Paragraph({
+      spacing: { after: 40 },
+      children: [new TextRun({ text: `Prepared for ${agency}`, size: 15, color: MUTE })]
+    }));
+  }
   children.push(new Paragraph({
     heading: HeadingLevel.TITLE,
     spacing: { after: 140 },
@@ -122,7 +130,8 @@ function build(stmt: CapStmt): Document {
     for (const p of String(stmt.differentiators).split(/\n+/).filter((x) => x.trim())) children.push(body(p.trim()));
   }
 
-  const past = (stmt.past_performance || []).filter((p) => p.title || p.notice_id);
+  // Reordered for the edition, never filtered — the point is which work leads.
+  const past = orderForAgency(stmt.past_performance || [], agency).filter((p) => p.title || p.notice_id);
   if (past.length) {
     children.push(eyebrow("PAST PERFORMANCE"));
     for (const p of past.slice(0, PAST_PERFORMANCE_EXPORT_LIMIT)) {
@@ -176,7 +185,7 @@ function build(stmt: CapStmt): Document {
   });
 }
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   const supabase = await createServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -197,13 +206,15 @@ export async function GET(_req: NextRequest) {
     );
   }
 
-  const buffer = await Packer.toBuffer(build(stmt as CapStmt));
+  const agency = resolveAgency((stmt as CapStmt).past_performance, req.nextUrl.searchParams.get("agency"));
+  const buffer = await Packer.toBuffer(build(stmt as CapStmt, agency));
   const ab = new ArrayBuffer(buffer.byteLength);
   new Uint8Array(ab).set(buffer);
 
   const generatedAt = new Date().toISOString().slice(0, 10);
   const slug = String((stmt as CapStmt).company_name).replace(/[^A-Za-z0-9_-]+/g, "_");
-  const filename = `${slug}-CapabilityStatement-${generatedAt}.docx`;
+  const edition = agency ? `-${agency.replace(/[^A-Za-z0-9]+/g, "_")}` : "";
+  const filename = `${slug}${edition}-CapabilityStatement-${generatedAt}.docx`;
 
   return new Response(ab, {
     status: 200,

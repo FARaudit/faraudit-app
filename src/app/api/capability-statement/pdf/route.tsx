@@ -4,6 +4,7 @@ import { PAST_PERFORMANCE_EXPORT_LIMIT } from "@/lib/capability-statement-limits
 import { formatPhone } from "@/lib/capability-statement-format";
 import { sniffImageType } from "@/lib/capability-statement-logo";
 import { naicsLines } from "@/lib/capability-statement-naics";
+import { orderForAgency, resolveAgency } from "@/lib/capability-statement-tailoring";
 import { renderToBuffer, Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
 import React from "react";
 
@@ -80,7 +81,7 @@ interface CapStmt {
   }>;
 }
 
-function CapDoc({ stmt, generatedAt, logo }: { stmt: CapStmt; generatedAt: string; logo: Buffer | null }): React.ReactElement {
+function CapDoc({ stmt, generatedAt, logo, agency }: { stmt: CapStmt; generatedAt: string; logo: Buffer | null; agency: string | null }): React.ReactElement {
   // No fallback. A capability statement is a document the customer sends to a
   // contracting officer under their own name; printing a placeholder on the letterhead
   // puts words in their mouth on government-facing paper. The GET refuses to render at
@@ -88,7 +89,8 @@ function CapDoc({ stmt, generatedAt, logo }: { stmt: CapStmt; generatedAt: strin
   const company = stmt.company_name as string;
   const naics = stmt.naics_codes || [];
   const certs = stmt.certifications || [];
-  const past = stmt.past_performance || [];
+  // Tailored editions reorder; they never filter and never add prose.
+  const past = orderForAgency(stmt.past_performance || [], agency);
 
   return (
     <Document>
@@ -107,6 +109,8 @@ function CapDoc({ stmt, generatedAt, logo }: { stmt: CapStmt; generatedAt: strin
           </View>
           <View style={styles.meta}>
             <Text>{generatedAt}</Text>
+            {/* A statement about which edition this is, not a claim about the firm. */}
+            {agency ? <Text style={{ marginTop: 2 }}>Prepared for {agency}</Text> : null}
           </View>
         </View>
 
@@ -203,7 +207,7 @@ function CapDoc({ stmt, generatedAt, logo }: { stmt: CapStmt; generatedAt: strin
   );
 }
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   const supabase = await createServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -227,13 +231,17 @@ export async function GET(_req: NextRequest) {
   }
 
   const generatedAt = new Date().toISOString().slice(0, 10);
+  // Validated against the record: an edition may only name an agency the customer has
+  // a recorded award with, so a query string cannot invent relevance.
+  const agency = resolveAgency((stmt as CapStmt).past_performance, req.nextUrl.searchParams.get("agency"));
   const logo = await fetchLogo((stmt as CapStmt).logo_url);
-  const buffer = await renderToBuffer(<CapDoc stmt={stmt as CapStmt} generatedAt={generatedAt} logo={logo} />);
+  const buffer = await renderToBuffer(<CapDoc stmt={stmt as CapStmt} generatedAt={generatedAt} logo={logo} agency={agency} />);
   const ab = new ArrayBuffer(buffer.byteLength);
   new Uint8Array(ab).set(buffer);
 
   const slug = String((stmt as CapStmt).company_name).replace(/[^A-Za-z0-9_-]+/g, "_");
-  const filename = `FARaudit-${slug}-CapabilityStatement-${generatedAt}.pdf`;
+  const edition = agency ? `-${agency.replace(/[^A-Za-z0-9]+/g, "_")}` : "";
+  const filename = `${slug}${edition}-CapabilityStatement-${generatedAt}.pdf`;
 
   return new Response(ab, {
     status: 200,

@@ -151,6 +151,74 @@
     }
   }
 
+  /* ── tailored versions — SELECTION AND ORDERING, never authorship ────────── */
+  /* An edition reorders the awards the customer already recorded so the work most
+     relevant to that buyer leads. It rewrites nothing. Agencies come from the award
+     history, so every edition on offer differs from the default in a way the record
+     supports — a "Navy edition" for a Navy they have never worked with would be the
+     same document under a name implying relevance it does not have. */
+  var AGENCIES = [];
+  var EDITION = null;
+
+  function paintVersions() {
+    var intro = el('.ver-intro');
+    var listEl = el('.ver-list');
+    if (!intro || !listEl) return;
+    clear(intro);
+    clear(listEl);
+
+    if (!AGENCIES.length) {
+      intro.appendChild(document.createTextNode(
+        'Agency editions come from the agencies you have won with. Record an audit as won and its agency appears here.'));
+      return;
+    }
+
+    intro.appendChild(document.createTextNode(
+      'Leads with the work you have done for that agency. Nothing else about the statement changes.'));
+
+    var opts = [{ agency: null, count: null, label: 'Default — most recent first' }]
+      .concat(AGENCIES.map(function (a) { return { agency: a.agency, count: a.count, label: a.agency }; }));
+
+    opts.forEach(function (o) {
+      var b = make('button', 'ver-opt');
+      b.type = 'button';
+      b.setAttribute('data-cs-edition', o.agency === null ? '' : o.agency);
+      if ((EDITION || null) === o.agency) b.className += ' is-active';
+      b.appendChild(document.createTextNode(o.label));
+      if (o.count !== null) {
+        b.appendChild(make('span', 'vc', o.count + (o.count === 1 ? ' award' : ' awards')));
+      }
+      listEl.appendChild(b);
+    });
+  }
+
+  function setEdition(agency) {
+    EDITION = has(agency) ? agency : null;
+    paintVersions();
+    /* The statement card is the document, so the preview reorders with the edition —
+       what the customer reads is what the export sends. */
+    paintPastPerformance();
+    paintAwardHistory();
+  }
+
+  /* Mirrors orderForAgency() in src/lib/capability-statement-tailoring.ts: a stable
+     partition, never a filter, and an unmatched agency leaves the list untouched. */
+  function orderForEdition(rows) {
+    if (!EDITION) return rows.slice();
+    var want = String(EDITION).trim().toLowerCase();
+    var match = [];
+    var rest = [];
+    for (var i = 0; i < rows.length; i++) {
+      var a = String(rows[i] && rows[i].agency ? rows[i].agency : '').trim().toLowerCase();
+      (a === want ? match : rest).push(rows[i]);
+    }
+    return match.length ? match.concat(rest) : rows.slice();
+  }
+
+  function editionQuery() {
+    return EDITION ? ('?agency=' + encodeURIComponent(EDITION)) : '';
+  }
+
   /* ── the company logo ───────────────────────────────────────────────────── */
   function paintLogo() {
     var box = el('.lh-logo');
@@ -265,7 +333,7 @@
     var wrap = el('.perf-list');
     if (!wrap) return;
     clear(wrap);
-    var rows = list(REC.past_performance);
+    var rows = orderForEdition(list(REC.past_performance));
     if (!rows.length) {
       wrap.appendChild(emptyNote(
         'past performance yet',
@@ -310,7 +378,7 @@
     if (!body || !sub) return;
     clear(body);
 
-    var rows = list(REC.past_performance);
+    var rows = orderForEdition(list(REC.past_performance));
     var total = PAST_TOTAL === null ? rows.length : PAST_TOTAL;
 
     /* Below the export limit the card already lists every award, so a second table
@@ -681,6 +749,8 @@
     var dl = e.target.closest('[data-cs-download]');
     if (dl) { e.preventDefault(); downloadExport(dl, dl.getAttribute('data-cs-download')); return; }
     if (e.target.closest('.lh-logo-remove')) { e.preventDefault(); removeLogo(); return; }
+    var ed = e.target.closest('[data-cs-edition]');
+    if (ed) { e.preventDefault(); setEdition(ed.getAttribute('data-cs-edition')); return; }
   });
 
   /* The file input is inside the label, so a click on the box opens the picker on its
@@ -707,7 +777,7 @@
     if (list(REC.certifications).length) L.push('Certifications: ' + list(REC.certifications).join(', '));
     if (has(REC.core_competencies)) L.push('', 'CORE COMPETENCIES', REC.core_competencies);
     if (has(REC.differentiators)) L.push('', 'DIFFERENTIATORS', REC.differentiators);
-    var allPerf = list(REC.past_performance);
+    var allPerf = orderForEdition(list(REC.past_performance));
     var perf = allPerf.slice(0, EXPORT_LIMIT);
     if (perf.length) {
       L.push('', 'PAST PERFORMANCE');
@@ -800,7 +870,7 @@
     if (has(REC.core_competencies)) sec('Core competencies', paras(REC.core_competencies));
     if (has(REC.differentiators)) sec('Differentiators', paras(REC.differentiators));
 
-    var all = list(REC.past_performance);
+    var all = orderForEdition(list(REC.past_performance));
     var perf = all.slice(0, EXPORT_LIMIT);
     if (perf.length) {
       var body = '<ul style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.55">' + perf.map(function (pp) {
@@ -846,7 +916,7 @@
     if (!spec) return;
     var say = function (msg, ok) { localNote(btn, msg, ok); };
     say('Building ' + spec.label + '…', true);
-    fetch(API + spec.path, { credentials: 'include' })
+    fetch(API + spec.path + editionQuery(), { credentials: 'include' })
       .then(function (r) {
         if (!r.ok) {
           return r.json().catch(function () { return null; }).then(function (b) {
@@ -925,6 +995,7 @@
       'This is what separates you from the other bidders. Add it with Edit.');
     paintPastPerformance();
     paintAwardHistory();
+    paintVersions();
     paintContact();
     paintHealth();
     paintStats();
@@ -956,6 +1027,7 @@
         PAST_TOTAL = typeof d.past_performance_total === 'number' ? d.past_performance_total : null;
         PAST_LIMIT = typeof d.past_performance_limit === 'number' ? d.past_performance_limit : null;
         NAICS_TITLES = (d.naics_titles && typeof d.naics_titles === 'object') ? d.naics_titles : {};
+        AGENCIES = Array.isArray(d.tailored_agencies) ? d.tailored_agencies : [];
         renderAll();
         document.body.classList.add('cs-ready');
         setLivePill(true);
