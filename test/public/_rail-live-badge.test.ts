@@ -760,6 +760,30 @@ console.log("\n── Part S · the badge script reaches every injected route �
     /out\.ok\)? return \{ state: "live"/.test(stateRoute) || /out\.ok/.test(stateRoute),
     "an empty but successful read must not read as an outage");
 
+  // ── No badge value is ever written into a served page ──────────────────────
+  // The static sidebars carried 86 of them across 17 pages — 16×"8", 14×"15",
+  // 16×"3" and, worst, 17×"Live". injectRail replaces the whole <aside> so none
+  // of them reached production, which is exactly why they survived: dead markup
+  // that no one sees is dead until the day the regex misses a page, and then the
+  // page claims the feed is up during an outage. The runtime is the only thing
+  // allowed to assert a badge — rail-live-badge.js builds the span itself when it
+  // is absent, and removes it rather than leave a stale claim standing.
+  {
+    const files = readdirSync(join(ROOT, "public")).filter((f) => f.endsWith(".html"));
+    const offenders: string[] = [];
+    for (const f of files) {
+      const html = readFileSync(join(ROOT, "public", f), "utf8");
+      const aside = html.match(/<aside class="sidebar">([\s\S]*?)<\/aside>/);
+      if (!aside) continue;
+      const n = (aside[1].match(/sb-badge/g) ?? []).length;
+      if (n) offenders.push(`${f}(${n})`);
+    }
+    check("no served page hardcodes a rail badge",
+      offenders.length === 0, offenders.join(", "));
+    check("S-P4 · that check can see a planted badge",
+      /sb-badge/.test('<aside class="sidebar"><a><span class="sb-badge count">8</span></a></aside>'));
+  }
+
   // Planted positives.
   check("S-P1 · rejects a rail that never mentions the script",
     !/rail-live-badge\.js/.test("export function injectRail(h){return h}"));
