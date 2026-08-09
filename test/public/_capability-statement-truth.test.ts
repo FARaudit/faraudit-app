@@ -785,5 +785,61 @@ console.log("\n── the Word export is a real document ──");
     !/Packer\.toBuffer/.test('return new Response(html, { headers: { "Content-Type": "application/msword" } })'));
 }
 
+// ── tailored versions: selection and ordering, never authorship ──────────────
+// CEO ruling, 2026-08-09. An agency edition reorders what the customer has already
+// recorded. It does not rewrite core competencies and it does not generate a sentence:
+// a model-written claim about a firm's capabilities, printed on paper that firm sends
+// under its own name, is a fabrication with their signature on it.
+console.log("\n── a tailored edition writes nothing ──");
+{
+  const lib = read("src/lib/capability-statement-tailoring.ts");
+  const pdf = read("src/app/api/capability-statement/pdf/route.tsx");
+  const docx = read("src/app/api/capability-statement/docx/route.ts");
+  const api = read("src/app/api/capability-statement/route.ts");
+
+  // The boundary itself. No surface that renders an edition may reach a model.
+  for (const [surface, src] of [["the tailoring library", lib], ["the PDF", pdf], ["the Word export", docx], ["the page", live]] as const) {
+    check(`${surface} calls no model`,
+      !/anthropic|openai|callModel|generateText|completion\(/i.test(src),
+      "a tailored edition that writes prose puts model text on the customer's letterhead");
+  }
+  check("prose fields are never rewritten for an edition",
+    !/core_competencies\s*=/.test(lib) && !/differentiators\s*=/.test(lib),
+    "tailoring mutates what the customer wrote");
+
+  check("an edition reorders, never filters", /const rest: T\[\] = \[\]/.test(lib) && /\[\.\.\.match, \.\.\.rest\]/.test(lib),
+    "a filter hides the firm's own past performance from its own document");
+  check("an unmatched agency leaves the list untouched", /match\.length \? \[\.\.\.match, \.\.\.rest\] : rows\.slice\(\)/.test(lib),
+    "an unknown agency empties the section");
+
+  check("agencies come from the award history", /agencyOptions/.test(api) && /counts\.set\(agency/.test(lib),
+    "a full agency list offers editions the record cannot support");
+  check("the requested agency is validated against the record", /function resolveAgency/.test(lib),
+    "a query string names an agency the customer has never worked with");
+  for (const [surface, src] of [["the PDF", pdf], ["the Word export", docx]] as const) {
+    check(`${surface} validates the edition`, /resolveAgency\(/.test(src),
+      "the caller decides what the document claims");
+    check(`${surface} names the edition`, /Prepared for /.test(src),
+      "two different documents download under one identity");
+    check(`${surface} reorders its awards`, /orderForAgency\(/.test(src),
+      "the edition differs in name only");
+  }
+  check("the filename distinguishes editions", /const edition = agency \?/.test(pdf) && /const edition = agency \?/.test(docx),
+    "three editions land in Downloads under one name and overwrite each other");
+
+  check("the page preview reorders with the edition",
+    /function orderForEdition/.test(live) && /orderForEdition\(list\(REC\.past_performance\)\)/.test(live),
+    "the statement card stops matching what the export sends");
+  check("the downloads carry the edition", /spec\.path \+ editionQuery\(\)/.test(live),
+    "the picker changes the preview and not the document");
+  check("the card is no longer declared unbuilt", !/Agency-specific editions are not built yet/.test(html),
+    "the page denies a capability it now has");
+  check("with no award history it says why", /Record an audit as won and its agency appears here/.test(live),
+    "an empty picker reads as broken rather than unearned");
+
+  check("P20 · the no-model check can see a generated edition",
+    /callModel/.test("const prose = await callModel('rewrite for ' + agency);"));
+}
+
 console.log(`\n${pass} passed · ${fail} failed`);
 if (fail > 0) process.exit(1);
