@@ -199,15 +199,6 @@ export function mapSamItems(raw: RawSamItem[], now: Date): OpportunityRow[] {
   if (droppedNoPdf || droppedExpired) {
     console.log(`[live-opportunities] filtered · ${droppedNoPdf} no-PDF · ${droppedExpired} expired`);
   }
-  if (rows.length > SAFETY_CEILING) {
-    // Keep what can still be acted on. A row with no deadline sorts last, because a bid
-    // you cannot date is worth less than one closing on Friday.
-    const far = Number.MAX_SAFE_INTEGER;
-    rows.sort((a, b) => (a.response_deadline ? Date.parse(a.response_deadline) : far)
-                      - (b.response_deadline ? Date.parse(b.response_deadline) : far));
-    console.warn(`[live-opportunities] SAFETY_CEILING hit: keeping ${SAFETY_CEILING} of ${rows.length} by soonest deadline`);
-    rows.length = SAFETY_CEILING;
-  }
   rows.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
   return rows;
 }
@@ -215,7 +206,7 @@ export function mapSamItems(raw: RawSamItem[], now: Date): OpportunityRow[] {
 // Exported for tests (uncached). Production goes through the unstable_cache
 // wrapper below so SAM.gov sees at most ~one refresh per half hour per NAICS
 // set, not one per pageview.
-export async function fetchLiveSamRowsUncached(naicsCsv: string): Promise<OpportunityRow[]> {
+export async function fetchLiveSamRowsUncached(naicsCsv: string): Promise<{ rows: OpportunityRow[]; complete: boolean }> {
   const apiKey = process.env.SAM_API_KEY;
   if (!apiKey) throw new Error("SAM_API_KEY is not configured on the server");
   const codes = naicsCsv.split(",").map((s) => s.trim()).filter(Boolean);
@@ -238,15 +229,35 @@ export async function fetchLiveSamRowsUncached(naicsCsv: string): Promise<Opport
         items.push(...next.items);
         pagesRead += 1;
       }
-      if (items.length < first.total) {
+      const short = items.length < first.total;
+      if (short) {
         console.warn(
           `[live-opportunities] NAICS ${code}: ${items.length}/${first.total} after ${pagesRead} page(s) — upstream has more`
         );
       }
-      return items;
+      return { items, short };
     })
   );
-  return mapSamItems(all.flat(), now);
+  const rows = mapSamItems(all.flatMap((a) => a.items), now);
+  let complete = !all.some((a) => a.short);
+
+  /* A TRUNCATION THE CUSTOMER CANNOT SEE IS THE DEFECT THIS FILE JUST FINISHED REMOVING.
+     The 200-cap survived for as long as it did because it was a console.warn and a number
+     under it — nobody was ever told. Replacing it with a higher console.warn would have
+     been the same mistake with more headroom, so the ceiling reports itself: `complete`
+     rides out with the rows and the surfaces that state a total can hedge it. */
+  if (rows.length > SAFETY_CEILING) {
+    // Keep what can still be acted on. A row with no deadline sorts last, because a bid
+    // you cannot date is worth less than one closing on Friday.
+    const far = Number.MAX_SAFE_INTEGER;
+    rows.sort((a, b) => (a.response_deadline ? Date.parse(a.response_deadline) : far)
+                      - (b.response_deadline ? Date.parse(b.response_deadline) : far));
+    console.warn(`[live-opportunities] SAFETY_CEILING hit: keeping ${SAFETY_CEILING} of ${rows.length} by soonest deadline`);
+    rows.length = SAFETY_CEILING;
+    rows.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+    complete = false;
+  }
+  return { rows, complete };
 }
 
 const fetchLiveSamRowsCached = unstable_cache(
@@ -301,22 +312,34 @@ export async function resolveFeedScope(client: SupabaseClient): Promise<FeedScop
 // zero-result window.
 export async function fetchLiveOpportunitiesScoped(
   client: SupabaseClient
-): Promise<{ rows: OpportunityRow[]; scope: FeedScope }> {
+): Promise<{ rows: OpportunityRow[]; scope: FeedScope; complete: boolean }> {
   const scope = await resolveFeedScope(client);
-  return { rows: await fetchLiveOpportunities(client, scope), scope };
+  const out = await fetchLiveOpportunitiesWithMeta(client, scope);
+  return { rows: out.rows, scope, complete: out.complete };
 }
 
+/** Rows only. `complete` is dropped here on purpose — a caller that does not state a
+ *  total cannot mis-state one. Anything that PRINTS a count uses the Scoped form. */
 export async function fetchLiveOpportunities(
   client: SupabaseClient,
   preresolved?: FeedScope
 ): Promise<OpportunityRow[]> {
+  return (await fetchLiveOpportunitiesWithMeta(client, preresolved)).rows;
+}
+
+async function fetchLiveOpportunitiesWithMeta(
+  client: SupabaseClient,
+  preresolved?: FeedScope
+): Promise<{ rows: OpportunityRow[]; complete: boolean }> {
   const scope = preresolved ?? (await resolveFeedScope(client));
   if (scope.codes.length === 0) {
     console.log("[live-opportunities] no NAICS on file for this customer — serving honest-empty, NOT a global fallback");
-    return [];
+    return { rows: [], complete: true };
   }
-  const rows = await fetchLiveSamRowsCached(scope.codes.join(","));
-  if (rows.length === 0) return rows;
+  const feed = await fetchLiveSamRowsCached(scope.codes.join(","));
+  const complete = feed.complete;
+  const rows = feed.rows;
+  if (rows.length === 0) return { rows, complete };
 
   const { data: completedAudits } = await client
     .from("audits")
@@ -330,7 +353,7 @@ export async function fetchLiveOpportunities(
   }
   // Return fresh objects — never mutate the cached array's rows in place, or
   // one request's audit overlay would leak into every later cache hit.
-  return rows.map((r) => {
+  const overlaid = rows.map((r) => {
     const matched = auditByNotice.get(r.notice_id);
     if (!matched) return { ...r };
     return {
@@ -341,4 +364,5 @@ export async function fetchLiveOpportunities(
       recommendation: matched.recommendation ?? r.recommendation
     };
   });
+  return { rows: overlaid, complete };
 }
