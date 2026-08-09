@@ -11,10 +11,8 @@ export const runtime = "nodejs";
 const styles = StyleSheet.create({
   page: { padding: 56, paddingBottom: 70, fontSize: 10, fontFamily: "Helvetica", color: "#0f172a" },
   header: { borderBottom: "2pt solid #378ADD", paddingBottom: 14, marginBottom: 16, flexDirection: "row", justifyContent: "space-between" },
-  brand: { fontSize: 18, fontWeight: 700, color: "#0f172a" },
-  brandGold: { color: "#378ADD" },
+  brand: { fontSize: 20, fontWeight: 700, color: "#0f172a", marginTop: 3 },
   meta: { fontSize: 8, color: "#475569", textAlign: "right" },
-  companyName: { fontSize: 22, fontWeight: 700, color: "#0f172a", marginTop: 8, marginBottom: 10 },
   contactGrid: { flexDirection: "row", justifyContent: "space-between", marginBottom: 16 },
   contactCol: { flexDirection: "column", flexGrow: 1, flexBasis: 0 },
   contactColRight: { flexDirection: "column", flexGrow: 1, flexBasis: 0 },
@@ -65,17 +63,19 @@ function CapDoc({ stmt, generatedAt }: { stmt: CapStmt; generatedAt: string }): 
   return (
     <Document>
       <Page size="LETTER" style={styles.page}>
+        {/* THE CUSTOMER'S NAME IS THE LETTERHEAD. This document is sent to a
+            contracting officer under their company's name; ours sitting above it reads
+            like an invoice tool printing its own logo larger than the biller's. The
+            FARaudit credit lives in the footer. */}
         <View style={styles.header} fixed>
           <View>
-            <Text style={styles.brand}>FAR<Text style={styles.brandGold}>audit</Text></Text>
-            <Text style={{ fontSize: 8, color: "#475569", marginTop: 3 }}>Capability Statement</Text>
+            <Text style={{ fontSize: 8, color: "#475569", letterSpacing: 1.2 }}>CAPABILITY STATEMENT</Text>
+            <Text style={styles.brand}>{company}</Text>
           </View>
           <View style={styles.meta}>
             <Text>{generatedAt}</Text>
           </View>
         </View>
-
-        <Text style={styles.companyName}>{company}</Text>
 
         <View style={styles.contactGrid}>
           <View style={styles.contactCol}>
@@ -149,7 +149,7 @@ function CapDoc({ stmt, generatedAt }: { stmt: CapStmt; generatedAt: string }): 
         <Text
           style={styles.footer}
           fixed
-          render={({ pageNumber }) => `FARaudit Federal Contract Intelligence  |  Page ${pageNumber}  |  Confidential`}
+          render={({ pageNumber }) => `${company}  |  Page ${pageNumber}  |  Confidential  |  Prepared with FARaudit`}
         />
       </Page>
     </Document>

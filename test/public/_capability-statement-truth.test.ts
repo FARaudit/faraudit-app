@@ -564,5 +564,46 @@ console.log("\n── the phone reads the same everywhere ──");
     !/length !== 10\) return raw/.test("function fmtPhone(v){return String(v).replace(/\\D/g,'')}"));
 }
 
+// ── the document is the customer's, and it is dated correctly ────────────────
+// Two CEO rulings, 2026-08-09. (1) DUNS was retired for federal use in April 2022 when
+// UEI replaced it, and it was printing in the pasted copy while being absent from the
+// PDF — one document, two identifier sets, one of them dating the firm. (2) The
+// FARaudit wordmark sat above the customer's company name on a document they send to a
+// contracting officer under their own name.
+console.log("\n── whose document this is ──");
+{
+  const pdf = read("src/app/api/capability-statement/pdf/route.tsx");
+
+  // Match the RENDERING, not the word — a comment mentioning DUNS is not a DUNS on the
+  // document, and a check that cannot tell the difference fails for the wrong reason.
+  for (const [surface, src] of [["the pasted copy", live], ["the printed document", pdf]] as const) {
+    check(`${surface} prints no DUNS`,
+      !/['"`]DUNS /.test(src) && !/\.duns\b/.test(src),
+      "an identifier retired for federal use in April 2022 is on a document sent to a CO");
+  }
+
+  // Scope to the HTML export: the plain-text builder names the same fields, so an
+  // unscoped indexOf compares positions in two different functions.
+  const htmlFn = live.slice(live.indexOf("function statementHtml()"), live.indexOf("function copyStatement"));
+  check("the pasted copy leads with the company, not with us",
+    htmlFn.indexOf("Capability Statement</div>") < htmlFn.indexOf("company name not set"),
+    "the vendor's name sits above the customer's on their own letterhead");
+  check("the pasted copy carries no FARaudit letterhead",
+    !/FAR<span style="color:/.test(live),
+    "our wordmark is still rendered into the head of the document");
+  check("the pasted copy credits FARaudit in the footer", /Prepared with FARaudit/.test(live),
+    "the credit was removed rather than moved");
+
+  check("the printed document's header is the company", /<Text style={styles\.brand}>{company}<\/Text>/.test(pdf),
+    "the PDF header is not the customer's name");
+  check("the printed document credits FARaudit in the footer", /Prepared with FARaudit/.test(pdf),
+    "the credit was removed rather than moved");
+  check("no dead brand styles remain", !/brandGold/.test(pdf) && !/companyName:/.test(pdf),
+    "styles for the retired header are still declared");
+
+  check("P16 · the DUNS check can see a reintroduced line",
+    /DUNS/.test("ids.push('DUNS ' + esc(REC.duns));"));
+}
+
 console.log(`\n${pass} passed · ${fail} failed`);
 if (fail > 0) process.exit(1);
