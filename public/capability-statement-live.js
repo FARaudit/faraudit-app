@@ -259,7 +259,9 @@
         }
         REC.logo_url = res.body.logo_url;
         paintLogo();
-        paintHealth();
+        /* Completeness is NOT repainted. A logo is not one of the twelve fields a
+           contracting officer looks for, and counting it would put every customer
+           without one below 100% for a gap that is not one. */
         note('✓ Logo saved', true);
       })
       .catch(function () { note('Could not upload the logo', false); })
@@ -285,7 +287,6 @@
         }
         REC.logo_url = null;
         paintLogo();
-        paintHealth();
         note('Logo removed', true);
       })
       .catch(function () { note('Could not remove the logo', false); })

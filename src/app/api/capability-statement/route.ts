@@ -12,7 +12,6 @@ interface PatchBody {
   company_name?: string | null;
   uei?: string | null;
   cage_code?: string | null;
-  duns?: string | null;
   naics_codes?: string[];
   certifications?: string[];
   core_competencies?: string | null;
@@ -26,7 +25,9 @@ interface PatchBody {
 }
 
 const ALLOWED_FIELDS = new Set<keyof PatchBody>([
-  "company_name", "uei", "cage_code", "duns",
+  // No duns: UEI replaced it for federal use in April 2022 and no surface renders
+  // it. A field that can be written and is never read is a trap for whoever is next.
+  "company_name", "uei", "cage_code",
   "naics_codes", "certifications",
   "core_competencies", "differentiators",
   "contact_name", "contact_email", "contact_phone", "contact_website", "contact_address",
