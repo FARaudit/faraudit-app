@@ -17,6 +17,15 @@
 
   var API = '/api/capability-statement';
   var REC = null;
+  /* How many awards were WON, and how many the route sent. They differ once a customer
+     passes the cap, and every number on this page reports the first. */
+  var PAST_TOTAL = null;
+  var PAST_LIMIT = null;
+  /* A capability statement is a one-page document and the convention is three to five
+     past-performance entries, so the EXPORT carries five while the page shows the whole
+     record. Mirrors PAST_PERFORMANCE_EXPORT_LIMIT in src/lib/capability-statement-limits.ts,
+     which the PDF uses; a gate asserts the two numbers agree. */
+  var EXPORT_LIMIT = 5;
 
   function el(sel, root) { return (root || document).querySelector(sel); }
   function has(v) { return typeof v === 'string' && v.trim().length > 0; }
@@ -165,25 +174,37 @@
       if (p.contract_value !== null && p.contract_value !== undefined && p.contract_value !== '') {
         item.appendChild(make('span', 'perf-value', p.contract_value));
       }
-      var who = [p.agency, p.notice_id].filter(Boolean).join(' · ');
+      /* Period of performance is a standard field on a capability statement and the PDF
+         already printed it. The page did not, so the document a customer checked on
+         screen and the one they sent described the same award differently. */
+      var who = [p.agency, p.notice_id, p.period].filter(Boolean).join(' · ');
       if (who) item.appendChild(make('span', 'perf-agency', who));
       wrap.appendChild(item);
     });
+
+    /* A CO reading this document cannot tell a short list from a truncated one, and
+       neither could the customer who sent it. Say so on the page itself. */
+    if (PAST_TOTAL !== null && PAST_TOTAL > rows.length) {
+      wrap.appendChild(make('div', 'perf-more',
+        'Showing the ' + rows.length + ' most recent of ' + PAST_TOTAL +
+        ' awards on file. The rest are in Past Audits.'));
+    }
   }
 
   /* ── contact strip ──────────────────────────────────────────────────────── */
   var CONTACT_FIELDS = ['contact_name', 'contact_email', 'contact_phone', 'contact_website', 'contact_address'];
 
   function paintContact() {
-    var cells = document.querySelectorAll('.contact-strip .contact-item .cv');
-    if (cells.length < CONTACT_FIELDS.length) return;
-    for (var i = 0; i < CONTACT_FIELDS.length; i++) {
-      var v = REC[CONTACT_FIELDS[i]];
-      clear(cells[i]);
-      var shown = CONTACT_FIELDS[i] === 'contact_phone' ? fmtPhone(v) : v;
-      cells[i].appendChild(has(v) ? document.createTextNode(shown) : unset('Not set'));
-      var item = cells[i].closest('.contact-item');
-      if (item) item.setAttribute('data-cs-contact', CONTACT_FIELDS[i]);
+    var items = document.querySelectorAll('.contact-strip .contact-item');
+    for (var i = 0; i < items.length; i++) {
+      var field = items[i].getAttribute('data-cs-contact');
+      var cell = items[i].querySelector('.cv');
+      if (!cell) continue;
+      if (CONTACT_FIELDS.indexOf(field) === -1) { clear(cell); continue; }
+      var v = REC[field];
+      clear(cell);
+      var shown = field === 'contact_phone' ? fmtPhone(v) : v;
+      cell.appendChild(has(v) ? document.createTextNode(shown) : unset('Not set'));
     }
   }
 
@@ -265,8 +286,11 @@
     var codes = list(REC.naics_codes);
     var perf = list(REC.past_performance);
 
-    statCard(cards[0], 'Awards on file', document.createTextNode(String(perf.length)),
-      perf.length ? 'pulled from audits you won' : 'record an audit as won to fill this');
+    var total = PAST_TOTAL === null ? perf.length : PAST_TOTAL;
+    statCard(cards[0], 'Awards on file', document.createTextNode(String(total)),
+      total > perf.length ? ('showing the ' + perf.length + ' most recent below')
+        : total ? 'pulled from audits you won'
+        : 'record an audit as won to fill this');
 
     var codeNode;
     if (codes.length) {
@@ -311,18 +335,31 @@
     contact_address: 'Business address'
   };
 
-  function note(msg, ok) {
+  /* A confirmation is an event, not a state. It clears itself, and a second press
+     restarts the clock instead of stacking another copy beside the first. */
+  var NOTE_MS = 4000;
+  var noteTimer = null;
+  function note(msg, ok, sticky) {
     var n = el('#csNote');
     if (!n) return;
     n.hidden = false;
     n.textContent = msg;
     n.classList.toggle('is-error', !ok);
+    if (noteTimer) { clearTimeout(noteTimer); noteTimer = null; }
+    if (!sticky) {
+      noteTimer = setTimeout(function () {
+        n.textContent = '';
+        n.hidden = true;
+        n.classList.remove('is-error');
+        noteTimer = null;
+      }, NOTE_MS);
+    }
   }
 
   /* A save reports only what the server confirms. The route returns the persisted
      row, so a mismatch here means the write did not land. */
   function save(patch) {
-    note('Saving…', true);
+    note('Saving…', true, true);
     fetch(API, {
       method: 'PATCH', credentials: 'include',
       headers: { 'content-type': 'application/json' },
@@ -480,7 +517,9 @@
     var contact = e.target.closest('[data-cs-contact]');
     if (contact) { e.preventDefault(); openEditor(contact.getAttribute('data-cs-contact')); return; }
     var copyBtn = e.target.closest('[data-cs-copy]');
-    if (copyBtn) { e.preventDefault(); copyStatement(copyBtn); }
+    if (copyBtn) { e.preventDefault(); copyStatement(copyBtn); return; }
+    var pdfBtn = e.target.closest('[data-cs-pdf]');
+    if (pdfBtn) { e.preventDefault(); downloadPdf(pdfBtn); return; }
   });
 
   /* ── copy to clipboard — built from the record, so it cannot drift ───────── */
@@ -496,14 +535,19 @@
     if (list(REC.certifications).length) L.push('Certifications: ' + list(REC.certifications).join(', '));
     if (has(REC.core_competencies)) L.push('', 'CORE COMPETENCIES', REC.core_competencies);
     if (has(REC.differentiators)) L.push('', 'DIFFERENTIATORS', REC.differentiators);
-    var perf = list(REC.past_performance);
+    var allPerf = list(REC.past_performance);
+    var perf = allPerf.slice(0, EXPORT_LIMIT);
     if (perf.length) {
       L.push('', 'PAST PERFORMANCE');
       perf.forEach(function (p) {
-        L.push('- ' + [p.title, p.agency, p.notice_id, p.contract_value].filter(Boolean).join(' · '));
+        L.push('- ' + [p.title, p.agency, p.notice_id, p.period, p.contract_value].filter(Boolean).join(' · '));
       });
+      var knownTotal = PAST_TOTAL === null ? allPerf.length : PAST_TOTAL;
+      if (knownTotal > perf.length) {
+        L.push('(Showing the ' + perf.length + ' most recent of ' + knownTotal + ' awards on file.)');
+      }
     }
-    var contact = [REC.contact_name, REC.contact_email, REC.contact_phone, REC.contact_website, REC.contact_address].filter(has);
+    var contact = [REC.contact_name, REC.contact_email, REC.contact_phone, REC.contact_address, REC.contact_website].filter(has);
     if (contact.length) L.push('', 'CONTACT', contact.join('\n'));
     return L.join('\n');
   }
@@ -523,27 +567,41 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  /* The pasted document and the PDF are the same letterhead: FARaudit blue rule,
+     the company ON FILE as the name, identifiers under it. Word and Google Docs drop
+     <style> blocks and classes, so every rule here is inline or it does not survive
+     the paste. */
+  var X_ACCENT = '#378ADD';
+  var X_INK = '#0f172a';
+  var X_MUTE = '#475569';
+
   function statementHtml() {
     var F = 'font-family:Calibri,Arial,Helvetica,sans-serif';
     var H = [];
-    H.push('<div style="' + F + ';color:#0A1628;max-width:660px">');
-    H.push('<div style="font-size:24px;font-weight:700;letter-spacing:-.01em;border-bottom:2px solid #0A1628;padding-bottom:6px;margin-bottom:8px">'
+    H.push('<div style="' + F + ';color:' + X_INK + ';max-width:660px">');
+
+    H.push('<div style="border-bottom:2px solid ' + X_ACCENT + ';padding-bottom:10px;margin-bottom:14px">');
+    H.push('<div style="font-size:13px;font-weight:700;letter-spacing:-.01em;color:' + X_INK + '">FAR<span style="color:' + X_ACCENT + '">audit</span></div>');
+    H.push('<div style="font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:' + X_MUTE + ';margin-top:2px">Capability Statement</div>');
+    H.push('</div>');
+
+    H.push('<div style="font-size:24px;font-weight:700;letter-spacing:-.01em;margin-bottom:8px">'
       + esc(has(REC.company_name) ? REC.company_name : '(company name not set)') + '</div>');
 
     var ids = [];
     if (has(REC.uei)) ids.push('UEI ' + esc(REC.uei));
     if (has(REC.cage_code)) ids.push('CAGE ' + esc(REC.cage_code));
     if (has(REC.duns)) ids.push('DUNS ' + esc(REC.duns));
-    if (ids.length) H.push('<div style="font-size:12px;color:#475569;margin-bottom:2px">' + ids.join(' &nbsp;&middot;&nbsp; ') + '</div>');
+    if (ids.length) H.push('<div style="font-size:12px;color:' + X_MUTE + ';margin-bottom:2px">' + ids.join(' &nbsp;&middot;&nbsp; ') + '</div>');
     if (list(REC.naics_codes).length) {
-      H.push('<div style="font-size:12px;color:#475569;margin-bottom:2px">NAICS &nbsp;' + list(REC.naics_codes).map(esc).join(' &nbsp;&middot;&nbsp; ') + '</div>');
+      H.push('<div style="font-size:12px;color:' + X_MUTE + ';margin-bottom:2px">NAICS &nbsp;' + list(REC.naics_codes).map(esc).join(' &nbsp;&middot;&nbsp; ') + '</div>');
     }
     if (list(REC.certifications).length) {
-      H.push('<div style="font-size:12px;color:#475569">Certifications &nbsp;' + list(REC.certifications).map(esc).join(', ') + '</div>');
+      H.push('<div style="font-size:12px;color:' + X_MUTE + '">Certifications &nbsp;' + list(REC.certifications).map(esc).join(', ') + '</div>');
     }
 
     var sec = function (label, inner) {
-      H.push('<div style="font-size:11px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:#185FA5;margin:18px 0 6px">' + label + '</div>');
+      H.push('<div style="font-size:11px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:' + X_ACCENT + ';margin:18px 0 6px">' + label + '</div>');
       H.push(inner);
     };
     var paras = function (v) {
@@ -554,28 +612,73 @@
     if (has(REC.core_competencies)) sec('Core competencies', paras(REC.core_competencies));
     if (has(REC.differentiators)) sec('Differentiators', paras(REC.differentiators));
 
-    var perf = list(REC.past_performance);
+    var all = list(REC.past_performance);
+    var perf = all.slice(0, EXPORT_LIMIT);
     if (perf.length) {
-      sec('Past performance', '<ul style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.55">' + perf.map(function (pp) {
-        return '<li>' + esc([pp.title, pp.agency, pp.notice_id, pp.contract_value].filter(Boolean).join(' · ')) + '</li>';
-      }).join('') + '</ul>');
+      var body = '<ul style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.55">' + perf.map(function (pp) {
+        return '<li>' + esc([pp.title, pp.agency, pp.notice_id, pp.period, pp.contract_value].filter(Boolean).join(' · ')) + '</li>';
+      }).join('') + '</ul>';
+      /* The pasted document carries the same disclosure the page does, or the customer
+         sends a shortened list under their own name without knowing it. */
+      var known = PAST_TOTAL === null ? all.length : PAST_TOTAL;
+      if (known > perf.length) {
+        body += '<div style="font-size:11px;color:' + X_MUTE + ';margin-top:6px">Showing the '
+          + perf.length + ' most recent of ' + known + ' awards on file.</div>';
+      }
+      sec('Past performance', body);
     }
 
     var c = [];
     if (has(REC.contact_name)) c.push(esc(REC.contact_name));
     if (has(REC.contact_email)) c.push(esc(REC.contact_email));
     if (has(fmtPhone(REC.contact_phone))) c.push(esc(fmtPhone(REC.contact_phone)));
-    if (has(REC.contact_website)) c.push(esc(REC.contact_website));
     if (has(REC.contact_address)) c.push(esc(REC.contact_address));
+    if (has(REC.contact_website)) c.push(esc(REC.contact_website));
     if (c.length) sec('Contact', '<div style="font-size:13.5px;line-height:1.7">' + c.join('<br>') + '</div>');
+
+    H.push('<div style="border-top:1px solid #cbd5e1;margin-top:20px;padding-top:8px;font-size:9px;color:#94a3b8">'
+      + esc(has(REC.company_name) ? REC.company_name : 'Capability statement') + ' &nbsp;&middot;&nbsp; Confidential</div>');
 
     H.push('</div>');
     return H.join('');
   }
 
+  /* The route refuses to render a statement with no company name on it (409) and has
+     nothing to render before the first save (404). Both are answers the customer can
+     act on, so they are read out of the response rather than dumped as raw JSON into
+     a new tab — which is what a plain link to the endpoint would have done. */
+  function downloadPdf(btn) {
+    var say = function (msg, ok) { localNote(btn, msg, ok); };
+    say('Building PDF…', true);
+    fetch(API + '/pdf', { credentials: 'include' })
+      .then(function (r) {
+        if (!r.ok) {
+          return r.json().catch(function () { return null; }).then(function (b) {
+            throw new Error((b && b.error) || ('Could not build the PDF (HTTP ' + r.status + ')'));
+          });
+        }
+        var name = 'capability-statement.pdf';
+        var cd = r.headers.get('content-disposition') || '';
+        var m = cd.match(/filename="([^"]+)"/);
+        if (m) name = m[1];
+        return r.blob().then(function (blob) { return { blob: blob, name: name }; });
+      })
+      .then(function (d) {
+        var url = URL.createObjectURL(d.blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = d.name;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
+        say('✓ Downloaded ' + d.name, true);
+      })
+      .catch(function (e) { say(e.message || 'Could not build the PDF', false); });
+  }
+
   function copyStatement(where) {
     var text = statementText();
-    var say = function (msg, ok) { note(msg, ok); if (where) localNote(where, msg, ok); };
+    /* ONE confirmation, at the control that was pressed. Reporting the same copy in
+       both places put two identical messages on screen for a single click. */
+    var say = function (msg, ok) { if (where) localNote(where, msg, ok); else note(msg, ok); };
     var plainOnly = function () {
       if (!(navigator.clipboard && navigator.clipboard.writeText)) { say('Could not copy', false); return; }
       navigator.clipboard.writeText(text).then(
@@ -600,13 +703,21 @@
   /* The confirmation has to appear where the button was pressed. The Export control sits
      ~900px below #csNote, so a copy from down there reported success off-screen and read
      as a dead button. */
+  var localTimers = [];
   function localNote(btn, msg, ok) {
     var host = btn.parentNode;
     if (!host) return;
+    /* One note per control, reused — and cleared, so a copy does not leave a
+       permanent green sentence sitting beside the button. */
+    for (var i = 0; i < localTimers.length; i++) clearTimeout(localTimers[i]);
+    localTimers = [];
+    var stale = document.querySelectorAll('.cs-localnote');
+    for (var j = 0; j < stale.length; j++) if (stale[j].parentNode !== host) stale[j].remove();
     var n = host.querySelector('.cs-localnote');
     if (!n) { n = make('span', 'cs-localnote'); host.appendChild(n); }
     n.textContent = msg;
     n.classList.toggle('is-error', !ok);
+    localTimers.push(setTimeout(function () { if (n.parentNode) n.remove(); }, NOTE_MS));
   }
 
   function renderAll() {
@@ -642,6 +753,10 @@
           throw new Error('capability statement: no statement in response');
         }
         REC = d.statement;
+        /* Absent is not zero. An older route that does not send these leaves the page
+           counting the rows it was given, which is what it did before. */
+        PAST_TOTAL = typeof d.past_performance_total === 'number' ? d.past_performance_total : null;
+        PAST_LIMIT = typeof d.past_performance_limit === 'number' ? d.past_performance_limit : null;
         renderAll();
         document.body.classList.add('cs-ready');
         setLivePill(true);
