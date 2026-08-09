@@ -304,7 +304,7 @@
       + '<td class="cell-date">' + esc(a.date) + '</td>'
       + '<td><span class="vcell" data-pole="' + esc(a._s) + '"><i class="pd ' + esc(a._s) + '"></i>' + esc(SL[a._s]) + '</span></td>'
       + '<td><span class="stcell">' + stInner + '</span></td>'
-      + '<td class="right"><a class="view-link" href="/audit/' + slug + '">' + (failed && a.retryable ? "Re-run" : "View") + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></td>'
+      + '<td class="right"><a class="view-link" href="/audits/' + slug + '">' + (failed && a.retryable ? "Re-run" : "View") + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></td>'
       + '</tr>';
   }
 
@@ -422,7 +422,7 @@
 
     if (sorted.length === 0) {
       body.innerHTML = '<tr><td colspan="10" style="padding:36px 16px;text-align:center;color:var(--mute);font-size:13px">'
-        + 'No audits yet — <a href="/audit" style="color:var(--blue-600);font-weight:600;text-decoration:none">run your first audit →</a>'
+        + 'No audits yet — <a href="/audits" style="color:var(--blue-600);font-weight:600;text-decoration:none">run your first audit →</a>'
         + '</td></tr>';
     } else if (visible.length === 0) {
       // R10 — honest empty: name the combination, offer clear. Never a blank
@@ -864,7 +864,7 @@
       });
       row.style.cursor = "pointer";
       row.addEventListener("click", function () {
-        if (target) window.location.href = "/audit/" + encodeURIComponent(target);
+        if (target) window.location.href = "/audits/" + encodeURIComponent(target);
       });
     });
     var clear = document.querySelector(".cc-clear-filters");

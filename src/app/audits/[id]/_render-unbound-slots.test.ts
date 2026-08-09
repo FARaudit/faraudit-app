@@ -13,7 +13,7 @@ import { stripUnboundSlots } from "./_render";
 let failures = 0;
 const assert = (cond: boolean, msg: string) => { console.log(`${cond ? "✅" : "❌"} ${msg}`); if (!cond) failures++; };
 
-const template = readFileSync(join(process.cwd(), "src", "app", "audit", "[id]", "_template.html"), "utf8");
+const template = readFileSync(join(process.cwd(), "src", "app", "audits", "[id]", "_template.html"), "utf8");
 
 // ── 1. NOTHING BOUND — every fabricated slot must render as an absence ──────────────────────────────
 {

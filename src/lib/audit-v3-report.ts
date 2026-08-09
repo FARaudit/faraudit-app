@@ -512,8 +512,8 @@ export function renderV3Report(payload: V3ReportPayload, meta: V3ReportMeta): st
   // on-screen export and the server can never diverge.
   const gated = meta.exportGated === true;
   const actions = gated
-    ? `<a href="/audit">← Back to audits</a><span class="tb-gated" title="This report is incomplete or under human review and cannot be exported.">⚠ Export unavailable — incomplete / human review</span>`
-    : `<a href="/audit">← Back to audits</a>${meta.auditId ? `<a class="tb-export" href="/api/audit/${escapeHtml(meta.auditId)}/pdf">Export PDF</a>` : ""}`;
+    ? `<a href="/audits">← Back to audits</a><span class="tb-gated" title="This report is incomplete or under human review and cannot be exported.">⚠ Export unavailable — incomplete / human review</span>`
+    : `<a href="/audits">← Back to audits</a>${meta.auditId ? `<a class="tb-export" href="/api/audit/${escapeHtml(meta.auditId)}/pdf">Export PDF</a>` : ""}`;
 
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

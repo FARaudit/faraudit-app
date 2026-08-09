@@ -93,9 +93,9 @@ export const WORKFLOW: RailItem[] = [
   // "Notices" names what SAM actually publishes and what the customer tracks. The KEY and
   // the ROUTE are unchanged: /opportunities stays valid, so every link already sent — in a
   // digest email, a bookmark, a deep link — still lands.
-  { key: "opportunities", label: "Notices", href: "/opportunities", icon: I.opportunities },
+  { key: "opportunities", label: "Notices", href: "/notices", icon: I.opportunities },
   // Plural, matching its neighbours; the page's own button still reads Run Audit.
-  { key: "run-audit", label: "Audits", href: "/audit", icon: I.runAudit },
+  { key: "run-audit", label: "Audits", href: "/audits", icon: I.runAudit },
   // "Decisions" names the artifact the engine produces. The ROUTE is unchanged.
   { key: "past-audits", label: "Decisions", href: "/past-audits", icon: I.pastAudits },
   { key: "pipeline", label: "Pipeline", href: "/pipeline", icon: I.pipeline },
@@ -290,6 +290,25 @@ export function railStyle(): string {
     `<style id="sb-phase5">` +
     RAIL_807_CSS +
     WORDMARK_CSS +
+    /* THE RAIL OWNS THE PILL IT RENDERS.
+       rail-live-badge.js builds <span class="sb-badge live">Live</span> inside a workflow
+       row. Every .sb-badge rule in the product is scoped `.sb-icon .sb-badge` — markup
+       belonging to the sidebar THIS RAIL REPLACED — and workflow rows are .sb-step, so
+       not one rule matched. Measured on the live page 2026-08-09: display block,
+       background rgba(0,0,0,0), color rgb(10,22,40), ::before content none. The pill was
+       inheriting the nav link's ink and font-size and rendering as plain dark text.
+       An injected component owns what it displaces, styling included. */
+    `.sb-badge{display:inline-flex;align-items:center;gap:4px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:.02em;line-height:1;padding:3px 7px 3px 6px;border-radius:5px;flex:none;white-space:nowrap}` +
+    `.sb-badge::before{content:"";width:5px;height:5px;border-radius:50%;flex:none;background:currentColor}` +
+    /* Each theme carries its own pair: the light values disappear on the navy rail and
+       the dark ones wash out on the white one. */
+    `.sb-badge.live{background:rgba(16,185,129,.14);color:#047857}` +
+    `.sb-badge.danger{background:rgba(180,35,24,.12);color:#b42318}` +
+    `[data-theme="dark"] .sb-badge.live{background:rgba(16,185,129,.20);color:#6ee7b7}` +
+    `[data-theme="dark"] .sb-badge.danger{background:rgba(248,113,113,.18);color:#fca5a5}` +
+    /* The collapsed rail hides every label, so a pill left standing would sit beside an
+       icon with nothing to attach it to. */
+    `[data-sb="mini"] .sb-badge,[data-sb="closed"] .sb-badge{display:none!important}` +
     `.sb-bottom{position:relative;margin-top:auto}` +
     `.sb-avatar-btn{display:flex;align-items:center;gap:9px;width:100%;padding:7px;border:0;background:transparent;border-radius:9px;cursor:pointer;text-align:left}` +
     `.sb-st{display:flex;flex-direction:column;min-width:0;gap:1px}` +

@@ -416,7 +416,7 @@ console.log("\n── an unfilled chip may not promise a check that never runs �
   const notifs = appCode.slice(appCode.indexOf("notifs: () =>"), appCode.indexOf("team: () =>"));
   check("the notifications panel names Track as the origin", /\bTrack\b/.test(notifs),
     "the tab never says how a notice becomes watched");
-  check("...and links to where that is done", /href="\/opportunities"/.test(notifs),
+  check("...and links to where that is done", /href="\/notices"/.test(notifs),
     "the reader is told the mechanism but not where to find it");
   check("...and says what actually reaches them", /every hour/.test(notifs) && /run the audit/.test(notifs),
     "no account of what happens between tracking and the email");

@@ -695,7 +695,7 @@ function rowHTML(o) {
     '<div class="pc-state"><span class="vd ' + v.cls + '">' + v.word + '</span><span class="pc-note">' + clause(o) + '</span></div>' +
     '<div class="pc-actions">' +
       (hasSolicitation && auditRef
-        ? '<a class="btn-open" href="/audit?noticeId=' + encodeURIComponent(auditRef) + '&sol=' + encodeURIComponent(o.id || '') + '">Run audit</a>'
+        ? '<a class="btn-open" href="/audits?noticeId=' + encodeURIComponent(auditRef) + '&sol=' + encodeURIComponent(o.id || '') + '">Run audit</a>'
         : '<span class="btn-open off" title="' + (hasSolicitation ? 'No notice reference' : 'Special Notice — no solicitation document has posted for this requirement yet') + '">' + (hasSolicitation ? 'Run audit' : 'No solicitation yet') + '</span>') +
       '<button class="btn-2" type="button" data-watch-notice="' + esc(o.notice_id) + '">Track</button>' +
       '<button class="btn-2" type="button" data-track="' + esc(o.id) + '">Pipeline</button>' +

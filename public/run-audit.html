@@ -1012,7 +1012,7 @@ function submitAudit(opts){
       if(!out.ok){__submitting=false;setRunning(btn,false);onErr((out.data&&out.data.error)||('Audit didn’t start (HTTP '+out.status+').'));return;}
       var slug=((out.data.solicitationNumber||out.data.auditId||'')+'').trim().toLowerCase();
       if(!slug){__submitting=false;setRunning(btn,false);onErr('Audit started but no ID was returned. Nothing was charged.');return;}
-      window.location.href='/audit/'+encodeURIComponent(slug);
+      window.location.href='/audits/'+encodeURIComponent(slug);
     })
     .catch(function(err){__submitting=false;setRunning(btn,false);onErr('Network error — '+(err&&err.message?err.message:String(err))+'. Nothing was charged.');});
 }
@@ -1288,7 +1288,7 @@ var __fdPartialNoticeId=null;
     var ins=insightOf(a);
     var badge=(score!=null)?'<span class="rac-score">'+escapeHtml(String(score))+'</span><span class="rac-of">/ 100</span>':'<span class="rac-score">—</span>';
     var dl=dueIn(a,v.label);
-    return '<a class="rac '+v.cls+'" href="/audit/'+slug+'"><div class="rac-badge">'+badge+'</div><div class="rac-main"><div class="rac-title">'+escapeHtml(titleLine)+'</div><div class="rac-sub">'+(office?'<span class="rac-office">'+escapeHtml(office)+'</span>':'')+'<span class="rac-insight"><span class="rac-spark"></span>'+escapeHtml(ins)+'</span></div></div><div class="rac-dl"><span class="lbl">Due in</span><span class="val '+dl.cls+'">'+escapeHtml(dl.txt)+'</span></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>'+escapeHtml(v.label)+'</span><span class="rac-ago">'+escapeHtml(when)+'</span><span class="rac-chev">→</span></div></a>';}
+    return '<a class="rac '+v.cls+'" href="/audits/'+slug+'"><div class="rac-badge">'+badge+'</div><div class="rac-main"><div class="rac-title">'+escapeHtml(titleLine)+'</div><div class="rac-sub">'+(office?'<span class="rac-office">'+escapeHtml(office)+'</span>':'')+'<span class="rac-insight"><span class="rac-spark"></span>'+escapeHtml(ins)+'</span></div></div><div class="rac-dl"><span class="lbl">Due in</span><span class="val '+dl.cls+'">'+escapeHtml(dl.txt)+'</span></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>'+escapeHtml(v.label)+'</span><span class="rac-ago">'+escapeHtml(when)+'</span><span class="rac-chev">→</span></div></a>';}
   // first-run vs returning: flip section order + expand the "what runs" teaching pipeline for first-run.
   function flip(n){var firstRun=(n===0);if(stack)stack.classList.toggle('flip',firstRun);var stages=document.querySelector('.blk-stages');if(stages&&stages.tagName==='DETAILS'){if(firstRun)stages.setAttribute('open','');else stages.removeAttribute('open');}}
   function renderCards(audits){if(!audits||!audits.length){list.innerHTML='<div class="ra-empty"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg></div><div class="h">No audits yet</div><div class="s">Upload a solicitation above and your first ranked report lands here — a bid / no-bid call with the KO clarification email drafted and ready.</div></div>';flip(0);return;}list.innerHTML=audits.map(cell).join('');flip(audits.length);}

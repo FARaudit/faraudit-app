@@ -4,7 +4,7 @@
 import { buildCoverageLedger, resolveAmendments, classifyBindingContent, parseAmendmentNumber } from "../../src/lib/agentic-ingest";
 import { selectMapTargets, mergeExtracts, countSchemaUnions, DOC_EXTRACT_SCHEMA, mapCacheKey, withDocExtractCache, type DocExtract, type DocExtractCache } from "../../src/lib/agentic-map";
 import { composeExtractedFacts, buildCoverageReport, partitionVacuousBindings, mapWithResilience } from "../../src/lib/agentic-orchestrator";
-import { decideCoverageChip } from "../../src/app/audit/[id]/_v2-render-surfaces";
+import { decideCoverageChip } from "../../src/app/audits/[id]/_v2-render-surfaces";
 import { scoreGoldSet, parseGoldSet, type GoldSetPackage, type EngineExtraction } from "./gold-set-score";
 import { agenticToExtraction, legacyToExtraction, detectGates, clauseNumber, priceUsd } from "./ab-extract-adapter";
 import { scalarsFromSolicitation } from "../../src/lib/agentic-executor";

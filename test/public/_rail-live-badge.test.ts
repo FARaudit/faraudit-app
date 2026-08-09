@@ -239,7 +239,7 @@ console.log("\n── Part H · card 807 workflow rail ──");
   const R = renderRail("opportunities");
   const S = railStyle();
   const J = railScript();
-  const ROUTES = ["/command-center","/opportunities","/audit","/past-audits","/pipeline","/cmmc","/capability-statement","/teaming-partners","/defense-news","/defense-spending","/agencies","/contracting-officers","/naics","/far-dfars-updates","/wage-benchmarks"];
+  const ROUTES = ["/command-center","/notices","/audits","/past-audits","/pipeline","/cmmc","/capability-statement","/teaming-partners","/defense-news","/defense-spending","/agencies","/contracting-officers","/naics","/far-dfars-updates","/wage-benchmarks"];
   const hrefs = [...R.matchAll(/href="([^"]+)"/g)].map((m) => m[1]).filter((h) => h !== "/settings");
   check("15 destinations, exactly the source routes", JSON.stringify(hrefs) === JSON.stringify(ROUTES), hrefs.join(" "));
 
@@ -413,9 +413,9 @@ console.log("\n── Part K · badge selectors resolve against the real rail �
   check("dashboard-live.js · its selector matches a real rail row", matchesRail(dashSel, railHtml), dashSel);
 
   // Planted positives — the check must be able to go RED on the exact defect it was written for.
-  check("K-P1 · REJECTS the shipped-and-dead `.sb-icon[href=\"/opportunities\"]`", !matchesRail('.sb-icon[href="/opportunities"]', railHtml));
+  check("K-P1 · REJECTS the shipped-and-dead `.sb-icon[href=\"/notices\"]`", !matchesRail('.sb-icon[href="/notices"]', railHtml));
   check("K-P2 · REJECTS the shipped-and-dead `.sb-icon[href=\"/past-audits\"]`", !matchesRail('.sb-icon[href="/past-audits"]', railHtml));
-  check("K-P3 · ACCEPTS the corrected `.sb-step[href=\"/opportunities\"]`", matchesRail('.sb-step[href="/opportunities"]', railHtml));
+  check("K-P3 · ACCEPTS the corrected `.sb-step[href=\"/notices\"]`", matchesRail('.sb-step[href="/notices"]', railHtml));
   // A section row genuinely IS .sb-icon — the check must not simply reject that class.
   check("K-P4 · ACCEPTS `.sb-icon[href=\"/cmmc\"]`, a real section row", matchesRail('.sb-icon[href="/cmmc"]', railHtml));
   check("K-P5 · REJECTS a route the rail does not carry", !matchesRail('.sb-step[href="/not-a-route"]', railHtml));
@@ -608,7 +608,7 @@ console.log("\n── Part P · run-audit distinguishes failure from empty ─�
 }
 
 // ── Part Q · every nav link points at a route that EXISTS ─────────────────────────────────
-// The audit report (/audit/[id], the v5 "Gate Brief") is deliberately NOT injectRail'd —
+// The audit report (/audits/[id], the v5 "Gate Brief") is deliberately NOT injectRail'd —
 // route.ts explains the rail assumes a grid the single-column report does not have — so it
 // ships its OWN sidebar in src/lib/v5-report/report.ts. Nothing checked that sidebar's
 // hrefs, and it carried href="/account", which 404s in production. A nav link to a route
@@ -621,7 +621,7 @@ console.log("\n── Part Q · nav links resolve to real routes ──");
     if (p === "") return true;
     try { readdirSync(join(APP, p)); return true; } catch { return false; }
   };
-  const sources = ["src/lib/v5-report/report.ts", "src/app/audit/[id]/_template.html"];
+  const sources = ["src/lib/v5-report/report.ts", "src/app/audits/[id]/_template.html"];
   for (const src of sources) {
     const html = read(src);
     // NAV links only — scoped to the <aside> sidebar. A whole-file href sweep also
@@ -642,6 +642,61 @@ console.log("\n── Part Q · nav links resolve to real routes ──");
   check("Q-P1 · REJECTS the /account link that shipped", !routeExists("/account"));
   check("Q-P2 · ACCEPTS a route that exists", routeExists("/settings"));
   check("Q-P3 · ACCEPTS the ledger route", routeExists("/past-audits"));
+}
+
+// ── Part R · the rail STYLES the pill it creates ──────────────────────────────────────
+// Found by the CEO on the live product: the "Live" pill rendered as plain dark text — no
+// dot, no background, no radius. Measured on the page 2026-08-09: display block,
+// background rgba(0,0,0,0), color rgb(10,22,40), ::before content none.
+//
+// Cause: every .sb-badge rule in the product is scoped `.sb-icon .sb-badge`, inherited
+// from the sidebar this rail REPLACED. rail.ts renders workflow rows as .sb-step, so the
+// badge matched nothing and took the nav link's ink and font-size. Every check in this
+// file passed throughout — they all assert the pill EXISTS and says the right word, and
+// none asserted it could be SEEN.
+//
+// The rule: a component that injects markup ships the CSS for that markup.
+console.log("\n── Part R · the rail styles its own badge ──");
+{
+  const css = railStyle();
+  check("the rail stylesheet declares .sb-badge at all", /\.sb-badge\s*\{/.test(css),
+    "the pill is styled only by whatever the host page happens to carry");
+  // The exact properties measured missing. A rule that exists but sets none of them
+  // leaves the same plain text on screen.
+  // Read the .sb-badge base rule out of the sheet and check its declarations, so a
+  // property set on some OTHER selector cannot satisfy this.
+  const badgeRule = (css.match(/\.sb-badge\s*\{([^}]*)\}/) ?? ["", ""])[1];
+  check("the .sb-badge rule body was located", badgeRule.length > 20,
+    `read ${badgeRule.length} chars — this leg would pass on an empty rule`);
+  for (const [prop, why] of [
+    ["display:inline-flex", "a block badge drops onto its own line"],
+    ["border-radius", "no radius means it is not a pill"],
+    ["padding", "no padding means text, not a chip"],
+    ["font-size", "it inherits the nav link's 14.5px"],
+  ] as const) {
+    check(`.sb-badge sets ${prop}`, badgeRule.includes(prop), why);
+  }
+  check("the green dot is drawn by the rail, not the page",
+    /\.sb-badge::before\s*\{[^}]*content/.test(css),
+    "::before content was 'none' live — the dot came from a page rule that no longer matches");
+  // Both states, both themes. A pill readable in one theme and invisible in the other is
+  // the same defect with a smaller audience.
+  for (const sel of [".sb-badge.live", ".sb-badge.danger",
+                     `[data-theme="dark"] .sb-badge.live`, `[data-theme="dark"] .sb-badge.danger`]) {
+    check(`${sel} has a colour`, css.includes(sel), "this state or theme falls back to inherited ink");
+  }
+  check("the collapsed rail hides the pill", /\[data-sb="(mini|closed)"\][^{]*\.sb-badge/.test(css),
+    "the pill survives into the icon-only rail with nothing to sit beside");
+
+  // Planted positives — this leg must be able to go red.
+  check("R-P1 · rejects a stylesheet with no badge rule",
+    !/\.sb-badge\s*\{/.test(".sb-step{color:red}.sb-label{color:blue}"),
+    "the detector fires on a sheet that never mentions the badge");
+  check("R-P2 · rejects a badge rule that sets no shape",
+    !/display:inline-flex/.test(".sb-badge{color:#047857}"),
+    "a colour-only rule would pass as styled while still rendering as plain text");
+  check("R-P3 · accepts the real rule",
+    /display:inline-flex/.test(".sb-badge{display:inline-flex;padding:3px 7px}"));
 }
 
 console.log(`\n${pass} passed · ${fail} failed`);

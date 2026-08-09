@@ -34,8 +34,8 @@ const emitted = rowJs.match(/href="(\/[a-z-]+)\?([A-Za-z]+)=' \+ encodeURICompon
 assert(!!emitted, `the row emits a Run audit deep link (found: ${emitted ? `${emitted[1]}?${emitted[2]}=` : "NONE"})`);
 const [, emittedPath, emittedParam] = emitted ?? [, "", ""];
 // Destination: the page /audit serves, and the param IT reads.
-assert(existsSync("src/app/audit/route.ts"), `${emittedPath} is a real route`);
-const routeSrc = read("src/app/audit/route.ts");
+assert(existsSync("src/app/audits/route.ts"), `${emittedPath} is a real route`);
+const routeSrc = read("src/app/audits/route.ts");
 const servedFile = routeSrc.match(/"public",\s*\n?\s*"([\w.-]+)"/)?.[1] ?? "";
 assert(servedFile === "run-audit.html", `${emittedPath} serves run-audit.html (got ${JSON.stringify(servedFile)})`);
 const readParam = runAuditHtml.match(/new URLSearchParams\(location\.search\)\.get\('([^']+)'\)/)?.[1];
@@ -53,12 +53,12 @@ assert(!!fieldCls && new RegExp(`class="[^"]*\\b${fieldCls}\\b[^"]*"`).test(runA
 
 console.log("\n── 3. THE SIGNED-OUT PATH — the deep link survives the sign-in bounce ────────");
 // The path a signed-in walk structurally cannot see: shared link, expired session, second tab.
-const bounced = signInRedirectPath("/audit", "?noticeId=ABC123");
-assert(bounced.includes(encodeURIComponent("/audit?noticeId=ABC123")), `next carries path AND search (got ${bounced})`);
+const bounced = signInRedirectPath("/audits", "?noticeId=ABC123");
+assert(bounced.includes(encodeURIComponent("/audits?noticeId=ABC123")), `next carries path AND search (got ${bounced})`);
 assert(!/[?&]noticeId=/.test(bounced), "the original param does NOT ride along as a top-level /sign-in param (sign-in ignores those, so they read as preserved while being dropped)");
-assert(signInRedirectPath("/opportunities", "") === "/sign-in?next=%2Fopportunities", "a query-less path is unchanged (no collateral change)");
+assert(signInRedirectPath("/notices", "") === "/sign-in?next=%2Fnotices", "a query-less path is unchanged (no collateral change)");
 // Both gates must use the one helper — two copies of this rule is how they drifted apart in the first place.
-for (const f of ["src/middleware.ts", "src/app/audit/route.ts"])
+for (const f of ["src/middleware.ts", "src/app/audits/route.ts"])
   assert(read(f).includes("signInRedirectPath"), `${f} builds its bounce with the shared helper, not its own string`);
 
 console.log("\n── 4. TRACK + PIPELINE — the identifier carried is the one the API keys on ───");

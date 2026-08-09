@@ -34,10 +34,10 @@ const VALID_RISKS = JSON.stringify({
 async function main(): Promise<void> {
   const engine = await import("../src/lib/audit-engine");
   const { executeAudit } = await import("../src/lib/audit-executor");
-  const { buildViewModel } = await import("../src/app/audit/[id]/_view-model");
-  const { renderAuditReportComplete } = await import("../src/app/audit/[id]/_render");
+  const { buildViewModel } = await import("../src/app/audits/[id]/_view-model");
+  const { renderAuditReportComplete } = await import("../src/app/audits/[id]/_render");
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
-  const template = readFileSync("src/app/audit/[id]/_template.html", "utf8");
+  const template = readFileSync("src/app/audits/[id]/_template.html", "utf8");
 
   // ── V · structural validator units ─────────────────────────────────────────
   check("V1 null json invalid", !engine.validateRisksJson(null).valid);

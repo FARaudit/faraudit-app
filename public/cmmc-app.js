@@ -278,7 +278,7 @@
       h('div', { cls: 'cop-note' }, [h('b', { text: 'What the level asks for' }), checklist]),
       sel
         ? h('div', { cls: 'cop-actions' }, [
-            h('a', { cls: 'cop-btn primary', text: 'Open the audit', attrs: { href: '/audit/' + sel.id } })
+            h('a', { cls: 'cop-btn primary', text: 'Open the audit', attrs: { href: '/audits/' + sel.id } })
           ])
         : null
     ]);

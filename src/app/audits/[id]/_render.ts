@@ -720,7 +720,7 @@ function injectCtaHandlers(html: string, auditId: string, noticeId: string): str
       // The template's bundled handler also fires (toast); we add the
       // navigation here so the user lands somewhere useful.
       e.preventDefault();
-      var dest = '/audit';
+      var dest = '/audits';
       if (NOTICE_ID) dest += '?notice=' + encodeURIComponent(NOTICE_ID);
       window.location.href = dest;
     });

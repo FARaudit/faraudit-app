@@ -19,7 +19,7 @@ export async function GET() {
   const {
     data: { user }
   } = await supabase.auth.getUser();
-  if (!user) redirect("/sign-in?next=/opportunities");
+  if (!user) redirect("/sign-in?next=/notices");
 
   const filePath = path.join(
     process.cwd(),

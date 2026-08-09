@@ -75,7 +75,7 @@ const SRC = [
   // Together those make "persisted ≤ 400" a proof that rendered === persisted. If either changes, this fails here
   // rather than silently shaving a customer's report again.
   const { RENDER_BUDGET } = await import("./audit-absence-reconcile");
-  const VM = (await import("node:fs")).readFileSync("src/app/audit/[id]/_view-model.ts", "utf8");
+  const VM = (await import("node:fs")).readFileSync("src/app/audits/[id]/_view-model.ts", "utf8");
   // Call sites are ENUMERATED, not named — there are two that render a requirement and a hand-picked one would go
   // stale the moment a third appears. Zero found is a FAILURE, never a silent pass.
   const sites = VM.split("\n")

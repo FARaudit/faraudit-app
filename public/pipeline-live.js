@@ -318,7 +318,7 @@
       var label = VERDICT_LABEL[pole]
         || (String(found.status || '').toLowerCase() === 'complete' ? (pole || 'Unresolved') : 'In flight');
       var open  = el('a', 'pcard-open');
-      open.href = '/audit/' + encodeURIComponent(String(c.solicitation_number));
+      open.href = '/audits/' + encodeURIComponent(String(c.solicitation_number));
       put(open, el('span', 'po-v', label), el('span', 'po-go', 'Open audit →'));
       card.appendChild(open);
     } else if (found === null) {
@@ -696,7 +696,7 @@
       });
   }
 
-  /* A pursuit's detail already exists: it is the audit report. /audit/[id] resolves a
+  /* A pursuit's detail already exists: it is the audit report. /audits/[id] resolves a
      solicitation number as a slug and returns the most recent audit for it, so a card
      needs no id lookup to link there — only the knowledge of WHETHER one exists.
      Read separately from the pipeline, and deliberately not fatal: a pursuit list that
