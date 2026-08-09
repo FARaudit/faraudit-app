@@ -59,7 +59,7 @@
       '<div class="pe">' +
       '<h4>' + (opts.heading || 'Add your NAICS codes') + '</h4>' +
       '<p class="pe-sub">' + (opts.sub ||
-        'The Opportunities feed searches SAM.gov for the codes you sell under. ' +
+        'The Notices feed searches SAM.gov for the codes you sell under. ' +
         'Until at least one is on file there is nothing honest to show you — we will not fill the tab with someone else’s market.') +
       '</p>' +
       '<div class="pe-chips" id="peChips"></div>' +
