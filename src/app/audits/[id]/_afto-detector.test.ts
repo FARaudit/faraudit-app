@@ -10,7 +10,7 @@ const assert = (c: boolean, m: string) => { console.log(`${c ? "✅" : "❌"} ${
 
 // Extract the SHIPPED patterns from the served module rather than restating them — a restatement would only
 // prove I can write the same regex twice.
-const src = readFileSync(join(process.cwd(), "src", "app", "audit", "[id]", "_view-model.ts"), "utf8");
+const src = readFileSync(join(process.cwd(), "src", "app", "audits", "[id]", "_view-model.ts"), "utf8");
 const named = src.match(/const VM_AFTO_NAMED_RE = (\/.*\/i?);/)![1];
 const tonum = src.match(/const VM_AFTO_TONUM_RE = (\/.*\/);/)![1];
 const fires = (s: string) =>

@@ -10,12 +10,12 @@
 // not on an internal variable. Tonight's other two defects both shipped because a
 // check inspected inputs instead of the result.
 //
-// Run: npx tsx "src/app/audit/[id]/_render-states-elapsed.test.ts"
+// Run: npx tsx "src/app/audits/[id]/_render-states-elapsed.test.ts"
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderAuditTransitionalState } from "./_render-states";
 
-const template = readFileSync(join(process.cwd(), "src/app/audit/[id]/_states-template.html"), "utf8");
+const template = readFileSync(join(process.cwd(), "src/app/audits/[id]/_states-template.html"), "utf8");
 
 let failures = 0;
 const assert = (c: boolean, m: string) => {

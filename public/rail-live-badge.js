@@ -24,7 +24,7 @@
       // only the collapsible-section rows get .sb-icon. Match both, or this
       // returns here and no badge — live OR "Feed down" — can ever render.
       // Gated by test/public/_rail-live-badge.test.ts Part K.
-      var link = document.querySelector('.sb-step[href="/opportunities"], .sb-icon[href="/opportunities"]');
+      var link = document.querySelector('.sb-step[href="/notices"], .sb-icon[href="/notices"]');
       if (!link) return;
       var el = link.querySelector('.sb-badge');
 

@@ -23,7 +23,7 @@
    * may not belong to. */
   var NDESK = {
     watcher_posted: { c: '#378ADD', l: 'Watcher',       href: null },
-    opp:            { c: '#378ADD', l: 'Notices', href: '/opportunities' },
+    opp:            { c: '#378ADD', l: 'Notices', href: '/notices' },
     gao:            { c: '#dc2626', l: 'GAO',           href: '/gao-protests' },
     cmmc:           { c: '#0891b2', l: 'CMMC',          href: '/cmmc' },
     far:            { c: '#7c3aed', l: 'FAR/DFARS',     href: '/far-dfars-updates' },

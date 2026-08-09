@@ -5,7 +5,7 @@
 // canonical case: it previously matched no classifyError branch and fell to the
 // default. This suite pins every stall/infra message to the transient-timeout
 // class and guards the other branches against regression.
-// Run: npx tsx src/app/audit/[id]/_render-states.test.ts
+// Run: npx tsx src/app/audits/[id]/_render-states.test.ts
 import { classifyError } from "./_render-states";
 
 let failures = 0;

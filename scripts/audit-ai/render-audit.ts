@@ -4,8 +4,8 @@ import { createClient } from "@supabase/supabase-js";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import * as dotenv from "dotenv";
-import { buildViewModel } from "../../src/app/audit/[id]/_view-model";
-import { renderAuditReportComplete } from "../../src/app/audit/[id]/_render";
+import { buildViewModel } from "../../src/app/audits/[id]/_view-model";
+import { renderAuditReportComplete } from "../../src/app/audits/[id]/_render";
 import { renderV4ReportFromRow } from "../../src/lib/v4-report/report";
 import { renderV5ReportFromRow } from "../../src/lib/v5-report/report";
 

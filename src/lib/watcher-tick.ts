@@ -502,7 +502,7 @@ export async function runWatcherTick(opts: WatcherTickOptions = {}): Promise<Wat
           body: incomplete
             ? "Auto-audit needs your review — couldn't confirm a complete read"
             : `Auto-audit complete · ${String(recommendation ?? "").replace(/_/g, " ").toUpperCase() || "verdict ready"}`,
-          link: `/audit/${newAuditId}`,
+          link: `/audits/${newAuditId}`,
           meta: {
             audit_id: newAuditId,
             notice_id: row.notice_id,
@@ -538,7 +538,7 @@ export async function runWatcherTick(opts: WatcherTickOptions = {}): Promise<Wat
             risksFlagsCount,
             responseDeadline: solicitation.responseDeadLine,
             questionsDueDate: null,
-            auditUrl: `${appBase}/audit/${newAuditId}`,
+            auditUrl: `${appBase}/audits/${newAuditId}`,
             watchingUrl: `${appBase}/watching`,
             settingsUrl: `${appBase}/settings`,
             unsubscribeUrl: `${appBase}/settings#alerts`,

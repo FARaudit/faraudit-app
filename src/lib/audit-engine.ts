@@ -3065,7 +3065,7 @@ import {
   workStatement as _v2WorkStatement,
   type WorkStatementKnown as _v2WorkStatementKnown,
   type WorkStatementUnknown as _v2WorkStatementUnknown,
-} from "../app/audit/[id]/_normalizers";
+} from "../app/audits/[id]/_normalizers";
 
 // FA-E2E Fix 3.1 (2026-06-18) — single source of truth for the attachment
 // provenance separator. The append literal (runAuditV2) and the split RegExp

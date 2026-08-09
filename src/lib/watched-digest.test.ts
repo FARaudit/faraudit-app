@@ -69,7 +69,7 @@ console.log("\n── the email ──");
     ok(/closing soon/i.test(b.subject), "a deadline-only week leads with the deadline", b.subject);
   }
   ok(/faraudit\.com\/settings/.test(e.text), "the footer says how to switch it off");
-  ok(/\/audit\/a1/.test(e.html), "a posted row links to its audit");
+  ok(/\/audits\/a1/.test(e.html), "a posted row links to its audit");
 }
 {
   const d = buildWatchedDigest([posted({ title: "<script>alert(1)</script>" })], OPTS)!;

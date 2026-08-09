@@ -121,6 +121,25 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      // ━━ OPPORTUNITIES → NOTICES, AUDIT → AUDITS (CEO 2026-08-08) ━━
+      // The pages moved to /notices and /audits. These keep every URL already in the
+      // world working: bookmarks, the /audit?noticeId=<ref> deep link out of the feed,
+      // and — the one that cannot be re-sent — the audit permalinks in mail already
+      // delivered. Query values are carried to the destination by Next, so the deep
+      // link arrives with its noticeId intact.
+      //
+      // 308, deliberately. These paths are retired for good, and a browser caching the
+      // hop is the desired outcome rather than the trap the /signin.html note below
+      // describes — that one is 307 because the destination may yet change.
+      //
+      // A note from 2026-05-25 in this file records /audit redirects being REMOVED
+      // because they masked a real route handler: redirects are checked before the
+      // filesystem. That is exactly why these are correct now and were wrong then —
+      // there is no longer a route at either old path for them to mask.
+      { source: "/opportunities", destination: "/notices", permanent: true },
+      { source: "/audit", destination: "/audits", permanent: true },
+      // Covers /audit/<id> (the shared report permalink) and /audit/report alike.
+      { source: "/audit/:path*", destination: "/audits/:path*", permanent: true },
       { source: "/login", destination: "/sign-in", permanent: true },
       { source: "/login/:path*", destination: "/sign-in", permanent: true },
       // /signin.html was a design placeholder that accepted ANY credentials, printed "Identity verified."

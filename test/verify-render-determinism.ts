@@ -23,7 +23,7 @@
 
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { buildViewModel } from "../src/app/audit/[id]/_view-model";
+import { buildViewModel } from "../src/app/audits/[id]/_view-model";
 
 const FIXTURE_DIR = join(__dirname, "fixtures");
 
