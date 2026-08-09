@@ -91,6 +91,24 @@ check("the header no longer says no source is connected", !/no source is connect
 check("it names whose codes these are", /your NAICS codes/i.test(page), "the scope is not stated on the page");
 
 console.log("\n── planted positives ──");
+// ── "Your audits" counts runs that FINISHED ────────────────────────────────
+// fetchRecentAudits applies no status filter, so this column was counting failed runs and
+// telling the customer we had audited an office when nothing was produced. A run that died
+// is our problem, not a fact about their pursuit. Production carried 1 failed of 50 sampled.
+const agRoute = read("src/app/api/agencies/route.ts");
+check("only completed runs count as an audit",
+  /a\.status !== "complete"/.test(agRoute) && /continue/.test(agRoute),
+  "a failed run is still counted in Your audits");
+// The notice→audit join is a raw string on both sides. It agrees today; normalising is
+// insurance, because the failure mode is silent — an unmatched office reads as zero audits.
+check("the audit join is normalised on both sides",
+  /function officeKey/.test(agRoute)
+    && /officeKey\(a\.agency\)/.test(agRoute)
+    && /auditedByOffice\.get\(officeKey\(raw\)\)/.test(agRoute),
+  "a case or spacing change on SAM's side silently zeroes an office's audit count");
+check("A-P4 · the completed-runs check can see its own absence",
+  !/a\.status !== "complete"/.test('for (const a of audits) { cur.audited += 1; }'));
+
 check("A-P1 · rejects a 90-day claim", /90[- ]day/i.test("ranked by volume over the last 90 days"));
 check("A-P2 · rejects a seeded data file", /department:/.test("window.DAG={OFFICES:[{department:'Army'}]}"));
 check("A-P3 · accepts an empty data file", !/department:/.test("window.DAG = { OFFICES: [], META: null };"));
