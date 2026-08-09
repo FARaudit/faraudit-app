@@ -548,7 +548,14 @@
     renderTrend(); renderBudget(); renderPricing(); renderNDAA();
   }
 
+  // Every renderer re-reads its colours through css(), so a theme flip has to run
+  // them all again — but only when there is data. renderUnavailable() removes every
+  // child of .body except .page-header, and #geoLegend is inside one of them, so an
+  // unguarded renderLegend() dereferences null on each flip. The notice it leaves
+  // behind is styled with CSS custom properties and re-themes without a render pass.
+  // Same guard, same order as init().
   function onThemeChange() {
+    if (!dsbHasData()) return;
     renderLegend(); renderAll(); renderStatic();
   }
 
