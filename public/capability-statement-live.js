@@ -119,6 +119,79 @@
     }
   }
 
+  /* ── the company logo ───────────────────────────────────────────────────── */
+  function paintLogo() {
+    var box = el('.lh-logo');
+    var img = el('.lh-logo-img');
+    var cta = el('.lh-logo-cta');
+    var rm = el('.lh-logo-remove');
+    if (!box || !img || !cta || !rm) return;
+    var url = has(REC.logo_url) ? REC.logo_url : null;
+    box.classList.toggle('is-set', !!url);
+    /* Nothing is substituted when there is no logo. A mark the customer never chose
+       does not go on paper they send under their own name. */
+    if (url) { img.src = url; img.hidden = false; cta.hidden = true; rm.hidden = false; }
+    else { img.removeAttribute('src'); img.hidden = true; cta.hidden = false; rm.hidden = true; }
+  }
+
+  function logoBusy(on) {
+    var box = el('.lh-logo');
+    var input = el('.lh-logo-input');
+    if (box) box.classList.toggle('is-busy', !!on);
+    if (input) input.disabled = !!on;
+  }
+
+  function uploadLogo(file) {
+    if (!file) return;
+    var body = new FormData();
+    body.append('file', file);
+    logoBusy(true);
+    note('Uploading logo…', true, true);
+    fetch(API + '/logo', { method: 'POST', credentials: 'include', body: body })
+      .then(function (r) {
+        return r.json().catch(function () { return null; })
+          .then(function (b) { return { ok: r.ok, status: r.status, body: b }; });
+      })
+      .then(function (res) {
+        if (!res.ok || !res.body || !has(res.body.logo_url)) {
+          note((res.body && res.body.error) || ('Could not upload the logo (HTTP ' + res.status + ')'), false);
+          return;
+        }
+        REC.logo_url = res.body.logo_url;
+        paintLogo();
+        paintHealth();
+        note('✓ Logo saved', true);
+      })
+      .catch(function () { note('Could not upload the logo', false); })
+      .then(function () {
+        logoBusy(false);
+        var input = el('.lh-logo-input');
+        if (input) input.value = '';
+      });
+  }
+
+  function removeLogo() {
+    logoBusy(true);
+    note('Removing logo…', true, true);
+    fetch(API + '/logo', { method: 'DELETE', credentials: 'include' })
+      .then(function (r) {
+        return r.json().catch(function () { return null; })
+          .then(function (b) { return { ok: r.ok, status: r.status, body: b }; });
+      })
+      .then(function (res) {
+        if (!res.ok) {
+          note((res.body && res.body.error) || ('Could not remove the logo (HTTP ' + res.status + ')'), false);
+          return;
+        }
+        REC.logo_url = null;
+        paintLogo();
+        paintHealth();
+        note('Logo removed', true);
+      })
+      .catch(function () { note('Could not remove the logo', false); })
+      .then(function () { logoBusy(false); });
+  }
+
   /* ── prose sections, editable in place ──────────────────────────────────── */
   function sectionByTitle(title) {
     var heads = document.querySelectorAll('.doc-section .sec-title');
@@ -575,6 +648,15 @@
     if (copyBtn) { e.preventDefault(); copyStatement(copyBtn); return; }
     var pdfBtn = e.target.closest('[data-cs-pdf]');
     if (pdfBtn) { e.preventDefault(); downloadPdf(pdfBtn); return; }
+    if (e.target.closest('.lh-logo-remove')) { e.preventDefault(); removeLogo(); return; }
+  });
+
+  /* The file input is inside the label, so a click on the box opens the picker on its
+     own. Only the change needs handling. */
+  document.addEventListener('change', function (e) {
+    if (!e.target || !e.target.classList) return;
+    if (!e.target.classList.contains('lh-logo-input')) return;
+    uploadLogo(e.target.files && e.target.files[0]);
   });
 
   /* ── copy to clipboard — built from the record, so it cannot drift ───────── */
@@ -635,7 +717,15 @@
     H.push('<div style="' + F + ';color:' + X_INK + ';max-width:660px">');
 
     /* THE CUSTOMER'S NAME IS THE LETTERHEAD. This document goes to a contracting
-       officer under their company's name, so ours does not sit above it. */
+       officer under their company's name, so ours does not sit above it.
+
+       The logo is an absolute URL into a PUBLIC bucket for exactly this reason: the
+       recipient opens this in Word or an email client with no session, possibly days
+       later, and a signed URL would have expired and stripped the letterhead. */
+    if (has(REC.logo_url)) {
+      H.push('<div style="margin-bottom:10px"><img src="' + esc(REC.logo_url)
+        + '" alt="" style="max-height:56px;max-width:200px"></div>');
+    }
     H.push('<div style="font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:' + X_MUTE + '">Capability Statement</div>');
     H.push('<div style="font-size:24px;font-weight:700;letter-spacing:-.01em;margin:2px 0 8px;padding-bottom:10px;border-bottom:2px solid ' + X_ACCENT + '">'
       + esc(has(REC.company_name) ? REC.company_name : '(company name not set)') + '</div>');
@@ -690,7 +780,7 @@
 
     H.push('<div style="border-top:1px solid #cbd5e1;margin-top:20px;padding-top:8px;font-size:9px;color:#94a3b8">'
       + esc(has(REC.company_name) ? REC.company_name : 'Capability statement')
-      + ' &nbsp;&middot;&nbsp; Confidential &nbsp;&middot;&nbsp; Prepared with FARaudit</div>');
+      + ' &nbsp;&middot;&nbsp; Confidential</div>');
 
     H.push('</div>');
     return H.join('');
@@ -775,6 +865,7 @@
 
   function renderAll() {
     paintLetterhead();
+    paintLogo();
     paintProse('Core Competencies', 'core_competencies', 'core competencies',
       'This is the first thing a contracting officer reads. Add it with Edit.');
     paintProse('Differentiators', 'differentiators', 'differentiators',

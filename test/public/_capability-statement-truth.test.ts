@@ -209,16 +209,19 @@ check("P4 · the fillability check names a field with no editor", !new Set(["com
 
 // ── the page does not invite a click it cannot honour, and empty teaches ──────
 {
-  check("the logo box is not dressed as a button",
-    !/\.lh-logo\{[^}]*cursor:pointer/.test(html),
-    "a dashed box with a hover state and no handler, no column and no storage behind it");
-  // Not dressed as a button was not enough. A dashed box reading "LOGO" is the shape of
-  // a drop zone, so it read as a control that was BROKEN rather than one not yet built.
-  check("the logo placeholder says it is unbuilt", /lt-unbuilt">NOT BUILT</.test(html),
-    "the box invites an upload the code cannot accept and names no reason");
-  check("nothing claims a logo the record cannot hold",
-    !/logo_url/.test(html) && !/logo_url/.test(live),
-    "a logo is rendered from a column that does not exist on capability_statements");
+  // THIS ASSERTION USED TO SAY THE OPPOSITE, AND WAS RIGHT TO. There was no column, no
+  // bucket and no handler, so the box carried the words NOT BUILT and was forbidden a
+  // pointer cursor — a control may only claim what the code can do. The column and the
+  // bucket exist now, so the claim it makes is true and the checks invert with it.
+  check("the logo box is a real control", /\.lh-logo\{[^}]*cursor:pointer/.test(html),
+    "the upload works but the box still looks inert");
+  check("it no longer says it is unbuilt", !/NOT BUILT/.test(html),
+    "the page denies a capability it now has");
+  check("the box takes only formats the route accepts",
+    /accept="image\/png,image\/jpeg,image\/webp"/.test(html),
+    "the picker offers files the server will refuse");
+  check("the logo is rendered from the record", /REC\.logo_url/.test(live),
+    "the letterhead shows something other than what is on file");
   check("a phone is shown as a phone", /function fmtPhone/.test(live) && /return '\(' \+ d\.slice\(0, 3\)/.test(live),
     "12034567890 is printed raw on a document a contracting officer reads");
   check("an unrecognised phone is passed through untouched", /if \(d\.length !== 10\) return String\(v\)/.test(live),
@@ -591,18 +594,115 @@ console.log("\n── whose document this is ──");
   check("the pasted copy carries no FARaudit letterhead",
     !/FAR<span style="color:/.test(live),
     "our wordmark is still rendered into the head of the document");
-  check("the pasted copy credits FARaudit in the footer", /Prepared with FARaudit/.test(live),
-    "the credit was removed rather than moved");
+  // CEO ruling, revised the same day: the credit does not appear at all. It is the
+  // customer's document, and on the CEO's own statement the footer read his company
+  // name twice. Moving it out of the header was step one; removing it is the ruling.
+  check("the pasted copy carries no FARaudit credit", !/Prepared with FARaudit/.test(live),
+    "our marketing is on a document the customer sends under their own name");
 
   check("the printed document's header is the company", /<Text style={styles\.brand}>{company}<\/Text>/.test(pdf),
     "the PDF header is not the customer's name");
-  check("the printed document credits FARaudit in the footer", /Prepared with FARaudit/.test(pdf),
-    "the credit was removed rather than moved");
+  check("the printed document carries no FARaudit credit", !/Prepared with FARaudit/.test(pdf),
+    "our marketing is on a document the customer sends under their own name");
+  check("the footer still identifies the document", /Page \$\{pageNumber\}/.test(pdf) && /Confidential/.test(pdf),
+    "removing the credit took the running footer with it");
   check("no dead brand styles remain", !/brandGold/.test(pdf) && !/companyName:/.test(pdf),
     "styles for the retired header are still declared");
 
   check("P16 · the DUNS check can see a reintroduced line",
     /DUNS/.test("ids.push('DUNS ' + esc(REC.duns));"));
+}
+
+// ── the logo: a real upload, and none of it trusts the caller ────────────────
+// Built 2026-08-09 on CEO authorisation. Column `capability_statements.logo_url` applied
+// via supabase/migrations/20260809230000; bucket `company-logos` created public-read
+// with a 2 MB ceiling and a three-format allowlist.
+console.log("\n── the logo upload trusts nothing the caller says ──");
+{
+  const route = read("src/app/api/capability-statement/logo/route.ts");
+  const lib = read("src/lib/capability-statement-logo.ts");
+  const pdf = read("src/app/api/capability-statement/pdf/route.tsx");
+  const api = read("src/app/api/capability-statement/route.ts");
+
+  check("the object path comes from the session, not the body",
+    /objectPath\(user\.id/.test(route) && !/form\.get\("path"\)/.test(route),
+    "the service-role client bypasses RLS, so a caller-supplied path writes anywhere");
+  check("the path carries a random component", /crypto\.randomUUID\(\)/.test(route),
+    "a public bucket keyed only by user id can be walked");
+  check("the bytes decide the type, not the header", /sniffImageType\(bytes\)/.test(route),
+    "Content-Type and the filename are both caller-controlled");
+  check("SVG is refused", /SVG is not accepted/.test(route),
+    "SVG is XML, carries script, and is served from a public bucket");
+  check("there is a size ceiling", /LOGO_MAX_BYTES/.test(route) && /2 \* 1024 \* 1024/.test(lib));
+  // SCOPED TO THE WRITE, AND COMMENT-STRIPPED. Two earlier versions of this check passed
+  // for the wrong reason: the first matched .select("logo_url") in the currentLogo()
+  // helper, the second matched the words ".select()" inside the comment that explains
+  // the guard. Both stayed green with the guard deleted. Code only.
+  const codeOnly = (s: string) => s.split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
+  const chain = (from: string, to: string) => {
+    const a = route.indexOf(from);
+    const b = route.indexOf(to);
+    return a === -1 || b === -1 || b < a ? "" : codeOnly(route.slice(a, b));
+  };
+  const writeChain = chain(".update({ logo_url: logoUrl", "if (saveErr || !saved)");
+  check("a zero-row update is not reported as saved",
+    writeChain.length > 0 && /\.select\(/.test(writeChain) && /!saved/.test(route),
+    "PostgREST answers 2xx for an update that matched nothing");
+  const deleteChain = chain(".update({ logo_url: null", "if (error) return");
+  check("a zero-row delete is not reported as removed",
+    deleteChain.length > 0 && /\.select\(/.test(deleteChain),
+    "the same 2xx-on-nothing applies to clearing the logo");
+  check("a failed save does not leave the object behind",
+    /remove\(\[path\]\)/.test(route), "the bucket accumulates orphans on every failed save");
+  check("replacing a logo deletes the old object", /removeObject\(admin, previous\)/.test(route),
+    "five replacements leave five files");
+  check("the delete path is validated before it is used",
+    /\^\[0-9a-f-\]\+\\\/\[0-9a-f\]\+\\\.\(png\|jpg\|webp\)\$/.test(route),
+    "a stored value pointing elsewhere becomes a delete against an arbitrary path");
+
+  check("logo_url is not settable through the record PATCH",
+    !/"logo_url"/.test(api.slice(api.indexOf("ALLOWED_FIELDS"), api.indexOf("interface AuditCore"))),
+    "a client could point the letterhead at any image on the internet");
+
+  check("the PDF fetches the logo itself", /async function fetchLogo/.test(pdf),
+    "handing the renderer a URL makes a 404 throw out of renderToBuffer");
+  check("that fetch has a timeout", /AbortSignal\.timeout\(/.test(pdf),
+    "a slow bucket hangs the download");
+  check("a failed logo still yields a document", /catch \{\s*return null;\s*\}/.test(pdf),
+    "the customer gets a 500 for a decoration");
+  check("the PDF re-sniffs what it fetched", /sniffImageType\(buf\)/.test(pdf),
+    "a URL out of a database row reaches a renderer unchecked");
+  check("no placeholder mark is substituted", /logo \? <Image/.test(pdf),
+    "a symbol the customer never chose goes on paper they send");
+
+  // Behaviour, not source. The sniffer is transcribed here and driven with real headers.
+  const sniff = (b: number[]): string | null => {
+    const bytes = Uint8Array.from(b);
+    if (bytes.length < 12) return null;
+    const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+    if (PNG.every((x, i) => bytes[i] === x)) return "png";
+    if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "jpg";
+    const ascii = (from: number, s: string) => [...s].every((c, i) => bytes[from + i] === c.charCodeAt(0));
+    if (ascii(0, "RIFF") && ascii(8, "WEBP")) return "webp";
+    return null;
+  };
+  const pad = (head: number[]) => head.concat(Array(Math.max(0, 16 - head.length)).fill(0));
+  const asBytes = (s: string) => [...s].map((c) => c.charCodeAt(0));
+
+  check("a PNG header is recognised", sniff(pad([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) === "png");
+  check("a JPEG header is recognised", sniff(pad([0xff, 0xd8, 0xff, 0xe0])) === "jpg");
+  check("a WebP header is recognised",
+    sniff(asBytes("RIFF") .concat([0, 0, 0, 0]).concat(asBytes("WEBP")).concat([0, 0, 0, 0])) === "webp");
+  check("an SVG renamed to .png is refused", sniff(pad(asBytes("<svg xmlns="))) === null,
+    "the extension and the Content-Type both said image; the bytes did not");
+  check("HTML is refused", sniff(pad(asBytes("<!doctype html>"))) === null);
+  check("a RIFF container that is not WebP is refused",
+    sniff(asBytes("RIFF").concat([0, 0, 0, 0]).concat(asBytes("WAVE")).concat([0, 0, 0, 0])) === null,
+    "checking only the RIFF magic accepts a .wav as an image");
+  check("a truncated file is refused", sniff([0x89, 0x50]) === null);
+
+  check("P17 · the sniffer check can see a blanket accept",
+    ((b: number[]) => b.length > 0)(asBytes("<svg")) === true);
 }
 
 console.log(`\n${pass} passed · ${fail} failed`);

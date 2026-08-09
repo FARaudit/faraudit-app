@@ -2,8 +2,34 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
 import { PAST_PERFORMANCE_EXPORT_LIMIT } from "@/lib/capability-statement-limits";
 import { formatPhone } from "@/lib/capability-statement-format";
-import { renderToBuffer, Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { sniffImageType } from "@/lib/capability-statement-logo";
+import { renderToBuffer, Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
 import React from "react";
+
+/**
+ * THE DOCUMENT MUST NOT FAIL TO DOWNLOAD BECAUSE OF A LOGO.
+ *
+ * Handing @react-pdf/renderer a URL makes it fetch during render, and a 404, a slow
+ * bucket or a DNS blip then throws out of renderToBuffer — the customer clicks Download
+ * PDF and gets a 500 for a decoration. The bytes are fetched here instead, with a
+ * timeout, and a failure returns null so the statement renders without the logo.
+ *
+ * The bytes are re-sniffed even though the upload route already did. This URL is read
+ * out of a database row, and the only thing that should ever reach a PDF renderer from
+ * there is one of three image formats.
+ */
+async function fetchLogo(url: string | null | undefined): Promise<Buffer | null> {
+  if (!url || !/^https:\/\//i.test(url)) return null;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(4000), cache: "no-store" });
+    if (!res.ok) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.byteLength === 0 || buf.byteLength > 2 * 1024 * 1024) return null;
+    return sniffImageType(buf) ? buf : null;
+  } catch {
+    return null;
+  }
+}
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -12,6 +38,7 @@ const styles = StyleSheet.create({
   page: { padding: 56, paddingBottom: 70, fontSize: 10, fontFamily: "Helvetica", color: "#0f172a" },
   header: { borderBottom: "2pt solid #378ADD", paddingBottom: 14, marginBottom: 16, flexDirection: "row", justifyContent: "space-between" },
   brand: { fontSize: 20, fontWeight: 700, color: "#0f172a", marginTop: 3 },
+  logo: { maxHeight: 44, maxWidth: 160, marginBottom: 8, objectFit: "contain" },
   meta: { fontSize: 8, color: "#475569", textAlign: "right" },
   contactGrid: { flexDirection: "row", justifyContent: "space-between", marginBottom: 16 },
   contactCol: { flexDirection: "column", flexGrow: 1, flexBasis: 0 },
@@ -28,6 +55,7 @@ const styles = StyleSheet.create({
 
 interface CapStmt {
   company_name?: string | null;
+  logo_url?: string | null;
   uei?: string | null;
   cage_code?: string | null;
   duns?: string | null;
@@ -50,7 +78,7 @@ interface CapStmt {
   }>;
 }
 
-function CapDoc({ stmt, generatedAt }: { stmt: CapStmt; generatedAt: string }): React.ReactElement {
+function CapDoc({ stmt, generatedAt, logo }: { stmt: CapStmt; generatedAt: string; logo: Buffer | null }): React.ReactElement {
   // No fallback. A capability statement is a document the customer sends to a
   // contracting officer under their own name; printing a placeholder on the letterhead
   // puts words in their mouth on government-facing paper. The GET refuses to render at
@@ -69,6 +97,9 @@ function CapDoc({ stmt, generatedAt }: { stmt: CapStmt; generatedAt: string }): 
             FARaudit credit lives in the footer. */}
         <View style={styles.header} fixed>
           <View>
+            {/* Absent when there is no logo, and absent when the fetch failed — never a
+                placeholder mark the customer did not choose. */}
+            {logo ? <Image src={logo} style={styles.logo} /> : null}
             <Text style={{ fontSize: 8, color: "#475569", letterSpacing: 1.2 }}>CAPABILITY STATEMENT</Text>
             <Text style={styles.brand}>{company}</Text>
           </View>
@@ -149,7 +180,7 @@ function CapDoc({ stmt, generatedAt }: { stmt: CapStmt; generatedAt: string }): 
         <Text
           style={styles.footer}
           fixed
-          render={({ pageNumber }) => `${company}  |  Page ${pageNumber}  |  Confidential  |  Prepared with FARaudit`}
+          render={({ pageNumber }) => `${company}  |  Page ${pageNumber}  |  Confidential`}
         />
       </Page>
     </Document>
@@ -180,7 +211,8 @@ export async function GET(_req: NextRequest) {
   }
 
   const generatedAt = new Date().toISOString().slice(0, 10);
-  const buffer = await renderToBuffer(<CapDoc stmt={stmt as CapStmt} generatedAt={generatedAt} />);
+  const logo = await fetchLogo((stmt as CapStmt).logo_url);
+  const buffer = await renderToBuffer(<CapDoc stmt={stmt as CapStmt} generatedAt={generatedAt} logo={logo} />);
   const ab = new ArrayBuffer(buffer.byteLength);
   new Uint8Array(ab).set(buffer);
 
