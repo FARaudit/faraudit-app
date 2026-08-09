@@ -168,7 +168,11 @@
       ));
       return;
     }
-    rows.forEach(function (p) {
+    /* THE CARD IS THE DOCUMENT. It shows exactly the awards that leave with the
+       statement, so what the customer reads here is what the contracting officer
+       receives. Everything they have won lives in Award history below, which is the
+       record and is not sent. */
+    rows.slice(0, EXPORT_LIMIT).forEach(function (p) {
       var item = make('div', 'perf-item');
       item.appendChild(make('span', 'perf-title', p.title || 'Untitled award'));
       if (p.contract_value !== null && p.contract_value !== undefined && p.contract_value !== '') {
@@ -182,13 +186,64 @@
       wrap.appendChild(item);
     });
 
-    /* A CO reading this document cannot tell a short list from a truncated one, and
+    /* A CO reading this document cannot tell a short list from a shortened one, and
        neither could the customer who sent it. Say so on the page itself. */
-    if (PAST_TOTAL !== null && PAST_TOTAL > rows.length) {
+    var total = PAST_TOTAL === null ? rows.length : PAST_TOTAL;
+    if (total > EXPORT_LIMIT) {
       wrap.appendChild(make('div', 'perf-more',
-        'Showing the ' + rows.length + ' most recent of ' + PAST_TOTAL +
-        ' awards on file. The rest are in Past Audits.'));
+        'These ' + EXPORT_LIMIT + ' go out with the statement — the ' + EXPORT_LIMIT +
+        ' most recent of ' + total + ' awards. All ' + total + ' are in Award history below.'));
     }
+  }
+
+  /* ── award history — every win, and NOT part of the sent document ───────────── */
+  function paintAwardHistory() {
+    var section = document.getElementById('awardHistory');
+    if (!section) return;
+    var body = el('.ah-body', section);
+    var sub = el('.ah-sub', section);
+    if (!body || !sub) return;
+    clear(body);
+
+    var rows = list(REC.past_performance);
+    var total = PAST_TOTAL === null ? rows.length : PAST_TOTAL;
+
+    /* Below the export limit the card already lists every award, so a second table
+       repeating the same rows would be noise. The section appears exactly when the
+       record holds more than the document carries. */
+    if (total <= EXPORT_LIMIT) { section.hidden = true; return; }
+    section.hidden = false;
+
+    clear(sub);
+    sub.appendChild(document.createTextNode(
+      rows.length < total
+        ? ('The ' + rows.length + ' most recent of ' + total + ' awards you have recorded as won. This is your record — the statement above sends ' + EXPORT_LIMIT + '.')
+        : ('All ' + total + ' awards you have recorded as won. This is your record — the statement above sends ' + EXPORT_LIMIT + '.')
+    ));
+
+    rows.forEach(function (p) {
+      var row = make('div', 'ah-row');
+      row.setAttribute('role', 'row');
+      row.appendChild(make('span', 'ah-title', p.title || p.notice_id || 'Untitled award'));
+      row.appendChild(cell(p.agency));
+      row.appendChild(cell(p.notice_id, 'ah-mono'));
+      row.appendChild(cell(p.period));
+      /* Blank, never a dash or a zero: an absent award value is a figure the record
+         does not hold, and a number here reads to a CO as what the work was worth. */
+      var v = make('span', 'ah-cell ah-value');
+      if (p.contract_value !== null && p.contract_value !== undefined && p.contract_value !== '') {
+        v.appendChild(document.createTextNode(String(p.contract_value)));
+      }
+      row.appendChild(v);
+      body.appendChild(row);
+    });
+  }
+
+  function cell(value, extra) {
+    var s = make('span', 'ah-cell' + (extra ? ' ' + extra : ''));
+    if (has(value)) s.appendChild(document.createTextNode(value));
+    else { s.className += ' ah-empty'; s.appendChild(document.createTextNode('—')); }
+    return s;
   }
 
   /* ── contact strip ──────────────────────────────────────────────────────── */
@@ -727,6 +782,7 @@
     paintProse('Differentiators', 'differentiators', 'differentiators',
       'This is what separates you from the other bidders. Add it with Edit.');
     paintPastPerformance();
+    paintAwardHistory();
     paintContact();
     paintHealth();
     paintStats();
