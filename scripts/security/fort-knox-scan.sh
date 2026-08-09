@@ -126,19 +126,33 @@ echo "--- auth wall ---"
 # NOT active" raised a security failure from a network blip. It is retried once,
 # then reported as an inconclusive SKIP. An actual 200 still FAILS: a reachable
 # gated route answering 200 is a real finding.
-AUTH_PROBE_PATH="/opportunities"
-code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 8 "https://www.faraudit.com${AUTH_PROBE_PATH}")
-if [[ "$code" == "000" ]]; then
-  sleep 3
-  code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "https://www.faraudit.com${AUTH_PROBE_PATH}")
-fi
-if [[ "$code" == "307" || "$code" == "302" ]]; then
-  echo "✓ ${AUTH_PROBE_PATH} → $code (auth active)"
-elif [[ "$code" == "000" ]]; then
-  SKIP "${AUTH_PROBE_PATH} unreachable (curl 000) — auth wall NOT asserted on this run"
-else
-  FAIL "${AUTH_PROBE_PATH} → $code — auth wall is NOT active"
-fi
+# WHAT IS ASSERTED: an anonymous request never reaches gated content. It asserted
+# the FIRST HOP was 307/302, which is a weaker and more brittle claim — the rename
+# of /opportunities to /notices put a 308 alias in front of the gate, and this check
+# reported "auth wall is NOT active" for a wall that was fully intact
+# (/opportunities → 308 → /notices → 307 → /sign-in). A redirect to another route is
+# not a hole; serving the page is. So the chain is FOLLOWED and the destination is
+# what has to be the sign-in page.
+#
+# It still goes red for the thing it exists to catch: drop the gate and the chain
+# terminates on the route itself, which does not match /sign-in.
+#
+# BOTH paths are probed. The legacy alias is still linked from the wild, so a gate
+# that covered only the new name would leave the reachable one unasserted.
+for AUTH_PROBE_PATH in /opportunities /notices; do
+  read -r code final < <(curl -sL -o /dev/null -w "%{http_code} %{url_effective}\n" --max-time 10 "https://www.faraudit.com${AUTH_PROBE_PATH}")
+  if [[ "$code" == "000" ]]; then
+    sleep 3
+    read -r code final < <(curl -sL -o /dev/null -w "%{http_code} %{url_effective}\n" --max-time 20 "https://www.faraudit.com${AUTH_PROBE_PATH}")
+  fi
+  if [[ "$code" == "000" ]]; then
+    SKIP "${AUTH_PROBE_PATH} unreachable (curl 000) — auth wall NOT asserted on this run"
+  elif [[ "$final" == *"/sign-in"* ]]; then
+    echo "✓ ${AUTH_PROBE_PATH} → ${final#https://www.faraudit.com} (auth active)"
+  else
+    FAIL "${AUTH_PROBE_PATH} → $code ${final} — auth wall is NOT active"
+  fi
+done
 
 echo ""
 echo "--- landing page live ---"
