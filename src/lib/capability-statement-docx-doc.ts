@@ -2,12 +2,13 @@
 // it — see the note in capability-statement-pdf-doc.tsx for why source-grepping was not
 // coverage.
 import {
-  Document, Paragraph, TextRun, AlignmentType, BorderStyle, HeadingLevel
+  Document, Paragraph, TextRun, AlignmentType, BorderStyle, HeadingLevel, ImageRun
 } from "docx";
 import { PAST_PERFORMANCE_EXPORT_LIMIT } from "@/lib/capability-statement-limits";
 import { formatPhone } from "@/lib/capability-statement-format";
 import { naicsLines } from "@/lib/capability-statement-naics";
 import { orderForAgency } from "@/lib/capability-statement-tailoring";
+import { imageSize, fitWithin, sniffImageType, LOGO_BOX } from "@/lib/capability-statement-logo";
 
 const INK = "0F172A";
 const MUTE = "475569";
@@ -15,6 +16,7 @@ const ACCENT = "378ADD";
 
 export interface CapStmt {
   company_name?: string | null;
+  logo_url?: string | null;
   uei?: string | null;
   cage_code?: string | null;
   naics_codes?: string[];
@@ -47,11 +49,27 @@ const body = (text: string) =>
     children: [new TextRun({ text, size: 21, color: INK })]
   });
 
-export function buildDocx(stmt: CapStmt, agency: string | null): Document {
+export function buildDocx(stmt: CapStmt, agency: string | null, logo: Buffer | null = null): Document {
   const company = String(stmt.company_name || "").trim();
   const children: Paragraph[] = [];
 
   // The customer's name is the letterhead. Ours appears nowhere on this document.
+  // THE WORD EXPORT NEVER HAD A LOGO. It was added to the page, the PDF and the pasted
+  // copy and simply not carried across to this builder. Sized from the image's own
+  // dimensions, same box as the PDF, so the two documents match.
+  const kind = logo ? sniffImageType(logo) : null;
+  if (logo && kind) {
+    const box = fitWithin(imageSize(logo), LOGO_BOX.width, LOGO_BOX.height);
+    children.push(new Paragraph({
+      spacing: { after: 100 },
+      children: [new ImageRun({
+        data: logo,
+        type: kind.ext === "jpg" ? "jpg" : kind.ext === "webp" ? "png" : "png",
+        transformation: { width: box.width, height: box.height }
+      })]
+    }));
+  }
+
   children.push(new Paragraph({
     spacing: { after: 40 },
     children: [new TextRun({ text: "CAPABILITY STATEMENT", size: 15, color: MUTE, characterSpacing: 40 })]

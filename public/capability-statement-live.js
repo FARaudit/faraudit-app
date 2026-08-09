@@ -830,8 +830,11 @@
        recipient opens this in Word or an email client with no session, possibly days
        later, and a signed URL would have expired and stripped the letterhead. */
     if (has(REC.logo_url)) {
+      /* HEIGHT AS AN ATTRIBUTE. Word discards CSS max-height on a pasted image and
+         renders it at natural size, so a square favicon filled most of a page. The
+         attribute is honoured, and width is left to scale with the aspect ratio. */
       H.push('<div style="margin-bottom:10px"><img src="' + esc(REC.logo_url)
-        + '" alt="" style="max-height:56px;max-width:200px"></div>');
+        + '" alt="" height="42" style="height:42px;width:auto"></div>');
     }
     H.push('<div style="font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:' + X_MUTE + '">Capability Statement</div>');
     H.push('<div style="font-size:24px;font-weight:700;letter-spacing:-.01em;margin:2px 0 8px;padding-bottom:10px;border-bottom:2px solid ' + X_ACCENT + '">'

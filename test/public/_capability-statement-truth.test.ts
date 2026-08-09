@@ -670,16 +670,27 @@ console.log("\n── the logo upload trusts nothing the caller says ──");
     !/"logo_url"/.test(api.slice(api.indexOf("ALLOWED_FIELDS"), api.indexOf("interface AuditCore"))),
     "a client could point the letterhead at any image on the internet");
 
-  check("the PDF fetches the logo itself", /async function fetchLogo/.test(pdf),
-    "handing the renderer a URL makes a 404 throw out of renderToBuffer");
-  check("that fetch has a timeout", /AbortSignal\.timeout\(/.test(pdf),
+  // The fetch moved into src/lib/capability-statement-logo.ts when Word needed it too —
+  // one fetcher, so a guard added for one export cannot be missing from the other.
+  const logolib = read("src/lib/capability-statement-logo.ts");
+  const docx = readExport("src/app/api/capability-statement/docx/route.ts", "src/lib/capability-statement-docx-doc.ts");
+  check("a document fetches the logo itself, never handing a URL to a renderer",
+    /export async function fetchLogoBytes/.test(logolib),
+    "a 404 or a slow bucket throws out of the render and the download 500s");
+  check("that fetch has a timeout", /AbortSignal\.timeout\(/.test(logolib),
     "a slow bucket hangs the download");
-  check("a failed logo still yields a document", /catch \{\s*return null;\s*\}/.test(pdf),
+  check("a failed logo still yields a document", /catch \{\s*return null;\s*\}/.test(logolib),
     "the customer gets a 500 for a decoration");
-  check("the PDF re-sniffs what it fetched", /sniffImageType\(buf\)/.test(pdf),
+  check("it re-sniffs what it fetched", /sniffImageType\(buf\)/.test(logolib),
     "a URL out of a database row reaches a renderer unchecked");
-  check("no placeholder mark is substituted", /logo \? <Image/.test(pdf),
-    "a symbol the customer never chose goes on paper they send");
+  for (const [surface, src] of [["the PDF", pdf], ["the Word export", docx]] as const) {
+    check(`${surface} uses the shared fetcher`, /fetchLogoBytes\(/.test(src),
+      "a second fetch path drifts from the guards on the first");
+    check(`${surface} substitutes no placeholder mark`, /logo &&|logo \?/.test(src),
+      "a symbol the customer never chose goes on paper they send");
+    check(`${surface} sizes the logo by its own dimensions`, /fitWithin\(imageSize\(logo\)/.test(src),
+      "max-height is not honoured here, so a 1024px favicon renders at natural size");
+  }
 
   // Behaviour, not source. The sniffer is transcribed here and driven with real headers.
   const sniff = (b: number[]): string | null => {
