@@ -149,5 +149,25 @@ check("P2 · rejects a hardcoded completeness figure", />82%</.test('<span class
 check("P3 · accepts a page with neither", !/SPY-6|>82%</.test('<div class="perf-list"></div><span class="pct"></span>'));
 check("P4 · the fillability check names a field with no editor", !new Set(["company_name"]).has("contact_fax"));
 
+// ── CAGE is synced, not typed, and not silently dropped ────────────────────
+// The UEI editor displayed cage_code as "not on file" and NOTHING wrote it — writable by
+// the API, shown on a document a contracting officer reads, and unfillable from anywhere in
+// the product. The entity was already carrying it: sam-entity.ts parses er.cageCode into
+// SamEntity.cage_code, and cert-sync dropped it on the floor.
+{
+  const certSync = read("src/lib/cert-sync.ts");
+  const samEntity = read("src/lib/sam-entity.ts");
+  check("the SAM entity still carries a CAGE to sync",
+    /cage_code:\s*er\.cageCode/.test(samEntity), "nothing upstream to persist");
+  check("cert-sync persists cage_code from the attested entity",
+    /\.update\(\{ cage_code: samCage \}\)/.test(certSync) && /entity\.cage_code/.test(certSync),
+    "CAGE reads 'not on file' forever with no control that can change it");
+  check("…and uses .select() as the zero-row control, like attributes_v2",
+    /\.update\(\{ cage_code: samCage \}\)[\s\S]{0,240}\.select\("user_id"\)/.test(certSync),
+    "PostgREST reports no error on a zero-row UPDATE — the write would claim success");
+  check("P5 · that check can see the pre-fix shape",
+    !/\.update\(\{ cage_code: samCage \}\)/.test('return { state: "verified", records };'));
+}
+
 console.log(`\n${pass} passed · ${fail} failed`);
 if (fail > 0) process.exit(1);
