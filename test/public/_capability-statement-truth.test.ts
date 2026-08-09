@@ -32,6 +32,10 @@ const ROOT = join(import.meta.dirname ?? __dirname, "..", "..");
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
 
 const html = read("public/capability-statement.html");
+// The export is two files: the route (auth, refusal, headers) and the document builder
+// in src/lib (extracted so a test can actually render it). Content assertions must see
+// both, or moving a line between them turns a gate red with nothing having changed.
+const readExport = (route: string, doc: string) => read(route) + "\n" + read(doc);
 const live = read("public/capability-statement-live.js");
 
 console.log("── the document invents nothing ──");
@@ -386,7 +390,7 @@ console.log("\n── the count is the total, not the slice ──");
   const pageLimit = Number(limits.match(/PAST_PERFORMANCE_LIMIT = (\d+)/)?.[1]);
   const exportLimit = Number(limits.match(/PAST_PERFORMANCE_EXPORT_LIMIT = (\d+)/)?.[1]);
   const api = read("src/app/api/capability-statement/route.ts");
-  const pdf = read("src/app/api/capability-statement/pdf/route.tsx");
+  const pdf = readExport("src/app/api/capability-statement/pdf/route.tsx", "src/lib/capability-statement-pdf-doc.tsx");
 
   check("there is one page cap and one export cap", pageLimit > 0 && exportLimit > 0,
     `parsed page=${pageLimit} export=${exportLimit}`);
@@ -521,7 +525,7 @@ console.log("\n── the statement card shows what actually exports ──");
 // contracting officer. Confirmed on a real production download, 2026-08-09.
 console.log("\n── the phone reads the same everywhere ──");
 {
-  const pdf = read("src/app/api/capability-statement/pdf/route.tsx");
+  const pdf = readExport("src/app/api/capability-statement/pdf/route.tsx", "src/lib/capability-statement-pdf-doc.tsx");
   const fmt = read("src/lib/capability-statement-format.ts");
 
   check("the printed document formats the phone", /formatPhone\(stmt\.contact_phone\)/.test(pdf),
@@ -577,7 +581,7 @@ console.log("\n── the phone reads the same everywhere ──");
 // contracting officer under their own name.
 console.log("\n── whose document this is ──");
 {
-  const pdf = read("src/app/api/capability-statement/pdf/route.tsx");
+  const pdf = readExport("src/app/api/capability-statement/pdf/route.tsx", "src/lib/capability-statement-pdf-doc.tsx");
 
   // Match the RENDERING, not the word — a comment mentioning DUNS is not a DUNS on the
   // document, and a check that cannot tell the difference fails for the wrong reason.
@@ -623,7 +627,7 @@ console.log("\n── the logo upload trusts nothing the caller says ──");
 {
   const route = read("src/app/api/capability-statement/logo/route.ts");
   const lib = read("src/lib/capability-statement-logo.ts");
-  const pdf = read("src/app/api/capability-statement/pdf/route.tsx");
+  const pdf = readExport("src/app/api/capability-statement/pdf/route.tsx", "src/lib/capability-statement-pdf-doc.tsx");
   const api = read("src/app/api/capability-statement/route.ts");
 
   check("the object path comes from the session, not the body",
@@ -715,8 +719,8 @@ console.log("\n── NAICS carries titles, from the regulation ──");
 {
   const lib = read("src/lib/capability-statement-naics.ts");
   const titles = read("src/lib/naics-titles.ts");
-  const pdf = read("src/app/api/capability-statement/pdf/route.tsx");
-  const docx = read("src/app/api/capability-statement/docx/route.ts");
+  const pdf = readExport("src/app/api/capability-statement/pdf/route.tsx", "src/lib/capability-statement-pdf-doc.tsx");
+  const docx = readExport("src/app/api/capability-statement/docx/route.ts", "src/lib/capability-statement-docx-doc.ts");
   const api = read("src/app/api/capability-statement/route.ts");
   const gen = read("scripts/naics/build-naics-titles.mjs");
 
@@ -756,7 +760,7 @@ console.log("\n── NAICS carries titles, from the regulation ──");
 // extension disagree, and this document is sent to a contracting officer.
 console.log("\n── the Word export is a real document ──");
 {
-  const docx = read("src/app/api/capability-statement/docx/route.ts");
+  const docx = readExport("src/app/api/capability-statement/docx/route.ts", "src/lib/capability-statement-docx-doc.ts");
 
   check("it is generated as OOXML", /Packer\.toBuffer/.test(docx) && /from "docx"/.test(docx),
     "an HTML file renamed .doc opens with a format warning");
@@ -793,8 +797,8 @@ console.log("\n── the Word export is a real document ──");
 console.log("\n── a tailored edition writes nothing ──");
 {
   const lib = read("src/lib/capability-statement-tailoring.ts");
-  const pdf = read("src/app/api/capability-statement/pdf/route.tsx");
-  const docx = read("src/app/api/capability-statement/docx/route.ts");
+  const pdf = readExport("src/app/api/capability-statement/pdf/route.tsx", "src/lib/capability-statement-pdf-doc.tsx");
+  const docx = readExport("src/app/api/capability-statement/docx/route.ts", "src/lib/capability-statement-docx-doc.ts");
   const api = read("src/app/api/capability-statement/route.ts");
 
   // The boundary itself. No surface that renders an edition may reach a model.
