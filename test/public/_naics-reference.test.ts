@@ -127,6 +127,15 @@ check("Escape clears the search field",
 // The title track absorbing all slack is what pushed the figure ~708px from the title.
 // A one-line card title lifted the rule, the size standard and the blue note by exactly
 // one line against its neighbours. Two lines are reserved whether or not they are used.
+// Reserving two title lines aligned the cards at 1835px and nowhere else: at 1700 and
+// 1440 the term chips wrap on some cards and not others, and below 1600 the longest title
+// needs a third line. Subgrid is what makes every band take the tallest card in its row.
+check("the cards align by subgrid, not by a guessed row count",
+  /\.pc\{[^}]*display:grid[^}]*grid-template-rows:subgrid[^}]*grid-row:span 5/.test(page),
+  "card alignment is back to fixed heights and breaks whenever the chips or title wrap");
+check("the two rail scopes are visually separated",
+  /\.nt-ri\.scope\[data-scope="mine"\]\{margin-bottom:\d+px\}/.test(page),
+  "My codes and All codes read as one undifferentiated list");
 check("the card title reserves two lines",
   /\.pc-t\{[^}]*min-height:\s*2\.7em/.test(page),
   "a one-line title pulls everything under it up and the cards stop aligning");
