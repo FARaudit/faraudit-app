@@ -86,11 +86,12 @@ console.log("\n── a control may only claim what the code can do ──");
   check("no PDF or Word export button", !/Download as PDF|Download as Word/.test(html), "an export that produces no file");
   check("no invented tailored versions", !/U\.S\. Army Edition|U\.S\. Navy Edition|Air &amp; Space Force Edition/.test(html), "agency editions that do not exist");
   check("what is not built says so", /cs-unwired/.test(html), "an absent feature is silently missing instead of stated");
-  // Both copy controls opt in through data-cs-copy. They used to share id="csCopy" —
-  // a duplicate id, and the confirmation rendered ~900px above the Export button, so a
-  // copy from down the page reported success off-screen and read as a dead control.
+  // The copy control opts in through data-cs-copy. There were once TWO of them firing
+  // the identical handler — this assertion required both, which made the duplicate a
+  // rule rather than the defect it was. Export is one cluster now; the count is asserted
+  // exactly, below, so a second control cannot creep back in unnoticed.
   const copyHooks = (html.match(/data-cs-copy/g) || []).length;
-  check("every copy control is wired", copyHooks >= 2 && /\[data-cs-copy\]/.test(live),
+  check("the copy control is wired", copyHooks >= 1 && /\[data-cs-copy\]/.test(live),
     `found ${copyHooks} copy hooks`);
   check("no duplicate copy id", (html.match(/id="csCopy"/g) || []).length === 0,
     "two elements share one id");
@@ -265,6 +266,171 @@ check("P4 · the fillability check names a field with no editor", !new Set(["com
     }
     return bad === 1;
   })());
+}
+
+// ── which field a contact row edits is authored, not inferred from its position ──
+// paintContact() used to walk `.cv` cells by index against CONTACT_FIELDS and STAMP
+// data-cs-contact from that index. The click handler opens the editor on that same
+// attribute, so reordering two rows in the markup did not merely mislabel them — it
+// pointed the editor at the wrong column of the record, and the save would have
+// written a website into the address. Nothing asserted the two orders agreed.
+console.log("\n── a contact row names its own field ──");
+{
+  const fields = (live.match(/var CONTACT_FIELDS\s*=\s*\[([^\]]*)\]/)?.[1] ?? "")
+    .split(",").map((s) => s.trim().replace(/^['"]|['"]$/g, "")).filter(Boolean);
+  check("the painted field list is readable", fields.length === 5, `parsed ${fields.length}`);
+
+  const strip = html.slice(html.indexOf('<div class="contact-strip">'), html.indexOf("</article>"));
+  const authored = [...strip.matchAll(/data-cs-contact="([^"]+)"/g)].map((m) => m[1]);
+  const rows = [...strip.matchAll(/<div class="contact-item"/g)].length;
+
+  check("every row names the field it edits", authored.length === rows && rows > 0,
+    `${rows} contact rows, ${authored.length} carry data-cs-contact — an unnamed row paints blank`);
+  for (const f of fields) {
+    check(`${f} is authored exactly once`, authored.filter((a) => a === f).length === 1,
+      "a field the strip paints has no row, or two rows claim it");
+  }
+  check("no row claims a field the record has no painter for",
+    authored.every((a) => fields.includes(a)),
+    "the editor would open on a key paintContact never fills");
+
+  check("the position of a row decides nothing", !/setAttribute\(\s*['"]data-cs-contact['"]/.test(live),
+    "the attribute is still stamped by index — reordering the markup re-points the editor");
+  check("hydration reads the authored field", /getAttribute\(\s*['"]data-cs-contact['"]\s*\)/.test(live),
+    "paintContact does not consult the attribute the click handler trusts");
+
+  check("P8 · the authored-field check can see a stripped attribute", (() => {
+    const planted = strip.replace(/ data-cs-contact="contact_website"/, "");
+    const a = [...planted.matchAll(/data-cs-contact="([^"]+)"/g)].map((m) => m[1]);
+    const r = [...planted.matchAll(/<div class="contact-item"/g)].length;
+    return !(a.length === r) && !a.includes("contact_website");
+  })());
+}
+
+// ── the strip reads as columns, and the document reaches the bottom of the rail ──
+console.log("\n── the contact strip is laid out in columns ──");
+{
+  const rule = html.match(/\.contact-strip\{([^}]*)\}/)?.[1] ?? "";
+  check("the strip is a grid, not a wrapping row", /display:grid/.test(rule) && /grid-template-columns:repeat\(3/.test(rule),
+    "flex-wrap packs by content width, so row two does not line up under row one");
+  check("the strip sits at the bottom of the document", /margin-top:auto/.test(rule),
+    "the strip floats mid-card once the card is taller than its content");
+  check("the document card fills the row beside the side column",
+    /\.doc-card\{[^}]*align-self:stretch/.test(html),
+    "the card stops short of the last side card and leaves a hole under it");
+
+  const cv = html.match(/\.contact-item \.cv\{([^}]*)\}/)?.[1] ?? "";
+  check("a contact value is never clipped by its column", !/white-space:nowrap/.test(cv),
+    "a fixed-width column plus nowrap spills the address out of the card");
+
+  check("P9 · the column check can see the pre-fix shape",
+    !/display:grid/.test("display:flex;flex-wrap:wrap;gap:18px 28px"));
+}
+
+// ── a confirmation is an event, not a permanent green sentence ───────────────
+// One press of Copy produced TWO messages — a global note beside the title AND a note
+// appended at the button — and neither was ever removed. Three copies left three
+// confirmations on screen, which is what "a glitch that does not go away" was.
+console.log("\n── the copy confirmation clears itself ──");
+{
+  check("the note is on a timer", /noteTimer\s*=\s*setTimeout/.test(live),
+    "note() shows a message with nothing scheduled to take it down");
+  check("a second press restarts the clock rather than stacking",
+    /if \(noteTimer\) \{ clearTimeout\(noteTimer\)/.test(live),
+    "two presses leave two pending timers and the first clears the second's message");
+  check("the note is hidden again, not merely emptied", /n\.hidden = true/.test(live),
+    "an empty but visible note keeps its layout space");
+  check("the note at the button is removed too", /\.cs-localnote[\s\S]{0,400}?remove\(\)/.test(live),
+    "the local confirmation is reused forever and never taken down");
+  check("one press writes one confirmation",
+    /if \(where\) localNote\(where, msg, ok\); else note\(msg, ok\)/.test(live),
+    "the same copy is reported in two places at once");
+  check("a save is not taken down mid-flight", /note\('Saving…', true, true\)/.test(live),
+    "the in-progress message expires while the request is still open");
+
+  check("P10 · the timer check can see the pre-fix shape",
+    !/noteTimer\s*=\s*setTimeout/.test("function note(m,o){var n=el('#csNote');n.hidden=false;n.textContent=m;}"));
+}
+
+// ── how many awards were won, and how many are being sent ────────────────────
+// The route caps past performance, and every number on the page counted the CAPPED
+// array. A customer with 300 wins read "AWARDS ON FILE 20" and sent a statement that
+// understated their own record to a contracting officer, with nothing saying a cap
+// existed. Separately the PDF capped at 12 where the page capped at 20, so the
+// document they checked on screen was not the document they sent.
+console.log("\n── the count is the total, not the slice ──");
+{
+  const limits = read("src/lib/capability-statement-limits.ts");
+  const pageLimit = Number(limits.match(/PAST_PERFORMANCE_LIMIT = (\d+)/)?.[1]);
+  const exportLimit = Number(limits.match(/PAST_PERFORMANCE_EXPORT_LIMIT = (\d+)/)?.[1]);
+  const api = read("src/app/api/capability-statement/route.ts");
+  const pdf = read("src/app/api/capability-statement/pdf/route.tsx");
+
+  check("there is one page cap and one export cap", pageLimit > 0 && exportLimit > 0,
+    `parsed page=${pageLimit} export=${exportLimit}`);
+  check("the export cap is within the 3–5 convention", exportLimit >= 3 && exportLimit <= 5,
+    `a capability statement carries three to five entries; this sends ${exportLimit}`);
+  // Only slices taken OF THE AWARD LIST count — `toISOString().slice(0, 10)` is a date.
+  const literalPastSlice = /(past|ranked)[^\n]{0,80}\.slice\(\s*0\s*,\s*\d+\s*\)/;
+  check("no route hardcodes its own past-performance cap",
+    !literalPastSlice.test(pdf) && !literalPastSlice.test(api),
+    "a second literal cap will drift from the shared one, which is how 20-vs-12 happened");
+  check("the PDF takes the export cap from the shared module",
+    /PAST_PERFORMANCE_EXPORT_LIMIT/.test(pdf) && /capability-statement-limits/.test(pdf),
+    "the printed document can silently carry a different number of rows than the page");
+  check("the copy export uses the same number as the PDF",
+    Number(live.match(/var EXPORT_LIMIT = (\d+)/)?.[1]) === exportLimit,
+    "paste and PDF disagree on how much of the record they send");
+
+  check("the route reports the total separately from the slice",
+    /past_performance_total/.test(api) && /const pastTotal = ranked\.length/.test(api),
+    "the client has no way to know anything was left out");
+  check("the total is counted before the cap is applied",
+    api.indexOf("const pastTotal = ranked.length") < api.indexOf("ranked.slice(0, PAST_PERFORMANCE_LIMIT)"),
+    "counting after the slice reports the cap as though it were the total");
+  check("the awards stat prints the total", /PAST_TOTAL === null \? perf\.length : PAST_TOTAL/.test(live),
+    "the headline number is the capped array length");
+  check("absent is not zero", /typeof d\.past_performance_total === 'number'/.test(live),
+    "a route that does not send a total would be read as zero awards");
+
+  for (const [what, src] of [["the page", live], ["the printed document", pdf]] as const) {
+    check(`${what} says when it is showing a subset`, /most recent/.test(src),
+      "a shortened list is indistinguishable from a complete one");
+  }
+  check("the PDF does not state a total it cannot prove", !/of \$\{pastTotal\}/.test(pdf),
+    "that route reads the already-capped row, so any total it printed would be wrong");
+
+  check("P11 · the shared-cap check can see a re-hardcoded slice",
+    /slice\(0,\s*\d+\)/.test("past.slice(0, 12).map"));
+}
+
+// ── one export home ──────────────────────────────────────────────────────────
+// Two controls fired the identical handler with identical output, and the one in the
+// side card reported success ~900px below the fold. The PDF route, meanwhile, was 187
+// complete lines with ZERO callers while the page said PDF export did not exist.
+console.log("\n── export is one place, and it claims only what is wired ──");
+{
+  check("there is exactly one copy control", (html.match(/data-cs-copy/g) || []).length === 1,
+    "two buttons, one behaviour — the second is a duplicate with no distinct purpose");
+  check("PDF download is reachable", /data-cs-pdf/.test(html) && /data-cs-pdf/.test(live),
+    "a built, working route with no caller is not a shipped capability");
+  check("the PDF button is handled, not just present",
+    /function downloadPdf/.test(live) && /API \+ '\/pdf'/.test(live),
+    "the control exists and does nothing");
+  check("a refused export is read out, not dumped as JSON",
+    /b\.error/.test(live) && /Could not build the PDF/.test(live),
+    "the route's 409 and 404 carry text the customer can act on");
+  check("the page no longer says PDF export is unbuilt", !/PDF and Word export are not built/.test(html),
+    "the page denies a capability it now offers");
+  check("Word export is still declared unbuilt", /Word export is not built yet/.test(html),
+    "an unbuilt format must keep saying so");
+  check("the retired Export card is gone", !/class="export-list"/.test(html),
+    "the side card and the header cluster both claim to be the export home");
+  check("both actions sit together", /export-actions[\s\S]{0,900}?data-cs-copy[\s\S]{0,900}?data-cs-pdf/.test(html),
+    "the two export actions are not in one cluster");
+
+  check("P12 · the duplicate-control check can see two copies",
+    (('data-cs-copy data-cs-copy').match(/data-cs-copy/g) || []).length === 2);
 }
 
 console.log(`\n${pass} passed · ${fail} failed`);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
 import { syncCertifications } from "@/lib/cert-sync";
 import { suggestedNaics } from "@/lib/naics-suggestions";
+import { PAST_PERFORMANCE_LIMIT } from "@/lib/capability-statement-limits";
 
 export const dynamic = "force-dynamic";
 
@@ -156,17 +157,25 @@ async function autopopulate(supabase: Awaited<ReturnType<typeof createServerClie
     });
   }
 
-  const past = Array.from(byId.values())
+  const ranked = Array.from(byId.values())
     .sort((a, b) => {
       const ta = a.awarded_at ? new Date(a.awarded_at).getTime() : 0;
       const tb = b.awarded_at ? new Date(b.awarded_at).getTime() : 0;
       return tb - ta;
-    })
-    .slice(0, 20);
+    });
+
+  // HOW MANY WERE WON IS REPORTED SEPARATELY FROM HOW MANY ARE SENT.
+  // The page prints one row per award and a capability statement is read in one
+  // sitting, so the list is capped — but the count is not the cap. A customer with
+  // 300 wins whose statement says "20 awards on file" is understating their own past
+  // performance to a contracting officer, and nothing on the page told them a cap
+  // existed. The cap stays; the total travels with it.
+  const pastTotal = ranked.length;
+  const past = ranked.slice(0, PAST_PERFORMANCE_LIMIT);
 
   const naicsSet = new Set<string>();
-  for (const p of past) if (p.naics_code) naicsSet.add(String(p.naics_code));
-  return { past, naics: Array.from(naicsSet) };
+  for (const p of ranked) if (p.naics_code) naicsSet.add(String(p.naics_code));
+  return { past, pastTotal, naics: Array.from(naicsSet) };
 }
 
 export async function GET(_req: NextRequest) {
@@ -195,7 +204,7 @@ export async function GET(_req: NextRequest) {
     );
   }
 
-  const { past, naics } = autoRes;
+  const { past, pastTotal, naics } = autoRes;
 
   // First-time visit — no saved row yet. Return a stub seeded from autopopulate.
   if (!stmtRes.data) {
@@ -228,6 +237,8 @@ export async function GET(_req: NextRequest) {
       // saved branch computes when its list is empty.
       naics_saved: [],
       naics_derived: naics,
+      past_performance_total: pastTotal,
+      past_performance_limit: PAST_PERFORMANCE_LIMIT,
       stub: true
     });
   }
@@ -257,6 +268,8 @@ export async function GET(_req: NextRequest) {
     statement: merged,
     naics_saved: savedNaics,
     naics_derived: derived,
+    past_performance_total: pastTotal,
+    past_performance_limit: PAST_PERFORMANCE_LIMIT,
     stub: false
   });
 }

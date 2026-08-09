@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
+import { PAST_PERFORMANCE_EXPORT_LIMIT } from "@/lib/capability-statement-limits";
 import { renderToBuffer, Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import React from "react";
 
@@ -122,7 +123,7 @@ function CapDoc({ stmt, generatedAt }: { stmt: CapStmt; generatedAt: string }): 
         {past.filter((p) => p.title || p.notice_id).length > 0 ? (
         <View style={styles.section}>
           <Text style={styles.sectionEyebrow}>PAST PERFORMANCE</Text>
-          {past.filter((p) => p.title || p.notice_id).slice(0, 12).map((p, i) => (
+          {past.filter((p) => p.title || p.notice_id).slice(0, PAST_PERFORMANCE_EXPORT_LIMIT).map((p, i) => (
             <View key={i} style={styles.pastRow} wrap={false}>
               <Text style={{ fontSize: 11, fontWeight: 700, color: "#0f172a" }}>{p.title || p.notice_id}</Text>
               <Text style={styles.small}>
@@ -132,6 +133,15 @@ function CapDoc({ stmt, generatedAt }: { stmt: CapStmt; generatedAt: string }): 
               </Text>
             </View>
           ))}
+          {/* The customer read a longer list on screen, so the document says it is
+              sending a selection. It does NOT print a total: this route reads the
+              persisted row, which is already capped, so any "of N" it stated would be
+              a number it cannot actually stand behind. */}
+          {past.filter((p) => p.title || p.notice_id).length > PAST_PERFORMANCE_EXPORT_LIMIT ? (
+            <Text style={{ fontSize: 8, color: "#94a3b8", marginTop: 2 }}>
+              {`Showing the ${PAST_PERFORMANCE_EXPORT_LIMIT} most recent awards. Full past performance available on request.`}
+            </Text>
+          ) : null}
         </View>
         ) : null}
 
