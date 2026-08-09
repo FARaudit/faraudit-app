@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     // this must not silently start dropping the deep link) and deliberately IDENTICAL in shape to the middleware:
     // `next` carries pathname AND search, because `/audit?noticeId=<ref>` is where every Opportunities
     // "Run audit" button points and the page's prefill reads that param from location.search.
-    redirect(signInRedirectPath("/audit", new URL(request.url).search));
+    redirect(signInRedirectPath("/audits", new URL(request.url).search));
   }
 
   const filePath = path.join(

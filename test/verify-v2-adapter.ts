@@ -8,7 +8,7 @@
 //
 // Pure function test — no Supabase, no API, no PDF. Fast.
 
-import { buildV2ViewModelFromShadow } from "../src/app/audit/[id]/_v2-render-surfaces";
+import { buildV2ViewModelFromShadow } from "../src/app/audits/[id]/_v2-render-surfaces";
 
 interface Probe {
   label: string;

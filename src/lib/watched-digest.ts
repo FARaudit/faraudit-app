@@ -60,7 +60,7 @@ const item = (r: WatchedRow, appBaseUrl: string): DigestItem => ({
   agency: r.agency ? String(r.agency) : null,
   solicitationNumber: r.solicitation_number ? String(r.solicitation_number) : null,
   deadline: r.response_deadline ? String(r.response_deadline) : null,
-  auditUrl: r.audit_id ? `${appBaseUrl.replace(/\/$/, "")}/audit/${r.audit_id}` : null,
+  auditUrl: r.audit_id ? `${appBaseUrl.replace(/\/$/, "")}/audits/${r.audit_id}` : null,
   verdict: r.verdict ?? null,
 });
 

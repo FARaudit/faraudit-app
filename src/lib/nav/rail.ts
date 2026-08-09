@@ -93,9 +93,9 @@ export const WORKFLOW: RailItem[] = [
   // "Notices" names what SAM actually publishes and what the customer tracks. The KEY and
   // the ROUTE are unchanged: /opportunities stays valid, so every link already sent — in a
   // digest email, a bookmark, a deep link — still lands.
-  { key: "opportunities", label: "Notices", href: "/opportunities", icon: I.opportunities },
+  { key: "opportunities", label: "Notices", href: "/notices", icon: I.opportunities },
   // Plural, matching its neighbours; the page's own button still reads Run Audit.
-  { key: "run-audit", label: "Audits", href: "/audit", icon: I.runAudit },
+  { key: "run-audit", label: "Audits", href: "/audits", icon: I.runAudit },
   // "Decisions" names the artifact the engine produces. The ROUTE is unchanged.
   { key: "past-audits", label: "Decisions", href: "/past-audits", icon: I.pastAudits },
   { key: "pipeline", label: "Pipeline", href: "/pipeline", icon: I.pipeline },

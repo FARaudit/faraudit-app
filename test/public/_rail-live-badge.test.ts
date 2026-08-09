@@ -239,7 +239,7 @@ console.log("\n── Part H · card 807 workflow rail ──");
   const R = renderRail("opportunities");
   const S = railStyle();
   const J = railScript();
-  const ROUTES = ["/command-center","/opportunities","/audit","/past-audits","/pipeline","/cmmc","/capability-statement","/teaming-partners","/defense-news","/defense-spending","/agencies","/contracting-officers","/naics","/far-dfars-updates","/wage-benchmarks"];
+  const ROUTES = ["/command-center","/notices","/audits","/past-audits","/pipeline","/cmmc","/capability-statement","/teaming-partners","/defense-news","/defense-spending","/agencies","/contracting-officers","/naics","/far-dfars-updates","/wage-benchmarks"];
   const hrefs = [...R.matchAll(/href="([^"]+)"/g)].map((m) => m[1]).filter((h) => h !== "/settings");
   check("15 destinations, exactly the source routes", JSON.stringify(hrefs) === JSON.stringify(ROUTES), hrefs.join(" "));
 
@@ -413,9 +413,9 @@ console.log("\n── Part K · badge selectors resolve against the real rail �
   check("dashboard-live.js · its selector matches a real rail row", matchesRail(dashSel, railHtml), dashSel);
 
   // Planted positives — the check must be able to go RED on the exact defect it was written for.
-  check("K-P1 · REJECTS the shipped-and-dead `.sb-icon[href=\"/opportunities\"]`", !matchesRail('.sb-icon[href="/opportunities"]', railHtml));
+  check("K-P1 · REJECTS the shipped-and-dead `.sb-icon[href=\"/notices\"]`", !matchesRail('.sb-icon[href="/notices"]', railHtml));
   check("K-P2 · REJECTS the shipped-and-dead `.sb-icon[href=\"/past-audits\"]`", !matchesRail('.sb-icon[href="/past-audits"]', railHtml));
-  check("K-P3 · ACCEPTS the corrected `.sb-step[href=\"/opportunities\"]`", matchesRail('.sb-step[href="/opportunities"]', railHtml));
+  check("K-P3 · ACCEPTS the corrected `.sb-step[href=\"/notices\"]`", matchesRail('.sb-step[href="/notices"]', railHtml));
   // A section row genuinely IS .sb-icon — the check must not simply reject that class.
   check("K-P4 · ACCEPTS `.sb-icon[href=\"/cmmc\"]`, a real section row", matchesRail('.sb-icon[href="/cmmc"]', railHtml));
   check("K-P5 · REJECTS a route the rail does not carry", !matchesRail('.sb-step[href="/not-a-route"]', railHtml));
@@ -608,7 +608,7 @@ console.log("\n── Part P · run-audit distinguishes failure from empty ─�
 }
 
 // ── Part Q · every nav link points at a route that EXISTS ─────────────────────────────────
-// The audit report (/audit/[id], the v5 "Gate Brief") is deliberately NOT injectRail'd —
+// The audit report (/audits/[id], the v5 "Gate Brief") is deliberately NOT injectRail'd —
 // route.ts explains the rail assumes a grid the single-column report does not have — so it
 // ships its OWN sidebar in src/lib/v5-report/report.ts. Nothing checked that sidebar's
 // hrefs, and it carried href="/account", which 404s in production. A nav link to a route
@@ -621,7 +621,7 @@ console.log("\n── Part Q · nav links resolve to real routes ──");
     if (p === "") return true;
     try { readdirSync(join(APP, p)); return true; } catch { return false; }
   };
-  const sources = ["src/lib/v5-report/report.ts", "src/app/audit/[id]/_template.html"];
+  const sources = ["src/lib/v5-report/report.ts", "src/app/audits/[id]/_template.html"];
   for (const src of sources) {
     const html = read(src);
     // NAV links only — scoped to the <aside> sidebar. A whole-file href sweep also

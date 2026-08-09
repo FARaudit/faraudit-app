@@ -233,7 +233,7 @@ function injectDegradedBanner(html: string, audit?: Record<string, unknown>): st
       ? `<span><b>${cause.head}</b>${cause.body}</span></div>`
       : `<span><b>Deep analysis unavailable for this run</b>The core report below is complete ` +
         `and accurate. Export is disabled until a full analysis succeeds — ` +
-        `<a href="/audit">re-run</a> to try again.</span></div>`);
+        `<a href="/audits">re-run</a> to try again.</span></div>`);
   let out = html;
   out = out.includes("</head>") ? out.replace("</head>", `${style}</head>`) : `${style}${out}`;
   // Top of the report content column, under the masthead (Design placement).
@@ -334,7 +334,7 @@ export async function GET(
 
   const supabase = await createServerClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect(`/sign-in?next=/audit/${encodeURIComponent(id)}`);
+  if (!user) redirect(`/sign-in?next=/audits/${encodeURIComponent(id)}`);
 
   // UUID path: direct lookup. Slug path: case-insensitive
   // solicitation_number match, most recent first (some sol numbers are
