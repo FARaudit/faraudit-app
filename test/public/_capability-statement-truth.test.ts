@@ -86,7 +86,22 @@ console.log("\n── a control may only claim what the code can do ──");
   check("no PDF or Word export button", !/Download as PDF|Download as Word/.test(html), "an export that produces no file");
   check("no invented tailored versions", !/U\.S\. Army Edition|U\.S\. Navy Edition|Air &amp; Space Force Edition/.test(html), "agency editions that do not exist");
   check("what is not built says so", /cs-unwired/.test(html), "an absent feature is silently missing instead of stated");
-  check("Copy to Clipboard is actually wired", /id="csCopy"/.test(html) && /navigator\.clipboard/.test(live), "the one working export is not connected");
+  // Both copy controls opt in through data-cs-copy. They used to share id="csCopy" —
+  // a duplicate id, and the confirmation rendered ~900px above the Export button, so a
+  // copy from down the page reported success off-screen and read as a dead control.
+  const copyHooks = (html.match(/data-cs-copy/g) || []).length;
+  check("every copy control is wired", copyHooks >= 2 && /\[data-cs-copy\]/.test(live),
+    `found ${copyHooks} copy hooks`);
+  check("no duplicate copy id", (html.match(/id="csCopy"/g) || []).length === 0,
+    "two elements share one id");
+  check("the confirmation lands where the button was pressed", /function localNote/.test(live),
+    "a copy from the Export section reports success off-screen");
+  // The page renders a letterhead; a flat transcript of it is not the document.
+  check("the export carries the document's formatting",
+    /function statementHtml/.test(live) && /'text\/html'/.test(live) && /'text\/plain'/.test(live),
+    "pasting into Word or email produces a wall of plain text");
+  check("…and falls back to plain text where rich is unsupported", /plainOnly/.test(live),
+    "a browser without ClipboardItem copies nothing");
   check("the copied text is built from the record", /function statementText/.test(live) && /REC\.company_name/.test(live), "the export could drift from what is on screen");
 }
 
@@ -189,6 +204,67 @@ check("P4 · the fillability check names a field with no editor", !new Set(["com
   check("the hint is not set in --mute-2", !/\.fe-hint\{[^}]*--mute-2/.test(html),
     "--mute-2 is not a text token at any size (2.56:1)");
   check("P6 · the prompt check can see the old shape", /window\.prompt\(/.test("var next = window.prompt('Edit ' + label, current);"));
+}
+
+// ── the page does not invite a click it cannot honour, and empty teaches ──────
+{
+  check("the logo box is not dressed as a button",
+    !/\.lh-logo\{[^}]*cursor:pointer/.test(html),
+    "a dashed box with a hover state and no handler, no column and no storage behind it");
+  check("a phone is shown as a phone", /function fmtPhone/.test(live) && /return '\(' \+ d\.slice\(0, 3\)/.test(live),
+    "12034567890 is printed raw on a document a contracting officer reads");
+  check("an unrecognised phone is passed through untouched", /if \(d\.length !== 10\) return String\(v\)/.test(live),
+    "an extension or a foreign number would be mangled into a shape it does not have");
+  // Guidance may never become data: the CEO fills this record as a customer and that act
+  // is the test, so nothing may pre-write a word of it.
+  check("empty prose fields show what to write", /PROSE_GUIDE/.test(live) && /function proseGuide/.test(live),
+    "an empty field says only that it is empty");
+  // The exported statement must be built from the record alone. Slice the two export
+  // builders out and assert neither can see the guidance.
+  const exportSrc = live.slice(live.indexOf("function statementText"));
+  check("…and that guidance is never written or exported",
+    !/PROSE_GUIDE|proseGuide/.test(exportSrc),
+    "example copy could reach the exported statement");
+  check("…nor saved onto the record",
+    !/save\([^)]*PROSE_GUIDE|patch\[[^\]]*\]\s*=\s*PROSE_GUIDE/.test(live),
+    "example copy could be written into the customer's record");
+}
+
+// ── the two-column grid actually has two columns ─────────────────────────────
+// A single stray </div> closed <article class="doc-card"> early, so the parser ejected
+// BOTH the contact strip and the whole side column out to <main>. The grid kept its
+// 3fr/2fr tracks with nothing in the second one — that empty 566px column is what read
+// as a blank hole beside the document, and it is why Export did not line up with
+// anything above it. Nothing asserted the panel was still inside the grid.
+{
+  const gridOpen = html.indexOf('<section class="cs-grid">');
+  const gridBlock = html.slice(gridOpen, html.indexOf('</section>', html.indexOf('<aside class="side-col">')));
+  check("the side column is inside the grid", gridOpen > -1 && /<aside class="side-col">/.test(gridBlock),
+    "the second grid track is empty and the side cards render full-bleed below");
+  check("the contact strip is inside the document", /<article class="doc-card">[\s\S]*?contact-strip[\s\S]*?<\/article>/.test(html),
+    "the contact strip was ejected out of the statement it belongs to");
+
+  // Tag balance inside the grid — the actual defect, not its symptom.
+  const VOID = new Set(["br","hr","img","input","meta","link","path","circle","rect","line","polyline","polygon","use","source","col","area","base","embed","param","track","wbr","stop","ellipse"]);
+  const region = html.slice(gridOpen, html.indexOf('<aside class="side-col">'));
+  const stack: string[] = [];
+  let stray = 0;
+  for (const m of region.matchAll(/<(\/?)([a-zA-Z][a-zA-Z0-9]*)([^>]*?)(\/?)>/g)) {
+    const [, closing, rawTag, , selfClose] = m;
+    const tag = rawTag.toLowerCase();
+    if (VOID.has(tag) || selfClose === "/") continue;
+    if (closing) { if (stack[stack.length - 1] === tag) stack.pop(); else stray++; }
+    else stack.push(tag);
+  }
+  check("no stray closing tag inside the document card", stray === 0,
+    `${stray} closing tag(s) with no matching open — the parser will eject everything after them`);
+  check("P7 · the balance check can see a planted stray", (() => {
+    const s2: string[] = []; let bad = 0;
+    for (const m of '<div><span></span></div></div>'.matchAll(/<(\/?)([a-z]+)>/g)) {
+      if (m[1]) { if (s2[s2.length - 1] === m[2]) s2.pop(); else bad++; } else s2.push(m[2]);
+    }
+    return bad === 1;
+  })());
 }
 
 console.log(`\n${pass} passed · ${fail} failed`);
