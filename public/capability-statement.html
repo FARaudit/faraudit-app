@@ -276,6 +276,38 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
 [data-sb="open"] .sb-bottom{align-items:flex-start;width:100%;padding:0 4px}
 
 /* ── /canonical toggle sidebar ── */
+
+/* ── field editor ─────────────────────────────────────────────────────────────
+   Replaces window.prompt(). The prompt was browser chrome on a designed document
+   ("www.faraudit.com says"), and it gave a ONE-LINE box for Core Competencies —
+   a field that holds paragraphs. Built from this page's own tokens and its three
+   loaded faces; it introduces no new colour, no new typeface, and no new radius. */
+.fe-scrim{position:fixed;inset:0;z-index:200;display:grid;place-items:center;padding:24px;
+  background:color-mix(in srgb, var(--page-bg) 72%, transparent);backdrop-filter:blur(2px)}
+.fe-scrim[hidden]{display:none}
+.fe{width:min(620px,100%);max-height:calc(100vh - 48px);display:flex;flex-direction:column;
+  background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+.fe-head{padding:18px 22px 0}
+.fe-kind{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--mute);margin:0 0 5px}
+.fe-title{font-size:17px;font-weight:800;letter-spacing:-.014em;color:var(--ink);margin:0}
+.fe-help{font-size:12.5px;line-height:1.55;color:var(--ink-2);margin:7px 0 0;text-wrap:pretty}
+.fe-body{padding:16px 22px 4px;overflow-y:auto}
+.fe-input,.fe-area{width:100%;box-sizing:border-box;font-family:Manrope,system-ui,sans-serif;font-size:14px;
+  line-height:1.6;color:var(--ink);background:var(--card-soft);border:1px solid var(--line);
+  border-radius:9px;padding:11px 13px;outline:none;transition:border-color .14s,box-shadow .14s}
+.fe-area{min-height:180px;resize:vertical}
+.fe-input:focus,.fe-area:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.fe-foot{display:flex;align-items:center;gap:12px;padding:14px 22px 18px;border-top:1px solid var(--line-2);margin-top:14px}
+.fe-count{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mute);font-variant-numeric:tabular-nums;margin-right:auto}
+.fe-btn{font-family:Manrope,system-ui,sans-serif;font-size:13px;font-weight:700;border-radius:8px;
+  padding:8px 15px;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--ink-2);transition:background-color .14s,color .14s}
+.fe-btn:hover{background:var(--search-bg);color:var(--ink)}
+.fe-btn.primary{background:var(--accent-deep,#185FA5);border-color:var(--accent-deep,#185FA5);color:#fff}
+.fe-btn.primary:hover{background:var(--accent,#378ADD);border-color:var(--accent,#378ADD)}
+.fe-btn:focus-visible,.fe-input:focus-visible,.fe-area:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.fe-hint{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mute)}  /* --mute-2 is not a text token: 2.56:1 */
+@media (prefers-reduced-motion:reduce){.fe-input,.fe-area,.fe-btn{transition:none}}
 </style>
 </head>
 <body>
