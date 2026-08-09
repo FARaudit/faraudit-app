@@ -125,6 +125,18 @@ check("Escape clears the search field",
   /e\.key !== 'Escape'/.test(tab) && /input\.value = ''/.test(tab) && /input\.id !== 'ntSearch'/.test(tab),
   "the search box has no keyboard exit");
 // The title track absorbing all slack is what pushed the figure ~708px from the title.
+// A one-line card title lifted the rule, the size standard and the blue note by exactly
+// one line against its neighbours. Two lines are reserved whether or not they are used.
+check("the card title reserves two lines",
+  /\.pc-t\{[^}]*min-height:\s*2\.7em/.test(page),
+  "a one-line title pulls everything under it up and the cards stop aligning");
+// The caveat is honesty, not decoration: evaluation method and clause regime are OUR
+// editorial judgment, not the regulation. It may be said once — it may not be dropped.
+check("the typical-terms caveat is still stated",
+  /typical terms are directional — confirm per solicitation/.test(tab),
+  "an unsourced evaluation method is presented as fact");
+check("…and stated once, not per row", !/'nt-dir'/.test(tab),
+  "the caveat is back on every card and all 27 editorial rows");
 check("the title track is capped, not 1fr",
   /grid-template-columns:104px minmax\(0,var\(--title-max\)\) 92px 88px/.test(page) && /--title-max:\s*\d+px/.test(page),
   "the title column takes every spare pixel and strands the figure at the far edge");

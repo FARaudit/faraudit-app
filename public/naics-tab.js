@@ -165,7 +165,6 @@ function pinCard(r) {
     ch.appendChild(el('span', 'nt-chip', CLAUSE[r[6]]));
     f2.appendChild(ch);
     d.appendChild(f2);
-    d.appendChild(el('span', 'nt-dir', 'directional — confirm per solicitation'));
   }
   if (r[7]) {
     var n = el('div', 'pc-n'); n.dataset.ed = '';
@@ -266,7 +265,6 @@ function row(r, M, i) {
     ch.appendChild(el('span', 'nt-chip', CLAUSE[r[6]]));
     m.appendChild(ch);
     m.appendChild(el('p', 'nt-note', r[7]));
-    m.appendChild(el('span', 'nt-dir', 'directional — confirm per solicitation'));
     d.appendChild(m);
   }
   return d;
@@ -351,7 +349,14 @@ function resultLine(n) {
   else if (S.scope === 'all') t.appendChild(document.createTextNode(' codes with an SBA size standard'));
   else t.appendChild(document.createTextNode(' code' + (n === 1 ? '' : 's') + ' in this sector'));
   b.appendChild(t);
-  b.appendChild(el('p', 'nt-res-n mono', 'size standard = SBA threshold, 13 CFR 121.201'));
+  /* The caveat on typical terms is stated ONCE, here, instead of under every card and
+     every one of the 27 editorial rows. It has to be said at all — evaluation method and
+     clause regime are our editorial judgment, not the regulation, and a stated evaluation
+     method nobody sourced could move a bid. It does not have to be said 27 times. This
+     line is in the sticky result bar, so unlike the per-row copy it is on screen no matter
+     how far the register is scrolled. */
+  b.appendChild(el('p', 'nt-res-n mono',
+    'size standard = SBA threshold, 13 CFR 121.201  ·  typical terms are directional — confirm per solicitation'));
   return b;
 }
 
