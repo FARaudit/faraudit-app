@@ -302,13 +302,123 @@
     }).catch(function () { note('Could not reach the server', false); });
   }
 
+  /* WHAT EACH FIELD IS FOR, in the reader's terms. A contracting officer is the
+     audience for every one of these, so the helper says what THEY do with it rather
+     than describing the input. `prose` fields hold paragraphs — the old prompt gave
+     them a single line, which is why Core Competencies was unreadable while editing. */
+  var FIELD_SPEC = {
+    company_name:     { kind: 'Identity', help: 'The legal name on your SAM registration. It heads the document and the engine matches it against the entity record.' },
+    core_competencies:{ kind: 'The document', prose: true, help: 'The first thing a contracting officer reads. What you build or do, in your own words — plain sentences beat a keyword list.' },
+    differentiators:  { kind: 'The document', prose: true, help: 'Why you over the other bidders. Certifications, facilities, clearances, past programs — the things another firm cannot simply claim.' },
+    contact_name:     { kind: 'Contact', help: 'Who a contracting officer asks for by name.' },
+    contact_email:    { kind: 'Contact', type: 'email', help: 'Where a solicitation question lands. Use a monitored address, not a personal one.' },
+    contact_phone:    { kind: 'Contact', type: 'tel', help: 'A number answered during business hours in your own time zone.' },
+    contact_website:  { kind: 'Contact', type: 'url', help: 'Your company site. Include https:// so it resolves when pasted.' },
+    contact_address:  { kind: 'Contact', prose: true, help: 'Your place of performance address, as it appears on the SAM registration.' }
+  };
+
+  var feScrim = null, feReturnTo = null;
+
+  function closeEditor() {
+    if (!feScrim) return;
+    feScrim.hidden = true;
+    feScrim.replaceChildren();
+    document.removeEventListener('keydown', feKeys, true);
+    if (feReturnTo && feReturnTo.focus) feReturnTo.focus();
+    feReturnTo = null;
+  }
+
+  function feKeys(e) {
+    if (!feScrim || feScrim.hidden) return;
+    if (e.key === 'Escape') { e.preventDefault(); closeEditor(); return; }
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      var ok = feScrim.querySelector('[data-fe-save]');
+      if (ok) ok.click();
+      return;
+    }
+    if (e.key === 'Tab') {                       // keep focus inside the sheet
+      var f = feScrim.querySelectorAll('button, input, textarea');
+      if (!f.length) return;
+      var first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  }
+
+  /* Replaces window.prompt(). The prompt was browser chrome sitting on a designed
+     document, it could not hold a paragraph, and it named the field with a bare
+     label and no explanation of what the field is for. */
   function openEditor(field) {
+    var spec = FIELD_SPEC[field] || {};
     var current = REC[field] == null ? '' : String(REC[field]);
-    var next = window.prompt('Edit ' + (FIELD_LABELS[field] || field), current);
-    if (next === null) return;
-    var patch = {};
-    patch[field] = next.trim();
-    save(patch);
+    feReturnTo = document.activeElement;
+
+    if (!feScrim) {
+      feScrim = make('div', 'fe-scrim');
+      feScrim.hidden = true;
+      document.body.appendChild(feScrim);
+      feScrim.addEventListener('mousedown', function (e) { if (e.target === feScrim) closeEditor(); });
+    }
+
+    var sheet = make('div', 'fe');
+    sheet.setAttribute('role', 'dialog');
+    sheet.setAttribute('aria-modal', 'true');
+    sheet.setAttribute('aria-labelledby', 'feTitle');
+
+    var head = make('div', 'fe-head');
+    head.appendChild(make('p', 'fe-kind', spec.kind || 'Field'));
+    var h = make('h2', 'fe-title', FIELD_LABELS[field] || field);
+    h.id = 'feTitle';
+    head.appendChild(h);
+    if (spec.help) head.appendChild(make('p', 'fe-help', spec.help));
+    sheet.appendChild(head);
+
+    var body = make('div', 'fe-body');
+    var input = document.createElement(spec.prose ? 'textarea' : 'input');
+    input.className = spec.prose ? 'fe-area' : 'fe-input';
+    if (!spec.prose) input.type = spec.type || 'text';
+    input.value = current;
+    input.setAttribute('aria-label', FIELD_LABELS[field] || field);
+    body.appendChild(input);
+    sheet.appendChild(body);
+
+    var foot = make('div', 'fe-foot');
+    var count = make('span', 'fe-count');
+    var setCount = function () {
+      count.textContent = spec.prose
+        ? input.value.length + ' characters'
+        : (input.value.trim() ? '' : 'empty — the field will be cleared');
+    };
+    input.addEventListener('input', setCount);
+    setCount();
+    foot.appendChild(count);
+    foot.appendChild(make('span', 'fe-hint', 'Esc to cancel'));
+
+    var cancel = make('button', 'fe-btn', 'Cancel');
+    cancel.type = 'button';
+    cancel.addEventListener('click', closeEditor);
+    foot.appendChild(cancel);
+
+    var ok = make('button', 'fe-btn primary', 'Save');
+    ok.type = 'button';
+    ok.setAttribute('data-fe-save', '');
+    ok.addEventListener('click', function () {
+      var next = input.value.trim();
+      closeEditor();
+      if (next === current.trim()) return;   // nothing changed — do not claim a save
+      var patch = {};
+      patch[field] = next;
+      save(patch);
+    });
+    foot.appendChild(ok);
+    sheet.appendChild(foot);
+
+    feScrim.replaceChildren(sheet);
+    feScrim.hidden = false;
+    document.addEventListener('keydown', feKeys, true);
+    input.focus();
+    if (input.setSelectionRange) input.setSelectionRange(input.value.length, input.value.length);
   }
 
   /* Delegated: the sections are re-rendered on every save, which detaches any

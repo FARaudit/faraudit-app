@@ -169,5 +169,27 @@ check("P4 · the fillability check names a field with no editor", !new Set(["com
     !/\.update\(\{ cage_code: samCage \}\)/.test('return { state: "verified", records };'));
 }
 
+// ── editing is an in-page editor, not window.prompt ────────────────────────
+// Every editable field opened a native browser dialog — "www.faraudit.com says" chrome on
+// a designed document — and it gave a SINGLE LINE to Core Competencies, a field that holds
+// paragraphs. Same dialog for all eight fields, with no statement of what any field is for.
+{
+  check("no field opens a native browser prompt", !/window\.prompt\(/.test(live.replace(/\/\*[\s\S]*?\*\//g, "")),
+    "editing drops out of the design into browser chrome");
+  check("prose fields get a textarea, not a one-line input",
+    /prose: true/.test(live) && /spec\.prose \? 'textarea' : 'input'/.test(live),
+    "Core Competencies is edited through a single-line box");
+  check("the editor says what the field is for", /FIELD_SPEC/.test(live) && /help:/.test(live),
+    "a bare label with no explanation of what a contracting officer does with it");
+  check("it is a real dialog — labelled, escapable, focus-trapped",
+    /aria-modal/.test(live) && /e\.key === 'Escape'/.test(live) && /e\.key === 'Tab'/.test(live),
+    "keyboard users cannot leave it and screen readers cannot name it");
+  check("an unchanged value does not claim a save",
+    /next === current\.trim\(\)/.test(live), "closing without editing reports a write that never happened");
+  check("the hint is not set in --mute-2", !/\.fe-hint\{[^}]*--mute-2/.test(html),
+    "--mute-2 is not a text token at any size (2.56:1)");
+  check("P6 · the prompt check can see the old shape", /window\.prompt\(/.test("var next = window.prompt('Edit ' + label, current);"));
+}
+
 console.log(`\n${pass} passed · ${fail} failed`);
 if (fail > 0) process.exit(1);

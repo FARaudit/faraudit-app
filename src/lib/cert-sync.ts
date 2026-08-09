@@ -145,6 +145,20 @@ export async function syncCertifications(
     // No UEI means nothing can be attested, and anything present is bound to a UEI no longer on this
     // profile. Clearing is the whole point, so this compares against the RAW column.
     const persisted = await write([]);
+    /* CAGE IS BOUND TO THE REGISTRATION, so it goes with it. Syncing CAGE in on a UEI and
+       leaving it behind on a clear would strand another firm's identifier on this document —
+       the same defect this branch already prevents for attested programs, one field over. */
+    if (String(data?.cage_code ?? "").trim()) {
+      const { data: rows, error: cErr } = await supabase
+        .from("capability_statements")
+        .update({ cage_code: null })
+        .eq("user_id", userId)
+        .select("user_id");
+      if (cErr) console.error("[cert-sync] cage_code clear failed:", cErr.message);
+      else if (!Array.isArray(rows) || rows.length === 0) {
+        console.error("[cert-sync] cage_code clear matched ZERO rows (RLS or missing row) — not written");
+      }
+    }
     return {
       state: "no-uei", uei: null, legalName: null, registrationExpires: null,
       records: [], establishedPrograms: [], persisted, checkedAt: nowIso,
