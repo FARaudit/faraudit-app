@@ -699,5 +699,76 @@ console.log("\n── Part R · the rail styles its own badge ──");
     /display:inline-flex/.test(".sb-badge{display:inline-flex;padding:3px 7px}"));
 }
 
+// ── Part S · the pill can appear on EVERY injected route ──────────────────────────────
+// The CEO: "ensure the Live pill follows all tabs, views, profile settings". It did not,
+// and the reason was not the badge logic — rail-live-badge.js was referenced by exactly
+// two pages, opportunities.html and today.html, the same two that measure the feed. On
+// the other injected routes window.setRailLiveBadge did not exist, so no pill could
+// appear however it was asked for.
+//
+// Every check above this line ran against renderRail()/railStyle() in isolation, where
+// the setter is irrelevant — which is how "the pill is correct" and "the pill is absent
+// on eight routes" stayed indistinguishable.
+console.log("\n── Part S · the badge script reaches every injected route ──");
+{
+  const railSrc = read("src/lib/nav/rail.ts");
+  check("injectRail ships the badge script", /rail-live-badge\.js/.test(railSrc),
+    "the rail styles a pill whose setter it never delivers");
+  check("...only when the page does not already carry it",
+    /includes\("rail-live-badge\.js"\)\s*===\s*false/.test(railSrc),
+    "a page that loads it itself would get it twice");
+
+  // Prove it through the real function, on a page that never referenced the script.
+  const bare = `<html><head></head><body><aside class="sidebar">old</aside></body></html>`;
+  const injected = injectRail(bare, "opportunities");
+  check("a page with no badge script gets one", /src="\/rail-live-badge\.js"/.test(injected),
+    "injectRail did not add the script");
+  const already = injectRail(
+    `<html><head></head><body><aside class="sidebar">old</aside><script src="/rail-live-badge.js"></script></body></html>`,
+    "opportunities");
+  check("a page that already has it does not get a second",
+    (already.match(/rail-live-badge\.js/g) ?? []).length === 1,
+    `found ${(already.match(/rail-live-badge\.js/g) ?? []).length} references`);
+
+  // The script must survive being run twice regardless, because the two self-loading
+  // pages exist and the guard above is a belt, not a proof.
+  const badgeSrc = read("public/rail-live-badge.js");
+  check("the script is idempotent", /if\s*\(window\.setRailLiveBadge\)\s*return/.test(badgeSrc),
+    "loading it twice re-registers the setter and fires a second probe");
+
+  // The shared reading, and its ranking against a real measurement.
+  check("the script asks the shared feed-state route", /\/api\/sam-feed-state/.test(badgeSrc),
+    "nothing tells a non-feed page what the feed is doing");
+  check("a page-measured call outranks the shared probe", /if\s*\(!d\s*\|\|\s*measured\)\s*return/.test(badgeSrc),
+    "a generic probe could overwrite the account's own feed reading");
+  check("the shared route exists", (() => { try { read("src/app/api/sam-feed-state/route.ts"); return true; } catch { return false; } })(),
+    "the script fetches a route that is not in the tree");
+
+  // The route must be BOUNDED — the rail asks on every page load, on ~10 routes.
+  const stateRoute = read("src/app/api/sam-feed-state/route.ts");
+  check("the shared route caches", /TTL_MS/.test(stateRoute) && /checkedAt/.test(stateRoute),
+    "an uncached probe is one upstream call per pageview across every route");
+  check("...and collapses concurrent misses", /inFlight/.test(stateRoute),
+    "a cold start would fire one probe per simultaneous page load");
+  check("...and goes through the shared SAM library, not its own request",
+    /searchOpportunitiesByNaics/.test(stateRoute),
+    "a hand-rolled query omitted api_key and reported unavailable every time — SAM 500s without one");
+  check("...and separates OUR misconfiguration from SAM's outage",
+    /unconfigured/.test(stateRoute) && /"unknown"/.test(stateRoute),
+    "a missing key on our server would be shown to the customer as a SAM outage");
+  check("...and an answer with zero results still counts as live",
+    /out\.ok\)? return \{ state: "live"/.test(stateRoute) || /out\.ok/.test(stateRoute),
+    "an empty but successful read must not read as an outage");
+
+  // Planted positives.
+  check("S-P1 · rejects a rail that never mentions the script",
+    !/rail-live-badge\.js/.test("export function injectRail(h){return h}"));
+  check("S-P2 · the duplicate check would catch a second copy",
+    ('<script src="/rail-live-badge.js"></script><script src="/rail-live-badge.js"></script>'
+      .match(/rail-live-badge\.js/g) ?? []).length === 2);
+  check("S-P3 · rejects an uncached probe route",
+    !/TTL_MS/.test("export async function GET(){ return fetch(SAM) }"));
+}
+
 console.log(`\n${pass} passed · ${fail} failed`);
 if (fail > 0) process.exit(1);
