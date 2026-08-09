@@ -132,7 +132,26 @@ console.log("\n── every stale sidebar is displaced at request time ──");
   }
 }
 
-// ── 4 · PLANTED POSITIVES — every leg above must be able to go red ────────────────────
+// ── 4 · THE EMAIL IS A SURFACE TOO ────────────────────────────────────────────────────
+// The first pass at this rename swept public/ and the rail and called it done. The weekly
+// digest is neither, and it went out on 2026-08-08 headed "Your watched opportunities" —
+// in the H1, in the plaintext body, and in one of the two subject lines — while its own
+// preheader already said "the notices you are watching". A customer-facing surface that
+// ships by mail is easy to forget precisely because no page renders it.
+console.log("\n── the weekly digest speaks the same vocabulary ──");
+{
+  const digest = read("src/lib/watched-digest.ts");
+  const visible = codeOnly(digest);
+  check("the digest builder was located", /buildWatchedDigestEmail/.test(digest),
+    "the export moved — this leg is checking a file that no longer builds the mail");
+  check("no 'opportunities' in what the digest presents", !/opportunit/i.test(visible),
+    "the mail still uses the retired word in copy a customer reads");
+  // Presence, not just absence: a rename that emptied the heading would pass the check above.
+  check("...and it says 'notices' instead", /watched notices/i.test(visible),
+    "the heading is gone rather than renamed");
+}
+
+// ── 5 · PLANTED POSITIVES — every leg above must be able to go red ────────────────────
 console.log("\n── planted positives ──");
 {
   const selector = /<aside class="sidebar">[\s\S]*?<\/aside>/;

@@ -1,4 +1,4 @@
-// WEEKLY DIGEST OF WATCHED OPPORTUNITIES — the send the Notifications toggle has been
+// WEEKLY DIGEST OF WATCHED NOTICES — the send the Notifications toggle has been
 // saving a choice for.
 //
 // Everything here is PURE: rows in, a payload or null out. The cron route owns the
@@ -238,7 +238,7 @@ export function buildWatchedDigestEmail(d: WatchedDigest, settingsUrl: string, n
     ? `${d.posted.length} watched ${d.posted.length === 1 ? "notice has" : "notices have"} posted — audit ready`
     : soonest !== undefined
       ? `${d.closingSoon.length} closing soon — the first in ${soonest} day${soonest === 1 ? "" : "s"}`
-      : `Your watched opportunities — ${counts.join(", ")}`;
+      : `Your watched notices — ${counts.join(", ")}`;
 
   const stat = (n: number, label: string, tone: string) => `<td width="33%" align="center" style="padding:14px 6px">
       <div style="font:700 26px/1 ${SANS};color:${tone}">${n}</div>
@@ -264,7 +264,7 @@ export function buildWatchedDigestEmail(d: WatchedDigest, settingsUrl: string, n
       </tr></table></td></tr>
 
     <tr><td style="padding:26px 34px 4px">
-      <div style="font:700 22px/1.25 ${SANS};color:${BRAND.ink};letter-spacing:-.01em">Your watched opportunities</div>
+      <div style="font:700 22px/1.25 ${SANS};color:${BRAND.ink};letter-spacing:-.01em">Your watched notices</div>
       <div style="font:13px/1.6 ${SANS};color:${BRAND.mute};margin-top:5px">The last ${d.windowDays} days${d.stillWatching ? ` &middot; ${d.stillWatching} still being watched` : ""}</div>
     </td></tr>
 
@@ -288,6 +288,6 @@ export function buildWatchedDigestEmail(d: WatchedDigest, settingsUrl: string, n
   </table>
 </td></tr></table></body></html>`;
 
-  const text = `YOUR WATCHED OPPORTUNITIES\nThe last ${d.windowDays} days${d.stillWatching ? ` \u00b7 ${d.stillWatching} still being watched` : ""}\n\n${d.posted.length} posted \u00b7 ${d.newlyTracked.length} newly tracked \u00b7 ${d.closingSoon.length} closing soon\n\n${secs.map((s) => s.text).filter(Boolean).join("\n")}\n${foot}\n${settingsUrl}\n`;
+  const text = `YOUR WATCHED NOTICES\nThe last ${d.windowDays} days${d.stillWatching ? ` \u00b7 ${d.stillWatching} still being watched` : ""}\n\n${d.posted.length} posted \u00b7 ${d.newlyTracked.length} newly tracked \u00b7 ${d.closingSoon.length} closing soon\n\n${secs.map((s) => s.text).filter(Boolean).join("\n")}\n${foot}\n${settingsUrl}\n`;
   return { subject, html, text };
 }
