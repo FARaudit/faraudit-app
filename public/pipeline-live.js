@@ -609,7 +609,7 @@
           STAGE_FULL[STATE.stage] + ' — click the stage again to show every pursuit.'));
       } else {
         grid.replaceChildren(emptyState('No pursuits yet',
-          'Add a solicitation from Opportunities and it appears here, at the stage the notice is in.'));
+          'Add a solicitation from Notices and it appears here, at the stage the notice is in.'));
       }
       return;
     }

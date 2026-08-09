@@ -90,9 +90,12 @@ export const TODAY: RailItem = { key: "today", label: "Today", href: "/command-c
 
 // The four things a user does in sequence. Order is the work, not the alphabet.
 export const WORKFLOW: RailItem[] = [
-  { key: "opportunities", label: "Opportunities", href: "/opportunities", icon: I.opportunities },
-  // "Audit" not "Run Audit" — the noun matches its neighbours; the page's own button still reads Run Audit.
-  { key: "run-audit", label: "Audit", href: "/audit", icon: I.runAudit },
+  // "Notices" names what SAM actually publishes and what the customer tracks. The KEY and
+  // the ROUTE are unchanged: /opportunities stays valid, so every link already sent — in a
+  // digest email, a bookmark, a deep link — still lands.
+  { key: "opportunities", label: "Notices", href: "/opportunities", icon: I.opportunities },
+  // Plural, matching its neighbours; the page's own button still reads Run Audit.
+  { key: "run-audit", label: "Audits", href: "/audit", icon: I.runAudit },
   // "Decisions" names the artifact the engine produces. The ROUTE is unchanged.
   { key: "past-audits", label: "Decisions", href: "/past-audits", icon: I.pastAudits },
   { key: "pipeline", label: "Pipeline", href: "/pipeline", icon: I.pipeline },
