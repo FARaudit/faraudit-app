@@ -2,7 +2,7 @@
 // Proves: flag-OFF the passed date 2026-07-18 still renders (byte-identical to today); flag-ON the reset caveat
 // renders and the passed date / countdown / expired banner are suppressed.  npx tsx scripts/audit-ai/_itemd-deadline-probe.ts
 import * as fs from "fs";
-import { buildViewModel } from "../../src/app/audit/[id]/_view-model";
+import { buildViewModel } from "../../src/app/audits/[id]/_view-model";
 
 const row = JSON.parse(fs.readFileSync("/tmp/itemd-row.json", "utf8"));
 let fail = 0;

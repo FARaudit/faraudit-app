@@ -154,7 +154,7 @@ const RENDER_ENTRIES = [
   "src/lib/v5-report/report.ts", "src/lib/v5-report/render.ts",
   "src/lib/v5-report/render-pdf.ts", "src/lib/v5-report/render-deck.ts",
   "src/lib/v4-report/build-data.ts", "src/lib/v4-report/render.ts",
-  "src/app/audit/[id]/_view-model.ts", "src/app/audit/[id]/_render.ts",
+  "src/app/audits/[id]/_view-model.ts", "src/app/audits/[id]/_render.ts",
 ].map((p) => join(ROOT, p)).filter((p) => existsSync(p));
 const workerRoots = files.filter((f) => f.startsWith(join(AGENTS, "audit-worker")));
 const WORKER = reach(workerRoots);

@@ -64,7 +64,7 @@ async function main() {
     renderPath = v5On ? "v5" : "v4";
   } else {
     const vm = buildViewModel(audit as never, { isWatching: false, hasCapabilityStatement: true });
-    const template = readFileSync(join(process.cwd(), "src", "app", "audit", "[id]", "_template.html"), "utf8");
+    const template = readFileSync(join(process.cwd(), "src", "app", "audits", "[id]", "_template.html"), "utf8");
     html = renderAuditReportComplete(template, vm as never, audit as Record<string, unknown>);
     renderPath = "v1";
   }

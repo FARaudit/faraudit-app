@@ -32,7 +32,7 @@ async function transitionalStatePage(
   state: "progress" | "failed",
   user: { email?: string | null; user_metadata?: Record<string, unknown> }
 ): Promise<Response> {
-  const templatePath = path.join(process.cwd(), "src", "app", "audit", "[id]", "_states-template.html");
+  const templatePath = path.join(process.cwd(), "src", "app", "audits", "[id]", "_states-template.html");
   const template = await readFile(templatePath, "utf8");
   const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
   const requestedBy = String(meta.full_name || meta.name || user.email || "").trim() || null;
@@ -430,7 +430,7 @@ export async function GET(
 
   const vm = buildViewModel(audit, { isWatching, hasCapabilityStatement });
 
-  const templatePath = path.join(process.cwd(), "src", "app", "audit", "[id]", "_template.html");
+  const templatePath = path.join(process.cwd(), "src", "app", "audits", "[id]", "_template.html");
   const template = await readFile(templatePath, "utf8");
   let html = renderAuditReportComplete(template, vm, audit as Record<string, unknown>);
   // FA-RAIL — swap the pre-Phase-5 hardcoded sidebar for the shared NAV_GROUPS

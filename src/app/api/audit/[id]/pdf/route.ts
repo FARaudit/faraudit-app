@@ -143,7 +143,7 @@ export async function GET(
       process.cwd(),
       "src",
       "app",
-      "audit",
+      "audits",
       "[id]",
       "_template.html"
     );
