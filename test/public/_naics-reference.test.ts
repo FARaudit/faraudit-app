@@ -118,6 +118,16 @@ check("the note block is conditional in the card", /if \(r\[7\]\)/.test(tab),
   "an empty note renders as an empty insight block");
 check("authored content is marked for the gate to read", (tab.match(/dataset\.ed/g) || []).length >= 4,
   "data-ed is what distinguishes sourced content from rendered chrome");
+// The field has no Clear control, so Escape is its ONLY keyboard exit — without it the
+// way back to the full table is select-all-delete. Defense Agencies already does this;
+// the two search boxes in one product must not disagree about it.
+check("Escape clears the search field",
+  /e\.key !== 'Escape'/.test(tab) && /input\.value = ''/.test(tab) && /input\.id !== 'ntSearch'/.test(tab),
+  "the search box has no keyboard exit");
+// The title track absorbing all slack is what pushed the figure ~708px from the title.
+check("the title track is capped, not 1fr",
+  /grid-template-columns:104px minmax\(0,var\(--title-max\)\) 92px 88px/.test(page) && /--title-max:\s*\d+px/.test(page),
+  "the title column takes every spare pixel and strands the figure at the far edge");
 check("search is null-safe on editorial fields",
   /\(r\[7\] \|\| ''\)/.test(tab) && /r\[1\] && CM\[r\[1\]\] \?/.test(tab),
   "searching would throw on rows with no note or category");

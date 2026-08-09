@@ -439,6 +439,21 @@ document.addEventListener('click', function (e) {
 document.addEventListener('input', function (e) {
   if (e.target.id === 'ntSearch') { S.q = e.target.value.trim().toLowerCase(); S.dir = 1; render(true); }
 });
+/* Escape clears the field, which is what everyone expects of a filter and what the
+   Defense Agencies search already does. Without it this box had no keyboard exit at all
+   and no Clear control either, so the only way back to the full table was to select the
+   text and delete it. Guarded on a non-empty value so Escape still belongs to whatever
+   else may want it when the field is already clear. */
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  var input = e.target;
+  if (!input || input.id !== 'ntSearch' || !input.value) return;
+  e.preventDefault();
+  input.value = '';
+  S.q = '';
+  S.dir = 1;
+  render(true);
+});
 window.addEventListener('resize', syncRail);
 
 buildRail();

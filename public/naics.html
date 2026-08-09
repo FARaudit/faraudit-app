@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <style>
-:root{ --accent:#378ADD; --accent-deep:#185FA5; --accent-light:#B5D4F4; --rail-w:296px; --row-pad:10px; --sec-n:31px; }
+:root{ --accent:#378ADD; --accent-deep:#185FA5; --accent-light:#B5D4F4; --rail-w:400px; --row-pad:10px; --sec-n:31px; --title-max:560px; }
 :root,[data-theme="light"]{
   --page-bg:#eef2f7; --bg:#f0f4f8; --card:#ffffff; --card-soft:#fafcfe;
   --ink:#0A1628; --ink-2:#334155; --mute:#64748b; --mute-2:#94a3b8;
@@ -286,7 +286,12 @@ html[data-t-facts="off"] .nt-facts{display:none}
 .nt-fk{font-size:11.5px;color:var(--mute)}
 /* rows */
 .nt-rows{display:flex;flex-direction:column}
-.nt-r{display:grid;grid-template-columns:104px minmax(0,1fr) 92px 88px;column-gap:16px;row-gap:9px;align-items:baseline;padding:var(--row-pad) 20px;border-bottom:1px solid var(--line-3);transition:background .14s}
+/* The title track is CAPPED, not 1fr. As 1fr it absorbed every pixel of slack, so at a
+   wide viewport the figure sat ~708px from the end of a title that averages 234px — the
+   row read as crammed left with a void before the number. 560px clears 960 of the 978
+   titles on one line; the 18 longest wrap rather than truncate. The rule still spans the
+   full row, so the table keeps its shape and only the figure moves in. */
+.nt-r{display:grid;grid-template-columns:104px minmax(0,var(--title-max)) 92px 88px;column-gap:16px;row-gap:9px;align-items:baseline;padding:var(--row-pad) 20px;border-bottom:1px solid var(--line-3);transition:background .14s}
 html[data-t-rule="none"] .nt-r{border-bottom-color:transparent}
 html[data-t-rule="zebra"] .nt-r{border-bottom-color:transparent}
 html[data-t-rule="zebra"] .nt-r:nth-child(even){background:var(--card-soft)}
