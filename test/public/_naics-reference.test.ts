@@ -130,6 +130,16 @@ check("Escape clears the search field",
 // Reserving two title lines aligned the cards at 1835px and nowhere else: at 1700 and
 // 1440 the term chips wrap on some cards and not others, and below 1600 the longest title
 // needs a third line. Subgrid is what makes every band take the tallest card in its row.
+// The band shapes were dead code behind pinMode(), which never returned anything but
+// 'off'. Deleted on Design's word after the CEO settled the shape. `.nt-pin-g` is NOT part
+// of it — Design's instruction said delete `.nt-pin*`, but that grid is what renders the
+// live My-codes cards, and following the instruction literally would erase them.
+check("the dead band paths are gone",
+  !/pinMode|renderPin|renderDivider|pinStripItem/.test(tab),
+  "the unreachable band shape is back in a served file");
+check("…and the live cards grid survived the deletion",
+  /\.nt-pin-g\{/.test(page) && /\.nt-pin-g\.mine-cards\{/.test(page) && /nt-pin-g mine-cards/.test(tab),
+  "My codes has no grid to render into");
 check("the cards align by subgrid, not by a guessed row count",
   /\.pc\{[^}]*display:grid[^}]*grid-template-rows:subgrid[^}]*grid-row:span 5/.test(page),
   "card alignment is back to fixed heights and breaks whenever the chips or title wrap");

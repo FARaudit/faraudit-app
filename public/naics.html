@@ -357,10 +357,6 @@ html[data-theme="dark"] .nt-chip{color:var(--ink-2)}
    one rich card stretches its sparse neighbours into empty space. A band that holds only
    your registered codes has no sparse neighbours, so matching heights costs nothing, and
    the register below keeps ONE row shape for everything. */
-.nt-pin{border-bottom:1px solid var(--line-2);padding:15px 18px 17px;background:var(--card-soft)}
-.nt-pin-h{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 12px}
-.nt-pin-h b{font-size:13.5px;font-weight:800;letter-spacing:-.01em}
-.nt-pin-h span{font-size:12px;color:var(--mute)}
 /* auto-FIT, not auto-fill: empty tracks collapse, so three cards divide the whole width
    between them instead of leaving a fourth column of air. The count sets the columns. */
 .nt-pin-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(292px,1fr));gap:11px}
@@ -392,17 +388,6 @@ html[data-theme="dark"] .nt-chip{color:var(--ink-2)}
 .pc-nt{margin:0;font-size:13px;line-height:1.45;color:var(--ink);text-wrap:pretty}
 /* The strip is the BOUNDED shape: one row high whatever the count, so the tab keeps its
    proportions for a customer with 3 codes and a customer with 30. */
-.nt-pin-s{display:flex;gap:9px;overflow-x:auto;padding-bottom:3px}
-.ps{flex:none;max-width:330px;min-width:0;display:flex;align-items:baseline;gap:10px;background:var(--card);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:9px;padding:9px 13px}
-.ps-code{font-size:13.5px;font-weight:700;flex:none}
-.ps-t{font-size:13px;font-weight:600;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.ps-f{flex:none;white-space:nowrap}
-.ps-f b{font-size:13.5px;font-weight:700}
-.ps-u{font-size:11.5px;color:var(--mute);margin-left:4px}
-.nt-pin-e{font-size:13px;color:var(--ink-2);margin:0;text-wrap:pretty}
-.nt-div{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap;padding:13px 18px;border-bottom:1px solid var(--line);background:var(--card)}
-.nt-div b{font-size:13.5px;font-weight:800;letter-spacing:-.01em}
-.nt-div span{font-size:12px;color:var(--mute)}
 
 /* ══ narrow widths ═══════════════════════════════════════════════════════════
    The rail plus four fixed row columns need about 1,240px. Below that the columns
@@ -775,8 +760,6 @@ html[data-theme="dark"] .nt-chip{color:var(--ink-2)}
           </label>
           <span class="nt-legend"><i class="nt-dot"></i><b>Your codes</b> · SBA size standards</span>
         </div>
-        <div id="ntPin"></div>
-        <div id="ntDiv"></div>
         <div class="nt-split">
           <div id="ntRail" class="nt-rail"></div>
           <div id="ntMain"></div>
