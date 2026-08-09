@@ -433,5 +433,62 @@ console.log("\n── export is one place, and it claims only what is wired ─�
     (('data-cs-copy data-cs-copy').match(/data-cs-copy/g) || []).length === 2);
 }
 
+// ── the card is the document; the history is the record ─────────────────────
+// The statement card showed up to twenty awards while the export sent five, so the
+// thing labelled GENERATED STATEMENT was not the thing that got generated. The card
+// now renders exactly what leaves with the statement, and every win lives in a
+// full-width Award history below it — which is the record, and is not sent.
+console.log("\n── the statement card shows what actually exports ──");
+{
+  const limits = read("src/lib/capability-statement-limits.ts");
+  const exportLimit = Number(limits.match(/PAST_PERFORMANCE_EXPORT_LIMIT = (\d+)/)?.[1]);
+
+  check("the card renders no more rows than the export carries",
+    /rows\.slice\(0, EXPORT_LIMIT\)\.forEach/.test(live),
+    "the preview shows awards the document will not contain");
+  check("the card says which of them go out", /go out with the statement/.test(live),
+    "five rows with no caption reads as the whole record");
+
+  check("award history is a section, not a card in the grid",
+    /<\/section>\s*<!-- award history[\s\S]*?<section class="award-history"/.test(html),
+    "it sits inside the two-column grid and cannot run full width");
+  check("award history is outside the statement card",
+    !/<article class="doc-card">[\s\S]*?award-history[\s\S]*?<\/article>/.test(html),
+    "the record is inside the document it is meant to sit apart from");
+  check("it ships hidden", /<section class="award-history" id="awardHistory" hidden>/.test(html),
+    "a section with no rows paints an empty table on first load");
+  check("only a settled read may reveal it", /section\.hidden = false/.test(live),
+    "nothing ever unhides it, so it is dead markup");
+
+  check("it appears only when the record exceeds the document",
+    /if \(total <= EXPORT_LIMIT\) \{ section\.hidden = true; return; \}/.test(live),
+    "it repeats the same rows the card already shows");
+  check("it lists every row the route sent", /rows\.forEach\(function \(p\) \{[\s\S]{0,400}?ah-row/.test(live),
+    "the history applies a cap of its own and stops being the record");
+  check("it says it is not the sent document", /This is your record — the statement above sends/.test(live),
+    "a second award list with no framing reads as part of the statement");
+  check("it reports its own shortfall too", /most recent of ' \+ total \+ ' awards/.test(live),
+    "a capped history presents itself as complete");
+
+  // An absent award value must stay blank. A dash in the VALUE column reads to a
+  // contracting officer as a figure of nothing; the other columns may dash, because
+  // "no contract number recorded" is not a claim about what the work was worth.
+  check("a missing award value is blank, never a dash",
+    /ah-value[\s\S]{0,320}?contract_value !== null/.test(live),
+    "an unrecorded value prints as an em dash in a money column");
+
+  check("the header row is labelled for assistive tech", /role="columnheader"/.test(html),
+    "a grid of divs with no roles is not a table to a screen reader");
+  check("the table collapses on narrow screens",
+    /@media \(max-width:900px\)\{[\s\S]{0,200}?\.ah-row\{grid-template-columns:1fr/.test(html),
+    "five columns at phone width crush every cell");
+
+  check("P13 · the card-cap check can see an uncapped loop",
+    !/rows\.slice\(0, EXPORT_LIMIT\)\.forEach/.test("rows.forEach(function (p) {"));
+  check("P14 · the containment check can see history inside the card",
+    /<article class="doc-card">[\s\S]*?award-history[\s\S]*?<\/article>/.test(
+      '<article class="doc-card"><div class="award-history"></div></article>'));
+}
+
 console.log(`\n${pass} passed · ${fail} failed`);
 if (fail > 0) process.exit(1);
