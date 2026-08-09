@@ -39,7 +39,21 @@ const PAGE_LIMIT = 1000;
 // Typing "30" into the copy would be the frozen-clock defect again: correct
 // the day it was written, silently wrong the day this changes.
 export const WINDOW_DAYS = 30;
-const FEED_CAP = 200; // parity with the old fetchOpportunities({ limit: 200 })
+/* THE FEED IS NOT CAPPED. It used to be held at 200 "for parity with the old
+   fetchOpportunities({ limit: 200 })" — a number inherited from a call that no longer
+   exists, applied AFTER sorting newest-posted-first, so the rows it deleted were the
+   OLDEST POSTED. Oldest posted skews hard to soonest closing: measured on a real 147-row
+   feed, the eight rows nearest the chopping block had 0, 1, 1, 1, 2, 2, 7 and 8 days left
+   to respond. A silent cap that deletes the bids you can still place this week is not
+   showing less, it is showing the WRONG less.
+
+   SAFETY_CEILING is a runaway guard, not a product decision, and it differs from the cap
+   in the two ways that matter: it is an order of magnitude clear of any real customer, and
+   it keeps by SOONEST DEADLINE rather than newest posted, so if it ever bites it discards
+   what you can no longer act on. When it bites it is reported to the caller rather than
+   logged and forgotten. */
+const SAFETY_CEILING = 5000;
+const MAX_PAGES_PER_CODE = 10; // PAGE_LIMIT × this = 10,000 per code before we stop asking
 
 function fmtSamDate(d: Date): string {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -75,7 +89,8 @@ async function searchNaicsPage(
   apiKey: string,
   naics: string,
   postedFrom: string,
-  postedTo: string
+  postedTo: string,
+  offset = 0
 ): Promise<{ items: RawSamItem[]; total: number }> {
   const params = new URLSearchParams({
     api_key: apiKey,
@@ -85,6 +100,7 @@ async function searchNaicsPage(
     ncode: naics,
     postedFrom,
     postedTo,
+    offset: String(offset),
     limit: String(PAGE_LIMIT),
     // No typeOfSetAside filter: the feed carries all set-asides incl.
     // unrestricted; HomeClient's set-aside chips slice client-side.
@@ -183,11 +199,16 @@ export function mapSamItems(raw: RawSamItem[], now: Date): OpportunityRow[] {
   if (droppedNoPdf || droppedExpired) {
     console.log(`[live-opportunities] filtered · ${droppedNoPdf} no-PDF · ${droppedExpired} expired`);
   }
-  rows.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
-  if (rows.length > FEED_CAP) {
-    console.log(`[live-opportunities] capping feed at ${FEED_CAP} of ${rows.length} rows (newest first)`);
-    rows.length = FEED_CAP;
+  if (rows.length > SAFETY_CEILING) {
+    // Keep what can still be acted on. A row with no deadline sorts last, because a bid
+    // you cannot date is worth less than one closing on Friday.
+    const far = Number.MAX_SAFE_INTEGER;
+    rows.sort((a, b) => (a.response_deadline ? Date.parse(a.response_deadline) : far)
+                      - (b.response_deadline ? Date.parse(b.response_deadline) : far));
+    console.warn(`[live-opportunities] SAFETY_CEILING hit: keeping ${SAFETY_CEILING} of ${rows.length} by soonest deadline`);
+    rows.length = SAFETY_CEILING;
   }
+  rows.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
   return rows;
 }
 
@@ -201,13 +222,31 @@ export async function fetchLiveSamRowsUncached(naicsCsv: string): Promise<Opport
   const now = new Date();
   const from = fmtSamDate(new Date(now.getTime() - WINDOW_DAYS * 86400_000));
   const to = fmtSamDate(now);
-  const pages = await Promise.all(codes.map((c) => searchNaicsPage(apiKey, c, from, to)));
-  for (let i = 0; i < codes.length; i++) {
-    if (pages[i].total > pages[i].items.length) {
-      console.warn(`[live-opportunities] NAICS ${codes[i]}: ${pages[i].items.length}/${pages[i].total} fetched — window has more than one page`);
-    }
-  }
-  return mapSamItems(pages.flatMap((p) => p.items), now);
+  /* PAGINATE. One call per code took the first PAGE_LIMIT and stopped, and the overflow
+     was a console.warn nobody reads — a second silent ceiling underneath the feed cap,
+     an order of magnitude higher and exactly as invisible. A code with more than one page
+     in the window lost the remainder at the source, before anything downstream could
+     know. MAX_PAGES bounds a runaway upstream; hitting it is reported, not swallowed. */
+  const all = await Promise.all(
+    codes.map(async (code) => {
+      const first = await searchNaicsPage(apiKey, code, from, to, 0);
+      const items = [...first.items];
+      let pagesRead = 1;
+      while (items.length < first.total && first.items.length > 0 && pagesRead < MAX_PAGES_PER_CODE) {
+        const next = await searchNaicsPage(apiKey, code, from, to, items.length);
+        if (!next.items.length) break;
+        items.push(...next.items);
+        pagesRead += 1;
+      }
+      if (items.length < first.total) {
+        console.warn(
+          `[live-opportunities] NAICS ${code}: ${items.length}/${first.total} after ${pagesRead} page(s) — upstream has more`
+        );
+      }
+      return items;
+    })
+  );
+  return mapSamItems(all.flat(), now);
 }
 
 const fetchLiveSamRowsCached = unstable_cache(

@@ -238,5 +238,26 @@ check("D4 · silent-return sweep catches a planted early return", /if\s*\(\s*!\s
 check("D5 · array-shape check does NOT fire on an emptied array", arrayIsEmpty(`const UPDATES = [];`, "UPDATES"));
 check("D6 · array-shape check does NOT fire on a template of primitives", arrayIsEmpty(`const TYPES = [ 'all', 'FAR' ];`, "TYPES"));
 
+// ── The live SAM feed is not silently truncated ────────────────────────────
+// It was held at 200 AFTER a newest-posted-first sort, so the rows deleted were the
+// oldest posted — which skew hard to soonest closing. Measured on a real 147-row feed the
+// eight nearest the chopping block had 0,1,1,1,2,2,7,8 days left. Separately, one call per
+// code read the first page only and lost the rest at the source. Both were console warnings.
+{
+  const feed = readFileSync(
+    join(import.meta.dirname ?? __dirname, "..", "..", "src", "lib", "bd-os", "live-opportunities.ts"),
+    "utf8"
+  );
+  check("the 200-row feed cap is gone", !/FEED_CAP/.test(feed), "the feed is truncated again");
+  check("SAM is paginated, not read one page deep",
+    /offset: String\(offset\)/.test(feed) && /while \(items\.length < first\.total/.test(feed),
+    "a code with more than one page loses the remainder at the source");
+  check("any residual ceiling keeps by soonest deadline, never newest posted",
+    /SAFETY_CEILING/.test(feed) && /a\.response_deadline \? Date\.parse\(a\.response_deadline\)/.test(feed),
+    "a truncation would again delete what the customer can still bid on");
+  check("F-P1 · these checks can see the old shape",
+    /FEED_CAP/.test("const FEED_CAP = 200;") && !/offset: String\(offset\)/.test("limit: String(PAGE_LIMIT),"));
+}
+
 console.log(`\n${pass} passed · ${fail} failed`);
 if (fail > 0) process.exit(1);
