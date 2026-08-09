@@ -463,5 +463,16 @@ export function injectRail(html: string, activeKey: string, counts: RailCounts =
       ? out.replace("</head>", `${railFonts()}</head>`)
       : railFonts() + out;
   }
+  /* THE RAIL SHIPS THE SCRIPT FOR THE PILL IT OWNS.
+     rail-live-badge.js was referenced by exactly TWO pages — opportunities.html and
+     today.html, the same two that measure the feed — so on the other ~8 injected routes
+     the setter did not exist and no pill could appear however it was asked for. That is
+     why it followed you onto Notices and Today and nowhere else.
+     Injected only when the page does not already carry it, and the script is written to
+     be idempotent, so the two pages that load it themselves are unaffected. */
+  if (out.includes("rail-live-badge.js") === false) {
+    const tag = `<script src="/rail-live-badge.js" defer></script>`;
+    out = out.includes("</body>") ? out.replace("</body>", `${tag}</body>`) : out + tag;
+  }
   return out;
 }
