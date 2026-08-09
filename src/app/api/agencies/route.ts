@@ -79,10 +79,14 @@ export async function GET() {
 
   let rows;
   let scope;
+  let feedComplete = true;
   try {
     const out = await fetchLiveOpportunitiesScoped(supabase);
     rows = out.rows;
     scope = out.scope;
+    // Rides out with the numbers so a surface stating a total can hedge it. The 200-cap
+    // survived as long as it did because it was a console.warn nobody read.
+    feedComplete = out.complete;
   } catch (e) {
     // Rule 61 — a failed dependency is a visible failure state, never a plausible one.
     // "SAM did not answer" and "no office is buying your codes" are different facts and
@@ -186,6 +190,7 @@ export async function GET() {
       offices: OFFICES.length,
       naics_scope: scope.codes,
       scope_source: scope.source,
+      feed_complete: feedComplete,
     },
   });
 }
