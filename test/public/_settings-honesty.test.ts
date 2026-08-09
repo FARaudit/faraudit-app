@@ -637,6 +637,36 @@ console.log("\n── the team panel cannot lose the label that makes it true �
     /workspace/i.test("Who can sign in to this workspace"));
 }
 
+// THE UNBUILT PART OF BILLING CARRIES THE LABEL — AND THE LIVE PART DOES NOT.
+// Billing is two things at once. The plan readout is real: /api/profile queries the
+// subscriptions table, maps tier to label, and sets plan_unreadable when the read
+// fails, so "No subscription on file" is a computed answer. Metering does not exist.
+// Labelling the whole panel would understate the half that works; labelling nothing
+// leaves "Usage this period" reading as a section that simply happens to be empty.
+console.log("\n── billing labels the unbuilt half, not the whole ──");
+{
+  const panel = appCode.slice(appCode.indexOf("billing: () =>"));
+  check("the billing panel was located", panel.length > 200, `read ${panel.length} chars`);
+  check("the usage section carries the not-yet-live chip",
+    /Usage this period<span class="sp-soon">/.test(panel),
+    "an empty usage list reads as a period with no activity rather than a feature that does not exist");
+  check("...and still says metering is not built", /metering is not built/i.test(panel),
+    "the chip replaced the sentence instead of reinforcing it");
+  check("the panel header is NOT chipped", !/Billing &amp; Plan<span class="sp-soon">/.test(panel),
+    "the live plan readout is being labelled as unbuilt");
+  check("the plan readout is still driven by the server fields",
+    /planName\(\)/.test(panel) && /plan_unreadable/.test(appCode),
+    "the plan line stopped distinguishing an unreadable record from no subscription");
+
+  // Planted positives.
+  check("B-P1 · an unchipped usage header is caught",
+    !/Usage this period<span class="sp-soon">/.test('<div class="fld-sec">Usage this period</div>'));
+  check("B-P2 · a chipped one is accepted",
+    /Usage this period<span class="sp-soon">/.test('<div class="fld-sec">Usage this period<span class="sp-soon">Not yet live</span></div>'));
+  check("B-P3 · a chipped PANEL header is caught",
+    /Billing &amp; Plan<span class="sp-soon">/.test('<div class="sp-t">Billing &amp; Plan<span class="sp-soon">Not yet live</span></div>'));
+}
+
 console.log("\n── planted positives ──");
 check("P5 · rejects a panel that names no origin",
   !/\bTrack\b/.test("These apply to the notices you are watching."));
