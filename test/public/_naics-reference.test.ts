@@ -25,6 +25,11 @@ const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
 const src = read("public/naics-reference.js");
 const page = read("public/naics.html");
 const build = read("scripts/naics/build-naics-reference.mjs");
+// The tab's behaviour moved out of an inline <script> in naics.html and into its own served
+// file. The invariants below are unchanged; only where they are written has changed. Read the
+// two together so a check cannot pass merely because the code it guards left the file.
+const tab = read("public/naics-tab.js");
+const surface = page + "\n" + tab;
 
 // Loaded the way the browser loads it — the file is an IIFE that assigns window.NAICS_REF,
 // so planting a window on the global and requiring it runs the real module.
@@ -95,15 +100,31 @@ for (const [code, [size, kind]] of Object.entries(SPOT)) {
 }
 
 console.log("\n── the page renders what is sourced and omits what is not ──");
-check("the directory groups by sector, not the editorial category", /r\[8\]===s\.id/.test(page), "pills still filter on the curated category, which most rows lack");
-check("the category chip is conditional", /if\(cat\)/.test(page), "a row without a category would read a property of undefined");
-check("typical terms are conditional", /if\(ev&&cl\)/.test(page), "a row without an evaluation method would render undefined as a chip");
-check("the note block is conditional", /if\(r\[7\]\)/.test(page), "an empty note renders as an empty insight block");
-check("search is null-safe on editorial fields", /\(r\[7\]\|\|''\)/.test(page) && /CM\[r\[1\]\]\?/.test(page), "searching would throw on rows with no note or category");
+// r[8] is the sector; r[1] the curated category. Scoping on r[8] is the invariant — 951 of
+// 978 rows carry no category, so a directory keyed on it would hide them.
+check("the directory groups by sector, not the editorial category",
+  /r\[8\]\s*!==\s*S\.scope/.test(tab) && /SEC_N\[r\[8\]\]/.test(tab),
+  "the rail still scopes on the curated category, which most rows lack");
+// Nothing is defaulted: the four editorial fields render only where all four are sourced,
+// and every element carrying authored content is marked so the gate can find it.
+check("the editorial block is gated on all four sourced fields",
+  /function isEd\(r\)\s*\{\s*return !!\(r\[1\] && r\[5\] && r\[6\] && r\[7\]\)/.test(tab),
+  "a row missing a field would render undefined as a chip");
+check("the register row renders editorial content only behind that gate",
+  /if \(isEd\(r\)\)/.test(tab), "the chips and note are drawn unconditionally");
+check("the category chip is conditional in the card", /if \(r\[1\] && CM\[r\[1\]\]\)/.test(tab),
+  "a row without a category would read a property of undefined");
+check("the note block is conditional in the card", /if \(r\[7\]\)/.test(tab),
+  "an empty note renders as an empty insight block");
+check("authored content is marked for the gate to read", (tab.match(/dataset\.ed/g) || []).length >= 4,
+  "data-ed is what distinguishes sourced content from rendered chrome");
+check("search is null-safe on editorial fields",
+  /\(r\[7\] \|\| ''\)/.test(tab) && /r\[1\] && CM\[r\[1\]\] \?/.test(tab),
+  "searching would throw on rows with no note or category");
 // Comments are documentation, not shipped claims. Scanning them made the copy check fire
 // on the comment explaining why the copy changed — the same way the settings gate did.
 // Code only, for every check that asks "does this still ship?".
-const pageCode = page.replace(/\/\*[\s\S]*?\*\//g, "").replace(/<!--[\s\S]*?-->/g, "");
+const pageCode = surface.replace(/\/\*[\s\S]*?\*\//g, "").replace(/<!--[\s\S]*?-->/g, "");
 check("no stale hardcoded size-standard vintage", !/tbl\s*\d\/\d{4}/.test(pageCode), "a hand-typed table date will outlive the data");
 check("the count is not described as a curated set", !/defense-relevant codes/.test(pageCode), "copy still claims a curated subset over the full regulation");
 check("N-P0 · the copy check can still see shipped text", /codes with an SBA size standard/.test(pageCode), "stripping comments removed the copy too — the check would pass on an empty string");
