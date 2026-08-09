@@ -88,7 +88,33 @@
 
     save.onclick = function () {
       var v = String(input.value || '').trim().toUpperCase();
-      if (!UEI_RE.test(v)) { msg('A SAM UEI is exactly 12 letters or digits.', 'err'); return; }
+      /* An EMPTY box clears the registration. The server was built for this — cert-sync's
+         `if (!uei)` branch drops every attested program and the CAGE, and its own comment
+         says "Clearing is the whole point" — but this validator rejected '' and so there
+         was no way out of a UEI once saved. A customer who mistyped one was stuck with a
+         registration they do not have, on the document a contracting officer reads. */
+      if (v === '') {
+        save.disabled = true;
+        msg('Removing the registration…', 'wait');
+        fetch('/api/capability-statement', {
+          method: 'PATCH', credentials: 'include',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ uei: null })
+        }).then(function (r) {
+          if (!r.ok) throw new Error('clear failed: ' + r.status);
+          return r.json();
+        }).then(function (b) {
+          var st = b && b.statement;
+          // Believe the server echo, never the box.
+          if (!st || (st.uei !== null && st.uei !== '')) throw new Error('clear did not persist');
+          paint(st);
+          msg('Registration removed. Certifications and CAGE cleared with it.', 'ok');
+        }).catch(function () {
+          msg('Could not remove the registration — reload and try again.', 'err');
+        }).then(function () { save.disabled = false; });
+        return;
+      }
+      if (!UEI_RE.test(v)) { msg('A SAM UEI is exactly 12 letters or digits, or empty to remove it.', 'err'); return; }
       save.disabled = true;
       msg('Saving and checking SAM…', 'wait');
       fetch('/api/capability-statement', {
