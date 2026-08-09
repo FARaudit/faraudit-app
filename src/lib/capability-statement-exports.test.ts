@@ -24,6 +24,7 @@
 //
 // That is where the defects actually lived. The phone bug was a formatter applied on two
 // surfaces and not a third; it was never a layout problem.
+import { deflateSync } from "node:zlib";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { Packer } from "docx";
 import React from "react";
@@ -33,7 +34,7 @@ import { PAST_PERFORMANCE_EXPORT_LIMIT } from "@/lib/capability-statement-limits
 import { formatPhone } from "@/lib/capability-statement-format";
 import { naicsLines } from "@/lib/capability-statement-naics";
 import { agencyOptions, orderForAgency, resolveAgency } from "@/lib/capability-statement-tailoring";
-import { sniffImageType } from "@/lib/capability-statement-logo";
+import { sniffImageType, imageSize, fitWithin, LOGO_BOX } from "@/lib/capability-statement-logo";
 
 let pass = 0; let fail = 0;
 const check = (label: string, ok: boolean, detail = "") => {
@@ -149,6 +150,76 @@ async function main() {
     check("a PNG is recognised", sniffImageType(Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]))?.ext === "png");
     check("an SVG renamed .png is refused",
       sniffImageType(Uint8Array.from([...'<svg xmlns="'].map((c) => c.charCodeAt(0)))) === null);
+  }
+
+  console.log("\n── the logo is sized by its own dimensions ──");
+  {
+    // A REAL PNG, built here: 1024x1024, the shape of the favicon that filled a page.
+    // Only the IHDR matters for sizing, so the rest is a minimal valid chunk stream.
+    const crc = (buf: Buffer) => {
+      let c = ~0;
+      for (const byte of buf) { c ^= byte; for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1)); }
+      return (~c) >>> 0;
+    };
+    const chunk = (type: string, data: Buffer) => {
+      const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+      const body = Buffer.concat([Buffer.from(type, "latin1"), data]);
+      const c = Buffer.alloc(4); c.writeUInt32BE(crc(body));
+      return Buffer.concat([len, body, c]);
+    };
+    // TWO FIXTURES, for two different jobs. `square` is a 1024x1024 HEADER — the shape of
+    // the favicon that filled a page — used only for the sizing maths; its pixel data is
+    // not valid and it is never rendered. `real` is a genuinely decodable PNG, small
+    // enough to build here, used wherever a renderer will actually decode the image. The
+    // first version used the invalid one for both and crashed the suite inside
+    // react-pdf's decoder, which is not the same thing as a failing assertion.
+    const png = (w: number, h: number, pixels: Buffer | null) => {
+      const ihdr = Buffer.alloc(13);
+      ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4);
+      ihdr[8] = 8; ihdr[9] = 6;
+      const idat = pixels
+        ? deflateSync(pixels)
+        : Buffer.from([0x78, 0x9c, 0x63, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01]);
+      return Buffer.concat([
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        chunk("IHDR", ihdr), chunk("IDAT", idat), chunk("IEND", Buffer.alloc(0))
+      ]);
+    };
+    const square = png(1024, 1024, null);
+    const W = 8, H = 4;
+    const scanlines = Buffer.concat(
+      Array.from({ length: H }, () => Buffer.concat([Buffer.from([0]), Buffer.alloc(W * 4, 0x40)]))
+    );
+    const real = png(W, H, scanlines);
+
+    check("a PNG's dimensions are read", JSON.stringify(imageSize(square)) === '{"width":1024,"height":1024}',
+      "without the intrinsic size there is nothing to scale against");
+    const box = fitWithin(imageSize(square), LOGO_BOX.width, LOGO_BOX.height);
+    check("a square logo is capped by height", box.height === LOGO_BOX.height && box.width === LOGO_BOX.height,
+      `got ${box.width}x${box.height} — a 1024px favicon reached the document at natural size`);
+    check("a small logo is never enlarged",
+      fitWithin({ width: 20, height: 10 }, LOGO_BOX.width, LOGO_BOX.height).height === 10,
+      "a small mark was stretched into a blurry banner");
+    check("a wide logo is capped by width",
+      fitWithin({ width: 2000, height: 100 }, LOGO_BOX.width, LOGO_BOX.height).width === LOGO_BOX.width);
+    check("an unreadable image falls back to the box height",
+      fitWithin(null, LOGO_BOX.width, LOGO_BOX.height).height === LOGO_BOX.height);
+
+    let pdfWithLogo: Buffer | null = null;
+    try { pdfWithLogo = await pdf(FIXTURE, null, real); } catch { /* reported below */ }
+    check("the PDF renders with a logo", !!pdfWithLogo && isPdf(pdfWithLogo),
+      "the download fails when a logo is set");
+
+    let docxWithLogo: Buffer | null = null;
+    let derr = "";
+    try { docxWithLogo = await Packer.toBuffer(buildDocx(FIXTURE, null, real)); } catch (e) { derr = (e as Error).message; }
+    check("the Word export renders with a logo", !!docxWithLogo && isZip(docxWithLogo), derr);
+    check("the Word export actually embeds it",
+      !!docxWithLogo && docxWithLogo.toString("latin1").includes("word/media/"),
+      "the logo was never carried into the Word builder — it was missing entirely until 2026-08-09");
+    check("a logo makes the Word file bigger",
+      !!docxWithLogo && docxWithLogo.byteLength > (await Packer.toBuffer(buildDocx(FIXTURE, null, null))).byteLength,
+      "the image is not in the package");
   }
 
   console.log("\n── falsifiability ──");

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
 import { resolveAgency } from "@/lib/capability-statement-tailoring";
+import { fetchLogoBytes } from "@/lib/capability-statement-logo";
 import { buildDocx, type CapStmt } from "@/lib/capability-statement-docx-doc";
 import { Packer } from "docx";
 
@@ -29,7 +30,8 @@ export async function GET(req: NextRequest) {
   }
 
   const agency = resolveAgency((stmt as CapStmt).past_performance, req.nextUrl.searchParams.get("agency"));
-  const buffer = await Packer.toBuffer(buildDocx(stmt as CapStmt, agency));
+  const logo = await fetchLogoBytes((stmt as CapStmt).logo_url);
+  const buffer = await Packer.toBuffer(buildDocx(stmt as CapStmt, agency, logo));
   const ab = new ArrayBuffer(buffer.byteLength);
   new Uint8Array(ab).set(buffer);
 

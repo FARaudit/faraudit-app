@@ -10,6 +10,7 @@ import { PAST_PERFORMANCE_EXPORT_LIMIT } from "@/lib/capability-statement-limits
 import { formatPhone } from "@/lib/capability-statement-format";
 import { naicsLines } from "@/lib/capability-statement-naics";
 import { orderForAgency } from "@/lib/capability-statement-tailoring";
+import { imageSize, fitWithin, LOGO_BOX } from "@/lib/capability-statement-logo";
 
 export interface CapStmt {
 
@@ -41,7 +42,7 @@ const styles = StyleSheet.create({
   page: { padding: 56, paddingBottom: 70, fontSize: 10, fontFamily: "Helvetica", color: "#0f172a" },
   header: { borderBottom: "2pt solid #378ADD", paddingBottom: 14, marginBottom: 16, flexDirection: "row", justifyContent: "space-between" },
   brand: { fontSize: 20, fontWeight: 700, color: "#0f172a", marginTop: 3 },
-  logo: { maxHeight: 44, maxWidth: 160, marginBottom: 8, objectFit: "contain" },
+
   naicsEyebrow: { fontSize: 7, color: "#94a3b8", letterSpacing: 1.1, marginBottom: 1 },
   meta: { fontSize: 8, color: "#475569", textAlign: "right" },
   contactGrid: { flexDirection: "row", justifyContent: "space-between", marginBottom: 16 },
@@ -67,6 +68,9 @@ export function CapDoc({ stmt, generatedAt, logo, agency }: { stmt: CapStmt; gen
   const naics = stmt.naics_codes || [];
   const certs = stmt.certifications || [];
   // Tailored editions reorder; they never filter and never add prose.
+  // Explicit width and height from the image's own dimensions. react-pdf does not honour
+  // maxHeight/maxWidth the way a browser does, so a 1024px-square favicon filled the page.
+  const logoBox = logo ? fitWithin(imageSize(logo), LOGO_BOX.width, LOGO_BOX.height) : null;
   const past = orderForAgency(stmt.past_performance || [], agency);
 
   return (
@@ -80,7 +84,7 @@ export function CapDoc({ stmt, generatedAt, logo, agency }: { stmt: CapStmt; gen
           <View>
             {/* Absent when there is no logo, and absent when the fetch failed — never a
                 placeholder mark the customer did not choose. */}
-            {logo ? <Image src={logo} style={styles.logo} /> : null}
+            {logo && logoBox ? <Image src={logo} style={{ width: logoBox.width, height: logoBox.height, marginBottom: 8 }} /> : null}
             <Text style={{ fontSize: 8, color: "#475569", letterSpacing: 1.2 }}>CAPABILITY STATEMENT</Text>
             <Text style={styles.brand}>{company}</Text>
           </View>
