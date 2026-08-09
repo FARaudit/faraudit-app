@@ -105,8 +105,10 @@ button{font-family:inherit}
 .letterhead{background:linear-gradient(135deg,var(--navy-800),var(--navy-900));color:#e8eef6;padding:24px 28px 20px;position:relative;overflow:hidden}
 .letterhead::before{content:"";position:absolute;top:-50px;right:-40px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(55,138,221,.25),transparent 70%);pointer-events:none}
 .lh-top{display:flex;align-items:center;gap:16px;position:relative}
-.lh-logo{width:58px;height:58px;border-radius:12px;background:rgba(255,255,255,.04);border:1.5px dashed rgba(181,212,244,.4);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#8aa0bd;flex-shrink:0;cursor:pointer;transition:border-color .14s,color .14s}
-.lh-logo:hover{border-color:var(--accent);color:var(--accent-light)}
+/* NOT A BUTTON. There is no logo column on the record, no storage bucket behind it and
+   no handler — it was a dashed box with cursor:pointer and a hover state, which is a
+   control claiming a capability the code does not have. It states what it is instead. */
+.lh-logo{width:58px;height:58px;border-radius:12px;background:rgba(255,255,255,.04);border:1.5px dashed rgba(181,212,244,.4);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#8aa0bd;flex-shrink:0;cursor:default}
 .lh-logo svg{width:18px;height:18px}
 .lh-logo .lt{font-family:"IBM Plex Mono",monospace;font-size:7px;font-weight:700;letter-spacing:.1em}
 .lh-id{min-width:0;flex:1}
@@ -308,6 +310,14 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
 .fe-btn:focus-visible,.fe-input:focus-visible,.fe-area:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .fe-hint{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mute)}  /* --mute-2 is not a text token: 2.56:1 */
 @media (prefers-reduced-motion:reduce){.fe-input,.fe-area,.fe-btn{transition:none}}
+/* Guidance shown where a prose field is empty. Muted and rule-led so it can never be
+   mistaken for content — it is not in the record and the export cannot reach it. */
+.cs-guide{margin:10px 0 0;padding:12px 14px;border-left:2px solid var(--line);background:var(--card-soft);border-radius:0 8px 8px 0}
+.cs-guide-lead{margin:0 0 7px;font-size:12.5px;font-weight:700;color:var(--ink-2)}
+.cs-guide-list{margin:0;padding-left:17px;display:flex;flex-direction:column;gap:4px}
+.cs-guide-list li{font-size:12.5px;line-height:1.5;color:var(--mute)}
+.cs-localnote{margin-left:12px;font-size:12px;font-weight:700;color:var(--good,#067647)}
+.cs-localnote.is-error{color:var(--alarm,#b42318)}
 </style>
 </head>
 <body>
@@ -383,7 +393,7 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
           <h1>Your Capability Statement</h1>
           <p class="sub">The document you send to contracting officers — and the record the audit engine reads when it judges whether you are eligible to bid. <b>Past performance fills in from audits you record as won</b>; everything else is yours to write.</p>
         </div>
-        <button class="cta-primary" id="csCopy" type="button">
+        <button class="cta-primary" id="csCopyTop" data-cs-copy type="button">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
           Copy statement
         </button>
@@ -436,7 +446,6 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
             </div>
             <div class="perf-list"></div>
           </div>
-          </div>
 
           <!-- differentiators -->
           <div class="doc-section">
@@ -478,9 +487,9 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
           <section class="side-card">
             <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Export</h3>
             <div class="export-list">
-              <button class="export-btn" id="csCopy" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>Copy to Clipboard<span class="ext">TEXT</span></button>
+              <button class="export-btn" id="csCopyExport" data-cs-copy type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>Copy to Clipboard<span class="ext">FORMATTED</span></button>
             </div>
-            <p class="cs-unwired">PDF and Word export are not built yet. Copy to clipboard gives you the full statement as text.</p>
+            <p class="cs-unwired">PDF and Word export are not built yet. Copy keeps the statement&rsquo;s formatting when pasted into Word, Google Docs or an email, and falls back to plain text anywhere else.</p>
           </section>
 
           <section class="side-card">

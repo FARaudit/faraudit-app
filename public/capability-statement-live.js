@@ -20,6 +20,17 @@
 
   function el(sel, root) { return (root || document).querySelector(sel); }
   function has(v) { return typeof v === 'string' && v.trim().length > 0; }
+  /* A PHONE IS READ, NOT PARSED. The record keeps exactly what was typed — this only
+     changes how it is SHOWN, so a customer who entered an extension or a foreign number
+     never sees it mangled: anything that is not a plain 10-digit US number is printed
+     through untouched rather than forced into a shape it does not have. */
+  function fmtPhone(v) {
+    if (!has(v)) return v;
+    var d = String(v).replace(/\D/g, '');
+    if (d.length === 11 && d.charAt(0) === '1') d = d.slice(1);
+    if (d.length !== 10) return String(v);
+    return '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6);
+  }
   function list(v) { return Array.isArray(v) ? v.filter(Boolean) : []; }
   function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); }
 
@@ -36,6 +47,42 @@
      a gap". */
   function emptyNote(what, why) {
     return make('p', 'cs-empty', 'No ' + what + ' on file. ' + why);
+  }
+
+  /* WHAT GOOD LOOKS LIKE, shown where the field is empty. This is GUIDANCE and never
+     data: it is not in REC, it is not written by any save, and statementText() cannot
+     reach it — an empty field copies as empty. The customer fills this record as a
+     customer, so nothing here may pre-write a word of it for them. */
+  var PROSE_GUIDE = {
+    core_competencies: {
+      lead: 'What to put here — three or four sentences, no bullet lists:',
+      points: [
+        'What you actually build, machine, repair or deliver — in the words a buyer would search',
+        'The NAICS work you have really performed, and for which services or commands',
+        'Certifications and approvals that qualify the work: ISO, AS9100, ITAR, DCAA-compliant accounting',
+        'Capacity a CO needs to believe you: facility, headcount, throughput, lead time'
+      ]
+    },
+    differentiators: {
+      lead: 'What to put here — why you, over the firm bidding against you:',
+      points: [
+        'Something a competitor cannot simply claim: a source approval, a clearance, an incumbent relationship',
+        'A number you can stand behind — on-time rate, quote turnaround, years without a DFARS finding',
+        'Equipment, tooling or a facility that narrows the field',
+        'Set-aside status that changes which solicitations you can win'
+      ]
+    }
+  };
+
+  function proseGuide(field) {
+    var g = PROSE_GUIDE[field];
+    if (!g) return null;
+    var box = make('div', 'cs-guide');
+    box.appendChild(make('p', 'cs-guide-lead', g.lead));
+    var ul = make('ul', 'cs-guide-list');
+    g.points.forEach(function (t) { ul.appendChild(make('li', null, t)); });
+    box.appendChild(ul);
+    return box;
   }
 
   /* ── the letterhead ─────────────────────────────────────────────────────── */
@@ -89,6 +136,8 @@
       });
     } else {
       body.appendChild(emptyNote(emptyWhat, emptyWhy));
+      var guide = proseGuide(field);
+      if (guide) body.appendChild(guide);
     }
     var btn = el('.edit-btn', section);
     if (btn) {
@@ -131,7 +180,8 @@
     for (var i = 0; i < CONTACT_FIELDS.length; i++) {
       var v = REC[CONTACT_FIELDS[i]];
       clear(cells[i]);
-      cells[i].appendChild(has(v) ? document.createTextNode(v) : unset('Not set'));
+      var shown = CONTACT_FIELDS[i] === 'contact_phone' ? fmtPhone(v) : v;
+      cells[i].appendChild(has(v) ? document.createTextNode(shown) : unset('Not set'));
       var item = cells[i].closest('.contact-item');
       if (item) item.setAttribute('data-cs-contact', CONTACT_FIELDS[i]);
     }
@@ -429,7 +479,8 @@
     if (edit) { e.preventDefault(); openEditor(edit.getAttribute('data-cs-field')); return; }
     var contact = e.target.closest('[data-cs-contact]');
     if (contact) { e.preventDefault(); openEditor(contact.getAttribute('data-cs-contact')); return; }
-    if (e.target.closest('#csCopy')) { e.preventDefault(); copyStatement(); }
+    var copyBtn = e.target.closest('[data-cs-copy]');
+    if (copyBtn) { e.preventDefault(); copyStatement(copyBtn); }
   });
 
   /* ── copy to clipboard — built from the record, so it cannot drift ───────── */
@@ -457,16 +508,105 @@
     return L.join('\n');
   }
 
-  function copyStatement() {
-    var text = statementText();
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(
-        function () { note('✓ Copied — ' + text.length + ' characters', true); },
-        function () { note('Could not copy', false); }
-      );
-    } else {
-      note('Could not copy', false);
+  /* THE EXPORT CARRIES THE DOCUMENT, NOT A TRANSCRIPT OF IT. The page renders a
+     letterhead — company name, identifiers, ruled section headings — and the copy handed
+     over a flat wall of text, so pasting into Word or an email produced something that
+     looked nothing like the statement on screen. The clipboard now takes TWO flavours at
+     once: text/html for anything that understands it (Word, Google Docs, Outlook, Gmail)
+     and text/plain for anything that does not. Same record behind both, so the two cannot
+     drift apart.
+
+     Inline styles, not a stylesheet — a pasted fragment arrives with no CSS attached and
+     Word discards <style> blocks. Every value below comes from REC; nothing is typed. */
+  function esc(t) {
+    return String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function statementHtml() {
+    var F = 'font-family:Calibri,Arial,Helvetica,sans-serif';
+    var H = [];
+    H.push('<div style="' + F + ';color:#0A1628;max-width:660px">');
+    H.push('<div style="font-size:24px;font-weight:700;letter-spacing:-.01em;border-bottom:2px solid #0A1628;padding-bottom:6px;margin-bottom:8px">'
+      + esc(has(REC.company_name) ? REC.company_name : '(company name not set)') + '</div>');
+
+    var ids = [];
+    if (has(REC.uei)) ids.push('UEI ' + esc(REC.uei));
+    if (has(REC.cage_code)) ids.push('CAGE ' + esc(REC.cage_code));
+    if (has(REC.duns)) ids.push('DUNS ' + esc(REC.duns));
+    if (ids.length) H.push('<div style="font-size:12px;color:#475569;margin-bottom:2px">' + ids.join(' &nbsp;&middot;&nbsp; ') + '</div>');
+    if (list(REC.naics_codes).length) {
+      H.push('<div style="font-size:12px;color:#475569;margin-bottom:2px">NAICS &nbsp;' + list(REC.naics_codes).map(esc).join(' &nbsp;&middot;&nbsp; ') + '</div>');
     }
+    if (list(REC.certifications).length) {
+      H.push('<div style="font-size:12px;color:#475569">Certifications &nbsp;' + list(REC.certifications).map(esc).join(', ') + '</div>');
+    }
+
+    var sec = function (label, inner) {
+      H.push('<div style="font-size:11px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:#185FA5;margin:18px 0 6px">' + label + '</div>');
+      H.push(inner);
+    };
+    var paras = function (v) {
+      return String(v).split(/\n+/).filter(function (x) { return x.trim(); })
+        .map(function (x) { return '<p style="margin:0 0 8px;font-size:13.5px;line-height:1.55">' + esc(x.trim()) + '</p>'; }).join('');
+    };
+
+    if (has(REC.core_competencies)) sec('Core competencies', paras(REC.core_competencies));
+    if (has(REC.differentiators)) sec('Differentiators', paras(REC.differentiators));
+
+    var perf = list(REC.past_performance);
+    if (perf.length) {
+      sec('Past performance', '<ul style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.55">' + perf.map(function (pp) {
+        return '<li>' + esc([pp.title, pp.agency, pp.notice_id, pp.contract_value].filter(Boolean).join(' · ')) + '</li>';
+      }).join('') + '</ul>');
+    }
+
+    var c = [];
+    if (has(REC.contact_name)) c.push(esc(REC.contact_name));
+    if (has(REC.contact_email)) c.push(esc(REC.contact_email));
+    if (has(fmtPhone(REC.contact_phone))) c.push(esc(fmtPhone(REC.contact_phone)));
+    if (has(REC.contact_website)) c.push(esc(REC.contact_website));
+    if (has(REC.contact_address)) c.push(esc(REC.contact_address));
+    if (c.length) sec('Contact', '<div style="font-size:13.5px;line-height:1.7">' + c.join('<br>') + '</div>');
+
+    H.push('</div>');
+    return H.join('');
+  }
+
+  function copyStatement(where) {
+    var text = statementText();
+    var say = function (msg, ok) { note(msg, ok); if (where) localNote(where, msg, ok); };
+    var plainOnly = function () {
+      if (!(navigator.clipboard && navigator.clipboard.writeText)) { say('Could not copy', false); return; }
+      navigator.clipboard.writeText(text).then(
+        function () { say('✓ Copied as text — ' + text.length + ' characters', true); },
+        function () { say('Could not copy', false); }
+      );
+    };
+    if (!(navigator.clipboard && window.ClipboardItem && navigator.clipboard.write)) { plainOnly(); return; }
+    var item;
+    try {
+      item = new window.ClipboardItem({
+        'text/html': new Blob([statementHtml()], { type: 'text/html' }),
+        'text/plain': new Blob([text], { type: 'text/plain' })
+      });
+    } catch (e) { plainOnly(); return; }
+    navigator.clipboard.write([item]).then(
+      function () { say('✓ Copied — keeps its formatting in Word, Docs and email', true); },
+      plainOnly
+    );
+  }
+
+  /* The confirmation has to appear where the button was pressed. The Export control sits
+     ~900px below #csNote, so a copy from down there reported success off-screen and read
+     as a dead button. */
+  function localNote(btn, msg, ok) {
+    var host = btn.parentNode;
+    if (!host) return;
+    var n = host.querySelector('.cs-localnote');
+    if (!n) { n = make('span', 'cs-localnote'); host.appendChild(n); }
+    n.textContent = msg;
+    n.classList.toggle('is-error', !ok);
   }
 
   function renderAll() {
