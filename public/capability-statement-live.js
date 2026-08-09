@@ -584,7 +584,6 @@
     var ids = [];
     if (has(REC.uei)) ids.push('UEI ' + REC.uei);
     if (has(REC.cage_code)) ids.push('CAGE ' + REC.cage_code);
-    if (has(REC.duns)) ids.push('DUNS ' + REC.duns);
     if (ids.length) L.push(ids.join('  ·  '));
     if (list(REC.naics_codes).length) L.push('NAICS: ' + list(REC.naics_codes).join(', '));
     if (list(REC.certifications).length) L.push('Certifications: ' + list(REC.certifications).join(', '));
@@ -635,18 +634,16 @@
     var H = [];
     H.push('<div style="' + F + ';color:' + X_INK + ';max-width:660px">');
 
-    H.push('<div style="border-bottom:2px solid ' + X_ACCENT + ';padding-bottom:10px;margin-bottom:14px">');
-    H.push('<div style="font-size:13px;font-weight:700;letter-spacing:-.01em;color:' + X_INK + '">FAR<span style="color:' + X_ACCENT + '">audit</span></div>');
-    H.push('<div style="font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:' + X_MUTE + ';margin-top:2px">Capability Statement</div>');
-    H.push('</div>');
-
-    H.push('<div style="font-size:24px;font-weight:700;letter-spacing:-.01em;margin-bottom:8px">'
+    /* THE CUSTOMER'S NAME IS THE LETTERHEAD. This document goes to a contracting
+       officer under their company's name, so ours does not sit above it. */
+    H.push('<div style="font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:' + X_MUTE + '">Capability Statement</div>');
+    H.push('<div style="font-size:24px;font-weight:700;letter-spacing:-.01em;margin:2px 0 8px;padding-bottom:10px;border-bottom:2px solid ' + X_ACCENT + '">'
       + esc(has(REC.company_name) ? REC.company_name : '(company name not set)') + '</div>');
 
+    /* Identifiers a contracting officer checks today: UEI and CAGE. */
     var ids = [];
     if (has(REC.uei)) ids.push('UEI ' + esc(REC.uei));
     if (has(REC.cage_code)) ids.push('CAGE ' + esc(REC.cage_code));
-    if (has(REC.duns)) ids.push('DUNS ' + esc(REC.duns));
     if (ids.length) H.push('<div style="font-size:12px;color:' + X_MUTE + ';margin-bottom:2px">' + ids.join(' &nbsp;&middot;&nbsp; ') + '</div>');
     if (list(REC.naics_codes).length) {
       H.push('<div style="font-size:12px;color:' + X_MUTE + ';margin-bottom:2px">NAICS &nbsp;' + list(REC.naics_codes).map(esc).join(' &nbsp;&middot;&nbsp; ') + '</div>');
@@ -692,7 +689,8 @@
     if (c.length) sec('Contact', '<div style="font-size:13.5px;line-height:1.7">' + c.join('<br>') + '</div>');
 
     H.push('<div style="border-top:1px solid #cbd5e1;margin-top:20px;padding-top:8px;font-size:9px;color:#94a3b8">'
-      + esc(has(REC.company_name) ? REC.company_name : 'Capability statement') + ' &nbsp;&middot;&nbsp; Confidential</div>');
+      + esc(has(REC.company_name) ? REC.company_name : 'Capability statement')
+      + ' &nbsp;&middot;&nbsp; Confidential &nbsp;&middot;&nbsp; Prepared with FARaudit</div>');
 
     H.push('</div>');
     return H.join('');
