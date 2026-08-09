@@ -595,6 +595,48 @@ console.log("\n── no absence is claimed before the read settles ──");
 }
 
 
+// A HEADING THAT ENUMERATES A SET NOBODY QUERIED.
+// "Team Members" sits over a list built from the signed-in account and nothing else:
+// there is no membership table, no roles model, no invitation path and no API that
+// returns people. The panel could not show a second person if one existed, so the
+// heading reads as an enumeration the code never performed.
+//
+// What makes it TRUE rather than a claim is the NOT-YET-LIVE chip and the sentence
+// under the row. They are the load-bearing part, and they are exactly the kind of copy
+// a later tidy-up deletes as redundant — leaving the enumerating heading standing alone.
+// So the heading and its qualifiers are pinned together here.
+console.log("\n── the team panel cannot lose the label that makes it true ──");
+{
+  const panel = appCode.slice(appCode.indexOf("team: () =>"), appCode.indexOf("billing: () =>"));
+  check("the team panel was located", panel.length > 200, `read ${panel.length} chars`);
+
+  // Every branch of the panel — data, failure and not-yet-known — carries the label.
+  const headings = (panel.match(/Team Members/g) ?? []).length;
+  const chips = (panel.match(/sp-soon">Not yet live/g) ?? []).length;
+  check("every 'Team Members' heading carries the not-yet-live chip", headings > 0 && chips === headings,
+    `${headings} heading(s), ${chips} chip(s) — a branch renders the heading bare`);
+
+  check("the panel states that access is not shareable yet", /is coming|not built|not yet/i.test(panel),
+    "the row stands alone as if it were a roster");
+  check("...and says who has access today", /only person with access/i.test(panel),
+    "the reader cannot tell whether more people exist");
+
+  // The jargon this panel was the only user of.
+  check("no 'workspace' jargon in the panel", !/workspace/i.test(panel),
+    "a word the rest of the product does not use is back");
+
+  // Planted positives.
+  check("T-P1 · a bare heading is caught",
+    (() => { const p = '<div class="sp-t">Team Members</div>';
+      return ((p.match(/Team Members/g) ?? []).length) !== ((p.match(/sp-soon">Not yet live/g) ?? []).length); })(),
+    "a heading with no chip would pass");
+  check("T-P2 · a labelled heading is accepted",
+    (() => { const p = '<div class="sp-t">Team Members<span class="sp-soon">Not yet live</span></div>';
+      return ((p.match(/Team Members/g) ?? []).length) === ((p.match(/sp-soon">Not yet live/g) ?? []).length); })());
+  check("T-P3 · the jargon check fires on the retired word",
+    /workspace/i.test("Who can sign in to this workspace"));
+}
+
 console.log("\n── planted positives ──");
 check("P5 · rejects a panel that names no origin",
   !/\bTrack\b/.test("These apply to the notices you are watching."));

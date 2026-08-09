@@ -406,22 +406,32 @@
        as a signed-in customer with an empty roster: either the read has not answered
        yet, or it has and the account holder is in the list. The list itself therefore
        decides all three states, and no branch can render an empty one. */
+    /* THE HEADING AND THE LABEL TRAVEL TOGETHER.
+       There is no membership table, no roles model, no invitation path and no API that
+       lists people. This panel does not read a roster — it renders the signed-in account
+       and nothing else, so it could never show a second person even if one existed.
+       "Team Members" over one row therefore reads as an enumeration of a set nobody
+       queried, and the NOT-YET-LIVE chip plus the line below are the only things making
+       it true. Delete either and the panel becomes a claim. Gated in
+       test/public/_settings-honesty.test.ts.
+       "Workspace" is retired here: it appeared nowhere else in the product, which says
+       account, profile and company record. */
     team: () => TEAM.length ? `
-      <div class="sp-hd"><div class="sp-t">Team Members</div><div class="sp-s">Who can sign in to this workspace</div></div>
+      <div class="sp-hd"><div class="sp-t">Team Members<span class="sp-soon">Not yet live</span></div><div class="sp-s">People with access to your FARaudit account</div></div>
       <div class="sp-bd">
         ${TEAM.map(m => `<div class="tm-row"><div class="tm-av">${esc(String(m.name || '?').split(' ').map(w => w[0]).join(''))}</div><div class="tm-info"><div class="tm-name">${esc(m.name)}${m.you ? ' <span class="tm-you">You</span>' : ''}</div><div class="tm-email">${esc(m.email)}</div></div></div>`).join('')}
-        <p class="ps-unwired">Inviting teammates is not built yet. This workspace has a single account, yours.</p>
+        <p class="ps-unwired">You are the only person with access. Adding people — invitations, roles and permissions — is coming.</p>
       </div>` : settled() ? `
-      <div class="sp-hd"><div class="sp-t">Team Members</div><div class="sp-s">Who can sign in to this workspace</div></div>
+      <div class="sp-hd"><div class="sp-t">Team Members<span class="sp-soon">Not yet live</span></div><div class="sp-s">People with access to your FARaudit account</div></div>
       <div class="sp-bd">
         <div class="ps-failed">
-          <div class="ps-failed-t">Who can sign in could not be loaded</div>
-          <div class="ps-failed-s">A connection problem, not an empty workspace — nothing has been lost and nothing has been changed. Reload to try again.</div>
+          <div class="ps-failed-t">Access could not be loaded</div>
+          <div class="ps-failed-s">A connection problem, not an empty account — nothing has been lost and nothing has been changed. Reload to try again.</div>
         </div>
       </div>` : `
-      <div class="sp-hd"><div class="sp-t">Team Members</div><div class="sp-s">Who can sign in to this workspace</div></div>
+      <div class="sp-hd"><div class="sp-t">Team Members<span class="sp-soon">Not yet live</span></div><div class="sp-s">People with access to your FARaudit account</div></div>
       <div class="sp-bd">
-        ${pending('Reading your workspace…')}
+        ${pending('Reading your account…')}
       </div>`,
 
     billing: () => `
