@@ -104,19 +104,28 @@ export async function GET() {
     // stay zero and the page says nothing about audits rather than claiming none exist.
     audits = [];
   }
-  const auditedByOffice = new Map<string, { audited: number; decided: number }>();
+  /* THIS COLUMN COUNTS SOLICITATIONS, NOT RUNS. "Your audits: 37" beside a buying office
+     is read as "I have looked at 37 of their opportunities". It was counting engine runs,
+     and this customer's ledger holds 77 runs across 19 solicitations — measured per office,
+     21 runs against the Air Force covered 2 solicitations, and 3 against DLA covered 1.
+     Re-auditing the same solicitation is our retry, not their pursuit, so it is collapsed.
+
+     ONLY A RUN THAT FINISHED COUNTS. fetchRecentAudits applies no status filter, so a
+     failed run used to claim we had audited an office when nothing was produced. A run
+     that died is our problem. `complete` is the marker live-opportunities.ts joins on. */
+  const auditedByOffice = new Map<string, { sols: Set<string>; decided: Set<string> }>();
   for (const a of audits) {
-    // ONLY A RUN THAT FINISHED IS AN AUDIT. fetchRecentAudits applies no status filter, so
-    // this was counting failed runs too and telling the customer we had audited an office
-    // when the run never produced anything. A run that died is our problem, not a fact
-    // about their pursuit. `complete` is the same marker live-opportunities.ts joins on.
     if (a.status !== "complete") continue;
     const key = officeKey(a.agency);
     if (!key) continue;
-    const cur = auditedByOffice.get(key) ?? { audited: 0, decided: 0 };
-    cur.audited += 1;
+    // Identity of the pursuit, not of the run. Falls back through notice id to the row id
+    // so a solicitation with no number still counts once rather than vanishing.
+    const sol = String(a.solicitation_number || a.notice_id || a.id || "").trim();
+    if (!sol) continue;
+    const cur = auditedByOffice.get(key) ?? { sols: new Set<string>(), decided: new Set<string>() };
+    cur.sols.add(sol);
     // A decision is a recorded outcome or a committal verdict — not merely a completed run.
-    if (a.outcome || a.recommendation) cur.decided += 1;
+    if (a.outcome || a.recommendation) cur.decided.add(sol);
     auditedByOffice.set(key, cur);
   }
 
@@ -148,7 +157,7 @@ export async function GET() {
   }
   for (const [raw, o] of byKey) {
     const hit = auditedByOffice.get(officeKey(raw));
-    if (hit) { o.audited = hit.audited; o.decided = hit.decided; }
+    if (hit) { o.audited = hit.sols.size; o.decided = hit.decided.size; }
   }
 
   const OFFICES = [...byKey.values()].sort(
