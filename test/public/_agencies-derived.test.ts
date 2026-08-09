@@ -106,6 +106,15 @@ check("the audit join is normalised on both sides",
     && /officeKey\(a\.agency\)/.test(agRoute)
     && /auditedByOffice\.get\(officeKey\(raw\)\)/.test(agRoute),
   "a case or spacing change on SAM's side silently zeroes an office's audit count");
+// "Your audits: 37" beside a buying office is read as 37 of their opportunities. It was
+// counting engine runs — 21 runs against the Air Force covered 2 solicitations, 3 against
+// DLA covered 1. A re-run is our retry, not their pursuit.
+check("Your audits counts solicitations, not runs",
+  /sols: Set<string>/.test(agRoute) && /cur\.sols\.add\(sol\)/.test(agRoute)
+    && /o\.audited = hit\.sols\.size/.test(agRoute),
+  "re-auditing one solicitation inflates the office's count");
+check("A-P5 · that check can see a run-counting renderer",
+  !/cur\.sols\.add\(sol\)/.test('cur.audited += 1;'));
 check("A-P4 · the completed-runs check can see its own absence",
   !/a\.status !== "complete"/.test('for (const a of audits) { cur.audited += 1; }'));
 
