@@ -843,7 +843,8 @@ details[open]>summary .chev{transform:rotate(180deg)}
                       <div class="fdr-h-tx"><div class="fdr-count">Complete package retrieved</div><div class="fdr-sub" id="fdCompleteSub">All posted documents ingested. <b>§C, §L and §M</b> all present.</div></div>
                       <span class="fdr-src"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>From SAM.gov</span>
                     </div>
-                    <div class="fd-autorun"><div class="fd-spin sm-spin"></div><div class="fd-autorun-tx"><b>Set complete — starting your audit automatically.</b> No action needed.</div></div>
+                    <div class="fd-autorun" id="fdConfirmRun"><div class="fd-autorun-tx"><b>Ready to audit.</b> The full analysis reads every document in this package and takes several minutes. It cannot be stopped once it has started.</div></div>
+                    <div class="fdr-foot"><div class="fdr-info">Nothing has run yet.</div><div class="sp"></div><button class="fd-btn-ghost" id="cancelRun"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>Cancel</button><button class="fd-btn" id="startRun"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 3l14 9-14 9z"/></svg>Start the audit</button></div>
                     <details class="fd-man"><summary>View all documents<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></summary><div class="fd-man-scroll" id="fdCompleteDocs"></div></details>
                   </div>
                 </div>
@@ -1073,6 +1074,9 @@ function setState(s){if(__fd)__fd.dataset.state=s||'empty';}
    Every value rendered (sol#, agency, doc list, missing sections) is from SAM — no
    fabrication. */
 var __fdPartialNoticeId=null;
+// Held between "the package resolved" and "the customer pressed Start". Null means
+// there is nothing to run, so the button cannot fire a second time or fire on nothing.
+var __fdReadyNoticeId=null;
 (function(){
   var field=document.querySelector('.ev-d .sm-field input'),go=document.querySelector('.ev-d .sm-go'),errMsg=$('fdErrMsg');
   if(!field||!go)return;
@@ -1101,8 +1105,13 @@ var __fdPartialNoticeId=null;
       return '<div class="frow"><span class="fico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg></span><span class="fmeta"><span class="fname">'+escapeHtml(d.name)+'</span><span class="fsub">'+roles+(d.sizeBytes?('<span class="fsize">'+fmtSize(d.sizeBytes)+'</span>'):'')+'</span></span></div>';
     }).join('');
     setState('complete');
-    // set complete → start the audit automatically (the COMPLETE card says so).
-    submitAudit({noticeId:data.noticeId,btn:go,onErr:function(m){showError(m);}});
+    /* THE COMPLETE PACKAGE ASKS, LIKE THE PARTIAL ONE ALREADY DID.
+       This branch used to call submitAudit() straight from here, so resolving a clean
+       package spent a full engine run with no second click — while the PARTIAL branch,
+       the lower-quality outcome, paused and offered "Proceed on what we have". The good
+       case was the only one that could not be stopped. The reference is held and the
+       run waits for the button below. */
+    __fdReadyNoticeId=data.noticeId;
   }
   // drive the PARTIAL state — THREE HONEST STATES. A section we never read
   // (unverified) is NEVER shown as "missing" — only a section we read-and-confirmed-absent is. The
@@ -1158,6 +1167,22 @@ var __fdPartialNoticeId=null;
   }
   go.addEventListener('click',run);
   field.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();run();}});
+  // COMPLETE → "Start the audit": the only path that spends on a clean package.
+  // Cleared before submitting so a double-press cannot enqueue the run twice.
+  var startRun=$('startRun');
+  if(startRun)startRun.addEventListener('click',function(){
+    if(!__fdReadyNoticeId)return;
+    var id=__fdReadyNoticeId;__fdReadyNoticeId=null;
+    submitAudit({noticeId:id,btn:startRun,onErr:function(m){__fdReadyNoticeId=id;showError(m);}});
+  });
+  // Cancel returns to the input with nothing spent and nothing queued.
+  var cancelRun=$('cancelRun');
+  if(cancelRun)cancelRun.addEventListener('click',function(){
+    __fdReadyNoticeId=null;
+    // 'empty' is the panel's real resting state — the CSS carries no rule for anything
+    // else, so a made-up name here would blank the card instead of returning to it.
+    setState('empty');
+  });
   // PARTIAL → "Proceed on what we have": enqueue the resolved package as-is.
   var proceed=$('proceedPartial');
   if(proceed)proceed.addEventListener('click',function(){
