@@ -50,6 +50,20 @@ type Office = {
 
 /** Split resolveAgency()'s "Department · Office". Only the FIRST separator splits, so an
  *  office whose own name contains " · " stays intact. Mirrors opportunities-live.js. */
+/* THE JOIN BETWEEN A NOTICE AND AN AUDIT IS A STRING, SO IT IS NORMALISED ON BOTH SIDES.
+   Measured against production today the two agree character-for-character — normalising
+   changes not one of the 53 matches — so this is insurance against a latent class, not a
+   live fix. The class is worth closing because of how it fails: a case or spacing change
+   on SAM's side would drop an office to 0 audits, and a zero in that column reads as "you
+   have never worked this office" rather than "we could not match the name."
+
+   NOT office_leaf, which is the obvious-looking alternative and is wrong: it is sub-office
+   grain — "NAVSUP FLT LOG CTR YOKOSUKA", "W6QM MICC-FT BLISS" — where this page groups at
+   "DEPT OF DEFENSE · DEPT OF THE NAVY". Joining on it would match almost nothing. */
+function officeKey(s: string | null | undefined): string {
+  return String(s ?? "").toUpperCase().replace(/\s+/g, " ").trim();
+}
+
 function splitAgency(s: string | null): [string, string] {
   const v = String(s ?? "").trim();
   if (!v) return ["", ""];
@@ -92,7 +106,12 @@ export async function GET() {
   }
   const auditedByOffice = new Map<string, { audited: number; decided: number }>();
   for (const a of audits) {
-    const key = String(a.agency ?? "").trim();
+    // ONLY A RUN THAT FINISHED IS AN AUDIT. fetchRecentAudits applies no status filter, so
+    // this was counting failed runs too and telling the customer we had audited an office
+    // when the run never produced anything. A run that died is our problem, not a fact
+    // about their pursuit. `complete` is the same marker live-opportunities.ts joins on.
+    if (a.status !== "complete") continue;
+    const key = officeKey(a.agency);
     if (!key) continue;
     const cur = auditedByOffice.get(key) ?? { audited: 0, decided: 0 };
     cur.audited += 1;
@@ -128,7 +147,7 @@ export async function GET() {
     byKey.set(raw, cur);
   }
   for (const [raw, o] of byKey) {
-    const hit = auditedByOffice.get(raw);
+    const hit = auditedByOffice.get(officeKey(raw));
     if (hit) { o.audited = hit.audited; o.decided = hit.decided; }
   }
 
