@@ -434,11 +434,17 @@
         ${pending('Reading your account…')}
       </div>`,
 
+    /* THE LABEL GOES ON THE PART THAT IS UNBUILT, NOT ON THE PANEL.
+       The plan readout is LIVE — /api/profile queries the subscriptions table, maps
+       tier to label, and reports plan_unreadable when the read fails, which is why
+       "No subscription on file" is an answer rather than an assumption. Metering is
+       the piece that does not exist, so the chip sits on that section. A chip across
+       the whole panel would understate a part that genuinely works. */
     billing: () => `
       <div class="sp-hd"><div class="sp-t">Billing &amp; Plan</div><div class="sp-s">Your plan, and what this page can and cannot change</div></div>
       <div class="sp-bd">
         <div class="plan-card"><div class="pc-l"><div class="pc-kicker">Current plan</div><div class="pc-name">${planName()}</div>${planStatus() ? `<div class="pc-status">${planStatus()}</div>` : ''}<div class="pc-desc">${planPrice()}</div></div></div>
-        <div class="fld-sec">Usage this period</div>
+        <div class="fld-sec">Usage this period<span class="sp-soon">Not yet live</span></div>
         ${USAGE.length
           ? `<div class="usage-list">${USAGE.map(u => `<div class="us-row"><div class="us-l">${u.l}${u.s ? `<small>${u.s}</small>` : ''}</div><span class="us-v">${u.v}</span></div>`).join('')}</div>`
           : '<p class="ps-unwired">Usage metering is not built yet, so there is nothing to show for this period.</p>'}
