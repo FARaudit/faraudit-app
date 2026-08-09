@@ -434,22 +434,24 @@ console.log("\n── export is one place, and it claims only what is wired ─�
 {
   check("there is exactly one copy control", (html.match(/data-cs-copy/g) || []).length === 1,
     "two buttons, one behaviour — the second is a duplicate with no distinct purpose");
-  check("PDF download is reachable", /data-cs-pdf/.test(html) && /data-cs-pdf/.test(live),
+  check("PDF download is reachable", /data-cs-download="pdf"/.test(html) && /data-cs-download/.test(live),
     "a built, working route with no caller is not a shipped capability");
   check("the PDF button is handled, not just present",
-    /function downloadPdf/.test(live) && /API \+ '\/pdf'/.test(live),
+    /function downloadExport/.test(live) && /pdf: \{ path: '\/pdf'/.test(live),
     "the control exists and does nothing");
   check("a refused export is read out, not dumped as JSON",
-    /b\.error/.test(live) && /Could not build the PDF/.test(live),
+    /b\.error/.test(live) && /Could not build the ' \+ spec\.label/.test(live),
     "the route's 409 and 404 carry text the customer can act on");
   check("the page no longer says PDF export is unbuilt", !/PDF and Word export are not built/.test(html),
     "the page denies a capability it now offers");
-  check("Word export is still declared unbuilt", /Word export is not built yet/.test(html),
-    "an unbuilt format must keep saying so");
+  // Word WAS declared unbuilt and that was correct until the route existed. Both
+  // exports are real now, so the caption states what each control does instead.
+  check("the caption describes both downloads", /PDF and Word download as files/.test(html),
+    "the page does not say what the two buttons produce");
   check("the retired Export card is gone", !/class="export-list"/.test(html),
     "the side card and the header cluster both claim to be the export home");
-  check("both actions sit together", /export-actions[\s\S]{0,900}?data-cs-copy[\s\S]{0,900}?data-cs-pdf/.test(html),
-    "the two export actions are not in one cluster");
+  check("all three actions sit together", /export-actions[\s\S]{0,1600}?data-cs-copy[\s\S]{0,1600}?data-cs-download="pdf"[\s\S]{0,1600}?data-cs-download="docx"/.test(html),
+    "the export actions are not in one cluster");
 
   check("P12 · the duplicate-control check can see two copies",
     (('data-cs-copy data-cs-copy').match(/data-cs-copy/g) || []).length === 2);
@@ -703,6 +705,84 @@ console.log("\n── the logo upload trusts nothing the caller says ──");
 
   check("P17 · the sniffer check can see a blanket accept",
     ((b: number[]) => b.length > 0)(asBytes("<svg")) === true);
+}
+
+// ── NAICS says what the code means, and the primary is marked ────────────────
+// The exports carried `NAICS · 332710, 336412, 336611` — a bare list that tells a
+// contracting officer nothing they did not already have to look up, and does not say
+// which code the firm's size standard is judged against.
+console.log("\n── NAICS carries titles, from the regulation ──");
+{
+  const lib = read("src/lib/capability-statement-naics.ts");
+  const titles = read("src/lib/naics-titles.ts");
+  const pdf = read("src/app/api/capability-statement/pdf/route.tsx");
+  const docx = read("src/app/api/capability-statement/docx/route.ts");
+  const api = read("src/app/api/capability-statement/route.ts");
+  const gen = read("scripts/naics/build-naics-titles.mjs");
+
+  check("the title table is generated, not typed", /GENERATED\. Do not edit by hand/.test(titles),
+    "978 titles typed by hand drift from the regulation between revisions");
+  check("the generator can detect staleness", /--check/.test(gen) && /is STALE/.test(gen),
+    "a generated file with no check silently rots");
+  check("the table is derived from the regulation's projection",
+    /public.*naics-reference\.js/.test(gen) && /121\.201/.test(titles),
+    "a second hand-made source of NAICS titles");
+  check("it carries a real corpus", (titles.match(/^  "\d{6}":/gm) || []).length > 900,
+    `only ${(titles.match(/^  "\d{6}":/gm) || []).length} codes`);
+  check("an unknown code yields null, never a guess", /\?\? null/.test(titles),
+    "a wrong industry title misdescribes the firm to a contracting officer");
+
+  check("first is primary", /out\.length === 0/.test(lib),
+    "the primary is re-derived instead of taken from the customer's own order");
+  check("duplicates are dropped", /seen\.has\(code\)/.test(lib));
+  for (const [surface, src] of [["the PDF", pdf], ["the Word export", docx]] as const) {
+    check(`${surface} uses the shared NAICS lines`, /naicsLines\(/.test(src),
+      "a surface formats NAICS its own way and drifts");
+    check(`${surface} no longer prints a bare comma list`, !/naics\.join\(", "\)/.test(src),
+      "the list is still codes with no titles");
+  }
+  check("the route sends the titles to the page", /naics_titles/.test(api),
+    "the page would need the 90 KB browser table to print three lines");
+  check("the client reads them from the route", /d\.naics_titles/.test(live),
+    "the page invents titles or shows none");
+  check("the client marks the primary", /primary: out\.length === 0/.test(live));
+
+  check("P18 · the bare-list check can see the old shape",
+    /naics\.join\(", "\)/.test('<Text>NAICS · {naics.join(", ")}</Text>'));
+}
+
+// ── Word export ──────────────────────────────────────────────────────────────
+// A real .docx, not HTML wearing the extension: Word warns when the format and the
+// extension disagree, and this document is sent to a contracting officer.
+console.log("\n── the Word export is a real document ──");
+{
+  const docx = read("src/app/api/capability-statement/docx/route.ts");
+
+  check("it is generated as OOXML", /Packer\.toBuffer/.test(docx) && /from "docx"/.test(docx),
+    "an HTML file renamed .doc opens with a format warning");
+  check("it is served as a Word document",
+    /application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document/.test(docx),
+    "the browser cannot tell the client what it just downloaded");
+  check("the filename ends .docx", /\.docx`/.test(docx));
+  check("it refuses without a company name", /Add your company name before exporting/.test(docx),
+    "a statement goes out headed with a placeholder");
+  check("it shares the export limit", /PAST_PERFORMANCE_EXPORT_LIMIT/.test(docx),
+    "Word sends a different number of awards than the PDF");
+  check("it shares the phone formatter", /formatPhone\(/.test(docx),
+    "the third surface reintroduces the raw phone number");
+  check("it carries no FARaudit credit", !/Prepared with FARaudit/.test(docx) && !/FARaudit/.test(docx.replace(/@\/lib\/[a-z-]+/g, "")),
+    "our marketing is on a document the customer sends under their own name");
+  check("an empty section is absent", /if \(stmt\.core_competencies\)/.test(docx) && /if \(certs\.length\)/.test(docx),
+    "a heading over nothing is a claim about the firm");
+  check("Word is no longer declared unbuilt", !/Word export is not built yet/.test(html),
+    "the page denies a capability it now has");
+  check("the button is wired", /data-cs-download="docx"/.test(html) && /docx: \{ path: '\/docx'/.test(live),
+    "a control with no caller");
+  check("both downloads share one handler", /function downloadExport/.test(live) && !/function downloadPdf/.test(live),
+    "two copies of the download path drift on error handling");
+
+  check("P19 · the OOXML check can see an HTML-as-doc export",
+    !/Packer\.toBuffer/.test('return new Response(html, { headers: { "Content-Type": "application/msword" } })'));
 }
 
 console.log(`\n${pass} passed · ${fail} failed`);

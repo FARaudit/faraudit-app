@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase-server";
 import { syncCertifications } from "@/lib/cert-sync";
 import { suggestedNaics } from "@/lib/naics-suggestions";
 import { PAST_PERFORMANCE_LIMIT } from "@/lib/capability-statement-limits";
+import { naicsLines } from "@/lib/capability-statement-naics";
 
 export const dynamic = "force-dynamic";
 
@@ -239,6 +240,7 @@ export async function GET(_req: NextRequest) {
       naics_derived: naics,
       past_performance_total: pastTotal,
       past_performance_limit: PAST_PERFORMANCE_LIMIT,
+      naics_titles: naicsTitles(naics),
       stub: true
     });
   }
@@ -270,8 +272,19 @@ export async function GET(_req: NextRequest) {
     naics_derived: derived,
     past_performance_total: pastTotal,
     past_performance_limit: PAST_PERFORMANCE_LIMIT,
+    // The industry titles for the codes on THIS record. Sent from here rather than read
+    // from public/naics-reference.js so the page, the clipboard copy and the PDF all
+    // quote 13 CFR 121.201 through one path — and so the page does not pull a 90 KB
+    // table to print three lines. A code the regulation does not carry is simply absent.
+    naics_titles: naicsTitles(merged.naics_codes),
     stub: false
   });
+}
+
+function naicsTitles(codes: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const line of naicsLines(codes)) if (line.title) out[line.code] = line.title;
+  return out;
 }
 
 export async function PATCH(req: NextRequest) {
