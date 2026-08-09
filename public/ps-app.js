@@ -307,7 +307,7 @@
         </div>
         <div class="fld-sec">NAICS codes</div>
         <div class="cert-row">${NAICS.length ? NAICS.map(n => `<span class="cert-tg on">${esc(n.code || n.k || n)}</span>`).join('') : settled() ? '<span class="fld-none">None on file</span>' : pending('Reading your record…')}</div>
-        ${NAICS.length || !settled() ? '' : '<div class="note note-warn">No NAICS codes on file, so Today, Opportunities, Contracting Officers and Teaming Partners have nothing to match against and will stay empty. Add them under NAICS Configuration.</div>'}
+        ${NAICS.length || !settled() ? '' : '<div class="note note-warn">No NAICS codes on file, so Today, Notices, Contracting Officers and Teaming Partners have nothing to match against and will stay empty. Add them under NAICS Configuration.</div>'}
         <div class="fld-sec">Certifications on your capability statement</div>
         <div class="cert-row">${CERTS.length ? CERTS.map(c => certChip(c)).join('') : certEmpty()}</div>
         ${certCaption()}
@@ -352,7 +352,7 @@
              directly, because the reference table is a convenience and not an allowlist. -->
         <div class="naics-find" id="psNaicsResults" role="listbox" aria-label="Matching NAICS codes" hidden></div>
         <div class="naics-msg" id="psNaicsMsg" role="status" hidden></div>
-        <div class="note"><b>How this works:</b> your NAICS codes are what Today, Opportunities, Contracting Officers and Teaming Partners match against — with none on file those pages have nothing to match and stay empty. Wage Benchmarks offers them as an optional filter over a national reference table; it is not scoped by them. Each page picks up a change the next time it loads.</div>
+        <div class="note"><b>How this works:</b> your NAICS codes are what Today, Notices, Contracting Officers and Teaming Partners match against — with none on file those pages have nothing to match and stay empty. Wage Benchmarks offers them as an optional filter over a national reference table; it is not scoped by them. Each page picks up a change the next time it loads.</div>
       </div>
       `,
 
@@ -398,7 +398,7 @@
           <button class="nf-tg" data-pref-tg="alerts_in_app_enabled"><span class="tgl"><i></i></span></button>
         </div>
         <div class="naics-msg" id="psPrefNote" role="status" hidden></div>
-        <div class="note"><b>Where these come from:</b> press <b>Track</b> on any notice in <a href="/opportunities">Opportunities</a>. From then on we re-check that notice against SAM every hour, and the moment its documents post we run the audit and tell you — by email, on the bell, or both, depending on the switches above. The weekly digest is the same activity gathered into one Monday summary.<br><br>A switch you have never touched is ON, and if we cannot read your preferences we deliver rather than go quiet — missing a solicitation costs more than one unwanted email.</div>
+        <div class="note"><b>Where these come from:</b> press <b>Track</b> on any notice in <a href="/opportunities">Notices</a>. From then on we re-check that notice against SAM every hour, and the moment its documents post we run the audit and tell you — by email, on the bell, or both, depending on the switches above. The weekly digest is the same activity gathered into one Monday summary.<br><br>A switch you have never touched is ON, and if we cannot read your preferences we deliver rather than go quiet — missing a solicitation costs more than one unwanted email.</div>
       </div>`,
 
     /* A ROSTER WITH NOBODY ON IT IS AN ANSWER — a workspace whose own owner is not
