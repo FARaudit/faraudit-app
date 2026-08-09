@@ -112,12 +112,19 @@ button{font-family:inherit}
 .letterhead{background:linear-gradient(135deg,var(--navy-800),var(--navy-900));color:#e8eef6;padding:24px 28px 20px;position:relative;overflow:hidden}
 .letterhead::before{content:"";position:absolute;top:-50px;right:-40px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(55,138,221,.25),transparent 70%);pointer-events:none}
 .lh-top{display:flex;align-items:center;gap:16px;position:relative}
-/* A placeholder, not a control: no logo column on the record, no storage behind it and
-   no handler. It carries the words NOT BUILT so it does not read as a drop zone. */
-.lh-logo{width:58px;height:58px;border-radius:12px;background:rgba(255,255,255,.04);border:1.5px dashed rgba(181,212,244,.4);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#8aa0bd;flex-shrink:0;cursor:default}
-.lh-logo svg{width:18px;height:18px}
-.lh-logo .lt{font-family:"IBM Plex Mono",monospace;font-size:7px;font-weight:700;letter-spacing:.1em;line-height:1.35}
-.lh-logo .lt-unbuilt{font-size:6px;font-weight:600;letter-spacing:.06em;color:#6f849f}
+/* A real control: it uploads to POST /api/capability-statement/logo, which is the only
+   writer of capability_statements.logo_url. */
+.lh-logo-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0}
+.lh-logo{position:relative;width:58px;height:58px;border-radius:12px;background:rgba(255,255,255,.04);border:1.5px dashed rgba(181,212,244,.4);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#8aa0bd;flex-shrink:0;cursor:pointer;overflow:hidden;transition:border-color .14s, color .14s}
+.lh-logo:hover{border-color:rgba(181,212,244,.85);color:#cfe0f5}
+.lh-logo:focus-within{outline:2px solid var(--accent-light);outline-offset:2px}
+.lh-logo.is-set{border-style:solid;border-color:rgba(181,212,244,.28);background:#fff}
+.lh-logo.is-busy{opacity:.55;cursor:progress}
+.lh-logo-input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
+.lh-logo-img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.lh-logo .lt{font-family:"IBM Plex Mono",monospace;font-size:7px;font-weight:700;letter-spacing:.1em;line-height:1.35;text-align:center}
+.lh-logo-remove{background:none;border:0;padding:0;font-family:"IBM Plex Mono",monospace;font-size:7.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8aa0bd;cursor:pointer}
+.lh-logo-remove:hover{color:#ffd7d7;text-decoration:underline}
 .lh-id{min-width:0;flex:1}
 .lh-name{font-family:"Fraunces",serif;font-weight:600;font-size:24px;letter-spacing:-.01em;color:#fff;line-height:1.1;display:flex;align-items:center;flex-wrap:wrap;gap:8px}
 .lh-tag{font-family:"IBM Plex Mono",monospace;font-size:11px;color:#aebbcf;margin-top:5px;letter-spacing:.01em}
@@ -481,7 +488,14 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
           <!-- letterhead -->
           <div class="letterhead">
             <div class="lh-top">
-              <div class="lh-logo"><span class="lt">LOGO</span><span class="lt lt-unbuilt">NOT BUILT</span></div>
+              <div class="lh-logo-wrap">
+                <label class="lh-logo" data-cs-logo>
+                  <input type="file" accept="image/png,image/jpeg,image/webp" class="lh-logo-input" aria-label="Upload your company logo">
+                  <img class="lh-logo-img" alt="" hidden>
+                  <span class="lt lh-logo-cta">ADD<br>LOGO</span>
+                </label>
+                <button class="lh-logo-remove" type="button" hidden>Remove</button>
+              </div>
               <div class="lh-id">
                 <div class="lh-name"><button class="lh-name-edit" type="button" data-cs-field="company_name" aria-label="Edit company name"></button></div>
                 <div class="lh-tag"></div>
