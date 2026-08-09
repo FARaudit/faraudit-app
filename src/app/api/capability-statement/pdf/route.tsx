@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
 import { PAST_PERFORMANCE_EXPORT_LIMIT } from "@/lib/capability-statement-limits";
+import { formatPhone } from "@/lib/capability-statement-format";
 import { renderToBuffer, Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import React from "react";
 
@@ -85,7 +86,7 @@ function CapDoc({ stmt, generatedAt }: { stmt: CapStmt; generatedAt: string }): 
           <View style={styles.contactColRight}>
             {stmt.contact_name && <Text style={styles.contactLineRight}>{stmt.contact_name}</Text>}
             {stmt.contact_email && <Text style={styles.contactLineRight}>{stmt.contact_email}</Text>}
-            {stmt.contact_phone && <Text style={styles.contactLineRight}>{stmt.contact_phone}</Text>}
+            {stmt.contact_phone && <Text style={styles.contactLineRight}>{formatPhone(stmt.contact_phone)}</Text>}
             {stmt.contact_website && <Text style={styles.contactLineRight}>{stmt.contact_website}</Text>}
             {stmt.contact_address && <Text style={styles.contactLineRight}>{stmt.contact_address}</Text>}
           </View>

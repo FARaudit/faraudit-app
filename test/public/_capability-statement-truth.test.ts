@@ -212,6 +212,13 @@ check("P4 · the fillability check names a field with no editor", !new Set(["com
   check("the logo box is not dressed as a button",
     !/\.lh-logo\{[^}]*cursor:pointer/.test(html),
     "a dashed box with a hover state and no handler, no column and no storage behind it");
+  // Not dressed as a button was not enough. A dashed box reading "LOGO" is the shape of
+  // a drop zone, so it read as a control that was BROKEN rather than one not yet built.
+  check("the logo placeholder says it is unbuilt", /lt-unbuilt">NOT BUILT</.test(html),
+    "the box invites an upload the code cannot accept and names no reason");
+  check("nothing claims a logo the record cannot hold",
+    !/logo_url/.test(html) && !/logo_url/.test(live),
+    "a logo is rendered from a column that does not exist on capability_statements");
   check("a phone is shown as a phone", /function fmtPhone/.test(live) && /return '\(' \+ d\.slice\(0, 3\)/.test(live),
     "12034567890 is printed raw on a document a contracting officer reads");
   check("an unrecognised phone is passed through untouched", /if \(d\.length !== 10\) return String\(v\)/.test(live),
@@ -311,8 +318,20 @@ console.log("\n── a contact row names its own field ──");
 console.log("\n── the contact strip is laid out in columns ──");
 {
   const rule = html.match(/\.contact-strip\{([^}]*)\}/)?.[1] ?? "";
-  check("the strip is a grid, not a wrapping row", /display:grid/.test(rule) && /grid-template-columns:repeat\(3/.test(rule),
-    "flex-wrap packs by content width, so row two does not line up under row one");
+  check("the strip is a grid, not a wrapping row", /display:grid/.test(rule) && /grid-template-columns:minmax\(0,320px\)/.test(rule),
+    "flex-wrap packs by content width, so nothing lines up column to column");
+
+  // Every cell is placed BY FIELD. Auto-flow would put the phone wherever the markup
+  // happens to sit, and markup order on this strip is already load-bearing for which
+  // record column an edit writes to — layout must not add a second reason to care.
+  for (const [field, col] of [["contact_name", "1"], ["contact_email", "1"], ["contact_phone", "1"],
+                              ["contact_address", "2"], ["contact_website", "2"]] as const) {
+    check(`${field} is placed in column ${col}`,
+      new RegExp(`\\.contact-item\\[data-cs-contact="${field}"\\]\\{grid-column:${col};grid-row:\\d`).test(html),
+      "the cell falls wherever auto-flow puts it, so reordering the markup moves it");
+  }
+  check("narrow screens drop the placement", /\.contact-strip \.contact-item\{grid-column:auto !important/.test(html),
+    "a two-column placement survives into a one-column grid and leaves holes");
   check("the strip sits at the bottom of the document", /margin-top:auto/.test(rule),
     "the strip floats mid-card once the card is taller than its content");
   check("the document card fills the row beside the side column",
@@ -488,6 +507,61 @@ console.log("\n── the statement card shows what actually exports ──");
   check("P14 · the containment check can see history inside the card",
     /<article class="doc-card">[\s\S]*?award-history[\s\S]*?<\/article>/.test(
       '<article class="doc-card"><div class="award-history"></div></article>'));
+}
+
+// ── one field, one rendering, on every surface it reaches ────────────────────
+// The page and the clipboard ran the number through the client's fmtPhone(); the PDF
+// printed `contact_phone` straight off the record. So the customer checked
+// "(203) 456-7890" on screen and sent a document reading "12034567890" to a
+// contracting officer. Confirmed on a real production download, 2026-08-09.
+console.log("\n── the phone reads the same everywhere ──");
+{
+  const pdf = read("src/app/api/capability-statement/pdf/route.tsx");
+  const fmt = read("src/lib/capability-statement-format.ts");
+
+  check("the printed document formats the phone", /formatPhone\(stmt\.contact_phone\)/.test(pdf),
+    "the PDF prints the raw record value while every other surface formats it");
+  check("it uses the shared formatter", /from "@\/lib\/capability-statement-format"/.test(pdf),
+    "a second copy of the rule will drift from the client's");
+  check("no surface prints the bare field", !/\{stmt\.contact_phone\}/.test(pdf),
+    "an unformatted contact_phone still reaches a rendered surface");
+
+  // public/*.js is served verbatim and cannot import from src/lib, so there are
+  // necessarily two implementations. They are held together by asserting BOTH carry the
+  // same four rules — strip non-digits, drop a leading country 1 on an 11-digit number,
+  // bail out unless exactly 10 remain, and emit (xxx) xxx-xxxx. Behaviour is then
+  // checked against a transcription of those rules. Structural, not executed: the
+  // alternative is evaluating shipped source inside the gate, which is worse.
+  const RULES: Array<[string, RegExp, RegExp]> = [
+    ["strips non-digits",        /replace\(\/\\D\/g, ''\)/,            /replace\(\/\\D\/g, ""\)/],
+    ["drops a leading 1 of 11",  /length === 11 && .*charAt\(0\) === '1'/, /length === 11 && .*startsWith\("1"\)/],
+    ["bails unless 10 remain",   /length !== 10\) return String\(v\)/,  /length !== 10\) return raw/],
+    ["emits \\(xxx\\) xxx-xxxx", /'\(' \+ .*slice\(0, 3\)/,             /\(\$\{.*slice\(0, 3\)\}\)/]
+  ];
+  for (const [what, clientRe, serverRe] of RULES) {
+    check(`client and server both ${what}`, clientRe.test(live) && serverRe.test(fmt),
+      `client=${clientRe.test(live)} server=${serverRe.test(fmt)} — the two renderings will diverge`);
+  }
+
+  const format = (value: string | null | undefined): string => {
+    const raw = String(value ?? "");
+    if (!raw.trim()) return raw;
+    let d = raw.replace(/\D/g, "");
+    if (d.length === 11 && d.startsWith("1")) d = d.slice(1);
+    if (d.length !== 10) return raw;
+    return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+  };
+  check("the number the PDF got wrong now formats", format("12034567890") === "(203) 456-7890",
+    "the exact value downloaded from production on 2026-08-09");
+  check("a plain 10-digit number formats", format("2034567890") === "(203) 456-7890");
+  check("an already-formatted number is stable", format("(203) 456-7890") === "(203) 456-7890");
+  check("an extension is passed through untouched", format("203-456-7890 x22") === "203-456-7890 x22",
+    "a number with an extension is mangled into a shape it does not have");
+  check("a foreign number is passed through untouched", format("+44 20 7946 0958") === "+44 20 7946 0958");
+  check("empty stays empty", format("") === "" && format(null) === "");
+
+  check("P15 · the parity check can see a divergent implementation",
+    !/length !== 10\) return raw/.test("function fmtPhone(v){return String(v).replace(/\\D/g,'')}"));
 }
 
 console.log(`\n${pass} passed · ${fail} failed`);

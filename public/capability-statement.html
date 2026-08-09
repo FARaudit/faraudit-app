@@ -112,12 +112,12 @@ button{font-family:inherit}
 .letterhead{background:linear-gradient(135deg,var(--navy-800),var(--navy-900));color:#e8eef6;padding:24px 28px 20px;position:relative;overflow:hidden}
 .letterhead::before{content:"";position:absolute;top:-50px;right:-40px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(55,138,221,.25),transparent 70%);pointer-events:none}
 .lh-top{display:flex;align-items:center;gap:16px;position:relative}
-/* NOT A BUTTON. There is no logo column on the record, no storage bucket behind it and
-   no handler — it was a dashed box with cursor:pointer and a hover state, which is a
-   control claiming a capability the code does not have. It states what it is instead. */
+/* A placeholder, not a control: no logo column on the record, no storage behind it and
+   no handler. It carries the words NOT BUILT so it does not read as a drop zone. */
 .lh-logo{width:58px;height:58px;border-radius:12px;background:rgba(255,255,255,.04);border:1.5px dashed rgba(181,212,244,.4);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#8aa0bd;flex-shrink:0;cursor:default}
 .lh-logo svg{width:18px;height:18px}
-.lh-logo .lt{font-family:"IBM Plex Mono",monospace;font-size:7px;font-weight:700;letter-spacing:.1em}
+.lh-logo .lt{font-family:"IBM Plex Mono",monospace;font-size:7px;font-weight:700;letter-spacing:.1em;line-height:1.35}
+.lh-logo .lt-unbuilt{font-size:6px;font-weight:600;letter-spacing:.06em;color:#6f849f}
 .lh-id{min-width:0;flex:1}
 .lh-name{font-family:"Fraunces",serif;font-weight:600;font-size:24px;letter-spacing:-.01em;color:#fff;line-height:1.1;display:flex;align-items:center;flex-wrap:wrap;gap:8px}
 .lh-tag{font-family:"IBM Plex Mono",monospace;font-size:11px;color:#aebbcf;margin-top:5px;letter-spacing:.01em}
@@ -197,16 +197,27 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
 [data-theme="dark"] .diff-list li::before{background-color:rgba(16,185,129,.16);border-color:rgba(16,185,129,.3)}
 
 /* contact strip */
-.contact-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px 28px;padding:16px 28px;background:var(--card-soft);border-top:1px solid var(--line);margin-top:auto}
+/* Two columns: who to call, then where they are. The left column is a FIXED width
+   rather than half the card. Halves push the second block to the middle of an 1100px
+   card and leave a canyon between them; sizing to content closes the canyon but makes
+   the second column's position depend on the longest value in the first, so the layout
+   moves when a customer edits their email. A fixed track is stable at every width, and
+   a long value wraps inside its own column instead of pushing the grid around. */
+.contact-strip{display:grid;grid-template-columns:minmax(0,320px) minmax(0,1fr);gap:13px 48px;padding:18px 28px;background:var(--card-soft);border-top:1px solid var(--line);margin-top:auto;align-content:start}
 .contact-item{display:flex;align-items:center;gap:9px;min-width:0}
 .contact-item svg{width:15px;height:15px;color:var(--accent-deep);flex-shrink:0}
 [data-theme="dark"] .contact-item svg{color:var(--accent-light)}
 .contact-item .ci{min-width:0}
 .contact-item .ck{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);line-height:1.2}
 .contact-item .cv{font-size:12px;color:var(--ink-2);font-weight:600;line-height:1.3;white-space:normal;overflow-wrap:break-word}
-.contact-item[data-cs-contact="contact_address"]{grid-column:1/3}
-.contact-item[data-cs-contact="contact_website"]{justify-self:end;text-align:right}
-.contact-item[data-cs-contact="contact_website"] .ck{text-align:right}
+/* Two stacked columns: who to call on the left, where they are on the right. Each cell
+   is placed BY FIELD, not by source order — the markup order is already load-bearing for
+   which record column an edit writes to, and nothing about layout may depend on it. */
+.contact-item[data-cs-contact="contact_name"]{grid-column:1;grid-row:1}
+.contact-item[data-cs-contact="contact_email"]{grid-column:1;grid-row:2}
+.contact-item[data-cs-contact="contact_phone"]{grid-column:1;grid-row:3}
+.contact-item[data-cs-contact="contact_address"]{grid-column:2;grid-row:1}
+.contact-item[data-cs-contact="contact_website"]{grid-column:2;grid-row:2}
 
 /* ═══ SIDE (right) ═══ */
 .side-col{display:flex;flex-direction:column;gap:16px;position:sticky;top:80px}
@@ -268,9 +279,7 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
 
 @media (max-width:680px){
   .contact-strip{grid-template-columns:1fr}
-  .contact-item[data-cs-contact="contact_address"]{grid-column:auto}
-  .contact-item[data-cs-contact="contact_website"]{justify-self:start;text-align:left}
-  .contact-item[data-cs-contact="contact_website"] .ck{text-align:left}
+  .contact-strip .contact-item{grid-column:auto !important;grid-row:auto !important}
 }
 
 /* ── canonical toggle sidebar ── */
@@ -472,7 +481,7 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
           <!-- letterhead -->
           <div class="letterhead">
             <div class="lh-top">
-              <div class="lh-logo" aria-hidden="true"><span class="lt">LOGO</span></div>
+              <div class="lh-logo"><span class="lt">LOGO</span><span class="lt lt-unbuilt">NOT BUILT</span></div>
               <div class="lh-id">
                 <div class="lh-name"><button class="lh-name-edit" type="button" data-cs-field="company_name" aria-label="Edit company name"></button></div>
                 <div class="lh-tag"></div>
