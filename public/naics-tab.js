@@ -25,10 +25,8 @@ var SEC_N = {}; DATA.forEach(function (r) { SEC_N[r[8]] = (SEC_N[r[8]] || 0) + 1
  * Statement, which is the only thing that can fill it. */
 var MINE_SET = [];
 var MINE_ALL = MINE_SET;
-function pinMode() { var v = document.documentElement.getAttribute('data-t-pin'); return v || 'off'; }
 function mineCount() { var v = document.documentElement.getAttribute('data-t-mine'); return v == null ? S.mine : parseInt(v, 10); }
-var S = { scope: pinMode() === 'off' ? 'mine' : 'all', q: '', mine: 0, dir: 1 };
-var lastPin = pinMode();
+var S = { scope: 'mine', q: '', mine: 0, dir: 1 };
 var ORDER = ['mine', 'all'].concat(SECTORS.map(function (s) { return s.id; }));
 
 function el(t, c, x) { var e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; }
@@ -109,7 +107,7 @@ function buildRail() {
   /* WHEN THE BAND IS PINNED, A “My codes” SCOPE IS A SECOND CONTROL FOR THE SAME THING —
    * and the register would then print the same codes a reader can already see above it.
    * The band IS my codes; the rail is left to do one job, which is taxonomy. */
-  if (pinMode() === 'off') w.appendChild(railItem('mine', 'My codes', mineCount(), { dot: true, scope: true }));
+  w.appendChild(railItem('mine', 'My codes', mineCount(), { dot: true, scope: true }));
   w.appendChild(railItem('all', 'All codes', DATA.length, { scope: true }));
   var h2 = el('p', 'nt-rk');
   h2.appendChild(document.createTextNode('Sector'));
@@ -174,74 +172,7 @@ function pinCard(r) {
   }
   return d;
 }
-function pinStripItem(r) {
-  var d = el('article', 'ps'); d.dataset.code = r[0];
-  var c = el('span', 'ps-code mono');
-  c.appendChild(el('b', 'nt-c1', r[0].slice(0, 3)));
-  c.appendChild(el('span', 'nt-c2', r[0].slice(3)));
-  d.appendChild(c);
-  d.appendChild(el('span', 'ps-t', r[2]));
-  var p = parts(r);
-  var f = el('span', 'ps-f');
-  f.appendChild(el('b', 'mono', p.fig));
-  f.appendChild(el('span', 'ps-u', p.unit));
-  d.appendChild(f);
-  return d;
-}
-function renderPin() {
-  var host = document.getElementById('ntPin');
-  if (!host) return;
-  var mode = pinMode();
-  if (mode === 'off') { host.replaceChildren(); return; }
-  var rows = MINE_ALL.slice(0, mineCount()).map(function (c) { return R.byCode[c]; }).filter(Boolean);
-  var w = el('div', 'nt-pin'); w.dataset.shape = mode;
-  var h = el('div', 'nt-pin-h');
-  /* The live dot marks what is YOURS. It used to sit on the rail's My codes item; with the
-   * band pinned that item is gone, so the dot moves with the meaning rather than staying
-   * where it was drawn. One dot, one meaning, always on screen. */
-  h.appendChild(el('i', 'nt-dot'));
-  h.appendChild(el('b', null, 'Your registered codes'));
-  h.appendChild(el('span', null, rows.length
-    ? fmtN(rows.length) + (rows.length === 1 ? ' code' : ' codes') + ' · here whatever you are browsing below'
-    : 'nothing registered yet'));
-  w.appendChild(h);
-  if (!rows.length) {
-    var e = el('p', 'nt-pin-e');
-    e.appendChild(document.createTextNode('Your registered codes come from your '));
-    var a = el('a', null, 'Capability Statement'); a.href = '/capability-statement';
-    e.appendChild(a);
-    e.appendChild(document.createTextNode('. Until it is set, the register below is the whole reference.'));
-    w.appendChild(e);
-  } else if (mode === 'strip') {
-    var g = el('div', 'nt-pin-s');
-    rows.forEach(function (r) { g.appendChild(pinStripItem(r)); });
-    w.appendChild(g);
-  } else {
-    var gc = el('div', 'nt-pin-g');
-    rows.forEach(function (r) { gc.appendChild(pinCard(r)); });
-    w.appendChild(gc);
-  }
-  host.replaceChildren(w);
-}
-
 /* ── rows ───────────────────────────────────────────────────────────────────── */
-/* The boundary between the two regions is a REGION HEADING, not a count of what is shown:
- * the result line inside the register already names the scope, and a second figure moving
- * with the filter would be two clocks reading as one. What this line has to settle is that
- * the register holds EVERYTHING — including the codes pinned above, in their own sectors —
- * so nobody reads the band as having taken them out of it. */
-function renderDivider() {
-  var host = document.getElementById('ntDiv');
-  if (!host) return;
-  if (pinMode() === 'off') { host.replaceChildren(); return; }
-  var n = mineCount();
-  var w = el('div', 'nt-div');
-  w.appendChild(el('b', null, 'The full register'));
-  w.appendChild(el('span', null, fmtN(DATA.length) + ' codes with an SBA size standard, grouped by sector'
-    + (n ? ' — your ' + n + ' are in here too, marked where they sit' : '')));
-  host.replaceChildren(w);
-}
-
 function row(r, M, i) {
   var d = el('article', 'nt-r' + (M[r[0]] ? ' mine' : ''));
   d.dataset.code = r[0];
@@ -361,8 +292,6 @@ function resultLine(n) {
 }
 
 function render(animate) {
-  renderPin();
-  renderDivider();
   var M = mineMap(), list = visible();
   var main = document.getElementById('ntMain');
   var frag = document.createDocumentFragment();
@@ -374,7 +303,7 @@ function render(animate) {
    * codes has no sparse neighbours, so the rich card is safe there. This is the two-shapes
    * problem bounded rather than solved by subtraction: the cards are reachable, but they can
    * never sit in a grid beside the 951 that will never carry editorial content. */
-  else if (pinMode() === 'off' && S.scope === 'mine') {
+  else if (S.scope === 'mine') {
     var gc = el('div', 'nt-pin-g mine-cards');
     list.forEach(function (r) { gc.appendChild(pinCard(r)); });
     body.appendChild(gc);
@@ -411,30 +340,6 @@ function pingDot() {
   var d = document.querySelector('.nt-ri.on .nt-dot');
   if (!d) return;
   d.classList.remove('ping'); void d.offsetWidth; d.classList.add('ping');
-}
-
-/* The tuning panel writes attributes; two of them change what the RAIL contains and which
- * scope is reachable, so they cannot be answered by CSS alone. Re-entering an unreachable
- * scope is the defect to avoid: with the band pinned there is no “My codes” item to stand
- * on, so the scope moves to the register's own default rather than leaving the rail with
- * nothing marked. */
-function retune() {
-  buildRail();
-  /* The two shapes land in different places, and each landing is the one that shows the
-   * reader their own codes: with the band pinned they are already on screen, so the register
-   * opens on everything; with it off, “My codes” is a rail scope and the tab opens standing
-   * in it. Only a CHANGE of shape moves the scope — otherwise re-tuning anything else would
-   * drag the reader out of the sector they were reading. */
-  var pin = pinMode();
-  if (pin !== lastPin) {
-    if (pin !== 'off' && S.scope === 'mine') S.scope = 'all';
-    if (pin === 'off' && S.scope === 'all') S.scope = 'mine';
-    lastPin = pin;
-  }
-  if (pin !== 'off' && S.scope === 'mine') S.scope = 'all';
-  render(false);
-  syncRail();
-  pingDot();
 }
 
 document.addEventListener('click', function (e) {
@@ -486,5 +391,5 @@ fetch('/api/capability-statement', { credentials: 'include' })
   })
   .catch(function () { /* left empty on purpose — see above */ });
 
-window.NTAB = { S: S, DATA: DATA, SECTORS: SECTORS, SEC_N: SEC_N, MINE_SET: MINE_SET, mineMap: mineMap, isEd: isEd, parts: parts, summary: summary, visible: visible, render: render, syncRail: syncRail, setScope: setScope, matches: matches, retune: retune, renderPin: renderPin, renderDivider: renderDivider, pinMode: pinMode, mineCount: mineCount, MINE_ALL: MINE_ALL, byCode: R.byCode };
+window.NTAB = { S: S, DATA: DATA, SECTORS: SECTORS, SEC_N: SEC_N, MINE_SET: MINE_SET, mineMap: mineMap, isEd: isEd, parts: parts, summary: summary, visible: visible, render: render, syncRail: syncRail, setScope: setScope, matches: matches, mineCount: mineCount, MINE_ALL: MINE_ALL, byCode: R.byCode };
 })();
