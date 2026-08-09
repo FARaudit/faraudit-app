@@ -26,6 +26,31 @@
      record. Mirrors PAST_PERFORMANCE_EXPORT_LIMIT in src/lib/capability-statement-limits.ts,
      which the PDF uses; a gate asserts the two numbers agree. */
   var EXPORT_LIMIT = 5;
+  /* Industry titles for the codes on this record, sent by the route from 13 CFR 121.201.
+     A code the regulation does not carry is simply absent — the bare code prints, never
+     a guessed title, because a wrong industry name misdescribes the firm. */
+  var NAICS_TITLES = {};
+
+  /* FIRST IS PRIMARY — the record's own convention, and the customer controls the order.
+     The primary is the code the firm's size standard is judged against, so it is marked
+     rather than left for a contracting officer to infer. */
+  function naicsLines() {
+    var codes = list(REC.naics_codes);
+    var seen = {};
+    var out = [];
+    for (var i = 0; i < codes.length; i++) {
+      var code = String(codes[i] == null ? '' : codes[i]).trim();
+      if (!code || seen[code]) continue;
+      seen[code] = true;
+      out.push({ code: code, title: NAICS_TITLES[code] || null, primary: out.length === 0 });
+    }
+    return out;
+  }
+
+  function naicsLineText(l) {
+    var head = l.title ? (l.code + '  ' + l.title) : l.code;
+    return l.primary ? (head + ' (primary)') : head;
+  }
 
   function el(sel, root) { return (root || document).querySelector(sel); }
   function has(v) { return typeof v === 'string' && v.trim().length > 0; }
@@ -108,10 +133,17 @@
     var tag = el('.lh-tag');
     if (tag) {
       clear(tag);
-      var codes = list(REC.naics_codes);
+      var lines = naicsLines();
       var certs = list(REC.certifications);
       var parts = [];
-      if (codes.length) parts.push('NAICS ' + codes.join(' · '));
+      /* The tagline stays a single line — it sits beside the company name on a dark
+         band. The titles belong on the document, not crammed into the letterhead
+         strapline, so this marks the primary and leaves the rest as codes. */
+      if (lines.length) {
+        parts.push('NAICS ' + lines.map(function (l) {
+          return l.primary && l.title ? (l.code + ' ' + l.title) : l.code;
+        }).join(' · '));
+      }
       if (certs.length) parts.push(certs.join(' · '));
       tag.appendChild(parts.length
         ? document.createTextNode(parts.join('  |  '))
@@ -646,8 +678,8 @@
     if (contact) { e.preventDefault(); openEditor(contact.getAttribute('data-cs-contact')); return; }
     var copyBtn = e.target.closest('[data-cs-copy]');
     if (copyBtn) { e.preventDefault(); copyStatement(copyBtn); return; }
-    var pdfBtn = e.target.closest('[data-cs-pdf]');
-    if (pdfBtn) { e.preventDefault(); downloadPdf(pdfBtn); return; }
+    var dl = e.target.closest('[data-cs-download]');
+    if (dl) { e.preventDefault(); downloadExport(dl, dl.getAttribute('data-cs-download')); return; }
     if (e.target.closest('.lh-logo-remove')) { e.preventDefault(); removeLogo(); return; }
   });
 
@@ -667,7 +699,11 @@
     if (has(REC.uei)) ids.push('UEI ' + REC.uei);
     if (has(REC.cage_code)) ids.push('CAGE ' + REC.cage_code);
     if (ids.length) L.push(ids.join('  ·  '));
-    if (list(REC.naics_codes).length) L.push('NAICS: ' + list(REC.naics_codes).join(', '));
+    var textLines = naicsLines();
+    if (textLines.length) {
+      L.push('', 'NAICS');
+      for (var t = 0; t < textLines.length; t++) L.push('  ' + naicsLineText(textLines[t]));
+    }
     if (list(REC.certifications).length) L.push('Certifications: ' + list(REC.certifications).join(', '));
     if (has(REC.core_competencies)) L.push('', 'CORE COMPETENCIES', REC.core_competencies);
     if (has(REC.differentiators)) L.push('', 'DIFFERENTIATORS', REC.differentiators);
@@ -735,8 +771,18 @@
     if (has(REC.uei)) ids.push('UEI ' + esc(REC.uei));
     if (has(REC.cage_code)) ids.push('CAGE ' + esc(REC.cage_code));
     if (ids.length) H.push('<div style="font-size:12px;color:' + X_MUTE + ';margin-bottom:2px">' + ids.join(' &nbsp;&middot;&nbsp; ') + '</div>');
-    if (list(REC.naics_codes).length) {
-      H.push('<div style="font-size:12px;color:' + X_MUTE + ';margin-bottom:2px">NAICS &nbsp;' + list(REC.naics_codes).map(esc).join(' &nbsp;&middot;&nbsp; ') + '</div>');
+    var nl = naicsLines();
+    if (nl.length) {
+      H.push('<div style="margin:6px 0 2px">');
+      H.push('<div style="font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;color:' + X_MUTE + ';margin-bottom:3px">NAICS</div>');
+      for (var ni = 0; ni < nl.length; ni++) {
+        H.push('<div style="font-size:12px;color:' + X_INK + ';line-height:1.5">'
+          + '<span style="font-weight:700">' + esc(nl[ni].code) + '</span>'
+          + (nl[ni].title ? ' &nbsp;' + esc(nl[ni].title) : '')
+          + (nl[ni].primary ? ' <span style="font-size:8px;letter-spacing:.1em;color:' + X_ACCENT + '">PRIMARY</span>' : '')
+          + '</div>');
+      }
+      H.push('</div>');
     }
     if (list(REC.certifications).length) {
       H.push('<div style="font-size:12px;color:' + X_MUTE + '">Certifications &nbsp;' + list(REC.certifications).map(esc).join(', ') + '</div>');
@@ -790,17 +836,24 @@
      nothing to render before the first save (404). Both are answers the customer can
      act on, so they are read out of the response rather than dumped as raw JSON into
      a new tab — which is what a plain link to the endpoint would have done. */
-  function downloadPdf(btn) {
+  var DOWNLOADS = {
+    pdf: { path: '/pdf', label: 'PDF', fallback: 'capability-statement.pdf' },
+    docx: { path: '/docx', label: 'Word document', fallback: 'capability-statement.docx' }
+  };
+
+  function downloadExport(btn, kind) {
+    var spec = DOWNLOADS[kind];
+    if (!spec) return;
     var say = function (msg, ok) { localNote(btn, msg, ok); };
-    say('Building PDF…', true);
-    fetch(API + '/pdf', { credentials: 'include' })
+    say('Building ' + spec.label + '…', true);
+    fetch(API + spec.path, { credentials: 'include' })
       .then(function (r) {
         if (!r.ok) {
           return r.json().catch(function () { return null; }).then(function (b) {
-            throw new Error((b && b.error) || ('Could not build the PDF (HTTP ' + r.status + ')'));
+            throw new Error((b && b.error) || ('Could not build the ' + spec.label + ' (HTTP ' + r.status + ')'));
           });
         }
-        var name = 'capability-statement.pdf';
+        var name = spec.fallback;
         var cd = r.headers.get('content-disposition') || '';
         var m = cd.match(/filename="([^"]+)"/);
         if (m) name = m[1];
@@ -814,7 +867,7 @@
         setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
         say('✓ Downloaded ' + d.name, true);
       })
-      .catch(function (e) { say(e.message || 'Could not build the PDF', false); });
+      .catch(function (e) { say(e.message || ('Could not build the ' + spec.label), false); });
   }
 
   function copyStatement(where) {
@@ -902,6 +955,7 @@
            counting the rows it was given, which is what it did before. */
         PAST_TOTAL = typeof d.past_performance_total === 'number' ? d.past_performance_total : null;
         PAST_LIMIT = typeof d.past_performance_limit === 'number' ? d.past_performance_limit : null;
+        NAICS_TITLES = (d.naics_titles && typeof d.naics_titles === 'object') ? d.naics_titles : {};
         renderAll();
         document.body.classList.add('cs-ready');
         setLivePill(true);

@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase-server";
 import { PAST_PERFORMANCE_EXPORT_LIMIT } from "@/lib/capability-statement-limits";
 import { formatPhone } from "@/lib/capability-statement-format";
 import { sniffImageType } from "@/lib/capability-statement-logo";
+import { naicsLines } from "@/lib/capability-statement-naics";
 import { renderToBuffer, Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
 import React from "react";
 
@@ -39,6 +40,7 @@ const styles = StyleSheet.create({
   header: { borderBottom: "2pt solid #378ADD", paddingBottom: 14, marginBottom: 16, flexDirection: "row", justifyContent: "space-between" },
   brand: { fontSize: 20, fontWeight: 700, color: "#0f172a", marginTop: 3 },
   logo: { maxHeight: 44, maxWidth: 160, marginBottom: 8, objectFit: "contain" },
+  naicsEyebrow: { fontSize: 7, color: "#94a3b8", letterSpacing: 1.1, marginBottom: 1 },
   meta: { fontSize: 8, color: "#475569", textAlign: "right" },
   contactGrid: { flexDirection: "row", justifyContent: "space-between", marginBottom: 16 },
   contactCol: { flexDirection: "column", flexGrow: 1, flexBasis: 0 },
@@ -112,7 +114,21 @@ function CapDoc({ stmt, generatedAt, logo }: { stmt: CapStmt; generatedAt: strin
           <View style={styles.contactCol}>
             {stmt.uei && <Text style={styles.contactLine}>UEI · {stmt.uei}</Text>}
             {stmt.cage_code && <Text style={styles.contactLine}>CAGE · {stmt.cage_code}</Text>}
-            {naics.length > 0 && <Text style={styles.contactLine}>NAICS · {naics.join(", ")}</Text>}
+            {/* One line per code with its 13 CFR 121.201 title, primary marked — the
+                primary is the code the firm's size standard is judged against. An
+                unknown code prints alone rather than with a guessed title. */}
+            {naicsLines(naics).length > 0 ? (
+              <View style={{ marginBottom: 2 }}>
+                <Text style={styles.naicsEyebrow}>NAICS</Text>
+                {naicsLines(naics).map((l) => (
+                  <Text key={l.code} style={styles.contactLine}>
+                    <Text style={{ fontWeight: 700 }}>{l.code}</Text>
+                    {l.title ? `  ${l.title}` : ""}
+                    {l.primary ? "  (primary)" : ""}
+                  </Text>
+                ))}
+              </View>
+            ) : null}
           </View>
           <View style={styles.contactColRight}>
             {stmt.contact_name && <Text style={styles.contactLineRight}>{stmt.contact_name}</Text>}

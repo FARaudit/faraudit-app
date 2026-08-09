@@ -31,6 +31,7 @@
     "@tanstack/react-virtual": "^3.13.24",
     "@types/word-extractor": "^1.0.6",
     "clsx": "^2.1.1",
+    "docx": "^9.7.1",
     "exceljs": "^4.4.0",
     "googleapis": "^171.4.0",
     "lucide-react": "^1.11.0",

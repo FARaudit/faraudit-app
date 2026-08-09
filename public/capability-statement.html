@@ -457,12 +457,16 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
               Copy statement
             </button>
-            <button class="cta-secondary" id="csPdfExport" data-cs-pdf type="button">
+            <button class="cta-secondary" id="csPdfExport" data-cs-download="pdf" type="button">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
               Download PDF
             </button>
+            <button class="cta-secondary" id="csDocxExport" data-cs-download="docx" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l1.5 5L12 14l1.5 4L15 13"/></svg>
+              Download Word
+            </button>
           </div>
-          <p class="export-caption">Copy keeps its formatting in Word, Google Docs and email. Word export is not built yet.</p>
+          <p class="export-caption">Copy keeps its formatting when pasted into Word, Google Docs or an email. PDF and Word download as files.</p>
           <span class="cs-note" id="csNote" hidden></span>
         </div>
       </header>
