@@ -6,7 +6,6 @@
 
   async function wire() {
     try {
-      document.body.classList.add('is-loading');
       const res = await fetch('/api/profile', { credentials: 'include' });
       if (!res.ok) throw new Error('profile fetch failed: ' + res.status);
       const data = await res.json();
@@ -99,6 +98,7 @@
       // Plan scalars were assigned before the capability-statement read, above.
 
       window.PS.loadError = false;
+      window.PS.loaded = true;
       writeHeaderStats();
 
       if (window.PS_APP && typeof window.PS_APP.render === 'function') {
@@ -112,6 +112,7 @@
       // standing from before, and the header counters may not keep claiming a
       // total nobody could read.
       window.PS.loadError = true;
+      window.PS.loaded = true;
       window.PS.NAICS.length = 0;
       window.PS.CERTS.length = 0;
       window.PS.TEAM.length  = 0;
@@ -121,8 +122,6 @@
         window.PS_APP.render();
       }
       setLivePill(false);
-    } finally {
-      document.body.classList.remove('is-loading');
     }
   }
 

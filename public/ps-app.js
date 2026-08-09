@@ -21,8 +21,14 @@
   //
   // loadError is the third state: empty, failure and data are three different
   // answers and none may wear another's clothes.
+  //
+  // `loaded` is the FOURTH state: NOT YET KNOWN. The first paint happens before the
+  // account read answers, so every array here is empty while loadError is still
+  // false — indistinguishable from a genuinely empty account. Absence may only be
+  // asserted once the read has SETTLED.
   window.PS = window.PS || {
     loadError: false,
+    loaded: false,
     COMPANY: { name: '', cage: '', uei: '', address: '', contact: '', email: '', phone: '' },
     CERTS: [], NAICS: [], NOTIFS: [], TEAM: [], USAGE: []
   };
@@ -32,6 +38,16 @@
   const NOTIFS = window.PS.NOTIFS;
   const TEAM = window.PS.TEAM;
   const USAGE = window.PS.USAGE;
+
+  /* Has the account read SETTLED? Every statement about what this record does or does
+     not hold is conditioned on this. It is deliberately a positive test — `settled()`
+     is false until something says otherwise, so a new panel that forgets to ask still
+     renders the unknown state rather than inventing an empty one. */
+  function settled() { return !!window.PS.loaded; }
+  /* The unknown state. Not an error and not an empty result — the page simply does not
+     know yet, and says so in the same quiet register the header counters already use
+     (they ship a dash, which is why they never lied here and these rows did). */
+  function pending(what) { return `<span class="fld-none">${esc(what)}</span>`; }
 
   function tog(on) { return `<span class="tgl ${on ? 'on' : ''}"><i></i></span>`; }
   function field(label, val, ph) { return `<div class="fld"><label>${label}</label><input type="text" value="${val || ''}" placeholder="${ph || ''}"></div>`; }
@@ -131,6 +147,10 @@
       : st === 'verified'
         ? 'Your active SAM registration carries no SBA socioeconomic programs. Service-disabled and veteran-owned status is issued separately by VA VetCert and does not appear here.'
       : 'Not known — SAM could not be read just now, so this row is unanswered rather than empty.';
+    // A SIXTH CAUSE: the read has not finished. It falls through to the message above,
+    // which names SAM as the thing at fault — the honest direction, but the wrong
+    // reason, and a reason a customer may act on.
+    if (!st && !settled()) return pending('Reading your registration…');
     return `<span class="fld-none">${esc(msg)}</span>`;
   }
 
@@ -220,18 +240,25 @@
 
   function editable(id, label, val, ph) { return `<div class="fld"><label>${label}</label><input type="text" id="${id}" value="${esc(val)}" placeholder="${esc(ph)}"></div>`; }
   /* Read-only value. "Not on file" rather than an empty box, so nothing-on-file is visibly
-     different from a field you are meant to fill in. */
+     different from a field you are meant to fill in — but only once we know, since
+     before the read settles every value here is '' and would report itself absent. */
   function ro(label, val, note) {
-    return `<div class="fld"><label>${label}</label><div class="fld-ro">${val ? esc(val) : '<span class="fld-none">Not on file</span>'}</div>${note ? `<div class="fld-note">${esc(note)}</div>` : ''}</div>`;
+    const shown = val ? esc(val)
+      : settled() ? '<span class="fld-none">Not on file</span>'
+      : pending('…');
+    return `<div class="fld"><label>${label}</label><div class="fld-ro">${shown}</div>${note ? `<div class="fld-note">${esc(note)}</div>` : ''}</div>`;
   }
 
   /* Plan comes from the subscription record, and there are three answers, not two:
      a plan, no subscription, or a record that could not be read. An unreadable
-     billing record must never render as "no subscription". */
+     billing record must never render as "no subscription". Nor must an unfinished
+     one: before the read settles there is no plan_label and no plan_unreadable, and
+     a two-way test on those alone resolves to "no subscription" on every first paint. */
   function planName() {
     if (window.PS.plan_unreadable) return '<span class="fld-none">Could not be read</span>';
-    return window.PS.plan_label ? esc(window.PS.plan_label)
-      : '<span class="fld-none">No subscription on file</span>';
+    if (window.PS.plan_label) return esc(window.PS.plan_label);
+    return settled() ? '<span class="fld-none">No subscription on file</span>'
+                     : pending('Reading your plan…');
   }
   /* NO PRICE IS RENDERED. What a customer pays is agreed with their point of contact
      and is stored nowhere this page can read, so the page states that instead of a
@@ -279,8 +306,8 @@
           ${editable('psAddress', 'Business address', COMPANY.address, 'Street, city, state ZIP')}
         </div>
         <div class="fld-sec">NAICS codes</div>
-        <div class="cert-row">${NAICS.length ? NAICS.map(n => `<span class="cert-tg on">${esc(n.code || n.k || n)}</span>`).join('') : '<span class="fld-none">None on file</span>'}</div>
-        ${NAICS.length ? '' : '<div class="note note-warn">No NAICS codes on file, so Today, Opportunities, Contracting Officers and Teaming Partners have nothing to match against and will stay empty. Add them under NAICS Configuration.</div>'}
+        <div class="cert-row">${NAICS.length ? NAICS.map(n => `<span class="cert-tg on">${esc(n.code || n.k || n)}</span>`).join('') : settled() ? '<span class="fld-none">None on file</span>' : pending('Reading your record…')}</div>
+        ${NAICS.length || !settled() ? '' : '<div class="note note-warn">No NAICS codes on file, so Today, Opportunities, Contracting Officers and Teaming Partners have nothing to match against and will stay empty. Add them under NAICS Configuration.</div>'}
         <div class="fld-sec">Certifications on your capability statement</div>
         <div class="cert-row">${CERTS.length ? CERTS.map(c => certChip(c)).join('') : certEmpty()}</div>
         ${certCaption()}
@@ -310,7 +337,7 @@
         ${NAICS.length
           ? `<div class="naics-head"><span>Code</span><span>Description</span><span class="nh-r">Size standard</span><span></span></div>`
             + NAICS.map(n => naicsRow(n.code)).join('')
-          : '<div class="fld-none" style="padding:6px 2px 12px">No NAICS codes on file.</div>'}
+          : `<div class="fld-none" style="padding:6px 2px 12px">${settled() ? 'No NAICS codes on file.' : 'Reading your record…'}</div>`}
         ${(window.PS.NAICS_DERIVED || []).length ? `
         <div class="naics-sugg">
           <div class="ns-t">From contracts you have won — not saved to your profile yet</div>
@@ -374,11 +401,27 @@
         <div class="note"><b>Where these come from:</b> press <b>Track</b> on any notice in <a href="/opportunities">Opportunities</a>. From then on we re-check that notice against SAM every hour, and the moment its documents post we run the audit and tell you — by email, on the bell, or both, depending on the switches above. The weekly digest is the same activity gathered into one Monday summary.<br><br>A switch you have never touched is ON, and if we cannot read your preferences we deliver rather than go quiet — missing a solicitation costs more than one unwanted email.</div>
       </div>`,
 
-    team: () => `
+    /* A ROSTER WITH NOBODY ON IT IS AN ANSWER — a workspace whose own owner is not
+       listed, under a line stating it has a single account. There is no such thing
+       as a signed-in customer with an empty roster: either the read has not answered
+       yet, or it has and the account holder is in the list. The list itself therefore
+       decides all three states, and no branch can render an empty one. */
+    team: () => TEAM.length ? `
       <div class="sp-hd"><div class="sp-t">Team Members</div><div class="sp-s">Who can sign in to this workspace</div></div>
       <div class="sp-bd">
         ${TEAM.map(m => `<div class="tm-row"><div class="tm-av">${esc(String(m.name || '?').split(' ').map(w => w[0]).join(''))}</div><div class="tm-info"><div class="tm-name">${esc(m.name)}${m.you ? ' <span class="tm-you">You</span>' : ''}</div><div class="tm-email">${esc(m.email)}</div></div></div>`).join('')}
         <p class="ps-unwired">Inviting teammates is not built yet. This workspace has a single account, yours.</p>
+      </div>` : settled() ? `
+      <div class="sp-hd"><div class="sp-t">Team Members</div><div class="sp-s">Who can sign in to this workspace</div></div>
+      <div class="sp-bd">
+        <div class="ps-failed">
+          <div class="ps-failed-t">Who can sign in could not be loaded</div>
+          <div class="ps-failed-s">A connection problem, not an empty workspace — nothing has been lost and nothing has been changed. Reload to try again.</div>
+        </div>
+      </div>` : `
+      <div class="sp-hd"><div class="sp-t">Team Members</div><div class="sp-s">Who can sign in to this workspace</div></div>
+      <div class="sp-bd">
+        ${pending('Reading your workspace…')}
       </div>`,
 
     billing: () => `

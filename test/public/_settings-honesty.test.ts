@@ -12,6 +12,7 @@
 // no write path is a lie the moment a customer types in it.
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import vm from "node:vm";
 
 let pass = 0; let fail = 0;
 const check = (label: string, ok: boolean, detail = "") => {
@@ -436,6 +437,163 @@ console.log("\n── an unfilled chip may not promise a check that never runs �
       "clicking this tab throws PANELS[active] is not a function and the panel never changes");
   }
 }
+
+// NOTHING MAY BE ASSERTED ABOUT A RECORD THAT HAS NOT BEEN READ YET.
+// Measured live 2026-08-09 against production 763712b1: ps-app.js finishes at ~723ms and
+// /api/profile does not answer until ~1220-1573ms. For that window every array in
+// window.PS is empty while loadError is still false — byte for byte the shape of a real
+// empty account — so Settings told an account holding three NAICS codes that it had none,
+// and that Today, Opportunities, Contracting Officers and Teaming Partners "will stay
+// empty". It corrected itself when the fetch landed. It was wrong until then.
+//
+// The page had a mechanism for exactly this and the mechanism was inert:
+// profile-settings-live.js added `is-loading` to <body> and removed it again, and no CSS
+// rule for that class exists anywhere in the repo. A flag name is not a behaviour.
+//
+// This leg does not grep for guards — it RUNS the page. ps-app.js is executed in a vm
+// against a minimal DOM, every panel is opened through its own nav click handler, and the
+// emitted HTML is read back. A panel that states absence without asking first goes red
+// whether or not its author knew this rule existed.
+console.log("\n── no absence is claimed before the read settles ──");
+{
+  // Statements about what THIS ACCOUNT holds. Every one is false while the answer is
+  // still in flight. Copy about the PRODUCT — "usage metering is not built yet" — is
+  // true at any time and is deliberately absent from this list.
+  const RECORD_CLAIMS = [
+    "None on file",
+    "No NAICS codes on file",
+    "will stay empty",
+    "Not on file",
+    "No subscription on file",
+    "SAM could not be read just now",
+    "This workspace has a single account, yours",
+  ];
+
+  type State = Record<string, unknown>;
+
+  // Runs ps-app.js and returns the HTML each panel rendered, keyed by nav key.
+  // `source` is a parameter so the planted positive can run the SAME harness over a
+  // deliberately broken copy — a plant checked by a different code path proves nothing.
+  const renderPanels = (source: string, state: State): Record<string, string> => {
+    const written: Record<string, string> = {};
+    const navButtons: Record<string, { dataset: { k: string }; onclick: null | (() => void) }> = {};
+    const nodes: Record<string, Record<string, unknown>> = {};
+    const node = (id: string) => {
+      if (nodes[id]) return nodes[id];
+      const n: Record<string, unknown> = {
+        _html: "",
+        get innerHTML() { return this._html as string; },
+        set innerHTML(v: string) { this._html = v; written[id] = v; },
+        // renderNav re-reads its own markup to bind the clicks. Handing back real button
+        // stand-ins is what lets this test open a panel the way a customer does, rather
+        // than reaching past the handler into the template.
+        querySelectorAll(sel: string) {
+          if (sel !== ".sn") return [];
+          return [...String(this._html).matchAll(/data-k="([a-z]+)"/g)].map((m) => {
+            const b = { dataset: { k: m[1] }, onclick: null as null | (() => void) };
+            navButtons[m[1]] = b;
+            return b;
+          });
+        },
+        classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+        hidden: false, textContent: "", disabled: false, value: "",
+      };
+      nodes[id] = n;
+      return n;
+    };
+    const sandbox: Record<string, unknown> = {
+      console: { log() {}, error() {} },
+      setTimeout: () => 0,
+      fetch: () => Promise.reject(new Error("no network in this harness")),
+      document: {
+        readyState: "complete",
+        getElementById: (id: string) => node(id),
+        addEventListener() {},
+        body: { classList: { add() {}, remove() {} } },
+      },
+    };
+    sandbox.window = sandbox;
+    sandbox.PS = state;
+    vm.createContext(sandbox);
+    new vm.Script(source, { filename: "ps-app.js" }).runInContext(sandbox);
+
+    const out: Record<string, string> = {};
+    for (const [key, btn] of Object.entries(navButtons)) {
+      btn.onclick?.();
+      out[key] = written["setContent"] ?? "";
+    }
+    return out;
+  };
+
+  const inFlight = (): State => ({
+    loadError: false, loaded: false,
+    COMPANY: { name: "", cage: "", uei: "", address: "", contact: "", email: "", phone: "" },
+    CERTS: [], NAICS: [], NOTIFS: [], TEAM: [], USAGE: [],
+  });
+
+  // ── 1 · the harness has to be real before its silence means anything ──────────
+  const pending = renderPanels(app, inFlight());
+  const navKeys = [...appCode.matchAll(/\{\s*key:\s*['"]([a-z]+)['"]/g)].map((m) => m[1]);
+  check("the harness opened every nav panel", navKeys.length > 0 && navKeys.every((k) => k in pending),
+    `opened [${Object.keys(pending).join(", ")}] · nav declares [${navKeys.join(", ")}]`);
+  check("...and every panel rendered something", Object.values(pending).every((h) => h.length > 40),
+    "a panel came back empty — these checks would pass on a blank page");
+
+  // ── 2 · in flight, no panel states what the record holds ──────────────────────
+  for (const key of Object.keys(pending)) {
+    const said = RECORD_CLAIMS.filter((c) => pending[key].includes(c));
+    check(`'${key}' claims nothing about the record before the read settles`, said.length === 0,
+      `renders ${said.map((s) => JSON.stringify(s)).join(", ")} while the answer is still in flight`);
+  }
+
+  // ── 3 · NEGATIVE CONTROL — the real zero must still speak ─────────────────────
+  // A guard that silences the genuine empty state is the same defect facing the other
+  // way. A customer who truly holds no NAICS codes must still be told so, and told what
+  // it costs. This is what stops the fix from being "hide it and pass".
+  const settledEmpty = renderPanels(app, { ...inFlight(), loaded: true });
+  check("N1 · a settled empty record still says 'None on file'",
+    settledEmpty.company.includes("None on file"),
+    "the guard swallowed the real empty state — a genuine zero is now invisible");
+  check("N2 · ...and still states what an empty NAICS list costs",
+    settledEmpty.company.includes("will stay empty"),
+    "the consequence of holding no codes is no longer stated");
+  check("N3 · ...and the NAICS panel still reports the zero",
+    settledEmpty.naics.includes("No NAICS codes on file"),
+    "the panel went quiet on a real empty list");
+  check("N4 · ...and Billing still reports no subscription",
+    settledEmpty.billing.includes("No subscription on file"),
+    "an account with no plan is no longer told so");
+
+  // ── 4 · a failed read renders as a failure on every record-bearing panel ──────
+  const failed = renderPanels(app, { ...inFlight(), loaded: true, loadError: true });
+  for (const key of ["company", "naics", "team"]) {
+    check(`F · '${key}' renders a failure, not an empty answer, when the read failed`,
+      failed[key].includes("could not be loaded"),
+      "a connection failure is being shown to the customer as their own empty record");
+  }
+
+  // ── 5 · PLANTED POSITIVE — this leg must be able to go red ────────────────────
+  // The guards are removed from a copy of the source and the SAME harness re-run. If it
+  // comes back clean, everything above is decoration.
+  const unguarded = app
+    .replace("settled() ? '<span class=\"fld-none\">None on file</span>' : pending('Reading your record…')",
+             "'<span class=\"fld-none\">None on file</span>'")
+    .replace("${NAICS.length || !settled() ? '' :", "${NAICS.length ? '' :");
+  check("PL1 · the plant actually removed both guards", unguarded !== app
+    && !unguarded.includes("NAICS.length || !settled()"),
+    "the guard text was not found — this planted positive is inert and proves nothing");
+  const plantedOut = renderPanels(unguarded, inFlight());
+  check("PL2 · without the guards the harness DOES see the claims",
+    plantedOut.company.includes("None on file") && plantedOut.company.includes("will stay empty"),
+    "the harness cannot see the defect it exists to catch — check 2 is passing for the wrong reason");
+
+  // ── 6 · the inert mechanism must not come back ────────────────────────────────
+  const anyStylesheetReads = /\.is-loading\b/.test(html);
+  check("no body class stands in for the loaded state unless something styles it",
+    !/is-loading/.test(liveCode) || anyStylesheetReads,
+    "profile-settings-live.js toggles `is-loading` and no stylesheet reads it — an inert guard");
+}
+
 
 console.log("\n── planted positives ──");
 check("P5 · rejects a panel that names no origin",
