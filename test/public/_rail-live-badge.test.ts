@@ -780,6 +780,21 @@ console.log("\n── Part S · the badge script reaches every injected route �
     }
     check("no served page hardcodes a rail badge",
       offenders.length === 0, offenders.join(", "));
+
+    // Same class, worse blast radius: the topbar chip shipped "Jose Rodriguez" / "JR" on
+    // 15 pages. rail.ts hydrates it from /api/profile and its own comment says "never
+    // hardcoded" — but it bails on `if(!p)return`, so a customer whose profile read failed
+    // kept the CEO's name on screen. The rail's own markup ships EMPTY and lets hydration
+    // fill it; the topbar now matches.
+    const idOffenders: string[] = [];
+    for (const f of files) {
+      const html = readFileSync(join(ROOT, "public", f), "utf8");
+      const named = [...html.matchAll(/<div class="(nm|av)">([^<]+)<\/div>/g)].map((m) => `${m[1]}=${m[2].trim()}`);
+      if (named.length) idOffenders.push(`${f}: ${named.join(", ")}`);
+    }
+    check("no served page hardcodes a user identity", idOffenders.length === 0, idOffenders.join(" · "));
+    check("S-P5 · that check can see a planted name",
+      /<div class="nm">([^<]+)<\/div>/.test('<div class="nm">Jose Rodriguez</div>'));
     check("S-P4 · that check can see a planted badge",
       /sb-badge/.test('<aside class="sidebar"><a><span class="sb-badge count">8</span></a></aside>'));
   }
