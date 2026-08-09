@@ -258,6 +258,10 @@ details[open]>summary .chev{transform:rotate(180deg)}
 .nt-ri-n{flex:none;width:38px;font-size:11px;font-weight:600;color:var(--mute)}
 .nt-ri-l{flex:1;min-width:0;font-size:12.5px;font-weight:600;line-height:1.38}
 .nt-ri.scope .nt-ri-l{font-weight:700;color:var(--ink)}
+/* "My codes" is the customer's own set and "All codes" is the regulation's — the same
+   control, two different questions. They were flush against each other and read as one
+   list; this breaks them apart without inventing a heading for a group of two. */
+.nt-ri.scope[data-scope="mine"]{margin-bottom:14px}
 .nt-ri-c{flex:none;font-size:11px;font-weight:700;color:var(--mute)}
 .nt-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);flex:none;align-self:center;position:relative}
 /* The ring is a SEPARATE element from the dot, so the dot itself never dims — a dot that
@@ -361,7 +365,15 @@ html[data-theme="dark"] .nt-chip{color:var(--ink-2)}
    between them instead of leaving a fourth column of air. The count sets the columns. */
 .nt-pin-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(292px,1fr));gap:11px}
 .nt-pin-g.mine-cards{padding:15px 18px 20px}
-.pc{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:11px;padding:13px 15px 15px;min-width:0;display:flex;flex-direction:column}
+/* SUBGRID, so the cards align at every width rather than at the one I measured.
+   Reserving two lines for the title fixed 1835px and nothing else: at 1700 and 1440 the
+   TERM CHIPS wrap to a second row on some cards and not others, and at 1600 and below the
+   longest title needs a THIRD line. Two independent causes, both width-dependent, so no
+   fixed min-height can hold them. Each card subscribes to the grid's rows instead, and
+   every band — title, size standard, terms, note — takes the height of the tallest card
+   in that row. Below ~880px the grid drops to fewer columns and the cards stack, where
+   aligning across bands is not a thing to want. */
+.pc{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:11px;padding:13px 15px 15px;min-width:0;display:grid;grid-template-rows:subgrid;grid-row:span 5;align-content:start}
 .pc-h{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:7px}
 .pc-code{font-size:16px;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
 .pc-cat{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:var(--mute);white-space:nowrap}
