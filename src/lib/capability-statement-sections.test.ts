@@ -7,7 +7,7 @@
 // collapse: NULL is not [], a legacy line is a head and NOT an invented card, and the caps are
 // enforced by refusing rather than by trimming.
 import {
-  resolveCompetencies, resolveDifferentiators, refusalsFor,
+  resolveCompetencies, resolveDifferentiators, refusalsFor, sentencesIn,
   COMPETENCY_COUNT, DIFFERENTIATOR_MAX
 } from "./capability-statement-sections";
 
@@ -104,6 +104,60 @@ assert(refusalsFor({ core_competencies: "one\ntwo\nthree" }).length === 0,
   "a legacy profile with three lines builds — the cap reads resolved items, not the column type");
 assert(refusalsFor({ core_competencies: "one\ntwo" }).length === 1,
   "a legacy profile with two lines refuses, exactly as a structured one would");
+
+// ── 7 · PROSE THAT WAS NEVER SPLIT ──────────────────────────────────────────
+// The legacy columns split on NEWLINES, so a customer who typed sentences on ONE line has one
+// item whose head is a paragraph. Competencies caught it by accident (the count is exact);
+// differentiators had only a ceiling, so a run-on paragraph built clean and downloaded.
+
+// TRANSCRIBED FROM THE LIVE RECORD 2026-08-10 — the sheet Design read at 01f9036e. This is the
+// document that carried a test string to a rendered capability statement, and it is the reason
+// this check exists. It must refuse.
+const liveRecord = "FARaudit-powered compliance intelligence on every bid. Zero DFARS violations in 12 years. Average 4-day quote turnaround on LPTA solicitations. TEST WRITE UP";
+assert(sentencesIn(liveRecord) === 4, `the live differentiators field runs 4 sentences on one line (read ${sentencesIn(liveRecord)})`);
+assert(resolveDifferentiators({ differentiators: liveRecord }).items.length === 1,
+  "…and resolves to ONE item, because there is no newline to split on");
+// Indexed reads go through `first`, because an assertion that THROWS on the empty array is a
+// gate that crashes rather than one that fails: the run stops at the first missing element and
+// every assertion below it is never reached, so a sabotage pass reports one red and hides the
+// rest. Proven by breaking this check — it surfaced exactly one failure until this was added.
+const first = (r: ReturnType<typeof refusalsFor>) => r[0] ?? { field: "", count: -1, kind: "", message: "" };
+
+const live = refusalsFor({ core_competencies_json: [{ h: "a" }, { h: "b" }, { h: "c" }], differentiators: liveRecord });
+assert(live.length === 1 && first(live).field === "differentiators" && first(live).kind === "prose",
+  "the live record REFUSES — before this check it built clean and shipped TEST WRITE UP");
+assert(/own line/.test(first(live).message), "…and the message says what to do about it");
+
+// NEGATIVE CONTROLS. A gate that only ever fires is as useless as one that never does, and this
+// one BLOCKS a customer's export — a wrong refusal costs more than a missed paragraph.
+assert(sentencesIn("Zero DFARS violations in 12 years.") === 1, "a single sentence with a trailing period is ONE");
+assert(sentencesIn("Cleared work for U.S. Air Force sustainment commands") === 1,
+  "an abbreviation is not a boundary — the character before the period is uppercase");
+assert(sentencesIn("Average 4.5-day quote turnaround") === 1, "a decimal is not a boundary — no whitespace follows");
+assert(sentencesIn("Small lots accepted (10 ea.) as standard") === 1, "a parenthetical abbreviation is not a boundary");
+assert(refusalsFor({
+  core_competencies: "Precision machining\nSustainment spares\nReverse engineering",
+  differentiators: "Quotes inside a short RFQ window\nInspection kept under our roof"
+}).length === 0, "a properly split legacy profile builds clean — the check reads shape, not the column type");
+assert(refusalsFor({
+  core_competencies_json: [{ h: "a" }, { h: "b" }, { h: "c" }],
+  differentiators_json: [{ h: "Quotes fast. Inspection in-house.", b: "Two sentences a human typed as a head." }]
+}).length === 0, "a STRUCTURED head is exempt — it was authored as a head, not made one by a newline");
+assert(refusalsFor({ core_competencies_json: [{ h: "a" }, { h: "b" }, { h: "c" }], differentiators: "One good claim" }).length === 0,
+  "ONE differentiator is legitimate and must NOT refuse — this is why the floor is shape, not count");
+
+// THE KNOWN MISS, asserted so it stays visible rather than being discovered as a surprise.
+assert(sentencesIn("fast quotes. always on time.") === 1,
+  "a lowercase continuation reads as one sentence — the gate fails toward LETTING THE DOCUMENT BUILD, deliberately");
+
+// SUPERSESSION. "Add 2 more" is wrong advice to someone holding one four-sentence paragraph:
+// until the entries are separated the count is not knowable.
+const blob = refusalsFor({ core_competencies: liveRecord });
+assert(blob.length === 1 && first(blob).kind === "prose",
+  "unsplit prose reports ONCE, as prose — the count refusal it would otherwise trigger is superseded");
+assert(!/Add 2 more/.test(first(blob).message), "…and does not tell the customer to add items it cannot yet count");
+assert(first(refusalsFor({ core_competencies: "one\ntwo" })).kind === "count",
+  "a genuinely short SPLIT profile still gets the count refusal — supersession is scoped to unsplit prose");
 
 console.log(`\n${failures === 0 ? "✅ ALL GREEN" : `❌ ${failures} FAILURE(S)`}`);
 process.exit(failures === 0 ? 0 : 1);
