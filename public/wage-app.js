@@ -186,11 +186,17 @@
       const row = h('div', { cls: 'wage-row' + (S.sel === rowId(r) ? ' sel' : '') }, [
         h('div', { cls: 'wr-cat' }, [
           h('div', { cls: 'wr-name', text: r.category }),
-          h('div', { cls: 'wr-src', text: r.source || 'source not recorded' })
+          /* The source line is the same 50 times out of 55, so the row says what this
+             number IS instead — which of the two it is reading. */
+          h('div', { cls: 'wr-src', text: awardedLabel(r) })
         ]),
         h('div', { cls: 'wr-codes mono', text: (r.naics_codes || []).join(' · ') || '—' }),
         h('div', { cls: 'wr-rate mono', text: money(r.rate_low) }),
-        h('div', { cls: 'wr-rate wr-med mono', text: money(r.rate_median) }),
+        /* THE HEADLINE IS WHAT WAS AWARDED. A band from national medians is where to start;
+           what schedule holders actually won on federal contracts is what a subcontractor
+           prices against. The reference median stays beside it as context, never replaced by
+           it — a row with no awarded rate shows the reference and says which one it is. */
+        h('div', { cls: 'wr-rate wr-med mono', text: headlineRate(r) }),
         h('div', { cls: 'wr-rate mono', text: money(r.rate_high) })
       ]);
       row.addEventListener('click', () => {
@@ -214,6 +220,20 @@
   }
 
   /* ── detail panel ───────────────────────────────────────────────────── */
+
+  /* WHICH NUMBER THIS ROW IS SHOWING, said on the row itself. Three states and they are not
+     interchangeable: an awarded median, a category CALC+ does not index, and one the lookup did
+     not get to. Collapsing the last two tells a customer their role has no market when the only
+     thing that happened is that we ran out of time to ask. */
+  function headlineRate(r) {
+    return r.awarded && r.awarded.median != null ? money(r.awarded.median) : money(r.rate_median);
+  }
+  function awardedLabel(r) {
+    if (r.awarded && r.awarded.median != null) return 'Awarded median · ' + r.awarded.count + ' rates';
+    if (r.awarded_state === 'none') return 'Reference — not indexed by CALC+';
+    if (r.awarded_state === 'unresolved') return 'Reference — awarded rate not checked';
+    return r.source || 'source not recorded';
+  }
 
   function renderPanel() {
     const host = $('wagePanel');

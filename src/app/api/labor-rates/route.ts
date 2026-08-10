@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
-import { calcRateStats } from "@/lib/calc-rates";
+import { calcRateStats, calcRateStatsBulk } from "@/lib/calc-rates";
 import { resolveFeedScope } from "@/lib/bd-os/live-opportunities";
 import { CATEGORY_SPEC } from "@/lib/labor-category-spec";
 
@@ -162,6 +162,21 @@ export async function GET(req: NextRequest) {
   // The page needs the customer's own codes to offer them as filters, and it
   // must be able to tell "nothing matches this filter" from "the reference is
   // empty". Both travel with the rows rather than being guessed client-side.
+  // AWARDED RATES ON EVERY VISIBLE ROW — CEO ruling 2026-08-10: what schedule holders have
+  // actually won is the headline, and the BLS band is the context around it. Asked only for the
+  // rows that survive the filters, so a customer scoped to their own codes pays for those alone.
+  //
+  // Three outcomes per row, kept apart: an awarded median, "CALC+ does not index this category",
+  // and "not resolved in the time available". The third is not the second.
+  const awarded = await calcRateStatsBulk(merged.map((r) => r.category));
+  const priced = merged.map((r) => {
+    if (!awarded.has(r.category)) return { ...r, awarded: null, awarded_state: "unresolved" as const };
+    const a = awarded.get(r.category);
+    return a && a.median != null
+      ? { ...r, awarded: { median: a.median, min: a.min, max: a.max, count: a.count }, awarded_state: "found" as const }
+      : { ...r, awarded: null, awarded_state: "none" as const };
+  });
+
   const scope = await resolveFeedScope(supabase);
 
   // HONEST-FAIL, not a silent blank. Three outcomes are distinct on screen: rates found, the
@@ -188,17 +203,19 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
-    rates: merged,
+    rates: priced,
     compare: compareOut,
     scope: { codes: scope.codes, source: scope.source },
     meta: {
       source: "bls-sca-reference",
       curated: merged.filter((r) => r.curated).length,
+      awarded_found: priced.filter((r) => r.awarded_state === "found").length,
+      awarded_unresolved: priced.filter((r) => r.awarded_state === "unresolved").length,
       live_awarded: wageRows.length,
       naics: naics || null,
       state: state || null,
       query: search || null,
-      reason: merged.length === 0 ? (search || naics ? "no-match" : "reference-empty") : null
+      reason: priced.length === 0 ? (search || naics ? "no-match" : "reference-empty") : null
     }
   });
 }

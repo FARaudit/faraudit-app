@@ -224,6 +224,56 @@ ok(!SILENT_CATCH.test("catch (e) { return { state: 'error' }; }"),
     "the check cannot see the shape it forbids");
 }
 
+// ── THE HEADLINE IS WHAT WAS AWARDED ────────────────────────────────────────
+// CEO ruling 2026-08-10: a band from national BLS medians is where to start; what schedule
+// holders actually won on federal contracts is what a subcontractor prices against. Measured
+// while building: the reference is off by -$43.74 on Program Manager II and +$14.85 on Quality
+// Engineer against awarded medians over 200 and 104 rates.
+{
+  const wapp2 = read("wage-app.js");
+  const whtml = read("wage-benchmarks.html");
+  const route2 = readFileSync(path.join(PUB, "..", "src", "app", "api", "labor-rates", "route.ts"), "utf8");
+  const calc = readFileSync(path.join(PUB, "..", "src", "lib", "calc-rates.ts"), "utf8");
+
+  ok(/function headlineRate\(r\)/.test(wapp2) && /r\.awarded\.median != null \? money\(r\.awarded\.median\)/.test(wapp2),
+    "the row leads with the awarded median when there is one");
+  ok(/: money\(r\.rate_median\);/.test(wapp2),
+    "a row with no awarded rate still shows the reference rather than a blank");
+  ok(/Awarded median · ' \+ r\.awarded\.count \+ ' rates/.test(wapp2),
+    "the row says how many awarded rates the median came from",
+    "a median over 2 awards reads identically to one over 200");
+  ok(/not indexed by CALC\+/.test(wapp2) && /awarded rate not checked/.test(wapp2),
+    "NOT INDEXED and NOT CHECKED are different sentences on the row",
+    "a category we ran out of time to ask about would read as having no market");
+  ok(/Ref low/.test(whtml) && /Ref high/.test(whtml) && !/<span>Median<\/span>/.test(whtml),
+    "the column headers say which number is which");
+  ok(/actually been awarded/.test(whtml),
+    "the page still describes itself as a reference band");
+
+  // The route must ask for every visible row, and keep the three states apart.
+  ok(/calcRateStatsBulk\(merged\.map\(\(r\) => r\.category\)\)/.test(route2),
+    "awarded rates are fetched for every row that survives the filters");
+  ok(/awarded_state: "unresolved"/.test(route2) && /awarded_state: "none"/.test(route2) && /awarded_state: "found"/.test(route2),
+    "the route keeps found, not-indexed and unresolved apart");
+  ok(/!awarded\.has\(r\.category\)/.test(route2),
+    "a category absent from the result is UNRESOLVED, not unindexed",
+    "a missing key would be read as 'CALC+ has no rate', which is a different fact");
+
+  // Bulk lookup: cached, bounded, and it must not hang the page.
+  ok(/RATE_TTL_MS = 6 \* 3600_000/.test(calc), "the awarded-rate cache has a stated TTL");
+  ok(/if \(Date\.now\(\) >= deadline\) break;/.test(calc),
+    "the bulk lookup stops at its deadline",
+    "55 categories measured at 5.8s — without a deadline a slow upstream is a hung page");
+  ok(/catch \{\s*\/\/ Not cached/.test(calc),
+    "a transient failure is not cached as a verdict",
+    "one bad response would pin 'unknown' on a category for six hours");
+  ok(/export function __resetRateCache/.test(calc),
+    "the process-global cache has a test seam");
+
+  ok(/function headlineRate/.test("function headlineRate(r) { return money(r.rate_median); }"),
+    "P· the headline check can see a reference-only implementation");
+}
+
 console.log(`\n══════ ${pass} passed · ${fail} failed ══════`);
 if (fail > 0) {
   console.error("\nCMMC+WAGE TRUTH GATE FAILED — a page can show something no writer produces.");
