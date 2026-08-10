@@ -206,8 +206,11 @@ check("P4 · the fillability check names a field with no editor", !new Set(["com
   check("it is a real dialog — labelled, escapable, focus-trapped",
     /aria-modal/.test(live) && /e\.key === 'Escape'/.test(live) && /e\.key === 'Tab'/.test(live),
     "keyboard users cannot leave it and screen readers cannot name it");
+  // The comparison moved per-part when the point of contact became a grouped editor. The rule
+  // is unchanged — an untouched value is never written back — so the anchor moves with it.
   check("an unchanged value does not claim a save",
-    /next === current\.trim\(\)/.test(live), "closing without editing reports a write that never happened");
+    /next === inputs\[i\]\.was\.trim\(\)/.test(live) && /if \(!changed\) return;/.test(live),
+    "closing without editing reports a write that never happened");
   check("the hint is not set in --mute-2", !/\.fe-hint\{[^}]*--mute-2/.test(html),
     "--mute-2 is not a text token at any size (2.56:1)");
   check("P6 · the prompt check can see the old shape", /window\.prompt\(/.test("var next = window.prompt('Edit ' + label, current);"));
@@ -294,7 +297,7 @@ console.log("\n── a contact row names its own field ──");
 {
   const fields = (live.match(/var CONTACT_FIELDS\s*=\s*\[([^\]]*)\]/)?.[1] ?? "")
     .split(",").map((s) => s.trim().replace(/^['"]|['"]$/g, "")).filter(Boolean);
-  check("the painted field list is readable", fields.length === 6, `parsed ${fields.length}`);
+  check("the painted field list is readable", fields.length === 5, `parsed ${fields.length}`);
 
   const strip = html.slice(html.indexOf('<div class="contact-strip">'), html.indexOf("</article>"));
   const authored = [...strip.matchAll(/data-cs-contact="([^"]+)"/g)].map((m) => m[1]);
@@ -333,7 +336,7 @@ console.log("\n── the contact strip is laid out in columns ──");
   // Every cell is placed BY FIELD. Auto-flow would put the phone wherever the markup
   // happens to sit, and markup order on this strip is already load-bearing for which
   // record column an edit writes to — layout must not add a second reason to care.
-  for (const [field, col] of [["contact_name", "1"], ["contact_title", "1"], ["contact_email", "1"], ["contact_phone", "1"],
+  for (const [field, col] of [["contact_name", "1"], ["contact_email", "1"], ["contact_phone", "1"],
                               ["contact_address", "2"], ["contact_website", "2"]] as const) {
     check(`${field} is placed in column ${col}`,
       new RegExp(`\\.contact-item\\[data-cs-contact="${field}"\\]\\{grid-column:${col};grid-row:\\d`).test(html),
@@ -934,12 +937,19 @@ console.log("\n── every field the plate reads can be written ──");
   check("the page's own scripts were discovered", pageScripts.length >= 2,
     `found ${pageScripts.length} script(s) — the <script src> pattern may be stale`);
   const allScripts = [live, ...pageScripts].join("\n");
+  // FIELD_LABELS IS DELIBERATELY NOT A SOURCE HERE. It is a label map, not a control — a field
+  // can sit in it and be reachable from nowhere, which is exactly the state contact_title was in.
+  // Counting it made the leg answer "is this field NAMED", when the question is "can a customer
+  // produce one". Proven by deleting the grouped editor: the leg stayed green off the label alone.
   const typeable = new Set([
-    ...[...allScripts.matchAll(/FIELD_LABELS = \{([\s\S]*?)\};/g)].flatMap((m) => [...m[1].matchAll(/(\w+):/g)].map((x) => x[1])),
+    ...[...html.matchAll(/data-cs-field="(\w+)"/g)].map((m) => m[1]),
     ...[...allScripts.matchAll(/CONTACT_FIELDS = \[([^\]]+)\]/g)].flatMap((m) => [...m[1].matchAll(/'(\w+)'/g)].map((x) => x[1])),
     ...[...allScripts.matchAll(/STRUCTURED = \{([\s\S]*?)\n  \};/g)].flatMap((m) => [...m[1].matchAll(/json: '(\w+)'/g)].map((x) => x[1])),
     // A literal PATCH body is a control too — that is the shape uei-editor.js writes through.
     ...[...allScripts.matchAll(/JSON\.stringify\(\{\s*(\w+):/g)].map((m) => m[1]),
+    // A grouped editor names its parts; contact_title has no cell of its own and is reached
+    // only this way, so a set that could not see a group would report it unfillable.
+    ...[...allScripts.matchAll(/\{ field: '(\w+)',\s*label:/g)].map((m) => m[1]),
   ]);
   // Derived, not typed — each names WHAT fills it, so nothing is waved through by silence.
   const DERIVED: Record<string, string> = {
@@ -964,6 +974,51 @@ console.log("\n── every field the plate reads can be written ──");
   check("P· the fillability check can see a field with no control",
     !new Set(["contact_name"]).has("contact_fax"),
     "the third leg cannot fail, so it proves nothing");
+}
+
+// ── the title is part of the point of contact, not a row of its own ─────────
+// CEO ruling 2026-08-10, on seeing it shipped as a sixth cell: the plate and the pasted copy both
+// print "Name, Title" as ONE value, so a strip that breaks them into two rows shows the customer a
+// shape their own document does not have. One cell, one dialog, two inputs.
+console.log("\n── the point of contact carries its title ──");
+{
+  const stripHtml = html.slice(html.indexOf('<div class="contact-strip">'), html.indexOf("</article>"));
+  check("the title has no row of its own", !/data-cs-contact="contact_title"/.test(stripHtml),
+    "a second row for a value the document prints on one line");
+  check("the name cell renders the title beside the name",
+    /field === 'contact_name' && has\(v\) && has\(REC\.contact_title\)/.test(live),
+    "the strip shows a bare name while the document it previews shows a title");
+  check("the comma belongs to the title", /'ct', ', ' \+ REC\.contact_title/.test(live),
+    "a record with no title prints a trailing comma, which reads as a dropped word");
+
+  // ONE PROMPT — the page is what joins them, so it is what asks for them.
+  const specSrc = live.slice(live.indexOf("var FIELD_SPEC"), live.indexOf("var feScrim"));
+  // WORD-ANCHORED. Written first as /group: \[/, which also matches `nogroup: [` — the sabotage
+  // that renamed the key exited 0 and the check never noticed the group was gone.
+  check("the point of contact opens a grouped editor", /\bgroup: \[/.test(specSrc),
+    "the title is reachable only from a control the customer has to find separately");
+  check("the group asks for both parts",
+    /field: 'contact_name'/.test(specSrc) && /field: 'contact_title'/.test(specSrc),
+    "the grouped dialog does not name both parts");
+  check("the title is not separately clickable", !/data-cs-field="contact_title"/.test(html),
+    "two ways in for one value");
+
+  const editorSrc = live.slice(live.indexOf("function openEditor(field)"), live.indexOf("document.addEventListener('click'"));
+  check("the editor source was sliced, not empty", editorSrc.length > 400,
+    `sliced ${editorSrc.length} chars — the markers are out of order and every check below is vacuous`);
+  check("a grouped editor builds one input per part", /parts\.length/.test(editorSrc),
+    "the dialog renders a single box for a multi-part value");
+  check("each input is prefilled from its own field", /REC\[part\.field\]/.test(editorSrc),
+    "a part opens empty, so saving would clear a value the customer never touched");
+  check("only changed parts are sent", /next === inputs\[i\]\.was\.trim\(\)/.test(editorSrc),
+    "an untouched field is written back, claiming a save that changed nothing");
+  check("an unchanged dialog does not claim a save", /if \(!changed\) return;/.test(editorSrc),
+    "closing a grouped editor with no edits reports a write that never happened");
+  check("the single-field path still exists", /spec\.group \|\| \[\{ field: field/.test(editorSrc),
+    "the ungrouped path changed shape along with the grouped one");
+
+  check("P· the row check can see the shape it forbids",
+    /data-cs-contact="contact_title"/.test('<div class="contact-item" data-cs-contact="contact_title">'));
 }
 
 // ── the page after a save is the page after a load ──────────────────────────

@@ -231,9 +231,11 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
    is placed BY FIELD, not by source order — the markup order is already load-bearing for
    which record column an edit writes to, and nothing about layout may depend on it. */
 .contact-item[data-cs-contact="contact_name"]{grid-column:1;grid-row:1}
-.contact-item[data-cs-contact="contact_title"]{grid-column:1;grid-row:2}
-.contact-item[data-cs-contact="contact_email"]{grid-column:1;grid-row:3}
-.contact-item[data-cs-contact="contact_phone"]{grid-column:1;grid-row:4}
+.contact-item[data-cs-contact="contact_email"]{grid-column:1;grid-row:2}
+.contact-item[data-cs-contact="contact_phone"]{grid-column:1;grid-row:3}
+/* The title prints beside the name because the document prints them as one value. It is a
+   qualifier on the same entity, which is the only construction a sub-position is allowed. */
+.contact-item .ct{color:var(--mute)}
 .contact-item[data-cs-contact="contact_address"]{grid-column:2;grid-row:1}
 .contact-item[data-cs-contact="contact_website"]{grid-column:2;grid-row:2}
 
@@ -364,6 +366,10 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
 .fe-title{font-size:17px;font-weight:800;letter-spacing:-.014em;color:var(--ink);margin:0}
 .fe-help{font-size:12.5px;line-height:1.55;color:var(--ink-2);margin:7px 0 0;text-wrap:pretty}
 .fe-body{padding:16px 22px 4px;overflow-y:auto}
+/* A grouped dialog labels each part; the parts below the first need air above them. */
+.fe-label{display:block;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--mute);margin:0 0 6px}
+.fe-body .fe-help + .fe-label{margin-top:16px}
 .fe-input,.fe-area{width:100%;box-sizing:border-box;font-family:Manrope,system-ui,sans-serif;font-size:14px;
   line-height:1.6;color:var(--ink);background:var(--card-soft);border:1px solid var(--line);
   border-radius:9px;padding:11px 13px;outline:none;transition:border-color .14s,box-shadow .14s}
@@ -567,10 +573,6 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
             <div class="contact-item" data-cs-contact="contact_name">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>
               <div class="ci"><div class="ck">Point of Contact</div><div class="cv"></div></div>
-            </div>
-            <div class="contact-item" data-cs-contact="contact_title">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2"/></svg>
-              <div class="ci"><div class="ck">Title</div><div class="cv"></div></div>
             </div>
             <div class="contact-item" data-cs-contact="contact_email">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
