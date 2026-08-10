@@ -16,7 +16,7 @@
 (function () {
   'use strict';
 
-  const S = { naics: 'all', q: '', sel: null, sort: 'category' };
+  const S = { naics: 'all', q: '', sel: null, sort: 'category', compare: null };
   const $ = (id) => document.getElementById(id);
 
   function h(tag, opts, children) {
@@ -193,7 +193,22 @@
         h('div', { cls: 'wr-rate wr-med mono', text: money(r.rate_median) }),
         h('div', { cls: 'wr-rate mono', text: money(r.rate_high) })
       ]);
-      row.addEventListener('click', () => { S.sel = rowId(r); renderList(); renderPanel(); });
+      row.addEventListener('click', () => {
+        S.sel = rowId(r);
+        /* The comparison belongs to the row that asked for it. Without clearing it, a fast
+           click to a second category paints the first category's awarded rates under the
+           second one's name — which is worse than showing nothing. */
+        S.compare = null;
+        renderList(); renderPanel();
+        if (typeof window.WAGE_COMPARE === 'function') {
+          const asked = rowId(r);
+          window.WAGE_COMPARE(r.category).then((c) => {
+            if (S.sel !== asked) return;   // selection moved on; this answer is stale
+            S.compare = c;
+            renderPanel();
+          });
+        }
+      });
       return row;
     }));
   }
@@ -213,12 +228,25 @@
       return;
     }
 
-    const band = h('div', { style: 'display:flex;flex-direction:column;gap:9px;margin-top:4px' }, [
-      ['Low', r.rate_low], ['Median', r.rate_median], ['High', r.rate_high]
-    ].map(([label, v]) => h('div', { style: 'display:flex;justify-content:space-between;gap:12px' }, [
-      h('span', { text: label, style: 'font-size:12px;color:var(--mute)' }),
-      h('span', { cls: 'mono', text: money(v), style: 'font-size:13px;font-weight:800;color:var(--ink)' })
-    ])));
+    /* THE PANEL SAYS WHAT THE ROW CANNOT. The row already prints low, median and high, so
+       repeating them here spends the whole panel restating the line the customer just read.
+       What it adds instead: what the category IS, what it takes to fill it, and what primes
+       have actually been awarded for it. */
+    const rows = (pairs) => h('div', { style: 'display:flex;flex-direction:column;gap:7px;margin-top:5px' },
+      pairs.map(([label, v, strong]) => h('div', { style: 'display:flex;justify-content:space-between;gap:12px' }, [
+        h('span', { text: label, style: 'font-size:12px;color:var(--mute)' }),
+        h('span', { cls: 'mono', text: v, style: 'font-size:13px;font-weight:' + (strong ? '800' : '600') + ';color:var(--ink)' })
+      ])));
+
+    const spec = r.spec || null;
+    const cmp = S.compare && S.compare.category === r.category ? S.compare : null;
+
+    /* WHERE IT CAME FROM, ONLY WHEN IT DIFFERS. 50 of the 55 reference rows carry the same
+       source string, so printing it on every panel is a line the reader learns to skip. It is
+       stated once beneath the table and repeated here only when this row is one of the few
+       that came from somewhere else. */
+    const DEFAULT_SOURCE = 'BLS OES 2024 + SCA';
+    const oddSource = r.source && r.source !== DEFAULT_SOURCE ? r.source : null;
 
     fill(host, [
       h('div', { cls: 'cop-head' }, [
@@ -228,13 +256,38 @@
           (r.naics_codes || []).length ? h('div', { cls: 'cop-agy', text: (r.naics_codes || []).join(' · ') }) : null
         ])
       ]),
-      h('div', { cls: 'cop-note' }, [h('b', { text: 'Hourly band' }), band]),
-      h('div', { cls: 'cop-note' }, [h('b', { text: 'Where this came from' }), h('span', { text: r.source || 'source not recorded' })]),
+
+      spec ? h('div', { cls: 'cop-note' }, [h('b', { text: 'What this role does' }), h('span', { text: spec.what })]) : null,
+      spec ? h('div', { cls: 'cop-note' }, [h('b', { text: 'Typical qualifications' }), h('span', { text: spec.quals })]) : null,
+      spec ? h('div', { cls: 'cop-note' }, [
+        h('span', { text: 'Role summary and qualifications are FARaudit editorial, not a government standard.',
+                    style: 'font-size:11px;color:var(--mute)' })
+      ]) : null,
+
+      /* AGAINST WHAT PRIMES HAVE WON. Four states, each said plainly — a blank panel for
+         "loading", "not in the index" and "the lookup failed" would tell three different
+         customers the same untrue thing. */
+      h('div', { cls: 'cop-note' }, [
+        h('b', { text: 'Against awarded rates' }),
+        !cmp ? h('span', { text: 'Checking GSA CALC+ for awarded rates…', style: 'color:var(--mute)' })
+        : cmp.state === 'found' ? rows([
+            ['Your reference median', money(r.rate_median), false],
+            ['Awarded median (GSA CALC+)', money(cmp.median), true],
+            ['Awarded range', money(cmp.min) + ' – ' + money(cmp.max), false],
+            ['Awarded rates in sample', String(cmp.count), false],
+            ['Difference', (cmp.median >= r.rate_median ? '+' : '−') + money(Math.abs(cmp.median - r.rate_median)), true]
+          ])
+        : cmp.state === 'none' ? h('span', { text: 'GSA CALC+ indexes no awarded rate under this category name. That is a gap in the index, not a rate of zero.', style: 'color:var(--mute)' })
+        : h('span', { text: 'The GSA CALC+ lookup could not be reached, so no comparison is shown rather than a stale one.', style: 'color:var(--mute)' })
+      ]),
+
+      oddSource ? h('div', { cls: 'cop-note' }, [h('b', { text: 'Where this one came from' }), h('span', { text: oddSource })]) : null,
+
       h('div', { cls: 'cop-note' }, [
         h('b', { text: 'What it is not' }),
         h('span', { text: 'A market band, not your payroll and not an SCA wage determination for a specific place of performance. Check the WD named in the solicitation before you price to it.' })
       ])
-    ]);
+    ].filter(Boolean));
   }
 
   /* ── wiring ─────────────────────────────────────────────────────────── */
