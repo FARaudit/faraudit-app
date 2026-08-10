@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
-import { searchTeamingPartners, type SamEntity } from "@/lib/sam-entity";
+import { searchTeamingPartners, SBA_SET_ASIDES, isKnownSetAside, type SamEntity } from "@/lib/sam-entity";
 import { resolveFeedScope } from "@/lib/bd-os/live-opportunities";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +26,16 @@ export async function GET(req: NextRequest) {
   const state = url.searchParams.get("state");
   const setAside = url.searchParams.get("setAside");
 
+  // An unrecognised set-aside is rejected rather than forwarded. SAM answers an unknown
+  // sbaBusinessTypeCode with 200 and zero records, which the page would render as "nothing
+  // matched" — a statement about the market caused by a bad parameter.
+  if (setAside && !isKnownSetAside(setAside)) {
+    return NextResponse.json(
+      { error: "unknown set-aside", meta: { reason: "unknown-set-aside", allowed: SBA_SET_ASIDES } },
+      { status: 400 }
+    );
+  }
+
   const scope = await resolveFeedScope(supabase);
   const codes = naicsParam ? [naicsParam] : scope.codes;
 
@@ -33,7 +43,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       partners: [],
       scope: { codes: [], source: scope.source },
-      meta: { reason: "no-profile-codes", per_code: {} }
+      meta: { reason: "no-profile-codes", per_code: {}, set_aside_options: SBA_SET_ASIDES }
     });
   }
 
@@ -43,7 +53,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       partners: [],
       scope: { codes, source: scope.source },
-      meta: { reason: "sam-key-missing", per_code: {} }
+      meta: { reason: "sam-key-missing", per_code: {}, set_aside_options: SBA_SET_ASIDES }
     });
   }
 
@@ -68,7 +78,7 @@ export async function GET(req: NextRequest) {
         {
           partners: [],
           scope: { codes, source: scope.source },
-          meta: { reason: result.outcome === "unconfigured" ? "sam-key-missing" : "sam-unavailable", per_code: {}, failed_code: code }
+          meta: { reason: result.outcome === "unconfigured" ? "sam-key-missing" : "sam-unavailable", per_code: {}, failed_code: code, set_aside_options: SBA_SET_ASIDES }
         },
         { status: 502 }
       );
@@ -101,6 +111,7 @@ export async function GET(req: NextRequest) {
       // a page-one sample, and the surface has to say so rather than imply completeness.
       total_available: totalAvailable,
       shown: partners.length,
+      set_aside_options: SBA_SET_ASIDES,
       reason: partners.length === 0 ? (state || setAside ? "no-match" : "no-partners") : null
     }
   });

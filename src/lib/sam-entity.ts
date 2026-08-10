@@ -186,10 +186,37 @@ export async function fetchEntityByUei(uei: string): Promise<SamEntity | null> {
   return (await lookupEntityByUei(uei)).entity;
 }
 
+/** The SBA certifications SAM's entity search can actually filter on.
+ *
+ *  `sbaBusinessTypeCode` takes the CODE, not the description. Passing a description returns
+ *  HTTP 200 with zero records — a fabricated "nothing matched", not an error. The previous
+ *  code passed descriptions, so a set-aside filter could only ever report an empty market.
+ *
+ *  Every pair below was read back from live SAM, not assumed. Measured totals at the time of
+ *  writing: A6 4,863 · A9 13,127 · XX 4,526 · A0 4,024 · JT 777. Codes that look plausible and
+ *  return nothing on this parameter: A2, A5, QF, 8W, 27, 23.
+ *
+ *  THIS LIST IS COMPLETE, AND SDVOSB IS DELIBERATELY ABSENT. SAM's sbaBusinessTypeList carries
+ *  SBA *certifications* only. Service-disabled veteran status appears in the sibling
+ *  businessTypeList as self-certified code QF, which is the list toSamEntity deliberately does
+ *  not read as certification. Offering an SDVOSB filter here would either return nothing or
+ *  attest a self-assertion as an SBA certification. */
+export const SBA_SET_ASIDES: ReadonlyArray<{ code: string; label: string }> = [
+  { code: "A6", label: "SBA Certified 8(a) Program Participant" },
+  { code: "A9", label: "SBA-Certified Women-Owned Small Business" },
+  { code: "XX", label: "SBA Certified HUBZone Firm" },
+  { code: "A0", label: "SBA-Certified Economically Disadvantaged Women-Owned Small Business" },
+  { code: "JT", label: "SBA Certified 8(a) Joint Venture" }
+];
+
+export function isKnownSetAside(code: string): boolean {
+  return SBA_SET_ASIDES.some((s) => s.code === code);
+}
+
 export interface TeamingSearch {
   naics: string;
   state?: string | null;
-  setAside?: string | null; // SBA business type description, e.g. "Service Disabled Veteran Owned Small Business"
+  setAside?: string | null; // an SBA_SET_ASIDES code, e.g. "A6" — never a description
   limit?: number;
 }
 
