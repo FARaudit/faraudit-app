@@ -11,6 +11,7 @@ import { renderAuditReportComplete } from "../../src/app/audits/[id]/_render";
 import { renderV4ReportFromRow } from "../../src/lib/v4-report/report";
 import { renderV5ReportFromRow } from "../../src/lib/v5-report/report";
 import { reconcileAbsenceClaims } from "../../src/lib/audit-absence-reconcile";
+import { classifyEnv, equals, describe, applyReadableProductionEnv, type EnvState, type RawVercelEnv } from "./vercel-env-state";
 dotenv.config({ path: ".env.local", quiet: true });
 
 const OUT = process.env.VERIFY_OUT_DIR || "/tmp";
@@ -22,17 +23,26 @@ async function applyProductionFlags(): Promise<string> {
   if (!TOKEN) throw new Error("VERCEL_TOKEN absent — refusing to render a laptop-state artifact.");
   const res = await fetch(`https://api.vercel.com/v9/projects/${PROJ}/env?teamId=${TEAM}`, { headers: { Authorization: `Bearer ${TOKEN}` } });
   if (!res.ok) throw new Error(`Vercel env fetch failed HTTP ${res.status}`);
-  const j = await res.json() as { envs?: any[]; env?: any[] };
-  let n = 0;
-  for (const e of (j.envs ?? j.env ?? [])) {
-    if (typeof e.key === "string" && e.key.startsWith("AUDIT_") && e.type === "plain" && e.target?.includes("production") && typeof e.value === "string") { process.env[e.key] = e.value; n++; }
-  }
-  return `PRODUCTION (${n} AUDIT_* vars from Vercel)`;
+  const j = await res.json() as { envs?: RawVercelEnv[]; env?: RawVercelEnv[] };
+  const envs = j.envs ?? j.env ?? [];
+  const { applied, unreadable } = applyReadableProductionEnv(envs);
+  // Same fix as render-audit.ts, which this script says it mirrors: a plain-only pull leaves an ENCRYPTED flag OFF
+  // in silence, and `render()` below stamps "v4"/"v5" onto the artifact from exactly that env.
+  if (unreadable.length) console.log(`⚠ ${unreadable.length} AUDIT_* production var(s) NOT readable → OFF in these renders, possibly ON in production: ${unreadable.join(", ")}`);
+  V5_STATE = classifyEnv(envs, "AUDIT_REPORT_V5");
+  return `PRODUCTION (${applied.length} AUDIT_* vars from Vercel)`;
 }
+
+// Set by applyProductionFlags; null until then (and in any local-flag path).
+let V5_STATE: EnvState | null = null;
 
 function render(audit: Record<string, unknown>): { html: string; path: string } {
   const engine = String((audit as any).compliance_json?.engine ?? "");
-  const v5On = process.env.AUDIT_REPORT_V5 === "true";
+  // `process.env.AUDIT_REPORT_V5 === "true"` reads false both when the flag is off and when it was never readable.
+  // The classified state distinguishes them; unknowable stops the render rather than mislabelling the artifact.
+  const v5Resolved = V5_STATE ? equals(V5_STATE, "true") : process.env.AUDIT_REPORT_V5 === "true";
+  if (v5Resolved === null) throw new Error(`AUDIT_REPORT_V5 is present on production but not readable (${describe(V5_STATE!)}). The served renderer cannot be resolved, so BEFORE/AFTER cannot be labelled v4 or v5. Refusing to render.`);
+  const v5On = v5Resolved;
   if (engine === "agentic_v3") return { html: v5On ? renderV5ReportFromRow(audit) : renderV4ReportFromRow(audit), path: v5On ? "v5" : "v4" };
   const vm = buildViewModel(audit as never, { isWatching: false, hasCapabilityStatement: true });
   const template = readFileSync(join(process.cwd(), "src", "app", "audits", "[id]", "_template.html"), "utf8");

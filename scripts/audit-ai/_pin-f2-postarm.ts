@@ -4,6 +4,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { renderV5ReportFromRow } from "../../src/lib/v5-report/report";
 import { buildV4Data } from "../../src/lib/v4-report/build-data";
+import { classifyEnv, equals, describe, applyReadableProductionEnv, type RawVercelEnv } from "./vercel-env-state";
 const TOKEN = process.env.VERCEL_TOKEN!;
 const PROJ = "prj_oqyqfwO0qJmkSAO9Hvt7VxbLUToD";
 const TEAM = "team_4FAowTLgslDBY6aZ0acPaES0";
@@ -15,13 +16,16 @@ const findingCount = (row: any) => { const d: any = buildV4Data(row); const f = 
 (async () => {
   // 1) pull LIVE prod config
   const res = await fetch(`https://api.vercel.com/v9/projects/${PROJ}/env?teamId=${TEAM}`, { headers: { Authorization: `Bearer ${TOKEN}` } });
-  const j = await res.json(); const envs = j.envs || j.env || [];
-  let sevInProd = false;
-  for (const e of envs) if (typeof e.key === "string" && e.key.startsWith("AUDIT_") && e.type === "plain" && Array.isArray(e.target) && e.target.includes("production") && typeof e.value === "string") {
-    process.env[e.key] = e.value; if (e.key === "AUDIT_SEVERITY_HONEST" && e.value === "true") sevInProd = true;
-  }
+  const j = await res.json(); const envs = (j.envs || j.env || []) as RawVercelEnv[];
+  const { unreadable } = applyReadableProductionEnv(envs);
   process.env.AUDIT_REPORT_V5 = "true"; process.env.AUDIT_V5_SEAL = "true";
-  console.log(`AUDIT_SEVERITY_HONEST present+true in LIVE Vercel prod config: ${sevInProd}`);
+  // The plain-only scan reported `false` for an ENCRYPTED flag, indistinguishable from genuinely-off — and this
+  // boolean is a term in the PASS below, so an unreadable flag produced a confident REVIEW verdict. Three states now.
+  const sev = classifyEnv(envs, "AUDIT_SEVERITY_HONEST");
+  const sevInProd = equals(sev, "true");
+  console.log(`AUDIT_SEVERITY_HONEST in LIVE Vercel prod config → ${describe(sev)} · === "true": ${sevInProd === null ? "UNKNOWABLE" : sevInProd}`);
+  if (unreadable.length) console.log(`⚠ not readable here, therefore OFF in this render though possibly ON in production: ${unreadable.join(", ")}`);
+  if (sevInProd === null) { console.log(`\nRESULT: UNVERIFIABLE — the flag this pin is about cannot be read. Not claiming PASS, not claiming REVIEW.`); process.exit(2); }
 
   // 2) specimen row
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });

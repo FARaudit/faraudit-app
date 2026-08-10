@@ -3,6 +3,7 @@
 import dotenv from "dotenv"; dotenv.config({ path: ".env.local", quiet: true });
 import { createClient } from "@supabase/supabase-js";
 import { renderV5ReportFromRow } from "../../src/lib/v5-report/report";
+import { applyReadableProductionEnv, type RawVercelEnv } from "./vercel-env-state";
 
 const TOKEN = process.env.VERCEL_TOKEN!;
 const PROJ = "prj_oqyqfwO0qJmkSAO9Hvt7VxbLUToD";
@@ -14,10 +15,10 @@ const strip = (h: string) => h.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
   // prod config (served surface)
   const res = await fetch(`https://api.vercel.com/v9/projects/${PROJ}/env?teamId=${TEAM}`, { headers: { Authorization: `Bearer ${TOKEN}` } });
   const j = await res.json();
-  for (const e of (j.envs || j.env || [])) {
-    if (typeof e.key === "string" && e.key.startsWith("AUDIT_") && e.type === "plain" && Array.isArray(e.target) && e.target.includes("production") && typeof e.value === "string") process.env[e.key] = e.value;
-  }
+  const { unreadable } = applyReadableProductionEnv((j.envs || j.env || []) as RawVercelEnv[]);
   process.env.AUDIT_REPORT_V5 = "true"; process.env.AUDIT_V5_SEAL = "true";
+  // "prod config (served surface)" is only true for the flags that could be read. Name the ones that could not.
+  if (unreadable.length) console.log(`⚠ ${unreadable.length} AUDIT_* production var(s) NOT readable → OFF in this diagnostic, possibly ON in production: ${unreadable.join(", ")}`);
 
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   const { data: row } = await admin.from("audits").select("*").eq("id", ID).single();

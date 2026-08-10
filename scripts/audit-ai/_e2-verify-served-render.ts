@@ -11,6 +11,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { writeFileSync } from "node:fs";
 import * as dotenv from "dotenv";
+import { applyReadableProductionEnv, type RawVercelEnv } from "./vercel-env-state";
 dotenv.config({ path: ".env.local", quiet: true });
 
 const PREFIX = process.argv[2] ?? "d0664ba2";
@@ -41,14 +42,12 @@ const toText = (html: string) => html
   const token = process.env.VERCEL_TOKEN;
   if (!token) { console.error("VERCEL_TOKEN missing — cannot pull production config; refusing to render against a guessed config"); process.exit(1); }
   const j: any = await (await fetch(`https://api.vercel.com/v9/projects/${PROJ}/env?teamId=${TEAM}`, { headers: { Authorization: `Bearer ${token}` } })).json();
-  let applied = 0;
-  for (const e of j.envs || j.env || []) {
-    if (typeof e.key === "string" && e.key.startsWith("AUDIT_") && e.type === "plain" && Array.isArray(e.target) && e.target.includes("production") && typeof e.value === "string") {
-      process.env[e.key] = e.value; applied++;
-    }
-  }
+  const { applied, unreadable } = applyReadableProductionEnv((j.envs || j.env || []) as RawVercelEnv[]);
   process.env.AUDIT_REPORT_V5 = "true"; process.env.AUDIT_V5_SEAL = "true";   // prod serves v5 by execution
-  console.log(`=== PROD CONFIG === plain AUDIT_* applied: ${applied}`);
+  console.log(`=== PROD CONFIG === readable AUDIT_* applied: ${applied.length}`);
+  // This script drives "the SAME render the customer's browser gets". Any flag named here is OFF in that render and
+  // may be ON for the customer, so it is stated rather than dropped.
+  if (unreadable.length) console.log(`⚠ ${unreadable.length} AUDIT_* production var(s) NOT readable → OFF here, possibly ON in production: ${unreadable.join(", ")}`);
 
   const { renderV5ReportFromRow } = await import("../../src/lib/v5-report/report");
   const { gateFindingCitations } = await import("../../src/lib/audit-citation-fidelity");

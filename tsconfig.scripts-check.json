@@ -1,0 +1,41 @@
+{
+  // The root tsconfig excludes `scripts/**/_*.ts`, so the forensic scripts are never typechecked — and `npx tsx`
+  // running green is not a typecheck. That was tolerable while each script was self-contained; it stopped being
+  // tolerable once they started sharing scripts/audit-ai/vercel-env-state.ts, where one bad signature would break
+  // every reader at once and nothing would say so.
+  //
+  // This config typechecks the shared module and every script that imports it:
+  //   npx tsc --noEmit -p tsconfig.scripts-check.json
+  //
+  // It lists files explicitly rather than globbing the directory: the rest of scripts/audit-ai/ carries pre-existing
+  // type errors, and a config that is red on arrival is a config nobody runs.
+  "extends": "./tsconfig.json",
+  "include": [
+    "scripts/audit-ai/vercel-env-state.ts",
+    "scripts/audit-ai/_probe-env-three-state.ts",
+    "scripts/audit-ai/render-audit.ts",
+    "scripts/audit-ai/_fa145-read-served-copy.ts",
+    "scripts/audit-ai/_fa145-closed-mode-served.ts",
+    "scripts/audit-ai/_arm-capnotmute-vercel.ts",
+    "scripts/audit-ai/_arm-capture-vercel.ts",
+    "scripts/audit-ai/_arm-covsplit-vercel.ts",
+    "scripts/audit-ai/_arm-nmr-honesty-vercel.ts",
+    "scripts/audit-ai/_arm-primary-election-vercel.ts",
+    "scripts/audit-ai/_arm-profileschema-vercel.ts",
+    "scripts/audit-ai/_arm-releaseledger-vercel.ts",
+    "scripts/audit-ai/_arm-reporttruth-vercel.ts",
+    "scripts/audit-ai/_e1-flagstate-severity-honest.ts",
+    "scripts/audit-ai/_pin-f2-postarm.ts",
+    "scripts/audit-ai/_pin-covsplit-served-verify.ts",
+    "scripts/audit-ai/_pin-served-verify.ts",
+    "scripts/audit-ai/_item1-postarm-3row.ts",
+    "scripts/audit-ai/_item1-render-served.ts",
+    "scripts/audit-ai/_cert5-rerender-p3p4p5.ts",
+    "scripts/audit-ai/_panel-render-d0664ba2.ts",
+    "scripts/audit-ai/_e2-probe-adversarial.ts",
+    "scripts/audit-ai/_e2-verify-served-render.ts",
+    "scripts/audit-ai/_verify-rt7-rendered.ts",
+    "scripts/audit-ai/_diag-t1-row.ts"
+  ],
+  "exclude": ["node_modules"]
+}

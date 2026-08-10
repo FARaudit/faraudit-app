@@ -7,6 +7,7 @@
 // cannot certify" that the design comment at render.ts:292 names). $0. Read-only.
 import { readFileSync } from "node:fs";
 import { renderV5ReportFromRow } from "../../src/lib/v5-report/report";
+import { classifyEnv, equals, describe, applyReadableProductionEnv, type RawVercelEnv } from "./vercel-env-state";
 
 const TOKEN = process.env.VERCEL_TOKEN!;
 const PROJ = "prj_oqyqfwO0qJmkSAO9Hvt7VxbLUToD";
@@ -25,20 +26,18 @@ const bandOf = (t: string) => (t.match(/NEEDS HUMAN REVIEW|INCOMPLETE|BID-WITH-C
     headers: { Authorization: `Bearer ${TOKEN}` },
   });
   const j = await res.json();
-  const envs = j.envs || j.env || [];
-  let applied = 0, covsplitInProd = false;
-  for (const e of envs) {
-    if (typeof e.key === "string" && e.key.startsWith("AUDIT_") && e.type === "plain" &&
-        Array.isArray(e.target) && e.target.includes("production") && typeof e.value === "string") {
-      process.env[e.key] = e.value;
-      applied++;
-      if (e.key === "AUDIT_COVERAGE_COUNTER_SPLIT" && e.value === "true") covsplitInProd = true;
-    }
-  }
+  const envs = (j.envs || j.env || []) as RawVercelEnv[];
+  const { applied, unreadable } = applyReadableProductionEnv(envs);
   process.env.AUDIT_REPORT_V5 = "true";
   process.env.AUDIT_V5_SEAL = "true";
-  console.log(`prod AUDIT_* plain flags applied: ${applied}`);
-  console.log(`AUDIT_COVERAGE_COUNTER_SPLIT already true in prod config: ${covsplitInProd} (expect false — this is the arm we're gating)`);
+  console.log(`prod AUDIT_* readable flags applied: ${applied.length}`);
+  if (unreadable.length) console.log(`⚠ not readable here, therefore OFF in the renders below though possibly ON in production: ${unreadable.join(", ")}`);
+  // The expected answer here is FALSE, which is exactly why the old two-state read was dangerous: an ENCRYPTED
+  // entry also produced `false`, and a wrong reading that agrees with the expectation is the one nobody re-checks.
+  const cov = classifyEnv(envs, "AUDIT_COVERAGE_COUNTER_SPLIT");
+  const covsplitInProd = equals(cov, "true");
+  console.log(`AUDIT_COVERAGE_COUNTER_SPLIT in prod config → ${describe(cov)} · === "true": ${covsplitInProd === null ? "UNKNOWABLE" : covsplitInProd} (expected false — this is the arm being gated)`);
+  if (covsplitInProd === null) { console.log(`\nRESULT: UNVERIFIABLE — the BEFORE state of the flag under test cannot be read, so the before/after contrast has no baseline.`); process.exit(2); }
 
   const row = JSON.parse(readFileSync("scripts/audit-ai/fixtures/row-e63bd1e7-live.json", "utf8"));
 

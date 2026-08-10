@@ -2,19 +2,24 @@
 // renders each superseded-orphan row through the served function. Confirms 31 Jul + provenance + no orphan 18 Jul.
 import { createClient } from "@supabase/supabase-js";
 import { renderV5ReportFromRow } from "../../src/lib/v5-report/report";
+import { classifyEnv, equals, describe, applyReadableProductionEnv, type RawVercelEnv } from "./vercel-env-state";
 const TOKEN = process.env.VERCEL_TOKEN!;
 const PROJ = "prj_oqyqfwO0qJmkSAO9Hvt7VxbLUToD", TEAM = "team_4FAowTLgslDBY6aZ0acPaES0";
 const strip = (h: string) => h.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 const IDS = ["496a9a21", "e63bd1e7", "24eeea9b"];
 (async () => {
   const res = await fetch(`https://api.vercel.com/v9/projects/${PROJ}/env?teamId=${TEAM}`, { headers: { Authorization: `Bearer ${TOKEN}` } });
-  const envs = (await res.json()).envs || [];
-  let flagLive = false;
-  for (const e of envs) if (typeof e.key === "string" && e.key.startsWith("AUDIT_") && e.type === "plain" && (e.target||[]).includes("production") && typeof e.value === "string") {
-    process.env[e.key] = e.value; if (e.key === "AUDIT_MASTHEAD_DEADLINE_RECONCILE" && e.value === "true") flagLive = true;
-  }
+  const envs = ((await res.json()).envs || []) as RawVercelEnv[];
+  const { unreadable } = applyReadableProductionEnv(envs);
   process.env.AUDIT_REPORT_V5 = "true"; process.env.AUDIT_V5_SEAL = "true";
-  console.log("AUDIT_MASTHEAD_DEADLINE_RECONCILE live+true in prod config:", flagLive, "\n");
+  // `flagLive` is a term in the RESULT below. A plain-only scan set it false for an ENCRYPTED var, so an unreadable
+  // flag printed FAIL — a verdict about a value nobody read.
+  const recon = classifyEnv(envs, "AUDIT_MASTHEAD_DEADLINE_RECONCILE");
+  const flagLive = equals(recon, "true");
+  console.log(`AUDIT_MASTHEAD_DEADLINE_RECONCILE in prod config → ${describe(recon)} · === "true": ${flagLive === null ? "UNKNOWABLE" : flagLive}`);
+  if (unreadable.length) console.log(`⚠ not readable here, therefore OFF in these renders though possibly ON in production: ${unreadable.join(", ")}`);
+  if (flagLive === null) { console.log(`\nRESULT: UNVERIFIABLE — the flag this pin is about cannot be read. Not claiming PASS, not claiming FAIL.`); process.exit(2); }
+  console.log("");
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
   const rows: any[] = [];
   for (let f = 0; ; f += 200) { const { data } = await sb.from("audits").select("id,solicitation_number,raw_pdf_text,response_deadline,compliance_json").eq("status","complete").range(f, f+199); if (!data||!data.length) break; rows.push(...data); if (data.length<200) break; }

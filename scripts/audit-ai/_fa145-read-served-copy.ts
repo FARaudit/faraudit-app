@@ -7,6 +7,7 @@
 // judged rather than pattern-matched.
 import { createClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
+import { classifyEnv, equals, describe, applyReadableProductionEnv, type RawVercelEnv } from "./vercel-env-state";
 dotenv.config({ path: ".env.local", quiet: true });
 
 const PROJ = "prj_oqyqfwO0qJmkSAO9Hvt7VxbLUToD";
@@ -28,14 +29,31 @@ const IMPERATIVE = /\b(before quoting|before submission|before you bid|before bi
   const token = process.env.VERCEL_TOKEN;
   if (!token) { console.error("VERCEL_TOKEN missing — refusing to guess the served renderer."); process.exit(1); }
   const res = await fetch(`https://api.vercel.com/v9/projects/${PROJ}/env?teamId=${TEAM}`, { headers: { Authorization: `Bearer ${token}` } });
-  const j = await res.json() as { envs?: Array<{ key: string; value?: string; type?: string; target?: string[] }> };
-  let v5: string | null = null;
-  for (const e of j.envs ?? []) {
-    if (e.type !== "plain" || !e.target?.includes("production")) continue;
-    if (e.key?.startsWith("AUDIT_") && typeof e.value === "string") process.env[e.key] = e.value;
-    if (e.key === "AUDIT_REPORT_V5") v5 = e.value ?? null;
+  const j = await res.json() as { envs?: RawVercelEnv[] };
+  const envs = j.envs ?? [];
+  const { applied, unreadable } = applyReadableProductionEnv(envs);
+
+  // THREE states, never two. The old form was `if (e.type !== "plain") continue`, which sent an encrypted variable
+  // down the same path as one that does not exist and then printed "(unset) → served renderer = v4" for both — a
+  // guess, stated as a fact about production. AUDIT_V5_SEAL and AUDIT_V3_SECTION_ROUTING are both encrypted on this
+  // project, so the shape is live, not hypothetical.
+  const v5 = classifyEnv(envs, "AUDIT_REPORT_V5");
+  const isTrue = equals(v5, "true");            // null = unknowable. Do not collapse it to false.
+  console.log(`\n█ LIVE PRODUCTION · ${describe(v5)}`);
+  console.log(`  AUDIT_* production vars: ${applied.length} readable and applied${unreadable.length ? ` · ${unreadable.length} NOT readable → ${unreadable.join(", ")}` : ""}`);
+  if (isTrue === null) {
+    // Refuse to name a renderer. Every reading below is labelled "the served surface", and that label would be
+    // unfounded — so nothing is printed rather than something unprovable.
+    console.log(`  → served renderer: CANNOT BE DETERMINED from the env API. Not guessing v4.`);
+    console.log(`    Resolve it by execution instead (render a real audit through the deployed route and read what came back), or re-add the flag as plain.\n`);
+    process.exit(1);
   }
-  console.log(`\n█ LIVE PRODUCTION AUDIT_REPORT_V5 = ${v5 ?? "(unset)"} → served renderer = ${v5 === "true" ? "V5" : "v4 (_render.ts)"}\n`);
+  const renderer = isTrue ? "V5 (src/lib/v5-report)" : "v4 (_render.ts), by the code default at src/app/audits/[id]/route.ts:422";
+  console.log(`  → value === "true": ${isTrue} → served renderer = ${renderer}`);
+  // The samples below all come from renderV5ReportFromRow. If production is on v4 they are not the served copy, and
+  // the readings must not be reported as such.
+  if (!isTrue) console.log(`  ⚠ the renders below are V5 — production serves v4, so they are NOT the served copy`);
+  console.log("");
 
   // PLANTED POSITIVE — prove the matcher can fire before trusting any zero from it.
   const planted = "<p>Cure what you can and verify the others before quoting.</p>";

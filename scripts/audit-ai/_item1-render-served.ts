@@ -3,6 +3,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { renderV5ReportFromRow } from "../../src/lib/v5-report/report";
 import { writeFileSync } from "node:fs";
+import { classifyEnv, equals, describe, applyReadableProductionEnv, type RawVercelEnv } from "./vercel-env-state";
 const TOKEN = process.env.VERCEL_TOKEN!;
 const PROJ = "prj_oqyqfwO0qJmkSAO9Hvt7VxbLUToD";
 const TEAM = "team_4FAowTLgslDBY6aZ0acPaES0";
@@ -11,20 +12,24 @@ const ID = "496a9a21-8391-41b4-9e24-cff212971fd3";
 (async () => {
   // 1) live prod config (the served surface's actual flags)
   const res = await fetch(`https://api.vercel.com/v9/projects/${PROJ}/env?teamId=${TEAM}`, { headers: { Authorization: `Bearer ${TOKEN}` } });
-  const j = await res.json(); const envs = j.envs || j.env || [];
-  const applied: string[] = [];
-  for (const e of envs) if (typeof e.key === "string" && e.key.startsWith("AUDIT_") && e.type === "plain" && Array.isArray(e.target) && e.target.includes("production") && typeof e.value === "string") {
-    process.env[e.key] = e.value; if (e.value === "true") applied.push(e.key);
-  }
+  const j = await res.json(); const envs = (j.envs || j.env || []) as RawVercelEnv[];
+  const { unreadable } = applyReadableProductionEnv(envs);
   process.env.AUDIT_REPORT_V5 = "true"; process.env.AUDIT_V5_SEAL = "true";
-  const flagCheck = (k: string) => process.env[k] === "true";
+  if (unreadable.length) console.log(`⚠ ${unreadable.length} AUDIT_* production var(s) NOT readable → OFF in this render, possibly ON in production: ${unreadable.join(", ")}`);
+  // These lines go to a human seat grading the report. `process.env[k] === "true"` printed a flat false for a flag
+  // that was merely unreadable, so the seat was told a flag was off when nobody had read it.
+  const flagCheck = (k: string) => {
+    const st = classifyEnv(envs, k);
+    const isTrue = equals(st, "true");
+    return isTrue === null ? `UNKNOWABLE (${describe(st)})` : String(isTrue);
+  };
   console.log("LIVE prod flags relevant to this grade:");
   console.log("  AUDIT_NHR_NARRATIVE_TRUE_CAUSE:", flagCheck("AUDIT_NHR_NARRATIVE_TRUE_CAUSE"));
   console.log("  AUDIT_SEVERITY_HONEST         :", flagCheck("AUDIT_SEVERITY_HONEST"));
   console.log("  AUDIT_SETASIDE_HEADER_RECONCILE:", flagCheck("AUDIT_SETASIDE_HEADER_RECONCILE"), "(expect false — held)");
   console.log("  AUDIT_MASTHEAD_OFFICE_LEAF    :", flagCheck("AUDIT_MASTHEAD_OFFICE_LEAF"), "(expect false — held)");
   console.log("  AUDIT_COVERAGE_DISPLAY_COHERENT:", flagCheck("AUDIT_COVERAGE_DISPLAY_COHERENT"), "(expect false — v4-only)");
-  console.log("  total true AUDIT_* plain flags:", applied.length);
+  console.log("  total AUDIT_* production flags readable and === \"true\":", envs.filter((e) => equals(classifyEnv(envs, String(e.key)), "true") === true).length, unreadable.length ? `(+${unreadable.length} unreadable, state unknown)` : "");
 
   // 2) row + served render
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });

@@ -12,6 +12,7 @@
 // Prints flag state and phrase counts only. No key value is ever printed.
 import { createClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
+import { classifyEnv, equals, describe, applyReadableProductionEnv, type RawVercelEnv } from "./vercel-env-state";
 dotenv.config({ path: ".env.local", quiet: true });
 
 const PROJ = "prj_oqyqfwO0qJmkSAO9Hvt7VxbLUToD";
@@ -34,15 +35,21 @@ const ACTION_NOW = [
   const token = process.env.VERCEL_TOKEN;
   if (!token) { console.error("VERCEL_TOKEN not set — cannot read live production flags. Refusing to guess."); process.exit(1); }
   const res = await fetch(`https://api.vercel.com/v9/projects/${PROJ}/env?teamId=${TEAM}`, { headers: { Authorization: `Bearer ${token}` } });
-  const j = await res.json() as { envs?: Array<{ key: string; value?: string; type?: string; target?: string[] }> };
+  const j = await res.json() as { envs?: RawVercelEnv[] };
   const envs = j.envs ?? [];
-  let v5Live: string | null = null;
-  for (const e of envs) {
-    if (e.type !== "plain" || !Array.isArray(e.target) || !e.target.includes("production")) continue;
-    if (typeof e.key === "string" && e.key.startsWith("AUDIT_") && typeof e.value === "string") process.env[e.key] = e.value;
-    if (e.key === "AUDIT_REPORT_V5") v5Live = e.value ?? null;
+  const { applied, unreadable } = applyReadableProductionEnv(envs);
+
+  // Three states. An encrypted variable used to take the `continue` and print "(unset) → v4" — indistinguishable
+  // from the flag genuinely not existing, and the whole point of this script is which renderer production runs.
+  const v5 = classifyEnv(envs, "AUDIT_REPORT_V5");
+  const v5IsTrue = equals(v5, "true");
+  console.log(`LIVE PRODUCTION · ${describe(v5)}`);
+  console.log(`AUDIT_* production vars: ${applied.length} readable and applied${unreadable.length ? ` · ${unreadable.length} NOT readable → ${unreadable.join(", ")}` : ""}`);
+  if (v5IsTrue === null) {
+    console.log(`→ served renderer: CANNOT BE DETERMINED from the env API — not defaulting to v4. This script's entire finding is "which renderer is served", so it stops here rather than answer it with a guess.`);
+    process.exit(1);
   }
-  console.log(`LIVE PRODUCTION · AUDIT_REPORT_V5 = ${v5Live ?? "(unset)"}  →  served renderer = ${v5Live === "true" ? "V5 (src/lib/v5-report)" : "v4 (_render.ts)"}`);
+  console.log(`→ value === "true": ${v5IsTrue}  →  served renderer = ${v5IsTrue ? "V5 (src/lib/v5-report)" : "v4 (_render.ts), by the code default at src/app/audits/[id]/route.ts:422"}`);
 
   // 2) A REAL expired audit — chosen from the corpus by its own response_deadline, not hand-picked.
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL as string, process.env.SUPABASE_SERVICE_ROLE_KEY as string, { auth: { persistSession: false } });

@@ -3,6 +3,7 @@
 // production AUDIT_* plain flag set, pulled fresh in-script (not a hand-guess), applied to process.env.
 import { readFileSync } from "node:fs";
 import { renderV5ReportFromRow } from "../../src/lib/v5-report/report";
+import { classifyEnv, equals, describe, applyReadableProductionEnv, type RawVercelEnv } from "./vercel-env-state";
 
 const TOKEN = process.env.VERCEL_TOKEN!;
 const PROJ = "prj_oqyqfwO0qJmkSAO9Hvt7VxbLUToD";
@@ -18,22 +19,20 @@ const strip = (h: string) => h.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
     headers: { Authorization: `Bearer ${TOKEN}` },
   });
   const j = await res.json();
-  const envs = j.envs || j.env || [];
-  let applied = 0, nhrTrueInProd = false;
-  for (const e of envs) {
-    if (typeof e.key === "string" && e.key.startsWith("AUDIT_") && e.type === "plain" &&
-        Array.isArray(e.target) && e.target.includes("production") && typeof e.value === "string") {
-      process.env[e.key] = e.value;
-      applied++;
-      if (e.key === "AUDIT_NHR_NARRATIVE_TRUE_CAUSE" && e.value === "true") nhrTrueInProd = true;
-    }
-  }
+  const envs = (j.envs || j.env || []) as RawVercelEnv[];
+  const { applied, unreadable } = applyReadableProductionEnv(envs);
   // AUDIT_REPORT_V5 / AUDIT_V5_SEAL are encrypted on Vercel (value not readable via API); prod serves v5
   // by execution, and renderV5ReportFromRow is the served function for agentic_v3 rows — set true to match.
   process.env.AUDIT_REPORT_V5 = "true";
   process.env.AUDIT_V5_SEAL = "true";
-  console.log(`prod AUDIT_* plain flags applied: ${applied}`);
-  console.log(`AUDIT_NHR_NARRATIVE_TRUE_CAUSE present+true in prod config: ${nhrTrueInProd}`);
+  console.log(`prod AUDIT_* readable flags applied: ${applied.length}`);
+  if (unreadable.length) console.log(`⚠ not readable here, therefore OFF in the renders below though possibly ON in production: ${unreadable.join(", ")}`);
+  // The flag whose armed state the "NOW" render is supposed to represent. A plain-only scan called an encrypted
+  // entry `false`, which would have described the NOW render as unarmed while it may well have been armed.
+  const nhr = classifyEnv(envs, "AUDIT_NHR_NARRATIVE_TRUE_CAUSE");
+  const nhrTrueInProd = equals(nhr, "true");
+  console.log(`AUDIT_NHR_NARRATIVE_TRUE_CAUSE in prod config → ${describe(nhr)} · === "true": ${nhrTrueInProd === null ? "UNKNOWABLE" : nhrTrueInProd}`);
+  if (nhrTrueInProd === null) { console.log(`\nRESULT: UNVERIFIABLE — the armed state this pin renders against cannot be read. Not claiming PASS, not claiming FAIL.`); process.exit(2); }
 
   const row = JSON.parse(readFileSync("scripts/audit-ai/fixtures/row-496a9a21-live.json", "utf8"));
 

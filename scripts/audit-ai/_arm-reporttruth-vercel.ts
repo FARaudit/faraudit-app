@@ -6,6 +6,7 @@
 // verifies (Vercel env-snapshot trap: a running build carries the OLD snapshot, so a fresh GIT build is required).
 // Secrets are never echoed (Rules 32/46) — these are booleans, and only the boolean-ness is printed.
 import dotenv from "dotenv";
+import { classifyEnv, equals, describe, type RawVercelEnv } from "./vercel-env-state";
 dotenv.config({ path: ".env.local", quiet: true });
 const TOKEN = process.env.VERCEL_TOKEN!;
 const PROJ = "prj_oqyqfwO0qJmkSAO9Hvt7VxbLUToD";
@@ -34,15 +35,24 @@ const KEYS = ["AUDIT_DOC_ANALYZED_TRUTH", "AUDIT_NONPRESENCE_HONESTY", "AUDIT_PA
     headers: { Authorization: `Bearer ${TOKEN}` },
   });
   const gj = await get.json();
-  const envs = (gj.envs || gj.env || []) as Array<{ key: string; type: string; value: string; target: string[] }>;
+  const envs = (gj.envs || gj.env || []) as RawVercelEnv[];
   console.log("");
+  // Three states per key. `hit.type === "plain" && hit.value === "true"` reported FAIL for an ENCRYPTED var, which is
+  // a verdict nobody read: the API returns CIPHERTEXT in `value` for encrypted/sensitive entries, so the comparison is
+  // meaningless rather than false. UNVERIFIABLE is now its own bucket and it keeps the run out of both VERIFIED and
+  // FAIL — the whole point of a read-back is that it read something.
+  const unverifiable: string[] = [];
   for (const KEY of KEYS) {
-    const hit = envs.find((e) => e.key === KEY && Array.isArray(e.target) && e.target.includes("production"));
-    if (!hit) { console.log(`READ-BACK ${KEY}: FAIL — not present on production`); allOk = false; continue; }
-    const ok = hit.type === "plain" && hit.value === "true";
-    if (!ok) allOk = false;
-    console.log(`READ-BACK ${KEY}: type=${hit.type} value_is_true=${hit.value === "true"} target=${JSON.stringify(hit.target)} → ${ok ? "OK" : "FAIL"}`);
+    const state = classifyEnv(envs, KEY);
+    const isTrue = equals(state, "true");
+    if (isTrue === null) { unverifiable.push(KEY); console.log(`READ-BACK ${describe(state)} → UNVERIFIABLE`); continue; }
+    if (!isTrue) allOk = false;
+    console.log(`READ-BACK ${describe(state)} · value === "true": ${isTrue} → ${isTrue ? "OK" : "FAIL"}`);
   }
-  console.log(`\nVERCEL ARM ${allOk ? "VERIFIED — both plain 'true' on production. Next: a FRESH GIT BUILD (env-snapshot trap: a redeploy of an existing build carries the OLD env)." : "FAIL"}`);
+  if (unverifiable.length) {
+    console.log(`\nVERCEL ARM UNVERIFIABLE for ${unverifiable.length} of ${KEYS.length} key(s): ${unverifiable.join(", ")} — present on production, value not readable here. Not claiming VERIFIED${allOk ? "" : " (and other keys did FAIL)"}. Confirm those by execution, or re-add them as plain.`);
+    process.exit(allOk ? 2 : 1);
+  }
+  console.log(`\nVERCEL ARM ${allOk ? `VERIFIED — all ${KEYS.length} plain 'true' on production. Next: a FRESH GIT BUILD (env-snapshot trap: a redeploy of an existing build carries the OLD env).` : "FAIL"}`);
   process.exit(allOk ? 0 : 1);
 })();

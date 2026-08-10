@@ -2,6 +2,7 @@
 // production flag config (post F-2 dedup + deadline reconcile arms). Report-completeness + arm-regression check.
 import { createClient } from "@supabase/supabase-js";
 import { renderV5ReportFromRow } from "../../src/lib/v5-report/report";
+import { classifyEnv, equals, describe, applyReadableProductionEnv, type RawVercelEnv } from "./vercel-env-state";
 const TOKEN = process.env.VERCEL_TOKEN!;
 const PROJ = "prj_oqyqfwO0qJmkSAO9Hvt7VxbLUToD", TEAM = "team_4FAowTLgslDBY6aZ0acPaES0";
 const strip = (h: string) => h.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
@@ -13,14 +14,18 @@ const SPECIMENS = [
 ];
 (async () => {
   const res = await fetch(`https://api.vercel.com/v9/projects/${PROJ}/env?teamId=${TEAM}`, { headers: { Authorization: `Bearer ${TOKEN}` } });
-  const envs = (await res.json()).envs || [];
-  const live: Record<string, boolean> = {};
-  for (const e of envs) if (typeof e.key === "string" && e.key.startsWith("AUDIT_") && e.type === "plain" && (e.target||[]).includes("production") && typeof e.value === "string") {
-    process.env[e.key] = e.value; if (e.value === "true") live[e.key] = true;
-  }
+  const envs = ((await res.json()).envs || []) as RawVercelEnv[];
+  const { unreadable } = applyReadableProductionEnv(envs);
   process.env.AUDIT_REPORT_V5 = "true"; process.env.AUDIT_V5_SEAL = "true";
-  console.log("LIVE arms confirmed: SEVERITY_HONEST=%s · MASTHEAD_DEADLINE_RECONCILE=%s · NHR_NARRATIVE_TRUE_CAUSE=%s\n",
-    !!live.AUDIT_SEVERITY_HONEST, !!live.AUDIT_MASTHEAD_DEADLINE_RECONCILE, !!live.AUDIT_NHR_NARRATIVE_TRUE_CAUSE);
+  // "LIVE arms confirmed" is a strong word for a plain-only scan: `!!live.X` printed false for an ENCRYPTED arm just
+  // as it did for an absent one. Each arm now reports its own state, and UNKNOWABLE is not confirmation.
+  for (const k of ["AUDIT_SEVERITY_HONEST", "AUDIT_MASTHEAD_DEADLINE_RECONCILE", "AUDIT_NHR_NARRATIVE_TRUE_CAUSE"]) {
+    const st = classifyEnv(envs, k);
+    const isTrue = equals(st, "true");
+    console.log(`arm ${k} → ${describe(st)} · === "true": ${isTrue === null ? "UNKNOWABLE (not confirmed)" : isTrue}`);
+  }
+  if (unreadable.length) console.log(`⚠ not readable here, therefore OFF in the re-renders below though possibly ON in production: ${unreadable.join(", ")}`);
+  console.log("");
 
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
   const rows: any[] = [];

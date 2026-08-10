@@ -2,6 +2,7 @@
 // The happy path is proven (_e2-verify-served-render.ts). These are the ways it could be wrong anyway.
 import { createClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
+import { applyReadableProductionEnv, type RawVercelEnv } from "./vercel-env-state";
 dotenv.config({ path: ".env.local", quiet: true });
 
 const PROJ = "prj_oqyqfwO0qJmkSAO9Hvt7VxbLUToD";
@@ -15,10 +16,11 @@ const TEAM = "team_4FAowTLgslDBY6aZ0acPaES0";
 
   const token = process.env.VERCEL_TOKEN!;
   const j: any = await (await fetch(`https://api.vercel.com/v9/projects/${PROJ}/env?teamId=${TEAM}`, { headers: { Authorization: `Bearer ${token}` } })).json();
-  for (const e of j.envs || j.env || []) {
-    if (typeof e.key === "string" && e.key.startsWith("AUDIT_") && e.type === "plain" && Array.isArray(e.target) && e.target.includes("production") && typeof e.value === "string") process.env[e.key] = e.value;
-  }
+  const { unreadable } = applyReadableProductionEnv((j.envs || j.env || []) as RawVercelEnv[]);
   process.env.AUDIT_REPORT_V5 = "true"; process.env.AUDIT_V5_SEAL = "true";
+  // These probes exist to find the ways the happy path could still be wrong. A flag that is ON in production and
+  // unreadable here is one of those ways — the probes would run against a config production does not have.
+  if (unreadable.length) console.log(`⚠ ${unreadable.length} AUDIT_* production var(s) NOT readable → OFF in these probes, possibly ON in production: ${unreadable.join(", ")}`);
 
   const { renderV5ReportFromRow } = await import("../../src/lib/v5-report/report");
   const { gateFindingCitations } = await import("../../src/lib/audit-citation-fidelity");

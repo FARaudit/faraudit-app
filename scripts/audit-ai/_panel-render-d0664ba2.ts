@@ -4,6 +4,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { writeFileSync } from "node:fs";
 import * as dotenv from "dotenv";
+import { unreadableProductionEnvKeys, type RawVercelEnv } from "./vercel-env-state";
 
 dotenv.config({ path: ".env.local", quiet: true });
 
@@ -62,6 +63,10 @@ const TEAM = "team_4FAowTLgslDBY6aZ0acPaES0";
   process.env.AUDIT_REPORT_V5 = "true";
   process.env.AUDIT_V5_SEAL = "true";
   console.log(`\n=== PROD CONFIG === plain AUDIT_* applied: ${applied} · true: ${onFlags.length}`);
+  // This artifact goes to a review panel labelled "the served surface". Any AUDIT_* flag that cannot be read here is
+  // OFF in the render below and may be ON in production, so the label is only as good as this list being empty.
+  const unreadable = unreadableProductionEnvKeys(envs as RawVercelEnv[]);
+  if (unreadable.length) console.log(`⚠ ${unreadable.length} AUDIT_* production var(s) NOT readable → OFF in this render, possibly ON in production: ${unreadable.join(", ")}`);
 
   // 3) Render on the served path — import AFTER env is set.
   const engine = String(cj.engine ?? "");

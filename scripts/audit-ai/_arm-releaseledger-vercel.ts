@@ -2,6 +2,7 @@
 // Step 1: POST the env var (plain, target=production). Step 2: read back and assert value==="true" & target=production.
 // Does NOT redeploy — that is a separate explicit step after read-back verifies. Secrets never echoed (Rule 32/46).
 import dotenv from "dotenv";
+import { classifyEnv, equals, describe } from "./vercel-env-state";
 dotenv.config({ path: ".env.local", quiet: true });
 const TOKEN = process.env.VERCEL_TOKEN!;
 const PROJ = "prj_oqyqfwO0qJmkSAO9Hvt7VxbLUToD";
@@ -25,10 +26,17 @@ const KEY = "AUDIT_RELEASE_LEDGER";
   });
   const gj = await get.json();
   const envs = gj.envs || gj.env || [];
-  const hit = envs.find((e: any) => e.key === KEY && Array.isArray(e.target) && e.target.includes("production"));
-  if (!hit) { console.log("  READ-BACK FAIL — not present on production"); process.exit(1); }
-  const ok = hit.type === "plain" && hit.value === "true" && hit.target.includes("production");
-  console.log(`READ-BACK: key=${hit.key} type=${hit.type} value_is_true=${hit.value === "true"} target=${JSON.stringify(hit.target)}`);
-  console.log(`\nARM ${ok ? "VERIFIED — plain 'true' on production. Next: redeploy so a fresh build picks it up." : "FAIL"}`);
-  process.exit(ok ? 0 : 1);
+  // Three states, not two. `type === "plain" && value === "true"` folded ENCRYPTED into FAIL — but the env API
+  // returns CIPHERTEXT in `value` for an encrypted/sensitive var, so that comparison is meaningless there, not false.
+  // A read-back that never read the value must not name a verdict in either direction.
+  const state = classifyEnv(envs, KEY);
+  console.log(`READ-BACK: ${describe(state)}`);
+  const isTrue = equals(state, "true");
+  if (isTrue === null) {
+    console.log(`\nARM UNVERIFIABLE — ${KEY} is present on production but its value cannot be read here. Not VERIFIED, not FAIL. Confirm by execution against the deployed app, or re-add the var as plain.`);
+    process.exit(2);
+  }
+  console.log(`value === "true": ${isTrue}`);
+  console.log(`\nARM ${isTrue ? "VERIFIED — plain 'true' on production. Next: redeploy so a fresh build picks it up." : state.state === "absent" ? "FAIL — not present on production." : "FAIL — readable on production, but not 'true'."}`);
+  process.exit(isTrue ? 0 : 1);
 })();
