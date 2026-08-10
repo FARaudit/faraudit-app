@@ -14,6 +14,7 @@
 // scripts/audit-ai/ runs on a push. This does.
 import { strict as assert } from "node:assert";
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 let pass = 0, fail = 0;
@@ -76,6 +77,31 @@ ok("armed: importanceOf==='boilerplate' ⇒ !hasBarSignal, over every fixture",
 console.log("-- bond paper: the single loosening, by design --");
 ok("flag OFF — false surety hit refuses the release", r.bondPaper.off === "ambiguous");
 ok("flag ON  — the #587b carve-out grants it", r.bondPaper.on === "boilerplate");
+
+// ── 6 · THE TERMINATOR GUARDS ITSELF ───────────────────────────────────────────────────────────────────────
+//
+// This suite COUNTS failures instead of throwing where they happen, so the one line below is the only thing
+// that turns a printed ✗ into a red build. Anything appended under it runs, prints, increments `fail` and
+// exits 0. Measured, not assumed: a failing assertion appended below the terminator exited 0.
+//
+// Same class as _capability-statement-truth (PR #604) and audit-decide-temporal, whose fourteen-assertion F1
+// regression bank sat below its own exit. This reads THIS file so the next block appended in the wrong place
+// fails the run that appends it.
+console.log("-- the terminator is the last thing in this file --");
+{
+  const self = readFileSync(join(import.meta.dirname ?? __dirname, "audit-noop-rep-bar-signal-parity.test.ts"), "utf8");
+  // Anchored to the STATEMENT form at line start. A plain substring search also matches the search term
+  // written out here, which is an assertion failing on its own source rather than on the file.
+  const hits = [...self.matchAll(/^assert\.equal\(fail, 0, /gm)];
+  ok(`the terminator is present exactly once (found ${hits.length}) — an earlier one truncates the run`,
+    hits.length === 1);
+  const last = hits[hits.length - 1];
+  const after = last ? self.slice((last.index ?? 0) + last[0].length) : "";
+  // A trailing comment or console.log is not a test; a call to the helper is.
+  const orphans = (after.match(/\bok\(/g) || []).length;
+  ok(`no assertion is written below the terminator (found ${orphans} that would run but never fail the build)`,
+    orphans === 0);
+}
 
 console.log(`\nnoop-rep bar-signal parity: ${pass} passed, ${fail} failed`);
 assert.equal(fail, 0, `${fail} assertion(s) failed`);

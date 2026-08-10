@@ -5,6 +5,8 @@
 // audit-temporal.test.ts): flag-OFF byte-identity, CLOSED dominance (NO_BID + temporalClosed), the
 // silently-fatal false-CLOSED guard (snapshot-past + NO live confirmation → INCOMPLETE, NEVER NO_BID),
 // INDETERMINATE capping a would-be committal, and OPEN passing through untouched.
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { deriveVerdict } from "./audit-decide";
 import { classifyTemporal, type LiveSamStatus } from "./audit-temporal";
 import type { TypedFinding, VerdictInputs } from "./audit-findings";
@@ -102,8 +104,6 @@ console.log("\n── 8 · missing today/snapshot ⇒ no temporal reasoning even
 }
 
 delete process.env.AUDIT_TEMPORAL_VERDICT;
-console.log(`\n${failures === 0 ? "✅ ALL GREEN" : `❌ ${failures} FAILURE(S)`} — deriveVerdict × temporal integration`);
-if (failures) process.exit(1);
 
 // ── ULTRA B2 · FINDING F1 REGRESSION BANK (Brain RULING 4, 2026-07-22) ──────────────────────────────────────
 // SAM v2 `responseDeadLine` is ALWAYS `YYYY-MM-DDTHH:MM:SS±HH:MM`. `parseSolicitationDate` returns null on that
@@ -148,3 +148,28 @@ console.log("\n── F1 regression bank (SAM-format datetimes, instants only) �
   assert(D("2026-07-15T10:00:00-04:00", "2026-07-22T12:00:00Z", true, null).kind === "INDETERMINATE",
     "F1: unknown active still INDETERMINATE");
 }
+
+// ── THE TERMINATOR GUARDS ITSELF ────────────────────────────────────────────────────────────────────────────
+// The summary and the exit used to sit above the F1 regression bank, so all FOURTEEN of its assertions ran
+// after the process had already decided its exit code. Breaking one printed ❌ next to ✅ ALL GREEN and the
+// run still exited 0 — the bank the Brain ratified as the F1 backstop could not fail CI. A red line is what
+// the run prints; the exit code is what CI reads.
+//
+// This reads THIS file and asserts nothing testable follows the exit, so the next block appended in the
+// wrong place fails the run that appends it.
+console.log("\n── the exit is the last thing in this file ──");
+{
+  const self = readFileSync(join(import.meta.dirname ?? __dirname, "audit-decide-temporal.test.ts"), "utf8");
+  // Anchored to the STATEMENT form. A plain substring search also matches the search term written out here,
+  // which is a check failing on its own source rather than on the file.
+  const hits = [...self.matchAll(/^if \(failures > 0\) process\.exit\(1\);$/gm)];
+  assert(hits.length === 1, `the exit call is present exactly once (found ${hits.length}) — an earlier one truncates the run`);
+  const last = hits[hits.length - 1];
+  const after = last ? self.slice((last.index ?? 0) + last[0].length) : "";
+  // A trailing comment is not a test; an `assert\(` call is.
+  const orphans = (after.match(/\bassert\(/g) || []).length;
+  assert(orphans === 0, `no assertion is written after the exit (found ${orphans} that would run once the exit code is already decided)`);
+}
+
+console.log(`\n${failures === 0 ? "✅ ALL GREEN" : `❌ ${failures} FAILURE(S)`} — deriveVerdict × temporal integration`);
+if (failures > 0) process.exit(1);
