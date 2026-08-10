@@ -175,10 +175,9 @@
       </div>
       <div class="cop-note" style="border-bottom:1px solid var(--line-2)"><b>What changed</b>${esc(u.summary)}</div>
       ${u.diff ? `<div class="redline"><div class="redline-head">Clause redline</div><div class="redline-before"><span class="rl-tag">WAS</span>${esc(u.diff.before)}</div><div class="redline-after"><span class="rl-tag">NOW</span>${esc(u.diff.after)}</div></div>` : ''}
-      <div class="cop-note"><b>⚡ Why it matters to you</b>${esc(u.insight)}</div>
+      ${u.insight ? `<div class="cop-note"><b>⚡ Why it matters to you</b>${esc(u.insight)}</div>` : ''}
       <div class="cop-actions">
-        <button class="cop-btn primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>Read full text</button>
-        <button class="cop-btn ghost"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Track clause</button>
+        ${u.link ? `<a class="cop-btn primary" href="${esc(u.link)}" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>Read full text</a>` : ''}
       </div>`;
   }
 
@@ -196,7 +195,7 @@
         <div class="feed-top"><span class="feed-clause">${esc(u.clause || u.type)}</span><span class="feed-type" style="color:${tc};background:${hexA(tc,.1)}">${esc(u.type)}</span><span class="feed-imp" style="color:${im.color};background:${hexA(im.color,.12)}">${esc(im.label)}</span><span class="feed-date">${esc(fmtDate(u.date))}</span></div>
         <div class="feed-title">${esc(u.title)}</div>
         <div class="feed-summary">${esc(u.summary)}</div>
-        <div class="feed-insight"><b>⚡ Why it matters</b>${esc(u.insight)}</div>
+        ${u.insight ? `<div class="feed-insight"><b>⚡ Why it matters</b>${esc(u.insight)}</div>` : ''}
       </div>`;
     }).join('') || (function () { const [t, d] = blankReason();
       return D.UPDATES.length ? `<div class="tl-empty">No updates match your filters.</div>`
@@ -253,7 +252,15 @@
     let html;
     if (u && u.impact === 'HIGH') html = `<span class="ib-label">Priority</span><b>${esc(u.clause ? u.clause + " · " : "")}${esc(u.title)}</b> is high-impact and hits <b>${esc(String(u.affects))} of your contracts</b> — ${esc(u.insight)}`;
     else if (u) html = `<span class="ib-label">Focus</span><b>${esc(u.clause || u.title)}</b> (${esc(u.type)}, ${esc(impMeta(u.impact).label.toLowerCase())} impact) — ${esc(u.insight)}`;
-    else { const [t, d] = blankReason(); html = `<span class="ib-label">${esc(t)}</span>${esc(d)}`; }
+    else {
+      /* NOTHING SELECTED IS NOT NOTHING PUBLISHED. With rows on the page this branch used to
+         print the no-data message beside a counter reading 40, which is the page contradicting
+         itself about its own source. The panel already drew this distinction; the bar did not. */
+      const [t, d] = D.UPDATES.length
+        ? ['Pick a change', 'Select any card in the feed to see what it does to your bids.']
+        : blankReason();
+      html = `<span class="ib-label">${esc(t)}</span>${esc(d)}`;
+    }
     $('insightBar').innerHTML = `<span class="ib-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a7 7 0 00-4 12.7V17a1 1 0 001 1h6a1 1 0 001-1v-2.3A7 7 0 0012 2z"/><path d="M9 21h6"/></svg></span><span>${html}</span>`;
   }
 

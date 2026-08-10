@@ -176,6 +176,53 @@ async function main(): Promise<void> {
       "the tooltip and panel print an empty string as the title of the update");
   }
 
+
+  // ── THE PAGE MAY NOT DENY ITS OWN FEED, AND A CONTROL MAY ONLY CLAIM WHAT IT DOES ──
+  // Found by driving the deployed page 2026-08-10. Two of these are CEO findings from his own
+  // review; the first is a regression I shipped in the commit directly above.
+  //
+  // Keying selection on `id` left `S.sel` null on load. renderPanel already split "nothing
+  // selected" from "nothing published"; renderInsight did not, so the bar printed the no-data
+  // message beside a counter reading 40 IN FEED. A surface claiming absence while holding data
+  // is the honest-fail rule inverted.
+  console.log("\n── nothing selected is not nothing published ──");
+  {
+    const insight = app.slice(app.indexOf("function renderInsight()"), app.indexOf("function shade("));
+    check("the insight source was sliced, not empty", insight.length > 200,
+      `sliced ${insight.length} chars — the markers are out of order and the checks below are vacuous`);
+    check("an unselected row does not report an empty feed", /D\.UPDATES\.length[\s\S]{0,120}?blankReason\(\)/.test(insight),
+      "with rows loaded and none selected, the bar prints the source-unavailable message");
+    check("…and it still reports a genuinely empty feed", /blankReason\(\)/.test(insight),
+      "the no-data state lost its message along with the bug");
+    // The panel had it right all along — the two must not drift apart again.
+    const panel = app.slice(app.indexOf("function renderPanel()"), app.indexOf("function renderFeed()"));
+    check("the panel draws the same distinction", /D\.UPDATES\.length \? \['Select a clause'/.test(panel),
+      "the two empty states disagree about what an empty selection means");
+
+    // CEO review 2026-08-10: "when I click Read full text or + Track clause, nothing happens."
+    // Both were <button> with no handler. Read full text has a real destination on every row —
+    // the Federal Register URL the feed already carries. Track clause had no feature behind it.
+    check("Read full text is a real link to the published rule",
+      /<a class="cop-btn primary" href="\$\{esc\(u\.link\)\}"/.test(panel),
+      "the control is a button with no handler — pressing it does nothing");
+    check("…and it opens safely in a new tab", /rel="noopener noreferrer"/.test(panel),
+      "target=_blank without noopener hands the opener to the destination");
+    check("…and it is not rendered for a row with no link", /\$\{u\.link \? /.test(panel),
+      "a row with no URL still offers a control that cannot go anywhere");
+    check("Track clause is gone", !/Track clause/.test(app),
+      "a control with no feature behind it is still on the page");
+
+    // "Why it matters" printed its own label with nothing after it: this route runs no insight
+    // pass, so `insight` is the empty string on every row.
+    check("the insight block is omitted when there is no insight",
+      /\$\{u\.insight \? /.test(panel) && (app.match(/\$\{u\.insight \? /g) || []).length >= 2,
+      "a bold heading renders above an empty string, in the panel or the feed or both");
+
+    check("P· the dead-control check can see a handlerless button",
+      /<button class="cop-btn ghost">/.test('<button class="cop-btn ghost">Track clause</button>'),
+      "the check cannot see the shape it forbids");
+  }
+
   console.log(`\n${pass} passed · ${fail} failed`);
   if (fail > 0) process.exit(1);
 }
