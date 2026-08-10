@@ -154,11 +154,22 @@
     const d = dist();
     const m = meta();
     const shown = m.state === 'ready' || m.state === 'empty';
+    // Label and practice count come from the reference the server sent, not from a copy kept
+    // here. They were hardcoded, so the same number lived in two places and only one of them was
+    // ever updated. The descriptor names what actually puts an audit at the level — Level 3 read
+    // "critical programs", which described a trigger the engine no longer uses and never reliably
+    // established.
+    const ref = (window.CMMC && window.CMMC.REFERENCE) || {};
+    const lvl = (k, fallbackLabel, what) => {
+      const r = ref[k] || {};
+      const n = typeof r.practices === 'number' ? r.practices : null;
+      return { k: k, label: r.label || fallbackLabel, foot: what + (n ? ' · ' + n + ' practices' : '') };
+    };
     const cells = [
       { k: '0', label: 'No CMMC named', foot: 'nothing in the audit triggers a level' },
-      { k: '1', label: 'Level 1 — Foundational', foot: 'FCI · 17 practices' },
-      { k: '2', label: 'Level 2 — Advanced', foot: 'CUI · 110 practices' },
-      { k: '3', label: 'Level 3 — Expert', foot: 'critical programs · 134 practices' }
+      lvl('1', 'Level 1 — Foundational', 'FCI'),
+      lvl('2', 'Level 2 — Advanced', 'CUI'),
+      lvl('3', 'Level 3 — Expert', 'NIST SP 800-172')
     ];
     fill(host, cells.map((c) => h('div', { cls: 'kpi' }, [
       h('p', { cls: 'lbl', text: c.label }),
