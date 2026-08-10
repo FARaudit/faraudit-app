@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
 import { calcRateStats } from "@/lib/calc-rates";
 import { resolveFeedScope } from "@/lib/bd-os/live-opportunities";
+import { CATEGORY_SPEC } from "@/lib/labor-category-spec";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -93,6 +94,11 @@ export async function GET(req: NextRequest) {
   const state = url.searchParams.get("state");
   const search = (url.searchParams.get("q") || "").toLowerCase();
   const includeWage = url.searchParams.get("wage") === "1";
+  // WHAT PRIMES ACTUALLY BILL, for ONE category. GSA CALC+ indexes Contract-Awarded Labor
+  // Category ceiling rates off GSA schedules — the rates schedule holders have actually won,
+  // which is the only comparison a subcontractor pricing against a prime can make. It answers
+  // by category name, so it is asked for the selected row rather than for the whole table.
+  const compare = (url.searchParams.get("compare") || "").trim();
 
   // Live cache pass — operator-curated rows in labor_rate_benchmarks override reference.
   let liveQuery = supabase
@@ -144,7 +150,9 @@ export async function GET(req: NextRequest) {
       curated: true
     })),
     ...wageRows,
-    ...REFERENCE.map((r) => ({ ...r, curated: false }))
+    // The spec travels WITH the row. A panel that had to look it up separately would go blank
+    // for a curated or live row that has no entry, which is a real state rather than an error.
+    ...REFERENCE.map((r) => ({ ...r, curated: false, spec: CATEGORY_SPEC[r.category] || null }))
   ].filter((r) => {
     if (naics && !r.naics_codes.includes(naics)) return false;
     if (search && !r.category.toLowerCase().includes(search)) return false;
@@ -156,8 +164,32 @@ export async function GET(req: NextRequest) {
   // empty". Both travel with the rows rather than being guessed client-side.
   const scope = await resolveFeedScope(supabase);
 
+  // HONEST-FAIL, not a silent blank. Three outcomes are distinct on screen: rates found, the
+  // category is not in CALC+, and the lookup failed. A panel that renders nothing for all
+  // three tells the customer their category has no market when the service was simply down.
+  let compareOut: unknown = null;
+  if (compare) {
+    try {
+      const stats = await calcRateStats(compare);
+      compareOut = stats && stats.median != null
+        ? {
+            category: compare,
+            median: stats.median,
+            min: stats.min ?? null,
+            max: stats.max ?? null,
+            count: stats.count,
+            source: "GSA CALC+ — awarded ceiling rates on GSA schedules",
+            state: "found"
+          }
+        : { category: compare, state: "none", source: "GSA CALC+" };
+    } catch {
+      compareOut = { category: compare, state: "error", source: "GSA CALC+" };
+    }
+  }
+
   return NextResponse.json({
     rates: merged,
+    compare: compareOut,
     scope: { codes: scope.codes, source: scope.source },
     meta: {
       source: "bls-sca-reference",
