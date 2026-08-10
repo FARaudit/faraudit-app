@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase-server";
 import { fetchLogoBytes } from "@/lib/capability-statement-logo";
 import { resolveAgency } from "@/lib/capability-statement-tailoring";
 import { CapDoc, type CapStmt } from "@/lib/capability-statement-pdf-doc";
+import { refusalsFor } from "@/lib/capability-statement-sections";
 import { renderToBuffer } from "@react-pdf/renderer";
 import React from "react";
 export const dynamic = "force-dynamic";
@@ -27,6 +28,27 @@ export async function GET(req: NextRequest) {
   if (!String((stmt as CapStmt).company_name || "").trim()) {
     return NextResponse.json(
       { error: "Add your company name before exporting — a capability statement is sent under it." },
+      { status: 409 }
+    );
+  }
+
+  // THE CAPS, ENFORCED WHERE THE DOCUMENT IS BUILT — card 825 §2.
+  //
+  // `refusalsFor` has existed and been unit-tested since the structured columns landed, and
+  // NOTHING CALLED IT. A cap that no caller consults is a cap the document does not have: the
+  // grid draws three competency tracks, so a fourth was rendering 78px off the page and the
+  // sheet still downloaded, looking complete to the customer and clipped to the contracting
+  // officer who received it.
+  //
+  // Refuse, never trim. Design was explicit that choosing which three print is an editorial
+  // step and "the one thing in this card I cannot solve in layout" — an export that silently
+  // keeps the first three makes that editorial call on the customer's behalf, invisibly, on a
+  // document sent under their name. 409 is the same answer the missing-company-name guard
+  // gives, for the same reason: a fixable state the customer can act on, not a failure.
+  const refusals = refusalsFor(stmt as Parameters<typeof refusalsFor>[0]);
+  if (refusals.length) {
+    return NextResponse.json(
+      { error: refusals.map((r) => r.message).join(" "), refusals },
       { status: 409 }
     );
   }

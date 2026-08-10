@@ -10,6 +10,11 @@ import { registerCapabilityFonts } from "@/lib/capability-statement-fonts";
 import { PlatePage } from "@/lib/capability-statement-plate";
 
 export interface CapStmt {
+  // SAM-OWNED, never customer-typed. Registration status is SAM's fact; a firm printing "Active"
+  // over a lapsed registration makes a false statement on a document a contracting officer reads.
+  // Declared so the plate's ninth title-block cell has a shape to bind; absent until a sync writes
+  // it, so under the empty-section rule the cell does not render today.
+  sam_registration_status?: string | null;
 
   company_name?: string | null;
   logo_url?: string | null;
