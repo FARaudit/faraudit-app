@@ -294,7 +294,7 @@ console.log("\n── a contact row names its own field ──");
 {
   const fields = (live.match(/var CONTACT_FIELDS\s*=\s*\[([^\]]*)\]/)?.[1] ?? "")
     .split(",").map((s) => s.trim().replace(/^['"]|['"]$/g, "")).filter(Boolean);
-  check("the painted field list is readable", fields.length === 5, `parsed ${fields.length}`);
+  check("the painted field list is readable", fields.length === 6, `parsed ${fields.length}`);
 
   const strip = html.slice(html.indexOf('<div class="contact-strip">'), html.indexOf("</article>"));
   const authored = [...strip.matchAll(/data-cs-contact="([^"]+)"/g)].map((m) => m[1]);
@@ -333,7 +333,7 @@ console.log("\n── the contact strip is laid out in columns ──");
   // Every cell is placed BY FIELD. Auto-flow would put the phone wherever the markup
   // happens to sit, and markup order on this strip is already load-bearing for which
   // record column an edit writes to — layout must not add a second reason to care.
-  for (const [field, col] of [["contact_name", "1"], ["contact_email", "1"], ["contact_phone", "1"],
+  for (const [field, col] of [["contact_name", "1"], ["contact_title", "1"], ["contact_email", "1"], ["contact_phone", "1"],
                               ["contact_address", "2"], ["contact_website", "2"]] as const) {
     check(`${field} is placed in column ${col}`,
       new RegExp(`\\.contact-item\\[data-cs-contact="${field}"\\]\\{grid-column:${col};grid-row:\\d`).test(html),
@@ -890,9 +890,6 @@ console.log("\n── a tailored edition writes nothing ──");
     /callModel/.test("const prose = await callModel('rewrite for ' + agency);"));
 }
 
-console.log(`\n${pass} passed · ${fail} failed`);
-if (fail > 0) process.exit(1);
-
 // ── a field the document reads must be a field the record can write ──────────
 // contact_title landed as a column, the plate reads it to build "Name, Title", and it was in
 // neither PatchBody nor ALLOWED_FIELDS — so every save carrying a title had it dropped by the
@@ -918,6 +915,100 @@ console.log("\n── every field the plate reads can be written ──");
   check("the SAM-owned field is still NOT writable",
     !allowed.includes('"sam_registration_status"'),
     "a customer could type a registration status SAM did not confirm");
+
+  // THE THIRD LEG, and the one whose absence cost a second round. The two checks above prove
+  // the plate READS a field and the API ACCEPTS it. Neither asks whether a customer can supply
+  // one. contact_title passed both and had no input anywhere in the product: four read sites,
+  // an allowlist entry, and nothing on any screen that could set it — so the document printed a
+  // bare name forever and the fix that made it writable changed nothing a customer could see.
+  // A field is only fillable when something can produce it: an editor on this page, or a named
+  // derivation. Anything else is read on a document nobody can complete.
+  // EVERY SCRIPT THE PAGE SHIPS, discovered from its own <script src>. Scanning only
+  // capability-statement-live.js reported `uei` as unfillable while /uei-editor.js — loaded
+  // by this same page — was PATCHing it. A gate narrower than the page it guards produces a
+  // finding about the gate, so the file list is read off the markup rather than typed here.
+  const pageScripts = [...html.matchAll(/<script[^>]+src="\/([\w.-]+\.js)"/g)]
+    .map((m) => m[1])
+    .filter((f) => existsSync(join(ROOT, "public", f)))
+    .map((f) => read(`public/${f}`));
+  check("the page's own scripts were discovered", pageScripts.length >= 2,
+    `found ${pageScripts.length} script(s) — the <script src> pattern may be stale`);
+  const allScripts = [live, ...pageScripts].join("\n");
+  const typeable = new Set([
+    ...[...allScripts.matchAll(/FIELD_LABELS = \{([\s\S]*?)\};/g)].flatMap((m) => [...m[1].matchAll(/(\w+):/g)].map((x) => x[1])),
+    ...[...allScripts.matchAll(/CONTACT_FIELDS = \[([^\]]+)\]/g)].flatMap((m) => [...m[1].matchAll(/'(\w+)'/g)].map((x) => x[1])),
+    ...[...allScripts.matchAll(/STRUCTURED = \{([\s\S]*?)\n  \};/g)].flatMap((m) => [...m[1].matchAll(/json: '(\w+)'/g)].map((x) => x[1])),
+    // A literal PATCH body is a control too — that is the shape uei-editor.js writes through.
+    ...[...allScripts.matchAll(/JSON\.stringify\(\{\s*(\w+):/g)].map((m) => m[1]),
+  ]);
+  // Derived, not typed — each names WHAT fills it, so nothing is waved through by silence.
+  const DERIVED: Record<string, string> = {
+    sam_registration_status: "SAM, and deliberately never the customer",
+    certifications: "synced from the SAM entity record when a UEI is saved",
+    cage_code: "synced from the SAM entity record when a UEI is saved",
+    naics_codes: "the NAICS page",
+    past_performance: "recomputed from audits recorded as won",
+    logo_url: "the logo upload control, deliberately outside the record PATCH",
+    core_competencies: "the structured editor writes core_competencies_json",
+    differentiators: "the structured editor writes differentiators_json",
+    user_id: "the session",
+    created_at: "the database",
+    updated_at: "the database",
+  };
+  for (const f of readByPlate) {
+    const where = typeable.has(f) ? "an editor on this page" : DERIVED[f];
+    check(`the plate reads ${f} — and something can fill it: ${where ?? "NOTHING"}`, !!where,
+      `${f} is printed on a document a contracting officer reads and no control in the product can set it`);
+  }
+
+  check("P· the fillability check can see a field with no control",
+    !new Set(["contact_name"]).has("contact_fax"),
+    "the third leg cannot fail, so it proves nothing");
+}
+
+// ── the page after a save is the page after a load ──────────────────────────
+// Reported from the live page 2026-08-10: "I saved it but it does not refresh unless you hit
+// refresh." GET answers with the record PLUS values computed per request — recomputed past
+// performance, the NAICS overlay, the industry titles, the tailored agency list. PATCH answers
+// with the stored row alone. The client assigned that reply straight over REC, so every computed
+// value was dropped on every save and only a manual reload put them back.
+console.log("\n── a save leaves the page in the same state a load would ──");
+{
+  const api = read("src/app/api/capability-statement/route.ts");
+  // The premise: the two replies really are different shapes. If PATCH ever starts returning
+  // the merged object this check should be revisited rather than silently kept.
+  check("GET answers with more than the stored row",
+    /statement: merged/.test(api) && /naics_titles/.test(api) && /past_performance_total/.test(api),
+    "the premise no longer holds — GET and PATCH may now agree");
+  check("PATCH answers with the stored row alone", /return NextResponse\.json\(\{ statement: data/.test(api),
+    "PATCH's reply shape changed; the reason for re-reading may have gone with it");
+
+  const saveFn = live.slice(live.indexOf("function save(patch)"), live.indexOf("function openStructuredEditor"));
+  check("a save does not adopt the PATCH reply as the record", !/REC = saved/.test(saveFn),
+    "the stored row overwrites the computed one and the page silently loses what only GET sends");
+  check("a save re-reads through the same loader", /load\(\)/.test(saveFn),
+    "nothing refetches, so the page holds stale computed values until a manual reload");
+  check("the save is still confirmed against the row the server returned",
+    /Save did not persist/.test(saveFn) && /res\.body && res\.body\.statement/.test(saveFn),
+    "re-reading replaced the persistence check instead of following it");
+  check("the confirmation is written before the re-read",
+    saveFn.indexOf("'✓ Saved'") < saveFn.indexOf("load()"),
+    "a slow or failed refresh would present a landed save as a failure");
+
+  // ONE reader. Two would drift, which is the same defect one layer up.
+  check("there is a single loader", (live.match(/function load\(\)/g) || []).length === 1,
+    "a second reader will populate a different subset of the computed values");
+  const loadFn = live.slice(live.indexOf("function load()"), live.indexOf("function wire()"));
+  for (const computed of ["PAST_TOTAL", "PAST_LIMIT", "NAICS_TITLES", "AGENCIES"]) {
+    check(`${computed} is set by the loader`, new RegExp(`${computed} =`).test(loadFn),
+      "a computed value the save path cannot restore");
+  }
+  check("a recovered read clears the unreadable state", /classList\.remove\('cs-unreadable'\)/.test(loadFn),
+    "one failed refresh leaves the document marked unreadable for the rest of the session");
+
+  check("P· the stale-record check can see the pre-fix shape",
+    /REC = saved/.test("REC = saved; renderAll(); note('✓ Saved', true);"),
+    "the check cannot see the assignment it exists to forbid");
 }
 
 // ── the pasted copy has to fit the page it promises ──────────────────────────
@@ -1012,3 +1103,29 @@ console.log("\n── card 826 · NAICS key grammar ──");
   check("both new keys stay inside the two-word rule",
     "NAICS".split(/\s+/).length <= 2 && "Also".split(/\s+/).length <= 2);
 }
+
+// ── THE TERMINATOR GUARDS ITSELF ─────────────────────────────────────────────
+// The summary and the exit used to sit at line 894 of a 1100-line file, so the SIX blocks
+// appended below them printed ✗ FAIL and the process still exited 0. Every one of those gates
+// had been called "proven falsifiable" on the strength of a red line in the output — which is
+// what the run prints, not what CI reads. A gate that cannot fail the build is decoration.
+//
+// This check reads THIS file and asserts nothing testable follows the exit, so the next block
+// appended in the wrong place fails the run that appends it.
+console.log("\n── the exit is the last thing in this file ──");
+{
+  const self = readFileSync(join(ROOT, "test/public/_capability-statement-truth.test.ts"), "utf8");
+  // Anchored to the STATEMENT form. A plain substring search also matches the search term
+  // written out here, which is a check failing on its own source rather than on the file.
+  const hits = [...self.matchAll(/^if \(fail > 0\) process\.exit\(1\);$/gm)];
+  check("the exit call is present exactly once", hits.length === 1,
+    `${hits.length} exit statements — an earlier one truncates the run`);
+  const last = hits[hits.length - 1];
+  const after = last ? self.slice((last.index ?? 0) + last[0].length) : "";
+  // Its own trailing comment is not a test; a `check(` call is.
+  check("no assertion is written after the exit", !/\bcheck\(/.test(after),
+    `${(after.match(/\bcheck\(/g) || []).length} assertion(s) run after the process has already decided its exit code`);
+}
+
+console.log(`\n${pass} passed · ${fail} failed`);
+if (fail > 0) process.exit(1);

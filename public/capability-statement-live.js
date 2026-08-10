@@ -509,7 +509,7 @@
   }
 
   /* ── contact strip ──────────────────────────────────────────────────────── */
-  var CONTACT_FIELDS = ['contact_name', 'contact_email', 'contact_phone', 'contact_website', 'contact_address'];
+  var CONTACT_FIELDS = ['contact_name', 'contact_title', 'contact_email', 'contact_phone', 'contact_website', 'contact_address'];
 
   function paintContact() {
     var items = document.querySelectorAll('.contact-strip .contact-item');
@@ -646,6 +646,7 @@
     core_competencies: 'Core Competencies',
     differentiators: 'Differentiators',
     contact_name: 'Point of contact',
+    contact_title: 'Title',
     contact_email: 'Email',
     contact_phone: 'Phone',
     contact_website: 'Website',
@@ -708,9 +709,11 @@
           return;
         }
       }
-      REC = saved;
-      renderAll();
+      /* The write is confirmed above, from the row the server sent back, so the save is
+         reported before the re-read — a slow or failed refresh must never be shown as a
+         failed save. The re-read is what puts the recomputed values back on the page. */
       note('✓ Saved', true);
+      load();
     }).catch(function () { note('Could not reach the server', false); });
   }
 
@@ -723,6 +726,7 @@
     core_competencies:{ kind: 'The document', prose: true, help: 'The first thing a contracting officer reads. What you build or do, in your own words — plain sentences beat a keyword list.' },
     differentiators:  { kind: 'The document', prose: true, help: 'Why you over the other bidders. Certifications, facilities, clearances, past programs — the things another firm cannot simply claim.' },
     contact_name:     { kind: 'Contact', help: 'Who a contracting officer asks for by name.' },
+    contact_title:    { kind: 'Contact', help: 'Their role, printed beside the name. A contracting officer reads it to know whether they have the President or the front desk.' },
     contact_email:    { kind: 'Contact', type: 'email', help: 'Where a solicitation question lands. Use a monitored address, not a personal one.' },
     contact_phone:    { kind: 'Contact', type: 'tel', help: 'A number answered during business hours in your own time zone.' },
     contact_website:  { kind: 'Contact', type: 'url', help: 'Your company site. Include https:// so it resolves when pasted.' },
@@ -1425,8 +1429,14 @@
     if (pill) pill.hidden = !on;
   }
 
-  function wire() {
-    fetch(API, { credentials: 'include' })
+  /* ONE READER, SO THE PAGE AFTER A SAVE IS THE PAGE AFTER A LOAD.
+     GET answers with the record PLUS values computed per request — recomputed past
+     performance, the NAICS overlay, the industry titles, the tailored agency list.
+     PATCH answers with the stored row alone. Assigning that reply over REC therefore
+     dropped every computed value until the customer reloaded by hand. load() is the
+     only thing that fills them, and a save calls it rather than reusing its own reply. */
+  function load() {
+    return fetch(API, { credentials: 'include' })
       .then(function (r) {
         if (!r.ok) throw new Error('capability statement fetch failed: ' + r.status);
         return r.json();
@@ -1445,6 +1455,7 @@
         NAICS_TITLES = (d.naics_titles && typeof d.naics_titles === 'object') ? d.naics_titles : {};
         AGENCIES = Array.isArray(d.tailored_agencies) ? d.tailored_agencies : [];
         renderAll();
+        document.body.classList.remove('cs-unreadable');
         document.body.classList.add('cs-ready');
         setLivePill(true);
       })
@@ -1454,6 +1465,8 @@
         setLivePill(false);
       });
   }
+
+  function wire() { load(); }
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', wire);
