@@ -787,7 +787,13 @@ console.log("\n── the Word export is a real document ──");
     "the third surface reintroduces the raw phone number");
   check("it carries no FARaudit credit", !/Prepared with FARaudit/.test(docx) && !/FARaudit/.test(docx.replace(/@\/lib\/[a-z-]+/g, "")),
     "our marketing is on a document the customer sends under their own name");
-  check("an empty section is absent", /if \(stmt\.core_competencies\)/.test(docx) && /if \(certs\.length\)/.test(docx),
+  // Both sections resolve through the shared reader — the exports and the page cannot disagree
+  // about one profile — and each heading sits behind a length guard on the resolved list.
+  // THE BEHAVIOURAL PROOF IS NOT HERE: this greps source, and a grep for a guard cannot tell a
+  // real absence from a renamed variable. capability-statement-exports.test.ts renders the PDF
+  // and reads the heading back out of it, in both directions, with the matcher itself checked
+  // for vacuity — the letter-spaced eyebrow made the first absence assertion unfailable.
+  check("an empty section is absent", /resolveCompetencies\(/.test(docx) && /if \(comps\.length\)/.test(docx) && /if \(certs\.length\)/.test(docx),
     "a heading over nothing is a claim about the firm");
   check("Word is no longer declared unbuilt", !/Word export is not built yet/.test(html),
     "the page denies a capability it now has");
