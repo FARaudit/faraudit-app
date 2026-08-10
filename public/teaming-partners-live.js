@@ -19,13 +19,16 @@
       reason: m.reason || null,
       perCode: m.per_code || {},
       stateFilter: m.state || null,
-      setAside: m.set_aside || null
+      setAside: m.set_aside || null,
+      // How many SAM holds vs how many arrived. The renderer says so when they differ.
+      totalAvailable: typeof m.total_available === 'number' ? m.total_available : null,
+      shown: typeof m.shown === 'number' ? m.shown : window.TEAM.PARTNERS.length
     };
   }
 
   function fail(detail) {
     window.TEAM.PARTNERS = [];
-    window.TEAM.meta = { state: 'error', reason: 'fetch-failed', detail: detail || null, perCode: {}, stateFilter: null, setAside: null };
+    window.TEAM.meta = { state: 'error', reason: 'fetch-failed', detail: detail || null, perCode: {}, stateFilter: null, setAside: null, totalAvailable: null, shown: 0 };
   }
 
   function paint() {
