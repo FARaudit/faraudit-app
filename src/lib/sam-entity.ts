@@ -193,10 +193,35 @@ export interface TeamingSearch {
   limit?: number;
 }
 
-export async function searchTeamingPartners(opts: TeamingSearch): Promise<SamEntity[]> {
+/** Same discrimination as EntityLookup above, for the same reason, on the search path.
+ *
+ *  This function used to return `[]` on every failure — no key, network throw, non-2xx,
+ *  unparseable body. Its one caller maps an empty list to `reason: "no-partners"`, which the
+ *  page renders as "SAM answered and returned no active registrations under your primary
+ *  codes." So a SAM outage was reported to the customer as a positive statement about the
+ *  market: that nobody is registered under their codes. The action that invites — stop
+ *  looking for partners — is the opposite of the correct one, which is to try again later.
+ *
+ *  The sibling lookupEntityByUei, twenty lines up, already drew this distinction and
+ *  documented why. The rot was in the function next to the fixed one.
+ *
+ *  `total` is SAM's own totalRecords — how many active registrations exist under this code,
+ *  NOT how many are in `partners`. Measured live 2026-08-09: primaryNaics=332710 answers
+ *  totalRecords 4384 and returns 10 rows. The v3 search rejects pageSize/pageNumber, so ten
+ *  is the whole page the API will give. A page that shows those ten and says nothing states
+ *  an arbitrary 0.2% sample as if it were the market — the same invented-absence defect as
+ *  the one above, one floor down. The caller must carry this number to the surface. */
+export type TeamingSearchResult =
+  | { outcome: "ok"; partners: SamEntity[]; total: number }
+  | { outcome: "unconfigured"; partners: null }
+  | { outcome: "unreachable"; partners: null };
+
+export async function searchTeamingPartners(opts: TeamingSearch): Promise<TeamingSearchResult> {
+  const unreachable = { outcome: "unreachable", partners: null } as const;
   const apiKey = process.env.SAM_API_KEY;
-  if (!apiKey) return [];
-  if (!opts.naics) return [];
+  if (!apiKey) return { outcome: "unconfigured", partners: null };
+  // An absent NAICS is the caller's own state to report, not a SAM answer about one.
+  if (!opts.naics) return { outcome: "unconfigured", partners: null };
 
   // SAM Entity v3 param shape (May 11 2026, evidence-based via direct curl tests
   // against sam.gov/api/prod):
@@ -229,27 +254,33 @@ export async function searchTeamingPartners(opts: TeamingSearch): Promise<SamEnt
     });
   } catch (err) {
     console.error("[sam-entity] fetch failed:", err);
-    return [];
+    return unreachable;
   }
   if (!res.ok) {
     console.error("[sam-entity] SAM responded", res.status, await res.text().catch(() => ""));
-    return [];
+    return unreachable;
   }
 
-  let data: { entityData?: SamEntityRaw[] } = {};
+  let data: { entityData?: SamEntityRaw[]; totalRecords?: number } = {};
   try {
     data = await res.json();
   } catch (err) {
     console.error("[sam-entity] JSON parse failed:", err);
-    return [];
+    return unreachable;
   }
   const list = data.entityData || [];
   const mapped = list.map(toSamEntity);
   const seen = new Set<string>();
-  return mapped.filter(e => {
+  // A zero-length list here is a real answer from SAM and stays `ok` — a quiet market must
+  // still be reportable, or this becomes a fail-everything machine.
+  const partners = mapped.filter(e => {
     const key = e.uei || e.cage_code || e.legal_business_name;
     if (!key || seen.has(key)) return false;
     seen.add(key);
     return true;
   });
+  // Fall back to the row count, never to 0: an absent totalRecords must not make a capped
+  // page look complete.
+  const total = typeof data.totalRecords === "number" ? data.totalRecords : partners.length;
+  return { outcome: "ok", partners, total };
 }

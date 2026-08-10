@@ -125,6 +125,17 @@
       ]);
       return;
     }
+    // Ready — but SAM's entity search serves one page and rejects pageSize, so what arrived
+    // is usually a small sample of what is registered. The count carries its caveat in
+    // place: a list of ten drawn from thousands must not read as the whole market.
+    if (typeof m.totalAvailable === 'number' && typeof m.shown === 'number' && m.totalAvailable > m.shown) {
+      el.hidden = false;
+      fill(el, [
+        h('span', { cls: 'sb-label', text: 'Partial list' }),
+        h('span', { text: 'SAM holds ' + m.totalAvailable.toLocaleString() + ' active registrations under your codes. This page shows the ' + m.shown + ' it returns per request — narrow by NAICS to see a different set.' })
+      ]);
+      return;
+    }
     el.hidden = true;
     fill(el, []);
   }
