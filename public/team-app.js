@@ -48,7 +48,14 @@
     if (!iso) return '—';
     const t = Date.parse(iso);
     if (Number.isNaN(t)) return '—';
-    return new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    // Registration and certification expiry arrive as calendar dates, not instants. A
+    // date-only string parses as UTC midnight, so formatting it in local time lands on the
+    // previous day for any viewer west of UTC. A date with no time of day has no timezone to
+    // convert, so it is formatted in UTC.
+    const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(String(iso).trim());
+    return new Date(t).toLocaleDateString('en-US',
+      dateOnly ? { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }
+               : { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
   const meta = () => (window.TEAM && window.TEAM.meta) || { state: 'loading' };
