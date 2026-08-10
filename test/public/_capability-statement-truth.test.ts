@@ -986,3 +986,29 @@ console.log("\n── the presence test rejects serialization accidents ──")
   check("both paste containers guard the comma", commaGuards >= 2,
     `found ${commaGuards} — the comma belongs to the title, so a record without one must not emit it`);
 }
+
+
+// ── card 826 · the key names the field, not the sub-line ─────────────────────
+// Design refused the stamp partly on this: the title block printed `336412 · 336611` under a key
+// reading PRIMARY NAICS. Those are different codes, not a property of the primary — the same
+// CAGE-under-UEI construction ruled out in card 825. The key is now NAICS (the value's position
+// says which one is primary) and the sub-line says `Also`, naming the relationship rather than
+// sitting mute. Held in BOTH containers, because the plate and the paste are one document.
+console.log("\n── card 826 · NAICS key grammar ──");
+{
+  // Comments are not markup — the plate's own comment explains what the key changed FROM, and a
+  // bare grep reads that as the defect. Second time today; stripped at the source now.
+  const decomment = (x: string) => x.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const plateSrc = decomment(read("src/lib/capability-statement-plate.tsx"));
+  for (const [where, src] of [["the plate", plateSrc], ["the paste", decomment(live)]] as const) {
+    check(`${where} does not claim the sub-line is the primary`,
+      !/Primary NAICS/.test(src),
+      "the secondaries print under a key that says they are a property of the primary");
+    check(`${where} names the relationship on the sub-line`,
+      /Also /.test(src),
+      "a mute row of codes under a value reads as a qualifier on it");
+  }
+  // The key exemption still rests on its condition — NAICS is one word, Also is one word.
+  check("both new keys stay inside the two-word rule",
+    "NAICS".split(/\s+/).length <= 2 && "Also".split(/\s+/).length <= 2);
+}

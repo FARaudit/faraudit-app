@@ -1,0 +1,113 @@
+- generic [active] [ref=f14e1]:
+  - navigation [ref=f14e2]:
+    - generic [ref=f14e3]:
+      - link "F FARaudit" [ref=f14e4] [cursor=pointer]:
+        - /url: "#top"
+        - generic [ref=f14e5]: F
+        - generic [ref=f14e6]: FARaudit
+      - generic [ref=f14e7]:
+        - link "How it works" [ref=f14e8] [cursor=pointer]:
+          - /url: /how-it-works
+        - link "Plans" [ref=f14e9] [cursor=pointer]:
+          - /url: /pricing
+        - link "Learn" [ref=f14e10] [cursor=pointer]:
+          - /url: /learn
+        - link "Sign in" [ref=f14e11] [cursor=pointer]:
+          - /url: /sign-in
+        - link "Request Access" [ref=f14e12] [cursor=pointer]:
+          - /url: /access
+  - generic [ref=f14e16]:
+    - generic [ref=f14e17]: Federal Contract Intelligence
+    - heading "A bid/no-bid verdict you can trust — because it tells you when it can't." [level=1] [ref=f14e18]: A bid/no-bid verdict you can trust —because it tells you when it can't.
+    - paragraph [ref=f14e19]: FARaudit runs the full federal BD arc — from the first government signal to recompete alert. Every finding cites the source line. When the documents can't support a verdict, it says so instead of guessing. Where a requirement can't be covered, the verdict is capped and the gap is named — it stays a decision you can act on.
+    - generic [ref=f14e20]:
+      - link "Request access →" [ref=f14e21] [cursor=pointer]:
+        - /url: /access
+      - link "See how it works ↓" [ref=f14e22] [cursor=pointer]:
+        - /url: "#how"
+        - text: See how it works
+        - generic [ref=f14e23]: ↓
+  - generic [ref=f14e26]:
+    - generic [ref=f14e27]:
+      - generic [ref=f14e28]:
+        - generic [ref=f14e29]: "01"
+        - text: Trust
+      - heading "A verdict that admits what it can't verify." [level=2] [ref=f14e30]: A verdict that admitswhat it can't verify.
+      - paragraph [ref=f14e31]: Five independent expert lenses. An adversarial verifier that tags every claim VERIFIED, UNVERIFIABLE, or REFUTED against source text. Missing sections return INCOMPLETE — not a confident guess on unread documents. Anyone can hand you a confident recommendation. FARaudit renders a verdict it can defend — or tells you it can't.
+    - generic [ref=f14e32]:
+      - generic [ref=f14e33]:
+        - generic [ref=f14e34]:
+          - generic [ref=f14e35]: FA301626Q0068
+          - generic [ref=f14e36]: T-38 Intake Plugs
+        - generic [ref=f14e37]:
+          - generic [ref=f14e38]: RFQ
+          - generic [ref=f14e39]: NAICS 336413
+      - generic [ref=f14e40]:
+        - generic [ref=f14e41]:
+          - generic [ref=f14e42]: P0
+          - generic [ref=f14e43]:
+            - generic [ref=f14e44]: CLIN quantity ambiguity
+            - generic [ref=f14e45]: "\"80 Each\" — 80 sets or 80 plugs? 2× margin exposure."
+        - generic [ref=f14e46]:
+          - generic [ref=f14e47]: P0
+          - generic [ref=f14e48]:
+            - generic [ref=f14e49]: FOB designation conflict
+            - generic [ref=f14e50]: CLIN 0001 vs CLINs 0002/0003 vs Note 7 — three different answers.
+        - generic [ref=f14e51]:
+          - generic [ref=f14e52]: P1
+          - generic [ref=f14e53]:
+            - generic [ref=f14e54]: Hexavalent chromium
+            - generic [ref=f14e55]: DFARS 252.223-7008 — standard aerospace primers disqualify.
+      - generic [ref=f14e56]: Each finding cited to its clause
+      - generic [ref=f14e59]: Air Force RFQ — CLIN quantity ambiguity and an FOB designation conflict, each cited to the clause it came from.
+  - generic [ref=f14e61]:
+    - generic [ref=f14e62]:
+      - generic [ref=f14e63]:
+        - generic [ref=f14e64]: "02"
+        - text: Ecosystem
+      - heading "First signal to recompete alert." [level=2] [ref=f14e65]
+    - paragraph [ref=f14e66]: Pre-Sol synopsis detection 60–90 days before the solicitation drops. RFI response drafting. The full audit. Pre-submission checklist. Post-award compliance. Recompete alert 180 days out. Not alerts — drafted action at every stage. One system, the whole arc.
+    - generic [ref=f14e68]:
+      - generic [ref=f14e69]:
+        - generic [ref=f14e71]: "01"
+        - generic [ref=f14e72]: Pre-Sol synopsis detection
+        - generic [ref=f14e73]: 60–90 days out
+      - generic [ref=f14e74]:
+        - generic [ref=f14e76]: "02"
+        - generic [ref=f14e77]: RFI response drafting
+      - generic [ref=f14e78]:
+        - generic [ref=f14e80]: "03"
+        - generic [ref=f14e81]: The full audit
+      - generic [ref=f14e82]:
+        - generic [ref=f14e84]: "04"
+        - generic [ref=f14e85]: Pre-submission checklist
+      - generic [ref=f14e86]:
+        - generic [ref=f14e88]: "05"
+        - generic [ref=f14e89]: Post-award compliance
+      - generic [ref=f14e90]:
+        - generic [ref=f14e92]: "06"
+        - generic [ref=f14e93]: Recompete alert
+        - generic [ref=f14e94]: 180 days out
+  - generic [ref=f14e96]:
+    - heading "Access is by application." [level=2] [ref=f14e97]
+    - paragraph [ref=f14e98]: We onboard a limited number of design partners who shape the roadmap. Tell us about your pipeline — we review every application within one business day.
+    - link "Request access →" [ref=f14e99] [cursor=pointer]:
+      - /url: /access
+  - contentinfo [ref=f14e100]:
+    - generic [ref=f14e101]:
+      - link "F FARaudit" [ref=f14e102] [cursor=pointer]:
+        - /url: "#top"
+        - generic [ref=f14e103]: F
+        - generic [ref=f14e104]: FARaudit
+      - generic [ref=f14e105]:
+        - link "How it works" [ref=f14e106] [cursor=pointer]:
+          - /url: /how-it-works
+        - link "Plans" [ref=f14e107] [cursor=pointer]:
+          - /url: /pricing
+        - link "Learn" [ref=f14e108] [cursor=pointer]:
+          - /url: /learn
+        - link "Sign in" [ref=f14e109] [cursor=pointer]:
+          - /url: /sign-in
+        - link "Request Access" [ref=f14e110] [cursor=pointer]:
+          - /url: /access
+      - generic [ref=f14e111]: © 2026 FARaudit Inc. · Dover, DE

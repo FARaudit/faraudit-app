@@ -188,9 +188,12 @@ export function PlatePage({ stmt, generatedAt, logo, agency }: {
   if (addr) fields.push({ k: "Address", v: addrParts[0] || addr, sub: addrParts[1] || null, tracks: 3 });
   if (codes.length) {
     fields.push({
-      k: "Primary NAICS",
+      // NAICS, not "Primary NAICS" — card 826. The value is the primary and its position says
+      // so; the key was additionally claiming the SUB-LINE was a property of it, and the codes
+      // beneath are not. `Also` names the relationship rather than leaving the row mute.
+      k: "NAICS",
       v: codes[0].title ? `${codes[0].code}  ${codes[0].title}` : codes[0].code,
-      sub: codes.length > 1 ? codes.slice(1).map((c) => c.code).join(" · ") : null,
+      sub: codes.length > 1 ? `Also ${codes.slice(1).map((c) => c.code).join(" · ")}` : null,
       tracks: 5
     });
   }
