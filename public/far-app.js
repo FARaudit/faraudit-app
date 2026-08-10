@@ -21,7 +21,7 @@
     return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  const S = { type: 'all', impact: 'all', q: '', sort: 'Newest', sel: null };
+  const S = { type: 'all', impact: 'all', q: '', sort: 'Newest', sel: null, picked: false };
 
   /* Feed state helpers. A count is only a count when the sources answered; while
      loading or unavailable every tile shows an em dash instead of a zero. */
@@ -36,8 +36,8 @@
   // A partial outage dashes too: a bare 0 at the top of the page reads as "no rule
   // changes this month", which is a claim the surviving source cannot support.
   const num = (n) => (isDown() || isPending() || isPartial() ? DASH : n);
-  function emptyBlock(title, detail) {
-    return `<div class="cop-empty"><div class="t">${title}</div><div class="d">${detail}</div></div>`;
+  function emptyBlock(title, detail, collapsed) {
+    return `<div class="cop-empty${collapsed ? ' is-collapsed' : ''}"><div class="t">${title}</div><div class="d">${detail}</div></div>`;
   }
   /* One sentence, used wherever a surface has nothing to draw, so the reason a
      panel is blank is never left to the reader to guess. */
@@ -62,7 +62,7 @@
     $('sortSeg').innerHTML = D.SORTS.map(s => `<button data-sort="${s}" class="fpill ${s === S.sort ? 'active' : ''}">${s}</button>`).join('');
     $('sortSeg').querySelectorAll('button').forEach(b => b.onclick = () => { S.sort = b.dataset.sort; syncSort(); renderFeed(); });
     $('searchInput').addEventListener('input', e => { S.q = e.target.value.toLowerCase(); renderAll(); });
-    $('resetBtn').onclick = () => { S.type = 'all'; S.impact = 'all'; S.q = ''; S.sort = 'Newest'; $('searchInput').value = ''; sync(); syncSort(); renderAll(); };
+    $('resetBtn').onclick = () => { S.type = 'all'; S.impact = 'all'; S.q = ''; S.sort = 'Newest'; S.sel = null; S.picked = false; $('searchInput').value = ''; sync(); syncSort(); renderAll(); };
   }
   function sync() {
     $('typeFilters').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.type === S.type));
@@ -231,10 +231,10 @@
       /* A panel with nothing in ITS OWN slice must not report on the feed. The feed can
          have returned 40 changes and still have none taking effect ahead of today. */
       if (D.UPDATES.length && !isDown() && !isPending() && !isPartial()) {
-        return emptyBlock('No upcoming effective dates', 'No change in this view has an effective date still ahead.');
+        return emptyBlock('No upcoming effective dates', 'No change in this view has an effective date still ahead.', true);
       }
       const [t, d] = blankReason();
-      return emptyBlock(esc(t), esc(d)); })();
+      return emptyBlock(esc(t), esc(d), true); })();
   }
 
   function renderAffected() {
@@ -244,7 +244,32 @@
     }).join('') || (function () { const [t, d] = D.UPDATES.length
       ? ['No affected solicitations', 'No clause change in this view touches a solicitation in your account.']
       : blankReason();
-      return emptyBlock(esc(t), esc(d)); })();
+      return emptyBlock(esc(t), esc(d), true); })();
+  }
+
+  /* WHAT THE PAGE OPENS ON. Blank on load and blank after Reset made the reader hunt for the
+     interaction before the page had told them anything.
+     RANKED BY WHAT IT DOES TO THIS CUSTOMER FIRST. Impact is a keyword heuristic over the title
+     and summary — nothing authoritative sets it — so it cannot be the primary sort without
+     promoting a guess to the page's headline. Contracts touched is a fact about this account.
+     It is 0 for every row today because no solicitations are on file, so the order behaves as
+     impact-then-newest until that changes, and changes by itself when it does. */
+  function defaultPick(rows) {
+    return rows.slice().sort((a, b) =>
+      (b.affects - a.affects) ||
+      (impMeta(b.impact).rank - impMeta(a.impact).rank) ||
+      (Date.parse(b.date) - Date.parse(a.date))
+    )[0] || null;
+  }
+
+  /* Once per load, and again on Reset — never after a deliberate deselect, which is a choice
+     the reader made and the page must not undo on its next render. */
+  function autoPick() {
+    if (S.picked || S.sel !== null) return;
+    const rows = filtered();
+    if (!rows.length) return;
+    const d = defaultPick(rows);
+    if (d) { S.sel = d.id; S.picked = true; }
   }
 
   function renderInsight() {
@@ -267,7 +292,7 @@
   function shade(hex) { const n = parseInt(hex.slice(1), 16); return `rgb(${Math.round(((n>>16)&255)*.66)},${Math.round(((n>>8)&255)*.66)},${Math.round((n&255)*.66)})`; }
   function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`; }
 
-  function renderAll() { renderKPIs(); renderTimeline(); renderPanel(); renderFeed(); renderByType(); renderEffective(); renderAffected(); renderInsight(); }
+  function renderAll() { autoPick(); renderKPIs(); renderTimeline(); renderPanel(); renderFeed(); renderByType(); renderEffective(); renderAffected(); renderInsight(); }
   function onThemeChange() { renderAll(); }
   function init() { buildControls(); renderAll(); let to; window.addEventListener('resize', () => { clearTimeout(to); to = setTimeout(renderTimeline, 200); }); }
   window.FAR_APP = { render: renderAll, onThemeChange };

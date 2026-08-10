@@ -223,6 +223,51 @@ async function main(): Promise<void> {
       "the check cannot see the shape it forbids");
   }
 
+
+  // ── WHAT THE PAGE OPENS ON, AND WHAT AN EMPTY PANEL COSTS ────────────────
+  // CEO, 2026-08-10: open on the highest-impact change rather than blank, and collapse the
+  // panels that have nothing in them. Both taken, with one correction to the first.
+  console.log("\n── the page opens on something, and says so honestly ──");
+  {
+    check("a default is picked", /function autoPick\(\)/.test(app) && /autoPick\(\); renderKPIs\(\)/.test(app),
+      "the panel is blank on load and again after Reset");
+
+    // AFFECTED FIRST. Impact is a keyword heuristic over title and summary — nothing
+    // authoritative sets it — so it must not be the primary sort or the page opens on whatever
+    // has the scariest words. Contracts touched is a fact about THIS account.
+    const pick = app.slice(app.indexOf("function defaultPick(rows)"), app.indexOf("function autoPick()"));
+    check("the default-pick source was sliced, not empty", pick.length > 120,
+      `sliced ${pick.length} chars — the checks below would be vacuous`);
+    check("the ranking leads with contracts affected", /\(b\.affects - a\.affects\) \|\|/.test(pick),
+      "the page opens on a keyword heuristic instead of on what touches this customer");
+    check("…then impact, then newest", /impMeta\(b\.impact\)\.rank - impMeta\(a\.impact\)\.rank/.test(pick)
+      && /Date\.parse\(b\.date\) - Date\.parse\(a\.date\)/.test(pick),
+      "ties are broken arbitrarily, so the page opens somewhere different on each load");
+    check("impact is still only a heuristic", /cmmc\|cyber\|cui\|safeguard/.test(live),
+      "if impact ever becomes authoritative this ranking should be revisited");
+
+    // A DELIBERATE DESELECT IS A CHOICE. Re-picking on the next render undoes it.
+    check("a deselect is not undone on the next render", /if \(S\.picked \|\| S\.sel !== null\) return;/.test(app),
+      "clicking the selected row to close it re-opens it immediately");
+    check("Reset picks again", /S\.sel = null; S\.picked = false;/.test(app),
+      "Reset leaves the panel on a row that no longer matches the filters");
+
+    // COLLAPSED, NOT HIDDEN. A panel that vanishes when empty teaches the reader it does not
+    // exist; one that keeps 200px of centred white to say nothing wastes the fold.
+    check("an empty side panel collapses", /is-collapsed/.test(html) && /emptyBlock\(esc\(t\), esc\(d\), true\)/.test(app),
+      "an empty panel still occupies its full height");
+    check("…and still states the reason", /No change in this view has an effective date still ahead/.test(app)
+      && /No clause change in this view touches a solicitation/.test(app),
+      "collapsing removed the sentence along with the whitespace");
+    check("the rule panel does NOT collapse", /emptyBlock\(esc\(t\), esc\(d\)\);/.test(app),
+      "the main reading surface shrank to a caption");
+    check("no panel is hidden outright", !/effList[^\n]*hidden|affList[^\n]*hidden/.test(app),
+      "a section that disappears when empty teaches the reader it does not exist");
+
+    check("P· the ranking check can see an impact-first sort",
+      !/\(b\.affects - a\.affects\) \|\|/.test("rows.sort((a,b) => impMeta(b.impact).rank - impMeta(a.impact).rank)"));
+  }
+
   console.log(`\n${pass} passed · ${fail} failed`);
   if (fail > 0) process.exit(1);
 }

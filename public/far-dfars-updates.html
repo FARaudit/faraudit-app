@@ -195,6 +195,15 @@ button{font-family:inherit}
 .cop-empty svg{width:34px;height:34px;color:var(--mute-2)}
 .cop-empty .t{font-size:13px;font-weight:700;color:var(--ink-2)}
 .cop-empty .d{font-size:11.5px;color:var(--mute);max-width:240px;line-height:1.5}
+/* COLLAPSED, NOT DELETED. A panel with nothing in it still has something to say — "no change
+   here has an effective date ahead" is a fact a contracting officer's supplier wants. What it
+   does not need is 200px of centred white to say it in. The compact form keeps the sentence
+   and gives back the height; the panel is never hidden, because a section that vanishes when
+   empty teaches the reader it does not exist. */
+.cop-empty.is-collapsed{flex-direction:row;align-items:baseline;justify-content:flex-start;
+  gap:8px;padding:10px 2px;text-align:left;flex-wrap:wrap}
+.cop-empty.is-collapsed .t{font-size:12px}
+.cop-empty.is-collapsed .d{font-size:11.5px;max-width:none}
 
 /* people rail (table) */
 .people-tabs{display:flex;gap:4px}
