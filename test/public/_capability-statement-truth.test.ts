@@ -452,7 +452,7 @@ console.log("\n── export is one place, and it claims only what is wired ─�
     "the page denies a capability it now offers");
   // Word WAS declared unbuilt and that was correct until the route existed. Both
   // exports are real now, so the caption states what each control does instead.
-  check("the caption describes the one download", /PDF downloads as a file/.test(html),
+  check("the caption describes the one download", /download the PDF/.test(html),
     "the page does not say what the two buttons produce");
   check("the retired Export card is gone", !/class="export-list"/.test(html),
     "the side card and the header cluster both claim to be the export home");
@@ -803,8 +803,16 @@ console.log("\n── the Word export is gone ──");
     "the builder survives and invites a caller");
   // Paste-into-Word is a DIFFERENT capability and must survive: the copy button's whole point is
   // that the formatting holds when it lands in Word. Deleting the download must not have taken it.
-  check("copy-into-Word still promised", /pasted into Word/.test(html),
-    "the paste target was removed with the download — they are not the same feature");
+  // WORD IS NO LONGER NAMED AS A PASTE TARGET, and that is a decision rather than an omission.
+  // The copy is a table sized to a Letter text column; Word honours the width but breaks the
+  // footer across a page boundary, stranding the CONTACT and EMAIL keys on one page and their
+  // values on the next. Email and Google Docs render it correctly. A caption that names Word
+  // promises a surface the layout does not serve — the same defect class as a control with no
+  // caller, reached through copy instead of code.
+  check("the caption does not name Word as a paste target", !/pasted into Word|formatting.*into Word/.test(html),
+    "the page promises a surface where the footer splits across pages");
+  check("it names the surfaces the copy DOES serve", /email or Google Docs/i.test(html),
+    "removing the wrong claim without stating the right one leaves the customer guessing");
   check("the copy button is still there", /data-cs-copy/.test(html),
     "the remaining export path went with the one that was cut");
 }
