@@ -243,6 +243,65 @@ async function main() {
       "the render path swallows a broken record and produces a file anyway");
   }
 
+  // ── STRUCTURED SECTIONS, READ OUT OF THE RENDERED PDF ─────────────────────────────────
+  // The competency card has four fields and the prose column carries one, which is why the
+  // structured columns exist. Asserting that the renderer "uses the resolver" would prove a
+  // call, not a document — so this reads the text back out of the PDF the customer receives.
+  {
+    console.log("\n── structured sections reach the document ──");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mod = require("pdf-parse");
+    const Ctor = mod?.PDFParse ?? mod?.default ?? mod;
+    const textOf = async (b: Buffer): Promise<string> => {
+      const r = typeof Ctor === "function" && Ctor.prototype?.getText
+        ? await new Ctor({ data: new Uint8Array(b) }).getText()
+        : await Ctor(b);
+      return String(r?.text ?? "").replace(/\s+/g, " ");
+    };
+    // The eyebrows are letter-spaced, so pdf-parse returns "C O R E  C O M P E T E N C I E S".
+    // Matching /CORE\s*COMPETENCIES/ never fires — which silently makes the NEGATIVE assertion
+    // below ("prints no heading") pass whatever the document contains. Strip whitespace before
+    // testing a heading so the absence check can actually fail.
+    const hasHeading = (text: string, heading: string) =>
+      text.replace(/\s+/g, "").toUpperCase().includes(heading.replace(/\s+/g, "").toUpperCase());
+
+    const structured: CapStmt = {
+      ...SPARSE,
+      core_competencies: "PROSE THAT MUST NOT APPEAR",
+      core_competencies_json: [
+        { k: "Machining", h: "5-axis titanium details", b: "Build-to-print from OEM drawings.", s: "AS9102 first article" },
+        { k: "Sustainment", h: "Qualified second source", b: "Spares against national stock numbers.", s: "Small lots standard" },
+        { k: "Legacy", h: "Reverse engineering", b: "Dimensional capture when the source is gone.", s: "Drawing reconstruction" }
+      ],
+      differentiators_json: [{ h: "Quotes inside a short RFQ window", b: "No capture team in the path." }]
+    };
+    const t = await textOf(await pdf(structured, null));
+    check("the kicker reaches the PDF", t.includes("Machining"), "cap-t is dropped in the render");
+    check("the head reaches the PDF", t.includes("5-axis titanium details"));
+    check("the body reaches the PDF", t.includes("Build-to-print from OEM drawings."),
+      "the field prose could never carry is lost on the way to the document");
+    check("the spec line reaches the PDF", t.includes("AS9102 first article"));
+    check("all three competencies render", t.includes("Reverse engineering") && t.includes("Qualified second source"));
+    check("the differentiator body renders", t.includes("No capture team in the path."));
+    check("the superseded prose column is NOT printed", !t.includes("PROSE THAT MUST NOT APPEAR"),
+      "both representations reach the document and the customer sees their old text twice");
+
+    // structured-and-empty omits the heading; NULL falls back to prose. Collapsing these
+    // either prints a heading over nothing or resurrects text the customer deleted.
+    const emptied = await textOf(await pdf({ ...SPARSE, core_competencies: "Deleted", core_competencies_json: [] }, null));
+    check("an empty structured section prints no heading", !hasHeading(emptied, "CORE COMPETENCIES"),
+      "a heading over nothing is a claim about the firm");
+    check("…and does not resurrect the prose column", !emptied.includes("Deleted"));
+
+    const legacy = await textOf(await pdf({ ...SPARSE, core_competencies: "Precision machining\nSustainment" }, null));
+    check("a legacy profile still renders its lines", legacy.includes("Precision machining") && legacy.includes("Sustainment"),
+      "the structured path broke every profile written before it existed");
+    check("a legacy profile still gets the heading", hasHeading(legacy, "CORE COMPETENCIES"));
+    // The matcher must be able to SEE a heading, or the absence check above proves nothing.
+    check("the heading matcher is not vacuous", hasHeading(t, "CORE COMPETENCIES"),
+      "the absence assertion passes on every document, including one that has the heading");
+  }
+
   console.log(`\n${pass} passed · ${fail} failed`);
   if (fail > 0) process.exit(1);
 }

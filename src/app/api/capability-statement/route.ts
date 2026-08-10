@@ -16,6 +16,10 @@ interface PatchBody {
   certifications?: string[];
   core_competencies?: string | null;
   differentiators?: string | null;
+  // Structured forms. The plate draws four fields per competency and two per differentiator;
+  // the TEXT columns can carry one. Both shapes are accepted and the readers prefer these.
+  core_competencies_json?: unknown;
+  differentiators_json?: unknown;
   contact_name?: string | null;
   contact_email?: string | null;
   contact_phone?: string | null;
@@ -30,6 +34,7 @@ const ALLOWED_FIELDS = new Set<keyof PatchBody>([
   "company_name", "uei", "cage_code",
   "naics_codes", "certifications",
   "core_competencies", "differentiators",
+  "core_competencies_json", "differentiators_json",
   "contact_name", "contact_email", "contact_phone", "contact_website", "contact_address",
   "past_performance"
 ]);
@@ -221,6 +226,10 @@ export async function GET(_req: NextRequest) {
         certifications: [],
         core_competencies: null,
         differentiators: null,
+        // NULL, not [] — the stub has not been structured, it is not structured-and-empty,
+        // and the readers key on exactly that difference.
+        core_competencies_json: null,
+        differentiators_json: null,
         contact_name: null,
         contact_email: user.email || null,
         contact_phone: null,

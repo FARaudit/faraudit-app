@@ -10,6 +10,7 @@ import { PAST_PERFORMANCE_EXPORT_LIMIT } from "@/lib/capability-statement-limits
 import { formatPhone } from "@/lib/capability-statement-format";
 import { naicsLines } from "@/lib/capability-statement-naics";
 import { orderForAgency } from "@/lib/capability-statement-tailoring";
+import { resolveCompetencies, resolveDifferentiators } from "@/lib/capability-statement-sections";
 import { imageSize, fitWithin, LOGO_BOX } from "@/lib/capability-statement-logo";
 
 export interface CapStmt {
@@ -23,6 +24,8 @@ export interface CapStmt {
   certifications?: string[];
   core_competencies?: string | null;
   differentiators?: string | null;
+  core_competencies_json?: unknown;
+  differentiators_json?: unknown;
   contact_name?: string | null;
   contact_email?: string | null;
   contact_phone?: string | null;
@@ -67,6 +70,10 @@ export function CapDoc({ stmt, generatedAt, logo, agency }: { stmt: CapStmt; gen
   const company = stmt.company_name as string;
   const naics = stmt.naics_codes || [];
   const certs = stmt.certifications || [];
+  // Same resolver as the Word export and the page, so the three cannot disagree about one
+  // profile: structured when it exists, the prose column when it does not.
+  const comps = resolveCompetencies(stmt).items;
+  const difs = resolveDifferentiators(stmt).items;
   // Tailored editions reorder; they never filter and never add prose.
   // Explicit width and height from the image's own dimensions. react-pdf does not honour
   // maxHeight/maxWidth the way a browser does, so a 1024px-square favicon filled the page.
@@ -128,10 +135,16 @@ export function CapDoc({ stmt, generatedAt, logo, agency }: { stmt: CapStmt; gen
             reads to a contracting officer as "asked and answered: nothing" — and on
             CERTIFICATIONS, "None recorded." is a statement about the firm's standing
             that the absence of a row does not support. Omit the heading instead. */}
-        {stmt.core_competencies ? (
+        {comps.length > 0 ? (
           <View style={styles.section}>
             <Text style={styles.sectionEyebrow}>CORE COMPETENCIES</Text>
-            <Text style={styles.body}>{stmt.core_competencies}</Text>
+            {comps.map((c, i) => (
+              <View key={i} wrap={false}>
+                <Text style={styles.body}>{[c.k, c.h].filter(Boolean).join(" — ")}</Text>
+                {c.b ? <Text style={styles.body}>{c.b}</Text> : null}
+                {c.s ? <Text style={styles.body}>{c.s}</Text> : null}
+              </View>
+            ))}
           </View>
         ) : null}
 
@@ -142,10 +155,15 @@ export function CapDoc({ stmt, generatedAt, logo, agency }: { stmt: CapStmt; gen
           </View>
         ) : null}
 
-        {stmt.differentiators ? (
+        {difs.length > 0 ? (
           <View style={styles.section}>
             <Text style={styles.sectionEyebrow}>DIFFERENTIATORS</Text>
-            <Text style={styles.body}>{stmt.differentiators}</Text>
+            {difs.map((d, i) => (
+              <View key={i} wrap={false}>
+                <Text style={styles.body}>{d.h}</Text>
+                {d.b ? <Text style={styles.body}>{d.b}</Text> : null}
+              </View>
+            ))}
           </View>
         ) : null}
 

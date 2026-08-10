@@ -8,6 +8,7 @@ import { PAST_PERFORMANCE_EXPORT_LIMIT } from "@/lib/capability-statement-limits
 import { formatPhone } from "@/lib/capability-statement-format";
 import { naicsLines } from "@/lib/capability-statement-naics";
 import { orderForAgency } from "@/lib/capability-statement-tailoring";
+import { resolveCompetencies, resolveDifferentiators } from "@/lib/capability-statement-sections";
 import { imageSize, fitWithin, sniffImageType, LOGO_BOX } from "@/lib/capability-statement-logo";
 
 const INK = "0F172A";
@@ -23,6 +24,8 @@ export interface CapStmt {
   certifications?: string[];
   core_competencies?: string | null;
   differentiators?: string | null;
+  core_competencies_json?: unknown;
+  differentiators_json?: unknown;
   contact_name?: string | null;
   contact_email?: string | null;
   contact_phone?: string | null;
@@ -124,13 +127,25 @@ export function buildDocx(stmt: CapStmt, agency: string | null, logo: Buffer | n
 
   // AN EMPTY SECTION IS ABSENT. A heading over nothing tells a contracting officer
   // "asked and answered: nothing", which is a claim the absence of data does not support.
-  if (stmt.core_competencies) {
+  // Resolved through the shared reader so this export, the PDF and the page cannot disagree
+  // about the same profile. A structured item carries a head and up to three more fields; a
+  // legacy line carries a head and nothing, and nothing is invented to fill the gap.
+  const comps = resolveCompetencies(stmt).items;
+  if (comps.length) {
     children.push(eyebrow("CORE COMPETENCIES"));
-    for (const p of String(stmt.core_competencies).split(/\n+/).filter((x) => x.trim())) children.push(body(p.trim()));
+    for (const c of comps) {
+      children.push(body([c.k, c.h].filter(Boolean).join(" — ")));
+      if (c.b) children.push(body(c.b));
+      if (c.s) children.push(body(c.s));
+    }
   }
-  if (stmt.differentiators) {
+  const difs = resolveDifferentiators(stmt).items;
+  if (difs.length) {
     children.push(eyebrow("DIFFERENTIATORS"));
-    for (const p of String(stmt.differentiators).split(/\n+/).filter((x) => x.trim())) children.push(body(p.trim()));
+    for (const d of difs) {
+      children.push(body(d.h));
+      if (d.b) children.push(body(d.b));
+    }
   }
 
   // Reordered for the edition, never filtered — the point is which work leads.
