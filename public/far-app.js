@@ -21,7 +21,7 @@
     return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  const S = { type: 'all', impact: 'all', q: '', sort: 'Newest', sel: D.UPDATES.length ? D.UPDATES[0].clause : null };
+  const S = { type: 'all', impact: 'all', q: '', sort: 'Newest', sel: null };
 
   /* Feed state helpers. A count is only a count when the sources answered; while
      loading or unavailable every tile shows an em dash instead of a zero. */
@@ -126,7 +126,9 @@
     const x = d3.scaleTime().domain([d3.min(dates), d3.max(dates)]).range([m.l, W - m.r]).nice();
     const bands = ['HIGH', 'MEDIUM', 'LOW'];
     const y = d3.scalePoint().domain(bands).range([m.t + 14, H - m.b - 10]).padding(0.5);
-    const r = d3.scaleSqrt().domain([1, 7]).range([6, 18]);
+    /* Domain starts at ZERO because most rules in this corpus name no clause, and a
+       sqrt scale over [1,7] extrapolates 0 to a NEGATIVE radius, which draws nothing. */
+    const r = d3.scaleSqrt().domain([0, 7]).range([6, 18]).clamp(true);
     // band rows
     bands.forEach(b => {
       svg.append('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', y(b)).attr('y2', y(b)).attr('stroke', css('--line-2')).attr('stroke-width', 1);
@@ -137,22 +139,22 @@
       svg.append('text').attr('x', x(t)).attr('y', H - m.b + 16).attr('text-anchor', 'middle').attr('font-family', 'IBM Plex Mono').attr('font-size', 9).attr('fill', css('--mute')).text(t.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }));
     });
     // dots
-    svg.selectAll('circle.tld').data(data, d => d.clause).join('circle')
-      .attr('class', d => 'tld' + (S.sel === d.clause ? ' sel' : '') + (S.sel && S.sel !== d.clause ? ' dim' : ''))
+    svg.selectAll('circle.tld').data(data, d => d.id).join('circle')
+      .attr('class', d => 'tld' + (S.sel === d.id ? ' sel' : '') + (S.sel && S.sel !== d.id ? ' dim' : ''))
       .attr('cx', d => x(new Date(d.date))).attr('cy', d => y(d.impact)).attr('r', d => r(d.affects))
       .attr('fill', d => D.TYPE_COLOR[d.type]).attr('opacity', 1).attr('stroke', css('--card')).attr('stroke-width', 1.8)
       .style('cursor', 'pointer')
-      .on('click', (ev, d) => { S.sel = d.clause; renderAll(); })
+      .on('click', (ev, d) => { S.sel = S.sel === d.id ? null : d.id; renderAll(); })
       .on('mousemove', (ev, d) => {
         const tip = $('coTip');
-        tip.innerHTML = `<div style="font-family:Manrope;font-weight:800;font-size:12px;margin-bottom:3px">${d.clause}</div><div style="font-family:'IBM Plex Mono';font-size:10px;color:#cbd5e1;line-height:1.5">${d.title} · ${d.type}<br>${fmtDate(d.date)} · ${d.affects} affected</div>`;
+        tip.innerHTML = `<div style="font-family:Manrope;font-weight:800;font-size:12px;margin-bottom:3px">${d.clause || d.title}</div><div style="font-family:'IBM Plex Mono';font-size:10px;color:#cbd5e1;line-height:1.5">${d.title} · ${d.type}<br>${fmtDate(d.date)} · ${d.affects} affected</div>`;
         tip.style.display = 'block'; tip.style.left = Math.min(ev.clientX + 14, window.innerWidth - 220) + 'px'; tip.style.top = (ev.clientY + 14) + 'px';
       }).on('mouseleave', () => $('coTip').style.display = 'none');
     $('timelineLegend').innerHTML = Object.entries(D.TYPE_COLOR).map(([k, c]) => `<span class="lg"><i style="background:${c}"></i>${k}</span>`).join('') + `<span class="lg" style="color:var(--mute-2)">○ size = contracts affected</span>`;
   }
 
   function renderPanel() {
-    const u = D.UPDATES.find(x => x.clause === S.sel);
+    const u = D.UPDATES.find(x => x.id === S.sel);
     const el = $('rulePanel');
     if (!u) {
       const [t, d] = D.UPDATES.length ? ['Select a clause', 'Pick any card in the feed to see its redline.'] : blankReason();
@@ -163,7 +165,7 @@
     el.innerHTML = `
       <div class="cop-head">
         <div class="cop-av" style="background:linear-gradient(135deg,${tc},${shade(tc)})"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" style="width:24px;height:24px"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></div>
-        <div class="cop-id"><div class="cop-name">${esc(u.clause)}</div><div class="cop-title">${esc(u.title)}</div><span class="cop-agy">${esc(u.type)}</span></div>
+        <div class="cop-id"><div class="cop-name">${esc(u.clause || u.title)}</div><div class="cop-title">${esc(u.title)}</div><span class="cop-agy">${esc(u.type)}</span></div>
         <span class="cop-rel" style="background:${hexA(im.color,.13)};color:${im.color}"><i style="background:${im.color}"></i>${im.label}</span>
       </div>
       <div class="cop-metrics">
@@ -190,8 +192,8 @@
       : `${data.length} updates · click any card to inspect`;
     $('feedList').innerHTML = data.map(u => {
       const im = impMeta(u.impact), tc = typeColor(u.type);
-      return `<div class="feed-card${S.sel === u.clause ? ' sel' : ''}" data-clause="${esc(u.clause)}" style="border-left-color:${tc}">
-        <div class="feed-top"><span class="feed-clause">${esc(u.clause)}</span><span class="feed-type" style="color:${tc};background:${hexA(tc,.1)}">${esc(u.type)}</span><span class="feed-imp" style="color:${im.color};background:${hexA(im.color,.12)}">${esc(im.label)}</span><span class="feed-date">${esc(fmtDate(u.date))}</span></div>
+      return `<div class="feed-card${S.sel === u.id ? ' sel' : ''}" data-id="${esc(u.id)}" style="border-left-color:${tc}">
+        <div class="feed-top"><span class="feed-clause">${esc(u.clause || u.type)}</span><span class="feed-type" style="color:${tc};background:${hexA(tc,.1)}">${esc(u.type)}</span><span class="feed-imp" style="color:${im.color};background:${hexA(im.color,.12)}">${esc(im.label)}</span><span class="feed-date">${esc(fmtDate(u.date))}</span></div>
         <div class="feed-title">${esc(u.title)}</div>
         <div class="feed-summary">${esc(u.summary)}</div>
         <div class="feed-insight"><b>⚡ Why it matters</b>${esc(u.insight)}</div>
@@ -199,7 +201,7 @@
     }).join('') || (function () { const [t, d] = blankReason();
       return D.UPDATES.length ? `<div class="tl-empty">No updates match your filters.</div>`
                               : emptyBlock(esc(t), esc(d)); })();
-    $('feedList').querySelectorAll('.feed-card').forEach(c => c.onclick = () => { S.sel = c.dataset.clause; renderTimeline(); renderPanel(); renderFeed(); });
+    $('feedList').querySelectorAll('.feed-card').forEach(c => c.onclick = () => { S.sel = S.sel === c.dataset.id ? null : c.dataset.id; renderTimeline(); renderPanel(); renderFeed(); });
   }
 
   function renderByType() {
@@ -247,10 +249,10 @@
   }
 
   function renderInsight() {
-    const u = D.UPDATES.find(x => x.clause === S.sel);
+    const u = D.UPDATES.find(x => x.id === S.sel);
     let html;
-    if (u && u.impact === 'HIGH') html = `<span class="ib-label">Priority</span><b>${esc(u.clause)} · ${esc(u.title)}</b> is high-impact and hits <b>${esc(String(u.affects))} of your contracts</b> — ${esc(u.insight)}`;
-    else if (u) html = `<span class="ib-label">Focus</span><b>${esc(u.clause)}</b> (${esc(u.type)}, ${esc(impMeta(u.impact).label.toLowerCase())} impact) — ${esc(u.insight)}`;
+    if (u && u.impact === 'HIGH') html = `<span class="ib-label">Priority</span><b>${esc(u.clause ? u.clause + " · " : "")}${esc(u.title)}</b> is high-impact and hits <b>${esc(String(u.affects))} of your contracts</b> — ${esc(u.insight)}`;
+    else if (u) html = `<span class="ib-label">Focus</span><b>${esc(u.clause || u.title)}</b> (${esc(u.type)}, ${esc(impMeta(u.impact).label.toLowerCase())} impact) — ${esc(u.insight)}`;
     else { const [t, d] = blankReason(); html = `<span class="ib-label">${esc(t)}</span>${esc(d)}`; }
     $('insightBar').innerHTML = `<span class="ib-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a7 7 0 00-4 12.7V17a1 1 0 001 1h6a1 1 0 001-1v-2.3A7 7 0 0012 2z"/><path d="M9 21h6"/></svg></span><span>${html}</span>`;
   }

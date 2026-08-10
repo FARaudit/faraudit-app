@@ -122,6 +122,60 @@ async function main(): Promise<void> {
   // trivial reason that the function drops everything.
   check("D5 · a real upcoming date is KEPT", buildEffective([{ title: "x", effective_date: iso(10) }]).length === 1);
 
+
+  // ── A ROW'S IDENTITY IS ITS DOCUMENT, NOT ITS CLAUSE ──────────────────────
+  // Measured against the live Federal Register feed 2026-08-10: of 40 documents, FOUR cite a
+  // "part N" and ONE carries a bare clause number. So `clause` is empty on ~88% of rows, and
+  // the timeline keyed its D3 join on exactly that field. A keyed join binds one datum per
+  // key, so forty updates collapsed to a single circle — which then got a NEGATIVE radius,
+  // because scaleSqrt over domain [1,7] extrapolates 0 affected clauses to -1.29 and SVG
+  // draws nothing for a negative r. Two independent reasons the chart was empty.
+  //
+  // A clause is not a row identity even when it IS present: two rules may amend the same part.
+  console.log("\n── the timeline is keyed on the document, not on a clause ──");
+  {
+    check("the live mapping gives every row an id", /id:\s*u\.link \|\| u\.title/.test(live),
+      "rows arrive with no stable identity, so any join must fall back to a content field");
+    check("the data join is keyed on that id", /\.data\(data, d => d\.id\)/.test(app),
+      "the join is keyed on a field that is absent on most rows — they collapse to one mark");
+    check("no selection is keyed on clause",
+      !/x\.clause === S\.sel/.test(app) && !/dataset\.clause/.test(app) && !/S\.sel === u\.clause/.test(app),
+      "the chart selects by id while the panel looks up by clause, so the panel goes blank");
+
+    const domain = app.match(/scaleSqrt\(\)\.domain\(\[(\d+), *(\d+)\]\)/);
+    check("the radius domain starts at zero", !!domain && domain[1] === "0",
+      `domain starts at ${domain?.[1]} — a rule naming no clause is extrapolated below the range`);
+    check("the radius scale is clamped", /scaleSqrt\(\)[\s\S]{0,80}?\.clamp\(true\)/.test(app),
+      "an out-of-domain value still extrapolates past the declared range");
+
+    // BEHAVIOUR, not source. The scale is transcribed and driven with the value 88% of live
+    // rows actually carry. A radius must be a positive number or the browser draws nothing.
+    const scaleSqrt = (d0: number, d1: number, r0: number, r1: number, clamp: boolean) => (d: number) => {
+      const v = clamp ? Math.min(Math.max(d, d0), d1) : d;
+      return r0 + (Math.sqrt(v) - Math.sqrt(d0)) * (r1 - r0) / (Math.sqrt(d1) - Math.sqrt(d0));
+    };
+    check("the OLD scale drew nothing for a rule with no clause",
+      scaleSqrt(1, 7, 6, 18, false)(0) < 0,
+      "the pre-fix defect is not reproducible, so this check proves nothing");
+    const rNow = scaleSqrt(0, 7, 6, 18, true);
+    check("the new scale gives a visible radius at zero", rNow(0) >= 6,
+      `r(0) = ${rNow(0)} — still not drawable`);
+    check("…and still scales up with affected clauses", rNow(7) > rNow(1) && rNow(1) > rNow(0),
+      "the radius no longer carries the affected count");
+
+    // A keyed join over the live shape: every row empty-claused, ids distinct.
+    const rows = Array.from({ length: 40 }, (_, i) => ({ clause: "", id: `https://example.gov/doc/${i}` }));
+    check("keying on clause collapses the live corpus to one mark",
+      new Set(rows.map((r) => r.clause)).size === 1,
+      "the collapse this gate exists for is not reproducible from the live shape");
+    check("keying on id keeps every row", new Set(rows.map((r) => r.id)).size === 40,
+      "the replacement key is not unique either");
+
+    check("a blank clause never renders as an empty headline",
+      /u\.clause \|\| u\.title/.test(app) && /d\.clause \|\| d\.title/.test(app),
+      "the tooltip and panel print an empty string as the title of the update");
+  }
+
   console.log(`\n${pass} passed · ${fail} failed`);
   if (fail > 0) process.exit(1);
 }

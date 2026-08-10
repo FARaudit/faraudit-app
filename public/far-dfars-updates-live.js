@@ -31,6 +31,10 @@
 
   function mapUpdate(u) {
     return {
+      /* THE ROW'S IDENTITY IS ITS DOCUMENT, NOT ITS CLAUSE. Most rules in this corpus
+         name no clause at all, and a clause is not unique to one rule even when present —
+         two rules may amend the same part. The published document URL is one row, always. */
+      id:      u.link || u.title || '',
       clause:  u.clause || '',
       title:   u.title || '',
       type:    classifyType(u.source, u.title, u.clause),
