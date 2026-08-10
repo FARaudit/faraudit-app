@@ -24,6 +24,7 @@ import {
   parseFederalRegister,
   classifySource,
   extractClauses,
+  extractAmendedClauses,
 } from "../src/lib/federal-register";
 
 let pass = 0; let fail = 0;
@@ -142,6 +143,36 @@ check("C5 · 'DFARS' in a title does not fall through to far",
 // C6: clause extraction must find real citations and invent none.
 check("C6 · extracts a real clause citation", extractClauses("amends DFARS 252.204-7012 and FAR 52.204-21").length === 2);
 check("C7 · extracts nothing from clause-free prose", extractClauses("A notice about paperwork burden.").length === 0);
+
+// ── WHICH CLAUSES A RULE CHANGES ─────────────────────────────────────────────
+// Measured against the live feed 2026-08-10: the ABSTRACT names a clause number on 1 of 40
+// documents, so the page shipped an empty clause on every row and a filter that could never
+// match. The amendatory instructions are in the FULL TEXT, which the query now asks for.
+//
+// Fixtures transcribed from real documents, both directions. A rule that MENTIONS a clause is
+// not a rule that CHANGES one — one proposed rule in this corpus carries 334 distinct citations
+// and amends none of them.
+check("C8 · an amendatory instruction yields the section",
+  extractAmendedClauses("2. Amend section 252.204-7012 by revising paragraph (b) to read as follows:")[0] === "252.204-7012",
+  JSON.stringify(extractAmendedClauses("2. Amend section 252.204-7012 by revising paragraph (b)")));
+check("C9 · the passive form is caught too",
+  extractAmendedClauses("3. Section 225.7001 is amended by removing the definition.")[0] === "225.7001");
+check("C10 · a four-digit DFARS suffix survives whole",
+  extractAmendedClauses("Amend section 252.227-7013 by adding paragraph (c).")[0] === "252.227-7013",
+  "a suffix cap of two digits truncates 252.204-7012 to 252.204-70, a clause that does not exist");
+check("C11 · a two-digit FAR suffix is not padded or cut",
+  extractAmendedClauses("Revise section 52.204-21 to read as follows:")[0] === "52.204-21");
+// NEGATIVE CONTROLS — both transcribed from documents this recognizer must stay silent on.
+check("C12 · a cross-reference is not an amendment",
+  extractAmendedClauses("a comparable requirement exists in GAAP, other CAS standards, or FAR 31.205-26, Material Costs").length === 0,
+  "a rule that merely cites a clause would be flagged as changing it");
+check("C13 · 'see the clause at' is not an amendment",
+  extractAmendedClauses("rather than seeking Government purpose rights (see the clause at DFARS 252.227-7013, -7014, or -7018)").length === 0);
+check("C14 · empty text yields nothing rather than throwing",
+  extractAmendedClauses("").length === 0 && extractAmendedClauses(undefined as unknown as string).length === 0);
+check("C15 · the query asks for the full text it reads",
+  federalRegisterUrl().includes("raw_text_url"),
+  "the parser reads a field the query never requested, so every row arrives without one");
 
 console.log(`\n${pass} passed · ${fail} failed`);
 if (fail > 0) process.exit(1);
