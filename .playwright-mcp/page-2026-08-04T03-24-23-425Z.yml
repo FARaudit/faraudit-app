@@ -1,0 +1,197 @@
+- generic [active] [ref=f1e1]:
+  - navigation [ref=f1e2]:
+    - generic [ref=f1e3]:
+      - link "F FARaudit" [ref=f1e4] [cursor=pointer]:
+        - /url: /
+        - generic [ref=f1e5]: F
+        - generic [ref=f1e6]: FARaudit
+      - generic [ref=f1e7]:
+        - link "How it works" [ref=f1e8] [cursor=pointer]:
+          - /url: /how-it-works
+        - link "Plans" [ref=f1e9] [cursor=pointer]:
+          - /url: /pricing
+        - link "Learn" [ref=f1e10] [cursor=pointer]:
+          - /url: /learn
+        - link "Sign in" [ref=f1e11] [cursor=pointer]:
+          - /url: /sign-in
+        - link "Request Access" [ref=f1e12] [cursor=pointer]:
+          - /url: /access
+  - generic [ref=f1e15]:
+    - generic [ref=f1e16]: How it works
+    - heading "From first signal to a verdict you can act on." [level=1] [ref=f1e17]: From first signal to a verdictyou can act on.
+    - paragraph [ref=f1e18]: Connect your profile once. FARaudit watches all eight acquisition stages, drafts your upstream responses, audits every solicitation against source text — and refuses to render a verdict it can't verify.
+    - link "Request access →" [ref=f1e20] [cursor=pointer]:
+      - /url: /access
+  - generic [ref=f1e23]:
+    - generic [ref=f1e24]:
+      - generic [ref=f1e25]:
+        - generic [ref=f1e26]: ↑
+        - text: Upstream coverage
+      - heading "Most tools start at Stage 03. FARaudit starts at 01." [level=2] [ref=f1e27]: Most tools start at Stage 03.FARaudit starts at 01.
+      - paragraph [ref=f1e28]: Seven of eight acquisition stages — beginning 60–90 days before the solicitation drops, when a single CO conversation still shapes the requirement.
+    - generic [ref=f1e29]:
+      - generic [ref=f1e30]:
+        - generic [ref=f1e31]: Stage Coverage
+        - generic [ref=f1e32]: 7 of 8
+      - generic [ref=f1e34]:
+        - generic [ref=f1e35]:
+          - generic [ref=f1e36]: "00"
+          - generic [ref=f1e37]: Govt need identified
+          - generic [ref=f1e38]: Upstream
+        - generic [ref=f1e39]:
+          - generic [ref=f1e40]: "01"
+          - generic [ref=f1e41]: Pre-Sol Synopsis
+          - generic [ref=f1e42]: Active
+        - generic [ref=f1e43]:
+          - generic [ref=f1e44]: "02"
+          - generic [ref=f1e45]: Sources Sought / RFI
+          - generic [ref=f1e46]: Active
+        - generic [ref=f1e47]:
+          - generic [ref=f1e48]: "03"
+          - generic [ref=f1e49]: Solicitation drops
+          - generic [ref=f1e50]: Active
+        - generic [ref=f1e51]:
+          - generic [ref=f1e52]: 04–07
+          - generic [ref=f1e53]: Proposal → Award
+          - generic [ref=f1e54]: Active
+  - generic [ref=f1e56]:
+    - generic [ref=f1e57]:
+      - generic [ref=f1e58]: The flow
+      - heading "Four moves from notice to submission-ready." [level=2] [ref=f1e59]: Four moves from noticeto submission-ready.
+    - generic [ref=f1e60]:
+      - generic [ref=f1e61]:
+        - generic [ref=f1e62]:
+          - generic [ref=f1e63]: Step 01
+          - heading "Connect your profile" [level=3] [ref=f1e65]
+          - paragraph [ref=f1e66]: Drop in your NAICS codes, set-asides, capability statement and past performance. FARaudit indexes it once and matches the entire SAM.gov firehose against you — no keyword alerts that bury your inbox.
+          - generic [ref=f1e67]:
+            - generic [ref=f1e68]: Your NAICS codes scanned at 06:15 CT daily
+            - generic [ref=f1e73]: Cap statement → SOW mapping at the capability line
+        - generic [ref=f1e78]:
+          - paragraph [ref=f1e79]: Illustrative examples — not live data.
+          - generic [ref=f1e80]:
+            - generic [ref=f1e81]: Your Profile
+            - generic [ref=f1e82]: Example
+          - generic [ref=f1e83]:
+            - generic [ref=f1e84]:
+              - generic [ref=f1e85]: NAICS
+              - generic [ref=f1e86]: "9"
+              - generic [ref=f1e87]: codes tracked
+            - generic [ref=f1e88]:
+              - generic [ref=f1e89]: Set-asides
+              - generic [ref=f1e90]: "4"
+              - generic [ref=f1e91]: SDVOSB · WOSB…
+            - generic [ref=f1e92]:
+              - generic [ref=f1e93]: Past perf.
+              - generic [ref=f1e94]: "23"
+              - generic [ref=f1e95]: contracts indexed
+      - generic [ref=f1e96]:
+        - generic [ref=f1e97]:
+          - generic [ref=f1e98]: Step 02
+          - heading "Match & score the firehose" [level=3] [ref=f1e100]
+          - paragraph [ref=f1e101]: Every notice is scored on composite signal — fit, deadline and pipeline relevance — the moment it posts. The ones that map to your past performance rise to the top with a cited rationale attached.
+          - generic [ref=f1e102]:
+            - generic [ref=f1e103]: Urgency score 0–100 per opportunity
+            - generic [ref=f1e108]: CO contact email drafted for upstream positioning
+        - generic [ref=f1e113]:
+          - generic [ref=f1e114]:
+            - generic [ref=f1e115]: Intelligence Feed
+            - generic [ref=f1e116]: Example
+          - generic [ref=f1e117]:
+            - generic [ref=f1e118]:
+              - generic [ref=f1e119]: N00024-26-R-2207 · NAVSEA
+              - generic [ref=f1e120]: 14h left
+            - generic [ref=f1e121]:
+              - generic [ref=f1e122]: RFP
+              - generic [ref=f1e123]: NAICS 541330
+            - generic [ref=f1e124]:
+              - generic [ref=f1e125]: Panel Insight
+              - text: Strong fit · 9 of 12 SOW capabilities map to your past performance. CO responds ~2.3 days.
+          - generic [ref=f1e126]:
+            - generic [ref=f1e127]:
+              - generic [ref=f1e128]: FA8730-26-Q-0114 · AFLCMC
+              - generic [ref=f1e129]: 5d left
+            - generic [ref=f1e130]:
+              - generic [ref=f1e131]: RFQ
+              - generic [ref=f1e132]: NAICS 541715
+            - generic [ref=f1e133]:
+              - generic [ref=f1e134]: Panel Insight
+              - text: Q&A deadline closes Thursday. Section L requires DO-178C DAL-B history — confirmed in your file.
+      - generic [ref=f1e135]:
+        - generic [ref=f1e136]:
+          - generic [ref=f1e137]: Step 03
+          - heading "Run the audit" [level=3] [ref=f1e139]
+          - paragraph [ref=f1e140]: A pre-step classifies the document — SOW, PWS, or SOO — because that changes your entire bid strategy. Five independent expert lenses then read the source sections in parallel. An adversarial verifier checks every claim against the document before anything reaches you. If required sections are missing, you get INCOMPLETE — not a confident wrong answer.
+          - generic [ref=f1e141]:
+            - generic [ref=f1e142]: DFARS traps — hex-chrome, covered telecom, CMMC, Xinjiang, Buy American
+            - generic [ref=f1e147]: CLIN + FOB conflict detection with CO email draft
+        - generic [ref=f1e152]:
+          - generic [ref=f1e153]:
+            - generic [ref=f1e154]:
+              - generic [ref=f1e155]: FA301626Q0068
+              - generic [ref=f1e156]: T-38 Intake Plugs
+            - generic [ref=f1e157]:
+              - generic [ref=f1e158]: RFQ
+              - generic [ref=f1e159]: NAICS 336413
+          - generic [ref=f1e160]:
+            - generic [ref=f1e161]:
+              - generic [ref=f1e162]: P0
+              - generic [ref=f1e163]:
+                - generic [ref=f1e164]: CLIN quantity ambiguity
+                - generic [ref=f1e165]: "\"80 Each\" — 80 sets or 80 plugs? 2× margin exposure."
+            - generic [ref=f1e166]:
+              - generic [ref=f1e167]: P1
+              - generic [ref=f1e168]:
+                - generic [ref=f1e169]: Hexavalent chromium
+                - generic [ref=f1e170]: DFARS 252.223-7008 — standard aerospace primers disqualify.
+          - generic [ref=f1e171]:
+            - text: All traps caught
+            - generic [ref=f1e174]: 4 min
+      - generic [ref=f1e175]:
+        - generic [ref=f1e176]:
+          - generic [ref=f1e177]: Step 04
+          - heading "Ship to a weighted pipeline" [level=3] [ref=f1e179]
+          - paragraph [ref=f1e180]: Move audited opportunities into a confidence-weighted funnel — capture, drafting, pricing, review, submit. At-risk pursuits surface before they slip, so you submit knowing nothing disqualifying made it through. And when the final solicitation drops, the SOW Influence Tracker scores how much of your RFI language made it into the requirement — proof, not a promise.
+          - generic [ref=f1e181]:
+            - generic [ref=f1e182]: Weighted $ funnel across five capture stages
+            - generic [ref=f1e187]: At-risk & closing-soon flagged on the rail
+        - generic [ref=f1e192]:
+          - generic [ref=f1e193]:
+            - generic [ref=f1e194]: Active Pursuits
+            - generic [ref=f1e195]: Example
+          - generic [ref=f1e196]:
+            - generic [ref=f1e197]:
+              - generic [ref=f1e198]: In flight
+              - generic [ref=f1e199]: "19"
+              - generic [ref=f1e200]: weighted 59%
+            - generic [ref=f1e201]:
+              - generic [ref=f1e202]: Closing 7d
+              - generic [ref=f1e203]: "4"
+              - generic [ref=f1e204]: $54.1M
+            - generic [ref=f1e205]:
+              - generic [ref=f1e206]: At risk
+              - generic [ref=f1e207]: "2"
+              - generic [ref=f1e208]: $7.1M
+  - generic [ref=f1e210]:
+    - heading "See it run on your pipeline." [level=2] [ref=f1e211]
+    - paragraph [ref=f1e212]: Design partners shape the roadmap. Request access and we'll match your profile against the live market within a day.
+    - link "Request access →" [ref=f1e213] [cursor=pointer]:
+      - /url: /access
+  - contentinfo [ref=f1e214]:
+    - generic [ref=f1e215]:
+      - link "F FARaudit" [ref=f1e216] [cursor=pointer]:
+        - /url: /
+        - generic [ref=f1e217]: F
+        - generic [ref=f1e218]: FARaudit
+      - generic [ref=f1e219]:
+        - link "How it works" [ref=f1e220] [cursor=pointer]:
+          - /url: /how-it-works
+        - link "Plans" [ref=f1e221] [cursor=pointer]:
+          - /url: /pricing
+        - link "Learn" [ref=f1e222] [cursor=pointer]:
+          - /url: /learn
+        - link "Sign in" [ref=f1e223] [cursor=pointer]:
+          - /url: /sign-in
+        - link "Request Access" [ref=f1e224] [cursor=pointer]:
+          - /url: /access
+      - generic [ref=f1e225]: © 2026 FARaudit Inc. · Dover, DE

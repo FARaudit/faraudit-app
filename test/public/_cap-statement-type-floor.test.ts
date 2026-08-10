@@ -106,12 +106,12 @@ check("the paste declares the same display face",
 console.log("\n── the ruled title block is 9 cells, 3/3/3 (card 825 §2) ──");
 // Design's ruled arrangement:
 //   row 1  SBA CERTIFIED   SELF-CERTIFIED   SAM REGISTRATION
-//   row 2  UEI             CAGE             PRIMARY NAICS
+//   row 2  UEI             CAGE             NAICS  (card 826: the key names the field)
 //   row 3  CONTACT         EMAIL            ADDRESS
 // SELF-CERTIFIED is its own cell because "self-certified" describes where the claim came from,
 // not the entity — a property of the field belongs in the key, the same ruling as UEI vs CAGE.
 // Two registries of different reliability are two fields, not one field with a footnote.
-const RULED = ["SBA certified", "Self-certified", "SAM registration", "UEI", "CAGE", "Primary NAICS", "Contact", "Email", "Address"];
+const RULED = ["SBA certified", "Self-certified", "SAM registration", "UEI", "CAGE", "NAICS", "Contact", "Email", "Address"];
 const norm = (x: string) => x.toLowerCase().replace(/[^a-z]/g, "");
 const present = RULED.filter((r) => allKeys.some((k) => norm(k) === norm(r)));
 const missing = RULED.filter((r) => !present.includes(r));

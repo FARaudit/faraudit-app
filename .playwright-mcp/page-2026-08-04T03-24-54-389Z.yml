@@ -1,0 +1,62 @@
+- generic [ref=f3e2]:
+  - complementary [ref=f3e3]:
+    - link "F FARaudit" [ref=f3e5] [cursor=pointer]:
+      - /url: /
+      - generic [ref=f3e6]: F
+      - generic [ref=f3e7]: FARaudit
+    - generic [ref=f3e8]:
+      - generic [ref=f3e9]: Design Partner Program
+      - heading "Start at Stage 01, 60–90 days early." [level=2] [ref=f3e11]: Start at Stage 01,60–90 days early.
+      - generic [ref=f3e12]:
+        - generic [ref=f3e13]:
+          - generic [ref=f3e14]: Founding Cohort
+          - generic [ref=f3e19]: Open
+        - generic [ref=f3e20]: Design partners shape the roadmap.
+        - generic [ref=f3e21]: Limited seats — and a direct line to the team building it.
+    - generic [ref=f3e25]: Federal Contract Intelligence
+  - main [ref=f3e26]:
+    - generic [ref=f3e28]:
+      - heading "Request access" [level=1] [ref=f3e29]
+      - paragraph [ref=f3e30]: Tell us about your pipeline. We review applications within one business day.
+      - generic [ref=f3e31]: Founding cohort
+      - generic [ref=f3e33]: Applications open
+      - generic [ref=f3e35]:
+        - generic [ref=f3e36]:
+          - generic [ref=f3e37]:
+            - generic [ref=f3e38]: Full name
+            - textbox "Full name" [ref=f3e39]:
+              - /placeholder: Jordan Reyes
+          - generic [ref=f3e40]:
+            - generic [ref=f3e41]: Work email
+            - textbox "Work email" [ref=f3e42]:
+              - /placeholder: you@company.com
+        - generic [ref=f3e43]:
+          - generic [ref=f3e44]:
+            - generic [ref=f3e45]: Company
+            - textbox "Company" [ref=f3e46]:
+              - /placeholder: Acme Defense LLC
+          - generic [ref=f3e47]:
+            - generic [ref=f3e48]: Your role
+            - combobox "Your role" [ref=f3e49] [cursor=pointer]:
+              - option "Select…" [disabled] [selected]
+              - option "BD / Capture Director"
+              - option "Proposal Manager"
+              - option "Founder / Owner"
+              - option "Contracts / Compliance"
+              - option "Other"
+        - generic [ref=f3e50]:
+          - generic [ref=f3e51]:
+            - text: Primary NAICS codes
+            - generic [ref=f3e52]: — optional
+          - textbox "Primary NAICS codes — optional" [ref=f3e53]:
+            - /placeholder: e.g. 541330, 336413, 541512
+        - generic [ref=f3e54]:
+          - generic [ref=f3e55]: Where does your pipeline lose deals today?
+          - textbox "Where does your pipeline lose deals today?" [ref=f3e56]:
+            - /placeholder: Late on solicitations, missed CLIN traps, compliance surprises…
+        - button "Apply for Design Partner access →" [ref=f3e57] [cursor=pointer]
+      - paragraph [ref=f3e58]:
+        - text: Already have an account?
+        - link "Sign in →" [ref=f3e59] [cursor=pointer]:
+          - /url: /sign-in
+    - generic [ref=f3e60]: © 2026 FARaudit Inc. · Dover, DE

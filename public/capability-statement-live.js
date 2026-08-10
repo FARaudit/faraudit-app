@@ -1226,8 +1226,10 @@
     }
     var nl = naicsLines();
     if (nl.length) {
-      fields.push({ k: 'Primary NAICS', v: nl[0].code + (nl[0].title ? '  ' + nl[0].title : ''),
-        sub: nl.length > 1 ? nl.slice(1).map(function (l) { return l.code; }).join(' · ') : null, t: 5 });
+      /* The codes beneath are OTHER codes, not a property of the primary, so the key names the
+         field and the sub-line states the relationship. */
+      fields.push({ k: 'NAICS', v: nl[0].code + (nl[0].title ? '  ' + nl[0].title : ''),
+        sub: nl.length > 1 ? 'Also ' + nl.slice(1).map(function (l) { return l.code; }).join(' · ') : null, t: 5 });
     }
     if (has(REC.contact_name)) {
       fields.push({ k: 'Contact', v: REC.contact_name + (has(REC.contact_title) ? ', ' + REC.contact_title : ''),
