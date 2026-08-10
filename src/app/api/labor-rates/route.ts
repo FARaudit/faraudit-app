@@ -13,6 +13,12 @@ export const runtime = "nodejs";
 // these; live SAM wage determinations augment when explicitly requested.
 export type CategoryGroup = "engineering" | "program" | "manufacturing" | "logistics" | "security";
 
+// WHICH INDUSTRIES A TRADE SERVES, not which industry invented it. 336412 (aircraft engine and
+// engine parts) and 336611 (ship building and repairing) carried ZERO rows, so a customer whose
+// profile holds them filtered to an empty table and read it as "no data for my work". The same
+// welder, inspector and machinist serve those industries; only the tagging was narrow. No rate
+// is changed by this — a rate is a claim about the market, and none of them moved.
+
 const REFERENCE: Array<{
   category: string;
   category_group: CategoryGroup;
@@ -23,9 +29,9 @@ const REFERENCE: Array<{
   source: string;
 }> = [
   // ── ENGINEERING / TECHNICAL ──
-  { category: "Mechanical Engineer I",         category_group: "engineering", naics_codes: ["541330", "336413"], rate_low:  68, rate_median:  82, rate_high:  98, source: "BLS OES 2024 + SCA" },
-  { category: "Mechanical Engineer II",        category_group: "engineering", naics_codes: ["541330", "336413"], rate_low:  88, rate_median: 108, rate_high: 132, source: "BLS OES 2024 + SCA" },
-  { category: "Mechanical Engineer III",       category_group: "engineering", naics_codes: ["541330", "336413"], rate_low: 112, rate_median: 138, rate_high: 168, source: "BLS OES 2024 + SCA" },
+  { category: "Mechanical Engineer I",         category_group: "engineering", naics_codes: ["541330", "336413", "336412", "336611"], rate_low:  68, rate_median:  82, rate_high:  98, source: "BLS OES 2024 + SCA" },
+  { category: "Mechanical Engineer II",        category_group: "engineering", naics_codes: ["541330", "336413", "336412", "336611"], rate_low:  88, rate_median: 108, rate_high: 132, source: "BLS OES 2024 + SCA" },
+  { category: "Mechanical Engineer III",       category_group: "engineering", naics_codes: ["541330", "336413", "336412"], rate_low: 112, rate_median: 138, rate_high: 168, source: "BLS OES 2024 + SCA" },
   { category: "Systems Engineer I",            category_group: "engineering", naics_codes: ["541330"],            rate_low:  65, rate_median:  85, rate_high: 105, source: "BLS OES 2024 + SCA" },
   { category: "Systems Engineer II",           category_group: "engineering", naics_codes: ["541330"],            rate_low:  90, rate_median: 115, rate_high: 140, source: "BLS OES 2024 + SCA" },
   { category: "Systems Engineer III",          category_group: "engineering", naics_codes: ["541330"],            rate_low: 120, rate_median: 150, rate_high: 185, source: "BLS OES 2024 + SCA" },
@@ -35,15 +41,15 @@ const REFERENCE: Array<{
   { category: "Electrical Engineer I",         category_group: "engineering", naics_codes: ["541330"],            rate_low:  68, rate_median:  85, rate_high: 105, source: "BLS OES 2024 + SCA" },
   { category: "Electrical Engineer II",        category_group: "engineering", naics_codes: ["541330"],            rate_low:  90, rate_median: 115, rate_high: 140, source: "BLS OES 2024 + SCA" },
   { category: "Electrical Engineer III",       category_group: "engineering", naics_codes: ["541330"],            rate_low: 118, rate_median: 145, rate_high: 180, source: "BLS OES 2024 + SCA" },
-  { category: "Electronics Technician I",      category_group: "engineering", naics_codes: ["334511"],            rate_low:  25, rate_median:  32, rate_high:  42, source: "BLS OES 2024 + SCA" },
-  { category: "Electronics Technician II",     category_group: "engineering", naics_codes: ["334511"],            rate_low:  35, rate_median:  45, rate_high:  58, source: "BLS OES 2024 + SCA" },
+  { category: "Electronics Technician I",      category_group: "engineering", naics_codes: ["334511", "336611"],            rate_low:  25, rate_median:  32, rate_high:  42, source: "BLS OES 2024 + SCA" },
+  { category: "Electronics Technician II",     category_group: "engineering", naics_codes: ["334511", "336611"],            rate_low:  35, rate_median:  45, rate_high:  58, source: "BLS OES 2024 + SCA" },
   { category: "Electronics Technician III",    category_group: "engineering", naics_codes: ["334511"],            rate_low:  48, rate_median:  60, rate_high:  78, source: "BLS OES 2024 + SCA" },
-  { category: "Test Engineer",                 category_group: "engineering", naics_codes: ["541330"],            rate_low:  78, rate_median:  98, rate_high: 122, source: "BLS OES 2024 + SCA" },
+  { category: "Test Engineer",                 category_group: "engineering", naics_codes: ["541330", "336412"],            rate_low:  78, rate_median:  98, rate_high: 122, source: "BLS OES 2024 + SCA" },
   { category: "Systems Analyst",               category_group: "engineering", naics_codes: ["541512"],            rate_low:  68, rate_median:  88, rate_high: 110, source: "BLS OES 2024 + SCA" },
   { category: "Data Analyst",                  category_group: "engineering", naics_codes: ["541512"],            rate_low:  55, rate_median:  72, rate_high:  92, source: "BLS OES 2024 + SCA" },
   { category: "Network Engineer",              category_group: "engineering", naics_codes: ["541512"],            rate_low:  78, rate_median:  98, rate_high: 124, source: "BLS OES 2024 + SCA" },
-  { category: "Quality Engineer",              category_group: "engineering", naics_codes: ["336413", "332710"], rate_low:  78, rate_median:  96, rate_high: 118, source: "BLS OES 2024 + SCA" },
-  { category: "Aerospace Technician",          category_group: "engineering", naics_codes: ["336413"],            rate_low:  52, rate_median:  68, rate_high:  86, source: "BLS OES 2024 + SCA" },
+  { category: "Quality Engineer",              category_group: "engineering", naics_codes: ["336413", "332710", "336412", "336611"], rate_low:  78, rate_median:  96, rate_high: 118, source: "BLS OES 2024 + SCA" },
+  { category: "Aerospace Technician",          category_group: "engineering", naics_codes: ["336413", "336412"],            rate_low:  52, rate_median:  68, rate_high:  86, source: "BLS OES 2024 + SCA" },
   { category: "Cybersecurity / CMMC Engineer", category_group: "engineering", naics_codes: ["541512", "541330"], rate_low: 128, rate_median: 162, rate_high: 210, source: "Corpus + market survey" },
   // ── PROGRAM / CONTRACTS ──
   { category: "Program Manager I",             category_group: "program",     naics_codes: ["541330"],            rate_low: 100, rate_median: 125, rate_high: 155, source: "BLS OES 2024 + SCA" },
@@ -57,20 +63,20 @@ const REFERENCE: Array<{
   { category: "Configuration Manager",         category_group: "program",     naics_codes: ["541330", "336413"], rate_low:  82, rate_median: 102, rate_high: 128, source: "Corpus" },
   { category: "Subcontract Administrator",     category_group: "program",     naics_codes: ["541330"],            rate_low:  72, rate_median:  92, rate_high: 116, source: "Corpus" },
   // ── MANUFACTURING / TRADES ──
-  { category: "Sheet Metal Mechanic",          category_group: "manufacturing", naics_codes: ["336413"],            rate_low:  35, rate_median:  46, rate_high:  58, source: "BLS OES 2024 + SCA" },
+  { category: "Sheet Metal Mechanic",          category_group: "manufacturing", naics_codes: ["336413", "336412", "336611"],            rate_low:  35, rate_median:  46, rate_high:  58, source: "BLS OES 2024 + SCA" },
   { category: "Aircraft Mechanic I",           category_group: "manufacturing", naics_codes: ["336411"],            rate_low:  36, rate_median:  46, rate_high:  58, source: "BLS OES 2024 + SCA" },
   { category: "Aircraft Mechanic II",          category_group: "manufacturing", naics_codes: ["336411"],            rate_low:  52, rate_median:  66, rate_high:  82, source: "BLS OES 2024 + SCA" },
   { category: "Electronics Assembler",         category_group: "manufacturing", naics_codes: ["334511"],            rate_low:  24, rate_median:  32, rate_high:  42, source: "BLS OES 2024 + SCA" },
-  { category: "Quality Inspector",             category_group: "manufacturing", naics_codes: ["336413"],            rate_low:  48, rate_median:  62, rate_high:  78, source: "BLS OES 2024 + SCA" },
-  { category: "CMM Programmer / Machinist",    category_group: "manufacturing", naics_codes: ["332710"],            rate_low:  62, rate_median:  78, rate_high:  98, source: "BLS OES 2024 + SCA" },
-  { category: "CNC Machinist I",               category_group: "manufacturing", naics_codes: ["332710"],            rate_low:  42, rate_median:  55, rate_high:  70, source: "BLS OES 2024 + SCA" },
-  { category: "CNC Machinist II",              category_group: "manufacturing", naics_codes: ["332710"],            rate_low:  58, rate_median:  74, rate_high:  92, source: "BLS OES 2024 + SCA" },
-  { category: "Welder — Structural",           category_group: "manufacturing", naics_codes: ["332710"],            rate_low:  38, rate_median:  50, rate_high:  64, source: "BLS OES 2024 + SCA" },
-  { category: "Production Welder (Mil-Spec)",  category_group: "manufacturing", naics_codes: ["332710", "336413"], rate_low:  48, rate_median:  62, rate_high:  82, source: "SCA wage determinations" },
-  { category: "Tool & Die Maker",              category_group: "manufacturing", naics_codes: ["332710"],            rate_low:  48, rate_median:  62, rate_high:  78, source: "BLS OES 2024 + SCA" },
-  { category: "Assembler — Precision",         category_group: "manufacturing", naics_codes: ["336413"],            rate_low:  32, rate_median:  42, rate_high:  54, source: "BLS OES 2024 + SCA" },
-  { category: "NDT Technician",                category_group: "manufacturing", naics_codes: ["336413"],            rate_low:  46, rate_median:  58, rate_high:  74, source: "BLS OES 2024 + SCA" },
-  { category: "Painter — Industrial",          category_group: "manufacturing", naics_codes: ["336413"],            rate_low:  34, rate_median:  44, rate_high:  56, source: "BLS OES 2024 + SCA" },
+  { category: "Quality Inspector",             category_group: "manufacturing", naics_codes: ["336413", "336412", "336611"],            rate_low:  48, rate_median:  62, rate_high:  78, source: "BLS OES 2024 + SCA" },
+  { category: "CMM Programmer / Machinist",    category_group: "manufacturing", naics_codes: ["332710", "336412"],            rate_low:  62, rate_median:  78, rate_high:  98, source: "BLS OES 2024 + SCA" },
+  { category: "CNC Machinist I",               category_group: "manufacturing", naics_codes: ["332710", "336412", "336611"],            rate_low:  42, rate_median:  55, rate_high:  70, source: "BLS OES 2024 + SCA" },
+  { category: "CNC Machinist II",              category_group: "manufacturing", naics_codes: ["332710", "336412", "336611"],            rate_low:  58, rate_median:  74, rate_high:  92, source: "BLS OES 2024 + SCA" },
+  { category: "Welder — Structural",           category_group: "manufacturing", naics_codes: ["332710", "336611"],            rate_low:  38, rate_median:  50, rate_high:  64, source: "BLS OES 2024 + SCA" },
+  { category: "Production Welder (Mil-Spec)",  category_group: "manufacturing", naics_codes: ["332710", "336413", "336412", "336611"], rate_low:  48, rate_median:  62, rate_high:  82, source: "SCA wage determinations" },
+  { category: "Tool & Die Maker",              category_group: "manufacturing", naics_codes: ["332710", "336412", "336611"],            rate_low:  48, rate_median:  62, rate_high:  78, source: "BLS OES 2024 + SCA" },
+  { category: "Assembler — Precision",         category_group: "manufacturing", naics_codes: ["336413", "336412", "336611"],            rate_low:  32, rate_median:  42, rate_high:  54, source: "BLS OES 2024 + SCA" },
+  { category: "NDT Technician",                category_group: "manufacturing", naics_codes: ["336413", "336412", "336611"],            rate_low:  46, rate_median:  58, rate_high:  74, source: "BLS OES 2024 + SCA" },
+  { category: "Painter — Industrial",          category_group: "manufacturing", naics_codes: ["336413", "336412", "336611"],            rate_low:  34, rate_median:  44, rate_high:  56, source: "BLS OES 2024 + SCA" },
   // ── LOGISTICS / SUPPLY CHAIN ──
   { category: "Supply Chain Analyst",          category_group: "logistics",   naics_codes: ["541614"],            rate_low:  58, rate_median:  74, rate_high:  94, source: "BLS OES 2024 + SCA" },
   { category: "Purchasing Agent",              category_group: "logistics",   naics_codes: ["541614"],            rate_low:  52, rate_median:  66, rate_high:  84, source: "BLS OES 2024 + SCA" },

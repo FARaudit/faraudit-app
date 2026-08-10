@@ -35,7 +35,9 @@ const S = { name: 19.5, sentence: 10, capHead: 10.5, difHead: 10.1, value: 9.4, 
 
 const st = StyleSheet.create({
   page: { backgroundColor: PAPER, padding: 18.72, fontFamily: DISPLAY, color: INK },
-  plate: { flexGrow: 1, borderWidth: 1.1, borderColor: INK, borderStyle: "solid", backgroundColor: PLATE, padding: 2.25 },
+  // The frame no longer stretches to the foot: with the block un-pinned, a growing plate would
+  // put the same void back between the last section and the border.
+  plate: { borderWidth: 1.1, borderColor: INK, borderStyle: "solid", backgroundColor: PLATE, padding: 2.25 },
   field: { flexGrow: 1, borderWidth: 0.75, borderColor: LINE, borderStyle: "solid", paddingTop: 14.4, paddingHorizontal: 18.72, paddingBottom: 4.32 },
 
   head: { flexDirection: "row", justifyContent: "space-between", paddingBottom: 10.5, borderBottomWidth: 1.1, borderBottomColor: INK, borderBottomStyle: "solid" },
@@ -54,8 +56,12 @@ const st = StyleSheet.create({
   capB: { fontSize: S.sentence, lineHeight: 1.36, color: INK2, marginBottom: 5.25 },
   capS: { fontFamily: MONO, fontSize: S.key, color: INK3, lineHeight: 1.4, paddingTop: 3, borderTopWidth: 0.75, borderTopColor: LINE, borderTopStyle: "dashed", marginTop: "auto" },
 
-  difRow: { flexDirection: "row" },
-  dif: { flexDirection: "row", paddingVertical: 3, borderBottomWidth: 0.75, borderBottomColor: LINE2, borderBottomStyle: "solid" },
+  // THE RULE BELONGS TO THE ROW. Drawn per ITEM, a rule sits at the foot of whatever that item
+  // happens to be, so a two-line entry beside a one-line entry puts the two rules at different
+  // heights and the section reads as misassembled. Moving it to the row makes one rule per row
+  // at the row's own baseline, whatever the items inside it do.
+  difRow: { flexDirection: "row", borderBottomWidth: 0.75, borderBottomColor: LINE2, borderBottomStyle: "solid" },
+  dif: { flexDirection: "row", paddingVertical: 3 },
   difM: { fontFamily: MONO, fontSize: S.key, fontWeight: 700, color: ACCENT, width: 13.68 },
   difH: { fontSize: S.difHead, fontWeight: 700, lineHeight: 1.24 },
   difB: { fontSize: S.sentence, lineHeight: 1.34, color: INK2, marginTop: 1.5 },
@@ -69,7 +75,16 @@ const st = StyleSheet.create({
   ppM: { fontFamily: MONO, fontSize: S.key, color: INK2, lineHeight: 1.28, paddingVertical: 2.25, paddingHorizontal: 6 },
   ppNote: { fontFamily: MONO, fontSize: S.key, color: INK3, lineHeight: 1.45, marginTop: 6.75 },
 
-  tb: { marginTop: "auto", borderTopWidth: 1.1, borderTopColor: INK, borderLeftWidth: 0.75, borderLeftColor: LINE, borderStyle: "solid" },
+  // NOT PINNED TO THE FOOT. `marginTop:"auto"` pushed the block to the bottom of the sheet, so a
+  // record with no past performance punched a third of a page of white THROUGH the document. A
+  // short capability statement reads as a small firm, which is true; a hole in the middle reads
+  // as a broken template, which is not. The white now falls below the document instead.
+  // 25.2pt = 0.35in, the gap Design ruled.
+  // THE CONTAINER OWNS THE BOUNDARY. The block closes today only because `rowsOf` re-fits every
+  // row to 12 tracks — a behaviour, not a structure. Put the frame on the container and no cell
+  // can carry an edge away with it if that re-fitting ever changes. Interior rules stay on the
+  // cells; only the outer boundary moved.
+  tb: { marginTop: 25.2, borderWidth: 0.75, borderColor: LINE, borderTopWidth: 1.1, borderTopColor: INK, borderStyle: "solid" },
   tbRow: { flexDirection: "row" },
   cell: { borderRightWidth: 0.75, borderRightColor: LINE, borderBottomWidth: 0.75, borderBottomColor: LINE, borderStyle: "solid", paddingVertical: 6, paddingHorizontal: 7.5 },
   k: { fontFamily: MONO, fontSize: S.key, letterSpacing: 1.17, color: INK3, marginBottom: 3 },
@@ -94,6 +109,14 @@ function Cell({ k, v, sub, tracks, hi }: { k: string; v: string; sub?: string | 
 }
 
 interface Field { k: string; v: string; sub?: string | null; tracks: number }
+
+/** THE EMPHASIS BINDS TO THE FIELD, NEVER TO THE SLOT. The inverted cell exists for the single
+ *  most consequential claim in the block — the SBA-verified set-aside standing. Bound to
+ *  "whatever lands first", it fell through to ADDRESS on a record with no certifications, and
+ *  painted a mailing address as the most important fact on the document. When the field is
+ *  absent there is NO highlighted cell: the block reads perfectly without one, and an emphasis
+ *  with no referent is worse than none. */
+const HIGHLIGHT_FIELD = "SBA certified";
 
 /** THE BLOCK IS BUILT FROM THE FIELDS THAT EXIST, not from a fixed nine-cell template.
  *  The reference plate was measured with every cell populated; a real profile is missing
@@ -314,7 +337,7 @@ export function PlatePage({ stmt, generatedAt, logo, agency }: {
               {rowsOf(fields).map((row, r) => (
                 <View key={r} style={st.tbRow}>
                   {row.map((f, c) => (
-                    <Cell key={c} k={f.k} v={f.v} sub={f.sub} tracks={f.tracks} hi={r === 0 && c === 0} />
+                    <Cell key={c} k={f.k} v={f.v} sub={f.sub} tracks={f.tracks} hi={f.k === HIGHLIGHT_FIELD} />
                   ))}
                 </View>
               ))}
