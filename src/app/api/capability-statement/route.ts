@@ -26,6 +26,8 @@ interface PatchBody {
   core_competencies_json?: unknown;
   differentiators_json?: unknown;
   contact_name?: string | null;
+  // Read by the card-825 plate to build "Name, Title"; declared here so it can also be written.
+  contact_title?: string | null;
   contact_email?: string | null;
   contact_phone?: string | null;
   contact_website?: string | null;
@@ -40,7 +42,13 @@ const ALLOWED_FIELDS = new Set<keyof PatchBody>([
   "naics_codes", "certifications",
   "core_competencies", "differentiators",
   "core_competencies_json", "differentiators_json",
-  "contact_name", "contact_email", "contact_phone", "contact_website", "contact_address",
+  // contact_title was READ by the plate and WRITEABLE BY NOBODY. The card-825 plate builds the
+  // CONTACT cell as "Name, Title" and Design asked for the field by name — a CO wants to know
+  // whether they are reading the President or the front desk. The column landed, the renderer
+  // reads it, and it was never added here, so every PATCH carrying a title had it silently
+  // dropped by the allowlist and the cell printed a bare name. Exactly the trap the `duns` note
+  // above describes, in the other direction: a field that can be read and never written.
+  "contact_name", "contact_title", "contact_email", "contact_phone", "contact_website", "contact_address",
   "past_performance"
 ]);
 
