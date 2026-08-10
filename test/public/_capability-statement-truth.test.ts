@@ -893,3 +893,52 @@ console.log("\n── every field the plate reads can be written ──");
     !allowed.includes('"sam_registration_status"'),
     "a customer could type a registration status SAM did not confirm");
 }
+
+// ── the pasted copy has to fit the page it promises ──────────────────────────
+// The caption says the copy keeps its formatting when pasted into Word. The outer table was
+// width:100% with max-width:660pt — 192pt wider than a US Letter text column (612pt of paper
+// less 144pt of margin = 468pt) — and Word's HTML renderer ignores max-width on a table, so
+// nothing constrained it at all. The third competency column was cut off mid-word on paste.
+// It looked fine in email only because a mail client scrolls where a page cannot.
+console.log("\n── the pasted copy fits a Word page ──");
+{
+  const LETTER_TEXT_COLUMN_PT = 468;
+  check("the page width is named, not buried in a literal",
+    /var WORD_TEXT_COLUMN_PT = (\d+)/.test(live),
+    "a bare number in the markup cannot be reasoned about or gated");
+  const declared = Number((live.match(/var WORD_TEXT_COLUMN_PT = (\d+)/) || [])[1]);
+  check(`the paste is set to the Letter text column (${LETTER_TEXT_COLUMN_PT}pt)`,
+    declared === LETTER_TEXT_COLUMN_PT,
+    `declared ${declared}pt — anything wider is off the page the moment it lands in Word`);
+  check("the outer table carries the width ATTRIBUTE, which is what Word obeys",
+    /width="' \+ WORD_TEXT_COLUMN_PT \+ '"/.test(live),
+    "a style-only width is ignored by Word's renderer");
+  // COMMENTS ARE NOT MARKUP. First written as a bare grep of the file, and it went red on the
+  // comment that explains what the value was changed FROM — the fix's own rationale read as the
+  // defect. A gate that cannot tell prose about the code from the code is measuring the wrong
+  // text, so the source is stripped of comments before the emitted markup is searched.
+  const liveCode = live.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  check("no table is left on the old 660pt bound", !/max-width:660pt/.test(liveCode),
+    "the value that overflowed the page");
+  // Narrower viewports (mail on a phone) still need to shrink — one number for the page, one
+  // rule for everything smaller.
+  check("it still shrinks below that on a narrow viewport", /max-width:100%/.test(live),
+    "a fixed width with no ceiling breaks mail clients the other way");
+}
+
+// ── the page may not name an action the product cannot perform ───────────────
+// autopopulate() reads audits.outcome='won' and audit_outcomes.outcome='awarded'. Both readers
+// are real; NO ROUTE WRITES EITHER, and audit_outcomes is empty. "Record an audit as won" named
+// a step a customer cannot take, so the empty state read as "not done yet" instead of "not built".
+console.log("\n── past performance does not promise an unbuilt step ──");
+{
+  const capHtml = read("public/capability-statement.html");
+  for (const [where, src] of [["the empty state", live], ["the page subhead", capHtml]] as const) {
+    check(`${where} does not instruct the customer to record an audit as won`,
+      !/record as won|records as won|you record as won/i.test(src),
+      "an instruction for a control that exists nowhere in the product");
+  }
+  check("the empty state says the step is not built",
+    /not built yet/i.test(live),
+    "silence about a missing mechanism reads as a task the customer has not got to");
+}

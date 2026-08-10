@@ -416,9 +416,10 @@
     clear(wrap);
     var rows = orderForEdition(list(REC.past_performance));
     if (!rows.length) {
+      /* Names the missing step rather than an action the customer cannot take. */
       wrap.appendChild(emptyNote(
         'past performance yet',
-        'It fills in automatically from audits you record as won — nothing to type here.'
+        'This section fills itself from awards — recording an outcome on an audit is not built yet, so there is no way to populate it today.'
       ));
       return;
     }
@@ -1101,6 +1102,8 @@
   var T_LINE = '#b3bfcd', T_LINE2 = '#dbe2ec', T_ACCENT = '#185FA5';
   var T_PAPER = '#E9EDF2', T_PLATE = '#F7F9FB', T_NAVY = '#0A1628';
   var T_ONNAVY = '#F6F8FA', T_NAVYKEY = '#9fb0c4';
+  /* US Letter text column: 612pt of paper less 144pt of margin. */
+  var WORD_TEXT_COLUMN_PT = 468;
   var T_DISP = "Manrope,'Segoe UI',Calibri,Arial,sans-serif";
   var T_MONO = "'JetBrains Mono',Consolas,'Courier New',monospace";
   /* The three ruled floors: sentences 10pt, title-block values 9.4pt, keys 9pt. */
@@ -1301,7 +1304,9 @@
     /* The plate's drawing frame is a border on one outer cell — the piece of the identity
        that survives the paste intact — and the interior padding goes with it, because a
        frame with content against its edge reads as a mistake. */
-    return '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;max-width:660pt;border-collapse:collapse;background:'
+    /* Width goes in the ATTRIBUTE: Word obeys that and ignores a max-width on a table.
+       max-width:100% stays in the style so narrower viewports still shrink. */
+    return '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="' + WORD_TEXT_COLUMN_PT + '" style="width:' + WORD_TEXT_COLUMN_PT + 'pt;max-width:100%;border-collapse:collapse;background:'
       + T_PLATE + ';"><tr><td style="padding:22pt 24pt;border:1.5pt solid ' + T_INK + ';">' + inner + '</td></tr></table>';
   }
 
