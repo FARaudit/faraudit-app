@@ -87,7 +87,54 @@ export function resolveDifferentiators(row: {
 export const COMPETENCY_COUNT = 3;
 export const DIFFERENTIATOR_MAX = 6;
 
-export interface BuildRefusal { field: "core_competencies" | "differentiators"; count: number; message: string; }
+// ── PROSE THAT WAS NEVER SPLIT ────────────────────────────────────────────────────────────
+//
+// The legacy columns split on NEWLINES. A customer who typed four sentences on one line has
+// ONE item whose head is a paragraph, and the plate draws that head as a claim.
+//
+// Competencies survive this by accident: the count is exact, so a single blob is 1 of 3 and
+// refuses. Differentiators have only a CEILING of 6, so one run-on paragraph builds clean and
+// downloads. That is how a test string reached a rendered capability statement — the field
+// with no floor was the field carrying it.
+//
+// A COUNT FLOOR WAS REJECTED. One differentiator is legitimate, and a floor of 2 would refuse
+// a customer who has exactly one thing to say. The defect is not "too few items", it is "this
+// item is a paragraph" — so the recognizer reads SHAPE.
+//
+// FAILURE DIRECTION, BOTH MEASURED. Requiring a capital after the terminator is what keeps
+// abbreviations out: the character before the period in "U.S. Air Force" is uppercase, and a
+// decimal has no whitespace after it. The cost is that "fast quotes. always on time." reads as
+// one sentence and passes. That miss is deliberate and it is the right way round — this gate
+// BLOCKS a customer's export, so a wrong refusal costs more than a paragraph that slips
+// through. It fails toward letting the document build.
+const SENTENCE_BOUNDARY = /[a-z0-9)\]][.!?]+["')\]]?\s+["'(\[]?[A-Z]/g;
+
+/** How many sentences one entry runs together. 1 means it is a single claim. */
+export function sentencesIn(text: string): number {
+  return (String(text ?? "").match(SENTENCE_BOUNDARY) || []).length + 1;
+}
+
+/** Entries that are paragraphs rather than claims. Scoped to `legacy-text` because that is the
+ *  class observed: a structured head was authored as a head by whoever wrote the row, while a
+ *  legacy line is only a head because a newline happened to make it one. */
+function unsplitEntries<T extends { h: string }>(section: ResolvedSection<T>): number {
+  if (section.source !== "legacy-text") return 0;
+  return section.items.filter((i) => sentencesIn(i.h) > 1).length;
+}
+
+export interface BuildRefusal {
+  field: "core_competencies" | "differentiators";
+  /** What this refusal counts: items on file when `kind` is `count`, unsplit entries when `prose`. */
+  count: number;
+  kind: "count" | "prose";
+  message: string;
+}
+
+function proseMessage(section: string, n: number): string {
+  const subject = n === 1 ? "one entry runs" : `${n} entries run`;
+  const verb = n === 1 ? "it prints" : "they print";
+  return `The ${section} section splits on line breaks, and ${subject} several sentences together on a single line — so ${verb} as a run-on paragraph rather than as separate claims. Put each claim on its own line.`;
+}
 
 /** Returns every reason the document cannot be built, or [] when it can. Never mutates and
  *  never trims — a caller that wants to ship anyway has to say so in its own code, where the
@@ -97,19 +144,32 @@ export function refusalsFor(row: {
   differentiators?: string | null; differentiators_json?: unknown;
 }): BuildRefusal[] {
   const out: BuildRefusal[] = [];
-  const comp = resolveCompetencies(row).items.length;
-  if (comp !== COMPETENCY_COUNT) {
+
+  // A PROSE REFUSAL SUPERSEDES THE COUNT REFUSAL FOR THE SAME FIELD, and not for tidiness:
+  // when the entries have not been separated the count is not yet knowable. Telling a customer
+  // holding one four-sentence paragraph to "add 2 more" is wrong advice about a real defect.
+  const comps = resolveCompetencies(row);
+  const compProse = unsplitEntries(comps);
+  const comp = comps.items.length;
+  if (compProse) {
+    out.push({ field: "core_competencies", count: compProse, kind: "prose", message: proseMessage("core competencies", compProse) });
+  } else if (comp !== COMPETENCY_COUNT) {
     out.push({
-      field: "core_competencies", count: comp,
+      field: "core_competencies", count: comp, kind: "count",
       message: comp < COMPETENCY_COUNT
         ? `The capability statement prints exactly ${COMPETENCY_COUNT} core competencies and ${comp} ${comp === 1 ? "is" : "are"} on file. Add ${COMPETENCY_COUNT - comp} more.`
         : `The capability statement prints exactly ${COMPETENCY_COUNT} core competencies and ${comp} are on file. Choose the ${COMPETENCY_COUNT} to print — a fourth runs off the page, so this is an editorial call rather than something the export should make for you.`
     });
   }
-  const dif = resolveDifferentiators(row).items.length;
-  if (dif > DIFFERENTIATOR_MAX) {
+
+  const difs = resolveDifferentiators(row);
+  const difProse = unsplitEntries(difs);
+  const dif = difs.items.length;
+  if (difProse) {
+    out.push({ field: "differentiators", count: difProse, kind: "prose", message: proseMessage("differentiators", difProse) });
+  } else if (dif > DIFFERENTIATOR_MAX) {
     out.push({
-      field: "differentiators", count: dif,
+      field: "differentiators", count: dif, kind: "count",
       message: `The capability statement holds up to ${DIFFERENTIATOR_MAX} differentiators and ${dif} are on file. Remove ${dif - DIFFERENTIATOR_MAX} — beyond ${DIFFERENTIATOR_MAX} the section runs past one page.`
     });
   }
