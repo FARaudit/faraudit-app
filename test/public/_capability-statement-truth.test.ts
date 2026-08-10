@@ -32,10 +32,12 @@ const ROOT = join(import.meta.dirname ?? __dirname, "..", "..");
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
 
 const html = read("public/capability-statement.html");
-// The export is two files: the route (auth, refusal, headers) and the document builder
-// in src/lib (extracted so a test can actually render it). Content assertions must see
-// both, or moving a line between them turns a gate red with nothing having changed.
-const readExport = (route: string, doc: string) => read(route) + "\n" + read(doc);
+// The export is several files: the route (auth, refusal, headers), the document builder in
+// src/lib (extracted so a test can actually render it), and — for the PDF — the plate that
+// carries the geometry. Content assertions must see all of them, or moving a line between
+// them turns a gate red with nothing having changed. That is not hypothetical: extracting
+// the plate reddened six assertions here and not one behaviour had altered.
+const readExport = (...files: string[]) => files.map(read).join("\n");
 const live = read("public/capability-statement-live.js");
 
 console.log("── the document invents nothing ──");
@@ -390,7 +392,7 @@ console.log("\n── the count is the total, not the slice ──");
   const pageLimit = Number(limits.match(/PAST_PERFORMANCE_LIMIT = (\d+)/)?.[1]);
   const exportLimit = Number(limits.match(/PAST_PERFORMANCE_EXPORT_LIMIT = (\d+)/)?.[1]);
   const api = read("src/app/api/capability-statement/route.ts");
-  const pdf = readExport("src/app/api/capability-statement/pdf/route.tsx", "src/lib/capability-statement-pdf-doc.tsx");
+  const pdf = readExport("src/app/api/capability-statement/pdf/route.tsx", "src/lib/capability-statement-pdf-doc.tsx", "src/lib/capability-statement-plate.tsx");
 
   check("there is one page cap and one export cap", pageLimit > 0 && exportLimit > 0,
     `parsed page=${pageLimit} export=${exportLimit}`);
@@ -525,7 +527,7 @@ console.log("\n── the statement card shows what actually exports ──");
 // contracting officer. Confirmed on a real production download, 2026-08-09.
 console.log("\n── the phone reads the same everywhere ──");
 {
-  const pdf = readExport("src/app/api/capability-statement/pdf/route.tsx", "src/lib/capability-statement-pdf-doc.tsx");
+  const pdf = readExport("src/app/api/capability-statement/pdf/route.tsx", "src/lib/capability-statement-pdf-doc.tsx", "src/lib/capability-statement-plate.tsx");
   const fmt = read("src/lib/capability-statement-format.ts");
 
   check("the printed document formats the phone", /formatPhone\(stmt\.contact_phone\)/.test(pdf),
@@ -581,7 +583,7 @@ console.log("\n── the phone reads the same everywhere ──");
 // contracting officer under their own name.
 console.log("\n── whose document this is ──");
 {
-  const pdf = readExport("src/app/api/capability-statement/pdf/route.tsx", "src/lib/capability-statement-pdf-doc.tsx");
+  const pdf = readExport("src/app/api/capability-statement/pdf/route.tsx", "src/lib/capability-statement-pdf-doc.tsx", "src/lib/capability-statement-plate.tsx");
 
   // Match the RENDERING, not the word — a comment mentioning DUNS is not a DUNS on the
   // document, and a check that cannot tell the difference fails for the wrong reason.
@@ -606,12 +608,17 @@ console.log("\n── whose document this is ──");
   check("the pasted copy carries no FARaudit credit", !/Prepared with FARaudit/.test(live),
     "our marketing is on a document the customer sends under their own name");
 
-  check("the printed document's header is the company", /<Text style={styles\.brand}>{company}<\/Text>/.test(pdf),
+  check("the printed document's header is the company", /<Text style={st\.co}>{company\.toUpperCase\(\)}<\/Text>/.test(pdf),
     "the PDF header is not the customer's name");
   check("the printed document carries no FARaudit credit", !/Prepared with FARaudit/.test(pdf),
     "our marketing is on a document the customer sends under their own name");
-  check("the footer still identifies the document", /Page \$\{pageNumber\}/.test(pdf) && /Confidential/.test(pdf),
-    "removing the credit took the running footer with it");
+  // The plate carries the sheet designation in the title area instead of a running footer,
+  // and it is DERIVED — "SHEET 1 OF 1" as a literal becomes false the moment a long record
+  // wraps, and it would be false on the very page asserting it.
+  check("every page identifies which sheet it is", /SHEET \$\{pageNumber\} OF \$\{totalPages\}/.test(pdf),
+    "a page carries no sheet designation, or states one it did not derive");
+  check("the sheet count is never a literal", !/SHEET 1 OF 1/.test(pdf),
+    "a hardcoded sheet count is a claim the document cannot keep");
   check("no dead brand styles remain", !/brandGold/.test(pdf) && !/companyName:/.test(pdf),
     "styles for the retired header are still declared");
 
@@ -627,7 +634,7 @@ console.log("\n── the logo upload trusts nothing the caller says ──");
 {
   const route = read("src/app/api/capability-statement/logo/route.ts");
   const lib = read("src/lib/capability-statement-logo.ts");
-  const pdf = readExport("src/app/api/capability-statement/pdf/route.tsx", "src/lib/capability-statement-pdf-doc.tsx");
+  const pdf = readExport("src/app/api/capability-statement/pdf/route.tsx", "src/lib/capability-statement-pdf-doc.tsx", "src/lib/capability-statement-plate.tsx");
   const api = read("src/app/api/capability-statement/route.ts");
 
   check("the object path comes from the session, not the body",
@@ -730,7 +737,7 @@ console.log("\n── NAICS carries titles, from the regulation ──");
 {
   const lib = read("src/lib/capability-statement-naics.ts");
   const titles = read("src/lib/naics-titles.ts");
-  const pdf = readExport("src/app/api/capability-statement/pdf/route.tsx", "src/lib/capability-statement-pdf-doc.tsx");
+  const pdf = readExport("src/app/api/capability-statement/pdf/route.tsx", "src/lib/capability-statement-pdf-doc.tsx", "src/lib/capability-statement-plate.tsx");
   const docx = readExport("src/app/api/capability-statement/docx/route.ts", "src/lib/capability-statement-docx-doc.ts");
   const api = read("src/app/api/capability-statement/route.ts");
   const gen = read("scripts/naics/build-naics-titles.mjs");
@@ -814,7 +821,7 @@ console.log("\n── the Word export is a real document ──");
 console.log("\n── a tailored edition writes nothing ──");
 {
   const lib = read("src/lib/capability-statement-tailoring.ts");
-  const pdf = readExport("src/app/api/capability-statement/pdf/route.tsx", "src/lib/capability-statement-pdf-doc.tsx");
+  const pdf = readExport("src/app/api/capability-statement/pdf/route.tsx", "src/lib/capability-statement-pdf-doc.tsx", "src/lib/capability-statement-plate.tsx");
   const docx = readExport("src/app/api/capability-statement/docx/route.ts", "src/lib/capability-statement-docx-doc.ts");
   const api = read("src/app/api/capability-statement/route.ts");
 
@@ -840,7 +847,7 @@ console.log("\n── a tailored edition writes nothing ──");
   for (const [surface, src] of [["the PDF", pdf], ["the Word export", docx]] as const) {
     check(`${surface} validates the edition`, /resolveAgency\(/.test(src),
       "the caller decides what the document claims");
-    check(`${surface} names the edition`, /Prepared for /.test(src),
+    check(`${surface} names the edition`, /Prepared for |PREPARED FOR /.test(src),
       "two different documents download under one identity");
     check(`${surface} reorders its awards`, /orderForAgency\(/.test(src),
       "the edition differs in name only");

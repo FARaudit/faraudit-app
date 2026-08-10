@@ -276,7 +276,9 @@ async function main() {
       differentiators_json: [{ h: "Quotes inside a short RFQ window", b: "No capture team in the path." }]
     };
     const t = await textOf(await pdf(structured, null));
-    check("the kicker reaches the PDF", t.includes("Machining"), "cap-t is dropped in the render");
+    // The kicker is set in caps and letter-spaced by the design, so it extracts as
+    // "M A C H I N I N G" — the same normalisation the headings need.
+    check("the kicker reaches the PDF", hasHeading(t, "Machining"), "cap-t is dropped in the render");
     check("the head reaches the PDF", t.includes("5-axis titanium details"));
     check("the body reaches the PDF", t.includes("Build-to-print from OEM drawings."),
       "the field prose could never carry is lost on the way to the document");
