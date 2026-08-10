@@ -42,7 +42,11 @@
       impact:  classifyImpact(u.title, u.summary),
       summary: u.summary || '',
       insight: '', // no insight pass on this route — stays empty
-      affects: Array.isArray(u.affects_clauses) ? u.affects_clauses.length : 0,
+      /* THE NUMBER OF CLAUSES THIS RULE AMENDS. Not contracts, and not this customer's
+         contracts — `affects_clauses` is what the rule changes in the CFR. It was named
+         `affects` and rendered as "contracts hit", which read as true only while it was
+         always 0. */
+      amends: Array.isArray(u.affects_clauses) ? u.affects_clauses.length : 0,
       source:  u.source || '',
       link:    u.link || ''
     };
