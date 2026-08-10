@@ -186,6 +186,12 @@ button{font-family:inherit}
 [data-theme="dark"] .state-banner.is-error .sb-label,[data-theme="dark"] .state-banner.is-error b{color:#fca5a5}
 .tl-svg circle.tld.sel{stroke:var(--ink);stroke-width:2.5}
 .feed-list{display:flex;flex-direction:column;gap:10px}
+.feed-deadline{margin-top:6px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.02em;color:var(--mute)}
+.feed-deadline.is-due{color:#B45309;font-weight:600}
+.feed-deadline.is-closed{color:var(--mute-2);text-decoration:line-through}
+.cop-deadline.is-due{color:#B45309;font-weight:600}
+.cop-deadline.is-closed{color:var(--mute-2)}
+.fpill.is-empty{opacity:.45;cursor:default}
 .feed-card{background:var(--card-soft);border:1px solid var(--line-2);border-left:3px solid var(--accent);border-radius:11px;padding:13px 15px;cursor:pointer;transition:transform .12s,box-shadow .12s,border-color .12s}
 .feed-card:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm)}
 .feed-card.sel{box-shadow:0 0 0 1px var(--accent)}
