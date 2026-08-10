@@ -66,6 +66,73 @@
     return '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6);
   }
   function list(v) { return Array.isArray(v) ? v.filter(Boolean) : []; }
+
+  /* ── STRUCTURED SECTIONS ──────────────────────────────────────────────────
+     Core competencies and differentiators exist in two forms: the original prose
+     column, and a structured list whose items carry the separate fields the
+     document draws. These rules MIRROR the server resolver exactly — the page,
+     the PDF and the Word export must agree about one profile, and a second
+     interpretation written here is how they would stop agreeing.
+
+     A null structured column means "not structured yet" and the prose column
+     answers. An EMPTY ARRAY means "structured, and empty" — the section is
+     omitted and the prose is NOT brought back. */
+  var STRUCTURED = {
+    core_competencies: {
+      json: 'core_competencies_json',
+      exact: 3,
+      parts: [
+        { key: 'k', label: 'Category', hint: 'One or two words — Machining, Sustainment, Logistics', area: false },
+        { key: 'h', label: 'What it is', hint: 'The line a buyer skims. Required.', area: false },
+        { key: 'b', label: 'Detail', hint: 'One sentence a contracting officer can act on', area: true },
+        { key: 's', label: 'Qualifier', hint: 'Approvals, equipment or terms that back it up', area: false }
+      ]
+    },
+    differentiators: {
+      json: 'differentiators_json',
+      max: 6,
+      parts: [
+        { key: 'h', label: 'The claim', hint: 'Why you over the firm bidding against you. Required.', area: false },
+        { key: 'b', label: 'What backs it', hint: 'The fact behind the claim', area: true }
+      ]
+    }
+  };
+
+  function itemsOf(field) {
+    var spec = STRUCTURED[field];
+    var raw = REC[spec.json];
+    if (Array.isArray(raw)) {
+      return raw.filter(function (x) { return x && typeof x === 'object' && has(x.h); })
+        .map(function (x) {
+          var out = {};
+          spec.parts.forEach(function (p) { out[p.key] = has(x[p.key]) ? String(x[p.key]).trim() : ''; });
+          return out;
+        });
+    }
+    // Legacy prose: each line is a head and nothing else. Nothing is invented to
+    // fill the other fields for a customer who never wrote them.
+    return String(REC[field] == null ? '' : REC[field]).split(/\r?\n+/)
+      .map(function (s) { return s.trim(); }).filter(Boolean)
+      .map(function (h) { var out = { h: h }; spec.parts.forEach(function (p) { if (p.key !== 'h') out[p.key] = ''; }); return out; });
+  }
+
+  function isStructured(field) { return Array.isArray(REC[STRUCTURED[field].json]); }
+
+  /* The caps Design measured on the plate. Reported, never applied: trimming here
+     would silently drop the customer's material, and which three competencies
+     print is an editorial decision only they can make. */
+  function capNote(field) {
+    var spec = STRUCTURED[field], n = itemsOf(field).length;
+    if (spec.exact != null && n !== spec.exact) {
+      return n < spec.exact
+        ? 'The document prints exactly ' + spec.exact + ' — add ' + (spec.exact - n) + ' more before exporting.'
+        : 'The document prints exactly ' + spec.exact + ' and ' + n + ' are on file. Remove ' + (n - spec.exact) + ' — a fourth runs off the page.';
+    }
+    if (spec.max != null && n > spec.max) {
+      return 'The document holds up to ' + spec.max + ' and ' + n + ' are on file. Remove ' + (n - spec.max) + '.';
+    }
+    return null;
+  }
   function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); }
 
   function make(tag, cls, text) {
@@ -312,9 +379,22 @@
       if (old) old.parentNode.replaceChild(body, old); else section.appendChild(body);
     }
     clear(body);
-    var v = REC[field];
-    if (has(v)) {
-      String(v).split(/\n+/).forEach(function (para) {
+    var items = STRUCTURED[field] ? itemsOf(field) : [];
+    if (STRUCTURED[field] && items.length) {
+      items.forEach(function (it) {
+        var row = make('div', 'cs-item');
+        if (has(it.k)) row.appendChild(make('p', 'cs-item-k', it.k));
+        row.appendChild(make('p', 'cs-item-h', it.h));
+        if (has(it.b)) row.appendChild(make('p', 'cs-prose', it.b));
+        if (has(it.s)) row.appendChild(make('p', 'cs-item-s', it.s));
+        body.appendChild(row);
+      });
+      // The cap is REPORTED here, never applied. Which items print is the customer's
+      // editorial call, and the export refuses rather than choosing for them.
+      var cap = capNote(field);
+      if (cap) body.appendChild(make('p', 'cs-cap', cap));
+    } else if (has(REC[field]) && !isStructured(field)) {
+      String(REC[field]).split(/\n+/).forEach(function (para) {
         if (para.trim()) body.appendChild(make('p', 'cs-prose', para.trim()));
       });
     } else {
@@ -444,8 +524,8 @@
     { label: 'CAGE code',        ok: function () { return has(REC.cage_code); } },
     { label: 'NAICS codes',      ok: function () { return list(REC.naics_codes).length > 0; } },
     { label: 'Certifications',   ok: function () { return list(REC.certifications).length > 0; } },
-    { label: 'Core competencies',ok: function () { return has(REC.core_competencies); } },
-    { label: 'Differentiators',  ok: function () { return has(REC.differentiators); } },
+    { label: 'Core competencies',ok: function () { return itemsOf('core_competencies').length > 0; } },
+    { label: 'Differentiators',  ok: function () { return itemsOf('differentiators').length > 0; } },
     { label: 'Point of contact', ok: function () { return has(REC.contact_name); } },
     { label: 'Contact email',    ok: function () { return has(REC.contact_email); } },
     { label: 'Contact phone',    ok: function () { return has(REC.contact_phone); } },
@@ -607,7 +687,15 @@
       for (var i = 0; i < keys.length; i++) {
         var want = patch[keys[i]] === '' ? null : patch[keys[i]];
         var got = saved[keys[i]] === '' ? null : saved[keys[i]];
-        if (String(want) !== String(got)) {
+        // COMPARE BY VALUE, NOT BY String(). String([{a:1}]) is "[object Object]" for
+        // every array of objects, so the structured sections would confirm a save that
+        // never landed — the check would pass on any two lists of the same length, and
+        // on lists of different content entirely. Scalars keep their old comparison so
+        // 7 and "7" still match the way the route round-trips them.
+        var same = (want !== null && typeof want === 'object') || (got !== null && typeof got === 'object')
+          ? JSON.stringify(want) === JSON.stringify(got)
+          : String(want) === String(got);
+        if (!same) {
           note('Save did not persist — reload and try again', false);
           return;
         }
@@ -665,7 +753,161 @@
   /* Replaces window.prompt(). The prompt was browser chrome sitting on a designed
      document, it could not hold a paragraph, and it named the field with a bare
      label and no explanation of what the field is for. */
+  /* The repeating editor for the two structured sections. The document draws each
+     item as several separate fields, so the editor asks for them separately —
+     a single textarea cannot say which line is the category and which is the
+     detail, and guessing from position is how the wrong string ends up in the
+     wrong slot on a document sent to a contracting officer.
+
+     A profile still on prose opens with its existing lines as the heads, so
+     nothing the customer wrote is discarded on the way in. */
+  function openStructuredEditor(field) {
+    var spec = STRUCTURED[field];
+    var fspec = FIELD_SPEC[field] || {};
+    var draft = itemsOf(field).map(function (it) {
+      var c = {}; spec.parts.forEach(function (p) { c[p.key] = it[p.key] || ''; }); return c;
+    });
+    var wasStructured = isStructured(field);
+    feReturnTo = document.activeElement;
+
+    if (!feScrim) {
+      feScrim = make('div', 'fe-scrim');
+      feScrim.hidden = true;
+      document.body.appendChild(feScrim);
+      feScrim.addEventListener('mousedown', function (e) { if (e.target === feScrim) closeEditor(); });
+    }
+
+    var sheet = make('div', 'fe');
+    sheet.setAttribute('role', 'dialog');
+    sheet.setAttribute('aria-modal', 'true');
+    sheet.setAttribute('aria-labelledby', 'feTitle');
+
+    var head = make('div', 'fe-head');
+    head.appendChild(make('p', 'fe-kind', fspec.kind || 'The document'));
+    var h2 = make('h2', 'fe-title', FIELD_LABELS[field] || field);
+    h2.id = 'feTitle';
+    head.appendChild(h2);
+    if (fspec.help) head.appendChild(make('p', 'fe-help', fspec.help));
+    sheet.appendChild(head);
+
+    var body = make('div', 'fe-body');
+    var listBox = make('div', 'fe-items');
+    body.appendChild(listBox);
+
+    var addBtn = make('button', 'fe-btn', 'Add another');
+    addBtn.type = 'button';
+    var countNote = make('p', 'fe-cap');
+
+    function limit() { return spec.exact != null ? spec.exact : spec.max; }
+
+    function paint() {
+      clear(listBox);
+      draft.forEach(function (item, i) {
+        var card = make('div', 'fe-item');
+        var bar = make('div', 'fe-item-bar');
+        bar.appendChild(make('span', 'fe-item-n', String(i + 1)));
+        var rm = make('button', 'fe-item-x', 'Remove');
+        rm.type = 'button';
+        rm.setAttribute('aria-label', 'Remove item ' + (i + 1));
+        rm.addEventListener('click', function () { draft.splice(i, 1); paint(); });
+        bar.appendChild(rm);
+        card.appendChild(bar);
+
+        spec.parts.forEach(function (p) {
+          var lab = make('label', 'fe-lab', p.label + (p.key === 'h' ? '' : ' — optional'));
+          var id = 'fe-' + field + '-' + i + '-' + p.key;
+          lab.setAttribute('for', id);
+          card.appendChild(lab);
+          var inp = document.createElement(p.area ? 'textarea' : 'input');
+          inp.className = p.area ? 'fe-area fe-area-sm' : 'fe-input';
+          if (!p.area) inp.type = 'text';
+          inp.id = id;
+          inp.value = item[p.key] || '';
+          inp.placeholder = p.hint;
+          inp.addEventListener('input', function () { item[p.key] = inp.value; recount(); });
+          card.appendChild(inp);
+        });
+        listBox.appendChild(card);
+      });
+      recount();
+    }
+
+    function recount() {
+      var n = draft.filter(function (d) { return has(d.h); }).length;
+      var lim = limit();
+      var msg;
+      if (spec.exact != null) {
+        msg = n === spec.exact
+          ? n + ' of ' + spec.exact + ' — this is what the document prints.'
+          : (n < spec.exact
+              ? n + ' of ' + spec.exact + '. The document prints exactly ' + spec.exact + ' — add ' + (spec.exact - n) + ' more.'
+              : n + ' on file. The document prints exactly ' + spec.exact + ' — remove ' + (n - spec.exact) + '. A fourth runs off the page.');
+      } else {
+        msg = n > spec.max
+          ? n + ' on file. The document holds up to ' + spec.max + ' — remove ' + (n - spec.max) + '.'
+          : n + ' of up to ' + spec.max + '.';
+      }
+      // An empty card is not counted, because it will not be saved. Say so — otherwise
+      // six cards beside "1 of up to 6" reads as a broken counter rather than as the
+      // truth about what will print.
+      var blank = draft.length - n;
+      if (blank > 0) msg += ' ' + blank + (blank === 1 ? ' card has' : ' cards have') + ' no ' +
+        (spec.exact != null ? 'entry in "What it is"' : 'claim') + ' yet and will not be saved.';
+      countNote.textContent = msg;
+      countNote.className = 'fe-cap' + (spec.exact != null ? (n === spec.exact ? '' : ' is-off') : (n > spec.max ? ' is-off' : ''));
+      addBtn.disabled = draft.length >= lim;
+    }
+
+    addBtn.addEventListener('click', function () {
+      if (draft.length >= limit()) return;
+      var c = {}; spec.parts.forEach(function (p) { c[p.key] = ''; });
+      draft.push(c); paint();
+      var inputs = listBox.querySelectorAll('.fe-item:last-child input,.fe-item:last-child textarea');
+      if (inputs.length) inputs[0].focus();
+    });
+
+    body.appendChild(addBtn);
+    body.appendChild(countNote);
+    sheet.appendChild(body);
+
+    var foot = make('div', 'fe-foot');
+    foot.appendChild(make('span', 'fe-hint', 'Esc to cancel'));
+    var cancel = make('button', 'fe-btn', 'Cancel');
+    cancel.type = 'button';
+    cancel.addEventListener('click', closeEditor);
+    foot.appendChild(cancel);
+
+    var ok = make('button', 'fe-btn primary', 'Save');
+    ok.type = 'button';
+    ok.setAttribute('data-fe-save', '');
+    ok.addEventListener('click', function () {
+      // An item with no head is not an item — it is an empty card the customer
+      // opened and did not fill, and saving it would print a blank row.
+      var next = draft.filter(function (d) { return has(d.h); }).map(function (d) {
+        var out = {};
+        spec.parts.forEach(function (p) { out[p.key] = has(d[p.key]) ? String(d[p.key]).trim() : null; });
+        return out;
+      });
+      var before = wasStructured ? JSON.stringify(REC[spec.json] || []) : null;
+      closeEditor();
+      if (before !== null && before === JSON.stringify(next)) return;  // nothing changed
+      var patch = {};
+      patch[spec.json] = next;
+      save(patch);
+    });
+    foot.appendChild(ok);
+    sheet.appendChild(foot);
+
+    paint();
+    feScrim.replaceChildren(sheet);
+    feScrim.hidden = false;
+    document.addEventListener('keydown', feKeys, true);
+    var first = listBox.querySelector('input,textarea');
+    if (first) first.focus(); else addBtn.focus();
+  }
+
   function openEditor(field) {
+    if (STRUCTURED[field]) return openStructuredEditor(field);
     var spec = FIELD_SPEC[field] || {};
     var current = REC[field] == null ? '' : String(REC[field]);
     feReturnTo = document.activeElement;
@@ -776,8 +1018,23 @@
       for (var t = 0; t < textLines.length; t++) L.push('  ' + naicsLineText(textLines[t]));
     }
     if (list(REC.certifications).length) L.push('Certifications: ' + list(REC.certifications).join(', '));
-    if (has(REC.core_competencies)) L.push('', 'CORE COMPETENCIES', REC.core_competencies);
-    if (has(REC.differentiators)) L.push('', 'DIFFERENTIATORS', REC.differentiators);
+    var compText = itemsOf('core_competencies');
+    if (compText.length) {
+      L.push('', 'CORE COMPETENCIES');
+      compText.forEach(function (it) {
+        L.push((has(it.k) ? it.k + ' — ' : '') + it.h);
+        if (has(it.b)) L.push('  ' + it.b);
+        if (has(it.s)) L.push('  ' + it.s);
+      });
+    }
+    var difText = itemsOf('differentiators');
+    if (difText.length) {
+      L.push('', 'DIFFERENTIATORS');
+      difText.forEach(function (it) {
+        L.push(it.h);
+        if (has(it.b)) L.push('  ' + it.b);
+      });
+    }
     var allPerf = orderForEdition(list(REC.past_performance));
     var perf = allPerf.slice(0, EXPORT_LIMIT);
     if (perf.length) {
@@ -871,8 +1128,20 @@
         .map(function (x) { return '<p style="margin:0 0 8px;font-size:13.5px;line-height:1.55">' + esc(x.trim()) + '</p>'; }).join('');
     };
 
-    if (has(REC.core_competencies)) sec('Core competencies', paras(REC.core_competencies));
-    if (has(REC.differentiators)) sec('Differentiators', paras(REC.differentiators));
+    var itemHtml = function (arr) {
+      return arr.map(function (it) {
+        return '<p style="margin:0 0 8px;font-size:13.5px;line-height:1.55">'
+          + (has(it.k) ? '<strong>' + esc(it.k) + '</strong> — ' : '')
+          + '<strong>' + esc(it.h) + '</strong>'
+          + (has(it.b) ? '<br>' + esc(it.b) : '')
+          + (has(it.s) ? '<br>' + esc(it.s) : '')
+          + '</p>';
+      }).join('');
+    };
+    var compCopy = itemsOf('core_competencies');
+    if (compCopy.length) sec('Core competencies', itemHtml(compCopy));
+    var difCopy = itemsOf('differentiators');
+    if (difCopy.length) sec('Differentiators', itemHtml(difCopy));
 
     var all = orderForEdition(list(REC.past_performance));
     var perf = all.slice(0, EXPORT_LIMIT);

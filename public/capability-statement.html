@@ -367,6 +367,27 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
   line-height:1.6;color:var(--ink);background:var(--card-soft);border:1px solid var(--line);
   border-radius:9px;padding:11px 13px;outline:none;transition:border-color .14s,box-shadow .14s}
 .fe-area{min-height:180px;resize:vertical}
+.fe-area-sm{min-height:62px}
+.fe-items{display:flex;flex-direction:column;gap:14px}
+.fe-item{border:1px solid var(--line-2);border-radius:10px;padding:12px 13px 14px;background:var(--card-soft)}
+.fe-item-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.fe-item-n{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--mute)}
+.fe-item-x{font-family:Manrope,system-ui,sans-serif;font-size:11.5px;font-weight:600;color:var(--mute);
+  background:none;border:none;padding:2px 4px;cursor:pointer;border-radius:6px}
+.fe-item-x:hover{color:var(--ink);background:var(--search-bg)}
+.fe-lab{display:block;font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--mute);margin:9px 0 4px}
+.fe-item .fe-input,.fe-item .fe-area{background:var(--card,#fff)}
+.fe-cap{font-size:12px;line-height:1.5;color:var(--mute);margin:12px 0 0}
+.fe-cap.is-off{color:var(--accent-deep,#185FA5);font-weight:600}
+.fe-items+.fe-btn{margin-top:14px}
+.cs-item{margin:0 0 14px}
+.cs-item:last-child{margin-bottom:0}
+.cs-item-k{margin:0 0 3px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:700;
+  letter-spacing:.09em;text-transform:uppercase;color:var(--accent-deep,#185FA5)}
+.cs-item-h{margin:0 0 4px;font-size:14px;font-weight:700;line-height:1.3;color:var(--ink)}
+.cs-item-s{margin:5px 0 0;font-family:'IBM Plex Mono',monospace;font-size:11.5px;line-height:1.45;color:var(--mute)}
+.cs-cap{margin:12px 0 0;font-size:12px;line-height:1.5;color:var(--accent-deep,#185FA5);font-weight:600}
 .fe-input:focus,.fe-area:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .fe-foot{display:flex;align-items:center;gap:12px;padding:14px 22px 18px;border-top:1px solid var(--line-2);margin-top:14px}
 .fe-count{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mute);font-variant-numeric:tabular-nums;margin-right:auto}
