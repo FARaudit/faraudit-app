@@ -866,3 +866,30 @@ console.log("\n── a tailored edition writes nothing ──");
 
 console.log(`\n${pass} passed · ${fail} failed`);
 if (fail > 0) process.exit(1);
+
+// ── a field the document reads must be a field the record can write ──────────
+// contact_title landed as a column, the plate reads it to build "Name, Title", and it was in
+// neither PatchBody nor ALLOWED_FIELDS — so every save carrying a title had it dropped by the
+// allowlist without an error, and the cell printed a bare name. The `duns` note in that file
+// warns about the mirror image (writable and never read); this is the same trap reversed, and
+// it is the more dangerous direction because the customer types a value and watches it vanish.
+console.log("\n── every field the plate reads can be written ──");
+{
+  const api = read("src/app/api/capability-statement/route.ts");
+  const plateSrc = read("src/lib/capability-statement-plate.tsx");
+  // Fields the plate actually reads off the record, discovered rather than listed here — a
+  // hand-kept list would go stale the next time the plate binds something new.
+  const readByPlate = [...new Set([...plateSrc.matchAll(/\bstmt\.([a-z_]+)/g)].map((m) => m[1]))];
+  const allowed = api.slice(api.indexOf("ALLOWED_FIELDS"), api.indexOf("]);", api.indexOf("ALLOWED_FIELDS")));
+  // SAM-owned facts are deliberately unwritable — that is the point of them, not an oversight.
+  const SAM_OWNED = ["sam_registration_status"];
+  const unwritable = readByPlate.filter((f) => !SAM_OWNED.includes(f) && !allowed.includes(`"${f}"`));
+  check("the plate's fields were discovered, not assumed", readByPlate.length >= 8,
+    `only ${readByPlate.length} stmt.* reads found — the pattern may be stale`);
+  check("no field the plate reads is unwritable through the record",
+    unwritable.length === 0,
+    `read by the plate, dropped by the allowlist: ${unwritable.join(", ")}`);
+  check("the SAM-owned field is still NOT writable",
+    !allowed.includes('"sam_registration_status"'),
+    "a customer could type a registration status SAM did not confirm");
+}
