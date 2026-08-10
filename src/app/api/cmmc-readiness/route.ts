@@ -62,7 +62,36 @@ export async function GET(req: NextRequest) {
   // the question either way — counted separately rather than as "not required".
   let unanalyzed = 0;
 
-  for (const a of (audits || []) as Array<Record<string, unknown>>) {
+  // ONE ROW PER SOLICITATION, THE MOST RECENT AUDIT OF IT. Re-auditing a solicitation is
+  // normal — an amendment lands, the customer re-runs it — and every run was its own row
+  // here, so the same requirement appeared three and four times and each repeat counted
+  // again toward "solicitations that require CMMC". The page then stated a number of
+  // SOLICITATIONS that was really a number of AUDIT RUNS.
+  //
+  // The key is the solicitation number, then the notice id, and finally the audit's own id.
+  // Falling back to the id matters: without it every row that carries neither identifier
+  // would share one key and collapse into a single arbitrary survivor, which would hide
+  // real solicitations rather than duplicates.
+  //
+  // The query is already ordered created_at DESC, so the first row seen for a key is the
+  // most recent audit of it — but the order is asserted here rather than assumed, because a
+  // later edit to the query would otherwise silently start keeping the oldest.
+  const rawRows = (audits || []) as Array<Record<string, unknown>>;
+  const newestFirst = [...rawRows].sort((x, y) =>
+    Date.parse(String(y.created_at ?? 0)) - Date.parse(String(x.created_at ?? 0)));
+  const seen = new Set<string>();
+  const rows: Array<Record<string, unknown>> = [];
+  for (const a of newestFirst) {
+    const key = String(a.solicitation_number ?? "").trim()
+      || String(a.notice_id ?? "").trim()
+      || `id:${String(a.id)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rows.push(a);
+  }
+  const collapsed = rawRows.length - rows.length;
+
+  for (const a of rows) {
     if (!a.compliance_json) unanalyzed++;
     const { level, trigger } = inferLevel(a);
     distribution[level] += 1;
@@ -85,11 +114,18 @@ export async function GET(req: NextRequest) {
     reference: LEVELS,
     distribution,
     by_level: byLevel,
-    total_audited: (audits || []).length,
+    // BOTH NUMBERS, because they answer different questions and the page states one of them.
+    // total_solicitations is what the distribution sums to; total_audited is how many runs
+    // produced it. Returning only the second and labelling it "solicitations" is the defect
+    // this dedupe exists to fix, and returning only the first would hide the re-runs.
+    total_solicitations: rows.length,
+    total_audited: rawRows.length,
+    duplicates_collapsed: collapsed,
     unanalyzed,
     meta: {
       source: "audits.compliance_json",
-      reason: (audits || []).length === 0 ? "no-audits" : flagged === 0 ? "none-flagged" : null
+      deduped_by: "solicitation_number|notice_id|id, most recent kept",
+      reason: rows.length === 0 ? "no-audits" : flagged === 0 ? "none-flagged" : null
     }
   });
 }

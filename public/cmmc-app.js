@@ -138,7 +138,7 @@
       el.hidden = false;
       fill(el, [
         h('span', { cls: 'sb-label', text: 'Note' }),
-        h('span', { text: m.unanalyzed + ' of your ' + m.totalAudited + ' audits carry no analysis yet, so they answer neither way and are not counted as clear.' })
+        h('span', { text: m.unanalyzed + ' of your ' + m.totalSolicitations + ' solicitations carry no analysis yet, so they answer neither way and are not counted as clear.' })
       ]);
       return;
     }
@@ -154,7 +154,7 @@
     const flagged = d['1'] + d['2'] + d['3'];
     const ready = m.state === 'ready' || m.state === 'empty';
     const put = (id, v) => { const el = $(id); if (el) el.textContent = ready ? String(v) : '—'; };
-    put('hsAudited', m.totalAudited || 0);
+    put('hsAudited', m.totalSolicitations || 0);
     put('hsFlagged', flagged);
     const highest = LEVELS.filter((lv) => d[lv] > 0).pop();
     const hi = $('hsHighest');
@@ -189,7 +189,9 @@
     fill(host, cells.map((c) => h('div', { cls: 'kpi' }, [
       h('p', { cls: 'lbl', text: c.label }),
       h('div', { cls: 'kpi-val', text: shown ? String(d[c.k] || 0) : '—' }, [
-        h('span', { cls: 'unit', text: 'audits' })
+        // Singular when there is one. "1 audits" is the kind of seam that makes a reader
+        // wonder what else on the page was not looked at.
+        h('span', { cls: 'unit', text: (shown && d[c.k] === 1) ? 'solicitation' : 'solicitations' })
       ]),
       h('div', { cls: 'foot', text: c.foot })
     ])));
