@@ -1040,14 +1040,26 @@
     if (perf.length) {
       L.push('', 'PAST PERFORMANCE');
       perf.forEach(function (p) {
-        L.push('- ' + [p.title, p.agency, p.notice_id, p.period, p.contract_value].filter(Boolean).join(' · '));
+        /* One award, three lines. Joined onto one it runs past 72 columns, and a plain-text
+           document that wraps in the reader's composer is a table read as text, not a
+           document. An absent value contributes nothing — never a dash, never a zero. */
+        L.push(String(p.title || p.notice_id || ''));
+        if (has(p.agency)) L.push('    ' + p.agency);
+        var tail = [p.notice_id, p.period, p.contract_value].filter(Boolean).join('  ·  ');
+        if (tail) L.push('    ' + tail);
       });
       var knownTotal = PAST_TOTAL === null ? allPerf.length : PAST_TOTAL;
       if (knownTotal > perf.length) {
         L.push('(Showing the ' + perf.length + ' most recent of ' + knownTotal + ' awards on file.)');
       }
     }
-    var contact = [REC.contact_name, REC.contact_email, REC.contact_phone, REC.contact_address, REC.contact_website].filter(has);
+    /* The title rides with the name and the comma belongs to the title, so a record with
+       no title cannot emit a trailing comma. The phone is formatted here as it is on every
+       other surface — a raw record value reaching a contracting officer was a real defect. */
+    var who = has(REC.contact_name)
+      ? REC.contact_name + (has(REC.contact_title) ? ', ' + REC.contact_title : '')
+      : null;
+    var contact = [who, REC.contact_email, fmtPhone(REC.contact_phone), REC.contact_address, REC.contact_website].filter(has);
     if (contact.length) L.push('', 'CONTACT', contact.join('\n'));
     return L.join('\n');
   }
@@ -1071,108 +1083,226 @@
      the company ON FILE as the name, identifiers under it. Word and Google Docs drop
      <style> blocks and classes, so every rule here is inline or it does not survive
      the paste. */
-  var X_ACCENT = '#378ADD';
-  var X_INK = '#0f172a';
-  var X_MUTE = '#475569';
+  /* ── THE FORMATTED COPY — the plate, in the only primitives Word honours ──
+     Word and Google Docs strip <style> blocks and class attributes, and neither
+     understands grid or flex. Every rule below is an inline style attribute and every
+     region is a <table>, which is not a downgrade: the four regions of this document ARE
+     tables. The PDF uses flex because react-pdf has no table; this uses table because
+     Word has no flex. Same document, two primitives.
 
-  function statementHtml() {
-    var F = 'font-family:Calibri,Arial,Helvetica,sans-serif';
-    var H = [];
-    H.push('<div style="' + F + ';color:' + X_INK + ';max-width:660px">');
+     DECLARED IN POINTS. Word honours pt across page setups and rewrites px
+     unpredictably, and a document destined for paper has no business being specified in
+     screen units.
 
-    /* THE CUSTOMER'S NAME IS THE LETTERHEAD. This document goes to a contracting
-       officer under their company's name, so ours does not sit above it.
+     A FACE THE READER DOES NOT HAVE IS A FACE THAT DOES NOT ARRIVE. A clipboard carries
+     markup and no fonts, so every stack ends in a generic family — that makes the
+     substitution Word performs predictable instead of arbitrary. */
+  var T_INK = '#0f172a', T_INK2 = '#475569', T_INK3 = '#5f6e80';
+  var T_LINE = '#b3bfcd', T_LINE2 = '#dbe2ec', T_ACCENT = '#185FA5';
+  var T_PAPER = '#E9EDF2', T_PLATE = '#F7F9FB', T_NAVY = '#0A1628';
+  var T_ONNAVY = '#F6F8FA', T_NAVYKEY = '#9fb0c4';
+  var T_DISP = "Manrope,'Segoe UI',Calibri,Arial,sans-serif";
+  var T_MONO = "'JetBrains Mono',Consolas,'Courier New',monospace";
+  /* The three ruled floors: sentences 10pt, title-block values 9.4pt, keys 9pt. */
+  var TS = { name: 19.5, sentence: 10, capHead: 10.5, difHead: 10.1, value: 9.4, key: 9 };
 
-       The logo is an absolute URL into a PUBLIC bucket for exactly this reason: the
-       recipient opens this in Word or an email client with no session, possibly days
-       later, and a signed URL would have expired and stripped the letterhead. */
-    if (has(REC.logo_url)) {
-      /* HEIGHT AS AN ATTRIBUTE. Word discards CSS max-height on a pasted image and
-         renders it at natural size, so a square favicon filled most of a page. The
-         attribute is honoured, and width is left to scale with the aspect ratio. */
-      H.push('<div style="margin-bottom:10px"><img src="' + esc(REC.logo_url)
-        + '" alt="" height="42" style="height:42px;width:auto"></div>');
+  /* The record's own last-saved date, not the moment of the paste. The document states
+     when its contents were established; a clock reading would change every time the
+     customer pressed Copy while the facts underneath had not moved.
+     NO SHEET COUNT. The plate carries one because it is a printed sheet; a pasted
+     document has no pages, so a sheet count here would be a claim it cannot keep. */
+  function issuedOn() {
+    var d = REC && REC.updated_at ? new Date(REC.updated_at) : null;
+    if (!d || isNaN(d.getTime())) return '';
+    return d.toISOString().slice(0, 10);
+  }
+
+  function fnt(family, size, weight, colour, extra) {
+    return 'font-family:' + family + ';font-size:' + size + 'pt;font-weight:' + weight
+      + ';color:' + colour + ';' + (extra || '');
+  }
+  function tbl(style, rows) {
+    return '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;'
+      + (style || '') + '">' + rows + '</table>';
+  }
+
+  function copySectionHead(n, label) {
+    /* On the plate the rule fills the remainder of the row. Word drops a background on an
+       empty div, so the rule is a bottom border on a stretched cell. */
+    return tbl('margin:12pt 0 7pt 0;',
+      '<tr><td width="18" style="width:18pt;padding:0;"><span style="'
+        + fnt(T_MONO, TS.key, 700, '#ffffff', 'background:' + T_ACCENT + ';padding:3pt 5pt;letter-spacing:0.6pt;')
+        + '">' + esc(n) + '</span></td>'
+      + '<td style="padding:0 8pt;white-space:nowrap;"><span style="'
+        + fnt(T_MONO, TS.key, 700, T_INK, 'letter-spacing:1.9pt;text-transform:uppercase;')
+        + '">' + esc(label) + '</span></td>'
+      + '<td style="padding:0;border-bottom:1pt solid ' + T_LINE + ';font-size:1pt;line-height:1pt;">&nbsp;</td></tr>');
+  }
+
+  function copyCaps(items) {
+    var w = Math.floor(100 / items.length);
+    return tbl('', '<tr>' + items.map(function (c, i) {
+      var pad = 'padding:0 ' + (i === items.length - 1 ? '0' : '11pt') + ' 0 ' + (i ? '11pt' : '0') + ';';
+      return '<td valign="top" width="' + w + '%" style="width:' + w + '%;' + pad
+        + (i ? 'border-left:1pt solid ' + T_LINE2 + ';' : '') + '">'
+        + (has(c.k) ? '<div style="' + fnt(T_MONO, TS.key, 500, T_ACCENT, 'letter-spacing:1pt;text-transform:uppercase;margin-bottom:5pt;') + '">' + esc(c.k) + '</div>' : '')
+        + '<div style="' + fnt(T_DISP, TS.capHead, 700, T_INK, 'line-height:1.26;margin-bottom:4pt;') + '">' + esc(c.h) + '</div>'
+        + (has(c.b) ? '<div style="' + fnt(T_DISP, TS.sentence, 400, T_INK2, 'line-height:1.48;') + '">' + esc(c.b) + '</div>' : '')
+        + (has(c.s) ? '<div style="' + fnt(T_MONO, TS.key, 400, T_INK3, 'line-height:1.5;margin-top:6pt;padding-top:5pt;border-top:1pt solid ' + T_LINE + ';') + '">' + esc(c.s) + '</div>' : '')
+        + '</td>';
+    }).join('') + '</tr>');
+  }
+
+  function copyDifs(items) {
+    /* Word cannot wrap a flex line, so the pairing is written into the markup rather than
+       computed from the container width. */
+    var L = 'ABCDEFGHIJKL', rows = '';
+    for (var i = 0; i < items.length; i += 2) {
+      rows += '<tr>' + [items[i], items[i + 1]].map(function (d, j) {
+        if (!d) return '<td width="50%" style="width:50%;padding:0;"></td>';
+        var k = i + j;
+        return '<td valign="top" width="50%" style="width:50%;padding:4pt ' + (j ? '0' : '11pt') + ' 4pt ' + (j ? '11pt' : '0')
+          + ';border-bottom:1pt solid ' + T_LINE2 + ';">'
+          + '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tr>'
+          + '<td valign="top" width="14" style="width:14pt;padding:0;"><span style="' + fnt(T_MONO, TS.key, 700, T_ACCENT, '') + '">' + L.charAt(k) + '</span></td>'
+          + '<td valign="top" style="padding:0;">'
+          + '<div style="' + fnt(T_DISP, TS.difHead, 700, T_INK, 'line-height:1.22;') + '">' + esc(d.h) + '</div>'
+          + (has(d.b) ? '<div style="' + fnt(T_DISP, TS.sentence, 400, T_INK2, 'line-height:1.42;margin-top:1pt;') + '">' + esc(d.b) + '</div>' : '')
+          + '</td></tr></table></td>';
+      }).join('') + '</tr>';
     }
-    H.push('<div style="font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:' + X_MUTE + '">Capability Statement</div>');
-    H.push('<div style="font-size:24px;font-weight:700;letter-spacing:-.01em;margin:2px 0 8px;padding-bottom:10px;border-bottom:2px solid ' + X_ACCENT + '">'
-      + esc(has(REC.company_name) ? REC.company_name : '(company name not set)') + '</div>');
+    return tbl('', rows);
+  }
 
-    /* Identifiers a contracting officer checks today: UEI and CAGE. */
-    var ids = [];
-    if (has(REC.uei)) ids.push('UEI ' + esc(REC.uei));
-    if (has(REC.cage_code)) ids.push('CAGE ' + esc(REC.cage_code));
-    if (ids.length) H.push('<div style="font-size:12px;color:' + X_MUTE + ';margin-bottom:2px">' + ids.join(' &nbsp;&middot;&nbsp; ') + '</div>');
+  function copyAwards(perf, known) {
+    var head = ['Requirement', 'Awarding agency', 'Contract', 'Award'];
+    var wid = ['', '150', '105', '48'];
+    var r = '<tr>' + head.map(function (h, i) {
+      return '<td style="' + (wid[i] ? 'width:' + wid[i] + 'pt;' : '') + 'padding:4pt 7pt;border-bottom:1pt solid ' + T_LINE
+        + ';background:' + T_PAPER + ';' + fnt(T_MONO, TS.key, 700, T_INK2, 'letter-spacing:1.1pt;text-transform:uppercase;') + '">' + esc(h) + '</td>';
+    }).join('') + '</tr>';
+    perf.forEach(function (a, i) {
+      var b = i === perf.length - 1 ? '' : 'border-bottom:1pt solid ' + T_LINE2 + ';';
+      /* An absent award value stays blank — never a dash, never a zero. */
+      r += '<tr>'
+        + '<td valign="top" style="padding:3pt 7pt;' + b + fnt(T_DISP, TS.difHead, 700, T_INK, 'line-height:1.3;') + '">' + esc(a.title || a.notice_id || '') + '</td>'
+        + '<td valign="top" style="padding:3pt 7pt;' + b + fnt(T_DISP, TS.sentence, 400, T_INK2, 'line-height:1.3;') + '">' + esc(a.agency || '') + '</td>'
+        + '<td valign="top" style="padding:3pt 7pt;' + b + fnt(T_MONO, TS.key, 400, T_INK2, 'line-height:1.3;white-space:nowrap;') + '">' + esc(a.notice_id || '') + '</td>'
+        + '<td valign="top" style="padding:3pt 7pt;' + b + fnt(T_MONO, TS.key, 400, T_INK2, 'line-height:1.3;white-space:nowrap;') + '">' + esc(a.period || '') + '</td>'
+        + '</tr>';
+    });
+    var out = '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;border:1pt solid '
+      + T_LINE + ';background:#ffffff;">' + r + '</table>';
+    if (known > perf.length) {
+      out += '<div style="' + fnt(T_MONO, TS.key, 400, T_INK3, 'line-height:1.5;margin-top:4pt;') + '">The '
+        + perf.length + ' most recent of ' + known + ' awards.</div>';
+    }
+    return out;
+  }
+
+  /* The title block, built from the fields that EXIST. The reference was measured with
+     every cell populated; a real record is missing some, and a cell printed with nothing
+     in it is the "asked and answered: nothing" claim the empty-section rule prevents.
+     Rows pack to 12 tracks and a short row stretches, so the block rules to both edges. */
+  function copyTitleBlock() {
+    var fields = [];
+    var certs = list(REC.certifications);
+    if (certs.length) fields.push({ k: 'SBA certified', v: certs.join(' · '), sub: 'Verified against SAM', t: 4, hi: true });
+    if (has(REC.uei)) fields.push({ k: 'UEI', v: REC.uei, t: 2 });
+    if (has(REC.cage_code)) fields.push({ k: 'CAGE', v: REC.cage_code, t: 2 });
+    if (has(REC.contact_address)) {
+      var parts = String(REC.contact_address).split(/,\s*(?=[^,]*$)/);
+      fields.push({ k: 'Address', v: parts[0], sub: parts[1] || null, t: 3 });
+    }
     var nl = naicsLines();
     if (nl.length) {
-      H.push('<div style="margin:6px 0 2px">');
-      H.push('<div style="font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;color:' + X_MUTE + ';margin-bottom:3px">NAICS</div>');
-      for (var ni = 0; ni < nl.length; ni++) {
-        H.push('<div style="font-size:12px;color:' + X_INK + ';line-height:1.5">'
-          + '<span style="font-weight:700">' + esc(nl[ni].code) + '</span>'
-          + (nl[ni].title ? ' &nbsp;' + esc(nl[ni].title) : '')
-          + (nl[ni].primary ? ' <span style="font-size:8px;letter-spacing:.1em;color:' + X_ACCENT + '">PRIMARY</span>' : '')
-          + '</div>');
-      }
-      H.push('</div>');
+      fields.push({ k: 'Primary NAICS', v: nl[0].code + (nl[0].title ? '  ' + nl[0].title : ''),
+        sub: nl.length > 1 ? nl.slice(1).map(function (l) { return l.code; }).join(' · ') : null, t: 5 });
     }
-    if (list(REC.certifications).length) {
-      H.push('<div style="font-size:12px;color:' + X_MUTE + '">Certifications &nbsp;' + list(REC.certifications).map(esc).join(', ') + '</div>');
+    if (has(REC.contact_name)) {
+      fields.push({ k: 'Contact', v: REC.contact_name + (has(REC.contact_title) ? ', ' + REC.contact_title : ''),
+        sub: fmtPhone(REC.contact_phone) || null, t: 5 });
     }
+    if (has(REC.contact_email)) {
+      /* The host prints only when it differs from the email domain, or it is the same
+         fact twice in a block where every cell is a different fact. */
+      var dom = String(REC.contact_email).split('@')[1] || '';
+      var host = String(REC.contact_website || '').replace(/^https?:\/\//i, '').replace(/\/.*$/, '');
+      fields.push({ k: 'Email', v: REC.contact_email, sub: (host && host.toLowerCase() !== dom.toLowerCase()) ? host : null, t: 7 });
+    }
+    if (!fields.length) return '';
 
-    var sec = function (label, inner) {
-      H.push('<div style="font-size:11px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:' + X_ACCENT + ';margin:18px 0 6px">' + label + '</div>');
-      H.push(inner);
-    };
-    var paras = function (v) {
-      return String(v).split(/\n+/).filter(function (x) { return x.trim(); })
-        .map(function (x) { return '<p style="margin:0 0 8px;font-size:13.5px;line-height:1.55">' + esc(x.trim()) + '</p>'; }).join('');
-    };
+    var rows = [], row = [], used = 0, i;
+    for (i = 0; i < fields.length; i++) {
+      if (used + fields[i].t > 12 && row.length) { rows.push(row); row = []; used = 0; }
+      row.push(fields[i]); used += fields[i].t;
+    }
+    if (row.length) rows.push(row);
 
-    var itemHtml = function (arr) {
-      return arr.map(function (it) {
-        return '<p style="margin:0 0 8px;font-size:13.5px;line-height:1.55">'
-          + (has(it.k) ? '<strong>' + esc(it.k) + '</strong> — ' : '')
-          + '<strong>' + esc(it.h) + '</strong>'
-          + (has(it.b) ? '<br>' + esc(it.b) : '')
-          + (has(it.s) ? '<br>' + esc(it.s) : '')
-          + '</p>';
-      }).join('');
-    };
-    var compCopy = itemsOf('core_competencies');
-    if (compCopy.length) sec('Core competencies', itemHtml(compCopy));
-    var difCopy = itemsOf('differentiators');
-    if (difCopy.length) sec('Differentiators', itemHtml(difCopy));
+    var html = '';
+    rows.forEach(function (r) {
+      var total = 0;
+      r.forEach(function (f) { total += f.t; });
+      var grow = total === 12 ? 0 : (12 - total) / r.length;
+      html += '<tr>' + r.map(function (f) {
+        var pct = ((f.t + grow) * 100 / 12).toFixed(2);
+        var kc = f.hi ? T_NAVYKEY : T_INK3, vc = f.hi ? T_ONNAVY : T_INK;
+        return '<td valign="top" width="' + pct + '%" style="width:' + pct + '%;padding:6pt 8pt;'
+          + (f.hi ? 'background:' + T_NAVY + ';' : '')
+          + 'border-right:1pt solid ' + T_LINE + ';border-bottom:1pt solid ' + T_LINE + ';">'
+          + '<div style="' + fnt(T_MONO, TS.key, 400, kc, 'letter-spacing:1.5pt;text-transform:uppercase;margin-bottom:4pt;') + '">' + esc(f.k) + '</div>'
+          + '<div style="' + fnt(T_MONO, TS.value, 500, vc, 'line-height:1.2;') + '">' + esc(f.v) + '</div>'
+          + (f.sub ? '<div style="' + fnt(T_MONO, TS.key, 400, kc, 'line-height:1.35;margin-top:2pt;') + '">' + esc(f.sub) + '</div>' : '')
+          + '</td>';
+      }).join('') + '</tr>';
+    });
+    return '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;margin-top:12pt;border-top:1.5pt solid '
+      + T_INK + ';border-left:1pt solid ' + T_LINE + ';">' + html + '</table>';
+  }
+
+  function statementHtml() {
+    var inner = '';
+
+    /* THE CUSTOMER'S NAME IS THE LETTERHEAD, and ours appears nowhere on this document.
+       The logo is an absolute URL into a PUBLIC bucket for exactly this reason: the
+       recipient opens this with no session, possibly days later, and a signed URL would
+       have expired and stripped the letterhead. Height is an ATTRIBUTE — Word discards
+       CSS max-height on a pasted image and renders it at natural size. */
+    var headLeft = '';
+    if (has(REC.logo_url)) {
+      headLeft += '<div style="margin-bottom:7pt"><img src="' + esc(REC.logo_url) + '" alt="" height="42" style="height:42pt;width:auto"></div>';
+    }
+    headLeft += '<div style="' + fnt(T_DISP, TS.name, 800, T_INK, 'line-height:1.06;letter-spacing:-0.4pt;') + '">'
+      + esc(has(REC.company_name) ? String(REC.company_name).toUpperCase() : '') + '</div>';
+
+    var ed = EDITION || null;
+    inner += tbl('margin:0 0 10pt 0;',
+      '<tr><td valign="top" style="padding:0 14pt 9pt 0;border-bottom:1.5pt solid ' + T_INK + ';">' + headLeft + '</td>'
+      + '<td valign="top" align="right" width="150" style="width:150pt;padding:0 0 9pt 0;border-bottom:1.5pt solid ' + T_INK + ';">'
+      + '<div style="' + fnt(T_MONO, TS.key, 700, T_INK, 'letter-spacing:1.3pt;') + '">CAPABILITY STATEMENT</div>'
+      + '<div style="' + fnt(T_MONO, TS.key, 400, T_INK3, 'letter-spacing:1pt;line-height:1.6;margin-top:4pt;') + '">ISSUED ' + esc(issuedOn()) + '</div>'
+      + (ed ? '<div style="' + fnt(T_MONO, TS.key, 400, T_INK3, 'letter-spacing:1pt;line-height:1.6;') + '">PREPARED FOR ' + esc(String(ed).toUpperCase()) + '</div>' : '')
+      + '</td></tr>');
+
+    var comps = itemsOf('core_competencies');
+    if (comps.length) { inner += copySectionHead('01', 'Core competencies') + copyCaps(comps); }
+    var difs = itemsOf('differentiators');
+    if (difs.length) { inner += copySectionHead('02', 'Differentiators') + copyDifs(difs); }
 
     var all = orderForEdition(list(REC.past_performance));
     var perf = all.slice(0, EXPORT_LIMIT);
     if (perf.length) {
-      var body = '<ul style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.55">' + perf.map(function (pp) {
-        return '<li>' + esc([pp.title, pp.agency, pp.notice_id, pp.period, pp.contract_value].filter(Boolean).join(' · ')) + '</li>';
-      }).join('') + '</ul>';
-      /* The pasted document carries the same disclosure the page does, or the customer
-         sends a shortened list under their own name without knowing it. */
       var known = PAST_TOTAL === null ? all.length : PAST_TOTAL;
-      if (known > perf.length) {
-        body += '<div style="font-size:11px;color:' + X_MUTE + ';margin-top:6px">Showing the '
-          + perf.length + ' most recent of ' + known + ' awards on file.</div>';
-      }
-      sec('Past performance', body);
+      inner += copySectionHead('03', 'Past performance') + copyAwards(perf, known);
     }
 
-    var c = [];
-    if (has(REC.contact_name)) c.push(esc(REC.contact_name));
-    if (has(REC.contact_email)) c.push(esc(REC.contact_email));
-    if (has(fmtPhone(REC.contact_phone))) c.push(esc(fmtPhone(REC.contact_phone)));
-    if (has(REC.contact_address)) c.push(esc(REC.contact_address));
-    if (has(REC.contact_website)) c.push(esc(REC.contact_website));
-    if (c.length) sec('Contact', '<div style="font-size:13.5px;line-height:1.7">' + c.join('<br>') + '</div>');
+    inner += copyTitleBlock();
 
-    H.push('<div style="border-top:1px solid #cbd5e1;margin-top:20px;padding-top:8px;font-size:9px;color:#94a3b8">'
-      + esc(has(REC.company_name) ? REC.company_name : 'Capability statement')
-      + ' &nbsp;&middot;&nbsp; Confidential</div>');
-
-    H.push('</div>');
-    return H.join('');
+    /* The plate's drawing frame is a border on one outer cell — the piece of the identity
+       that survives the paste intact — and the interior padding goes with it, because a
+       frame with content against its edge reads as a mistake. */
+    return '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;max-width:660pt;border-collapse:collapse;background:'
+      + T_PLATE + ';"><tr><td style="padding:22pt 24pt;border:1.5pt solid ' + T_INK + ';">' + inner + '</td></tr></table>';
   }
 
   /* The route refuses to render a statement with no company name on it (409) and has

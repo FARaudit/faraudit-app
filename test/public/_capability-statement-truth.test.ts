@@ -596,9 +596,16 @@ console.log("\n── whose document this is ──");
   // Scope to the HTML export: the plain-text builder names the same fields, so an
   // unscoped indexOf compares positions in two different functions.
   const htmlFn = live.slice(live.indexOf("function statementHtml()"), live.indexOf("function copyStatement"));
+  // On the plate the customer's name is the first thing emitted and the document's own
+  // label sits in the right-hand cell beside it. The earlier form of this check asserted the
+  // opposite order because that was the old layout; the intent — the customer leads — is what
+  // is asserted here, against where the two strings actually are.
   check("the pasted copy leads with the company, not with us",
-    htmlFn.indexOf("Capability Statement</div>") < htmlFn.indexOf("company name not set"),
+    htmlFn.indexOf("REC.company_name") < htmlFn.indexOf("CAPABILITY STATEMENT"),
     "the vendor's name sits above the customer's on their own letterhead");
+  check("the pasted copy prints no placeholder letterhead",
+    !/company name not set/.test(htmlFn),
+    "a document goes out headed with a placeholder instead of refusing");
   check("the pasted copy carries no FARaudit letterhead",
     !/FAR<span style="color:/.test(live),
     "our wordmark is still rendered into the head of the document");
