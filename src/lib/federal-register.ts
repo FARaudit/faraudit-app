@@ -29,10 +29,14 @@ export interface RegRow {
   link: string;
   published_at: string | null;
   affects_clauses: string[];
+  /** TRANSIENT. Where the rule's full text lives, used to read its amendatory instructions.
+   *  There is no such column on `regulatory_updates` — strip it before any write. */
+  raw_text_url?: string | null;
 }
 
 export interface FrDocument {
   title?: string;
+  raw_text_url?: string | null;
   abstract?: string | null;
   publication_date?: string | null;
   effective_on?: string | null;
@@ -60,10 +64,47 @@ export function federalRegisterUrl(): string {
   p.append("conditions[cfr][title]", "48");
   p.append("conditions[type][]", "RULE");     // final rules
   p.append("conditions[type][]", "PRORULE");  // proposed rules
-  for (const f of ["title", "abstract", "publication_date", "effective_on", "html_url", "agencies"]) {
+  // raw_text_url is what makes clause extraction possible. Measured 2026-08-10: the ABSTRACT
+  // names a clause on 4 of 40 documents and a clause NUMBER on 1; the full text names amended
+  // sections on 6 of 12. The clause data was never in the field this parser was reading.
+  for (const f of ["title", "abstract", "publication_date", "effective_on", "html_url", "agencies", "raw_text_url"]) {
     p.append("fields[]", f);
   }
   return `${FR_DOCUMENTS_API}?${p.toString()}`;
+}
+
+// ── WHICH CLAUSES A RULE CHANGES, WHICH IS NOT WHICH CLAUSES IT MENTIONS ────────────────
+//
+// A FAR/DFARS section number is `PART.SECTION` with an optional `-N` suffix, where FAR parts
+// run 1–53 and DFARS parts 200–253. Matching that shape anywhere in a document is what makes a
+// mention look like a change: one proposed rule in this corpus carries 334 distinct citations
+// and amends none of them, and another says "a comparable requirement exists in ... FAR
+// 31.205-26" — a cross-reference, not an amendment.
+//
+// So the recognizer keys on the AMENDATORY INSTRUCTION, the sentence a rule uses to state what
+// it is doing to the CFR: "Amend section 252.204-7012 by ...", "Revise section 52.204-21 to
+// read as follows", "Section 225.7001 is amended by ...". Measured over 12 live documents:
+// 6 yield amendments, and the six that do not are notices, requests for comment and circular
+// introductions that genuinely change no section. A flag is a verdict, not a mention.
+const PART = "(?:2[0-5]\\d|5[0-3]|[1-9]\\d?)";
+// THE SUFFIX IS UP TO FOUR DIGITS. Capped at two, `252.204-7012` extracts as `252.204-70` —
+// a clause number that does not exist, printed on a page a contracting officer reads. DFARS
+// suffixes are four digits (7012, 7013), FAR suffixes one or two (52.204-21).
+const SECTION = `${PART}\\.\\d{3,4}(?:-\\d{1,4})?`;
+const AMENDS = new RegExp(
+  `(?:amend(?:ed|ing|ment to)?|revis(?:e|ed|ing)|add(?:ed|ing)?|remov(?:e|ed|ing)|redesignat(?:e|ed|ing))` +
+  `\\s+(?:paragraph[^.]{0,40}?\\s+of\\s+)?(?:section|\u00a7+)\\s*(${SECTION})`, "gi");
+const IS_AMENDED = new RegExp(
+  `(?:section|\u00a7+)\\s*(${SECTION})\\s+is\\s+(?:amended|revised|added|removed|redesignated)`, "gi");
+
+/** Sections a rule's own amendatory instructions say it changes. Empty is a real answer —
+ *  a notice that amends nothing must report nothing rather than its cross-references. */
+export function extractAmendedClauses(fullText: string): string[] {
+  const out = new Set<string>();
+  const text = String(fullText ?? "");
+  for (const m of text.matchAll(AMENDS)) out.add(m[1]);
+  for (const m of text.matchAll(IS_AMENDED)) out.add(m[1]);
+  return [...out].sort();
 }
 
 export function extractClauses(text: string): string[] {
@@ -108,7 +149,8 @@ export function parseFederalRegister(body: string): RegRow[] {
       effective_date: doc.effective_on || null,
       link,
       published_at: doc.publication_date ? new Date(doc.publication_date).toISOString() : null,
-      affects_clauses: affects
+      affects_clauses: affects,
+      raw_text_url: doc.raw_text_url || null
     });
   }
   return rows;
