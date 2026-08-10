@@ -509,7 +509,7 @@
   }
 
   /* ── contact strip ──────────────────────────────────────────────────────── */
-  var CONTACT_FIELDS = ['contact_name', 'contact_title', 'contact_email', 'contact_phone', 'contact_website', 'contact_address'];
+  var CONTACT_FIELDS = ['contact_name', 'contact_email', 'contact_phone', 'contact_website', 'contact_address'];
 
   function paintContact() {
     var items = document.querySelectorAll('.contact-strip .contact-item');
@@ -522,6 +522,14 @@
       clear(cell);
       var shown = field === 'contact_phone' ? fmtPhone(v) : v;
       cell.appendChild(has(v) ? document.createTextNode(shown) : unset('Not set'));
+      /* THE TITLE IS PART OF THE POINT OF CONTACT, not a row of its own. The plate and the
+         pasted copy both print "Name, Title" as one value, and a strip that broke them into
+         two rows would show the customer a shape their own document does not have. The comma
+         belongs to the title and leaves with it — the same rule both export containers follow.
+         It is edited in the Point of contact dialog, so there is nothing extra to click. */
+      if (field === 'contact_name' && has(v) && has(REC.contact_title)) {
+        cell.appendChild(make('span', 'ct', ', ' + REC.contact_title));
+      }
     }
   }
 
@@ -725,8 +733,12 @@
     company_name:     { kind: 'Identity', help: 'The legal name on your SAM registration. It heads the document and the engine matches it against the entity record.' },
     core_competencies:{ kind: 'The document', prose: true, help: 'The first thing a contracting officer reads. What you build or do, in your own words — plain sentences beat a keyword list.' },
     differentiators:  { kind: 'The document', prose: true, help: 'Why you over the other bidders. Certifications, facilities, clearances, past programs — the things another firm cannot simply claim.' },
-    contact_name:     { kind: 'Contact', help: 'Who a contracting officer asks for by name.' },
-    contact_title:    { kind: 'Contact', help: 'Their role, printed beside the name. A contracting officer reads it to know whether they have the President or the front desk.' },
+    contact_name:     { kind: 'Contact', help: 'Who a contracting officer asks for, and the role that prints beside the name.',
+                        group: [
+                          { field: 'contact_name',  label: 'Name',  hint: 'Who a contracting officer asks for by name.' },
+                          { field: 'contact_title', label: 'Title', hint: 'Their role. It prints beside the name as "Name, Title", so a contracting officer knows whether they have the President or the front desk. Leave it empty and the name prints alone.' }
+                        ] },
+    contact_title:    { kind: 'Contact' },
     contact_email:    { kind: 'Contact', type: 'email', help: 'Where a solicitation question lands. Use a monitored address, not a personal one.' },
     contact_phone:    { kind: 'Contact', type: 'tel', help: 'A number answered during business hours in your own time zone.' },
     contact_website:  { kind: 'Contact', type: 'url', help: 'Your company site. Include https:// so it resolves when pasted.' },
@@ -944,13 +956,28 @@
     if (spec.help) head.appendChild(make('p', 'fe-help', spec.help));
     sheet.appendChild(head);
 
+    /* A GROUP IS ONE DIALOG FOR VALUES THAT PRINT AS ONE VALUE. The point of contact is a
+       name and the role beside it — the document renders them as "Name, Title", so asking
+       for them in two places would ask the customer to assemble something the page already
+       knows how to join. Single-field editing is unchanged; a group is the same chrome with
+       one labelled input per part, and it patches only the parts that actually changed. */
+    var parts = spec.group || [{ field: field, label: FIELD_LABELS[field] || field }];
     var body = make('div', 'fe-body');
-    var input = document.createElement(spec.prose ? 'textarea' : 'input');
-    input.className = spec.prose ? 'fe-area' : 'fe-input';
-    if (!spec.prose) input.type = spec.type || 'text';
-    input.value = current;
-    input.setAttribute('aria-label', FIELD_LABELS[field] || field);
-    body.appendChild(input);
+    var inputs = [];
+    for (var pi = 0; pi < parts.length; pi++) {
+      var part = parts[pi];
+      var pspec = FIELD_SPEC[part.field] || {};
+      if (spec.group) body.appendChild(make('label', 'fe-label', part.label));
+      var pin = document.createElement(pspec.prose ? 'textarea' : 'input');
+      pin.className = pspec.prose ? 'fe-area' : 'fe-input';
+      if (!pspec.prose) pin.type = pspec.type || 'text';
+      pin.value = REC[part.field] == null ? '' : String(REC[part.field]);
+      pin.setAttribute('aria-label', part.label || FIELD_LABELS[part.field] || part.field);
+      body.appendChild(pin);
+      if (spec.group && part.hint) body.appendChild(make('p', 'fe-help', part.hint));
+      inputs.push({ field: part.field, el: pin, was: pin.value });
+    }
+    var input = inputs[0].el;
     sheet.appendChild(body);
 
     var foot = make('div', 'fe-foot');
@@ -974,11 +1001,18 @@
     ok.type = 'button';
     ok.setAttribute('data-fe-save', '');
     ok.addEventListener('click', function () {
-      var next = input.value.trim();
       closeEditor();
-      if (next === current.trim()) return;   // nothing changed — do not claim a save
+      /* Only what CHANGED is sent: an untouched part is never written back, and a dialog
+         closed without an edit reports nothing. */
       var patch = {};
-      patch[field] = next;
+      var changed = false;
+      for (var i = 0; i < inputs.length; i++) {
+        var next = inputs[i].el.value.trim();
+        if (next === inputs[i].was.trim()) continue;
+        patch[inputs[i].field] = next;
+        changed = true;
+      }
+      if (!changed) return;
       save(patch);
     });
     foot.appendChild(ok);
