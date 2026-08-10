@@ -163,6 +163,47 @@ const buried = { id: "deep", compliance_json: {
 ok(inferLevel(buried).level === "2",
   "a trigger past 4,000 characters is still read", `got L${inferLevel(buried).level}`);
 
+// ── E · the CUI banner marking ──────────────────────────────────────────────
+// The acronym triggers carry \b so that `cui` inside `circuit` cannot match (section above).
+// Serialising the payload before matching destroyed that boundary: JSON.stringify turns a
+// newline into the two characters `\` and `n`, and `n` is a word character, so `…8\nCUI\n…`
+// serialises to `8\nCUI\n` where /\bCUI\b/ has nothing to anchor on.
+//
+// The text below is transcribed from W911SG27BA002's own persisted finding. A line holding
+// nothing but CUI is the BANNER MARKING — mandatory at the top and bottom of every page of a
+// document carrying it, and therefore the most reliable CUI indicator a federal document has.
+// The audit was reported as requiring no CMMC at all.
+console.log(`\n── E · a CUI banner marking is read ──`);
+const banner = { id: "banner", compliance_json: { v3: { findings: [
+  { kind: "submission", excerpt: "3, 2026 \tFE 10031 4J\nPage | 8\nCUI\n• \tUFGS 32 84 23 Underground Sprinkler", citation: "Attachment 3" }
+] } } };
+ok(inferLevel(banner).level === "2",
+  "CUI alone on its own line is read as CUI, not swallowed by the newline escape",
+  `got L${inferLevel(banner).level}`);
+// The negative control the \b exists for must survive the same change.
+ok(inferLevel({ id: "circ", compliance_json: { v3: { findings: [
+  { kind: "technical_spec", excerpt: "Replace the printed circuit board assembly.\nTorque to spec.", citation: "SOW 3.2" }
+] } } }).level === "0",
+  "`circuit` on a line of its own still does not match CUI",
+  `got L${inferLevel({ id: "circ", compliance_json: { v3: { findings: [{ kind: "t", excerpt: "printed circuit board", citation: "c" }] } } }).level}`);
+// Tab is the other escape that yields a word character.
+ok(inferLevel({ id: "tab", compliance_json: { note: "Marking:\tFCI\tapplies" } }).level === "1",
+  "an acronym fenced by tabs is read", `got L${inferLevel({ id: "tab", compliance_json: { note: "Marking:\tFCI\tapplies" } }).level}`);
+
+// ── F · the reference counts are the ones in the rule ───────────────────────
+// 32 CFR 170.4 defines all three in one sentence: "the 15 Level 1 requirements listed in the
+// 48 CFR 52.204-21(b)(1), the 110 Level 2 requirements from NIST SP 800-171 R2 ..., and the 24
+// Level 3 requirements selected from NIST SP 800-172 Feb2021". 17 was the CMMC 1.0 Level 1
+// count; 134 was 110 + 24 summed here, a figure the rule never states.
+console.log(`\n── F · requirement counts match 32 CFR part 170 ──`);
+ok(LEVELS["1"].requirements === 15, "Level 1 is 15 — 48 CFR 52.204-21(b)(1)(i) through (xv)", `got ${LEVELS["1"].requirements}`);
+ok(LEVELS["2"].requirements === 110, "Level 2 is 110 — identical to NIST SP 800-171 R2", `got ${LEVELS["2"].requirements}`);
+ok(LEVELS["3"].requirements === 24, "Level 3 is the 24 selected NIST SP 800-172 requirements", `got ${LEVELS["3"].requirements}`);
+ok(/prerequisite/i.test(LEVELS["3"].requirements_note),
+  "Level 3's note says the Level 2 certification is a prerequisite — 24 alone reads as the smaller obligation");
+ok(!JSON.stringify(LEVELS).includes("practice"),
+  "the reference does not use CMMC 1.0's 'practice' vocabulary — the rule says security requirements");
+
 ok(inferLevel({ id: "x" }).level === "0", "an audit with no compliance_json is not flagged");
 ok(inferLevel({ id: "y", compliance_json: {} }).level === "0", "an empty compliance_json is not flagged");
 ok(inferLevel({ id: "z", compliance_json: null }).trigger === null, "a null compliance_json claims no trigger");

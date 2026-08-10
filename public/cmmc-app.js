@@ -169,7 +169,7 @@
     const d = dist();
     const m = meta();
     const shown = m.state === 'ready' || m.state === 'empty';
-    // Label and practice count come from the reference the server sent, not from a copy kept
+    // Label and requirement count come from the reference the server sent, not from a copy kept
     // here. They were hardcoded, so the same number lived in two places and only one of them was
     // ever updated. The descriptor names what actually puts an audit at the level — Level 3 read
     // "critical programs", which described a trigger the engine no longer uses and never reliably
@@ -177,8 +177,8 @@
     const ref = (window.CMMC && window.CMMC.REFERENCE) || {};
     const lvl = (k, fallbackLabel, what) => {
       const r = ref[k] || {};
-      const n = typeof r.practices === 'number' ? r.practices : null;
-      return { k: k, label: r.label || fallbackLabel, foot: what + (n ? ' · ' + n + ' practices' : '') };
+      const n = typeof r.requirements === 'number' ? r.requirements : null;
+      return { k: k, label: r.label || fallbackLabel, foot: what + (n ? ' · ' + n + ' requirements' : '') };
     };
     const cells = [
       { k: '0', label: 'No CMMC named', foot: 'nothing in the audit triggers a level' },
@@ -311,8 +311,10 @@
       h('div', { cls: 'cop-head' }, [
         h('div', { cls: 'cop-id' }, [
           h('div', { cls: 'cop-name', text: data.label || 'CMMC Level ' + level }),
-          h('div', { cls: 'cop-title', text: 'DoD CMMC 2.0 model · reference, not your assessment' }),
-          h('div', { cls: 'cop-agy', text: (data.practices || '—') + ' practices' })
+          h('div', { cls: 'cop-title', text: 'CMMC Program final rule, 32 CFR part 170 · reference, not your assessment' }),
+          // The note carries what a bare count cannot: Level 3's 24 sit on top of a Final Level 2,
+          // so "24" alone would read as the smaller obligation when it is the larger one.
+          h('div', { cls: 'cop-agy', text: data.requirements_note || ((data.requirements || '—') + ' requirements') })
         ])
       ]),
       sel

@@ -2,11 +2,31 @@
 // against real audit rows without a request context, and so the level a page
 // shows always arrives with the token that produced it.
 
-// Static CMMC reference. Levels per DoD CMMC 2.0 model.
+// Static CMMC reference. Counts and vocabulary are the CMMC Program final rule, 32 CFR part 170.
+//
+// THE COUNTS WERE CMMC 1.0's AND TWO OF THE THREE WERE WRONG. § 170.4 defines the term against
+// all three levels in one sentence — "the 15 Level 1 requirements listed in the 48 CFR
+// 52.204-21(b)(1), the 110 Level 2 requirements from NIST SP 800-171 R2 …, and the 24 Level 3
+// requirements selected from NIST SP 800-172 Feb2021" — and § 170.14(c)(2) fixes Level 1 as
+// "those set forth in 48 CFR 52.204-21(b)(1)(i) through (xv)", which is fifteen.
+//
+//   Level 1: 17 -> 15    17 is the CMMC 1.0 count and has not been the number since the rule.
+//   Level 2: 110         unchanged, and confirmed against the same sentence.
+//   Level 3: 134 -> 24   134 was 110 + 24 summed here. The rule never states 134: Level 3 IS the
+//                        24 selected 800-172 requirements, and the 110 arrive because a Final
+//                        Level 2 (C3PAO) status is a PREREQUISITE to a Level 3 assessment
+//                        (§ 170.18(c)), not because Level 3 restates them. Printing 134 as the
+//                        level's own count made Level 3 look like one larger assessment instead
+//                        of a second assessment gated behind the first.
+//
+// The field is `requirements`, not `practices`: "practice" is CMMC 1.0 vocabulary and the rule
+// says "security requirements" throughout. A contractor searching the number we print should
+// land on the regulation, and 17 practices matched nothing in it.
 export const LEVELS = {
   "1": {
     label: "Level 1 — Foundational",
-    practices: 17,
+    requirements: 15,
+    requirements_note: "15 requirements — 48 CFR 52.204-21(b)(1)(i) through (xv)",
     summary: "Basic safeguarding of FCI (Federal Contract Information). Annual self-assessment.",
     // 252.204-7012 is NOT a Level 1 trigger and was removed from this list. It is the covered
     // defense information safeguarding clause and it requires NIST SP 800-171 — Level 2. Level 1
@@ -24,8 +44,13 @@ export const LEVELS = {
   },
   "2": {
     label: "Level 2 — Advanced",
-    practices: 110,
-    summary: "Protects CUI (Controlled Unclassified Information). Aligned with NIST SP 800-171. Triennial third-party assessment for prioritized contracts.",
+    requirements: 110,
+    requirements_note: "110 requirements — identical to NIST SP 800-171 R2",
+    // "prioritized acquisitions" is pre-rule vocabulary. Under 32 CFR 170.17 a Level 2 contract
+    // requires EITHER a self-assessment (Level 2 Self) or a C3PAO certification (Level 2 C3PAO);
+    // which one applies is stated in the solicitation. Saying only "triennial third-party" told
+    // every Level 2 contractor to budget for a C3PAO they may not need.
+    summary: "Protects CUI (Controlled Unclassified Information). Identical to NIST SP 800-171 R2. Assessed every three years — by self-assessment or by a C3PAO, whichever the contract requires.",
     triggers: ["DFARS 252.204-7012", "DFARS 252.204-7019", "DFARS 252.204-7020", "DFARS 252.204-7021"],
     checklist: [
       "Develop a System Security Plan (SSP) covering all 110 NIST 800-171 controls",
@@ -40,15 +65,17 @@ export const LEVELS = {
   },
   "3": {
     label: "Level 3 — Expert",
-    practices: 134,
-    summary: "Higher protection for CUI on the most sensitive programs. Government-led assessment every 3 years.",
+    requirements: 24,
+    requirements_note: "24 requirements selected from NIST SP 800-172 — on top of a Final Level 2 (C3PAO), which is a prerequisite",
+    summary: "Higher protection for CUI on the most sensitive programs. 24 selected NIST SP 800-172 requirements, assessed by DCMA DIBCAC every 3 years. A Final Level 2 (C3PAO) certification is a prerequisite to even undergo the assessment.",
     // Level 3 is a government designation, not a phrase in a solicitation. This list used to read
     // "252.204-7012 (with critical asset designation)", which described a signal the recogniser
     // reached by matching the words "critical program" in any prose — so the panel named a
     // condition the engine could not actually establish. These two are what it can.
     triggers: ["CMMC Level 3 named in the solicitation", "NIST SP 800-172"],
     checklist: [
-      "All Level 2 practices + 24 additional from NIST SP 800-172",
+      "Achieve Final Level 2 (C3PAO) first — it is a prerequisite, not a step you can skip",
+      "The 24 selected NIST SP 800-172 requirements, with DoD-assigned parameters",
       "Advanced threat protection for APT-class adversaries",
       "Government-led assessment by DoD Cyber Crimes Center or equivalent",
       "Penetration testing performed by qualified red team",
@@ -70,7 +97,7 @@ export const LEVELS = {
 // 252.204-7012 MOVED FROM LEVEL 1 TO LEVEL 2. It is the safeguarding clause for covered defense
 // information: it requires NIST SP 800-171, which is Level 2 by definition, and LEVELS["2"]
 // already listed it. Reporting it as Level 1 told a contractor holding CDI that they faced a
-// self-assessment against 17 practices when the obligation is 110 plus an SPRS score. Level 1 is
+// self-assessment against 15 requirements when the obligation is 110 plus an SPRS score. Level 1 is
 // FAR 52.204-21 — FCI only — which is why that clause is the one added in its place.
 //
 // The bare acronyms carry word boundaries deliberately. `cui` as a substring matches inside
@@ -102,6 +129,17 @@ export const LEVEL_TRIGGERS: Array<{ level: "1" | "2" | "3"; rx: RegExp; label: 
   { level: "1", rx: /\bcmmc[-\s]*(level[-\s]*)?1\b/i, label: "CMMC Level 1 named" },
   { level: "1", rx: /\bFCI\b/, label: "FCI" }
 ];
+
+// Every string value in the payload, at any depth, in document order. The compliance record is
+// not one shape: v2 rows carry clause arrays and prose fields, v3 rows carry a findings array of
+// excerpts and citations, and both are read the same way here on purpose — the alternative was an
+// allowlist of field names, and the fields that actually carry solicitation text differ per
+// version, so an allowlist would go stale silently the next time the payload shape moves.
+function collectStrings(value: unknown, out: string[]): void {
+  if (typeof value === "string") { out.push(value); return; }
+  if (Array.isArray(value)) { for (const v of value) collectStrings(v, out); return; }
+  if (value && typeof value === "object") { for (const v of Object.values(value)) collectStrings(v, out); }
+}
 
 export function inferLevel(audit: Record<string, unknown>): { level: "0" | "1" | "2" | "3"; trigger: string | null } {
   const compJson = (audit.compliance_json as Record<string, unknown>) || {};
@@ -138,11 +176,26 @@ export function inferLevel(audit: Record<string, unknown>): { level: "0" | "1" |
   // corpus rows exceed that and the largest is 8,714 — so for almost every audit the majority of
   // its own compliance record was unreadable to the thing classifying it, and a trigger's
   // visibility depended on where it happened to land in key order.
+  //
+  // MATCHED AGAINST THE RAW STRINGS, NOT `JSON.stringify` OF THEM. Serialising first turns every
+  // newline in the source text into the two characters `\` and `n` — and `n` is a WORD character,
+  // so a `\b` that the raw text satisfies is destroyed in the serialised copy. The acronym
+  // triggers all carry `\b` deliberately (without it `cui` matches inside `circuit`), which means
+  // serialising made the boundary they depend on unreliable.
+  //
+  // This is not a hypothetical. W911SG27BA002 carries "…Page | 8\nCUI\n• …" — a CUI BANNER
+  // MARKING, which is the single most reliable CUI indicator a federal document has, because the
+  // marking is mandatory at the top and bottom of every page holding it. Serialised, the text
+  // reads `8\nCUI\n` and `/\bCUI\b/` cannot match it. The audit was reported as requiring no CMMC
+  // at all. Walking the object for its string values and joining on a real newline keeps every
+  // field the old code read — nothing is narrowed — and only removes the escaping.
+  const strings: string[] = [];
+  collectStrings(prose, strings);
   const allText = [
     ...dfarsClauses,
     ...detectedFlags.map((f) => `${f.clause} ${f.title}`),
-    JSON.stringify(prose)
-  ].join(" ");
+    ...strings
+  ].join("\n");
 
   for (const t of LEVEL_TRIGGERS) {
     if (t.rx.test(allText)) return { level: t.level, trigger: t.label };

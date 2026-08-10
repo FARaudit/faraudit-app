@@ -76,6 +76,18 @@ export async function GET(req: NextRequest) {
   // The query is already ordered created_at DESC, so the first row seen for a key is the
   // most recent audit of it — but the order is asserted here rather than assumed, because a
   // later edit to the query would otherwise silently start keeping the oldest.
+  //
+  // NO "THE LEVEL CHANGED BETWEEN RUNS" FLAG. It was designed and then refuted by the corpus.
+  // The concern is real — an amendment can change the CMMC requirement, and keeping only the
+  // newest audit would hide that — but the flag needs a signal that separates "the solicitation
+  // changed" from "the engine ran again", and there is none: the audit row carries no amendment
+  // or version identifier. Measured over the 116 live audits, every one of the 18 adjacent
+  // re-run pairs whose inferred level differs is under 24 hours apart (median ~3h), 16 of them
+  // used the identical model, and 0 are 24 hours or more apart — while 8 re-run pairs that ARE
+  // a day or more apart all kept the same level. So the flag would have fired 18 times, none of
+  // them an amendment, and told a customer their compliance obligation changed when only the
+  // run did. Shipping it would put the page back in the business of stating something its data
+  // cannot support, which is the defect the dedupe exists to remove.
   const rawRows = (audits || []) as Array<Record<string, unknown>>;
   const newestFirst = [...rawRows].sort((x, y) =>
     Date.parse(String(y.created_at ?? 0)) - Date.parse(String(x.created_at ?? 0)));
