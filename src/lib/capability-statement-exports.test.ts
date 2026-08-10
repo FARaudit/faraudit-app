@@ -26,10 +26,8 @@
 // surfaces and not a third; it was never a layout problem.
 import { deflateSync } from "node:zlib";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
-import { Packer } from "docx";
 import React from "react";
 import { CapDoc, type CapStmt } from "@/lib/capability-statement-pdf-doc";
-import { buildDocx } from "@/lib/capability-statement-docx-doc";
 import { PAST_PERFORMANCE_EXPORT_LIMIT } from "@/lib/capability-statement-limits";
 import { formatPhone } from "@/lib/capability-statement-format";
 import { naicsLines } from "@/lib/capability-statement-naics";
@@ -103,16 +101,6 @@ async function main() {
     ["a tailored edition", FIXTURE, "DEPT OF THE NAVY"],
     ["a bare record", SPARSE, null]
   ] as Array<[string, CapStmt, string | null]>) {
-    let buf: Buffer | null = null;
-    let err = "";
-    try { buf = await Packer.toBuffer(buildDocx(stmt, agency)); } catch (e) { err = (e as Error).message; }
-    check(`${what} produces a .docx`, !!buf && isZip(buf) && buf.byteLength > 1000,
-      err || `${buf?.byteLength ?? 0} bytes`);
-    if (buf) {
-      const raw = buf.toString("latin1");
-      check(`${what} carries word/document.xml`, raw.includes("word/document.xml"),
-        "a ZIP that is not an OOXML document");
-    }
   }
 
   console.log("\n── the content model, executed ──");
@@ -210,16 +198,6 @@ async function main() {
     check("the PDF renders with a logo", !!pdfWithLogo && isPdf(pdfWithLogo),
       "the download fails when a logo is set");
 
-    let docxWithLogo: Buffer | null = null;
-    let derr = "";
-    try { docxWithLogo = await Packer.toBuffer(buildDocx(FIXTURE, null, real)); } catch (e) { derr = (e as Error).message; }
-    check("the Word export renders with a logo", !!docxWithLogo && isZip(docxWithLogo), derr);
-    check("the Word export actually embeds it",
-      !!docxWithLogo && docxWithLogo.toString("latin1").includes("word/media/"),
-      "the logo was never carried into the Word builder — it was missing entirely until 2026-08-09");
-    check("a logo makes the Word file bigger",
-      !!docxWithLogo && docxWithLogo.byteLength > (await Packer.toBuffer(buildDocx(FIXTURE, null, null))).byteLength,
-      "the image is not in the package");
   }
 
   console.log("\n── falsifiability ──");

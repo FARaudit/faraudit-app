@@ -20,7 +20,7 @@
 // is nothing left to fix.
 //
 // The rule: every claim on this page derives from the record, or says it is empty.
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
 let pass = 0; let fail = 0;
@@ -452,11 +452,11 @@ console.log("\n── export is one place, and it claims only what is wired ─�
     "the page denies a capability it now offers");
   // Word WAS declared unbuilt and that was correct until the route existed. Both
   // exports are real now, so the caption states what each control does instead.
-  check("the caption describes both downloads", /PDF and Word download as files/.test(html),
+  check("the caption describes the one download", /PDF downloads as a file/.test(html),
     "the page does not say what the two buttons produce");
   check("the retired Export card is gone", !/class="export-list"/.test(html),
     "the side card and the header cluster both claim to be the export home");
-  check("all three actions sit together", /export-actions[\s\S]{0,1600}?data-cs-copy[\s\S]{0,1600}?data-cs-download="pdf"[\s\S]{0,1600}?data-cs-download="docx"/.test(html),
+  check("both actions sit together", /export-actions[\s\S]{0,1600}?data-cs-copy[\s\S]{0,1600}?data-cs-download="pdf"/.test(html),
     "the export actions are not in one cluster");
 
   check("P12 · the duplicate-control check can see two copies",
@@ -687,7 +687,6 @@ console.log("\n── the logo upload trusts nothing the caller says ──");
   // The fetch moved into src/lib/capability-statement-logo.ts when Word needed it too —
   // one fetcher, so a guard added for one export cannot be missing from the other.
   const logolib = read("src/lib/capability-statement-logo.ts");
-  const docx = readExport("src/app/api/capability-statement/docx/route.ts", "src/lib/capability-statement-docx-doc.ts");
   check("a document fetches the logo itself, never handing a URL to a renderer",
     /export async function fetchLogoBytes/.test(logolib),
     "a 404 or a slow bucket throws out of the render and the download 500s");
@@ -697,7 +696,7 @@ console.log("\n── the logo upload trusts nothing the caller says ──");
     "the customer gets a 500 for a decoration");
   check("it re-sniffs what it fetched", /sniffImageType\(buf\)/.test(logolib),
     "a URL out of a database row reaches a renderer unchecked");
-  for (const [surface, src] of [["the PDF", pdf], ["the Word export", docx]] as const) {
+  for (const [surface, src] of [["the PDF", pdf]] as const) {
     check(`${surface} uses the shared fetcher`, /fetchLogoBytes\(/.test(src),
       "a second fetch path drifts from the guards on the first");
     check(`${surface} substitutes no placeholder mark`, /logo &&|logo \?/.test(src),
@@ -745,7 +744,6 @@ console.log("\n── NAICS carries titles, from the regulation ──");
   const lib = read("src/lib/capability-statement-naics.ts");
   const titles = read("src/lib/naics-titles.ts");
   const pdf = readExport("src/app/api/capability-statement/pdf/route.tsx", "src/lib/capability-statement-pdf-doc.tsx", "src/lib/capability-statement-plate.tsx");
-  const docx = readExport("src/app/api/capability-statement/docx/route.ts", "src/lib/capability-statement-docx-doc.ts");
   const api = read("src/app/api/capability-statement/route.ts");
   const gen = read("scripts/naics/build-naics-titles.mjs");
 
@@ -764,7 +762,7 @@ console.log("\n── NAICS carries titles, from the regulation ──");
   check("first is primary", /out\.length === 0/.test(lib),
     "the primary is re-derived instead of taken from the customer's own order");
   check("duplicates are dropped", /seen\.has\(code\)/.test(lib));
-  for (const [surface, src] of [["the PDF", pdf], ["the Word export", docx]] as const) {
+  for (const [surface, src] of [["the PDF", pdf]] as const) {
     check(`${surface} uses the shared NAICS lines`, /naicsLines\(/.test(src),
       "a surface formats NAICS its own way and drifts");
     check(`${surface} no longer prints a bare comma list`, !/naics\.join\(", "\)/.test(src),
@@ -780,44 +778,35 @@ console.log("\n── NAICS carries titles, from the regulation ──");
     /naics\.join\(", "\)/.test('<Text>NAICS · {naics.join(", ")}</Text>'));
 }
 
-// ── Word export ──────────────────────────────────────────────────────────────
-// A real .docx, not HTML wearing the extension: Word warns when the format and the
-// extension disagree, and this document is sent to a contracting officer.
-console.log("\n── the Word export is a real document ──");
+// ── the Word export is GONE, and stays gone ─────────────────────────────────
+// CEO ruling 2026-08-10: copy-statement and PDF only. Design concurred in card 825 §5 —
+// "cutting the download makes them moot", the them being the card-821 defects the .docx path
+// still carried (A4 rather than Letter, sizes under the type floor, headings smaller than body
+// text, an empty docDefaults). Removing the path removes that class rather than fixing it.
+//
+// This is the INVERSE of the block it replaces. A deleted feature needs a check that can fail,
+// or it comes back the next time someone reads "Download Word" in an old comment and helpfully
+// restores it. Every assertion below goes red if any part of the export returns.
+console.log("\n── the Word export is gone ──");
 {
-  const docx = readExport("src/app/api/capability-statement/docx/route.ts", "src/lib/capability-statement-docx-doc.ts");
-
-  check("it is generated as OOXML", /Packer\.toBuffer/.test(docx) && /from "docx"/.test(docx),
-    "an HTML file renamed .doc opens with a format warning");
-  check("it is served as a Word document",
-    /application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document/.test(docx),
-    "the browser cannot tell the client what it just downloaded");
-  check("the filename ends .docx", /\.docx`/.test(docx));
-  check("it refuses without a company name", /Add your company name before exporting/.test(docx),
-    "a statement goes out headed with a placeholder");
-  check("it shares the export limit", /PAST_PERFORMANCE_EXPORT_LIMIT/.test(docx),
-    "Word sends a different number of awards than the PDF");
-  check("it shares the phone formatter", /formatPhone\(/.test(docx),
-    "the third surface reintroduces the raw phone number");
-  check("it carries no FARaudit credit", !/Prepared with FARaudit/.test(docx) && !/FARaudit/.test(docx.replace(/@\/lib\/[a-z-]+/g, "")),
-    "our marketing is on a document the customer sends under their own name");
-  // Both sections resolve through the shared reader — the exports and the page cannot disagree
-  // about one profile — and each heading sits behind a length guard on the resolved list.
-  // THE BEHAVIOURAL PROOF IS NOT HERE: this greps source, and a grep for a guard cannot tell a
-  // real absence from a renamed variable. capability-statement-exports.test.ts renders the PDF
-  // and reads the heading back out of it, in both directions, with the matcher itself checked
-  // for vacuity — the letter-spaced eyebrow made the first absence assertion unfailable.
-  check("an empty section is absent", /resolveCompetencies\(/.test(docx) && /if \(comps\.length\)/.test(docx) && /if \(certs\.length\)/.test(docx),
-    "a heading over nothing is a claim about the firm");
-  check("Word is no longer declared unbuilt", !/Word export is not built yet/.test(html),
-    "the page denies a capability it now has");
-  check("the button is wired", /data-cs-download="docx"/.test(html) && /docx: \{ path: '\/docx'/.test(live),
-    "a control with no caller");
-  check("both downloads share one handler", /function downloadExport/.test(live) && !/function downloadPdf/.test(live),
-    "two copies of the download path drift on error handling");
-
-  check("P19 · the OOXML check can see an HTML-as-doc export",
-    !/Packer\.toBuffer/.test('return new Response(html, { headers: { "Content-Type": "application/msword" } })'));
+  check("no Word download button", !/data-cs-download="docx"/.test(html) && !/Download Word/.test(html),
+    "a control the customer can press with no route behind it");
+  check("the client offers no docx download", !/docx: \{ path: '\/docx'/.test(live),
+    "the handler still lists a format the server cannot produce");
+  check("the caption does not promise a Word file", !/Word download|and Word download as files/.test(html),
+    "the page describes a download that no longer exists");
+  // The route and the builder are deleted, not orphaned. existsSync, not a grep of their contents:
+  // a file that still exists but is unreferenced is a route Next will still serve.
+  check("the docx route file is gone", !existsSync(join(ROOT, "src/app/api/capability-statement/docx/route.ts")),
+    "Next serves any route file present, referenced or not");
+  check("the docx builder is gone", !existsSync(join(ROOT, "src/lib/capability-statement-docx-doc.ts")),
+    "the builder survives and invites a caller");
+  // Paste-into-Word is a DIFFERENT capability and must survive: the copy button's whole point is
+  // that the formatting holds when it lands in Word. Deleting the download must not have taken it.
+  check("copy-into-Word still promised", /pasted into Word/.test(html),
+    "the paste target was removed with the download — they are not the same feature");
+  check("the copy button is still there", /data-cs-copy/.test(html),
+    "the remaining export path went with the one that was cut");
 }
 
 // ── tailored versions: selection and ordering, never authorship ──────────────
@@ -829,11 +818,10 @@ console.log("\n── a tailored edition writes nothing ──");
 {
   const lib = read("src/lib/capability-statement-tailoring.ts");
   const pdf = readExport("src/app/api/capability-statement/pdf/route.tsx", "src/lib/capability-statement-pdf-doc.tsx", "src/lib/capability-statement-plate.tsx");
-  const docx = readExport("src/app/api/capability-statement/docx/route.ts", "src/lib/capability-statement-docx-doc.ts");
   const api = read("src/app/api/capability-statement/route.ts");
 
   // The boundary itself. No surface that renders an edition may reach a model.
-  for (const [surface, src] of [["the tailoring library", lib], ["the PDF", pdf], ["the Word export", docx], ["the page", live]] as const) {
+  for (const [surface, src] of [["the tailoring library", lib], ["the PDF", pdf], ["the page", live]] as const) {
     check(`${surface} calls no model`,
       !/anthropic|openai|callModel|generateText|completion\(/i.test(src),
       "a tailored edition that writes prose puts model text on the customer's letterhead");
@@ -851,7 +839,7 @@ console.log("\n── a tailored edition writes nothing ──");
     "a full agency list offers editions the record cannot support");
   check("the requested agency is validated against the record", /function resolveAgency/.test(lib),
     "a query string names an agency the customer has never worked with");
-  for (const [surface, src] of [["the PDF", pdf], ["the Word export", docx]] as const) {
+  for (const [surface, src] of [["the PDF", pdf]] as const) {
     check(`${surface} validates the edition`, /resolveAgency\(/.test(src),
       "the caller decides what the document claims");
     check(`${surface} names the edition`, /Prepared for |PREPARED FOR /.test(src),
@@ -859,7 +847,7 @@ console.log("\n── a tailored edition writes nothing ──");
     check(`${surface} reorders its awards`, /orderForAgency\(/.test(src),
       "the edition differs in name only");
   }
-  check("the filename distinguishes editions", /const edition = agency \?/.test(pdf) && /const edition = agency \?/.test(docx),
+  check("the filename distinguishes editions", /const edition = agency \?/.test(pdf),
     "three editions land in Downloads under one name and overwrite each other");
 
   check("the page preview reorders with the edition",
