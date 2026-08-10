@@ -199,22 +199,25 @@
     const host = $('prioFilters');
     if (!host) return;
     const d = dist();
-    // EVERY LEVEL THE MODEL HAS, always. These were filtered to levels that happen to have
-    // rows, so Level 1 disappeared from the filter while the strip above it still showed a
-    // Level 1 card — two controls describing the same three levels and disagreeing about how
-    // many there are. A level with nothing in it is disabled and says so, which is a fact
-    // about this customer's audits rather than a gap in the model.
+    // EVERY LEVEL THE MODEL HAS, always, and every one of them clickable. These were built
+    // only from levels that happen to have rows, so Level 1 disappeared from the filter while
+    // the strip directly above it still showed a Level 1 card — two controls describing the
+    // same three levels and disagreeing about how many exist.
+    //
+    // NOT DISABLED AT ZERO. A greyed-out chip reads as a control that was never built, which
+    // is the opposite of the truth: the level exists, the filter works, and this customer has
+    // nothing at it. Selecting it shows the honest empty result, which is also the only way a
+    // reader can tell the control is wired at all.
     const opts = [{ k: 'all', label: 'All', n: null }].concat(
       LEVELS.map((lv) => ({ k: lv, label: 'Level ' + lv, n: d[lv] || 0 }))
     );
     fill(host, opts.map((o) => {
-      const empty = o.n === 0;
       const b = h('button', {
-        cls: 'fpill' + (S.level === o.k ? ' active' : '') + (empty ? ' is-empty' : ''),
+        cls: 'fpill' + (S.level === o.k ? ' active' : '') + (o.n === 0 ? ' is-empty' : ''),
         text: o.label,
-        attrs: Object.assign({ type: 'button' }, empty ? { disabled: '', title: 'No audit requires Level ' + o.k } : {})
+        attrs: { type: 'button', title: o.n === null ? 'Every level' : o.n + (o.n === 1 ? ' audit' : ' audits') }
       });
-      if (!empty) b.addEventListener('click', () => { S.level = o.k; renderAll(); });
+      b.addEventListener('click', () => { S.level = o.k; renderAll(); });
       return b;
     }));
   }
