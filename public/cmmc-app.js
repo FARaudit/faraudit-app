@@ -227,7 +227,10 @@
       const card = h('div', { cls: 'feed-card' + (S.sel === r.id ? ' sel' : '') }, [
         h('div', { cls: 'feed-top' }, [
           h('span', { cls: 'feed-clause', text: 'CMMC Level ' + r.level }),
-          h('span', { cls: 'feed-date', text: fmtDate(r.created_at) })
+          // LABELLED, because this is the date WE ran the audit — not the solicitation's
+          // posted date and not its response deadline. A bare date beside a solicitation
+          // number reads as the solicitation's own, and the two lead to opposite actions.
+          h('span', { cls: 'feed-date', text: 'Audited ' + fmtDate(r.created_at) })
         ]),
         h('div', { cls: 'feed-title', text: r.title || r.solicitation_number || r.notice_id || 'Untitled solicitation' }),
         h('div', { cls: 'feed-summary', text: [r.solicitation_number, r.agency].filter(Boolean).join(' · ') || '—' }),
@@ -308,7 +311,22 @@
 
   function buildControls() {
     const search = $('searchInput');
+    // `input` fires on every character AND on a paste, a drag-drop and an autofill — which
+    // `keyup` would all miss. The filter runs on each one.
     if (search) search.addEventListener('input', (e) => { S.q = e.target.value; renderList(); });
+
+    // The topbar control and the keyboard hint it advertises both land here.
+    const focusSearch = () => {
+      if (!search) return;
+      search.scrollIntoView({ block: 'center' });
+      search.focus();
+      search.select();
+    };
+    const tb = $('tbSearch');
+    if (tb) tb.addEventListener('click', focusSearch);
+    document.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && String(e.key).toLowerCase() === 'k') { e.preventDefault(); focusSearch(); }
+    });
     const reset = $('resetBtn');
     if (reset) {
       reset.addEventListener('click', () => {
