@@ -1310,8 +1310,7 @@
      act on, so they are read out of the response rather than dumped as raw JSON into
      a new tab — which is what a plain link to the endpoint would have done. */
   var DOWNLOADS = {
-    pdf: { path: '/pdf', label: 'PDF', fallback: 'capability-statement.pdf' },
-    docx: { path: '/docx', label: 'Word document', fallback: 'capability-statement.docx' }
+    pdf: { path: '/pdf', label: 'PDF', fallback: 'capability-statement.pdf' }
   };
 
   function downloadExport(btn, kind) {

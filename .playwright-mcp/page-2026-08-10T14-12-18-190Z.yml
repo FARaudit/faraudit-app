@@ -1,0 +1,135 @@
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - button "Toggle sidebar" [ref=e4] [cursor=pointer]
+    - generic [ref=e7]:
+      - generic [ref=e8]: F
+      - generic [ref=e9]:
+        - text: FAR
+        - generic [ref=e10]: audit
+    - generic [ref=e11]: WORKSPACE
+    - link "Today" [ref=e12] [cursor=pointer]:
+      - /url: /command-center
+    - link "Run Audit" [ref=e19] [cursor=pointer]:
+      - /url: /audit
+    - link "Acquisition Stages" [ref=e25] [cursor=pointer]:
+      - /url: /acquisition-stages
+    - link "Past Audits" [ref=e30] [cursor=pointer]:
+      - /url: /dashboard
+    - link "Pipeline" [ref=e35] [cursor=pointer]:
+      - /url: /pipeline
+    - link "Capability Statement" [ref=e40] [cursor=pointer]:
+      - /url: /capability-statement
+    - generic [ref=e45]: INTELLIGENCE
+    - link "Opportunities" [ref=e46] [cursor=pointer]:
+      - /url: /opportunities
+    - link "Defense News" [ref=e51] [cursor=pointer]:
+      - /url: /defense-news
+    - link "Defense Spending" [ref=e55] [cursor=pointer]:
+      - /url: /defense-spending
+    - link "Defense Agencies" [ref=e62] [cursor=pointer]:
+      - /url: /agencies
+    - link "Contracting Officers" [ref=e67] [cursor=pointer]:
+      - /url: /contracting-officers
+    - generic [ref=e74]: COMPLIANCE & BD
+    - link "FAR/DFARS Updates" [ref=e75] [cursor=pointer]:
+      - /url: /far-dfars-updates
+    - link "CMMC Readiness" [ref=e81] [cursor=pointer]:
+      - /url: /cmmc
+    - link "Wage Benchmarks" [ref=e86] [cursor=pointer]:
+      - /url: /wage-benchmarks
+    - link "Teaming Partners" [ref=e92] [cursor=pointer]:
+      - /url: /teaming-partners
+    - link "GAO Protests" [ref=e99] [cursor=pointer]:
+      - /url: /gao-protests
+    - generic [ref=e104]: ACCOUNT
+    - link "Profile & Settings" [ref=e105] [cursor=pointer]:
+      - /url: /settings
+    - button "Sign out" [ref=e111] [cursor=pointer]
+    - generic [ref=e116]: JR
+  - main [ref=e118]:
+    - generic [ref=e119]:
+      - generic [ref=e120]:
+        - generic [ref=e121]: CMMC Readiness
+        - generic [ref=e122]: /
+        - generic [ref=e123]: Cybersecurity Compliance
+      - generic [ref=e124]:
+        - generic [ref=e128]: Search domains, controls…
+        - generic [ref=e129]: ⌘K
+      - generic [ref=e130]:
+        - button "Toggle theme" [ref=e131] [cursor=pointer]
+        - button "Notifications" [ref=e134] [cursor=pointer]
+        - dialog "Notifications":
+          - generic:
+            - heading "Notifications" [level=3]
+            - generic: "0"
+          - generic:
+            - generic:
+              - generic:
+                - generic: Notifications unavailable
+                - generic: We could not read them just now — this is not an empty inbox. Retry shortly.
+          - generic:
+            - link "View all activity":
+              - /url: /dashboard
+    - generic [ref=e140]:
+      - generic [ref=e141]:
+        - generic [ref=e142]:
+          - paragraph [ref=e143]: Cybersecurity Compliance
+          - heading "CMMC Readiness" [level=1] [ref=e144]
+          - paragraph [ref=e145]: What the solicitations you have audited require — and what each CMMC level asks for
+        - generic [ref=e146]:
+          - generic [ref=e147]:
+            - generic [ref=e148]: —
+            - generic [ref=e149]: Audited
+          - generic [ref=e150]:
+            - generic [ref=e151]: —
+            - generic [ref=e152]: Require CMMC
+          - generic [ref=e153]:
+            - generic [ref=e154]: —
+            - generic [ref=e155]: Highest level
+      - generic [ref=e157]:
+        - generic [ref=e158]: Level
+        - button "All" [ref=e160] [cursor=pointer]
+        - textbox "Search solicitation, agency or trigger…" [ref=e165]
+        - button "Reset" [ref=e166] [cursor=pointer]
+      - generic [ref=e167]:
+        - generic [ref=e168]: Unavailable
+        - generic [ref=e169]: Your audits could not be read, so this page has nothing to report. It is not a clean bill of health — reload to try again.
+        - generic [ref=e170]: HTTP 404
+      - generic [ref=e171]:
+        - generic [ref=e172]:
+          - paragraph [ref=e173]: No CMMC named
+          - generic [ref=e174]:
+            - text: —
+            - generic [ref=e175]: audits
+          - generic [ref=e176]: nothing in the audit triggers a level
+        - generic [ref=e177]:
+          - paragraph [ref=e178]: Level 1 — Foundational
+          - generic [ref=e179]:
+            - text: —
+            - generic [ref=e180]: audits
+          - generic [ref=e181]: FCI
+        - generic [ref=e182]:
+          - paragraph [ref=e183]: Level 2 — Advanced
+          - generic [ref=e184]:
+            - text: —
+            - generic [ref=e185]: audits
+          - generic [ref=e186]: CUI
+        - generic [ref=e187]:
+          - paragraph [ref=e188]: Level 3 — Expert
+          - generic [ref=e189]:
+            - text: —
+            - generic [ref=e190]: audits
+          - generic [ref=e191]: NIST SP 800-172
+      - generic [ref=e192]:
+        - generic [ref=e193]:
+          - generic [ref=e194]:
+            - generic [ref=e200]:
+              - heading "Solicitations that require CMMC" [level=3] [ref=e201]
+              - paragraph
+            - generic [ref=e202]: your audits
+          - generic [ref=e204]:
+            - generic [ref=e205]: Nothing flagged
+            - generic [ref=e206]: See the note above.
+        - generic [ref=e209]:
+          - generic [ref=e210]: Reference unavailable
+          - generic [ref=e211]: The CMMC level reference did not load.
