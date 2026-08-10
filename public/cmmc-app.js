@@ -138,7 +138,7 @@
       el.hidden = false;
       fill(el, [
         h('span', { cls: 'sb-label', text: 'Note' }),
-        h('span', { text: m.unanalyzed + ' of your ' + m.totalAudited + ' audits carry no analysis yet, so they answer neither way and are not counted as clear.' })
+        h('span', { text: m.unanalyzed + ' of your ' + m.totalSolicitations + ' solicitations carry no analysis yet, so they answer neither way and are not counted as clear.' })
       ]);
       return;
     }
@@ -154,7 +154,7 @@
     const flagged = d['1'] + d['2'] + d['3'];
     const ready = m.state === 'ready' || m.state === 'empty';
     const put = (id, v) => { const el = $(id); if (el) el.textContent = ready ? String(v) : '—'; };
-    put('hsAudited', m.totalAudited || 0);
+    put('hsAudited', m.totalSolicitations || 0);
     put('hsFlagged', flagged);
     const highest = LEVELS.filter((lv) => d[lv] > 0).pop();
     const hi = $('hsHighest');
@@ -169,7 +169,7 @@
     const d = dist();
     const m = meta();
     const shown = m.state === 'ready' || m.state === 'empty';
-    // Label and practice count come from the reference the server sent, not from a copy kept
+    // Label and requirement count come from the reference the server sent, not from a copy kept
     // here. They were hardcoded, so the same number lived in two places and only one of them was
     // ever updated. The descriptor names what actually puts an audit at the level — Level 3 read
     // "critical programs", which described a trigger the engine no longer uses and never reliably
@@ -177,8 +177,8 @@
     const ref = (window.CMMC && window.CMMC.REFERENCE) || {};
     const lvl = (k, fallbackLabel, what) => {
       const r = ref[k] || {};
-      const n = typeof r.practices === 'number' ? r.practices : null;
-      return { k: k, label: r.label || fallbackLabel, foot: what + (n ? ' · ' + n + ' practices' : '') };
+      const n = typeof r.requirements === 'number' ? r.requirements : null;
+      return { k: k, label: r.label || fallbackLabel, foot: what + (n ? ' · ' + n + ' requirements' : '') };
     };
     const cells = [
       { k: '0', label: 'No CMMC named', foot: 'nothing in the audit triggers a level' },
@@ -189,7 +189,9 @@
     fill(host, cells.map((c) => h('div', { cls: 'kpi' }, [
       h('p', { cls: 'lbl', text: c.label }),
       h('div', { cls: 'kpi-val', text: shown ? String(d[c.k] || 0) : '—' }, [
-        h('span', { cls: 'unit', text: 'audits' })
+        // Singular when there is one. "1 audits" is the kind of seam that makes a reader
+        // wonder what else on the page was not looked at.
+        h('span', { cls: 'unit', text: (shown && d[c.k] === 1) ? 'solicitation' : 'solicitations' })
       ]),
       h('div', { cls: 'foot', text: c.foot })
     ])));
@@ -309,8 +311,10 @@
       h('div', { cls: 'cop-head' }, [
         h('div', { cls: 'cop-id' }, [
           h('div', { cls: 'cop-name', text: data.label || 'CMMC Level ' + level }),
-          h('div', { cls: 'cop-title', text: 'DoD CMMC 2.0 model · reference, not your assessment' }),
-          h('div', { cls: 'cop-agy', text: (data.practices || '—') + ' practices' })
+          h('div', { cls: 'cop-title', text: 'CMMC Program final rule, 32 CFR part 170 · reference, not your assessment' }),
+          // The note carries what a bare count cannot: Level 3's 24 sit on top of a Final Level 2,
+          // so "24" alone would read as the smaller obligation when it is the larger one.
+          h('div', { cls: 'cop-agy', text: data.requirements_note || ((data.requirements || '—') + ' requirements') })
         ])
       ]),
       sel
