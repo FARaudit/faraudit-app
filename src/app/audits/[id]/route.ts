@@ -408,11 +408,20 @@ export async function GET(
     .maybeSingle();
   if (!capErr) hasCapabilityStatement = !!capRow;
 
-  // AGENTIC V3 — when the graduated engine produced this audit it OWNS the
-  // entire report: render its self-contained grounded report instead of the V1
-  // view-model/template. Branch is keyed off the persisted engine marker, so V1
-  // audits are byte-for-byte unchanged.
-  if (((audit.compliance_json as Record<string, unknown> | null)?.engine) === "agentic_v3") {
+  // ONE REPORT, FOR EVERY AUDIT. This used to be keyed off `compliance_json.engine ===
+  // "agentic_v3"`, so audits from the graduated engine got this report and everything older kept
+  // the V1 view-model template — 29 of 105 complete audits, 14 of 33 distinct solicitations, all
+  // of them from before the engine graduated, stranded on a surface that looked like a different
+  // product. The customer was never told there were two; they just saw that some of their own
+  // audits did not match the others.
+  //
+  // The gate is now "is there anything to render", not "which engine produced it".
+  // buildV4Data reads compliance_json.v3 and, when a row predates it, adaptV2ToV3Payload expresses
+  // that row's own persisted v2 analysis in the same contract — so an old audit arrives here with
+  // its findings, gates, clauses and risks intact rather than as a re-run notice. What an adapted
+  // audit does NOT get is a verbatim excerpt behind each finding, because the v2 engine never
+  // stored one; that absence is carried honestly rather than papered over.
+  if (audit.compliance_json || audit.overview_json || audit.risks_json) {
     // Self-contained report (its own full HTML doc) — NOT injectRail'd: the rail
     // assumes the site's grid layout and would float a misplaced sidebar onto a
     // centered single-column report. A "back to audits" link in the report header
