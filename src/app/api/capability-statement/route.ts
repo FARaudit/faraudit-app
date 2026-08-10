@@ -14,6 +14,11 @@ interface PatchBody {
   cage_code?: string | null;
   naics_codes?: string[];
   certifications?: string[];
+  // SAM-OWNED, AND DELIBERATELY NOT IN ALLOWED_FIELDS. Registration status is a fact SAM holds;
+  // a customer typing "Active" over a lapsed registration puts a false statement on a document
+  // a contracting officer reads. Declared so the plate's ninth cell has a shape to bind, absent
+  // until a SAM sync writes it, and never settable through the record PATCH.
+  sam_registration_status?: string | null;
   core_competencies?: string | null;
   differentiators?: string | null;
   // Structured forms. The plate draws four fields per competency and two per differentiator;
