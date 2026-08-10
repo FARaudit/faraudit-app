@@ -72,7 +72,13 @@ const nextConfig: NextConfig = {
   // where this branch's live proof ran). Union: one /api/** glob covering every API function;
   // the @napi-rs/** glob also matches the platform dirs (e.g. canvas-linux-x64-gnu).
   outputFileTracingIncludes: {
-    "/api/**": ["./node_modules/pdf-parse/**/*", "./node_modules/@napi-rs/**"],
+    // @fontsource woff files are read by capability-statement-fonts.ts at render time from a
+    // path built with process.cwd(). The tracer cannot see a runtime-built path, so without
+    // this the capability statement deploys and quietly renders in a substituted face — the
+    // exact drift the Manrope ruling exists to prevent. Change this and that module together.
+    "/api/**": ["./node_modules/pdf-parse/**/*", "./node_modules/@napi-rs/**",
+      "./node_modules/@fontsource/manrope/files/*.woff",
+      "./node_modules/@fontsource/jetbrains-mono/files/*.woff"],
   },
   async headers() {
     return [
