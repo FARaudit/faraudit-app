@@ -53,7 +53,14 @@
   }
 
   function el(sel, root) { return (root || document).querySelector(sel); }
-  function has(v) { return typeof v === 'string' && v.trim().length > 0; }
+  /* A value is present when it says something. The string "null" is not a value: it is a
+     serialization accident, and printed on a document a contracting officer reads it is
+     indistinguishable from a claim. Same for "undefined". */
+  function has(v) {
+    if (typeof v !== 'string') return false;
+    var t = v.trim();
+    return t.length > 0 && t !== 'null' && t !== 'undefined';
+  }
   /* A PHONE IS READ, NOT PARSED. The record keeps exactly what was typed — this only
      changes how it is SHOWN, so a customer who entered an extension or a foreign number
      never sees it mangled: anything that is not a plain 10-digit US number is printed
