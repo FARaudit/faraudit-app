@@ -6,7 +6,7 @@
 // registrations under your primary codes." So a SAM outage became a positive claim about the
 // customer's market. This gate holds the three failure exits apart from a genuine zero-result
 // answer, and holds the zero-result answer REACHABLE so the fix cannot become fail-everything.
-import { searchTeamingPartners, type TeamingSearchResult } from "./sam-entity";
+import { searchTeamingPartners, SBA_SET_ASIDES, isKnownSetAside, type TeamingSearchResult } from "./sam-entity";
 
 let failures = 0;
 const assert = (cond: boolean, msg: string) => { console.log(`${cond ? "✅" : "❌"} ${msg}`); if (!cond) failures++; };
@@ -27,7 +27,9 @@ const ONE_ENTITY = {
     physicalAddress: { stateOrProvinceCode: "TX", zipCode: "76101" },
     businessTypes: {
       sbaBusinessTypeList: [
-        { sbaBusinessTypeCode: "A6", sbaBusinessTypeDesc: "Service Disabled Veteran Owned Small Business",
+        // A6 is 8(a), read back from live SAM. It is NOT SDVOSB — that guess looks right and
+        // is wrong, and SAM carries no SBA-certified veteran code on this list at all.
+        { sbaBusinessTypeCode: "A6", sbaBusinessTypeDesc: "SBA Certified 8(a) Program Participant",
           certificationEntryDate: "2024-01-10", certificationExitDate: "2027-01-10" },
         // An all-null row — SAM emits these for firms holding no certification. Must be filtered.
         { sbaBusinessTypeCode: null, sbaBusinessTypeDesc: null, certificationEntryDate: null, certificationExitDate: null }
@@ -38,7 +40,7 @@ const ONE_ENTITY = {
   pointsOfContact: { governmentBusinessPOC: { firstName: "Dana", lastName: "Ruiz", email: "dana@example.com", phoneNumber: "817-555-0110" } }
 };
 
-function mockFetch(impl: () => Promise<unknown>) {
+function mockFetch(impl: (url?: string) => Promise<unknown>) {
   globalThis.fetch = impl as unknown as typeof fetch;
 }
 const jsonRes = (body: unknown, status = 200) => Promise.resolve({
@@ -133,6 +135,26 @@ async function run() {
     assert(res.outcome !== "ok", `${name}: never reports 'ok' — the route's own discriminator`);
     assert(!Array.isArray(res.partners), `${name}: partners is not an array, so it cannot be rendered as a market`);
   }
+
+  // ── 8. THE SET-ASIDE CONTRACT. SAM's sbaBusinessTypeCode takes the CODE; a description
+  //      returns 200 with zero records, so a wrong value fabricates "nothing matched". ──
+  for (const s of SBA_SET_ASIDES) {
+    assert(/^[A-Z0-9]{2}$/.test(s.code), `set-aside "${s.label}" is a two-character code (${s.code}), not a description`);
+    assert(isKnownSetAside(s.code), `${s.code} is recognised by isKnownSetAside`);
+  }
+  assert(SBA_SET_ASIDES.length === 5, `exactly the five codes verified against live SAM (got ${SBA_SET_ASIDES.length})`);
+  // The descriptions SAM returns zero records for — the shape of the original defect.
+  for (const bad of ["Service Disabled Veteran Owned Small Business", "HUBZone", "8(a)", "WOSB", "QF", "A5", ""])
+    assert(!isKnownSetAside(bad), `"${bad}" is refused rather than forwarded to SAM`);
+  // SDVOSB is self-certified in SAM, not SBA-certified. Offering it would attest a
+  // self-assertion as a certification, so it must not appear in the filter.
+  assert(!SBA_SET_ASIDES.some(s => /veteran/i.test(s.label)), "no veteran set-aside is offered — SAM carries it only as self-certified");
+  // The code is what reaches SAM.
+  mockFetch((url?: string) => { (globalThis as Record<string, unknown>).__lastUrl = url; return jsonRes({ entityData: [], totalRecords: 0 }); });
+  await searchTeamingPartners({ naics: NAICS, setAside: "A6" });
+  const sent = String((globalThis as Record<string, unknown>).__lastUrl || "");
+  assert(sent.includes("sbaBusinessTypeCode=A6"), "the CODE is what reaches SAM");
+  assert(!/sbaBusinessTypeCode=SBA(\+|%20)/.test(sent), "a description is never sent as the code");
 
   globalThis.fetch = realFetch;
   if (realKey === undefined) delete process.env.SAM_API_KEY; else process.env.SAM_API_KEY = realKey;

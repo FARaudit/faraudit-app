@@ -69,7 +69,9 @@
   function filtered() {
     const q = S.q.trim().toLowerCase();
     return partners().filter((p) => {
-      if (S.cert !== 'all' && !certsOf(p).some((c) => c === S.cert)) return false;
+      // No certification test here. S.cert is an SBA code and the server has already applied
+      // it against every registration under the customer's codes; re-testing it locally
+      // against SAM's description strings would compare a code to a label and drop every row.
       if (!q) return true;
       return [p.legal_business_name, p.uei, p.cage_code, p.state, p.poc_name]
         .some((v) => v && String(v).toLowerCase().includes(q));
@@ -182,12 +184,17 @@
   function renderCertPills() {
     const host = $('certFilters');
     if (!host) return;
-    const counts = certCounts();
-    const keys = Object.keys(counts).sort();
-    const opts = [{ k: 'all', label: 'All certifications' }].concat(keys.map((k) => ({ k, label: k + ' · ' + counts[k] })));
+    // The certifications SAM can be filtered on, named by the server. These are NOT derived
+    // from the rows on screen: SAM returns one page per code, so a chip built from what
+    // arrived could only ever filter that sample, and a certification held by thousands of
+    // firms would be missing whenever none of them landed on page one. Choosing one is a
+    // fresh query against every registration under the customer's codes.
+    const options = (meta().setAsideOptions || []);
+    const opts = [{ k: 'all', label: 'All certifications' }]
+      .concat(options.map((o) => ({ k: o.code, label: o.label })));
     fill(host, opts.map((o) => {
       const b = h('button', { cls: 'fpill' + (S.cert === o.k ? ' active' : ''), text: o.label, attrs: { type: 'button' } });
-      b.addEventListener('click', () => { S.cert = o.k; renderList(); renderPanel(); renderCertPills(); });
+      b.addEventListener('click', () => { S.cert = o.k; reload(); });
       return b;
     }));
   }
@@ -323,7 +330,10 @@
     if (typeof window.TEAM_LOAD !== 'function') return;
     window.TEAM.meta = Object.assign({}, meta(), { state: 'loading' });
     renderBanner();
-    window.TEAM_LOAD({ naics: S.naics === 'all' ? null : S.naics });
+    window.TEAM_LOAD({
+      naics: S.naics === 'all' ? null : S.naics,
+      setAside: S.cert === 'all' ? null : S.cert
+    });
   }
 
   function buildControls() {
