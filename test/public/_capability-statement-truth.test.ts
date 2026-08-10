@@ -1159,6 +1159,53 @@ console.log("\n── card 826 · NAICS key grammar ──");
     "NAICS".split(/\s+/).length <= 2 && "Also".split(/\s+/).length <= 2);
 }
 
+// ── CARD 830 · THE SHEET IS NOT PINNED, THE EMPHASIS IS NOT POSITIONAL ──────
+// Design ruled against the rasterised render — the first time this block has been judged from a
+// document rather than from a description of one.
+console.log("\n── card 830 · the plate's own defects ──");
+{
+  const plate = read("src/lib/capability-statement-plate.tsx");
+
+  // §2 · marginTop:"auto" pushed the block to the foot, so a record with no past performance
+  // punched a third of a page of white THROUGH the document instead of leaving it beneath.
+  check("the title block is not pinned to the foot", !/tb: \{ marginTop: "auto"/.test(plate),
+    "a short record renders a hole in the middle of the sheet");
+  check("…it follows the last section at the ruled gap", /tb: \{ marginTop: 25\.2/.test(plate),
+    "0.35in = 25.2pt, the gap Design ruled");
+  check("the frame no longer stretches to the foot", !/plate: \{ flexGrow: 1/.test(plate),
+    "a growing plate reintroduces the void between the last section and the border");
+
+  // §3 · the emphasis fell through to ADDRESS on a record with no certifications.
+  check("the highlight binds to a FIELD, not a slot", !/hi=\{r === 0 && c === 0\}/.test(plate),
+    "the loudest signal in the block tracks position instead of meaning");
+  check("…and it names the field it belongs to",
+    /const HIGHLIGHT_FIELD = "SBA certified"/.test(plate) && /hi=\{f\.k === HIGHLIGHT_FIELD\}/.test(plate),
+    "a mailing address is painted as the most consequential claim on the document");
+
+  // §5 · a boundary drawn by a member moves when the members change — third finding on one rule.
+  check("the differentiator rule belongs to the row",
+    /difRow: \{ flexDirection: "row", borderBottomWidth/.test(plate),
+    "a two-line item beside a one-line item puts the two rules at different heights");
+  check("…and not to the item",
+    !/dif: \{ flexDirection: "row", paddingVertical: 3, borderBottomWidth/.test(plate),
+    "the per-item rule is still drawn and the section reads as misassembled");
+
+  // §2.1 · hardening — the block closes because rowsOf re-fits; make it structural too.
+  check("the container carries the block's own boundary",
+    /tb: \{ marginTop: 25\.2, borderWidth: 0\.75/.test(plate),
+    "the frame survives only as long as the row re-fitting does");
+
+  // §4 · ANSWERED, not fixed. The mark is the CEO's uploaded logo, confirmed by fetching the
+  // object and looking at it. What must stay true is the property a future change could break.
+  check("the sheet draws only an uploaded logo", /\{logo && logoBox \?/.test(plate),
+    "a placeholder or bundled mark could render on a document sent under the customer's name");
+  check("…and the plate names no bundled image", !/sb-logo|app-icon|favicon/.test(plate),
+    "a shipped asset is referenced by the document builder");
+
+  check("P· the pin check can see the pre-ruling shape",
+    /tb: \{ marginTop: "auto"/.test('  tb: { marginTop: "auto", borderTopWidth: 1.1 },'));
+}
+
 // ── THE TERMINATOR GUARDS ITSELF ─────────────────────────────────────────────
 // The summary and the exit used to sit at line 894 of a 1100-line file, so the SIX blocks
 // appended below them printed ✗ FAIL and the process still exited 0. Every one of those gates

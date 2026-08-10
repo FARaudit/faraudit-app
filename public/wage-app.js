@@ -200,6 +200,17 @@
         h('div', { cls: 'wr-rate mono', text: money(r.rate_high) })
       ]);
       row.addEventListener('click', () => {
+        selectRow(r);
+      });
+      return row;
+    }));
+  }
+
+  /* SELECTING A ROW IS ONE ACT, so the click and the first paint do the same thing. Landing on
+     a blank right-hand panel makes the reader hunt for the interaction before the page has told
+     them anything — the first row is as good an example as any and it costs nothing. */
+  function selectRow(r) {
+    {
         S.sel = rowId(r);
         /* The comparison belongs to the row that asked for it. Without clearing it, a fast
            click to a second category paints the first category's awarded rates under the
@@ -214,9 +225,16 @@
             renderPanel();
           });
         }
-      });
-      return row;
-    }));
+    }
+  }
+
+  /* Only on the FIRST paint with rows, and only when nothing is chosen — a re-render after a
+     save must not drag the reader back to row one. */
+  function autoSelectFirst() {
+    if (S.sel !== null) return;
+    const list = rates();
+    if (!list.length) return;
+    selectRow(list[0]);
   }
 
   /* ── detail panel ───────────────────────────────────────────────────── */
@@ -318,6 +336,7 @@
     renderNaicsPills();
     renderSort();
     renderList();
+    autoSelectFirst();
     renderPanel();
   }
 
