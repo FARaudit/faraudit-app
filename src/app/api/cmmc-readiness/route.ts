@@ -37,7 +37,11 @@ export async function GET(req: NextRequest) {
   // about whether this company meets it.
   const { data: audits, error: listError } = await supabase
     .from("audits")
-    .select("id, notice_id, solicitation_number, title, agency, created_at, compliance_json")
+    // response_deadline is SAM's own closing date. Without it the page states a compliance
+    // obligation and says nothing about whether the work can still be bid — and the only date
+    // on the row was the date WE ran the audit, which reads as the solicitation's own. A
+    // requirement on a closed solicitation is history, not a task.
+    .select("id, notice_id, solicitation_number, title, agency, created_at, response_deadline, compliance_json")
     .order("created_at", { ascending: false })
     .limit(500);
 
@@ -51,7 +55,8 @@ export async function GET(req: NextRequest) {
   const distribution: Record<"0" | "1" | "2" | "3", number> = { "0": 0, "1": 0, "2": 0, "3": 0 };
   const byLevel: Record<"1" | "2" | "3", Array<{
     id: string; notice_id: string | null; solicitation_number: string | null;
-    title: string | null; agency: string | null; created_at: string | null; matched_on: string | null;
+    title: string | null; agency: string | null; created_at: string | null;
+    response_deadline: string | null; matched_on: string | null;
   }>> = { "1": [], "2": [], "3": [] };
   // An audit with no compliance_json was never analyzed, so it cannot answer
   // the question either way — counted separately rather than as "not required".
@@ -69,6 +74,7 @@ export async function GET(req: NextRequest) {
         title: (a.title as string) || null,
         agency: (a.agency as string) || null,
         created_at: (a.created_at as string) || null,
+        response_deadline: (a.response_deadline as string) || null,
         matched_on: trigger
       });
     }

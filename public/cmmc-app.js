@@ -45,6 +45,21 @@
     host.replaceChildren.apply(host, children.filter(Boolean));
   }
 
+  /* WHETHER IT CAN STILL BE BID. SAM's own closing date, and the state that follows from
+     it — a Level 2 obligation on a solicitation that closed last month is history, not a
+     task, and the page could not tell the two apart. Null prints nothing: a missing
+     deadline is not an open one. */
+  function deadlineState(iso) {
+    if (!iso) return null;
+    const t = Date.parse(iso);
+    if (Number.isNaN(t)) return null;
+    const days = Math.ceil((t - Date.now()) / 86400000);
+    if (days < 0) return { cls: 'is-closed', text: 'Closed ' + fmtDate(iso) };
+    if (days === 0) return { cls: 'is-due', text: 'Closes today' };
+    if (days <= 14) return { cls: 'is-due', text: 'Closes ' + fmtDate(iso) + ' · ' + days + (days === 1 ? ' day' : ' days') };
+    return { cls: '', text: 'Closes ' + fmtDate(iso) };
+  }
+
   function fmtDate(iso) {
     if (!iso) return '—';
     const t = Date.parse(iso);
@@ -184,12 +199,22 @@
     const host = $('prioFilters');
     if (!host) return;
     const d = dist();
-    const opts = [{ k: 'all', label: 'All' }].concat(
-      LEVELS.filter((lv) => d[lv] > 0).map((lv) => ({ k: lv, label: 'Level ' + lv }))
+    // EVERY LEVEL THE MODEL HAS, always. These were filtered to levels that happen to have
+    // rows, so Level 1 disappeared from the filter while the strip above it still showed a
+    // Level 1 card — two controls describing the same three levels and disagreeing about how
+    // many there are. A level with nothing in it is disabled and says so, which is a fact
+    // about this customer's audits rather than a gap in the model.
+    const opts = [{ k: 'all', label: 'All', n: null }].concat(
+      LEVELS.map((lv) => ({ k: lv, label: 'Level ' + lv, n: d[lv] || 0 }))
     );
     fill(host, opts.map((o) => {
-      const b = h('button', { cls: 'fpill' + (S.level === o.k ? ' active' : ''), text: o.label, attrs: { type: 'button' } });
-      b.addEventListener('click', () => { S.level = o.k; renderAll(); });
+      const empty = o.n === 0;
+      const b = h('button', {
+        cls: 'fpill' + (S.level === o.k ? ' active' : '') + (empty ? ' is-empty' : ''),
+        text: o.label,
+        attrs: Object.assign({ type: 'button' }, empty ? { disabled: '', title: 'No audit requires Level ' + o.k } : {})
+      });
+      if (!empty) b.addEventListener('click', () => { S.level = o.k; renderAll(); });
       return b;
     }));
   }
@@ -234,6 +259,10 @@
         ]),
         h('div', { cls: 'feed-title', text: r.title || r.solicitation_number || r.notice_id || 'Untitled solicitation' }),
         h('div', { cls: 'feed-summary', text: [r.solicitation_number, r.agency].filter(Boolean).join(' · ') || '—' }),
+        (function () {
+          const d = deadlineState(r.response_deadline);
+          return d ? h('div', { cls: 'feed-deadline ' + d.cls, text: d.text }) : null;
+        })(),
         h('div', { cls: 'feed-insight' }, [
           h('b', { text: 'Matched on' }),
           h('span', { text: r.matched_on || 'not recorded' })
@@ -287,6 +316,16 @@
             h('span', { text: (sel.solicitation_number || sel.notice_id || 'This audit') + ' matched on ' + (sel.matched_on || 'a CMMC signal') + '.' })
           ])
         : null,
+      // The obligation and whether it can still be acted on, together. Absent when SAM
+      // recorded no closing date — an unknown deadline is not an open one.
+      (function () {
+        if (!sel) return null;
+        const d = deadlineState(sel.response_deadline);
+        return d ? h('div', { cls: 'cop-note' }, [
+          h('b', { text: 'Response deadline' }),
+          h('span', { cls: 'cop-deadline ' + d.cls, text: d.text })
+        ]) : null;
+      })(),
       h('div', { cls: 'cop-note' }, [h('b', { text: 'What it covers' }), h('span', { text: data.summary || '' })]),
       h('div', { cls: 'cop-note' }, [h('b', { text: 'Triggering clauses' }), triggers]),
       h('div', { cls: 'cop-note' }, [h('b', { text: 'What the level asks for' }), checklist]),
