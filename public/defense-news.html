@@ -858,7 +858,7 @@ if (document.readyState === 'loading') {
     });
   }
 
-  function renderIntel(){ renderKPIs(); renderVolume(); renderTopics(); }
+  function renderIntel(){ renderVolume(); renderTopics(); }
   window.DN_INTEL = renderIntel;
 
   function start(){ renderIntel(); var to; window.addEventListener('resize', function(){ clearTimeout(to); to=setTimeout(renderVolume,200); }); }
