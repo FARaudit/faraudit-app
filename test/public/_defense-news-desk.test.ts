@@ -197,6 +197,27 @@ console.log("\n── H · scroll-read summary, domains, freshness ──");
     /row!\.dup as number\) < idx \+ 1/.test(JUDGE),
     "two stories naming each other would remove the event from the page entirely");
 
+  // The per-chunk pass compares a story only with its own 20, so two outlets
+  // covering one announcement survive whenever they land in different calls.
+  check("same-event collapse runs across the WHOLE request, not just a chunk",
+    ROUTE.includes("judgeDuplicatesAcrossRequest") && JUDGE.includes("judgeDuplicatesAcrossRequest"),
+    "Breaking Defense and Defense News on one Boeing announcement landed in different chunks");
+  check("it is skipped when a single chunk already compared everything",
+    /if \(chunks\.length > 1\)/.test(ROUTE),
+    "a second pass over one chunk is a call that can only repeat the first");
+  check("its cost joins the same spend total the ledger writes",
+    /judgeDuplicatesAcrossRequest\(client, survivors, spend\)/.test(ROUTE),
+    "an unmetered call is spend the cockpit cannot see");
+  check("only a fully-readable group may drop anything",
+    /idxs\.length !== g\.length \|\| idxs\.length < 2/.test(JUDGE),
+    "honouring the readable part of a malformed group drops a real story");
+  check("the lowest-numbered story survives a group",
+    /const keep = Math\.min\(\.\.\.idxs\)/.test(JUDGE),
+    "otherwise a group can remove the event from the page entirely");
+  check("a failed dedup call leaves both takes on the page",
+    /cross-request dedup failed/.test(JUDGE),
+    "dropping stories on a broken reply is worse than showing two of one event");
+
   // The description bug that shipped entity-encoded markup onto the cards.
   check("feed text is decoded before tags are stripped",
     /decodeEntities\(cleanCdata\(s\)\)/.test(ROUTE),

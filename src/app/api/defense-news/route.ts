@@ -7,7 +7,7 @@ import { scoreArticle, scopeKey, deskDescription, distinctiveTerms } from "@/lib
 import { naicsTitle } from "@/lib/naics-titles";
 import { decodeEntities } from "@/lib/feed-entities";
 import { recordNewsSpend } from "@/lib/defense-news-usage";
-import { judgeChunk, RATE_PER_MTOK, type Judgement, type ChunkUsage } from "@/lib/defense-news-judge";
+import { judgeChunk, judgeDuplicatesAcrossRequest, RATE_PER_MTOK, type Judgement, type ChunkUsage, type CrossItem } from "@/lib/defense-news-judge";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -489,6 +489,30 @@ export async function GET() {
           if (!original || original.link === chunk[i].link) continue;
           map.delete(chunk[i].link);
           collapsed.push(chunk[i].link);
+        }
+      }
+
+      // ━━ Same-event collapse ACROSS chunks ━━
+      // The per-chunk pass above can only compare a story with its own chunk of 20,
+      // so two outlets covering one announcement survive whenever they land in
+      // different calls — which is most of the time. One extra pass over the
+      // survivors, headlines only, and only when more than one chunk ran.
+      if (chunks.length > 1) {
+        const alreadyDropped = new Set(collapsed);
+        const survivors: CrossItem[] = [];
+        for (const c of chunks) {
+          for (const it of c) {
+            if (alreadyDropped.has(it.link)) continue;
+            survivors.push({ link: it.link, title: it.title, source: it.source });
+          }
+        }
+        const crossDrop = await judgeDuplicatesAcrossRequest(client, survivors, spend);
+        for (const link of crossDrop) collapsed.push(link);
+        if (crossDrop.size > 0) {
+          console.log("[defense-news] cross-request same-event collapse", {
+            candidates: survivors.length,
+            collapsed: crossDrop.size
+          });
         }
       }
 
