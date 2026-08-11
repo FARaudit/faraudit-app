@@ -112,7 +112,6 @@ export interface SpendingPayload {
   BY_FY: Record<string, FyView>;
   MARKET_TREND: { labels: string[]; series: Record<string, number[]> };
   RECOMPETES: Array<RecompeteRow & { naics: string; expired: boolean }>;
-  AGENCY_FILTERS: Array<{ key: string; label: string }>;
   // Panels the stored table cannot support. Each names the measurement that is
   // missing, so the page says what is not connected instead of rendering blank.
   unsupported: Array<{ panel: string; needs: string }>;
@@ -322,19 +321,30 @@ export async function fetchDefenseSpending(
     };
   });
 
-  // ── recompetes: one flat list, each marked against today ──
+  // ── recompetes: one flat list, DEDUPED, each marked against today ──
+  //
+  // The worker asks USAspending for awards ending in the next 180 days and
+  // stores the answer on EVERY fiscal-year row — the question has no fiscal
+  // year in it, so all three rows hold the same awards. Flattening them gave
+  // the page each award three times: measured 39 entries, 13 distinct. An
+  // award_id is unique, so it is the key.
   const today = new Date().toISOString().slice(0, 10);
-  const RECOMPETES = rows
-    .flatMap((r) =>
-      (r.recompetes_expiring_180d || []).map((x) => ({
+  const byAward = new Map<string, RecompeteRow & { naics: string; expired: boolean }>();
+  for (const r of rows) {
+    for (const x of r.recompetes_expiring_180d || []) {
+      const key = x.award_id || `${x.recipient}|${x.end_date}|${x.amount}`;
+      if (byAward.has(key)) continue;
+      byAward.set(key, {
         ...x,
         naics: r.naics_code,
         // The window was cut 180 days from refreshed_at, so part of it is now in
         // the past. Saying which is the difference between a live radar and a
         // list that quietly aged.
         expired: !!x.end_date && x.end_date < today
-      }))
-    )
+      });
+    }
+  }
+  const RECOMPETES = Array.from(byAward.values())
     .sort((a, b) => (a.end_date || "").localeCompare(b.end_date || ""));
 
   const MARKET_TREND = {
@@ -350,10 +360,6 @@ export async function fetchDefenseSpending(
     )
   };
 
-  const agencyNames = Array.from(
-    new Set(Object.values(BY_FY).flatMap((v) => v.agencies.map((a) => a.name)))
-  ).sort();
-
   return {
     state: "ok",
     as_of: asOf,
@@ -364,10 +370,6 @@ export async function fetchDefenseSpending(
     BY_FY,
     MARKET_TREND,
     RECOMPETES,
-    AGENCY_FILTERS: [
-      { key: "all", label: "All" },
-      ...agencyNames.map((n) => ({ key: agencyKeyOf(n), label: AGENCY_SHORT[n] || n }))
-    ],
     unsupported: UNSUPPORTED
   };
 }
