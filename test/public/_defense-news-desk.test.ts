@@ -239,20 +239,62 @@ console.log("\n── I · landing tab, agency chip, pictures ──");
     "filtering to a value no officer carries would render an empty list");
   check("the filter is applied only on a hit", /if \(hit\) S\.agency = hit;/.test(DCO));
 
-  // Pictures: every card gets one, and none of them is a fabricated photograph.
-  check("a tile is drawn when the publisher shipped no photo", HTML.includes("dnTileHTML") && HTML.includes("dn-tile"));
-  check("the tile is typographic, not an image element",
-    !/dn-tile[\s\S]{0,200}<img/.test(HTML),
-    "a stock photograph in this slot would be the house placeholder this codebase refuses");
-  check("side stories get one too", /dn-side-img dn-tile/.test(HTML));
+  // Pictures: a story carries the publisher's own photograph or it carries none.
+  // CEO ruling 2026-08-11 — "if the article does not have a photo, don't add it."
+  check("no drawn panel stands in for a photograph",
+    !HTML.includes("dnTileHTML") && !HTML.includes("dn-tile") && !HTML.includes("DN_TILE"),
+    "a coloured block in the photo slot is the house placeholder under another name");
+  check("a photoless story renders as a text card",
+    HTML.includes("dnNoMediaHTML") && /if \(!a\.urlToImage\) return dnNoMediaHTML\(a\);/.test(HTML));
+  check("the category badge survives the missing photograph",
+    /dn-nomedia[\s\S]{0,160}dnKickerHTML/.test(HTML),
+    "the badge is positioned over the image, so removing the image must not remove the badge");
+  check("no image element is emitted without a source",
+    !/dn-nomedia[\s\S]{0,200}<img/.test(HTML));
+  check("a photoless side story gets no thumbnail column",
+    /s\.urlToImage\s*\?[\s\S]{0,140}:\s*'';/.test(HTML),
+    "its own comment already said the headline takes the width");
 
   // A site-wide og:image is not a story photograph.
   check("shared og:image assets are detected", ROUTE.includes("useCount") && ROUTE.includes("bannersDropped"));
   check("the rule is measured, not a blocklist",
     !/open_graph_site_banner/.test(ROUTE.split("const FEEDS")[0]) || ROUTE.includes("(useCount.get(url) ?? 0) > 1"),
     "naming publishers would miss the next one that does this");
-  const ogLimit = Number((ROUTE.match(/const OG_LOOKUP_LIMIT = (\d+)/) || [])[1]);
-  check("og lookup covers a page of stories", ogLimit >= 40, String(ogLimit));
+  // The lookup must cover the feed on EVERY future refresh, not the first screen
+  // of whatever size the feed happened to be the day the number was chosen. At 40
+  // a 56-item page left its last 16 stories permanently photoless.
+  check("og lookup is not positionally capped",
+    !/OG_LOOKUP_LIMIT/.test(ROUTE) && /const needsOg = items\.filter\(/.test(ROUTE),
+    "a fixed cap silently decides that everything past it never gets a picture");
+  check("it is bounded by concurrency instead of by count",
+    ROUTE.includes("OG_FETCH_CONCURRENCY") && ROUTE.includes("mapWithConcurrency"),
+    "unbounded parallel article fetches is the other way to get this wrong");
+  check("an unreachable publisher cannot take the other pictures with it",
+    /catch \{\s*return null;\s*\}/.test(ROUTE),
+    "one rejection inside the pool would abort every lookup in flight");
+  check("the fetch costs no model call and is cached for a day",
+    /next: \{ revalidate: 86400 \}/.test(ROUTE),
+    "re-fetching every article on every 5-minute refresh is the cost this page cannot carry");
+
+  // The unwired panel that printed its own absence at the bottom of the page.
+  // CEO ruling 2026-08-11 — deleted, not wired: FAR/DFARS Updates and CMMC
+  // Readiness are already tabs, and the Policy tab on this page carries the
+  // Federal Register items it claimed were missing.
+  check("the unwired regulatory panel is gone",
+    !HTML.includes("dn-reg") && !HTML.includes("REG_ITEMS") && !HTML.includes("Regulatory highlights"),
+    "a section that states it has no source is a fabricated section with an honest label");
+  check("nothing still calls its renderer", !/renderRegFeed/.test(HTML),
+    "a splice that leaves a caller behind throws on page load and takes the panels after it");
+
+  // The awards row promises teaming targets, not the reader's own bid list.
+  check("the awards row is named for what it actually holds",
+    HTML.includes("Who's winning your codes") && !HTML.includes("Recent Awards"),
+    "these are PRIME awards — a machine shop subs to them, it does not bid them");
+  check("it counts the whole set rather than the slice rendered",
+    /AWARDS\.length \+ ' award'/.test(HTML),
+    "showing 8 of 25 under no count reads as 8 awards existing");
+  check("four to a row, so there is a column to follow down",
+    /grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/.test(HTML));
 }
 
 // ── J · panels must not restate what the tabs already say ──
