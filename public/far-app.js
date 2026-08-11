@@ -242,7 +242,7 @@
       const im = impMeta(a.impact);
       return `<div class="aff-row2"><div class="aff-info"><div class="aff-sol">${esc(a.sol)}</div><div class="aff-cls">${esc(a.clause)}</div><div class="aff-action">${esc(a.action)}</div></div><span class="aff-badge" style="color:${im.color};background:${hexA(im.color,.12)}">${esc(im.label)}</span></div>`;
     }).join('') || (function () { const [t, d] = D.UPDATES.length
-      ? ['No affected solicitations', 'No clause change in this view touches a solicitation in your account.']
+      ? ['Not built yet', 'Matching a clause change to your own solicitations needs two things that do not exist yet: a list of the solicitations you are active on, and the clauses inside each one. This panel is empty because nothing computes it — not because nothing touches you.']
       : blankReason();
       return emptyBlock(esc(t), esc(d), true); })();
   }

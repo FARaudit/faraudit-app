@@ -266,8 +266,11 @@ async function main(): Promise<void> {
     // exist; one that keeps 200px of centred white to say nothing wastes the fold.
     check("an empty side panel collapses", /is-collapsed/.test(html) && /emptyBlock\(esc\(t\), esc\(d\), true\)/.test(app),
       "an empty panel still occupies its full height");
+    // Each collapsed panel still states its own reason. The affected-contracts wording changed
+    // when it was relabelled as unbuilt — the requirement is that a reason is given, not that
+    // this particular sentence survives.
     check("…and still states the reason", /No change in this view has an effective date still ahead/.test(app)
-      && /No clause change in this view touches a solicitation/.test(app),
+      && /solicitations you are active on/.test(app),
       "collapsing removed the sentence along with the whitespace");
     check("the rule panel does NOT collapse", /emptyBlock\(esc\(t\), esc\(d\)\);/.test(app),
       "the main reading surface shrank to a caption");
@@ -312,6 +315,38 @@ async function main(): Promise<void> {
     check("P· the mislabel check can see the shipped text",
       /Contracts hit/.test('<span class="ml">Contracts hit</span>'),
       "the check cannot see the label it forbids");
+  }
+
+
+  // ── A PANEL THAT CANNOT FILL SAYS SO ─────────────────────────────────────
+  // CEO asked what "Your Affected Contracts" is based on. Nothing: `AFFECTED` is declared as []
+  // in far-data.js and the only line that touches it CLEARS it on an outage. No FPDS call
+  // exists anywhere. The panel claimed "Active solicitations touched by these clause changes"
+  // and sourced itself to FPDS-NG, so it read as "you are unaffected" when the truth is that
+  // nothing has ever computed it — for any customer, ever.
+  console.log("\n── the unbuilt panel admits it ──");
+  {
+    const data = readFileSync(join(PUBLIC, "far-data.js"), "utf8");
+    const writes = (live.match(/FARD\.AFFECTED[^\n]*push|AFFECTED\.push/g) || []).length;
+    check("nothing populates AFFECTED — the premise of this block", writes === 0,
+      `${writes} writer(s) found; if it is wired now, this panel should stop saying it is not`);
+    check("the empty state says it is not built", /Not built yet/.test(app),
+      "an unbuilt panel reads as 'no clause change touches you', which is a claim about the customer");
+    check("…and says what it would take", /solicitations you are active on/.test(app),
+      "'not built' with no reason is as opaque as the false version");
+    check("the header no longer promises the capability",
+      !/Active solicitations touched by these clause changes/.test(html),
+      "the heading still describes a feature that does not exist");
+    check("the source badge no longer names FPDS-NG",
+      !/wh-source">FPDS-NG/.test(html),
+      "a source is credited for data it never supplied");
+
+    // The OTHER empty panel is genuinely working and must NOT be relabelled with it.
+    check("upcoming effective dates still states a real fact",
+      /No change in this view has an effective date still ahead/.test(app),
+      "a working empty state was swept up with an unbuilt one");
+    check("P· the not-built check can see the old claim",
+      /Active solicitations touched by these clause changes/.test('<p class="wh-sub">Active solicitations touched by these clause changes</p>'));
   }
 
   console.log(`\n${pass} passed · ${fail} failed`);
