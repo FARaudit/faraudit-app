@@ -32,7 +32,12 @@
       deskScore:    (typeof it.desk_relevance === 'number') ? it.desk_relevance : null,
       deskCode:     it.desk_code || '',
       deskTitle:    it.desk_code_title || '',
-      deskTerms:    Array.isArray(it.desk_terms) ? it.desk_terms : []
+      deskTerms:    Array.isArray(it.desk_terms) ? it.desk_terms : [],
+      /* The tab this story files under, and who is buying. Both null when nothing
+         judged the story — the tab strip and the chip each handle that on their
+         own rather than inventing a bucket. */
+      domain:       it.domain || null,
+      agency:       it.agency || null
     };
   }
 
@@ -131,6 +136,13 @@
       // rather than a fixed list, so a source that stops returning anything shows
       // as a zero instead of continuing to claim coverage.
       window.DN_SOURCES = Array.isArray(data.sources) ? data.sources : [];
+      // The window the route actually applied, so the volume panel frames itself
+      // on the real span instead of a number typed into the chart.
+      window.DN_FRESHNESS = (data.freshness && typeof data.freshness === 'object') ? data.freshness : null;
+      var vt = document.getElementById('dn-vol-title');
+      if (vt && window.DN_FRESHNESS) {
+        vt.textContent = 'Stories on this page · last ' + window.DN_FRESHNESS.window_days + ' days';
+      }
       window.DN_NAICS = Array.isArray(data.naics) ? data.naics : [];
       window.DN_NAICS_SOURCE = data.naics_source || '';
 

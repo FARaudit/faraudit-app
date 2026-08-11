@@ -34,6 +34,15 @@ ALTER TABLE public.defense_news_insights
 ALTER TABLE public.defense_news_insights
   ADD COLUMN IF NOT EXISTS matched_code TEXT;
 
+-- The tab the story files under and the buying organisation, both from the same
+-- judgement. Nullable: a row written before these existed was never asked, which
+-- is not the same as a story that belongs to no domain.
+ALTER TABLE public.defense_news_insights
+  ADD COLUMN IF NOT EXISTS domain TEXT;
+
+ALTER TABLE public.defense_news_insights
+  ADD COLUMN IF NOT EXISTS agency TEXT;
+
 -- Re-key: (url_key, scope_key) is the identity. Done as a swap rather than a
 -- drop-then-add so the table is never left without a uniqueness guarantee, which
 -- is what the upsert's ON CONFLICT resolves against — without it every request

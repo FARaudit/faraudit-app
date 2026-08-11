@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createServerClient } from "@/lib/supabase-server";
 import { extractFeedImage, extractOgImage, type ImageCarrier } from "@/lib/news-images";
 import { resolveFeedScope } from "@/lib/bd-os/live-opportunities";
-import { scoreArticle, scopeKey, deskDescription } from "@/lib/defense-news-naics";
+import { scoreArticle, scopeKey, deskDescription, distinctiveTerms } from "@/lib/defense-news-naics";
 import { naicsTitle } from "@/lib/naics-titles";
 import { judgeChunk, type Judgement } from "@/lib/defense-news-judge";
 
@@ -16,8 +16,21 @@ export const maxDuration = 60;
 // BATCHED — one call carries a chunk of stories — so this is a token bound, not
 // a call count. It was a per-article cap of 12 when each story cost its own
 // round trip.
-const JUDGE_LIMIT = 60;
+// Every story that reaches the page is judged. When this was 60 against a corpus
+// of ~80, the tail rendered with the deterministic per-category fallback — the
+// same sentence on every card — under a heading promising an AI read.
+const JUDGE_LIMIT = 120;
 const JUDGE_CHUNK = 20;
+// A news page has to turn over. Anything older than this is dropped outright:
+// Acquisition.gov's feed is a document archive whose newest entries were dated
+// 1 Jul and 15 May, and they were filling the grid under "11d ago" datelines
+// while same-day rulemaking sat below them. A week is what makes the page turn
+// over daily rather than showing the same grid three days running.
+const MAX_AGE_DAYS = 7;
+// Nothing older than this is worth a model call or a slot, but a feed that has
+// simply gone quiet must not empty the page. If the window leaves too little to
+// read, the newest items are kept regardless of age and the page says so.
+const MIN_ITEMS = 24;
 // Article fetches for og:image, for the feeds that carry no image element.
 // Bounded to what is read before scrolling: a fetch costs a round trip and buys
 // a photograph, so it is spent where the photograph is looked at.
@@ -51,6 +64,10 @@ interface NewsItem {
   // Set only when the deterministic scorer found the code's own regulation terms
   // in the text. It is rare and it is certain, so it is what the badge cites.
   desk_terms: string[];
+  // Which tab this story files under, and who is buying. Both come from the
+  // judgement; both are null when nothing judged the story.
+  domain: string | null;
+  agency: string | null;
   // The publisher's own photograph for this story, carried from the feed or
   // from the article's Open Graph tag. Null means the publisher shipped none —
   // the card then renders without an image region rather than with a box.
@@ -78,6 +95,38 @@ const FEEDS: { source: string; url: string; tag: NewsItem["tag"] }[] = [
   { source: "Breaking Defense",   url: "https://breakingdefense.com/feed/", tag: "defense" },
   { source: "DefenseScoop",       url: "https://defensescoop.com/feed/", tag: "defense" }
 ];
+
+/** Google News queries built from the customer's OWN codes.
+ *
+ *  Every other feed is the same eight wires for every reader; this is the only
+ *  source whose CONTENT is a function of who is asking. The query is the code's
+ *  own 13 CFR title terms plus a procurement qualifier, so 336412 asks about
+ *  aircraft engine work and 236220 asks about construction — no editorial choice
+ *  is made about which industries we cover.
+ *
+ *  Capped at three codes. Each is a feed fetch, and a capability statement with
+ *  fifteen codes would otherwise spend fifteen round trips before the page paints.
+ *
+ *  Google News aggregates publishers we do not carry directly, so items can
+ *  duplicate a wire story. Deduplication by title happens after the merge. */
+const GOOGLE_NEWS_CODES = 3;
+
+function googleNewsFeeds(codes: string[]): { source: string; url: string; tag: NewsItem["tag"] }[] {
+  const out: { source: string; url: string; tag: NewsItem["tag"] }[] = [];
+  for (const code of codes.slice(0, GOOGLE_NEWS_CODES)) {
+    const terms = distinctiveTerms(code);
+    // A code with no distinctive terms would produce a bare procurement query —
+    // the same generic feed for every such code, dressed as personalisation.
+    if (terms.length === 0) continue;
+    const q = `${terms.slice(0, 3).join(" ")} (contract OR procurement OR defense)`;
+    out.push({
+      source: `Your code ${code}`,
+      url: `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=en-US&gl=US&ceid=US:en`,
+      tag: "contract"
+    });
+  }
+  return out;
+}
 
 /** The article's own Open Graph image, for the feeds that ship no carrier. One
  *  fetch per article, bounded by the caller and cached for a day. A failure is
@@ -121,9 +170,9 @@ function parseItems(xml: string, source: string, tag: NewsItem["tag"]): NewsItem
       (block.match(/<description>([\s\S]*?)<\/description>/) || [])[1] ||
       (block.match(/<summary[^>]*>([\s\S]*?)<\/summary>/) || [])[1] ||
       "";
-    const cleanTitle = decodeEntities(stripCdataAndTags(title)).trim();
+    const cleanTitle = stripCdataAndTags(title);
     if (!cleanTitle) continue;
-    const cleanSummary = decodeEntities(stripCdataAndTags(description)).slice(0, 500).trim();
+    const cleanSummary = stripCdataAndTags(description).slice(0, 500).trim();
 
     const img = extractFeedImage(block);
     items.push({
@@ -139,14 +188,24 @@ function parseItems(xml: string, source: string, tag: NewsItem["tag"]): NewsItem
       desk_relevance: null,
       desk_code: null,
       desk_code_title: null,
-      desk_terms: []
+      desk_terms: [],
+      domain: null,
+      agency: null
     });
   }
   return items;
 }
 
+/** Feed text down to something a card can print.
+ *
+ *  Order matters, and it is the reverse of the obvious one. Some publishers ship
+ *  markup ENTITY-ENCODED inside the description — `&lt;span class="uid"&gt;` — so
+ *  stripping tags first finds nothing, and decoding afterwards reveals that markup
+ *  as literal text on the card. Decode, strip, decode again for entities that were
+ *  in the text all along, then collapse the whitespace the tags left behind. */
 function stripCdataAndTags(s: string): string {
-  return cleanCdata(s).replace(/<[^>]+>/g, "");
+  const decoded = decodeEntities(cleanCdata(s));
+  return decodeEntities(decoded.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
 }
 function cleanCdata(s: string): string {
   return s.replace(/<!\[CDATA\[/g, "").replace(/\]\]>/g, "");
@@ -180,8 +239,19 @@ export async function GET() {
 
   // Per-feed outcome, so the page can tell "every source is down" from "no news
   // today" — both of which arrive as an empty array once the catches swallow them.
+  // ━━ Whose desk this is ━━
+  // Resolved first: the customer's codes select feeds of their own, and the
+  // insights are cached under them.
+  const scope = await resolveFeedScope(supabase);
+  const codes = scope.codes;
+  const allowedCodes = new Set(codes);
+  const desk = deskDescription(codes);
+  const scope_key = scopeKey(codes);
+
+  const activeFeeds = [...FEEDS, ...googleNewsFeeds(codes)];
+
   const results = await Promise.all(
-    FEEDS.map(async (f) => {
+    activeFeeds.map(async (f) => {
       try {
         const res = await fetch(f.url, {
           headers: { Accept: "application/rss+xml,application/atom+xml,application/xml,text/xml" },
@@ -218,9 +288,39 @@ export async function GET() {
     );
   }
 
-  const items = results
-    .flatMap((r) => r.rows)
+  // ━━ Deduplicate ━━
+  // Google News republishes stories the wires already gave us, and two wires can
+  // carry the same syndicated piece. Keyed on the normalised headline rather than
+  // the URL, because the same story arrives under a Google redirect and under the
+  // publisher's own link. First writer wins, and the sort below runs after — so
+  // which COPY survives is decided here, not by which feed answered first.
+  const seenTitles = new Set<string>();
+  const deduped: NewsItem[] = [];
+  let duplicates = 0;
+  for (const row of results.flatMap((r) => r.rows)) {
+    // Google News appends " - Publisher" to every headline; stripping it is what
+    // makes a syndicated copy collide with the original.
+    const key = row.title.toLowerCase().replace(/\s+-\s+[^-]{2,40}$/, "").replace(/[^a-z0-9]+/g, " ").trim();
+    if (!key) continue;
+    if (seenTitles.has(key)) { duplicates++; continue; }
+    seenTitles.add(key);
+    deduped.push(row);
+  }
+
+  const allRows = deduped
     .sort((a, b) => new Date(b.pub_date || 0).getTime() - new Date(a.pub_date || 0).getTime());
+
+  // ━━ Freshness ━━
+  const cutoff = Date.now() - MAX_AGE_DAYS * 86400_000;
+  const fresh = allRows.filter((r) => {
+    const t = r.pub_date ? new Date(r.pub_date).getTime() : NaN;
+    // An item with no date is not evidence of staleness — it is a feed that omits
+    // pubDate. Keeping it is the failure direction that shows the reader more,
+    // and it still has to earn its place on relevance.
+    return Number.isNaN(t) || t >= cutoff;
+  });
+  const windowed = fresh.length >= MIN_ITEMS;
+  const items = windowed ? fresh : allRows.slice(0, MIN_ITEMS);
 
   // ━━ og:image for the items whose feed carried no picture ━━
   // Bounded to the run of items a reader actually sees before scrolling, and
@@ -237,15 +337,6 @@ export async function GET() {
       }
     });
   }
-
-  // ━━ Whose desk this is ━━
-  // Resolved BEFORE the insights, because the insights are now written against
-  // these codes and are cached under them.
-  const scope = await resolveFeedScope(supabase);
-  const codes = scope.codes;
-  const allowedCodes = new Set(codes);
-  const desk = deskDescription(codes);
-  const scope_key = scopeKey(codes);
 
   // ━━ Deterministic layer ━━
   // The code's own words out of 13 CFR 121.201, matched whole-word in the story.
@@ -270,7 +361,7 @@ export async function GET() {
   if (linkKeys.length > 0) {
     const { data: cached, error: cacheErr } = await supabase
       .from("defense_news_insights")
-      .select("url_key, ai_insight, relevance, matched_code")
+      .select("url_key, ai_insight, relevance, matched_code, domain, agency")
       .eq("scope_key", scope_key)
       .in("url_key", linkKeys);
     if (cacheErr) {
@@ -278,10 +369,15 @@ export async function GET() {
       // regenerate rather than serving another desk's insights.
       console.error("[defense-news] insight cache read failed", { error: cacheErr.message, scope_key });
     }
-    for (const row of (cached ?? []) as Array<{ url_key: string; ai_insight: string; relevance: number | null; matched_code: string | null }>) {
+    for (const row of (cached ?? []) as Array<{ url_key: string; ai_insight: string; relevance: number | null; matched_code: string | null; domain: string | null; agency: string | null }>) {
       if (!row.url_key || !row.ai_insight) continue;
       insightMap.set(row.url_key, {
         relevance: typeof row.relevance === "number" ? row.relevance : 0,
+        domain: row.domain ?? null,
+        agency: row.agency ?? null,
+        // A cached row survived the collapse when it was written, so by definition
+        // it is the copy that was kept.
+        duplicateOf: null,
         // A cached code the customer no longer holds is dropped on read, not just
         // on write — codes change on the capability statement after the row is
         // written, and the card must never print a code that is not theirs today.
@@ -293,6 +389,8 @@ export async function GET() {
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   let judged = 0;
+  // Links the judge identified as re-reporting an event another story already covers.
+  const collapsed: string[] = [];
   if (apiKey) {
     const missing: NewsItem[] = [];
     for (let idx = 0; idx < items.length && missing.length < JUDGE_LIMIT; idx++) {
@@ -305,7 +403,25 @@ export async function GET() {
       for (let i = 0; i < missing.length; i += JUDGE_CHUNK) chunks.push(missing.slice(i, i + JUDGE_CHUNK));
       const results = await Promise.all(chunks.map((c) => judgeChunk(client, desk, allowedCodes, c)));
 
-      const rows: Array<{ url_key: string; scope_key: string; title: string; ai_insight: string; relevance: number; matched_code: string | null; ai_insight_generated_at: string }> = [];
+      // ━━ Same-event collapse ━━
+      // The judge reads a whole chunk at once and marks a story that covers an
+      // event an earlier one already covered. Those are dropped here, before the
+      // page or the cache sees them. Limit worth stating: the reference is within
+      // a chunk, so two copies split across chunk boundaries both survive.
+      for (let ci = 0; ci < chunks.length; ci++) {
+        const chunk = chunks[ci];
+        const map = results[ci];
+        for (let i = 0; i < chunk.length; i++) {
+          const j = map.get(chunk[i].link);
+          if (!j || j.duplicateOf === null) continue;
+          const original = chunk[j.duplicateOf - 1];
+          if (!original || original.link === chunk[i].link) continue;
+          map.delete(chunk[i].link);
+          collapsed.push(chunk[i].link);
+        }
+      }
+
+      const rows: Array<{ url_key: string; scope_key: string; title: string; ai_insight: string; relevance: number; matched_code: string | null; domain: string | null; agency: string | null; ai_insight_generated_at: string }> = [];
       const now = new Date().toISOString();
       const byLink = new Map(missing.map((m) => [m.link, m] as const));
       for (const r of results) {
@@ -319,6 +435,8 @@ export async function GET() {
             ai_insight: j.why,
             relevance: j.relevance,
             matched_code: j.code,
+            domain: j.domain,
+            agency: j.agency,
             ai_insight_generated_at: now
           });
         }
@@ -336,7 +454,9 @@ export async function GET() {
     }
   }
 
-  const enriched = items.map((it) => {
+  // A story the judge marked as re-reporting an earlier one never reaches the page.
+  const collapsedSet = new Set(collapsed);
+  const enriched = items.filter((it) => !collapsedSet.has(it.link)).map((it) => {
     const j = it.link ? insightMap.get(it.link) ?? null : null;
     return {
       ...it,
@@ -357,14 +477,16 @@ export async function GET() {
       // industry nouns as structure throughout.
       desk_code: j ? j.code : it.desk_code,
       desk_code_title: j ? (j.code ? naicsTitle(j.code) : null) : it.desk_code_title,
-      desk_terms: j ? [] : it.desk_terms
+      desk_terms: j ? [] : it.desk_terms,
+      domain: j ? j.domain : null,
+      agency: j ? j.agency : null
     };
   });
 
   // Image coverage per source, so "the pictures stopped" is a number that moved
   // rather than something a reader has to notice. A source at 0 with items > 0
   // means its carrier changed shape.
-  const imageCoverage = FEEDS.map((f) => {
+  const imageCoverage = activeFeeds.map((f) => {
     const rows = enriched.filter((i) => i.source === f.source);
     return {
       name: f.source,
@@ -390,6 +512,17 @@ export async function GET() {
       relevant: enriched.filter((i) => (i.desk_relevance ?? 0) >= DESK_RELEVANT).length,
       threshold: DESK_RELEVANT,
       available: Boolean(apiKey)
+    },
+    freshness: {
+      window_days: MAX_AGE_DAYS,
+      // False means the window was relaxed because too little was published —
+      // the page then carries older items and must not imply they are fresh.
+      window_applied: windowed,
+      dropped_as_stale: windowed ? allRows.length - fresh.length : 0,
+      total_fetched: allRows.length,
+      duplicates_dropped: duplicates,
+      // Same-event repeats the judge caught that no title comparison could.
+      same_event_collapsed: collapsed.length
     },
     image_coverage: imageCoverage,
     degraded: sources.some((s) => !s.ok),

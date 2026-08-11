@@ -153,6 +153,63 @@ console.log("\n── F · sources ──");
   check("(positive control) the live pill still exists", LIVE.includes("setLivePill"));
 }
 
+// ── H · this round: summary, taxonomy, freshness, duplicates ──
+console.log("\n── H · scroll-read summary, domains, freshness ──");
+{
+  // The label must state what wrote the line. The fallback is one fixed sentence
+  // per category; calling that "AI Insight" is false on exactly the cards where
+  // nothing read the story.
+  check("the AI label is conditional, not blanket", /ai\s*\?\s*'AI Insight'\s*:\s*'Why it matters'/.test(HTML),
+    "both states must be distinguishable on the card");
+  check("the fallback sentence still exists for unjudged stories", HTML.includes("insightForCat"));
+
+  // Domains, not agencies, are the tabs — 85% placed vs 46% on the live corpus.
+  check("tabs are built from the domain set", HTML.includes("DN_DOMAINS") && HTML.includes("dnDomainKey"));
+  check("the judge returns a domain", JUDGE.includes("domain:") && JUDGE.includes("DOMAINS"));
+  check("domain is validated against a closed set",
+    /\(DOMAINS as readonly string\[\]\)\.includes\(dom\)/.test(JUDGE),
+    "a free-text domain would mint a tab nobody defined");
+  check("agency is validated against a closed set",
+    /\(AGENCIES as readonly string\[\]\)\.includes\(ag\)/.test(JUDGE));
+  check("agency renders as a chip, not a tab",
+    HTML.includes("dnAgencyHTML") && !/\['agency'/.test(HTML),
+    "46% coverage is fine for a chip and fatal for a tab");
+
+  // Every rendered story is judged, or the tail falls back to the canned line.
+  const judgeLimit = Number((ROUTE.match(/const JUDGE_LIMIT = (\d+)/) || [])[1]);
+  check("the judge limit covers a full page of stories", judgeLimit >= 100, String(judgeLimit));
+
+  // Freshness: the page has to turn over.
+  check("a maximum age is applied", /const MAX_AGE_DAYS = \d+/.test(ROUTE));
+  const maxAge = Number((ROUTE.match(/const MAX_AGE_DAYS = (\d+)/) || [])[1]);
+  check("the window is a week or less", maxAge > 0 && maxAge <= 7, String(maxAge));
+  check("the window fails open when too little is published", ROUTE.includes("MIN_ITEMS") && ROUTE.includes("window_applied"),
+    "a quiet week must not empty the page silently");
+
+  // Duplicates: two shapes, and text can only catch one of them.
+  check("syndicated copies are dropped by normalised title", ROUTE.includes("seenTitles"));
+  check("same-event repeats are collapsed from the judgement", ROUTE.includes("collapsedSet") && JUDGE.includes("duplicateOf"));
+  check("a duplicate reference may only point BACKWARD",
+    /row!\.dup as number\) < idx \+ 1/.test(JUDGE),
+    "two stories naming each other would remove the event from the page entirely");
+
+  // The description bug that shipped entity-encoded markup onto the cards.
+  check("feed text is decoded before tags are stripped",
+    /decodeEntities\(cleanCdata\(s\)\)/.test(ROUTE),
+    "stripping first leaves &lt;span&gt; to be decoded into visible markup");
+
+  // Story volume is derived, not blank and not invented.
+  check("volume is computed from the stories' own dates", HTML.includes("volumeSeries") && HTML.includes("a.publishedAt"));
+  check("no per-day history is claimed", !HTML.includes("Story Volume · 14 Days"));
+
+  // Code-driven sources — the only feed whose content depends on who is asking.
+  check("Google News feeds are built from the customer's codes",
+    ROUTE.includes("googleNewsFeeds") && ROUTE.includes("distinctiveTerms"));
+  check("a code with no distinctive terms gets no feed",
+    /if \(terms\.length === 0\) continue;/.test(ROUTE),
+    "otherwise every such code yields the same generic query dressed as personalisation");
+}
+
 // ── G · SELF-ARM ──
 console.log("\n── G · self-arm ──");
 {

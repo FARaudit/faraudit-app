@@ -21,8 +21,28 @@ export interface JudgeableItem {
 export interface Judgement {
   relevance: number;
   code: string | null;
+  /** Warfighting/subject domain — the tab this story files under. Measured on a
+   *  48-story live corpus: this places 85% of stories, against 46% for buying
+   *  agency, which is why the TABS are domains and the agency is only a chip. */
+  domain: string | null;
+  /** The buying organisation, when the story is about one. Null on more than half
+   *  of real stories, which is fine for a chip and fatal for a tab. */
+  agency: string | null;
+  /** The scroll-read line: what happened, and what it means for this desk. */
   why: string;
+  /** 1-based index, within this chunk, of an earlier story covering the SAME
+   *  event. Wire copy and a Google News aggregation of it carry different
+   *  headlines, so nothing textual catches the pair — but the model reading both
+   *  does, unprompted. Null when the story is not a repeat. */
+  duplicateOf: number | null;
 }
+
+/** The domains a story may file under. Fixed set — a free-text domain would make
+ *  a new tab appear every time the model reached for a synonym. */
+export const DOMAINS = ["Policy", "Land", "Sea", "Air & Space", "Cyber", "Industry"] as const;
+/** Buying organisations. "Other" is deliberately absent: a chip that says "Other"
+ *  tells the reader nothing, so an unrecognised agency becomes null. */
+export const AGENCIES = ["Army", "Navy", "Air Force", "Marine Corps", "Space Force", "DLA", "DARPA", "Pentagon/OSD", "Coast Guard", "GSA"] as const;
 
 /** Whose desk this is, in the model's words. Built only from codes on file and
  *  their 13 CFR titles. The prompt this replaced asserted a revenue band, a
@@ -36,7 +56,13 @@ export function judgePrompt(desk: string | null): string {
       "and do not name an industry, revenue or certification for them.",
       "",
       "For each numbered story, return relevance 0-100 for a generic federal",
-      "contractor and one line of what to watch.",
+      "contractor, plus the same summary, domain and agency fields described below.",
+      "",
+      "why: two sentences, 30-40 words. What happened, then what a federal",
+      "contractor should do about it. Lead with the concrete fact.",
+      "",
+      `domain: exactly one of: ${DOMAINS.join(" | ")}.`,
+      `agency: one of: ${AGENCIES.join(" | ")}, or null when none is buying.`,
       'Always return "code": null — you have no code list to choose from.'
     ].join("\n");
   }
@@ -59,8 +85,26 @@ export function judgePrompt(desk: string | null): string {
     "  NEVER return a code that is not in that list. null is the correct answer when",
     "  the story matters for a reason that is not industry-specific.",
     "",
-    "why: max 22 words. Address them directly. Name the concrete action or exposure.",
-    "  No 'consider', no 'might want to', no restating the headline."
+    "why: THE SUMMARY THE READER ACTUALLY READS. Most will never open the article —",
+    "  they scroll. Two sentences, 30-40 words total, in this order:",
+    "    1. What happened. The concrete fact: who, what, how much, by when.",
+    "    2. What it means for THEM. The exposure, the opening, or the deadline.",
+    "  Lead with the specific. \'Army awarded $840M for engine overhaul\' beats",
+    "  \'A contract was announced\'. Never restate the headline, never say \'consider\'",
+    "  or \'might want to\', never pad with \'this development\'.",
+    "",
+    `domain: exactly one of: ${DOMAINS.join(" | ")}.`,
+    "  Policy covers rulemaking, budget, acquisition reform and congressional action.",
+    "  Industry covers company news, M&A, earnings and the supplier base.",
+    "",
+    `agency: the buying organisation, exactly one of: ${AGENCIES.join(" | ")}, or null.`,
+    "  null is the RIGHT answer whenever no single organisation is buying — most",
+    "  policy and industry stories. Do not stretch to fill it.",
+    "",
+    "dup: if this story covers THE SAME EVENT as an earlier-numbered story in this",
+    "  list, return that number. Otherwise null. The same contract award reported by",
+    "  two outlets is the same event even when the headlines differ. A follow-up that",
+    "  adds new facts is NOT a duplicate."
   ].join("\n");
 }
 
@@ -80,13 +124,13 @@ export async function judgeChunk(
   try {
     const msg = await client.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 2000,
+      max_tokens: 4000,
       messages: [{
         role: "user",
         content:
           `${judgePrompt(desk)}\n\nSTORIES:\n${listing}\n\n` +
           `Return ONLY a JSON array, one object per story, no prose and no code fence:\n` +
-          `[{"i":1,"relevance":0-100,"code":"<code or null>","why":"..."}]`
+          `[{"i":1,"relevance":0-100,"code":"<code or null>","domain":"<domain>","agency":"<agency or null>","dup":null,"why":"..."}]`
       }]
     });
     const text = msg.content
@@ -104,7 +148,8 @@ export async function judgeChunk(
       return out;
     }
     const parsed = JSON.parse(text.slice(start, end + 1)) as Array<{
-      i?: number; relevance?: number; code?: string | null; why?: string;
+      i?: number; relevance?: number; code?: string | null;
+      domain?: string | null; agency?: string | null; why?: string; dup?: number | null;
     }>;
     if (!Array.isArray(parsed)) return out;
 
@@ -124,9 +169,22 @@ export async function judgeChunk(
       const why = typeof row?.why === "string" ? row.why.trim().replace(/^["']|["']$/g, "") : "";
       if (!why) continue;
 
+      // Domain and agency are closed sets. Anything outside them is dropped rather
+      // than passed through: a free-text value would mint a tab nobody defined, and
+      // an unrecognised agency on a chip is worse than no chip.
+      const dom = typeof row?.domain === "string" ? row.domain.trim() : "";
+      const ag = typeof row?.agency === "string" ? row.agency.trim() : "";
+
       out.set(item.link, {
         relevance: Number.isFinite(rel) ? Math.max(0, Math.min(100, Math.round(rel))) : 0,
         code,
+        domain: (DOMAINS as readonly string[]).includes(dom) ? dom : null,
+        agency: (AGENCIES as readonly string[]).includes(ag) ? ag : null,
+        // Only a BACKWARD reference to a real position is honoured. A forward or
+        // self reference would let two stories each name the other and remove the
+        // event from the page entirely.
+        duplicateOf: (Number.isInteger(row?.dup) && (row!.dup as number) >= 1 && (row!.dup as number) < idx + 1)
+          ? (row!.dup as number) : null,
         why
       });
     }
