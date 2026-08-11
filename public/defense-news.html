@@ -162,8 +162,6 @@ button{font-family:inherit}
 .dn-top-cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
 .dn-top-card{display:flex;flex-direction:column;text-decoration:none;cursor:pointer}
 .dn-top-card:hover .dn-card-headline{color:#378ADD}
-.dn-card-img-wrap{position:relative;width:100%;height:200px;overflow:hidden;border-radius:8px;margin-bottom:10px;background:#0A1628}
-.dn-card-img{width:100%;height:100%;object-fit:cover;display:block}
 .dn-card-cat-overlay{position:absolute;bottom:8px;left:8px;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:3px 8px;border-radius:3px;z-index:2}
 .dn-card-source-line{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
 .dn-card-headline{font-family:"Manrope",sans-serif;font-size:15px;font-weight:700;color:var(--ink);line-height:1.35;margin-bottom:6px;transition:color .12s;letter-spacing:-.005em}
@@ -179,8 +177,6 @@ button{font-family:inherit}
 .dn-story{display:grid;grid-template-columns:260px 1fr;gap:16px;padding:16px 0;border-bottom:0.5px solid var(--line-2);text-decoration:none;cursor:pointer}
 .dn-story:last-child{border-bottom:none}
 .dn-story:hover .dn-story-headline{color:#378ADD}
-.dn-story-img-wrap{position:relative;width:260px;height:155px;overflow:hidden;border-radius:8px;background:#0A1628;flex-shrink:0}
-.dn-story-img{width:100%;height:100%;object-fit:cover;display:block}
 .dn-story-content{display:flex;flex-direction:column;gap:4px;padding:2px 0;min-width:0}
 .dn-story-meta{display:flex;align-items:center;gap:8px;margin-bottom:2px;flex-wrap:wrap}
 .dn-story-source{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.04em}
@@ -299,16 +295,20 @@ button{font-family:inherit}
 .dn-lead-main .dn-excerpt{font-size:13.5px;max-width:60ch}
 .dn-lead-side{display:flex;flex-direction:column}
 .dn-side-story{display:grid;grid-template-columns:1fr 98px;gap:14px;padding:15px 0;border-top:1px solid var(--line-2);text-decoration:none;align-items:start}
+.dn-side-story.no-img{grid-template-columns:1fr}
 .dn-lead-side .dn-side-story:first-child{border-top:0;padding-top:2px}
 .dn-side-text{min-width:0}
 .dn-side-story h3{font-family:"Fraunces","Georgia",serif;font-weight:600;font-size:16.5px;line-height:1.24;letter-spacing:-.005em;color:var(--ink);margin:0;transition:color .14s}
 .dn-side-story:hover h3{color:var(--accent-deep)}
 .dn-side-img{width:98px;height:74px;border-radius:7px;overflow:hidden;background:#0A1628;flex-shrink:0}
 .dn-side-img img{width:100%;height:100%;object-fit:cover;display:block}
-/* labeled image placeholders (until real art is live) */
-.dn-card-img-wrap,.dn-story-img-wrap,.dn-img,.dn-side-img{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.045) 0 9px,rgba(255,255,255,0) 9px 18px),linear-gradient(160deg,#13243d,#0A1628)}
-.dn-card-img-wrap::after,.dn-story-img-wrap::after,.dn-img::after{content:"IMAGE";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.22em;color:rgba(255,255,255,.26);z-index:0;pointer-events:none}
-.dn-card-img,.dn-story-img,.dn-img img,.dn-side-img img{position:relative;z-index:1;color:transparent;font-size:0}
+/* An image region exists only when the publisher shipped a photograph for that
+   story — the renderers emit no wrapper otherwise, and dnImageFallback() removes
+   one whose picture fails to load. There is deliberately no house placeholder:
+   the striped "IMAGE" box that stood here read as a missing asset on a page
+   whose other panels are real, and a drawn stand-in would be worse. The dark
+   fill below is what shows for the instant before the photograph paints. */
+.dn-img img,.dn-side-img img{position:relative;z-index:1;color:transparent;font-size:0}
 .dn-insight{display:block;font-size:11.5px;color:var(--ink-2);line-height:1.55;padding:9px 12px;background:rgba(55,138,221,0.05);border:1px solid var(--accent-light);border-left:3px solid var(--accent);border-radius:7px}
 .dn-insight b{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-deep);display:block;margin-bottom:3px}
 [data-theme="dark"] .dn-insight{background:rgba(55,138,221,0.1);border-color:rgba(181,212,244,0.28)}
@@ -551,11 +551,6 @@ function insightForCat(cat){
   return 'This affects your NAICS codes and upcoming bid strategy.';
 }
 
-function buildImg(url, alt){
-  var safe = (alt||'').replace(/"/g, '');
-  return '<img class="dn-card-img" src="' + esc(url) + '" alt="' + esc(safe) + '" loading="lazy" onerror="this.style.display=\'none\'">';
-}
-
 /* Articles arrive at runtime from /api/defense-news. Nothing is seeded here:
    an unreachable feed renders as unavailable, never as content. */
 var MOCK_ARTICLES = [];
@@ -571,9 +566,30 @@ var DN_NAV = [['all','All'],['contracts','Contracts'],['cmmc','CMMC'],['ndaa','N
 function dnCat(a){ return a.__c || (a.__c = categorizeArticle(a.title, a.description)); }
 function dnAge(a){ return a.publishedAt ? relativeTime(a.publishedAt) : ''; }
 function dnKickerHTML(c){ return '<span class="dn-kicker" style="background:' + c.catBg + ';color:' + c.catColor + '">' + esc(c.cat) + '</span>'; }
-function dnImgHTML(a){
-  var img = a.urlToImage ? '<img src="' + esc(a.urlToImage) + '" alt="' + esc((a.title||'').replace(/"/g,'')) + '" loading="lazy" onerror="this.style.display=\'none\'">' : '';
-  return '<div class="dn-img">' + img + dnKickerHTML(dnCat(a)) + '</div>';
+/* ─── Publisher photographs ───
+   Every picture here is the one the publisher attached to that story. The
+   optimizer is asked first, because an untouched original runs to several
+   thousand pixels; if it cannot reach the origin the raw publisher URL is used
+   instead, which is the same photograph at full size. If neither loads, the
+   image region is REMOVED — a card with no picture is correct, an empty frame
+   is not. Nothing here can produce a picture the publisher did not publish. */
+function dnImgSrc(url, w){
+  return '/_next/image?url=' + encodeURIComponent(url) + '&w=' + w + '&q=70';
+}
+function dnImgFail(el){
+  var raw = el.getAttribute('data-raw');
+  if (raw){ el.removeAttribute('data-raw'); el.src = raw; return; }
+  var wrap = el.parentNode;
+  if (wrap && wrap.parentNode) wrap.parentNode.removeChild(wrap);
+}
+window.dnImgFail = dnImgFail;
+function dnImgTag(url, alt, w){
+  return '<img src="' + esc(dnImgSrc(url, w)) + '" data-raw="' + esc(url) + '"'
+    + ' alt="' + esc((alt||'').replace(/"/g,'')) + '" loading="lazy" onerror="dnImgFail(this)">';
+}
+function dnImgHTML(a, w){
+  if (!a.urlToImage) return '';
+  return '<div class="dn-img">' + dnImgTag(a.urlToImage, a.title, w || 720) + dnKickerHTML(dnCat(a)) + '</div>';
 }
 function dnInsightHTML(a, c){ return '<span class="dn-insight"><b>Why it matters</b>' + esc(a.aiInsight || insightForCat(c.cat)) + '</span>'; }
 
@@ -602,18 +618,19 @@ function renderLead(){
   var a = list[0], c = dnCat(a);
   var side = list.slice(1, 3).map(function(s){
     var sc = dnCat(s);
-    var img = s.urlToImage ? '<img src="' + esc(s.urlToImage) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">' : '';
-    return '<a class="dn-side-story" href="' + esc(s.url || '#') + '" target="_blank" rel="noopener noreferrer">'
+    // No photograph → no thumbnail column, and the headline takes the width.
+    var thumb = s.urlToImage ? '<div class="dn-side-img">' + dnImgTag(s.urlToImage, s.title, 256) + '</div>' : '';
+    return '<a class="dn-side-story' + (thumb ? '' : ' no-img') + '" href="' + esc(s.url || '#') + '" target="_blank" rel="noopener noreferrer">'
       + '<div class="dn-side-text">'
       +   '<div class="dn-meta"><span style="color:' + sc.catColor + '">' + esc(sc.cat) + '</span><span class="dot">·</span><span>' + esc(dnAge(s)) + '</span></div>'
       +   '<h3>' + esc(s.title) + '</h3>'
       + '</div>'
-      + '<div class="dn-side-img">' + img + '</div>'
+      + thumb
       + '</a>';
   }).join('');
   el.innerHTML =
       '<a class="dn-lead-main" href="' + esc(a.url || '#') + '" target="_blank" rel="noopener noreferrer">'
-    +   dnImgHTML(a)
+    +   dnImgHTML(a, 1080)
     +   '<div class="dn-meta"><span>' + esc(a.sourceName || '') + '</span><span class="dot">·</span><span>' + esc(dnAge(a)) + '</span></div>'
     +   '<h2>' + esc(a.title) + '</h2>'
     +   '<p class="dn-excerpt">' + esc(a.description || '') + '</p>'
@@ -629,7 +646,7 @@ function renderGrid(){
   el.innerHTML = list.map(function(a){
     var c = dnCat(a);
     return '<a class="dn-card" href="' + esc(a.url || '#') + '" target="_blank" rel="noopener noreferrer">'
-      + dnImgHTML(a)
+      + dnImgHTML(a, 640)
       + '<div class="dn-meta"><span>' + esc(a.sourceName || '') + '</span><span class="dot">·</span><span>' + esc(dnAge(a)) + '</span></div>'
       + '<h3>' + esc(a.title) + '</h3>'
       + '<p class="dn-excerpt">' + esc(a.description || '') + '</p>'

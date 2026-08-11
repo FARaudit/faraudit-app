@@ -193,7 +193,15 @@ const dsb = read("dsb-data.js");
 const DSB_TEMPLATES = new Set(["AGENCY_FILTERS", "RANK_TABS", "FY_TABS"]);
 console.log(`   exempt as render templates: ${[...DSB_TEMPLATES].join(", ")}`);
 
-const dsbArrays = [...dsb.matchAll(/(?:^|\n)\s*(?:const|var)\s+([A-Z_][A-Z0-9_]*)\s*=\s*\[/g)].map((m) => m[1]);
+// TWO SHAPES, because the file has had both: standalone `const NAME = [` while it
+// was a module of mock tables, and `NAME: [` now that it is one container object.
+// Reading only the first form made this enumeration return nothing the moment the
+// file was rewritten — and an enumeration that finds nothing proves nothing, which
+// is why the count check below fails closed rather than passing vacuously.
+const dsbArrays = [
+  ...[...dsb.matchAll(/(?:^|\n)\s*(?:const|var)\s+([A-Z_][A-Z0-9_]*)\s*=\s*\[/g)].map((m) => m[1]),
+  ...[...dsb.matchAll(/(?:^|\n)\s*([A-Z_][A-Z0-9_]*)\s*:\s*\[/g)].map((m) => m[1])
+];
 check("dsb-data.js · array declarations are readable", dsbArrays.length > 0, "found none");
 for (const name of dsbArrays) {
   if (DSB_TEMPLATES.has(name)) continue;
