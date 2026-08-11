@@ -13,6 +13,8 @@
 // Run: npx tsx src/lib/bd-os/defense-spending.test.ts
 import { fetchDefenseSpending, agencyKeyOf } from "./defense-spending";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 
 let failures = 0;
 const assert = (cond: boolean, msg: string) => { console.log(`${cond ? "✅" : "❌"} ${msg}`); if (!cond) failures++; };
@@ -96,7 +98,44 @@ function fakeClient(rows: unknown[], seen: string[][] = []) {
   } as unknown as SupabaseClient;
 }
 
+// ── THE WRITER/READER CONTRACT ───────────────────────────────────────────────
+// Every column this module SELECTs has to be a column the worker actually
+// WRITES. They are different files in different deploy targets, so nothing else
+// checks that they agree.
+//
+// The defect that put this here: `refreshed_at` was absent from the worker's
+// row and left to the column default — which fires on INSERT only. A refresh
+// that UPDATED 18 of 27 rows with new FY2026 totals (336412 went $2.56B to
+// $4.98B) left every one of them stamped three months earlier, and the page
+// prints that stamp as its measurement date. A number the page states, sourced
+// from a column nobody wrote.
+function contractCheck(): void {
+  const readerSrc = readFileSync(path.join(process.cwd(), "src/lib/bd-os/defense-spending.ts"), "utf8");
+  const workerSrc = readFileSync(path.join(process.cwd(), "agents/defense-spending/index.ts"), "utf8");
+
+  const selectBlock = readerSrc.match(/\.select\(\s*([\s\S]*?)\)\s*\n\s*\.in\(/);
+  const selected = selectBlock
+    ? selectBlock[1].replace(/["'+\s]/g, "").split(",").filter(Boolean)
+    : [];
+  assert(selected.length > 5, `the reader's select list was parsed (${selected.length} columns)`);
+
+  // What the worker's row literal actually assigns.
+  const rowBlock = workerSrc.match(/return\s*\{([\s\S]*?)\n\s{0,2}\};/);
+  const written = new Set(
+    rowBlock ? [...rowBlock[1].matchAll(/^\s*([a-z_][a-z0-9_]*)\s*:/gm)].map((m) => m[1]) : []
+  );
+  assert(written.size > 5, `the worker's row literal was parsed (${written.size} fields)`);
+
+  const unwritten = selected.filter((c) => !written.has(c) && c !== "id");
+  assert(unwritten.length === 0,
+    unwritten.length
+      ? `EVERY selected column is written by the worker — unwritten: ${unwritten.join(", ")}`
+      : "every column the page reads is a column the worker writes");
+}
+
 async function main() {
+  contractCheck();
+
   // ── the account's three codes, one of which the worker has pulled ──────────
   const seen: string[][] = [];
   const out = await fetchDefenseSpending(fakeClient(ROWS, seen), ["332710", "336412", "336611"]);
