@@ -587,6 +587,34 @@ function dnImgTag(url, alt, w){
   return '<img src="' + esc(dnImgSrc(url, w)) + '" data-raw="' + esc(url) + '"'
     + ' alt="' + esc((alt||'').replace(/"/g,'')) + '" loading="lazy" onerror="dnImgFail(this)">';
 }
+/* A request that HANGS never fires onerror, so the fallback above cannot see it
+   and the frame sits dark for as long as the page is open. This watches every
+   photograph and forces the same two steps on a timer: publisher URL, then
+   remove the frame. No image is better than an empty one. */
+var DN_IMG_WAIT = 6000;
+function dnStartWatch(img){
+  setTimeout(function step(){
+    if (!img.isConnected || img.naturalWidth > 0) return;
+    var hadRaw = !!img.getAttribute('data-raw');
+    dnImgFail(img);                       // step 1 publisher URL · step 2 remove
+    if (hadRaw) setTimeout(step, DN_IMG_WAIT);
+  }, DN_IMG_WAIT);
+}
+function dnWatchImages(){
+  var imgs = document.querySelectorAll('.dn-img img, .dn-side-img img');
+  /* The clock starts when the image ENTERS THE VIEWPORT, not when it is
+     inserted. These are loading="lazy": one below the fold has not been
+     requested at all, and timing it from insertion would discard photographs
+     for not having loaded before anyone asked for them. */
+  var io = window.IntersectionObserver ? new IntersectionObserver(function(entries, obs){
+    entries.forEach(function(e){ if (e.isIntersecting) { obs.unobserve(e.target); dnStartWatch(e.target); } });
+  }, { rootMargin: '200px' }) : null;
+  Array.prototype.forEach.call(imgs, function(img){
+    if (img.dataset.watched) return;
+    img.dataset.watched = '1';
+    if (io) io.observe(img); else dnStartWatch(img);
+  });
+}
 function dnImgHTML(a, w){
   if (!a.urlToImage) return '';
   return '<div class="dn-img">' + dnImgTag(a.urlToImage, a.title, w || 720) + dnKickerHTML(dnCat(a)) + '</div>';
@@ -606,7 +634,7 @@ function renderNav(){
     return '<button class="dn-nav-btn' + (DN_CAT === n[0] ? ' active' : '') + '" type="button" data-cat="' + n[0] + '">' + esc(n[1]) + '</button>';
   }).join('');
   el.querySelectorAll('.dn-nav-btn').forEach(function(b){
-    b.addEventListener('click', function(){ DN_CAT = b.getAttribute('data-cat'); renderNav(); renderLead(); renderGrid(); });
+    b.addEventListener('click', function(){ DN_CAT = b.getAttribute('data-cat'); renderNav(); renderLead(); renderGrid(); dnWatchImages(); });
   });
 }
 

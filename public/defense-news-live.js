@@ -4,9 +4,8 @@
    ai_insight via defense_news_insights). Maps items into the LIVE_ARTICLES
    global declared in defense-news.html.
 
-   The HTML's mergeArticles() uses LIVE_ARTICLES when length >= 4, else
-   falls back to MOCK_ARTICLES — so this script enhances when live data
-   is rich enough and stays out of the way when it isn't.
+   The HTML renders LIVE_ARTICLES and nothing else: an unreachable feed shows a
+   stated notice, never sample stories.
 
    Targets LIVE_ARTICLES per the HTML contract, and is loaded by
    defense-news.html via its own <script> tag. */
@@ -45,6 +44,8 @@
     if (typeof renderGrid === 'function')      renderGrid();
     if (typeof renderIntel === 'function')     renderIntel();
     if (typeof renderVolume === 'function')    renderVolume();
+    // Start the hang watchdog on whatever this pass put on the page.
+    if (typeof dnWatchImages === 'function')   dnWatchImages();
   }
 
   /* A banner in place of the lead story, because an unreachable source and a quiet
