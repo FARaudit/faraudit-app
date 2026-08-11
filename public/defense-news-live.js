@@ -37,13 +37,11 @@
   }
 
   function repaint() {
-    if (typeof renderTopCards === 'function') renderTopCards();
-    if (typeof renderStoryFeed === 'function') renderStoryFeed();
     if (typeof renderSidebar === 'function')   renderSidebar();
     if (typeof renderLead === 'function')      renderLead();
     if (typeof renderGrid === 'function')      renderGrid();
-    if (typeof renderIntel === 'function')     renderIntel();
-    if (typeof renderVolume === 'function')    renderVolume();
+    // DN_INTEL is the intel panel's export; the renderers are IIFE-scoped.
+    if (typeof window.DN_INTEL === 'function') window.DN_INTEL();
     // Start the hang watchdog on whatever this pass put on the page.
     if (typeof dnWatchImages === 'function')   dnWatchImages();
   }
