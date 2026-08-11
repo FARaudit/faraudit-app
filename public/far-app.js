@@ -249,17 +249,21 @@
 
   /* WHAT THE PAGE OPENS ON. Blank on load and blank after Reset made the reader hunt for the
      interaction before the page had told them anything.
-     RANKED BY HOW MUCH OF THE FAR THE RULE REWRITES. Impact is a keyword heuristic over title
-     and summary — nothing authoritative sets it — so it cannot be the primary sort without
-     promoting a guess to the page's headline claim. The count of sections a rule amends is read
-     from the rule's own amendatory instructions, which is a fact about the rule.
-     IT IS NOT A COUNT OF THIS CUSTOMER'S CONTRACTS. That list is separate, it is empty until
+     IMPACT LEADS, BREADTH BREAKS THE TIE. Breadth — the count of sections a rule amends — is
+     the more defensible number: it is read from the rule's own amendatory instructions rather
+     than guessed. It is the worse DEFAULT. Ranked first, the page opened on an inflation
+     threshold adjustment that rewrites 97 sections and creates no obligation anyone can fail,
+     while a CMMC or Section 889 rule amending ONE clause is the one that disqualifies a bid.
+     Impact is a keyword heuristic and is stated as one, but its terms — cmmc, cui, 889,
+     counterfeit — are the disqualifier class for a defence subcontractor, and this is the page
+     whose own KPI card reads "act before bidding". Fail toward the disqualifier.
+     NEITHER IS A COUNT OF THIS CUSTOMER'S CONTRACTS. That list is separate, empty until
      solicitations are on file, and conflating the two is what put "97 CONTRACTS HIT" on a
      screen whose own KPI card read 0. */
   function defaultPick(rows) {
     return rows.slice().sort((a, b) =>
-      (b.amends - a.amends) ||
       (impMeta(b.impact).rank - impMeta(a.impact).rank) ||
+      (b.amends - a.amends) ||
       (Date.parse(b.date) - Date.parse(a.date))
     )[0] || null;
   }
