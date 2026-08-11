@@ -156,15 +156,37 @@
   const LABEL_LONLAT = { FL: [-81.4, 28.4], MI: [-84.6, 43.4], LA: [-92.2, 30.9] };
   const FORCE_CALLOUT = new Set(['MD', 'DE', 'DC', 'RI', 'CT', 'NJ']);
 
+  /* Every state carries its abbreviation, whether or not it holds obligations.
+     The feed only names the top ten per code, so an unnamed state is one we did
+     not measure into the top ten — NOT a state with zero. The label therefore
+     comes from the geography, not from the data, and a state with nothing behind
+     it is drawn muted so it names the place without asserting a value: the fill
+     and the legend carry the number, the text carries only the name. */
+  const FIPS_ABBR = {
+    '01': 'AL', '02': 'AK', '04': 'AZ', '05': 'AR', '06': 'CA', '08': 'CO', '09': 'CT',
+    '10': 'DE', '11': 'DC', '12': 'FL', '13': 'GA', '15': 'HI', '16': 'ID', '17': 'IL',
+    '18': 'IN', '19': 'IA', '20': 'KS', '21': 'KY', '22': 'LA', '23': 'ME', '24': 'MD',
+    '25': 'MA', '26': 'MI', '27': 'MN', '28': 'MS', '29': 'MO', '30': 'MT', '31': 'NE',
+    '32': 'NV', '33': 'NH', '34': 'NJ', '35': 'NM', '36': 'NY', '37': 'NC', '38': 'ND',
+    '39': 'OH', '40': 'OK', '41': 'OR', '42': 'PA', '44': 'RI', '45': 'SC', '46': 'SD',
+    '47': 'TN', '48': 'TX', '49': 'UT', '50': 'VT', '51': 'VA', '53': 'WA', '54': 'WV',
+    '55': 'WI', '56': 'WY'
+  };
+  const abbrFor = (d) => (view().states[d.id] || {}).abbr || FIPS_ABBR[d.id] || '';
+
   function renderLegend() {
     const el = $('geoLegend'); if (!el) return;
     if (!geoBreaks.length) { clear(el); return; }
     const edges = [0].concat(geoBreaks);
-    setHTML(el, edges.map((lo, i) => {
+    const bands = edges.map((lo, i) => {
       const hi = edges[i + 1];
       const label = hi == null ? fmtM(lo) + '+' : (i === 0 ? '<' + fmtM(hi) : fmtM(lo) + '–' + fmtM(hi));
       return `<span class="sw"><i style="background:${css(GEO_RAMP[i + 1])}"></i>${esc(label)}</span>`;
-    }).join(''));
+    });
+    /* Every state is named on the map, so the fill of an unnamed-in-the-feed state
+       needs its own key — otherwise a muted label reads as a measured zero. */
+    bands.push(`<span class="sw"><i style="background:${css(GEO_RAMP[0])}"></i>outside the top ten</span>`);
+    setHTML(el, bands.join(''));
   }
 
   function renderMap() {
@@ -189,18 +211,22 @@
       .on('mouseleave', hideTip)
       .on('click', (ev, d) => { if (ST[d.id]) { S.state = (S.state === d.id ? null : d.id); syncControls(); renderAll(); } });
 
-    const labeled = states.features.filter(d => ST[d.id] && ST[d.id].abbr !== 'HI');
+    const labeled = states.features.filter(d => abbrFor(d) && abbrFor(d) !== 'HI');
     const inlineFeats = [], callItems = [];
     labeled.forEach(d => {
-      const s = ST[d.id], b = path.bounds(d);
+      const ab = abbrFor(d), b = path.bounds(d);
       const w = b[1][0] - b[0][0], h = b[1][1] - b[0][1];
-      if (!FORCE_CALLOUT.has(s.abbr) && (LABEL_LONLAT[s.abbr] || (w >= 13 && h >= 10))) inlineFeats.push(d);
-      else callItems.push({ s, c: path.centroid(d) });
+      if (!FORCE_CALLOUT.has(ab) && (LABEL_LONLAT[ab] || (w >= 13 && h >= 10))) inlineFeats.push(d);
+      else callItems.push({ s: ST[d.id] || null, abbr: ab, c: path.centroid(d) });
     });
     g.selectAll('text.geo-lab').data(inlineFeats).join('text')
-      .attr('class', d => 'geo-lab' + (lvl(ST[d.id].val) >= 4 ? ' lt' : ''))
-      .attr('transform', d => { const s = ST[d.id]; const ov = LABEL_LONLAT[s.abbr]; const p = (ov && proj(ov)) ? proj(ov) : path.centroid(d); return `translate(${p[0]},${p[1]})`; })
-      .attr('text-anchor', 'middle').attr('dy', 3).text(d => ST[d.id].abbr);
+      .attr('class', d => {
+        const s = ST[d.id];
+        if (!s) return 'geo-lab nodata';
+        return 'geo-lab' + (lvl(s.val) >= 4 ? ' lt' : '');
+      })
+      .attr('transform', d => { const ab = abbrFor(d); const ov = LABEL_LONLAT[ab]; const p = (ov && proj(ov)) ? proj(ov) : path.centroid(d); return `translate(${p[0]},${p[1]})`; })
+      .attr('text-anchor', 'middle').attr('dy', 3).text(d => abbrFor(d));
 
     callItems.sort((a, b) => a.c[1] - b.c[1]);
     const colX = 930, startY = 170, stepY = 16;
@@ -208,8 +234,9 @@
     callItems.forEach((it, i) => {
       const ly = startY + i * stepY;
       cg.append('line').attr('x1', it.c[0]).attr('y1', it.c[1]).attr('x2', colX - 6).attr('y2', ly).attr('stroke', css('--mute-2')).attr('stroke-width', .7).attr('opacity', .55);
-      cg.append('circle').attr('cx', colX).attr('cy', ly).attr('r', 3.2).attr('fill', geoColor(it.s.val)).attr('stroke', css('--mute-2')).attr('stroke-width', .6);
-      cg.append('text').attr('x', colX + 7).attr('y', ly).attr('dy', 3.2).attr('class', 'geo-callout').text(it.s.abbr);
+      cg.append('circle').attr('cx', colX).attr('cy', ly).attr('r', 3.2).attr('fill', geoColor(it.s ? it.s.val : null)).attr('stroke', css('--mute-2')).attr('stroke-width', .6);
+      cg.append('text').attr('x', colX + 7).attr('y', ly).attr('dy', 3.2)
+        .attr('class', 'geo-callout' + (it.s ? '' : ' nodata')).text(it.abbr);
     });
   }
 
