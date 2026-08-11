@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createServerClient } from "@/lib/supabase-server";
+import { extractFeedImage, extractOgImage, type ImageCarrier } from "@/lib/news-images";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -12,6 +13,9 @@ const CLAUDE_MODEL = "claude-sonnet-4-6";
 // scrolling; bounding parallel Claude calls keeps p95 latency < 5s on first
 // load. Items beyond the cap fall back to the deterministic relevance string.
 const INSIGHT_BATCH_LIMIT = 12;
+// Article fetches for og:image, for the feeds that carry no image element.
+// Same reasoning as the insight cap: bounded to what is read before scrolling.
+const OG_LOOKUP_LIMIT = 16;
 const INSIGHT_PROMPT_PREFIX = `You are advising a small-to-mid-market federal defense subcontractor (machine shops, aerospace parts manufacturers, professional services, $5M-$50M annual revenue, AS9100/ITAR/CMMC-aware). Read this news headline + summary and produce ONE LINE (max 25 words) of actionable insight for THIS contractor: what should they watch, what threat or opportunity does this create, what action might they take. No fluff, no 'consider' or 'might want to' — direct and concrete.`;
 
 interface NewsItem {
@@ -23,6 +27,11 @@ interface NewsItem {
   tag: "policy" | "contract" | "budget" | "defense";
   relevance: string;
   ai_insight?: string | null;
+  // The publisher's own photograph for this story, carried from the feed or
+  // from the article's Open Graph tag. Null means the publisher shipped none —
+  // the card then renders without an image region rather than with a box.
+  image: string | null;
+  image_source: ImageCarrier | null;
 }
 
 const FEEDS: { source: string; url: string; tag: NewsItem["tag"] }[] = [
@@ -31,6 +40,29 @@ const FEEDS: { source: string; url: string; tag: NewsItem["tag"] }[] = [
   { source: "Federal Register", url: "https://www.federalregister.gov/documents/search.rss?conditions%5Bagencies%5D%5B%5D=defense-department", tag: "policy" },
   { source: "FedScoop",         url: "https://fedscoop.com/feed/", tag: "policy" }
 ];
+
+/** The article's own Open Graph image, for the feeds that ship no carrier. One
+ *  fetch per article, bounded by the caller and cached for a day. A failure is
+ *  null — never a substitute picture. */
+async function fetchOgImage(articleUrl: string): Promise<string | null> {
+  try {
+    const res = await fetch(articleUrl, {
+      headers: {
+        // Some publishers serve a stripped page to unrecognised agents. This is
+        // the same page a reader gets; we read one meta tag out of its head.
+        "User-Agent": "Mozilla/5.0 (compatible; FARauditBot/1.0; +https://faraudit.com)",
+        Accept: "text/html"
+      },
+      signal: AbortSignal.timeout(6000),
+      next: { revalidate: 86400 }
+    });
+    if (!res.ok) return null;
+    const html = (await res.text()).slice(0, 200_000); // <head> is well inside this
+    return extractOgImage(html);
+  } catch {
+    return null;
+  }
+}
 
 // Tiny RSS/Atom item extractor. Looks for <item>…</item> and <entry>…</entry>.
 function parseItems(xml: string, source: string, tag: NewsItem["tag"]): NewsItem[] {
@@ -55,7 +87,10 @@ function parseItems(xml: string, source: string, tag: NewsItem["tag"]): NewsItem
     if (!cleanTitle) continue;
     const cleanSummary = decodeEntities(stripCdataAndTags(description)).slice(0, 500).trim();
 
+    const img = extractFeedImage(block);
     items.push({
+      image: img ? img.url : null,
+      image_source: img ? img.carrier : null,
       source,
       title: cleanTitle,
       link: cleanCdata(link).trim(),
@@ -172,6 +207,22 @@ export async function GET() {
     .flatMap((r) => r.rows)
     .sort((a, b) => new Date(b.pub_date || 0).getTime() - new Date(a.pub_date || 0).getTime());
 
+  // ━━ og:image for the items whose feed carried no picture ━━
+  // Bounded to the run of items a reader actually sees before scrolling, and
+  // only for items still without one — an article fetch costs a round trip and
+  // buys a photograph, so it is spent where the photograph is looked at.
+  const needsOg = items.slice(0, OG_LOOKUP_LIMIT).filter((i) => !i.image && i.link);
+  if (needsOg.length > 0) {
+    const resolved = await Promise.all(needsOg.map((i) => fetchOgImage(i.link)));
+    needsOg.forEach((it, idx) => {
+      const url = resolved[idx];
+      if (url) {
+        it.image = url;
+        it.image_source = "og:image";
+      }
+    });
+  }
+
   // ━━ Layer in Claude insights (cached by article URL) ━━
   const linkKeys = items.map((i) => i.link).filter(Boolean);
   const insightMap = new Map<string, string>();
@@ -226,9 +277,22 @@ export async function GET() {
     ai_insight: it.link ? insightMap.get(it.link) ?? null : null
   }));
 
+  // Image coverage per source, so "the pictures stopped" is a number that moved
+  // rather than something a reader has to notice. A source at 0 with items > 0
+  // means its carrier changed shape.
+  const imageCoverage = FEEDS.map((f) => {
+    const rows = enriched.filter((i) => i.source === f.source);
+    return {
+      name: f.source,
+      items: rows.length,
+      with_image: rows.filter((i) => i.image).length
+    };
+  });
+
   return NextResponse.json({
     items: enriched,
     sources,
+    image_coverage: imageCoverage,
     degraded: sources.some((s) => !s.ok),
     fetched_at: new Date().toISOString()
   });

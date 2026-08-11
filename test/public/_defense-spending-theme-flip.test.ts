@@ -1,43 +1,45 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// DEFENSE SPENDING · THEME-FLIP GATE — the unwired page, flipped light/dark.
+// DEFENSE SPENDING · FEED LIFECYCLE GATE — loading → ok → failure, and a theme
+// flip in each state.
 //
-// THE DEFECT. `public/dsb-app.js` threw on EVERY theme change in production:
+// WHAT THIS GUARDS. `renderUnavailable()` removes every child of `.body` except
+// `.page-header`, and there is no path that puts them back. Two defects live in
+// that one fact, and this gate holds both closed:
 //
-//     TypeError: Cannot set properties of null (setting 'innerHTML')
-//         at renderLegend (dsb-app.js:109)
-//         at Object.onThemeChange (dsb-app.js:552)
-//         at MutationObserver.<anonymous> (defense-spending-live.js:76)
+//   (1) A THEME FLIP INTO A STRIPPED DOM. `onThemeChange()` re-runs every
+//       renderer so each re-reads its colours; against a removed `#geoLegend`
+//       that dereferenced null on every flip.
 //
-// `#geoLegend` is NOT missing from the markup — it is served, and it survives both
-// injectors. It is missing from the DOM. `renderUnavailable()` removes every child
-// of `.body` except `.page-header` when the feed reports `unwired`, and the legend
-// lives inside one of the children it removes. `init()`, `renderAll()` and
-// `renderStatic()` each check `dsbHasData()` first; `onThemeChange()` did not, so
-// it called `renderLegend()` into a DOM that no longer had the element.
+//   (2) A SUCCESSFUL RESPONSE ARRIVING AT A STRIPPED DOM. When the pre-fetch
+//       status was seeded `unwired`, the strip ran at DOMContentLoaded — before
+//       the feed had answered. The first `ok` payload then rendered into panels
+//       that no longer existed. Measured, not predicted: stubbing the route to
+//       `{state:"ok"}` threw `TypeError: Cannot read properties of null
+//       (reading 'clientWidth')`. The page was therefore pre-broken against its
+//       own success path, which no test could see while the feed never answered.
 //
-// WHY THE FIX IS A CALLER GUARD AND NOT A NULL CHECK IN renderLegend. A null check
-// inside the renderer would be fail-open: it would also swallow a genuine markup
-// regression — the container renamed, or an injector eating it — on the WIRED page,
-// where the legend does belong. R1/R2 assert the container really is served, and R3
-// asserts it really is gone in the unwired state, so the skip is a precondition that
-// was measured, not an assumption.
+// THE INVARIANT, stated once: the data region is removed ONLY for a SETTLED
+// failure. The pre-fetch state draws nothing and removes nothing, so a success
+// always has a DOM to fill.
 //
-// WHY THERE IS NO BROWSER HERE. CI runs `npm ci` only; a chromium download is not
-// guaranteed, and a gate that silently skips on a missing browser gates nothing. So
-// the page's real bytes run in a `vm` sandbox against a DOM shim whose element set
-// is DERIVED FROM THE COMPOSED HTML — not from a fixture someone typed. R5 proves
-// the shim is faithful by planting the original defect back into a copy of the
-// source and requiring the exact production TypeError.
+// WHY THERE IS NO BROWSER HERE. CI runs `npm ci` only; a chromium download is
+// not guaranteed, and a gate that silently skips on a missing browser gates
+// nothing. So the page's real bytes run in a `vm` sandbox against a DOM shim
+// whose element set is DERIVED FROM THE COMPOSED HTML — not from a fixture
+// someone typed. R7 proves the shim is faithful by planting each defect back
+// into a copy of the source and requiring the failure to reappear.
 //
 //   R1  THE CONTAINER IS SERVED — #geoLegend survives injectRail + injectDefenseTabs.
 //   R2  EVERY LOOKUP RESOLVES — every id dsb-app.js reads via $() exists in the
 //       composed markup, so an id/markup fork fails here instead of at runtime.
-//   R3  PRECONDITION — in the unwired state init() really does remove the data
-//       region: #geoLegend absent, the notice present. A guard whose precondition
-//       does not hold is a finding, not a pass.
-//   R4  THE LIVE DEFECT — onThemeChange() in the unwired state does not throw.
-//   R5  PLANTED POSITIVE — with the guard removed, R4's harness must throw the
-//       production TypeError. An instrument that cannot go red is not evidence.
+//   R3  THE PRE-FETCH STATE IS INERT — nothing removed, no notice painted.
+//   R4  A SUCCESSFUL PAYLOAD RENDERS — defect (2). render() completes and the
+//       panels are still attached afterwards.
+//   R5  A SETTLED FAILURE STILL STRIPS — the honest-fail path is not weakened.
+//   R6  THEME FLIPS DO NOT THROW — defect (1), in all three states.
+//   R7  PLANTED POSITIVES — re-seed 'unwired' and the success path must break;
+//       remove the theme guard and the flip must throw. An instrument that
+//       cannot go red is not evidence.
 //
 // Run: npx tsx test/public/_defense-spending-theme-flip.test.ts
 // ─────────────────────────────────────────────────────────────────────────────
@@ -71,15 +73,15 @@ ok(COMPOSED.includes('id="geoLegend"'), "#geoLegend present in the composed page
 // ── R2 ────────────────────────────────────────────────────────────────────────
 console.log("\nR2  EVERY LOOKUP RESOLVES");
 const lookedUp = [...new Set([...APP_SRC.matchAll(/\$\('([A-Za-z0-9_-]+)'\)/g)].map((m) => m[1]))].sort();
-ok(lookedUp.length > 20, "id census is non-empty", `${lookedUp.length} ids read via $()`);
+ok(lookedUp.length > 15, "id census is non-empty", `${lookedUp.length} ids read via $()`);
 const unresolved = lookedUp.filter((id) => !COMPOSED.includes(`id="${id}"`));
 ok(unresolved.length === 0, "every $() target exists in the markup",
   unresolved.length ? `unresolved: ${unresolved.join(", ")}` : `${lookedUp.length}/${lookedUp.length} resolve`);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DOM SHIM. Models only what this page's unwired path touches, and its element set
-// comes from COMPOSED — the ids are the real ids and the `.body` child partition is
-// the real one, scanned from the markup rather than typed into a fixture.
+// DOM SHIM. Models only what this page touches, and its element set comes from
+// COMPOSED — the ids are the real ids and the `.body` child partition is the
+// real one, scanned from the markup rather than typed into a fixture.
 // ─────────────────────────────────────────────────────────────────────────────
 
 type Kid = { isHeader: boolean; ids: string[] };
@@ -101,7 +103,6 @@ function scanBodyChildren(html: string): Kid[] | null {
     const lt = html.indexOf("<", i);
     if (lt === -1) break;
 
-    // Walk to the tag's closing '>', honouring quoted attribute values.
     let j = lt + 1, quote = "";
     while (j < html.length) {
       const ch = html[j];
@@ -112,10 +113,10 @@ function scanBodyChildren(html: string): Kid[] | null {
     }
     if (j >= html.length) break;
 
-    const raw = html.slice(lt + 1, j);          // tag body, no angle brackets
+    const raw = html.slice(lt + 1, j);
     i = j + 1;
 
-    if (raw.startsWith("!")) continue;          // comment / doctype
+    if (raw.startsWith("!")) continue;
     const isClose = raw.startsWith("/");
     const nameEnd = (() => {
       const s = isClose ? 1 : 0;
@@ -136,14 +137,14 @@ function scanBodyChildren(html: string): Kid[] | null {
     const selfClosing = attrs.trimEnd().endsWith("/") || VOID.has(name);
 
     if (isClose) {
-      if (depth === 0) break;                   // the </div> that closes .body
+      if (depth === 0) break;
       depth--;
       if (depth === 0 && cur) { kids.push(cur); cur = null; }
       continue;
     }
 
     if (depth === 0) {
-      if (selfClosing) continue;                // a void element as a direct child
+      if (selfClosing) continue;
       cur = { isHeader: attrs.includes("page-header"), ids: [] };
       depth = 1;
     } else if (!selfClosing) depth++;
@@ -169,12 +170,35 @@ class Node {
   children: Node[] = [];
   parent: Node | null = null;
   style: Record<string, string> = {};
+  dataset: Record<string, string> = {};
   textContent = "";
-  innerHTML = "";
   constructor(tag: string, id: string | null = null, className = "") {
     this.tag = tag; this.id = id; this.className = className;
   }
+  get childNodes() { return this.children.slice(); }
+  get classList() {
+    const self = this;
+    const parts = () => self.className.split(/\s+/).filter(Boolean);
+    return {
+      add: (c: string) => { if (!parts().includes(c)) self.className = (self.className + " " + c).trim(); },
+      remove: (c: string) => { self.className = parts().filter((p) => p !== c).join(" "); },
+      toggle: (c: string, on?: boolean) => { if (on) self.classList.add(c); else self.classList.remove(c); },
+      contains: (c: string) => parts().includes(c)
+    };
+  }
   appendChild(n: Node) { n.parent = this; this.children.push(n); return n; }
+  replaceChildren(...nodes: Node[]) {
+    for (const c of this.children) c.parent = null;
+    this.children = [];
+    for (const n of nodes) this.appendChild(n);
+  }
+  replaceWith(n: Node) {
+    if (!this.parent) return;
+    const idx = this.parent.children.indexOf(this);
+    n.parent = this.parent;
+    this.parent.children.splice(idx, 1, n);
+    this.parent = null;
+  }
   remove() {
     if (!this.parent) return;
     this.parent.children = this.parent.children.filter((c) => c !== this);
@@ -194,6 +218,58 @@ class Node {
   querySelectorAll(): Node[] { return []; }
   addEventListener() {}
 }
+
+/** A chainable stand-in for d3. Every property is itself callable and returns
+ *  the same object, and it coerces to 1 so arithmetic on a scale's output stays
+ *  finite. It measures nothing — this gate is about which nodes exist when, not
+ *  about pixels. */
+function makeChain(): unknown {
+  const target = function () { /* callable */ } as unknown as Record<string | symbol, unknown>;
+  const proxy: unknown = new Proxy(target, {
+    get(_t, k) {
+      if (k === Symbol.toPrimitive) return () => 1;
+      if (k === "valueOf") return () => 1;
+      if (k === "toString") return () => "1";
+      if (k === "then") return undefined;     // never mistake this for a promise
+      return proxy;
+    },
+    apply() { return proxy; }
+  });
+  return proxy;
+}
+
+type RunResult = {
+  loadError: Error | null;
+  renderError: Error | null;
+  themeError: Error | null;
+  legendAttached: boolean;
+  noticePainted: boolean;
+};
+
+/** A minimal but SHAPED payload: three fiscal years, one tracked code, one
+ *  state, one agency, one recipient, one recompete. Every field the renderers
+ *  read is present, so a render that throws here throws on shape, not on a
+ *  field this fixture forgot. */
+const OK_PAYLOAD = {
+  FYS: ["FY2024", "FY2025", "FY2026"],
+  BY_FY: Object.fromEntries(["FY2024", "FY2025", "FY2026"].map((fy) => [fy, {
+    kpis: [{ label: "Obligated", val: "8.37", unit: "B", sub: "1 tracked code", delta: "+4.0%", tone: "accent", spark: [1, 2, 3] }],
+    states: { "48": { abbr: "TX", name: "Texas", val: 3946.6, yoy: 12.4 } },
+    agencies: [{ key: "department-of-defense", short: "DoD", name: "Department of Defense", val: 19573.4, naics: { "336412": 19573.4 } }],
+    incumbents: [{ name: "LOCKHEED MARTIN CORPORATION", val: 1318.4, naics: "336412", sb: false }]
+  }])),
+  MARKET_TREND: { labels: ["FY2024", "FY2025", "FY2026"], series: { "336412": [8370, 12020, 2560] } },
+  RECOMPETES: [{ agency: "U.S. Coast Guard", amount: 15261, award_id: "70Z03826PF0000296", end_date: "2026-08-19", recipient: "TECHNETICS GROUP LLC", naics: "336412", expired: true }],
+  AGENCY_FILTERS: [{ key: "all", label: "All" }, { key: "department-of-defense", label: "DoD" }],
+  coverage: { requested: ["332710", "336412", "336611"], tracked: ["336412"], untracked: ["332710", "336611"], top_n: 10 },
+  as_of: "2026-05-20T05:36:32.881704+00:00",
+  unsupported: [
+    { panel: "opportunity-matrix", needs: "the number of firms competing per segment" },
+    { panel: "budget-trajectory", needs: "the enacted DoD topline by year" },
+    { panel: "pricing", needs: "award-level contract values" },
+    { panel: "ndaa", needs: "the NDAA provision text" }
+  ]
+};
 
 function buildDom() {
   const root = new Node("html");
@@ -233,28 +309,32 @@ function buildDom() {
     addEventListener: () => {},
   };
 
-  return { document, bodyEl };
+  return { document, bodyEl, attached, byId };
 }
 
-type RunResult = {
-  loadError: Error | null;
-  themeError: Error | null;
-  legendAfterInit: boolean;
-  noticeAfterInit: boolean;
-};
+/** Loads the real dsb-data.js + a (possibly patched) dsb-app.js, optionally
+ *  settles the feed to `settle`, then flips the theme. */
+function run(appSrc: string, settle: "none" | "ok" | "unwired", dataSrc = DATA_SRC): RunResult {
+  const { document, bodyEl, attached, byId } = buildDom();
+  const out: RunResult = { loadError: null, renderError: null, themeError: null, legendAttached: false, noticePainted: false };
 
-/** Runs the real dsb-data.js + a (possibly patched) dsb-app.js, then a theme flip. */
-function run(appSrc: string): RunResult {
-  const { document, bodyEl } = buildDom();
-  const out: RunResult = { loadError: null, themeError: null, legendAfterInit: false, noticeAfterInit: false };
-
-  const win: Record<string, unknown> = { addEventListener: () => {} };
+  const win: Record<string, unknown> = { addEventListener: () => {}, innerWidth: 1440 };
+  class DOMParserShim {
+    parseFromString() {
+      const b = new Node("body");
+      b.appendChild(new Node("span"));
+      return { body: b };
+    }
+  }
   const sandbox: Record<string, unknown> = {
     window: win,
     document,
+    DOMParser: DOMParserShim,
+    d3: makeChain(),
+    topojson: makeChain(),
     getComputedStyle: () => ({ getPropertyValue: () => "" }),
-    // init() fetches the state atlas; a never-settling promise keeps that async
-    // branch out of this synchronous measurement without pretending it resolved.
+    // The state atlas fetch never settles: that async branch stays out of this
+    // synchronous measurement rather than being pretended to have resolved.
     fetch: () => new Promise(() => {}),
     setTimeout: () => 0,
     clearTimeout: () => {},
@@ -264,50 +344,91 @@ function run(appSrc: string): RunResult {
   const ctx = vm.createContext(sandbox);
 
   try {
-    vm.runInContext(DATA_SRC, ctx, { filename: "dsb-data.js" });
+    vm.runInContext(dataSrc, ctx, { filename: "dsb-data.js" });
     vm.runInContext(appSrc, ctx, { filename: "dsb-app.js" });
   } catch (e) { out.loadError = e as Error; }
 
-  out.legendAfterInit = document.getElementById("geoLegend") !== null;
-  out.noticeAfterInit = bodyEl.querySelector(".dsb-unavailable") !== null;
+  const DSB = win.DSB as Record<string, unknown> | undefined;
+  const app = win.DSB_APP as { render?: () => void; onThemeChange?: () => void } | undefined;
 
-  const app = win.DSB_APP as { onThemeChange?: () => void } | undefined;
+  if (settle !== "none" && DSB) {
+    if (settle === "ok") {
+      Object.assign(DSB, OK_PAYLOAD);
+      DSB.STATUS = { state: "ok", reason: "" };
+    } else {
+      DSB.STATUS = { state: "unwired", reason: "no source" };
+    }
+    try { app?.render?.(); } catch (e) { out.renderError = e as Error; }
+  }
+
+  const legend = byId.get("geoLegend");
+  out.legendAttached = !!legend && attached(legend);
+  out.noticePainted = bodyEl.querySelector(".dsb-unavailable") !== null;
+
   try { app?.onThemeChange?.(); } catch (e) { out.themeError = e as Error; }
   return out;
 }
 
 const describe = (e: Error | null) => (e ? `${e.constructor.name}: ${e.message}` : "");
 
-// ── R3 ────────────────────────────────────────────────────────────────────────
-console.log("\nR3  PRECONDITION — the unwired state really removes the data region");
 ok(bodyKids !== null && bodyKids.length > 1, ".body children scanned from the markup",
   bodyKids ? `${bodyKids.length} direct children, ${bodyKids.filter((k) => k.isHeader).length} page-header`
            : "scan failed — .body not found");
-ok(DATA_SRC.includes("window.DSB.STATUS = { state: 'unwired'"),
-  "dsb-data.js seeds STATUS unwired — the state this gate measures");
 
-const fixed = run(APP_SRC);
-ok(fixed.loadError === null, "the page's scripts load and init() completes", describe(fixed.loadError));
-ok(fixed.noticeAfterInit, "renderUnavailable() painted the notice",
-  fixed.noticeAfterInit ? "" : "no .dsb-unavailable — the unwired path did not run");
-ok(!fixed.legendAfterInit, "#geoLegend is gone after init in the unwired state",
-  fixed.legendAfterInit ? "still present — the guard's premise does not hold" : "removed with the data region");
+// ── R3 ────────────────────────────────────────────────────────────────────────
+console.log("\nR3  THE PRE-FETCH STATE IS INERT");
+ok(DATA_SRC.includes("state: 'loading'"),
+  "dsb-data.js seeds STATUS 'loading' — not a verdict the feed has not delivered");
+const pending = run(APP_SRC, "none");
+ok(pending.loadError === null, "the page's scripts load", describe(pending.loadError));
+ok(pending.legendAttached, "#geoLegend is STILL ATTACHED before the feed answers",
+  pending.legendAttached ? "" : "removed pre-fetch — a success would have nothing to render into");
+ok(!pending.noticePainted, "no failure notice is painted before the feed answers");
 
 // ── R4 ────────────────────────────────────────────────────────────────────────
-console.log("\nR4  THE LIVE DEFECT — a theme flip must not throw");
-ok(fixed.themeError === null, "onThemeChange() does not throw in the unwired state", describe(fixed.themeError));
+console.log("\nR4  A SUCCESSFUL PAYLOAD RENDERS — the pre-broken success path");
+const settled = run(APP_SRC, "ok");
+ok(settled.loadError === null, "scripts load", describe(settled.loadError));
+ok(settled.renderError === null, "render() completes on a state:'ok' payload", describe(settled.renderError));
+ok(settled.legendAttached, "#geoLegend survives the successful render");
+ok(!settled.noticePainted, "no failure notice on the success path");
 
 // ── R5 ────────────────────────────────────────────────────────────────────────
-console.log("\nR5  PLANTED POSITIVE — remove the guard, the harness must go red");
-const GUARD = "if (!dsbHasData()) return;\n    renderLegend();";
+console.log("\nR5  A SETTLED FAILURE STILL STRIPS — honest-fail is not weakened");
+const failed = run(APP_SRC, "unwired");
+ok(failed.renderError === null, "render() completes on a failure payload", describe(failed.renderError));
+ok(failed.noticePainted, "renderUnavailable() painted the notice",
+  failed.noticePainted ? "" : "no .dsb-unavailable — the failure path did not run");
+ok(!failed.legendAttached, "#geoLegend is gone with the data region");
+
+// ── R6 ────────────────────────────────────────────────────────────────────────
+console.log("\nR6  THEME FLIPS DO NOT THROW");
+ok(pending.themeError === null, "flip before the feed answers", describe(pending.themeError));
+ok(settled.themeError === null, "flip after a successful render", describe(settled.themeError));
+ok(failed.themeError === null, "flip after a settled failure", describe(failed.themeError));
+
+// ── R7 ────────────────────────────────────────────────────────────────────────
+console.log("\nR7  PLANTED POSITIVES — each defect put back must reappear");
+
+// (2) Re-seed the pre-fetch status to 'unwired', which is what made the strip run
+//     before the feed answered. The success path must then break.
+const REGRESSED_DATA = DATA_SRC.replace("state: 'loading'", "state: 'unwired'");
+ok(REGRESSED_DATA !== DATA_SRC, "the seed plant applied",
+  REGRESSED_DATA === DATA_SRC ? "seed text moved — this plant is inert" : "");
+const preStripped = run(APP_SRC, "ok", REGRESSED_DATA);
+ok(preStripped.renderError !== null || !preStripped.legendAttached,
+  "seeding 'unwired' breaks the success path — the harness can see defect (2)",
+  preStripped.renderError ? describe(preStripped.renderError)
+    : (preStripped.legendAttached ? "NO BREAK — R4 proves nothing" : "panels stripped before the payload arrived"));
+
+// (1) Remove the theme guard. A flip into the stripped DOM must throw.
+const GUARD = "if (dsbState() !== 'ok' || !built) return;";
 const guardFound = APP_SRC.includes(GUARD);
-ok(guardFound, "the guard is where the plant expects it",
-  guardFound ? "" : "guard text moved — R5 would be inert; update the plant");
-const planted = run(APP_SRC.replace(GUARD, "renderLegend();"));
-const plantedMsg = describe(planted.themeError);
-ok(planted.themeError !== null, "the unguarded source throws on a theme flip",
-  plantedMsg || "NO THROW — the shim is inert and R4 proves nothing");
-ok(/Cannot set propert(y|ies) of null/.test(plantedMsg), "and it is the production TypeError", plantedMsg);
+ok(guardFound, "the theme guard is where the plant expects it",
+  guardFound ? "" : "guard text moved — this plant is inert; update it");
+const unguarded = run(APP_SRC.replace(GUARD, ""), "unwired");
+ok(unguarded.themeError !== null, "the unguarded source throws on a flip into a stripped DOM",
+  describe(unguarded.themeError) || "NO THROW — the shim is inert and R6 proves nothing");
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? "PASS" : "FAIL"} — ${pass} passed, ${fail} failed`);

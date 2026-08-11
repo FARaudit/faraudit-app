@@ -62,6 +62,9 @@ button{font-family:inherit}
 .live-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green-500);box-shadow:0 0 0 3px rgba(16,185,129,.18);animation:pulse 1.6s ease-out infinite}
 .live-pill[data-state="unwired"]{background:#f1f5f9;color:#475569;border-color:#cbd5e1}
 .live-pill[data-state="unwired"]::before{background:#94a3b8;box-shadow:none;animation:none}
+/* "measured" — a named source pulled on a date, not a live stream: no pulse. */
+.live-pill[data-state="measured"]{background:var(--card-soft);color:var(--ink-2);border-color:var(--line)}
+.live-pill[data-state="measured"]::before{background:var(--accent);box-shadow:none;animation:none}
 [data-theme="dark"] .live-pill[data-state="unwired"]{background:rgba(148,163,184,.14);color:#cbd5e1;border-color:rgba(203,213,225,.28)}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(16,185,129,.45)}100%{box-shadow:0 0 0 8px rgba(16,185,129,0)}}
 .tb-search{margin-left:auto;display:flex;align-items:center;gap:10px;height:34px;width:300px;padding:0 12px;border-radius:9px;background:var(--search-bg);border:1px solid var(--line);color:var(--mute);font-size:13px}
@@ -88,6 +91,9 @@ button{font-family:inherit}
 .hdr-naics-pills{display:flex;gap:6px}
 .hdr-naics-pill{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;padding:4px 11px;border-radius:20px;border:1px solid var(--accent);background:var(--accent-pale);color:var(--accent-deep)}
 [data-theme="dark"] .hdr-naics-pill{background:rgba(55,138,221,0.18);border-color:var(--accent-light);color:var(--accent-light)}
+/* A code on file with no obligations pulled: shown, but not as covered. */
+.hdr-naics-pill.untracked{background:transparent;border-style:dashed;border-color:var(--mute-2);color:var(--mute)}
+[data-theme="dark"] .hdr-naics-pill.untracked{background:transparent;border-color:var(--mute-2);color:var(--mute)}
 
 /* ═══ CONTROL BAR (sticky, drives everything) ═══ */
 .controls{position:sticky;top:60px;z-index:50;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:11px 16px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-sm)}
@@ -144,6 +150,20 @@ button{font-family:inherit}
 .wh-text h3{font-family:"Manrope",sans-serif;font-size:14.5px;font-weight:800;letter-spacing:-.01em;color:var(--ink);margin:0;line-height:1.2}
 .wh-text .wh-sub{font-size:11.5px;color:var(--mute);margin:0;line-height:1.35}
 .wh-source{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mute-2);background:var(--card-soft);border:1px solid var(--line);padding:3px 7px;border-radius:5px;white-space:nowrap;flex-shrink:0}
+
+/* ═══ Provenance, empty states, and unsourced panels ═══ */
+.dsb-provenance{font-size:11.5px;line-height:1.6;color:var(--mute);margin:0 0 14px;display:flex;flex-wrap:wrap;gap:0 8px;align-items:baseline}
+.dsb-provenance b{color:var(--ink-2);font-weight:700}
+.dsb-prov-dot{color:var(--mute-2);padding:0 2px}
+.dsb-provenance .dsb-gap{color:#b45309}
+[data-theme="dark"] .dsb-provenance .dsb-gap{color:#fbbf24}
+.dsb-provenance .dsb-gap b{color:inherit}
+.dsb-empty{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute);padding:18px 4px;text-align:center}
+.dsb-nosource{font-size:12px;line-height:1.6;color:var(--mute);background:var(--card-soft);border:1px dashed var(--line);border-radius:9px;padding:16px 18px;margin:2px 0}
+/* A recompete whose end date has already passed: marked, never hidden. */
+.rc-card.expired{opacity:.55}
+.rc-card.expired .rc-name{text-decoration:line-through;text-decoration-thickness:1px}
+.rc-more{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute);padding:6px 0 0;text-align:center}
 
 /* ═══ Geo map ═══ */
 .geo-wrap{display:grid;grid-template-columns:1fr;gap:8px;min-height:0}
@@ -469,9 +489,8 @@ button{font-family:inherit}
         </div>
         <div class="hdr-naics">
           <span class="hdr-naics-label">Your NAICS</span>
-          <div class="hdr-naics-pills">
-            <span class="hdr-naics-pill">336413</span><span class="hdr-naics-pill">332710</span><span class="hdr-naics-pill">332721</span>
-          </div>
+          <!-- Filled from the capability statement on file. -->
+          <div class="hdr-naics-pills" id="hdrNaicsPills"></div>
         </div>
       </header>
 
@@ -480,13 +499,15 @@ button{font-family:inherit}
         <div class="ctl-grp"><span class="ctl-label">FY</span><div class="seg" id="segFY"></div></div>
         <div class="ctl-divider"></div>
         <div class="ctl-grp"><span class="ctl-label">Agency</span><div class="pillset" id="agencyFilters"></div></div>
-        <div class="ctl-divider"></div>
-        <div class="ctl-grp"><span class="ctl-label">Set-Aside</span><div class="pillset" id="setasideFilters"></div></div>
+        <!-- No set-aside filter: the feed carries no set-aside dimension. -->
         <div class="ctl-right">
           <span class="sel-chip" id="selChip"><span id="selChipText"></span><span class="x" id="selChipX"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg></span></span>
           <button class="reset-btn" id="resetBtn">Reset filters</button>
         </div>
       </section>
+
+      <!-- Measurement date, covered codes, top-N caveat. From the response. -->
+      <p class="dsb-provenance" id="dsbProvenance"></p>
 
       <!-- KPIs -->
       <section class="kpi-strip" id="kpiStrip"></section>
@@ -496,7 +517,7 @@ button{font-family:inherit}
         <section class="widget">
           <header class="widget-head">
             <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
-              <div class="wh-text"><h3>Where Your NAICS Money Flows</h3><p class="wh-sub">Click any state to focus the dashboard · red outline = BD gap</p></div></div>
+              <div class="wh-text"><h3>Obligations by place of performance</h3><p class="wh-sub">Click any state to scope every panel to it</p></div></div>
           </header>
           <div class="geo-wrap">
             <svg class="geo-svg" id="geoSvg" viewBox="0 0 960 500" preserveAspectRatio="xMidYMid meet"></svg>
@@ -507,7 +528,7 @@ button{font-family:inherit}
         <section class="widget">
           <header class="widget-head">
             <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h12M3 18h7"/></svg></span>
-              <div class="wh-text"><h3>State Leaderboard</h3><p class="wh-sub" id="rankSub">Top states by spend · FY2026</p></div></div>
+              <div class="wh-text"><h3>State Leaderboard</h3><p class="wh-sub" id="rankSub"></p></div></div>
             <div class="rank-tabs" id="rankTabs"></div>
           </header>
           <div class="rank-list" id="rankList"></div>
@@ -532,7 +553,7 @@ button{font-family:inherit}
         <section class="widget">
           <header class="widget-head">
             <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><circle cx="8" cy="15" r="1.6"/><circle cx="13" cy="9" r="1.6"/><circle cx="18" cy="6" r="1.6"/></svg></span>
-              <div class="wh-text"><h3>Opportunity Matrix · Competition vs Reward</h3><p class="wh-sub">Top-left = fewer rivals, more $ per win · bubble = total $</p></div></div>
+              <div class="wh-text"><h3>Opportunity Matrix · Competition vs Reward</h3><p class="wh-sub">Not connected</p></div></div>
           </header>
           <svg class="scatter-svg" id="scatterSvg"></svg>
           <div class="scatter-legend" id="scatterLegend"></div>
@@ -544,7 +565,7 @@ button{font-family:inherit}
         <section class="widget">
           <header class="widget-head">
             <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20h18"/><rect x="5" y="10" width="3" height="10"/><rect x="10.5" y="6" width="3" height="14"/><rect x="16" y="13" width="3" height="7"/></svg></span>
-              <div class="wh-text"><h3>DoD Budget Trajectory</h3><p class="wh-sub">5-yr topline — CR years constrain new starts</p></div></div>
+              <div class="wh-text"><h3>DoD Budget Trajectory</h3><p class="wh-sub">Not connected</p></div></div>
           </header>
           <div class="chart-wrap"><svg id="budgetSvg" class="bud-svg"></svg></div>
           <div class="bud-legend">
@@ -557,7 +578,7 @@ button{font-family:inherit}
         <section class="widget">
           <header class="widget-head">
             <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,17 8,12 13,15 21,7"/></svg></span>
-              <div class="wh-text"><h3>Market Trend · Your NAICS</h3><p class="wh-sub">Market size &amp; 5-yr momentum by code · FY27 projected</p></div></div>
+              <div class="wh-text"><h3>Market Trend · Your NAICS</h3><p class="wh-sub">Obligations by code across the measured fiscal years</p></div></div>
             
           </header>
           <div class="mkt-list" id="trendList"></div>
@@ -569,7 +590,7 @@ button{font-family:inherit}
         <section class="widget">
           <header class="widget-head">
             <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg></span>
-              <div class="wh-text"><h3>Recompete Radar · FY2027</h3><p class="wh-sub">Incumbent win rate is 70–90% — start positioning 12–18 months out</p></div></div>
+              <div class="wh-text"><h3>Recompete Radar</h3><p class="wh-sub">Awards ending within 180 days of the measurement date, by end month</p></div></div>
             
           </header>
           <div class="rc-timeline"><div class="rc-quarters" id="rcQuarters"></div></div>
@@ -581,17 +602,17 @@ button{font-family:inherit}
         <section class="widget">
           <header class="widget-head">
             <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M21 17c-.5-2-2-3.5-4-3.5"/></svg></span>
-              <div class="wh-text"><h3>Incumbent Intelligence</h3><p class="wh-sub">Recent awards = your teaming targets</p></div></div>
+              <div class="wh-text"><h3>Top recipients</h3><p class="wh-sub">Largest recipients in your codes · SB flagged from the feed’s own list</p></div></div>
           </header>
           <div style="overflow:auto">
-            <table class="ii-table"><thead><tr><th>Awardee</th><th>Agency</th><th class="r">Value</th><th>NAICS</th><th>Type</th></tr></thead><tbody id="iiBody"></tbody></table>
+            <table class="ii-table"><thead><tr><th>Recipient</th><th class="r">Obligated</th><th>NAICS</th><th>Size</th></tr></thead><tbody id="iiBody"></tbody></table>
           </div>
         </section>
 
         <section class="widget">
           <header class="widget-head">
             <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></span>
-              <div class="wh-text"><h3>Pricing Intelligence</h3><p class="wh-sub">What agencies actually pay per contract ($K)</p></div></div>
+              <div class="wh-text"><h3>Pricing Intelligence</h3><p class="wh-sub">Not connected</p></div></div>
           </header>
           <div class="price-wrap"><svg class="price-svg" id="priceSvg"></svg></div>
           <div class="price-legend" id="priceLegend"></div>
@@ -603,7 +624,7 @@ button{font-family:inherit}
         <section class="widget">
           <header class="widget-head">
             <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/></svg></span>
-              <div class="wh-text"><h3>Agency Breakdown</h3><p class="wh-sub">Bar = FY26 spend · green = SB share · click to filter</p></div></div>
+              <div class="wh-text"><h3>Agency Breakdown</h3><p class="wh-sub">Bar = obligations in the selected year · click to filter</p></div></div>
           </header>
           <div class="ag-head"><span>Agency</span><span>Spend · SB shaded</span><span>FY26</span><span>YoY</span></div>
           <div class="ag-list" id="agencyList"></div>
@@ -613,7 +634,7 @@ button{font-family:inherit}
         <section class="widget">
           <header class="widget-head">
             <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h6"/></svg></span>
-              <div class="wh-text"><h3>NDAA Highlights · FY2026</h3><p class="wh-sub">Provisions affecting your bids — act before enforcement</p></div></div>
+              <div class="wh-text"><h3>NDAA Highlights</h3><p class="wh-sub">Not connected</p></div></div>
           </header>
           <div class="ndaa-list" id="ndaaList"></div>
         </section>

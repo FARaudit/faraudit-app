@@ -40,6 +40,33 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // ━━ Defense News photographs ━━
+  // The image optimizer is a fetching proxy, so this list is a security
+  // boundary before it is a performance one: hostname:"**" would let anyone
+  // route any URL on the internet through our origin. Only the image hosts the
+  // four wired feeds actually publish from are named, each verified against the
+  // live feed on 2026-08-11. A host that is not here still renders — the page
+  // falls back to the publisher's own URL — it simply is not resized by us.
+  images: {
+    remotePatterns: [
+      // Defense News (Arc Publishing) — media:content on every item, originals
+      // run to 5554px, which is the reason this block exists.
+      { protocol: "https", hostname: "cloudfront-us-east-1.images.arcpublishing.com" },
+      { protocol: "https", hostname: "*.arc-cdn.net" },
+      // DoD News — <enclosure> on every item. Note: media.defense.gov answers
+      // 403 to server-side fetches, so the optimizer will fail on it and the
+      // raw-URL fallback is what actually paints. Listed anyway: this block
+      // states which hosts are permitted, not which ones succeed.
+      { protocol: "https", hostname: "media.defense.gov" },
+      // FedScoop — no feed carrier; resolved from the article's og:image.
+      { protocol: "https", hostname: "fedscoop.com" },
+      { protocol: "https", hostname: "*.fedscoop.com" }
+    ],
+    // The widths this page actually asks for (side thumb · card · lead hero).
+    imageSizes: [256, 640],
+    deviceSizes: [640, 1080],
+    minimumCacheTTL: 86400
+  },
   // PDF route (/api/audit/[id]/pdf) launches headless Chromium via
   // puppeteer-core + @sparticuz/chromium. The latter ships a brotli-
   // compressed Chromium binary that's extracted at runtime — Next.js's
