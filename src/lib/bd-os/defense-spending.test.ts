@@ -11,7 +11,7 @@
 // cut to their first entries. Totals, small-business dollars and the recompete
 // row are verbatim.
 // Run: npx tsx src/lib/bd-os/defense-spending.test.ts
-import { fetchDefenseSpending, agencyKeyOf } from "./defense-spending";
+import { recipientKey, fetchDefenseSpending, agencyKeyOf } from "./defense-spending";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -202,8 +202,62 @@ async function main() {
   const recipientKpi = dupFy.kpis.find((k) => /recipient/i.test(k.label));
   assert(!!recipientKpi && Number(recipientKpi.val) === dupFy.incumbents.length,
     "the recipients KPI states the number of rows the panel renders, not a distinct-name count");
-  assert(!!recipientKpi && Number(recipientKpi.sub.split(" ")[0]) === dupFy.incumbents.filter((i) => i.sb).length,
-    "and its small-business sub-line counts the same rows");
+  // A small-business COUNT may only be stated when the feed supplied the list it
+  // would be counted from. "0 of them small business" over a SIZE column reading
+  // "—" for every row was a measured zero nobody measured.
+  // The expectation is FIXED from the fixture, never derived from the output —
+  // an assertion that recomputes its expected value from the same data it is
+  // checking passes no matter what the code does.
+  //
+  // FY2026 fixture: 336412's row carries `sb_recipients: []`, so every recipient
+  // under that code has UNKNOWN status; 336611's row supplies a list, so its
+  // recipients are known. Exactly the recipients from the code WITH a list may
+  // be counted.
+  const unknown = dupFy.incumbents.filter((i) => i.sb === null);
+  const known = dupFy.incumbents.filter((i) => i.sb !== null);
+  assert(unknown.length > 0,
+    "the fixture must contain a code whose small-business list is empty, or this check proves nothing");
+  assert(unknown.every((i) => i.naics === "336412"),
+    "unknown status belongs to exactly the code whose sb_recipients list was empty");
+  assert(known.every((i) => i.naics !== "336412"),
+    "a recipient under the empty-list code must never be asserted as NOT small business");
+  // FY2026's only code carries an EMPTY sb_recipients list, so nothing in this
+  // year has a knowable status and the sub-line must say exactly that rather
+  // than print a zero.
+  assert(known.length === 0, "fixture: FY2026 supplies no small-business list at all");
+  assert(!!recipientKpi && /small-business status not supplied/.test(recipientKpi.sub),
+    "with no list supplied, the sub-line says so instead of stating '0 of them small business'");
+  assert(!!recipientKpi && !/^0 of them/.test(recipientKpi.sub),
+    "NEGATIVE CONTROL — the old wording asserted a measured zero from an absent list");
+  assert(!!recipientKpi && recipientKpi.sub.includes("top "),
+    "the recipients KPI names itself a display cap — the count is ours, not the market's");
+
+  // ── ONE COMPANY IS ONE ROW ────────────────────────────────────────────────
+  // USAspending does not normalise legal names, so the same firm arrives as
+  // "… INCORPORATED" and "… INC". Two rows understate concentration, which is
+  // the only thing this panel exists to convey.
+  const keyed = dupFy.incumbents.map((i) => `${recipientKey(i.name)}|${i.naics}`);
+  assert(new Set(keyed).size === keyed.length,
+    "no legal entity appears twice under one NAICS code");
+  assert(recipientKey("HUNTINGTON INGALLS INCORPORATED") === recipientKey("HUNTINGTON INGALLS INC"),
+    "the two Huntington Ingalls spellings resolve to one entity");
+  assert(recipientKey("GENERAL DYNAMICS") !== recipientKey("GENERAL ELECTRIC"),
+    "NEGATIVE CONTROL — stripping suffixes must not merge two different firms");
+  assert(recipientKey("BATH IRON WORKS CORPORATION") !== recipientKey("ELECTRIC BOAT CORPORATION"),
+    "NEGATIVE CONTROL — a shared suffix is not a shared identity");
+
+  // ── AN OPEN FISCAL YEAR CARRIES NO YEAR-OVER-YEAR ─────────────────────────
+  // The stored total for the running year is obligations TO DATE, and Q4 is the
+  // heaviest quarter — dividing a part-year by a whole one printed −43.1% and
+  // read as a collapsing market.
+  const openKpi = dupFy.kpis.find((k) => /Obligated/i.test(k.label));
+  assert(!!openKpi && openKpi.delta === null,
+    "the open year states no year-over-year");
+  assert(!!openKpi && /to date/.test(openKpi.sub),
+    "and says on its face that the year is still running");
+  const closedKpi = out.BY_FY.FY2024.kpis.find((k) => /Obligated/i.test(k.label));
+  assert(!!closedKpi && !/to date/.test(closedKpi.sub),
+    "NEGATIVE CONTROL — a closed year is not labelled as partial");
 
   // ── AGENCIES · per-NAICS split preserved for the treemap ──────────────────
   const dod = out.BY_FY.FY2024.agencies[0];
@@ -231,8 +285,14 @@ async function main() {
 
   // ── UNSUPPORTED PANELS ARE NAMED ──────────────────────────────────────────
   const panels = out.unsupported.map((u) => u.panel).sort();
-  assert(JSON.stringify(panels) === JSON.stringify(["budget-trajectory", "ndaa", "opportunity-matrix", "pricing"]),
-    "all four unsourced panels are named rather than left to render empty");
+  // CEO ruling 2026-08-11: the two MACRO panels are deleted, not wired. A budget
+  // topline and NDAA text are not scoped to this customer's codes — that is news,
+  // and a panel announcing its own absence is a fabricated section with an honest
+  // label. The two that remain are ours to build, not the source's to supply.
+  assert(JSON.stringify(panels) === JSON.stringify(["opportunity-matrix", "pricing"]),
+    "only the two BUILDABLE panels are named; the macro ones are gone, not blank");
+  assert(out.unsupported.every((u) => /buildable/i.test(u.needs)),
+    "each names the work as ours — saying 'not in the feed' blamed the source for our own architecture choice");
   assert(out.unsupported.every((u) => u.needs.length > 20),
     "each states the measurement it would need — an unsourced panel and an empty one must not read alike");
 
