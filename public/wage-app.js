@@ -279,12 +279,6 @@
     const spec = r.spec || null;
     const cmp = S.compare && S.compare.category === r.category ? S.compare : null;
 
-    /* WHERE IT CAME FROM, ONLY WHEN IT DIFFERS. 50 of the 55 reference rows carry the same
-       source string, so printing it on every panel is a line the reader learns to skip. It is
-       stated once beneath the table and repeated here only when this row is one of the few
-       that came from somewhere else. */
-    const DEFAULT_SOURCE = 'BLS OES 2024 + SCA';
-    const oddSource = r.source && r.source !== DEFAULT_SOURCE ? r.source : null;
 
     fill(host, [
       h('div', { cls: 'cop-head' }, [
@@ -319,7 +313,18 @@
         : h('span', { text: 'The GSA CALC+ lookup could not be reached, so no comparison is shown rather than a stale one.', style: 'color:var(--mute)' })
       ]),
 
-      oddSource ? h('div', { cls: 'cop-note' }, [h('b', { text: 'Where this one came from' }), h('span', { text: oddSource })]) : null,
+      /* BOTH NUMBERS, BOTH SOURCES. The panel shows a reference band and an awarded median side
+         by side — two different origins — so it names each rather than leaving the reader to
+         infer that an absent line means the default. The row still stays quiet: 50 of the 55
+         carry the same reference string and repeating it on every row is the bloat this
+         replaced. */
+      h('div', { cls: 'cop-note' }, [
+        h('b', { text: 'Where these came from' }),
+        rows([
+          ['Reference band', r.source || 'source not recorded', false],
+          ['Awarded median', cmp && cmp.state === 'found' ? 'GSA CALC+ · awarded ceiling rates' : 'not shown for this category', false]
+        ])
+      ]),
 
       h('div', { cls: 'cop-note' }, [
         h('b', { text: 'What it is not' }),
