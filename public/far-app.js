@@ -106,7 +106,7 @@
     }
   }
 
-  /* timeline: x = date, y-jitter by impact band, dot size = affects */
+  /* timeline: x = date, y-jitter by impact band, dot size = clauses amended */
   function renderTimeline() {
     const svg = d3.select('#timelineSvg'); svg.selectAll('*').remove();
     const node = $('timelineSvg'); if (!node) return;
@@ -141,16 +141,16 @@
     // dots
     svg.selectAll('circle.tld').data(data, d => d.id).join('circle')
       .attr('class', d => 'tld' + (S.sel === d.id ? ' sel' : '') + (S.sel && S.sel !== d.id ? ' dim' : ''))
-      .attr('cx', d => x(new Date(d.date))).attr('cy', d => y(d.impact)).attr('r', d => r(d.affects))
+      .attr('cx', d => x(new Date(d.date))).attr('cy', d => y(d.impact)).attr('r', d => r(d.amends))
       .attr('fill', d => D.TYPE_COLOR[d.type]).attr('opacity', 1).attr('stroke', css('--card')).attr('stroke-width', 1.8)
       .style('cursor', 'pointer')
       .on('click', (ev, d) => { S.sel = S.sel === d.id ? null : d.id; renderAll(); })
       .on('mousemove', (ev, d) => {
         const tip = $('coTip');
-        tip.innerHTML = `<div style="font-family:Manrope;font-weight:800;font-size:12px;margin-bottom:3px">${d.clause || d.title}</div><div style="font-family:'IBM Plex Mono';font-size:10px;color:#cbd5e1;line-height:1.5">${d.title} · ${d.type}<br>${fmtDate(d.date)} · ${d.affects} affected</div>`;
+        tip.innerHTML = `<div style="font-family:Manrope;font-weight:800;font-size:12px;margin-bottom:3px">${d.clause || d.title}</div><div style="font-family:'IBM Plex Mono';font-size:10px;color:#cbd5e1;line-height:1.5">${d.title} · ${d.type}<br>${fmtDate(d.date)} · ${d.amends} clause(s) amended</div>`;
         tip.style.display = 'block'; tip.style.left = Math.min(ev.clientX + 14, window.innerWidth - 220) + 'px'; tip.style.top = (ev.clientY + 14) + 'px';
       }).on('mouseleave', () => $('coTip').style.display = 'none');
-    $('timelineLegend').innerHTML = Object.entries(D.TYPE_COLOR).map(([k, c]) => `<span class="lg"><i style="background:${c}"></i>${k}</span>`).join('') + `<span class="lg" style="color:var(--mute-2)">○ size = contracts affected</span>`;
+    $('timelineLegend').innerHTML = Object.entries(D.TYPE_COLOR).map(([k, c]) => `<span class="lg"><i style="background:${c}"></i>${k}</span>`).join('') + `<span class="lg" style="color:var(--mute-2)">○ size = clauses amended</span>`;
   }
 
   function renderPanel() {
@@ -170,7 +170,7 @@
       </div>
       <div class="cop-metrics">
         <div class="cop-m"><span class="mv">${fmtDate(u.date).split(',')[0]}</span><span class="ml">Effective</span></div>
-        <div class="cop-m"><span class="mv">${u.affects}</span><span class="ml">Contracts hit</span></div>
+        <div class="cop-m"><span class="mv">${u.amends}</span><span class="ml">Clauses amended</span></div>
         <div class="cop-m"><span class="mv">${esc(u.type)}</span><span class="ml">Source</span></div>
       </div>
       <div class="cop-note" style="border-bottom:1px solid var(--line-2)"><b>What changed</b>${esc(u.summary)}</div>
@@ -185,7 +185,7 @@
     let data = filtered().slice();
     if (S.sort === 'Newest') data.sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
     else if (S.sort === 'Impact') data.sort((a, b) => impMeta(b.impact).rank - impMeta(a.impact).rank || Date.parse(b.date) - Date.parse(a.date));
-    else data.sort((a, b) => b.affects - a.affects);
+    else data.sort((a, b) => b.amends - a.amends);   // 'Most amended' — clauses, not contracts
     $('feedCount').innerHTML = isDown() ? 'source unavailable'
       : isPending() ? 'loading…'
       : `${data.length} updates · click any card to inspect`;
@@ -249,14 +249,16 @@
 
   /* WHAT THE PAGE OPENS ON. Blank on load and blank after Reset made the reader hunt for the
      interaction before the page had told them anything.
-     RANKED BY WHAT IT DOES TO THIS CUSTOMER FIRST. Impact is a keyword heuristic over the title
+     RANKED BY HOW MUCH OF THE FAR THE RULE REWRITES. Impact is a keyword heuristic over title
      and summary — nothing authoritative sets it — so it cannot be the primary sort without
-     promoting a guess to the page's headline. Contracts touched is a fact about this account.
-     It is 0 for every row today because no solicitations are on file, so the order behaves as
-     impact-then-newest until that changes, and changes by itself when it does. */
+     promoting a guess to the page's headline claim. The count of sections a rule amends is read
+     from the rule's own amendatory instructions, which is a fact about the rule.
+     IT IS NOT A COUNT OF THIS CUSTOMER'S CONTRACTS. That list is separate, it is empty until
+     solicitations are on file, and conflating the two is what put "97 CONTRACTS HIT" on a
+     screen whose own KPI card read 0. */
   function defaultPick(rows) {
     return rows.slice().sort((a, b) =>
-      (b.affects - a.affects) ||
+      (b.amends - a.amends) ||
       (impMeta(b.impact).rank - impMeta(a.impact).rank) ||
       (Date.parse(b.date) - Date.parse(a.date))
     )[0] || null;
@@ -275,7 +277,7 @@
   function renderInsight() {
     const u = D.UPDATES.find(x => x.id === S.sel);
     let html;
-    if (u && u.impact === 'HIGH') html = `<span class="ib-label">Priority</span><b>${esc(u.clause ? u.clause + " · " : "")}${esc(u.title)}</b> is high-impact and hits <b>${esc(String(u.affects))} of your contracts</b> — ${esc(u.insight)}`;
+    if (u && u.impact === 'HIGH') html = `<span class="ib-label">Priority</span><b>${esc(u.clause ? u.clause + " · " : "")}${esc(u.title)}</b> is high-impact and amends <b>${esc(String(u.amends))} clause(s)</b>.`;
     else if (u) html = `<span class="ib-label">Focus</span><b>${esc(u.clause || u.title)}</b> (${esc(u.type)}, ${esc(impMeta(u.impact).label.toLowerCase())} impact) — ${esc(u.insight)}`;
     else {
       /* NOTHING SELECTED IS NOT NOTHING PUBLISHED. With rows on the page this branch used to

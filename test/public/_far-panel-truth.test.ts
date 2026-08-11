@@ -238,8 +238,11 @@ async function main(): Promise<void> {
     const pick = app.slice(app.indexOf("function defaultPick(rows)"), app.indexOf("function autoPick()"));
     check("the default-pick source was sliced, not empty", pick.length > 120,
       `sliced ${pick.length} chars — the checks below would be vacuous`);
-    check("the ranking leads with contracts affected", /\(b\.affects - a\.affects\) \|\|/.test(pick),
-      "the page opens on a keyword heuristic instead of on what touches this customer");
+    // NAMED FOR WHAT IT SORTS. This assertion first read "leads with contracts affected" — the
+    // same mislabel as the panel, one layer down. The field counts CFR sections a rule amends;
+    // the customer's own contract count is a different list that is 0 for every row today.
+    check("the ranking leads with the breadth of the change", /\(b\.amends - a\.amends\) \|\|/.test(pick),
+      "the page opens on a keyword heuristic rather than on how much of the FAR a rule rewrites");
     check("…then impact, then newest", /impMeta\(b\.impact\)\.rank - impMeta\(a\.impact\)\.rank/.test(pick)
       && /Date\.parse\(b\.date\) - Date\.parse\(a\.date\)/.test(pick),
       "ties are broken arbitrarily, so the page opens somewhere different on each load");
@@ -266,6 +269,42 @@ async function main(): Promise<void> {
 
     check("P· the ranking check can see an impact-first sort",
       !/\(b\.affects - a\.affects\) \|\|/.test("rows.sort((a,b) => impMeta(b.impact).rank - impMeta(a.impact).rank)"));
+  }
+
+
+  // ── A NUMBER MAY NOT BE LABELLED AS SOMETHING IT IS NOT ──────────────────
+  // Found by driving the deployed page: the panel read "97 CONTRACTS HIT" while the KPI card
+  // directly above it read "AFFECTED CONTRACTS 0". Two numbers contradicting each other on one
+  // screen, for a customer with no solicitations on file.
+  //
+  // `affects_clauses` is the set of CFR sections a rule amends. It was mapped to a field called
+  // `affects` and rendered as "Contracts hit", "size = contracts affected" and "hits N of your
+  // contracts" — in four places. That read as true only while it was always 0, which it was
+  // until clause extraction landed. Making a number correct turned a dormant mislabel into a
+  // false claim, which is the cost of fixing a fail-open.
+  console.log("\n── the number says what it counts ──");
+  {
+    const data = readFileSync(join(PUBLIC, "far-data.js"), "utf8");
+
+    check("the field is named for what it counts", /amends: Array\.isArray\(u\.affects_clauses\)/.test(live),
+      "a field named `affects` invites the label `contracts affected`");
+    check("no surface calls it contracts",
+      !/Contracts hit/.test(app) && !/contracts affected/.test(app) && !/of your contracts/.test(app),
+      "the panel, the legend or the insight bar still claims this counts contracts");
+    check("the panel says clauses amended", /<span class="ml">Clauses amended<\/span>/.test(app));
+    check("the timeline legend says clauses amended", /size = clauses amended/.test(app),
+      "the dot size is explained as contracts");
+    check("the sort control says what it sorts", /'Most amended'/.test(data),
+      "the control is labelled for contracts and sorts by clauses");
+
+    // The customer's real contract count lives elsewhere and stays there.
+    check("the affected-contracts panel is untouched", /D\.AFFECTED/.test(app),
+      "the genuine contracts list was renamed along with the mislabelled count");
+    check("the KPI card still reads the contracts list", /AFFECTED|affList/.test(app));
+
+    check("P· the mislabel check can see the shipped text",
+      /Contracts hit/.test('<span class="ml">Contracts hit</span>'),
+      "the check cannot see the label it forbids");
   }
 
   console.log(`\n${pass} passed · ${fail} failed`);
