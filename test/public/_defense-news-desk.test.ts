@@ -285,6 +285,22 @@ console.log("\n── J · desk panel, sources, attribution ──");
   check("the fallback is visually quieter", /\.dn-insight:not\(\.is-ai\)\{background:transparent/.test(HTML));
 }
 
+// ── K · the page's own cost is auditable ──
+console.log("\n── K · spend reporting ──");
+{
+  check("token usage is read from the API response", JUDGE.includes("msg.usage.input_tokens") && JUDGE.includes("msg.usage.output_tokens"),
+    "an estimate cannot be checked against a bill");
+  check("the route accumulates it per request", ROUTE.includes("const spend: ChunkUsage[]"));
+  check("it is reported to the caller", /spend: \{[\s\S]{0,400}usd:/.test(ROUTE));
+  check("and logged server-side", /\[defense-news\] judged/.test(ROUTE));
+  check(
+    "the dollar figure is derived from tokens, not hardcoded",
+    /RATE_PER_MTOK\.input/.test(ROUTE) && /RATE_PER_MTOK\.output/.test(ROUTE),
+    "a fixed number would drift silently from the real rate"
+  );
+  check("a fully-cached request reports zero calls", ROUTE.includes("calls: spend.length"));
+}
+
 // ── G · SELF-ARM ──
 console.log("\n── G · self-arm ──");
 {
