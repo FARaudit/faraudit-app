@@ -199,8 +199,9 @@ console.log("\n── H · scroll-read summary, domains, freshness ──");
     "stripping first leaves &lt;span&gt; to be decoded into visible markup");
 
   // Story volume is derived, not blank and not invented.
-  check("volume is computed from the stories' own dates", HTML.includes("volumeSeries") && HTML.includes("a.publishedAt"));
-  check("no per-day history is claimed", !HTML.includes("Story Volume · 14 Days"));
+  check("no per-day publication histogram ships", !HTML.includes("volumeSeries") && !HTML.includes("dn-vol-svg"),
+    "it charted when publishers published — a newsroom metric the reader cannot act on");
+  check("no per-day history is claimed", !HTML.includes("Story Volume"));
 
   // Code-driven sources — the only feed whose content depends on who is asking.
   check("Google News feeds are built from the customer's codes",
@@ -252,6 +253,36 @@ console.log("\n── I · landing tab, agency chip, pictures ──");
     "naming publishers would miss the next one that does this");
   const ogLimit = Number((ROUTE.match(/const OG_LOOKUP_LIMIT = (\d+)/) || [])[1]);
   check("og lookup covers a page of stories", ogLimit >= 40, String(ogLimit));
+}
+
+// ── J · panels must not restate what the tabs already say ──
+console.log("\n── J · desk panel, sources, attribution ──");
+{
+  check("the intel panel breaks down the reader's OWN codes", HTML.includes("deskRows") && HTML.includes("agencyRows"));
+  check(
+    "it no longer re-counts stories by domain",
+    !HTML.includes("topicCounts"),
+    "the tab strip already prints those six numbers one row above"
+  );
+  check("a code with no hits stays on the chart at zero", /A code with no hits this week is a real answer/.test(HTML));
+
+  // The per-source counts were the per-feed cap, identical on every row forever.
+  check(
+    "the sidebar no longer prints a per-source count",
+    !/esc\(!s\.ok \? 'down' : String\(s\.count/.test(HTML),
+    "every feed is read to the same cap, so the number could not move"
+  );
+  check("a dead source is still surfaced", /responding/.test(HTML) && HTML.includes("dead.length"));
+
+  // Aggregated stories must be credited to the outlet, not to the query.
+  check("the publisher is parsed off aggregated items", ROUTE.includes("<source") && ROUTE.includes("attributed"));
+  check("the ' - Publisher' suffix is stripped from the headline", /cleanTitle\.endsWith\(suffix\)/.test(ROUTE));
+  check("the surfacing feed is kept separately", ROUTE.includes("via:") && LIVE.includes("via:"));
+
+  // AI Insight rides the house palette and carries a mark.
+  check("the AI variant uses the accent palette", /\.dn-insight\.is-ai\{border-left-color:var\(--accent\)/.test(HTML));
+  check("it carries a visual mark", /\.dn-insight\.is-ai b::before/.test(HTML));
+  check("the fallback is visually quieter", /\.dn-insight:not\(\.is-ai\)\{background:transparent/.test(HTML));
 }
 
 // ── G · SELF-ARM ──
