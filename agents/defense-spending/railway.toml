@@ -1,0 +1,22 @@
+# Defense Spending Intel — Railway cron worker.
+#
+# Runs daily at 04:00 UTC = 23:00 prior-day CT, after USAspending's own daily
+# refresh has settled. Slot chosen to sit clear of the other crons in this
+# project: sam-ingest 11:00, recompete-ai 12:00, regulatory-ai 13:00.
+#
+# Configure in the Railway dashboard: Root Directory = agents/defense-spending,
+# Watch Paths = agents/defense-spending/**.
+#
+# NAICS_CODES is a service variable, not a default in code: the set it pulls is
+# the union of every customer's capability-statement codes, and a page scoped to
+# a code this worker has never pulled says so rather than showing another code's
+# figures.
+
+[build]
+buildCommand = ""
+
+[deploy]
+startCommand = "npx tsx index.ts"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+cronSchedule = "0 4 * * *"
