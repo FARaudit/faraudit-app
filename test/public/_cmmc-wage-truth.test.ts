@@ -217,8 +217,13 @@ ok(!SILENT_CATCH.test("catch (e) { return { state: 'error' }; }"),
     "clicking quickly paints one category's awarded rates under another's name");
 
   // Source per row was 50-of-55 identical; it prints only when this row differs.
-  ok(/r\.source !== DEFAULT_SOURCE/.test(wapp), "the source line prints only when it differs",
-    "the same sentence is repeated on every panel and learns to be skipped");
+  // SUPERSEDED BY CEO RULING 2026-08-11. The panel prints BOTH sources always: it now shows a
+  // reference band and an awarded median side by side, two different origins, and the panel has
+  // the room the row does not. The row stays quiet — that is where the repetition was bloat.
+  ok(/Where these came from/.test(wapp), "the panel names where each number came from",
+    "the reader has to infer that an absent source line means the default");
+  ok(!/wr-src', text: r\.source/.test(wapp), "the ROW still does not repeat the source 55 times",
+    "the bloat the CEO flagged is back on the row");
 
   ok(/\['Low', r\.rate_low\]/.test("[['Low', r.rate_low], ['Median', r.rate_median]]"), "P· the band check can see the restated shape",
     "the check cannot see the shape it forbids");
@@ -272,6 +277,31 @@ ok(!SILENT_CATCH.test("catch (e) { return { state: 'error' }; }"),
 
   ok(/function headlineRate/.test("function headlineRate(r) { return money(r.rate_median); }"),
     "P· the headline check can see a reference-only implementation");
+}
+
+// ── THE BADGE DESCRIBES WHAT THE ROW ACTUALLY SHOWS ─────────────────────────
+// CEO: "it states source shown per row but I do not see it." Correct — the row's sub-line was
+// changed to say WHAT THE RATE IS ("Awarded median · 22 rates", "Reference — not indexed by
+// CALC+") and the badge kept describing the behaviour it replaced. The band's source is stated
+// ONCE on the panel instead, which is what he asked for: 50 of 55 rows carry the same string.
+{
+  const wh = read("wage-benchmarks.html");
+  const wa = read("wage-app.js");
+  ok(!/source shown per row/i.test(wh),
+    "the badge no longer claims a per-row source the rows do not print");
+  ok(/reference: BLS OES 2024 \+ SCA/i.test(wh),
+    "the band's source is stated once, at the surface that holds it");
+  ok(/WHAT THIS RATE IS/i.test(wh),
+    "the column header no longer says what the sub-line contains");
+  ok(/Awarded median · ' \+ r\.awarded\.count/.test(wa) && /not indexed by CALC\+/.test(wa),
+    "the row sub-line states which of the two numbers it is showing");
+  ok(/source shown per row/i.test('<span class="wh-source">source shown per row</span>'),
+    "P(+): the stale-badge check can see the shipped text");
+  // The panel has the room the row does not, and now holds two numbers from two origins.
+  ok(/Where these came from/.test(wa), "the panel names where each number came from");
+  ok(/\['Reference band', r\.source/.test(wa), "…the reference band's own source");
+  ok(/GSA CALC\+ · awarded ceiling rates/.test(wa), "…and the awarded median's");
+  ok(!/const oddSource/.test(wa), "the conditional source line is gone, not left dead beside it");
 }
 
 console.log(`\n══════ ${pass} passed · ${fail} failed ══════`);
