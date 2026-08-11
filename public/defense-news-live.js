@@ -24,6 +24,9 @@
       urlToImage:   it.image || it.imageUrl || null,
       tags:         Array.isArray(it.tags) ? it.tags : [],
       aiInsight:    it.ai_insight || '',
+      /* Which feed surfaced the story, when that is not who published it — a
+         code-driven query is worth naming, but the byline belongs to the outlet. */
+      via:          it.via || '',
       /* How much this story bears on the reader's own codes, 0-100. NULL means
          nothing judged it, which is kept distinct from 0 — judged and found
          irrelevant. A `|| 0` here would erase that difference.
@@ -136,13 +139,9 @@
       // rather than a fixed list, so a source that stops returning anything shows
       // as a zero instead of continuing to claim coverage.
       window.DN_SOURCES = Array.isArray(data.sources) ? data.sources : [];
-      // The window the route actually applied, so the volume panel frames itself
-      // on the real span instead of a number typed into the chart.
+      // The freshness window the route actually applied.
       window.DN_FRESHNESS = (data.freshness && typeof data.freshness === 'object') ? data.freshness : null;
-      var vt = document.getElementById('dn-vol-title');
-      if (vt && window.DN_FRESHNESS) {
-        vt.textContent = 'Stories on this page · last ' + window.DN_FRESHNESS.window_days + ' days';
-      }
+
       window.DN_NAICS = Array.isArray(data.naics) ? data.naics : [];
       window.DN_NAICS_SOURCE = data.naics_source || '';
 

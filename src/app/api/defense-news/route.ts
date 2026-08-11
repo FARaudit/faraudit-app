@@ -64,6 +64,8 @@ interface NewsItem {
   // Set only when the deterministic scorer found the code's own regulation terms
   // in the text. It is rare and it is certain, so it is what the badge cites.
   desk_terms: string[];
+  /** The feed that surfaced this story when that differs from who published it. */
+  via: string | null;
   // Which tab this story files under, and who is buying. Both come from the
   // judgement; both are null when nothing judged the story.
   domain: string | null;
@@ -170,7 +172,24 @@ function parseItems(xml: string, source: string, tag: NewsItem["tag"]): NewsItem
       (block.match(/<description>([\s\S]*?)<\/description>/) || [])[1] ||
       (block.match(/<summary[^>]*>([\s\S]*?)<\/summary>/) || [])[1] ||
       "";
-    const cleanTitle = stripCdataAndTags(title);
+    let cleanTitle = stripCdataAndTags(title);
+    // ── Google News attribution ──
+    // Its items are aggregated from other outlets: the headline carries a
+    // " - Publisher" suffix and the block carries <source url="...">. Without
+    // this the card credits the story to the query that found it. The article's
+    // own URL is NOT recoverable — Google encodes it in an opaque blob and the
+    // link resolves to news.google.com, whose og:image is Google's own logo —
+    // so these stories carry a tile rather than a photograph.
+    let attributed = source;
+    const srcTag = block.match(/<source[^>]*>([\s\S]*?)<\/source>/);
+    if (srcTag) {
+      const publisher = stripCdataAndTags(srcTag[1]);
+      if (publisher) {
+        attributed = publisher;
+        const suffix = ` - ${publisher}`;
+        if (cleanTitle.endsWith(suffix)) cleanTitle = cleanTitle.slice(0, -suffix.length).trim();
+      }
+    }
     if (!cleanTitle) continue;
     const cleanSummary = stripCdataAndTags(description).slice(0, 500).trim();
 
@@ -178,7 +197,10 @@ function parseItems(xml: string, source: string, tag: NewsItem["tag"]): NewsItem
     items.push({
       image: img ? img.url : null,
       image_source: img ? img.carrier : null,
-      source,
+      source: attributed,
+      // Which feed surfaced it. For a code-driven query this is the code itself,
+      // which is the whole point — but it is not who reported the story.
+      via: source === attributed ? null : source,
       title: cleanTitle,
       link: cleanCdata(link).trim(),
       pub_date: pub ? new Date(pub).toISOString() : null,
