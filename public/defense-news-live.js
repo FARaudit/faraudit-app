@@ -104,9 +104,31 @@
     }
   }
 
+  /* Recent contract actions in the customer's codes, from USAspending. Its own
+     fetch: the news feed and the award feed fail independently, and one being
+     down must not blank the other. */
+  async function wireAwards() {
+    try {
+      const res = await fetch('/api/defense-awards', { credentials: 'include' });
+      const data = await res.json().catch(function () { return null; });
+      if (!res.ok || !data || !Array.isArray(data.awards)) {
+        window.DN_AWARDS = [];
+        window.DN_AWARDS_STATE = 'error';
+      } else {
+        window.DN_AWARDS = data.awards;
+        window.DN_AWARDS_STATE = (data.meta && data.meta.reason) || 'ready';
+      }
+    } catch (e) {
+      window.DN_AWARDS = [];
+      window.DN_AWARDS_STATE = 'error';
+    }
+    if (typeof renderSidebar === 'function') renderSidebar();
+    if (typeof renderTicker === 'function') renderTicker();
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', wire);
+    document.addEventListener('DOMContentLoaded', function () { wire(); wireAwards(); });
   } else {
-    wire();
+    wire(); wireAwards();
   }
 })();
