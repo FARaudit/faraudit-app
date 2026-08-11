@@ -74,10 +74,9 @@
     // the moment the article list is replaced and must repaint with it.
     if (typeof renderNav === 'function')          renderNav();
     if (typeof renderSectionLabel === 'function') renderSectionLabel();
+    if (typeof renderDeskStat === 'function')     renderDeskStat();
     if (typeof renderLead === 'function')      renderLead();
     if (typeof renderGrid === 'function')      renderGrid();
-    // DN_INTEL is the intel panel's export; the renderers are IIFE-scoped.
-    if (typeof window.DN_INTEL === 'function') window.DN_INTEL();
     // Start the hang watchdog on whatever this pass put on the page.
     if (typeof dnWatchImages === 'function')   dnWatchImages();
   }
@@ -198,7 +197,6 @@
       window.DN_AWARDS_STATE = 'error';
     }
     if (typeof renderSidebar === 'function') renderSidebar();
-    if (typeof renderTicker === 'function') renderTicker();
   }
 
   /* ── Staying live ──
