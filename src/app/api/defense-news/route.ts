@@ -5,6 +5,7 @@ import { extractFeedImage, extractOgImage, type ImageCarrier } from "@/lib/news-
 import { resolveFeedScope } from "@/lib/bd-os/live-opportunities";
 import { scoreArticle, scopeKey, deskDescription, distinctiveTerms } from "@/lib/defense-news-naics";
 import { naicsTitle } from "@/lib/naics-titles";
+import { decodeEntities } from "@/lib/feed-entities";
 import { judgeChunk, RATE_PER_MTOK, type Judgement, type ChunkUsage } from "@/lib/defense-news-judge";
 
 export const dynamic = "force-dynamic";
@@ -231,15 +232,6 @@ function stripCdataAndTags(s: string): string {
 }
 function cleanCdata(s: string): string {
   return s.replace(/<!\[CDATA\[/g, "").replace(/\]\]>/g, "");
-}
-function decodeEntities(s: string): string {
-  return s
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, " ");
 }
 
 function deriveRelevance(title: string, summary: string, tag: NewsItem["tag"]): string {
