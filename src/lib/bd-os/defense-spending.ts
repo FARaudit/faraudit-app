@@ -268,6 +268,12 @@ export async function fetchDefenseSpending(
       }
     }
     incumbents.sort((a, b) => b.val - a.val);
+    // ONE list, counted once. The KPI beside this panel used to count DISTINCT
+    // NAMES while the panel rendered ROWS, and USAspending lists the same
+    // recipient more than once when it holds separate award records — so the
+    // card read 9 above a table of 10. A number stated beside a panel has to be
+    // the panel's own number.
+    const shownIncumbents = incumbents.slice(0, 20);
 
     const recompeteCount = rowsFor(fy).reduce((a, r) => a + (r.recompetes_expiring_180d || []).length, 0);
 
@@ -292,10 +298,10 @@ export async function fetchDefenseSpending(
           spark: sbPctSeries
         },
         {
-          label: "Recipients in top ten",
-          val: String(new Set(incumbents.map((i) => i.name)).size),
+          label: "Top recipients listed",
+          val: String(shownIncumbents.length),
           unit: "",
-          sub: `${incumbents.filter((i) => i.sb).length} of them small business`,
+          sub: `${shownIncumbents.filter((i) => i.sb).length} of them small business`,
           delta: null,
           tone: "accent",
           spark: []
@@ -312,7 +318,7 @@ export async function fetchDefenseSpending(
       ],
       states,
       agencies,
-      incumbents: incumbents.slice(0, 20)
+      incumbents: shownIncumbents
     };
   });
 

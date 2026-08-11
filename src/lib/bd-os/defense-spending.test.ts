@@ -61,7 +61,14 @@ const ROWS = [
   {
     naics_code: "336412", fiscal_year: 2026,
     total_obligations: 2555860963.78, sb_obligations: 10214286.85, sb_pct: 0.4, yoy_delta_pct: -78.74,
-    top_recipients: [{ name: "GENERAL ELECTRIC COMPANY", amount: 1059476264 }],
+    // GENERAL ELECTRIC COMPANY twice is real: USAspending returns it under two
+    // award records. This is the duplication that made a distinct-name count
+    // read 9 above a table of 10.
+    top_recipients: [
+      { name: "GENERAL ELECTRIC COMPANY", amount: 1059476264 },
+      { name: "RTX CORPORATION", amount: 664829808 },
+      { name: "GENERAL ELECTRIC COMPANY", amount: 401000000 }
+    ],
     sb_recipients: [],
     agency_breakdown: [{ name: "Department of Defense", amount: 2471563423 }],
     state_breakdown: [{ state: "CT", amount: 702326852 }],
@@ -147,6 +154,17 @@ async function main() {
   assert(inc24.find((i) => i.name === "CFM INTERNATIONAL INC")?.sb === false
       && inc24.find((i) => i.name === "AERO TURBINE, INC")?.sb === false,
     "two large primes whose names end in INC are NOT flagged SB — the flag is READ, never inferred from the name");
+
+  // ── THE KPI COUNTS THE PANEL'S OWN ROWS ──────────────────────────────────
+  // USAspending lists a recipient more than once when it holds separate award
+  // records, so a count of DISTINCT NAMES sits below a count of ROWS. The
+  // fixture carries that duplication on purpose.
+  const dupFy = out.BY_FY.FY2026;
+  const recipientKpi = dupFy.kpis.find((k) => /recipient/i.test(k.label));
+  assert(!!recipientKpi && Number(recipientKpi.val) === dupFy.incumbents.length,
+    "the recipients KPI states the number of rows the panel renders, not a distinct-name count");
+  assert(!!recipientKpi && Number(recipientKpi.sub.split(" ")[0]) === dupFy.incumbents.filter((i) => i.sb).length,
+    "and its small-business sub-line counts the same rows");
 
   // ── AGENCIES · per-NAICS split preserved for the treemap ──────────────────
   const dod = out.BY_FY.FY2024.agencies[0];
