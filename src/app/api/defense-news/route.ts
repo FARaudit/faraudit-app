@@ -33,9 +33,19 @@ const MAX_AGE_DAYS = 7;
 // read, the newest items are kept regardless of age and the page says so.
 const MIN_ITEMS = 24;
 // Article fetches for og:image, for the feeds that carry no image element.
-// Bounded to what is read before scrolling: a fetch costs a round trip and buys
-// a photograph, so it is spent where the photograph is looked at.
-const OG_LOOKUP_LIMIT = 40;
+//
+// EVERY photoless item is looked up, not the first screenful. A positional cap
+// silently decided that whatever sat below it would never have a picture, and it
+// went wrong the moment the feed outgrew it: at 40, a 56-item page left its last
+// 16 stories permanently photoless no matter what their publishers served. The
+// number of stories moves with how much was published and how many codes are on
+// file, so any fixed cap is wrong again on the next quiet Tuesday.
+//
+// This costs no model spend — one HTTP round trip per article, cached for a day
+// against the article's own URL, so a refresh five minutes later and every other
+// reader that day pay nothing. The bound that matters is therefore how many run
+// at once, not how many run.
+const OG_FETCH_CONCURRENCY = 8;
 // Per feed. Defense News publishes 25 items and DoD News 20; reading 6 threw
 // away the newest two thirds of the biggest feed and let a slow feed's week-old
 // items fill the page. Measured 2026-08-11: at 6/feed the freshest story on the
@@ -152,6 +162,28 @@ async function fetchOgImage(articleUrl: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+/** Run `fn` over every item with at most `limit` in flight. Results come back in
+ *  input order, and a rejection is impossible by construction — fetchOgImage
+ *  already resolves to null on failure, so one unreachable publisher cannot take
+ *  the rest of the page's pictures with it. */
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    for (;;) {
+      const i = next++;
+      if (i >= items.length) return;
+      out[i] = await fn(items[i]);
+    }
+  });
+  await Promise.all(workers);
+  return out;
 }
 
 // Tiny RSS/Atom item extractor. Looks for <item>…</item> and <entry>…</entry>.
@@ -337,12 +369,14 @@ export async function GET() {
   const items = windowed ? fresh : allRows.slice(0, MIN_ITEMS);
 
   // ━━ og:image for the items whose feed carried no picture ━━
-  // Bounded to the run of items a reader actually sees before scrolling, and
-  // only for items still without one — an article fetch costs a round trip and
-  // buys a photograph, so it is spent where the photograph is looked at.
-  const needsOg = items.slice(0, OG_LOOKUP_LIMIT).filter((i) => !i.image && i.link);
+  // Every one of them, however far down the page it sits. A story the reader
+  // scrolls to is not worth less than the one at the top, and the cost of asking
+  // is a cached round trip rather than a model call.
+  const needsOg = items.filter((i) => !i.image && i.link);
   if (needsOg.length > 0) {
-    const resolved = await Promise.all(needsOg.map((i) => fetchOgImage(i.link)));
+    const resolved = await mapWithConcurrency(needsOg, OG_FETCH_CONCURRENCY, (i) =>
+      fetchOgImage(i.link)
+    );
 
     // ━━ House banners are not story photographs ━━
     // Some publishers put a single site-wide graphic in og:image on every page.
