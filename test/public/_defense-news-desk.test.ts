@@ -210,6 +210,50 @@ console.log("\n── H · scroll-read summary, domains, freshness ──");
     "otherwise every such code yields the same generic query dressed as personalisation");
 }
 
+// ── I · desk default, agency links, images ──
+console.log("\n── I · landing tab, agency chip, pictures ──");
+{
+  const DCO = read("public/dco-app.js");
+
+  // The page opens on the reader's own codes — but never onto an empty tab.
+  check("a default landing tab is computed", HTML.includes("dnDefaultCat"));
+  check("it lands on the desk only when the desk has stories",
+    /dnDeskCount\(\) > 0\) \? 'desk' : 'all'/.test(HTML),
+    "landing on an empty personalised lane is worse than landing on the wire");
+  check("the reader's own tab choice is not overridden", HTML.includes("DN_CAT_TOUCHED"));
+
+  // Agency chip -> the officers who buy for that agency.
+  check("the agency chip carries a target", /data-agency="/.test(HTML));
+  check("it is not an anchor inside the card's anchor",
+    !/<a[^>]*class="dn-agency/.test(HTML),
+    "a nested <a> is invalid and breaks in browsers");
+  check("it is keyboard reachable", /role="link" tabindex="0"/.test(HTML));
+  check("it navigates to contracting officers", HTML.includes("/contracting-officers?agency="));
+
+  // The receiving page must RESOLVE the name, not assume the vocabularies match.
+  check("the destination reads the agency parameter", DCO.includes("requestedAgency"));
+  check("the name is resolved against agencies that actually exist", DCO.includes("resolveAgency") && DCO.includes("AGENCY_FILTERS"));
+  check("an unresolved agency is stated, not silently ignored",
+    /No officers in your feed are from/.test(DCO),
+    "filtering to a value no officer carries would render an empty list");
+  check("the filter is applied only on a hit", /if \(hit\) S\.agency = hit;/.test(DCO));
+
+  // Pictures: every card gets one, and none of them is a fabricated photograph.
+  check("a tile is drawn when the publisher shipped no photo", HTML.includes("dnTileHTML") && HTML.includes("dn-tile"));
+  check("the tile is typographic, not an image element",
+    !/dn-tile[\s\S]{0,200}<img/.test(HTML),
+    "a stock photograph in this slot would be the house placeholder this codebase refuses");
+  check("side stories get one too", /dn-side-img dn-tile/.test(HTML));
+
+  // A site-wide og:image is not a story photograph.
+  check("shared og:image assets are detected", ROUTE.includes("useCount") && ROUTE.includes("bannersDropped"));
+  check("the rule is measured, not a blocklist",
+    !/open_graph_site_banner/.test(ROUTE.split("const FEEDS")[0]) || ROUTE.includes("(useCount.get(url) ?? 0) > 1"),
+    "naming publishers would miss the next one that does this");
+  const ogLimit = Number((ROUTE.match(/const OG_LOOKUP_LIMIT = (\d+)/) || [])[1]);
+  check("og lookup covers a page of stories", ogLimit >= 40, String(ogLimit));
+}
+
 // ── G · SELF-ARM ──
 console.log("\n── G · self-arm ──");
 {

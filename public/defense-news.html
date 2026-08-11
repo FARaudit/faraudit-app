@@ -318,6 +318,16 @@ button{font-family:inherit}
 .dn-desk{display:inline-flex;align-items:center;gap:6px;max-width:100%;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:4px 9px;border-radius:5px;background:#dcfce7;color:#14532d;margin-bottom:8px}
 .dn-desk .dn-desk-t{font-weight:600;letter-spacing:.02em;text-transform:none;opacity:.8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 [data-theme="dark"] .dn-desk{background:rgba(34,197,94,0.16);color:#86efac}
+.dn-tile{position:relative;display:flex;flex-direction:column;justify-content:flex-end;gap:2px;padding:14px;background:var(--tile-bg);border-radius:8px;overflow:hidden}
+.dn-tile::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(135deg,transparent 0 9px,color-mix(in srgb,var(--tile-ink) 7%,transparent) 9px 10px);pointer-events:none}
+.dn-tile-domain{position:relative;font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--tile-ink);line-height:1.1}
+.dn-tile-src{position:relative;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tile-ink);opacity:.62}
+.dn-side-img.dn-tile{min-height:64px;padding:8px}
+.dn-side-img.dn-tile .dn-tile-domain{font-size:10px}
+[data-theme="dark"] .dn-tile{background:color-mix(in srgb,var(--tile-ink) 34%,#0b1220)}
+[data-theme="dark"] .dn-tile-domain,[data-theme="dark"] .dn-tile-src{color:var(--tile-bg)}
+.dn-agency[data-agency]{cursor:pointer}
+.dn-agency[data-agency]:hover{background:var(--accent-light);color:var(--accent-deep)}
 .dn-desk-note{font-size:11px;color:var(--mute);font-family:"IBM Plex Mono",monospace;padding:10px 0}
 .dn-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .dn-chips:empty{display:none}
@@ -576,7 +586,19 @@ function mergeArticles(){
 }
 
 /* ─── Modern news-outlet rendering ─── */
+/* The page opens on the reader's own desk, not on the wire. Set at render time
+   rather than here, because on an account with no codes — or before the first
+   response lands — that tab does not exist, and landing on a tab that is not
+   there would show an empty page. dnDefaultCat() decides against real state. */
 var DN_CAT = 'all';
+var DN_CAT_TOUCHED = false;
+function dnDefaultCat(){
+  if (DN_CAT_TOUCHED) return DN_CAT;
+  var deskLive = window.DN_DESK && window.DN_DESK.available && (window.DN_NAICS || []).length;
+  // An empty desk lane is worse than the wire: it opens onto nothing. Only land
+  // there when there is something behind it.
+  return (deskLive && dnDeskCount() > 0) ? 'desk' : 'all';
+}
 /* The tabs are DOMAINS, not buying agencies. Both were measured against the same
    live corpus: domain places 85% of stories across six tabs with none empty;
    agency places 46% and leaves three tabs at zero, with the largest bucket being
@@ -681,8 +703,31 @@ function dnWatchImages(){
     if (io) io.observe(img); else dnStartWatch(img);
   });
 }
+/* ─── The tile for a story with no photograph ───
+   Government rulemaking is published without pictures, and a card with an empty
+   region above it reads as a broken image. This draws a typographic tile from the
+   story's own domain and source — it is plainly a designed panel, not a
+   photograph, and it can never be mistaken for one the publisher supplied.
+   Nothing here reaches for a stock image or reuses another story's picture. */
+var DN_TILE = {
+  'Policy':      ['#1e3a5f', '#dbeafe'],
+  'Land':        ['#14532d', '#dcfce7'],
+  'Sea':         ['#0c4a6e', '#e0f2fe'],
+  'Air & Space': ['#3730a3', '#e0e7ff'],
+  'Cyber':       ['#7f1d1d', '#fee2e2'],
+  'Industry':    ['#713f12', '#fef9c3']
+};
+function dnTileHTML(a, tall){
+  var pal = DN_TILE[a.domain] || ['#334155', '#e2e8f0'];
+  return '<div class="dn-img dn-tile" style="--tile-ink:' + pal[0] + ';--tile-bg:' + pal[1] + ';'
+    + 'min-height:' + (tall ? 200 : 132) + 'px">'
+    + '<span class="dn-tile-domain">' + esc(a.domain || 'Defense') + '</span>'
+    + '<span class="dn-tile-src">' + esc(a.sourceName || '') + '</span>'
+    + dnKickerHTML(dnCat(a))
+    + '</div>';
+}
 function dnImgHTML(a, w){
-  if (!a.urlToImage) return '';
+  if (!a.urlToImage) return dnTileHTML(a, (w || 720) >= 720);
   return '<div class="dn-img">' + dnImgTag(a.urlToImage, a.title, w || 720) + dnKickerHTML(dnCat(a)) + '</div>';
 }
 /* The label states what actually wrote the line. `aiInsight` is a summary written
@@ -700,8 +745,25 @@ function dnInsightHTML(a, c){
    view are the same entity. */
 function dnAgencyHTML(a){
   if (!a.agency) return '';
-  return '<span class="dn-agency">' + esc(a.agency) + '</span>';
+  /* A control, not an anchor: the whole card is already a link, and an <a> inside
+     an <a> is invalid and breaks in browsers. The click is intercepted below. */
+  return '<span class="dn-agency" data-agency="' + esc(a.agency) + '" role="link" tabindex="0"'
+    + ' title="Contracting officers at ' + esc(a.agency) + '">' + esc(a.agency) + '</span>';
 }
+
+/* Clicking the agency takes the reader to the officers who buy for it, so the
+   newsroom and the directory name the same entity. Delegated, because cards are
+   re-rendered on every filter change and repaint. */
+function dnAgencyNav(ev){
+  var chip = ev.target.closest && ev.target.closest('.dn-agency[data-agency]');
+  if (!chip) return;
+  if (ev.type === 'keydown' && ev.key !== 'Enter' && ev.key !== ' ') return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  window.location.href = '/contracting-officers?agency=' + encodeURIComponent(chip.getAttribute('data-agency'));
+}
+document.addEventListener('click', dnAgencyNav, true);
+document.addEventListener('keydown', dnAgencyNav, true);
 
 function dnFiltered(){
   var all = mergeArticles();
@@ -748,7 +810,7 @@ function renderNav(){
     return b;
   }).filter(Boolean));
   el.querySelectorAll('.dn-nav-btn').forEach(function(b){
-    b.addEventListener('click', function(){ DN_CAT = b.getAttribute('data-cat'); renderNav(); renderSectionLabel(); renderLead(); renderGrid(); dnWatchImages(); });
+    b.addEventListener('click', function(){ DN_CAT = b.getAttribute('data-cat'); DN_CAT_TOUCHED = true; renderNav(); renderSectionLabel(); renderLead(); renderGrid(); dnWatchImages(); });
   });
 }
 
@@ -761,7 +823,11 @@ function renderLead(){
   var side = list.slice(1, 3).map(function(s){
     var sc = dnCat(s);
     // No photograph → no thumbnail column, and the headline takes the width.
-    var thumb = s.urlToImage ? '<div class="dn-side-img">' + dnImgTag(s.urlToImage, s.title, 256) + '</div>' : '';
+    var thumb = s.urlToImage
+      ? '<div class="dn-side-img">' + dnImgTag(s.urlToImage, s.title, 256) + '</div>'
+      : '<div class="dn-side-img dn-tile" style="--tile-ink:' + (DN_TILE[s.domain] || DN_TILE['Policy'])[0]
+        + ';--tile-bg:' + (DN_TILE[s.domain] || DN_TILE['Policy'])[1] + '"><span class="dn-tile-domain">'
+        + esc(s.domain || 'Defense') + '</span></div>';
     return '<a class="dn-side-story' + (thumb ? '' : ' no-img') + '" href="' + esc(s.url || '#') + '" target="_blank" rel="noopener noreferrer">'
       + '<div class="dn-side-text">'
       +   '<div class="dn-meta"><span style="color:' + sc.catColor + '">' + esc(sc.cat) + '</span><span class="dot">·</span><span>' + esc(dnAge(s)) + '</span></div>'
@@ -1045,7 +1111,7 @@ if (document.readyState === 'loading') {
       b.addEventListener('click', function(){
         if (typeof DN_CAT === 'undefined') return;
         var c = b.getAttribute('data-cat');
-        DN_CAT = (DN_CAT === c ? 'all' : c);
+        DN_CAT = (DN_CAT === c ? 'all' : c); DN_CAT_TOUCHED = true;
         if (typeof renderNav==='function') renderNav();
         if (typeof renderLead==='function') renderLead();
         if (typeof renderGrid==='function') renderGrid();

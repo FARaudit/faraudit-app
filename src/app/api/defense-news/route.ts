@@ -34,7 +34,7 @@ const MIN_ITEMS = 24;
 // Article fetches for og:image, for the feeds that carry no image element.
 // Bounded to what is read before scrolling: a fetch costs a round trip and buys
 // a photograph, so it is spent where the photograph is looked at.
-const OG_LOOKUP_LIMIT = 16;
+const OG_LOOKUP_LIMIT = 40;
 // Per feed. Defense News publishes 25 items and DoD News 20; reading 6 threw
 // away the newest two thirds of the biggest feed and let a slow feed's week-old
 // items fill the page. Measured 2026-08-11: at 6/feed the freshest story on the
@@ -329,13 +329,31 @@ export async function GET() {
   const needsOg = items.slice(0, OG_LOOKUP_LIMIT).filter((i) => !i.image && i.link);
   if (needsOg.length > 0) {
     const resolved = await Promise.all(needsOg.map((i) => fetchOgImage(i.link)));
+
+    // ━━ House banners are not story photographs ━━
+    // Some publishers put a single site-wide graphic in og:image on every page.
+    // Federal Register serves `assets/open_graph_site_banner.png` for every
+    // document, so ten rulemaking notices would carry ten copies of one banner,
+    // each presented as that story's picture. That is the house placeholder this
+    // codebase refuses to draw, arriving through the publisher's own tag.
+    //
+    // Detected rather than blocklisted: a URL that resolves for more than one
+    // ARTICLE in the same response is a template asset, not a photograph of any
+    // one of them. Nothing has to know which publishers do this.
+    const useCount = new Map<string, number>();
+    for (const url of resolved) if (url) useCount.set(url, (useCount.get(url) ?? 0) + 1);
+    let bannersDropped = 0;
+
     needsOg.forEach((it, idx) => {
       const url = resolved[idx];
-      if (url) {
-        it.image = url;
-        it.image_source = "og:image";
-      }
+      if (!url) return;
+      if ((useCount.get(url) ?? 0) > 1) { bannersDropped++; return; }
+      it.image = url;
+      it.image_source = "og:image";
     });
+    if (bannersDropped > 0) {
+      console.log("[defense-news] dropped shared og:image assets", { count: bannersDropped });
+    }
   }
 
   // ━━ Deterministic layer ━━
