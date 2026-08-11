@@ -212,8 +212,14 @@ async function main() {
   assert(near(dod.naics["336412"], 8354.967908, 0.001),
     "the agency carries its per-code amount, so the treemap splits by real numbers");
 
-  // ── RECOMPETES · a passed end date is MARKED, not hidden ──────────────────
-  assert(out.RECOMPETES.length === 3, "one recompete row per stored fiscal year survives");
+  // ── RECOMPETES · DEDUPED, and a passed end date MARKED not hidden ─────────
+  // The worker's recompete question has no fiscal year in it, so the same award
+  // is stored on all three FY rows. Measured on production: 39 entries, 13
+  // distinct — the page showed every award three times.
+  assert(out.RECOMPETES.length === 1,
+    "the same award stored on three fiscal-year rows appears ONCE");
+  assert(new Set(out.RECOMPETES.map((r) => r.award_id)).size === out.RECOMPETES.length,
+    "no award_id appears twice");
   assert(out.RECOMPETES.every((r) => r.award_id === REC.award_id && r.agency === REC.agency),
     "recompete fields are carried verbatim from the feed");
   const past = out.RECOMPETES.filter((r) => r.expired);

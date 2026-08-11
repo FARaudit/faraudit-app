@@ -251,6 +251,8 @@ button{font-family:inherit}
 .ag-row.active{background:var(--accent-pale);border-color:var(--accent-light)}
 [data-theme="dark"] .ag-row.active{background:rgba(55,138,221,0.16)}
 .ag-name{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:800;color:var(--ink)}
+.seg-split{display:flex;height:100%;border-radius:inherit;overflow:hidden}
+.seg-split i{display:block;height:100%}
 .ag-bar2{position:relative;height:18px;border-radius:5px;background:var(--line-2);overflow:hidden}
 .ag-bar2 .seg-lp{position:absolute;left:0;top:0;height:100%;background:linear-gradient(90deg,#274d80,#0A1628);border-radius:5px}
 .ag-bar2 .seg-sb{position:absolute;left:0;top:0;height:100%;background:linear-gradient(90deg,#10b981,#047857);border-radius:5px 0 0 5px}
@@ -485,7 +487,7 @@ button{font-family:inherit}
         <div class="heading">
           <p class="eyebrow">Budget Intelligence</p>
           <h1>Defense Spending</h1>
-          <p class="sub">Where the money is, who's winning it, and where <b>you</b> can</p>
+          <p class="sub">Federal obligations in <b>your NAICS codes</b> — every buying agency, not DoD alone</p>
         </div>
         <div class="hdr-naics">
           <span class="hdr-naics-label">Your NAICS</span>
@@ -498,7 +500,8 @@ button{font-family:inherit}
       <section class="controls">
         <div class="ctl-grp"><span class="ctl-label">FY</span><div class="seg" id="segFY"></div></div>
         <div class="ctl-divider"></div>
-        <div class="ctl-grp"><span class="ctl-label">Agency</span><div class="pillset" id="agencyFilters"></div></div>
+        <!-- No agency filter: states, recipients and totals are stored per NAICS
+             code, never per agency, so an agency selection could not scope them. -->
         <!-- No set-aside filter: the feed carries no set-aside dimension. -->
         <div class="ctl-right">
           <span class="sel-chip" id="selChip"><span id="selChipText"></span><span class="x" id="selChipX"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg></span></span>
@@ -539,16 +542,8 @@ button{font-family:inherit}
 
       <!-- treemap + scatter -->
       <section class="row two">
-        <section class="widget">
-          <header class="widget-head">
-            <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="11" rx="1"/><rect x="13" y="3" width="8" height="7" rx="1"/><rect x="13" y="12" width="8" height="9" rx="1"/><rect x="3" y="16" width="8" height="5" rx="1"/></svg></span>
-              <div class="wh-text"><h3>Spend Concentration · Agency × NAICS</h3><p class="wh-sub">Block size = obligated $ · click to filter by agency</p></div></div>
-            
-          </header>
-          <button id="treeClear" class="tree-clear" type="button" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg><span id="treeClearTxt">Show all agencies</span></button>
-          <svg class="tree-svg" id="treeSvg" preserveAspectRatio="none"></svg>
-          <div class="tree-legend" id="treeLegend"></div>
-        </section>
+        <!-- No treemap: the agency bars below carry the agency-by-code split. -->
+
 
         <section class="widget">
           <header class="widget-head">
@@ -602,7 +597,7 @@ button{font-family:inherit}
         <section class="widget">
           <header class="widget-head">
             <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M21 17c-.5-2-2-3.5-4-3.5"/></svg></span>
-              <div class="wh-text"><h3>Top recipients</h3><p class="wh-sub">Largest recipients in your codes · SB flagged from the feed’s own list</p></div></div>
+              <div class="wh-text"><h3>Who is winning your codes</h3><p class="wh-sub">The incumbents to team with or displace · SB flagged from the feed’s own list</p></div></div>
           </header>
           <div style="overflow:auto">
             <table class="ii-table"><thead><tr><th>Recipient</th><th class="r">Obligated</th><th>NAICS</th><th>Size</th></tr></thead><tbody id="iiBody"></tbody></table>
@@ -624,11 +619,14 @@ button{font-family:inherit}
         <section class="widget">
           <header class="widget-head">
             <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/></svg></span>
-              <div class="wh-text"><h3>Agency Breakdown</h3><p class="wh-sub">Bar = obligations in the selected year · click to filter</p></div></div>
+              <div class="wh-text"><h3>Who buys your codes</h3><p class="wh-sub">Obligations in <b>your NAICS codes only</b> — not the agency's budget · segments = code</p></div></div>
           </header>
           <div class="ag-head"><span>Agency</span><span>Spend · SB shaded</span><span>FY26</span><span>YoY</span></div>
           <div class="ag-list" id="agencyList"></div>
-          <div class="ag-legend2"><span class="lg"><i style="background:linear-gradient(90deg,#10b981,#047857)"></i>Small Business</span><span class="lg"><i style="background:linear-gradient(90deg,#274d80,#0A1628)"></i>Large Prime</span></div>
+          <!-- Legend is the NAICS split the bars actually draw. It read
+               "Small Business / Large Prime" over a bar with no such segment:
+               small-business dollars arrive per NAICS, never per agency. -->
+          <div class="ag-legend2" id="agencyLegend"></div>
         </section>
 
         <section class="widget">
