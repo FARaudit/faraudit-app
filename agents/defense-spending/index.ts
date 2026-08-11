@@ -58,6 +58,13 @@ interface IntelRow {
   recompetes_expiring_90d: unknown;
   recompetes_expiring_180d: unknown;
   yoy_delta_pct: number | null;
+  // WRITTEN EXPLICITLY, not left to the column default. The default fires on
+  // INSERT only, so an upsert that UPDATES an existing row left this reading
+  // whenever that row was first created — measured 2026-08-11: 18 of 27 rows
+  // carried new FY2026 totals (336412 went 2.56B -> 4.98B) under a timestamp
+  // three months old. /defense-spending prints this date on the page as the
+  // measurement date, so a stale value there is not untidy, it is false.
+  refreshed_at: string;
 }
 
 async function buildRow(naics: string, win: FYWindow, priorTotal: number | null): Promise<IntelRow> {
@@ -88,7 +95,8 @@ async function buildRow(naics: string, win: FYWindow, priorTotal: number | null)
     contract_type_breakdown: contractTypes,
     recompetes_expiring_90d: rec90,
     recompetes_expiring_180d: rec180,
-    yoy_delta_pct: yoy
+    yoy_delta_pct: yoy,
+    refreshed_at: new Date().toISOString()
   };
 }
 
