@@ -238,14 +238,21 @@ async function main(): Promise<void> {
     const pick = app.slice(app.indexOf("function defaultPick(rows)"), app.indexOf("function autoPick()"));
     check("the default-pick source was sliced, not empty", pick.length > 120,
       `sliced ${pick.length} chars — the checks below would be vacuous`);
-    // NAMED FOR WHAT IT SORTS. This assertion first read "leads with contracts affected" — the
-    // same mislabel as the panel, one layer down. The field counts CFR sections a rule amends;
-    // the customer's own contract count is a different list that is 0 for every row today.
-    check("the ranking leads with the breadth of the change", /\(b\.amends - a\.amends\) \|\|/.test(pick),
-      "the page opens on a keyword heuristic rather than on how much of the FAR a rule rewrites");
-    check("…then impact, then newest", /impMeta\(b\.impact\)\.rank - impMeta\(a\.impact\)\.rank/.test(pick)
-      && /Date\.parse\(b\.date\) - Date\.parse\(a\.date\)/.test(pick),
-      "ties are broken arbitrarily, so the page opens somewhere different on each load");
+    // IMPACT LEADS, BREADTH BREAKS THE TIE. Breadth is the more defensible number — read from
+    // the rule's own amendatory instructions rather than guessed — and the worse default.
+    // Ranked first it opened the page on an inflation threshold adjustment rewriting 97
+    // sections that creates no obligation anyone can fail, over a CMMC rule amending one clause
+    // that disqualifies a bid. This page's own KPI card says "act before bidding".
+    const impactAt = pick.indexOf("impMeta(b.impact).rank");
+    const amendsAt = pick.indexOf("b.amends - a.amends");
+    check("both keys are in the ranking", impactAt > -1 && amendsAt > -1,
+      `impact@${impactAt} amends@${amendsAt} — the sort lost a key`);
+    check("impact is the primary sort", impactAt > -1 && impactAt < amendsAt,
+      "the page opens on the broadest rewrite rather than on the disqualifier class");
+    check("breadth breaks the tie", amendsAt > impactAt,
+      "equally-flagged rules order arbitrarily");
+    check("newest breaks the remaining tie", /Date\.parse\(b\.date\) - Date\.parse\(a\.date\)/.test(pick),
+      "the page opens somewhere different on each load");
     check("impact is still only a heuristic", /cmmc\|cyber\|cui\|safeguard/.test(live),
       "if impact ever becomes authoritative this ranking should be revisited");
 
