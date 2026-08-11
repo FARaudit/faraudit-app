@@ -84,7 +84,7 @@ ok(unresolved.length === 0, "every $() target exists in the markup",
 // real one, scanned from the markup rather than typed into a fixture.
 // ─────────────────────────────────────────────────────────────────────────────
 
-type Kid = { isHeader: boolean; ids: string[] };
+type Kid = { isHeader: boolean; ids: Array<{ id: string; tag: string }> };
 
 /** Index-walking tag scanner. Deliberately not regex-driven: it has to respect
  *  quoted attribute values and skip the raw-text bodies of <script>/<style>. */
@@ -154,7 +154,10 @@ function scanBodyChildren(html: string): Kid[] | null {
       if (at !== -1) {
         const vs = at + 5;
         const ve = attrs.indexOf('"', vs);
-        if (ve !== -1) cur.ids.push(attrs.slice(vs, ve));
+        // The TAG matters, not just the id: setHTML() keys its table context off
+        // tagName, so a shim that made every node a <div> could never exercise
+        // the path a <tbody> takes.
+        if (ve !== -1) cur.ids.push({ id: attrs.slice(vs, ve), tag: name });
       }
     }
   }
@@ -176,6 +179,10 @@ class Node {
     this.tag = tag; this.id = id; this.className = className;
   }
   get childNodes() { return this.children.slice(); }
+  /** Real elements expose an UPPERCASE tagName, and setHTML() keys its table
+   *  context off it. A shim without it leaves that lookup undefined, which
+   *  silently sends every insertion down the no-context path. */
+  get tagName() { return this.tag.toUpperCase(); }
   get classList() {
     const self = this;
     const parts = () => self.className.split(/\s+/).filter(Boolean);
@@ -207,9 +214,10 @@ class Node {
   setAttribute(k: string, v: string) { if (k === "class") this.className = v; else if (k === "id") this.id = v; }
   getAttribute() { return null; }
   querySelector(sel: string): Node | null {
+    const byClass = sel.startsWith(".");
     const want = sel.replace(/^\./, "");
     for (const c of this.children) {
-      if (c.className.split(/\s+/).includes(want)) return c;
+      if (byClass ? c.className.split(/\s+/).includes(want) : c.tag === want) return c;
       const d = c.querySelector(sel);
       if (d) return d;
     }
@@ -244,6 +252,7 @@ type RunResult = {
   themeError: Error | null;
   legendAttached: boolean;
   noticePainted: boolean;
+  recipientRows: number;
 };
 
 /** A minimal but SHAPED payload: three fiscal years, one tracked code, one
@@ -256,7 +265,12 @@ const OK_PAYLOAD = {
     kpis: [{ label: "Obligated", val: "8.37", unit: "B", sub: "1 tracked code", delta: "+4.0%", tone: "accent", spark: [1, 2, 3] }],
     states: { "48": { abbr: "TX", name: "Texas", val: 3946.6, yoy: 12.4 } },
     agencies: [{ key: "department-of-defense", short: "DoD", name: "Department of Defense", val: 19573.4, naics: { "336412": 19573.4 } }],
-    incumbents: [{ name: "LOCKHEED MARTIN CORPORATION", val: 1318.4, naics: "336412", sb: false }]
+    // TWO recipients, not one. With a single row the count cannot tell a filled
+    // tbody from a tbody holding one discarded-and-rewrapped table node.
+    incumbents: [
+      { name: "GENERAL ELECTRIC COMPANY", val: 1059.48, naics: "336412", sb: false },
+      { name: "RTX CORPORATION", val: 664.83, naics: "336412", sb: false }
+    ]
   }])),
   MARKET_TREND: { labels: ["FY2024", "FY2025", "FY2026"], series: { "336412": [8370, 12020, 2560] } },
   RECOMPETES: [{ agency: "U.S. Coast Guard", amount: 15261, award_id: "70Z03826PF0000296", end_date: "2026-08-19", recipient: "TECHNETICS GROUP LLC", naics: "336412", expired: true }],
@@ -282,11 +296,11 @@ function buildDom() {
   for (const kid of bodyKids ?? []) {
     const k = new Node("div", null, kid.isHeader ? "page-header" : "panel");
     bodyEl.appendChild(k);
-    for (const id of kid.ids) byId.set(id, k.appendChild(new Node("div", id)));
+    for (const { id, tag } of kid.ids) byId.set(id, k.appendChild(new Node(tag, id)));
   }
   // Ids outside .body (rail, topbar) still resolve — nothing removes them.
-  for (const m of COMPOSED.matchAll(/\bid="([^"]+)"/g)) {
-    if (!byId.has(m[1])) byId.set(m[1], docBody.appendChild(new Node("div", m[1])));
+  for (const m of COMPOSED.matchAll(/<([a-zA-Z][a-zA-Z0-9]*)[^>]*\bid="([^"]+)"/g)) {
+    if (!byId.has(m[2])) byId.set(m[2], docBody.appendChild(new Node(m[1].toLowerCase(), m[2])));
   }
 
   /** A detached element resolves to null — precisely the production condition
@@ -316,14 +330,33 @@ function buildDom() {
  *  settles the feed to `settle`, then flips the theme. */
 function run(appSrc: string, settle: "none" | "ok" | "unwired", dataSrc = DATA_SRC): RunResult {
   const { document, bodyEl, attached, byId } = buildDom();
-  const out: RunResult = { loadError: null, renderError: null, themeError: null, legendAttached: false, noticePainted: false };
+  const out: RunResult = { loadError: null, renderError: null, themeError: null, legendAttached: false, noticePainted: false, recipientRows: 0 };
 
   const win: Record<string, unknown> = { addEventListener: () => {}, innerWidth: 1440 };
+  /** Models ONE rule of the real HTML parser, because that rule caused a real
+   *  defect: a `<tr>` at the top level of a parsed fragment is DISCARDED — it
+   *  survives only inside a table. A shim that returned a node for every input
+   *  reported a populated recipients table while production rendered an empty
+   *  one, which is a probe agreeing with something other than the thing it
+   *  names. Everything else parses to one node per top-level tag; this gate is
+   *  about which nodes exist, not about markup fidelity. */
   class DOMParserShim {
-    parseFromString() {
-      const b = new Node("body");
-      b.appendChild(new Node("span"));
-      return { body: b };
+    parseFromString(raw: string) {
+      const body = new Node("body");
+      // setHTML() hands us a full document string; the fragment it cares about
+      // is what sits inside <body>.
+      const html = raw.replace(/^\s*<body>/i, "").replace(/<\/body>\s*$/i, "");
+      const first = (html.match(/<([a-zA-Z][a-zA-Z0-9]*)/) || [])[1]?.toLowerCase();
+      const rows = (html.match(/<tr\b/gi) || []).length;
+      if (first === "table") {
+        const tbody = body.appendChild(new Node("table")).appendChild(new Node("tbody"));
+        for (let i = 0; i < rows; i++) tbody.appendChild(new Node("tr"));
+      } else {
+        const kept = html.replace(/<tr\b[\s\S]*?<\/tr>/gi, "");   // the discarded rows
+        const n = (kept.match(/<[a-zA-Z]/g) || []).length;
+        for (let i = 0; i < n; i++) body.appendChild(new Node("span"));
+      }
+      return { body, querySelector: (sel: string) => body.querySelector(sel) };
     }
   }
   const sandbox: Record<string, unknown> = {
@@ -364,6 +397,8 @@ function run(appSrc: string, settle: "none" | "ok" | "unwired", dataSrc = DATA_S
   const legend = byId.get("geoLegend");
   out.legendAttached = !!legend && attached(legend);
   out.noticePainted = bodyEl.querySelector(".dsb-unavailable") !== null;
+  const tbody = byId.get("iiBody");
+  out.recipientRows = tbody && attached(tbody) ? tbody.children.length : 0;
 
   try { app?.onThemeChange?.(); } catch (e) { out.themeError = e as Error; }
   return out;
@@ -392,6 +427,12 @@ ok(settled.loadError === null, "scripts load", describe(settled.loadError));
 ok(settled.renderError === null, "render() completes on a state:'ok' payload", describe(settled.renderError));
 ok(settled.legendAttached, "#geoLegend survives the successful render");
 ok(!settled.noticePainted, "no failure notice on the success path");
+// The recipients panel is a <tbody>, and a <tr> parsed outside a table is
+// DISCARDED — so a renderer that ignores the table context fills nothing while
+// every other panel looks fine.
+ok(settled.recipientRows === OK_PAYLOAD.BY_FY.FY2026.incumbents.length,
+  "the recipients <tbody> receives one row per recipient",
+  `${settled.recipientRows} row(s) for ${OK_PAYLOAD.BY_FY.FY2026.incumbents.length} recipient(s)`);
 
 // ── R5 ────────────────────────────────────────────────────────────────────────
 console.log("\nR5  A SETTLED FAILURE STILL STRIPS — honest-fail is not weakened");
