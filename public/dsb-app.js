@@ -33,11 +33,10 @@
   const clear = (el) => { if (el) el.replaceChildren(); };
 
   /* ─── global state ─── */
-  const S = { fy: null, agency: 'all', state: null, rankMode: 'top' };
+  const S = { fy: null, state: null, rankMode: 'top' };
 
   const view = () => (D.BY_FY && D.BY_FY[S.fy]) || { kpis: [], states: {}, agencies: [], incumbents: [] };
   const fyIdx = () => D.FYS.indexOf(S.fy);
-  const agencyKeyOf = (name) => String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
   // One colour per tracked NAICS, assigned in the order the feed lists them.
   // The codes belong to the customer, so they cannot be hardcoded here.
@@ -58,21 +57,14 @@
       `<button data-fy="${esc(f)}" class="${f === S.fy ? 'active' : ''}">${esc(f.replace('FY20', "'"))}</button>`).join(''));
     $('segFY').querySelectorAll('button').forEach(b => b.onclick = () => { S.fy = b.dataset.fy; syncControls(); renderAll(); });
 
-    setHTML($('agencyFilters'), D.AGENCY_FILTERS.map(a =>
-      `<button class="fpill ${a.key === S.agency ? 'active' : ''}" data-agency="${esc(a.key)}">${esc(a.label)}</button>`).join(''));
-    $('agencyFilters').querySelectorAll('button').forEach(b => b.onclick = () => {
-      S.agency = b.dataset.agency; syncControls(); renderAll();
-    });
-
     $('resetBtn').onclick = () => {
-      S.fy = D.FYS[D.FYS.length - 1]; S.agency = 'all'; S.state = null; S.rankMode = 'top';
+      S.fy = D.FYS[D.FYS.length - 1]; S.state = null; S.rankMode = 'top';
       syncControls(); renderRankTabs(); renderAll();
     };
     $('selChipX').onclick = () => { S.state = null; syncControls(); renderAll(); };
   }
   function syncControls() {
     $('segFY').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.fy === S.fy));
-    $('agencyFilters').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.agency === S.agency));
     const chip = $('selChip'); const st = view().states[S.state];
     if (S.state && st) { chip.classList.add('show'); $('selChipText').textContent = 'Focus: ' + st.name; }
     else chip.classList.remove('show');
@@ -274,62 +266,6 @@
     $('rankList').querySelectorAll('.rank-row').forEach(r => r.onclick = () => { const f = r.dataset.fips; S.state = (S.state === f ? null : f); syncControls(); renderAll(); });
   }
 
-  /* ════════════════ TREEMAP (agency × NAICS) ════════════════ */
-  function renderTreemap() {
-    const node = $('treeSvg'); if (!node) return;
-    const svg = d3.select('#treeSvg'); svg.selectAll('*').remove();
-    const W = node.clientWidth || 600, H = 300;
-    svg.attr('viewBox', `0 0 ${W} ${H}`);
-    const agencies = view().agencies;
-    if (!agencies.length) return;
-    const root = {
-      name: 'root',
-      children: agencies.map(a => ({
-        name: a.name, short: a.short, key: a.key,
-        children: Object.entries(a.naics).map(([code, v]) => ({ name: code, value: v, agency: a.key, short: a.short }))
-      }))
-    };
-    const h = d3.hierarchy(root).sum(d => d.value).sort((a, b) => b.value - a.value);
-    d3.treemap().size([W, H]).paddingOuter(0).paddingInner(2).paddingTop(15).round(true)(h);
-
-    const leaves = h.leaves();
-    svg.selectAll('rect.cell').data(leaves).join('rect')
-      .attr('class', d => 'cell' + (S.agency !== 'all' && d.data.agency !== S.agency ? ' dim' : '') + (S.agency !== 'all' && d.data.agency === S.agency ? ' sel' : ''))
-      .attr('x', d => d.x0).attr('y', d => d.y0).attr('width', d => Math.max(0, d.x1 - d.x0)).attr('height', d => Math.max(0, d.y1 - d.y0))
-      .attr('fill', d => naicsColor[d.data.name] || css('--accent')).attr('rx', 3)
-      .on('mousemove', (ev, d) => {
-        const act = (S.agency === d.data.agency) ? 'click to clear filter — show all' : (S.agency === 'all' ? 'click to focus this agency' : 'click to switch focus here');
-        const tip = $('geoTip');
-        setHTML(tip, `<div class="t">${esc(d.data.short)} · ${esc(d.data.name)}<span class="v">${fmtM(d.value)}</span></div><div class="r">${esc(act)}</div>`);
-        tip.style.display = 'block';
-        tip.style.left = Math.min(ev.clientX + 14, window.innerWidth - 200) + 'px';
-        tip.style.top = (ev.clientY + 14) + 'px';
-      })
-      .on('mouseleave', hideTip)
-      .on('click', (ev, d) => { S.agency = (S.agency === d.data.agency ? 'all' : d.data.agency); syncControls(); renderAll(); });
-
-    svg.selectAll('text.tree-val').data(leaves.filter(d => (d.x1 - d.x0) > 46 && (d.y1 - d.y0) > 26)).join('text')
-      .attr('class', 'tree-sub').attr('x', d => d.x0 + 5).attr('y', d => d.y1 - 6).attr('font-size', 9)
-      .text(d => fmtM(d.value));
-
-    svg.selectAll('text.tree-lab').data(h.children || []).join('text')
-      .attr('class', 'tree-lab').attr('x', d => d.x0 + 5).attr('y', d => d.y0 + 11).attr('font-size', 9.5)
-      .attr('fill', () => css('--ink'))
-      .text(d => (d.x1 - d.x0) > 40 ? d.data.short : '');
-
-    setHTML($('treeLegend'), Object.entries(naicsColor).map(([c, col]) => `<span class="lg"><i style="background:${col}"></i>${esc(c)}</span>`).join(''));
-
-    const tc = $('treeClear');
-    if (tc) {
-      if (S.agency !== 'all') {
-        const a = agencies.find(x => x.key === S.agency);
-        $('treeClearTxt').textContent = a ? ('Show all · clear ' + a.short) : 'Show all agencies';
-        tc.style.display = 'inline-flex';
-      } else { tc.style.display = 'none'; }
-      tc.onclick = () => { S.agency = 'all'; syncControls(); renderAll(); };
-    }
-  }
-
   /* ════════════════ AGENCY BREAKDOWN ════════════════
      One bar. Small-business dollars arrive per NAICS, never per agency, so no
      SB segment can be drawn here. */
@@ -343,15 +279,20 @@
       const g = was && was.val > 0 ? (a.val - was.val) / was.val * 100 : null;
       const gcls = g == null ? 'flat' : g > 2 ? 'up' : g < -2 ? 'down' : 'flat';
       const gtxt = g == null ? '—' : gcls === 'flat' ? '— flat' : (g >= 0 ? '▲ ' : '▼ ') + Math.abs(g).toFixed(0) + '%';
-      const active = S.agency === a.key ? ' active' : '';
-      return `<div class="ag-row${active}" data-agency="${esc(a.key)}" title="${esc(a.name)}">
+      const barW = Math.max(3, a.val / max * 100);
+      // One segment per code, in proportion — the agency-by-code split the
+      // treemap was drawing, in the panel that already ranks agencies.
+      const segs = Object.entries(a.naics).sort((x, y) => y[1] - x[1]).map(([code, v]) =>
+        `<i style="width:${(v / a.val) * 100}%;background:${naicsColor[code] || css('--accent')}" title="${esc(code)}"></i>`).join('');
+      return `<div class="ag-row" data-agency="${esc(a.key)}" title="${esc(a.name)}">
         <span class="ag-name">${esc(a.short)}</span>
-        <div class="ag-bar2"><div class="seg-lp" style="width:${Math.max(3, a.val / max * 100)}%"></div></div>
+        <div class="ag-bar2"><div class="seg-split" style="width:${barW}%">${segs}</div></div>
         <span class="ag-val">${fmtM(a.val)}</span>
         <span class="ag-grow ${gcls}">${gtxt}</span>
       </div>`;
     }).join('') || emptyLine('No agency breakdown for ' + S.fy + '.'));
-    $('agencyList').querySelectorAll('.ag-row').forEach(r => r.onclick = () => { const k = r.dataset.agency; S.agency = (S.agency === k ? 'all' : k); syncControls(); renderAll(); });
+    setHTML($('agencyLegend'), Object.entries(naicsColor).map(([c, col]) =>
+      `<span class="lg"><i style="background:${col}"></i>${esc(c)}</span>`).join(''));
   }
 
   /* ════════════════ MARKET TREND ════════════════
@@ -399,11 +340,16 @@
         : new Date(mk + '-01T00:00:00Z').toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
       return `<div class="rc-q">
         <div class="rc-qhead">${esc(label)}</div>
-        ${list.slice(0, 8).map(r => `<div class="rc-card${r.expired ? ' expired' : ''}${(S.agency !== 'all' && agencyKeyOf(r.agency || '') !== S.agency) ? ' dim' : ''}">
-            <div class="rc-name">${esc(r.recipient || 'Recipient not stated')}</div>
+        ${list.slice(0, 8).map(r => {
+          // The award id is the key to the public record, so the card opens it.
+          const href = r.award_id ? 'https://www.usaspending.gov/search/?hash=&query=' + encodeURIComponent(r.award_id) : null;
+          const inner = `<div class="rc-name">${esc(r.recipient || 'Recipient not stated')}</div>
             <div class="rc-meta"><span class="rc-inc">${esc(r.award_id || '')}</span><span class="rc-val">${fmtM((r.amount || 0) / 1e6)}</span></div>
-            <span class="rc-agy">${esc(r.agency || '')} · ${esc(r.naics)}${r.expired ? ' · already ended' : ''}</span>
-          </div>`).join('')}
+            <span class="rc-agy">${esc(r.agency || '')} · ${esc(r.naics)}${r.expired ? ' · already ended' : ''}</span>`;
+          return href
+            ? `<a class="rc-card${r.expired ? ' expired' : ''}" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${inner}</a>`
+            : `<div class="rc-card${r.expired ? ' expired' : ''}">${inner}</div>`;
+        }).join('')}
         ${list.length > 8 ? `<div class="rc-more">+${list.length - 8} more</div>` : ''}
       </div>`;
     }).join(''));
@@ -452,18 +398,13 @@
       const s = v.states[S.state];
       html = `<span class="ib-label">Focus</span><b>${esc(s.name)}</b> · ${fmtM(s.val)} obligated in your tracked codes in ${esc(S.fy)}`
         + (s.yoy == null ? ', with no prior-year figure in the top ten.' : `, ${s.yoy >= 0 ? 'up ' + s.yoy.toFixed(0) : 'down ' + Math.abs(s.yoy).toFixed(0)}% on the prior year.`);
-    } else if (S.agency !== 'all') {
-      const a = v.agencies.find(x => x.key === S.agency);
-      html = a
-        ? `<span class="ib-label">Agency</span><b>${esc(a.name)}</b> obligated <b>${fmtM(a.val)}</b> in your tracked codes in ${esc(S.fy)}.`
-        : `<span class="ib-label">Agency</span>No obligations recorded for that agency in ${esc(S.fy)}.`;
     } else {
       const top = v.agencies[0];
       const st = Object.values(v.states).sort((a, b) => b.val - a.val)[0];
       html = '<span class="ib-label">Read</span>'
-        + (top ? `<b>${esc(top.short)}</b> is the largest buyer in your tracked codes` : 'No agency breakdown for this year')
+        + (top ? `<b>${esc(top.short)}</b> is the largest buyer in your codes` : 'No agency breakdown for this year')
         + (st ? ` and <b>${esc(st.name)}</b> the largest place of performance` : '')
-        + ` in ${esc(S.fy)}. Click a state or an agency to scope every panel to it.`;
+        + ` in ${esc(S.fy)}. Click a state to scope the leaderboard to it.`;
     }
     setHTML($('insightBar'), '<span class="ib-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a7 7 0 00-4 12.7V17a1 1 0 001 1h6a1 1 0 001-1v-2.3A7 7 0 0012 2z"></path><path d="M9 21h6"></path></svg></span><span>' + html + '</span>');
   }
@@ -496,7 +437,7 @@
 
   function renderAll() {
     computeBreaks();
-    renderKPIs(); renderLegend(); renderMap(); renderRankList(); renderTreemap();
+    renderKPIs(); renderLegend(); renderMap(); renderRankList();
     renderAgencyList(); renderRecompetes(); renderIncumbents(); renderInsight();
   }
 
@@ -511,7 +452,7 @@
     fetch('/vendor/states-10m.json')
       .then(r => r.json()).then(j => { usGeo = j; renderMap(); })
       .catch(() => { console.warn('us-atlas failed'); });
-    let to; window.addEventListener('resize', () => { clearTimeout(to); to = setTimeout(() => { renderMap(); renderTreemap(); }, 220); });
+    let to; window.addEventListener('resize', () => { clearTimeout(to); to = setTimeout(renderMap, 220); });
   }
 
   function render() {

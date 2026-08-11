@@ -687,8 +687,19 @@ function renderGrid(){
 }
 
 /* ─── Sidebar (CMMC countdown, recent awards, sources) ─── */
+window.DN_AWARDS = window.DN_AWARDS || [];   // filled by defense-news-live.js
+window.DN_AWARDS_STATE = window.DN_AWARDS_STATE || 'loading';
+
+function fmtAwardVal(n){
+  if (!n) return '';
+  if (n >= 1e9) return '$' + (n/1e9).toFixed(2) + 'B';
+  if (n >= 1e6) return '$' + Math.round(n/1e6) + 'M';
+  if (n >= 1e3) return '$' + Math.round(n/1e3) + 'K';
+  return '$' + Math.round(n);
+}
+
 function renderSidebar(){
-var AWARDS = [];
+var AWARDS = window.DN_AWARDS || [];
   // The four feeds /api/defense-news actually requests. Listing a source we do
   // not read would claim coverage we do not have.
   var SOURCES = [
@@ -702,15 +713,17 @@ var AWARDS = [];
   el.innerHTML =
       '<div class="dn-sw">'
     +   '<div class="dn-sw-title">RECENT AWARDS · YOUR NAICS</div>'
-    +   (AWARDS.length ? '' : '<div style="font-size:11px;color:var(--mute);padding:6px 0">Award feed unavailable — no live award source is connected.</div>')
-    +   AWARDS.map(function(a){
-        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:0.5px solid var(--line-2)">'
-          + '<div style="min-width:0">'
-          +   '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:9px;font-weight:700;color:var(--mute);letter-spacing:.06em;text-transform:uppercase">' + esc(a.agency) + '</div>'
-          +   '<div style="font-size:11px;font-weight:600;color:var(--ink)">' + esc(a.label) + '</div>'
+    +   (AWARDS.length ? '' : '<div style="font-size:11px;color:var(--mute);padding:6px 0">' + esc(awardsEmptyLine()) + '</div>')
+    +   AWARDS.slice(0, 8).map(function(a){
+        var inner = '<div style="min-width:0;padding-right:10px">'
+          +   '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:9px;font-weight:700;color:var(--mute);letter-spacing:.06em;text-transform:uppercase">' + esc(a.sub_agency || a.agency || '') + ' · ' + esc(a.naics || '') + '</div>'
+          +   '<div style="font-size:11px;font-weight:600;color:var(--ink);line-height:1.3">' + esc(a.recipient) + '</div>'
           + '</div>'
-          + '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:12px;font-weight:800;color:#185FA5">' + esc(a.val) + '</div>'
-          + '</div>';
+          + '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:12px;font-weight:800;color:#185FA5;white-space:nowrap">' + esc(fmtAwardVal(a.amount)) + '</div>';
+        var style = 'display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:0.5px solid var(--line-2);text-decoration:none';
+        return a.url
+          ? '<a href="' + esc(a.url) + '" target="_blank" rel="noopener noreferrer" style="' + style + '">' + inner + '</a>'
+          : '<div style="' + style + '">' + inner + '</div>';
       }).join('')
     + '</div>'
     + '<div class="dn-sw">'
@@ -725,12 +738,23 @@ var AWARDS = [];
 }
 
 
-// Award ticker requires a live award source. None is wired, so it stays empty.
-
+/* The award ticker reads the same rows as the sidebar. An empty feed is stated
+   once and does not scroll. */
+function awardsEmptyLine(){
+  var st = window.DN_AWARDS_STATE;
+  if (st === 'loading') return 'Loading recent contract actions…';
+  if (st === 'no-profile-codes') return 'No NAICS codes on file — add them to your capability statement and this fills in.';
+  if (st === 'error') return 'Award feed unavailable — USAspending did not answer.';
+  return 'No contract actions in your codes in the last 30 days.';
+}
 
 var TICKER_ITEMS = [];
 
 function renderTicker(){
+  TICKER_ITEMS = (window.DN_AWARDS || []).slice(0, 12).map(function(a){
+    return { agency: a.sub_agency || a.agency || '', val: fmtAwardVal(a.amount),
+             company: a.recipient, naics: a.naics || '' };
+  });
   var items = TICKER_ITEMS.concat(TICKER_ITEMS); // duplicate for seamless loop
   var html = items.map(function(t){
     return '<div class="dn-ticker-item">'
@@ -743,7 +767,7 @@ function renderTicker(){
   var el = document.getElementById('dn-ticker');
   if (!el) return;
   el.innerHTML = TICKER_ITEMS.length ? html
-    : '<div class="dn-ticker-item"><span class="dn-ticker-company">Award feed unavailable — no live award source is connected.</span></div>';
+    : '<div class="dn-ticker-item"><span class="dn-ticker-company">' + esc(awardsEmptyLine()) + '</span></div>';
   // Speed, not duration, is what a reader perceives. A fixed 30s over one short
   // sentence is a crawl; over forty awards it is a blur. ~90px/s either way, and
   // a strip with nothing to scroll does not move at all.
