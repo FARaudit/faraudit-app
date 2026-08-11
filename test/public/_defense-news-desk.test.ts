@@ -42,6 +42,10 @@ const ROUTE = read("src/app/api/defense-news/route.ts");
 // The judgement layer lives in its own module so a probe can call it. A gate that
 // greps only the route would go green the moment that code moved out of it.
 const JUDGE = read("src/lib/defense-news-judge.ts");
+// The spend ledger and the migration that backs it. Read here so the gate fails
+// if either is deleted, rather than only if the route stops calling it.
+const USAGE = read("src/lib/defense-news-usage.ts");
+const MIGRATION = read("supabase/migrations/032_defense_news_usage.sql");
 const SERVER = ROUTE + "\n" + JUDGE;
 
 // ── A · no fabricated freshness ──
@@ -251,6 +255,19 @@ console.log("\n── I · landing tab, agency chip, pictures ──");
     "the badge is positioned over the image, so removing the image must not remove the badge");
   check("no image element is emitted without a source",
     !/dn-nomedia[\s\S]{0,200}<img/.test(HTML));
+  // Geometry: a fixed-height frame crops the photograph to fit the box. Measured
+  // live 2026-08-11 — a 1080x720 press photo (1.50) in a 762x300 frame (2.54) lost
+  // the same slice top and bottom, which is where faces are.
+  check("the photo frame is an aspect ratio, not a fixed height",
+    /\.dn-lead-main \.dn-img\{aspect-ratio:16\/9/.test(HTML)
+    && /\.dn-card \.dn-img\{aspect-ratio:16\/9/.test(HTML),
+    "a pixel height forces the crop to whatever the column happens to be wide");
+  check("no pixel height survives on either photo frame",
+    !/\.dn-(lead-main|card) \.dn-img\{[^}]*height:\d+px/.test(HTML));
+  check("what is cropped is biased away from faces",
+    /object-position:50% 32%/.test(HTML),
+    "a centred crop on a 3:2 source takes the top of the head and the feet equally");
+
   check("a photoless side story gets no thumbnail column",
     /s\.urlToImage\s*\?[\s\S]{0,140}:\s*'';/.test(HTML),
     "its own comment already said the headline takes the width");
@@ -348,7 +365,28 @@ console.log("\n── K · spend reporting ──");
   check("token usage is read from the API response", JUDGE.includes("msg.usage.input_tokens") && JUDGE.includes("msg.usage.output_tokens"),
     "an estimate cannot be checked against a bill");
   check("the route accumulates it per request", ROUTE.includes("const spend: ChunkUsage[]"));
-  check("it is reported to the caller", /spend: \{[\s\S]{0,400}usd:/.test(ROUTE));
+  check("it is reported to the caller", /const requestSpend = \{[\s\S]{0,400}usd:/.test(ROUTE) && ROUTE.includes("spend: requestSpend"));
+
+  // The ledger, so a week of spend can be read without anyone running a query.
+  check("the measurement is measured ONCE and both reported and recorded",
+    (ROUTE.match(/requestSpend/g) || []).length >= 3,
+    "two derivations of the same cost can disagree, and then neither can be trusted");
+  check("spend is appended to its own ledger", ROUTE.includes("recordNewsSpend"));
+  check("NOT to usage_events, which Cost/Audit divides by",
+    !ROUTE.includes("usage_events") && USAGE.includes('from("defense_news_usage")'),
+    "a news row in the audit ledger drags the cost of an audit toward zero");
+  check("the write is awaited, not fired and forgotten",
+    /await recordNewsSpend\(/.test(ROUTE),
+    "a serverless function can be killed at response time, silently under-counting");
+  check("a fully-cached page view records nothing",
+    /spend\.calls > 0/.test(USAGE),
+    "a zero-dollar row per pageview is a traffic log, not a cost ledger");
+  check("the ledger can never blank the page",
+    /catch \(e\)[\s\S]{0,220}console\.warn/.test(USAGE) && !/throw/.test(USAGE.split("export async function recordNewsSpend")[1] ?? ""),
+    "this runs on the read path of a page the customer is waiting for");
+  check("the table exists as a migration",
+    MIGRATION.includes("CREATE TABLE IF NOT EXISTS public.defense_news_usage")
+    && MIGRATION.includes("ENABLE ROW LEVEL SECURITY"));
   check("and logged server-side", /\[defense-news\] judged/.test(ROUTE));
   check(
     "the dollar figure is derived from tokens, not hardcoded",

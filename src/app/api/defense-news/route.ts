@@ -6,6 +6,7 @@ import { resolveFeedScope } from "@/lib/bd-os/live-opportunities";
 import { scoreArticle, scopeKey, deskDescription, distinctiveTerms } from "@/lib/defense-news-naics";
 import { naicsTitle } from "@/lib/naics-titles";
 import { decodeEntities } from "@/lib/feed-entities";
+import { recordNewsSpend } from "@/lib/defense-news-usage";
 import { judgeChunk, RATE_PER_MTOK, type Judgement, type ChunkUsage } from "@/lib/defense-news-judge";
 
 export const dynamic = "force-dynamic";
@@ -576,6 +577,30 @@ export async function GET() {
     };
   });
 
+  // Measured once, then both reported to the page and appended to the ledger, so
+  // what the response claims this request cost and what the cockpit later totals
+  // are the same numbers rather than two derivations that can disagree.
+  const requestSpend = {
+    model: "claude-sonnet-4-6",
+    calls: spend.length,
+    stories_judged: spend.reduce((t, u) => t + u.stories, 0),
+    input_tokens: spend.reduce((t, u) => t + u.input_tokens, 0),
+    output_tokens: spend.reduce((t, u) => t + u.output_tokens, 0),
+    usd: Number((
+      spend.reduce((t, u) => t + u.input_tokens, 0) / 1e6 * RATE_PER_MTOK.input +
+      spend.reduce((t, u) => t + u.output_tokens, 0) / 1e6 * RATE_PER_MTOK.output
+    ).toFixed(5))
+  };
+  // Awaited, not fired and forgotten: an un-awaited write on a serverless function
+  // can be killed when the response is returned, which would drop spend silently
+  // and make the ledger quietly under-count. It is fail-safe and no-ops on a
+  // fully-cached request, which is the common case.
+  await recordNewsSpend(supabase, {
+    userId: user?.id ?? null,
+    scopeKey: scope_key,
+    spend: requestSpend
+  });
+
   return NextResponse.json({
     items: enriched,
     sources,
@@ -586,17 +611,7 @@ export async function GET() {
     naics_source: scope.source,
     // Zero on a fully-cached request — the common case, since insights are stored
     // per article per desk and only new stories are judged.
-    spend: {
-      model: "claude-sonnet-4-6",
-      calls: spend.length,
-      stories_judged: spend.reduce((t, u) => t + u.stories, 0),
-      input_tokens: spend.reduce((t, u) => t + u.input_tokens, 0),
-      output_tokens: spend.reduce((t, u) => t + u.output_tokens, 0),
-      usd: Number((
-        spend.reduce((t, u) => t + u.input_tokens, 0) / 1e6 * RATE_PER_MTOK.input +
-        spend.reduce((t, u) => t + u.output_tokens, 0) / 1e6 * RATE_PER_MTOK.output
-      ).toFixed(5))
-    },
+    spend: requestSpend,
     desk: {
       // Whether anything actually judged this page against the codes. Without it,
       // a page with no ANTHROPIC_API_KEY looks identical to one where the reader's
