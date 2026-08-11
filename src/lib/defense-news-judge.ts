@@ -216,3 +216,95 @@ export async function judgeChunk(
   }
   return out;
 }
+
+/** ── Same-event collapse ACROSS the whole request ──
+ *
+ *  `judgeChunk`'s `dup` is an index into ITS OWN chunk, so it can only ever catch
+ *  two outlets' versions of one announcement when both land in the same call. Two
+ *  outlets are exactly the case that does not: Breaking Defense's "Boeing, Northrop
+ *  unveil low-cost intercept tech" and Defense News' "Boeing unveils cheap radar
+ *  seeker built from off-the-shelf parts" are one announcement, and with 20 stories
+ *  to a chunk they routinely land in different ones. Both then reach the page.
+ *
+ *  This is a second, cheaper pass over what survived: headlines and outlets only,
+ *  no summaries, one call. It is skipped entirely when a single chunk ran, because
+ *  the per-chunk pass has already compared everything against everything.
+ *
+ *  Deliberately NOT a lexical rule. Title-token overlap on federal reporting was
+ *  measured at 0 of 34 for code matching, and the two Boeing headlines above share
+ *  only "boeing" and "unveil" — a threshold loose enough to catch them merges every
+ *  unrelated Boeing story on the page, and a threshold tight enough to keep them
+ *  apart catches nothing. Judging whether two headlines describe one event is the
+ *  part that needs a reader.
+ */
+export interface CrossItem {
+  link: string;
+  title: string;
+  source: string;
+}
+
+export async function judgeDuplicatesAcrossRequest(
+  client: Anthropic,
+  items: CrossItem[],
+  usage?: ChunkUsage[]
+): Promise<Set<string>> {
+  const drop = new Set<string>();
+  if (items.length < 2) return drop;
+  const listing = items.map((it, i) => `${i + 1}. [${it.source}] ${it.title}`).join("\n");
+  try {
+    const msg = await client.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 1500,
+      messages: [{
+        role: "user",
+        content:
+          "Below is one day's defense-news headlines, each with its outlet.\n\n" +
+          "Find only the cases where two or more headlines report THE SAME EVENT — the " +
+          "same announcement, contract, hearing or filing, covered by different outlets. " +
+          "Different angles on one announcement are the same event. A follow-up that adds " +
+          "new facts, a different program, or a different contract is NOT the same event. " +
+          "When in doubt, treat them as different: dropping a real story is worse than " +
+          "showing two takes on one.\n\n" +
+          `HEADLINES:\n${listing}\n\n` +
+          "Return ONLY a JSON array of groups, each group being the numbers that report one " +
+          "event, lowest first, no prose and no code fence. Return [] if there are none:\n" +
+          `[[3,17],[8,22,29]]`
+      }]
+    });
+    usage?.push({
+      input_tokens: msg.usage.input_tokens,
+      output_tokens: msg.usage.output_tokens,
+      stories: items.length
+    });
+    const text = msg.content
+      .filter((c) => c.type === "text")
+      .map((c) => (c as { text: string }).text)
+      .join("")
+      .trim();
+    const json = text.slice(text.indexOf("["), text.lastIndexOf("]") + 1);
+    const groups = JSON.parse(json) as unknown;
+    if (!Array.isArray(groups)) return drop;
+    for (const g of groups) {
+      if (!Array.isArray(g) || g.length < 2) continue;
+      // Every member must be a real position. A group naming an index that does not
+      // exist is a malformed answer, and honouring the rest of it would drop a story
+      // on the strength of a reply we could not fully read.
+      const idxs = g
+        .filter((n): n is number => Number.isInteger(n) && n >= 1 && n <= items.length)
+        .map((n) => n - 1);
+      if (idxs.length !== g.length || idxs.length < 2) continue;
+      // The lowest-numbered survivor is kept — the same backward-only rule the
+      // per-chunk pass uses, so a group can never remove the event entirely.
+      const keep = Math.min(...idxs);
+      for (const i of idxs) if (i !== keep) drop.add(items[i].link);
+    }
+  } catch (err) {
+    // A failure here leaves both takes on the page, which is the pre-existing
+    // behaviour and strictly better than dropping stories on a broken reply.
+    console.error("[defense-news] cross-request dedup failed", {
+      size: items.length,
+      error: err instanceof Error ? err.message : String(err)
+    });
+  }
+  return drop;
+}
