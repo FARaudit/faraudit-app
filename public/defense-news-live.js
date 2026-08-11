@@ -163,6 +163,12 @@
       const mapped = items.map(mapItem);
       LIVE_ARTICLES.length = 0;
       LIVE_ARTICLES.push.apply(LIVE_ARTICLES, mapped);
+      // Chosen once the stories and the desk state are both in place, and before
+      // the first paint: the page opens on the reader's own codes when there is
+      // something behind that tab, and on the wire when there is not.
+      if (typeof dnDefaultCat === 'function' && typeof DN_CAT !== 'undefined') {
+        DN_CAT = dnDefaultCat();
+      }
       DN_FETCHED_AT = data.fetched_at ? new Date(data.fetched_at).getTime() : Date.now();
       if (!isFinite(DN_FETCHED_AT)) DN_FETCHED_AT = Date.now();
       paintUpdated();

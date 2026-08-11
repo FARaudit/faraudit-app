@@ -12,6 +12,43 @@
   'use strict';
 
   const S = { agency: 'all', q: '', sel: null };
+
+  /* ── An agency arriving in the URL ──
+     News names agencies the way reporting does ("Army"); SAM names them the way a
+     notice does ("DEPT OF THE ARMY"). The two vocabularies are unrelated, so the
+     request resolves against the agencies present in this reader's feed and
+     applies only on a hit — a filter value no officer carries renders an empty
+     list. `askedAgency` is retained on a miss so the notice can name what the
+     reader asked for. */
+  let askedAgency = null;
+  let agencyApplied = false;
+  function requestedAgency() {
+    try {
+      const v = new URLSearchParams(window.location.search).get('agency');
+      return v ? v.trim() : null;
+    } catch (_) { return null; }
+  }
+  function resolveAgency(asked) {
+    if (!asked) return null;
+    const list = Array.isArray(window.DCO.AGENCY_FILTERS) ? window.DCO.AGENCY_FILTERS : [];
+    const norm = (x) => String(x).toLowerCase().replace(/[^a-z ]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const a = norm(asked);
+    if (!a) return null;
+    let hit = list.find((f) => f !== 'all' && norm(f) === a);
+    if (hit) return hit;
+    // "Army" inside "DEPT OF THE ARMY". Longest match wins, so "Air Force" does
+    // not lose to a shorter incidental containment.
+    const partial = list.filter((f) => f !== 'all' && (norm(f).indexOf(a) !== -1 || a.indexOf(norm(f)) !== -1));
+    partial.sort((x, y) => String(y).length - String(x).length);
+    return partial[0] || null;
+  }
+  function applyRequestedAgency() {
+    const asked = requestedAgency();
+    if (!asked) return;
+    askedAgency = asked;
+    const hit = resolveAgency(asked);
+    if (hit) S.agency = hit;
+  }
   const $ = (id) => document.getElementById(id);
 
   /* h(tag, opts, children) — opts: {cls, text, attrs, style} */
@@ -286,11 +323,35 @@
   /* ── wiring ─────────────────────────────────────────────────────────── */
 
   function renderAll() {
+    // The incoming agency can only be resolved once the feed has told us which
+    // agencies exist. render() is called again when the live data lands, so this
+    // runs then — and applies at most once.
+    if (!agencyApplied && Array.isArray(window.DCO.AGENCY_FILTERS) && window.DCO.AGENCY_FILTERS.length > 1) {
+      applyRequestedAgency();
+      agencyApplied = true;
+    }
     renderBanner();
+    renderAgencyNotice();
     renderStats();
     renderAgencyPills();
     renderPeople();
     renderPanel();
+  }
+
+  /* Names the outcome for an agency arriving in the URL: a request that matches
+     nothing and no request at all are different states. */
+  function renderAgencyNotice() {
+    const host = $('agencyFilters');
+    if (!host || !askedAgency) return;
+    const resolved = resolveAgency(askedAgency);
+    const note = h('span', {
+      cls: 'fpill-note',
+      style: 'font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute);margin-left:8px',
+      text: resolved
+        ? 'from Defense News · ' + askedAgency
+        : 'No officers in your feed are from ' + askedAgency + ' — showing all'
+    });
+    host.appendChild(note);
   }
 
   function buildControls() {
@@ -302,6 +363,8 @@
         S.agency = 'all';
         S.q = '';
         S.sel = null;
+        askedAgency = null;
+        agencyApplied = true;
         if (search) search.value = '';
         renderAll();
       });
