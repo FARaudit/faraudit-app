@@ -19,10 +19,16 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   const PARSER = new DOMParser();
+  // Table sections need their table context to survive the parse: the HTML
+  // parser DISCARDS a <tr> that is not inside a table, so a tbody filled
+  // through the plain path comes back empty.
+  const TABLE_CTX = { TBODY: ['<table>', '</table>', 'tbody'], THEAD: ['<table>', '</table>', 'thead'], TR: ['<table><tbody>', '</tbody></table>', 'tr'] };
   function setHTML(el, html) {
     if (!el) return;
-    const doc = PARSER.parseFromString('<body>' + html + '</body>', 'text/html');
-    el.replaceChildren(...doc.body.childNodes);
+    const ctx = TABLE_CTX[el.tagName];
+    const doc = PARSER.parseFromString('<body>' + (ctx ? ctx[0] + html + ctx[1] : html) + '</body>', 'text/html');
+    const host = ctx ? doc.querySelector(ctx[2]) : doc.body;
+    el.replaceChildren(...(host ? host.childNodes : []));
   }
   const clear = (el) => { if (el) el.replaceChildren(); };
 

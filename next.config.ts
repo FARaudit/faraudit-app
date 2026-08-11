@@ -63,8 +63,14 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "*.fedscoop.com" }
     ],
     // The widths this page actually asks for (side thumb · card · lead hero).
-    imageSizes: [256, 640],
+    // imageSizes holds the values below the smallest deviceSize; a width absent
+    // from both is rejected outright by the optimizer.
+    imageSizes: [256],
     deviceSizes: [640, 1080],
+    // Next 16 changed images.qualities from "anything" to [75], and a request
+    // outside the list is a 400 INVALID_IMAGE_OPTIMIZE_REQUEST — not a soft
+    // downgrade. 75 is the only quality this page asks for.
+    qualities: [75],
     minimumCacheTTL: 86400
   },
   // PDF route (/api/audit/[id]/pdf) launches headless Chromium via
