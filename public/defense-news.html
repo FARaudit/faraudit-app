@@ -314,6 +314,10 @@ button{font-family:inherit}
 .dn-insight b{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-deep);display:block;margin-bottom:3px}
 [data-theme="dark"] .dn-insight{background:rgba(55,138,221,0.1);border-color:rgba(181,212,244,0.28)}
 [data-theme="dark"] .dn-insight b{color:var(--accent-light)}
+.dn-desk{display:inline-flex;align-items:center;gap:6px;max-width:100%;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:4px 9px;border-radius:5px;background:#dcfce7;color:#14532d;margin-bottom:8px}
+.dn-desk .dn-desk-t{font-weight:600;letter-spacing:.02em;text-transform:none;opacity:.8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+[data-theme="dark"] .dn-desk{background:rgba(34,197,94,0.16);color:#86efac}
+.dn-desk-note{font-size:11px;color:var(--mute);font-family:"IBM Plex Mono",monospace;padding:10px 0}
 .dn-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:30px 30px}
 @media(max-width:820px){.dn-grid{grid-template-columns:1fr}}
 .dn-card{display:flex;flex-direction:column;text-decoration:none}
@@ -446,11 +450,11 @@ button{font-family:inherit}
           <div class="heading">
             <p class="eyebrow">Industry Intelligence</p>
             <h1>Defense News</h1>
-            <p class="sub" id="dn-subline">Defense, acquisition and regulatory reporting from four wire sources</p>
+            <p class="sub" id="dn-subline">Defense, acquisition and regulatory reporting</p>
           </div>
           <div class="dn-mast-meta">
             <span class="dn-live">Live</span>
-            <span class="dn-updated">Updated 6 min ago</span>
+            <span class="dn-updated" id="dn-updated"></span>
           </div>
         </div>
         <nav class="dn-nav" id="dn-nav"></nav>
@@ -481,7 +485,7 @@ button{font-family:inherit}
       <div class="dn-main-layout">
         <div class="dn-content-col">
           <div class="dn-lead" id="dn-lead"></div>
-          <div class="dn-section-divider"><span class="dn-section-label">Latest — Your NAICS</span></div>
+          <div class="dn-section-divider"><span class="dn-section-label" id="dn-section-label">Latest</span></div>
           <div class="dn-grid" id="dn-grid"></div>
         </div>
         <aside class="dn-sidebar-col" id="dn-sidebar-col"></aside>
@@ -564,7 +568,48 @@ function mergeArticles(){
 
 /* ─── Modern news-outlet rendering ─── */
 var DN_CAT = 'all';
-var DN_NAV = [['all','All'],['defense','Defense'],['contracts','Contracts'],['cmmc','CMMC'],['ndaa','NDAA'],['regulatory','Regulatory'],['industry','Industry'],['supplychain','Supply Chain']];
+var DN_NAV = [['desk','Your Desk'],['all','All'],['defense','Defense'],['contracts','Contracts'],['cmmc','CMMC'],['ndaa','NDAA'],['regulatory','Regulatory'],['industry','Industry'],['supplychain','Supply Chain']];
+
+/* ─── Desk fit ───
+   `deskScore` is the route's judgement of this story against the codes on the
+   customer's capability statement. NULL means nothing scored it — no codes on
+   file, or scoring not running — and that is NOT the same as a zero, so the two
+   are never collapsed here. */
+var DN_DESK_FLOOR = 55;
+function dnDeskScore(a){ return (typeof a.deskScore === 'number') ? a.deskScore : null; }
+function dnIsDesk(a){ var s = dnDeskScore(a); return s !== null && s >= DN_DESK_FLOOR; }
+function dnDeskCount(){ return mergeArticles().filter(dnIsDesk).length; }
+
+/* The chip that says this story is the reader's business. It prints the code and
+   its 13 CFR title — never a bare number the reader has to look up, and never a
+   title we do not have. It appears only when the route named a code; a story that
+   is merely high-scoring for a reason that is not industry-specific gets no chip
+   rather than a chip pointing at an arbitrary code. */
+function dnDeskHTML(a){
+  if (!a.deskCode) return '';
+  return '<span class="dn-desk">' + esc(a.deskCode)
+    + (a.deskTitle ? '<span class="dn-desk-t">' + esc(a.deskTitle) + '</span>' : '')
+    + '</span>';
+}
+
+/* What the divider over the feed is allowed to say. Each branch is a state the
+   page can actually be in: no codes on file, codes with nothing scoring them, and
+   codes with a real count behind them. The label never asserts tailoring the data
+   does not carry. */
+function dnSectionLabel(){
+  var codes = window.DN_NAICS || [];
+  var desk  = window.DN_DESK;
+  if (!codes.length) return 'Latest — add your NAICS codes to tailor this feed';
+  if (!desk || !desk.available) return 'Latest';
+  var n = dnDeskCount();
+  if (DN_CAT === 'desk') return n ? ('Your Desk — ' + n + ' of ' + mergeArticles().length + ' stories touch your codes')
+                                  : 'Your Desk — nothing in this window touches your codes';
+  return 'Latest — ' + (n ? n + ' matched to your codes' : 'nothing matched your codes in this window');
+}
+function renderSectionLabel(){
+  var el = document.getElementById('dn-section-label');
+  if (el) el.textContent = dnSectionLabel();
+}
 
 function dnCat(a){ return a.__c || (a.__c = categorizeArticle(a.title, a.description)); }
 function dnAge(a){ return a.publishedAt ? relativeTime(a.publishedAt) : ''; }
@@ -626,18 +671,50 @@ function dnInsightHTML(a, c){ return '<span class="dn-insight"><b>Why it matters
 
 function dnFiltered(){
   var all = mergeArticles();
-  if (DN_CAT === 'all') return all;
+  if (DN_CAT === 'all') {
+    // Chronological, but a story that is the reader's actual business is not
+    // allowed to be buried under a carrier deployment just because the carrier
+    // was posted an hour later. Desk-relevant stories hold the top of the feed,
+    // each block still newest-first inside itself.
+    var mine = all.filter(dnIsDesk), rest = all.filter(function(a){ return !dnIsDesk(a); });
+    return mine.concat(rest);
+  }
+  if (DN_CAT === 'desk') {
+    return all.filter(dnIsDesk).sort(function(x, y){ return dnDeskScore(y) - dnDeskScore(x); });
+  }
   return all.filter(function(a){ return dnCat(a).cat.replace(/\s+/g,'').toLowerCase() === DN_CAT; });
 }
 
 function renderNav(){
   var el = document.getElementById('dn-nav');
   if (!el) return;
-  el.innerHTML = DN_NAV.map(function(n){
-    return '<button class="dn-nav-btn' + (DN_CAT === n[0] ? ' active' : '') + '" type="button" data-cat="' + n[0] + '">' + esc(n[1]) + '</button>';
-  }).join('');
+  var deskN = dnDeskCount();
+  var total = mergeArticles();
+  // Built as nodes, not as a markup string: the labels are constants but the
+  // counts are data, and a tab strip is not worth an innerHTML sink.
+  el.replaceChildren.apply(el, DN_NAV.map(function(n){
+    // The desk tab is hidden outright when nothing is scoring the page — an empty
+    // personalised lane on an account with no codes on file is a promise the page
+    // cannot keep.
+    if (n[0] === 'desk' && !(window.DN_DESK && window.DN_DESK.available && (window.DN_NAICS||[]).length)) return null;
+    // Every tab states how many stories are behind it, so a tab that would open
+    // onto an empty list says so before it is clicked.
+    var count = (n[0] === 'desk') ? deskN
+              : (n[0] === 'all')  ? total.length
+              : total.filter(function(a){ return dnCat(a).cat.replace(/\s+/g,'').toLowerCase() === n[0]; }).length;
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'dn-nav-btn' + (DN_CAT === n[0] ? ' active' : '');
+    b.setAttribute('data-cat', n[0]);
+    b.textContent = n[1] + ' ';
+    var c = document.createElement('span');
+    c.style.cssText = 'opacity:.5;font-weight:600';
+    c.textContent = String(count);
+    b.appendChild(c);
+    return b;
+  }).filter(Boolean));
   el.querySelectorAll('.dn-nav-btn').forEach(function(b){
-    b.addEventListener('click', function(){ DN_CAT = b.getAttribute('data-cat'); renderNav(); renderLead(); renderGrid(); dnWatchImages(); });
+    b.addEventListener('click', function(){ DN_CAT = b.getAttribute('data-cat'); renderNav(); renderSectionLabel(); renderLead(); renderGrid(); dnWatchImages(); });
   });
 }
 
@@ -663,11 +740,25 @@ function renderLead(){
       '<a class="dn-lead-main" href="' + esc(a.url || '#') + '" target="_blank" rel="noopener noreferrer">'
     +   dnImgHTML(a, 1080)
     +   '<div class="dn-meta"><span>' + esc(a.sourceName || '') + '</span><span class="dot">·</span><span>' + esc(dnAge(a)) + '</span></div>'
+    +   dnDeskHTML(a)
     +   '<h2>' + esc(a.title) + '</h2>'
     +   '<p class="dn-excerpt">' + esc(a.description || '') + '</p>'
     +   dnInsightHTML(a, c)
     + '</a>'
     + '<div class="dn-lead-side">' + side + '</div>';
+}
+
+/* An empty grid has three causes and they are not interchangeable: a category
+   nothing landed in today, a desk lane nothing touched this window, or no feed at
+   all. Each says which one it is, so an empty list is never read as a break. */
+function dnEmptyGridLine(){
+  if (!mergeArticles().length) return 'No stories loaded.';
+  if (DN_CAT === 'desk') {
+    return 'Nothing in the last few days touches ' + ((window.DN_NAICS||[]).join(' · ') || 'your codes')
+      + '. The other tabs still have ' + mergeArticles().length + ' stories.';
+  }
+  if (DN_CAT === 'all') return 'No further stories.';
+  return 'No stories in this category in the current window — the other tabs still have stories.';
 }
 
 function renderGrid(){
@@ -679,11 +770,12 @@ function renderGrid(){
     return '<a class="dn-card" href="' + esc(a.url || '#') + '" target="_blank" rel="noopener noreferrer">'
       + dnImgHTML(a, 640)
       + '<div class="dn-meta"><span>' + esc(a.sourceName || '') + '</span><span class="dot">·</span><span>' + esc(dnAge(a)) + '</span></div>'
+      + dnDeskHTML(a)
       + '<h3>' + esc(a.title) + '</h3>'
       + '<p class="dn-excerpt">' + esc(a.description || '') + '</p>'
       + dnInsightHTML(a, c)
       + '</a>';
-  }).join('') || '<div style="grid-column:1/-1;padding:36px;text-align:center;color:var(--mute);font-size:13px;font-family:\'IBM Plex Mono\',monospace">No further stories in this category.</div>';
+  }).join('') || '<div style="grid-column:1/-1;padding:36px;text-align:center;color:var(--mute);font-size:13px;font-family:\'IBM Plex Mono\',monospace">' + esc(dnEmptyGridLine()) + '</div>';
 }
 
 /* ─── Sidebar (CMMC countdown, recent awards, sources) ─── */
@@ -700,14 +792,14 @@ function fmtAwardVal(n){
 
 function renderSidebar(){
 var AWARDS = window.DN_AWARDS || [];
-  // The four feeds /api/defense-news actually requests. Listing a source we do
-  // not read would claim coverage we do not have.
-  var SOURCES = [
-    {n:'Defense News',     c:'#185FA5'},
-    {n:'DoD News',         c:'#0A1628'},
-    {n:'Federal Register', c:'#92400e'},
-    {n:'FedScoop',         c:'#378ADD'}
-  ];
+  /* The feeds /api/defense-news actually requested on THIS response, with how
+     many items each returned. A hardcoded list cannot go stale in the safe
+     direction: it kept naming a source that had been answering nothing, and it
+     would keep naming four after the route began reading eight. A source at 0 is
+     shown at 0 rather than hidden — that is the number that explains a thin page. */
+  var SOURCES = (window.DN_SOURCES || []).map(function(s){
+    return {n: s.name, ok: s.ok !== false, count: (typeof s.count === 'number') ? s.count : null};
+  });
   var el = document.getElementById('dn-sidebar-col');
   if (!el) return;
   el.innerHTML =
@@ -728,10 +820,14 @@ var AWARDS = window.DN_AWARDS || [];
     + '</div>'
     + '<div class="dn-sw">'
     +   '<div class="dn-sw-title">SOURCES</div>'
+    +   (SOURCES.length ? '' : '<div style="font-size:11px;color:var(--mute);padding:6px 0">Loading sources…</div>')
     +   SOURCES.map(function(s){
+        var dot = !s.ok ? '#b91c1c' : (s.count === 0 ? '#b45309' : '#185FA5');
         return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11px;color:var(--ink-2)">'
-          + '<div style="width:6px;height:6px;border-radius:50%;background:' + s.c + ';flex-shrink:0"></div>'
-          + esc(s.n)
+          + '<div style="width:6px;height:6px;border-radius:50%;background:' + dot + ';flex-shrink:0"></div>'
+          + '<span style="flex:1;min-width:0">' + esc(s.n) + '</span>'
+          + '<span style="font-family:\'IBM Plex Mono\',monospace;font-size:10px;color:var(--mute)">'
+          + esc(!s.ok ? 'down' : String(s.count === null ? '' : s.count)) + '</span>'
           + '</div>';
       }).join('')
     + '</div>';
@@ -802,6 +898,7 @@ function renderRegFeed(){
 
 function dnInit(){
   renderNav();
+  renderSectionLabel();
   renderLead();
   renderGrid();
   renderSidebar();

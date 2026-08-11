@@ -24,7 +24,15 @@
       urlToImage:   it.image || it.imageUrl || null,
       tags:         Array.isArray(it.tags) ? it.tags : [],
       aiInsight:    it.ai_insight || '',
-      relevance:    typeof it.relevance === 'number' ? it.relevance : 0
+      /* How much this story bears on the reader's own codes, 0-100. NULL means
+         nothing judged it, which is kept distinct from 0 — judged and found
+         irrelevant. A `|| 0` here would erase that difference.
+         Not to be confused with the route's `relevance`, which is a fixed
+         sentence per category and is a string. */
+      deskScore:    (typeof it.desk_relevance === 'number') ? it.desk_relevance : null,
+      deskCode:     it.desk_code || '',
+      deskTitle:    it.desk_code_title || '',
+      deskTerms:    Array.isArray(it.desk_terms) ? it.desk_terms : []
     };
   }
 
@@ -36,8 +44,28 @@
     if (pill) pill.hidden = !on;
   }
 
+  /* ── The freshness stamp ──
+     The age of the fetch that produced what is currently on screen, ticking on its
+     own. It is blank when there is nothing on screen: a stamp over an unavailable
+     feed would be timing the failure. */
+  var DN_FETCHED_AT = null;
+  function paintUpdated() {
+    var el = document.getElementById('dn-updated');
+    if (!el) return;
+    if (!DN_FETCHED_AT) { el.textContent = ''; return; }
+    var secs = Math.max(0, Math.round((Date.now() - DN_FETCHED_AT) / 1000));
+    var mins = Math.floor(secs / 60);
+    var hrs = Math.floor(mins / 60);
+    el.textContent = 'Updated '
+      + (secs < 60 ? 'just now' : hrs >= 1 ? hrs + 'h ago' : mins + 'm ago');
+  }
+
   function repaint() {
     if (typeof renderSidebar === 'function')   renderSidebar();
+    // The nav and the divider both COUNT desk-relevant stories, so they are stale
+    // the moment the article list is replaced and must repaint with it.
+    if (typeof renderNav === 'function')          renderNav();
+    if (typeof renderSectionLabel === 'function') renderSectionLabel();
     if (typeof renderLead === 'function')      renderLead();
     if (typeof renderGrid === 'function')      renderGrid();
     // DN_INTEL is the intel panel's export; the renderers are IIFE-scoped.
@@ -51,6 +79,8 @@
      with textContent so a reason echoed from the route cannot inject markup. */
   function renderUnavailable(reason) {
     setLivePill(false);
+    DN_FETCHED_AT = null;
+    paintUpdated();
     if (typeof LIVE_ARTICLES !== 'undefined' && Array.isArray(LIVE_ARTICLES)) LIVE_ARTICLES.length = 0;
     repaint();
     var el = document.getElementById('dn-lead');
@@ -93,18 +123,37 @@
       }
       if (typeof LIVE_ARTICLES === 'undefined' || !Array.isArray(LIVE_ARTICLES)) return;
 
-      // The account's own codes, from the capability statement. The sub-line
-      // used to print three that were typed into the markup and belong to
-      // nobody, under a claim that the feed was scored against them.
+      // What the page is allowed to claim about tailoring. Three distinct states,
+      // three distinct sentences: no codes on file, codes on file with nothing
+      // scoring them, and codes with a real count behind them.
+      window.DN_DESK = (data.desk && typeof data.desk === 'object') ? data.desk : null;
+      // Which feeds answered, and with how many items. The sidebar states these
+      // rather than a fixed list, so a source that stops returning anything shows
+      // as a zero instead of continuing to claim coverage.
+      window.DN_SOURCES = Array.isArray(data.sources) ? data.sources : [];
+      window.DN_NAICS = Array.isArray(data.naics) ? data.naics : [];
+      window.DN_NAICS_SOURCE = data.naics_source || '';
+
       var sub = document.getElementById('dn-subline');
-      if (sub && Array.isArray(data.naics) && data.naics.length) {
-        sub.textContent = 'Defense, acquisition and regulatory reporting · your codes on file: '
-          + data.naics.join(' · ');
+      if (sub) {
+        if (!window.DN_NAICS.length) {
+          sub.textContent = 'Defense, acquisition and regulatory reporting · no NAICS codes on file — '
+            + 'add them to your capability statement and every story below gets scored against them.';
+        } else if (!window.DN_DESK || !window.DN_DESK.available) {
+          sub.textContent = 'Defense, acquisition and regulatory reporting · your codes on file: '
+            + window.DN_NAICS.join(' · ') + ' · desk scoring is not running on this deployment.';
+        } else {
+          sub.textContent = 'Defense, acquisition and regulatory reporting · scored against your codes: '
+            + window.DN_NAICS.join(' · ');
+        }
       }
 
       const mapped = items.map(mapItem);
       LIVE_ARTICLES.length = 0;
       LIVE_ARTICLES.push.apply(LIVE_ARTICLES, mapped);
+      DN_FETCHED_AT = data.fetched_at ? new Date(data.fetched_at).getTime() : Date.now();
+      if (!isFinite(DN_FETCHED_AT)) DN_FETCHED_AT = Date.now();
+      paintUpdated();
       repaint();
       setLivePill(mapped.length > 0);
     } catch (e) {
@@ -135,9 +184,43 @@
     if (typeof renderTicker === 'function') renderTicker();
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () { wire(); wireAwards(); });
-  } else {
+  /* ── Staying live ──
+     The LIVE pill is a claim about what is on screen right now, so the page
+     re-fetches on a timer and whenever the tab is brought back to the front —
+     which is when a reader is actually looking at it.
+
+     Five minutes sits under the route's own 30-minute upstream cache, so most
+     refreshes cost a cache hit rather than eight RSS fetches, and judged insights
+     are stored per desk — a refresh that finds no new stories does no model work
+     at all. */
+  var REFRESH_MS = 5 * 60 * 1000;
+  var STAMP_MS = 30 * 1000;
+  var refreshing = false;
+
+  async function refresh() {
+    if (refreshing || document.hidden) return;
+    refreshing = true;
+    try { await wire(); await wireAwards(); } finally { refreshing = false; }
+  }
+
+  function start() {
     wire(); wireAwards();
+    setInterval(refresh, REFRESH_MS);
+    // The stamp has to move on its own, or "Updated 2m ago" stays 2m ago for an
+    // hour and is a worse lie than no stamp.
+    setInterval(paintUpdated, STAMP_MS);
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) return;
+      paintUpdated();
+      // Coming back to a tab that has been hidden long enough for the content to
+      // have moved on is the one moment a reader will notice staleness.
+      if (DN_FETCHED_AT && Date.now() - DN_FETCHED_AT > REFRESH_MS) refresh();
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start);
+  } else {
+    start();
   }
 })();

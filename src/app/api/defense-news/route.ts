@@ -3,21 +3,34 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createServerClient } from "@/lib/supabase-server";
 import { extractFeedImage, extractOgImage, type ImageCarrier } from "@/lib/news-images";
 import { resolveFeedScope } from "@/lib/bd-os/live-opportunities";
+import { scoreArticle, scopeKey, deskDescription } from "@/lib/defense-news-naics";
+import { naicsTitle } from "@/lib/naics-titles";
+import { judgeChunk, type Judgement } from "@/lib/defense-news-judge";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const revalidate = 0;
 export const maxDuration = 60;
 
-const CLAUDE_MODEL = "claude-sonnet-4-6";
-// Hard cap on per-request Claude calls. Most users see top 12 articles before
-// scrolling; bounding parallel Claude calls keeps p95 latency < 5s on first
-// load. Items beyond the cap fall back to the deterministic relevance string.
-const INSIGHT_BATCH_LIMIT = 12;
+// How many stories are judged against the reader's desk per request. Judging is
+// BATCHED — one call carries a chunk of stories — so this is a token bound, not
+// a call count. It was a per-article cap of 12 when each story cost its own
+// round trip.
+const JUDGE_LIMIT = 60;
+const JUDGE_CHUNK = 20;
 // Article fetches for og:image, for the feeds that carry no image element.
-// Same reasoning as the insight cap: bounded to what is read before scrolling.
+// Bounded to what is read before scrolling: a fetch costs a round trip and buys
+// a photograph, so it is spent where the photograph is looked at.
 const OG_LOOKUP_LIMIT = 16;
-const INSIGHT_PROMPT_PREFIX = `You are advising a small-to-mid-market federal defense subcontractor (machine shops, aerospace parts manufacturers, professional services, $5M-$50M annual revenue, AS9100/ITAR/CMMC-aware). Read this news headline + summary and produce ONE LINE (max 25 words) of actionable insight for THIS contractor: what should they watch, what threat or opportunity does this create, what action might they take. No fluff, no 'consider' or 'might want to' — direct and concrete.`;
+// Per feed. Defense News publishes 25 items and DoD News 20; reading 6 threw
+// away the newest two thirds of the biggest feed and let a slow feed's week-old
+// items fill the page. Measured 2026-08-11: at 6/feed the freshest story on the
+// page was 16h old against a median of 88h.
+const ITEMS_PER_FEED = 10;
+// A story the reader can act on. Below this it is defense news they should know
+// but that does not touch their business — it still renders, it just does not
+// claim to be about their codes.
+const DESK_RELEVANT = 55;
 
 interface NewsItem {
   source: string;
@@ -28,6 +41,16 @@ interface NewsItem {
   tag: "policy" | "contract" | "budget" | "defense";
   relevance: string;
   ai_insight?: string | null;
+  // ── Desk fit ──
+  // How much this story bears on the reader's OWN codes, 0-100, and the one code
+  // it bears on. Null relevance means nothing judged it — not that it was judged
+  // irrelevant. The page must render those two differently.
+  desk_relevance: number | null;
+  desk_code: string | null;
+  desk_code_title: string | null;
+  // Set only when the deterministic scorer found the code's own regulation terms
+  // in the text. It is rare and it is certain, so it is what the badge cites.
+  desk_terms: string[];
   // The publisher's own photograph for this story, carried from the feed or
   // from the article's Open Graph tag. Null means the publisher shipped none —
   // the card then renders without an image region rather than with a box.
@@ -35,11 +58,25 @@ interface NewsItem {
   image_source: ImageCarrier | null;
 }
 
+// Measured 2026-08-11 — every URL here answered 200 with items on that date, and
+// the one that did not is the reason this list was revisited: Federal Register's
+// `documents/search.rss` had been answering 302 to an empty body since before
+// this route shipped, so a quarter of the page's declared coverage was a source
+// name in the sidebar with nothing behind it. `api/v1/documents.rss` is the live
+// path and carries same-day DoD rulemaking.
+//
+// The additions are weighted to ACQUISITION rather than to geopolitics. A story
+// about a carrier deployment is defense news; a FAR overhaul notice is something
+// a subcontractor has to do something about this week.
 const FEEDS: { source: string; url: string; tag: NewsItem["tag"] }[] = [
-  { source: "Defense News",     url: "https://www.defensenews.com/arc/outboundfeeds/rss/", tag: "defense" },
-  { source: "DoD News",         url: "https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx?ContentType=1&Site=945&max=20", tag: "defense" },
-  { source: "Federal Register", url: "https://www.federalregister.gov/documents/search.rss?conditions%5Bagencies%5D%5B%5D=defense-department", tag: "policy" },
-  { source: "FedScoop",         url: "https://fedscoop.com/feed/", tag: "policy" }
+  { source: "Defense News",       url: "https://www.defensenews.com/arc/outboundfeeds/rss/", tag: "defense" },
+  { source: "DoD News",           url: "https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx?ContentType=1&Site=945&max=20", tag: "defense" },
+  { source: "Federal Register",   url: "https://www.federalregister.gov/api/v1/documents.rss?conditions%5Bagencies%5D%5B%5D=defense-department", tag: "policy" },
+  { source: "FedScoop",           url: "https://fedscoop.com/feed/", tag: "policy" },
+  { source: "Acquisition.gov",    url: "https://www.acquisition.gov/rss.xml", tag: "policy" },
+  { source: "Federal News Network", url: "https://federalnewsnetwork.com/category/acquisition-policy/feed/", tag: "policy" },
+  { source: "Breaking Defense",   url: "https://breakingdefense.com/feed/", tag: "defense" },
+  { source: "DefenseScoop",       url: "https://defensescoop.com/feed/", tag: "defense" }
 ];
 
 /** The article's own Open Graph image, for the feeds that ship no carrier. One
@@ -69,7 +106,7 @@ async function fetchOgImage(articleUrl: string): Promise<string | null> {
 function parseItems(xml: string, source: string, tag: NewsItem["tag"]): NewsItem[] {
   const items: NewsItem[] = [];
   const blocks = xml.match(/<(item|entry)[\s\S]*?<\/(item|entry)>/g) || [];
-  for (const block of blocks.slice(0, 6)) {
+  for (const block of blocks.slice(0, ITEMS_PER_FEED)) {
     const title = (block.match(/<title[^>]*>([\s\S]*?)<\/title>/) || [])[1] || "";
     const link =
       (block.match(/<link[^>]*href="([^"]+)"/) || [])[1] ||
@@ -98,7 +135,11 @@ function parseItems(xml: string, source: string, tag: NewsItem["tag"]): NewsItem
       pub_date: pub ? new Date(pub).toISOString() : null,
       summary: cleanSummary,
       tag,
-      relevance: deriveRelevance(cleanTitle, cleanSummary, tag)
+      relevance: deriveRelevance(cleanTitle, cleanSummary, tag),
+      desk_relevance: null,
+      desk_code: null,
+      desk_code_title: null,
+      desk_terms: []
     });
   }
   return items;
@@ -130,33 +171,6 @@ function deriveRelevance(title: string, summary: string, tag: NewsItem["tag"]): 
   if (t.includes("award") || t.includes("contract")) return "Award signal — competitive landscape shift.";
   if (tag === "policy") return "Policy update — review for compliance impact.";
   return "Defense-contracting signal worth monitoring.";
-}
-
-async function generateInsight(client: Anthropic, title: string, summary: string): Promise<string | null> {
-  try {
-    const msg = await client.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 80,
-      messages: [{
-        role: "user",
-        content: `${INSIGHT_PROMPT_PREFIX}\n\nHeadline: ${title}\nSummary: ${summary}\n\nOutput only the one-line insight, no preamble.`
-      }]
-    });
-    const text = msg.content
-      .filter((c) => c.type === "text")
-      .map((c) => (c as { text: string }).text)
-      .join("")
-      .trim();
-    if (!text) return null;
-    // Sometimes the model adds a leading "Insight:" or quotes — strip them.
-    return text.replace(/^["']|["']$/g, "").replace(/^Insight:\s*/i, "").trim();
-  } catch (err) {
-    console.error("[defense-news] insight generation failed", {
-      title: title.slice(0, 80),
-      error: err instanceof Error ? err.message : String(err)
-    });
-    return null;
-  }
 }
 
 export async function GET() {
@@ -224,63 +238,128 @@ export async function GET() {
     });
   }
 
-  // ━━ Layer in Claude insights (cached by article URL) ━━
-  const linkKeys = items.map((i) => i.link).filter(Boolean);
-  const insightMap = new Map<string, string>();
-  if (linkKeys.length > 0) {
-    const { data: cached } = await supabase
-      .from("defense_news_insights")
-      .select("url_key, ai_insight")
-      .in("url_key", linkKeys);
-    if (cached) {
-      for (const row of cached as Array<{ url_key: string; ai_insight: string }>) {
-        if (row.url_key && row.ai_insight) insightMap.set(row.url_key, row.ai_insight);
-      }
+  // ━━ Whose desk this is ━━
+  // Resolved BEFORE the insights, because the insights are now written against
+  // these codes and are cached under them.
+  const scope = await resolveFeedScope(supabase);
+  const codes = scope.codes;
+  const allowedCodes = new Set(codes);
+  const desk = deskDescription(codes);
+  const scope_key = scopeKey(codes);
+
+  // ━━ Deterministic layer ━━
+  // The code's own words out of 13 CFR 121.201, matched whole-word in the story.
+  // It fires rarely — measured 0 of 34 live stories on 2026-08-11 for an aircraft
+  // engine / machine shop / engineering desk — because federal reporting writes
+  // about programs and platforms, not about NAICS title nouns. That is precisely
+  // why it is not the ranking: it is the certain, explainable half, and it is what
+  // the badge cites when it does fire.
+  for (const it of items) {
+    const det = scoreArticle(it.title, it.summary, codes);
+    if (det.matches.length > 0) {
+      const top = det.matches[0];
+      it.desk_code = top.code;
+      it.desk_code_title = top.title;
+      it.desk_terms = top.terms;
     }
   }
 
-  // Generate missing insights for the top-N items only. Beyond the cap, items
-  // ship with ai_insight=null and the UI falls back to the deterministic relevance.
+  // ━━ Judged layer (cached per article PER DESK) ━━
+  const linkKeys = items.map((i) => i.link).filter(Boolean);
+  const insightMap = new Map<string, Judgement>();
+  if (linkKeys.length > 0) {
+    const { data: cached, error: cacheErr } = await supabase
+      .from("defense_news_insights")
+      .select("url_key, ai_insight, relevance, matched_code")
+      .eq("scope_key", scope_key)
+      .in("url_key", linkKeys);
+    if (cacheErr) {
+      // Migration 031 not applied yet reads as a missing column here. Log it and
+      // regenerate rather than serving another desk's insights.
+      console.error("[defense-news] insight cache read failed", { error: cacheErr.message, scope_key });
+    }
+    for (const row of (cached ?? []) as Array<{ url_key: string; ai_insight: string; relevance: number | null; matched_code: string | null }>) {
+      if (!row.url_key || !row.ai_insight) continue;
+      insightMap.set(row.url_key, {
+        relevance: typeof row.relevance === "number" ? row.relevance : 0,
+        // A cached code the customer no longer holds is dropped on read, not just
+        // on write — codes change on the capability statement after the row is
+        // written, and the card must never print a code that is not theirs today.
+        code: row.matched_code && allowedCodes.has(row.matched_code) ? row.matched_code : null,
+        why: row.ai_insight
+      });
+    }
+  }
+
   const apiKey = process.env.ANTHROPIC_API_KEY;
+  let judged = 0;
   if (apiKey) {
     const missing: NewsItem[] = [];
-    for (let idx = 0; idx < items.length && missing.length < INSIGHT_BATCH_LIMIT; idx++) {
+    for (let idx = 0; idx < items.length && missing.length < JUDGE_LIMIT; idx++) {
       const it = items[idx];
       if (it.link && !insightMap.has(it.link)) missing.push(it);
     }
     if (missing.length > 0) {
       const client = new Anthropic({ apiKey });
-      const generated = await Promise.all(
-        missing.map(async (it) => {
-          const insight = await generateInsight(client, it.title, it.summary);
-          return insight ? { url_key: it.link, title: it.title, ai_insight: insight } : null;
-        })
-      );
-      const ok = generated.filter((g): g is { url_key: string; title: string; ai_insight: string } => g !== null);
-      for (const g of ok) insightMap.set(g.url_key, g.ai_insight);
-      if (ok.length > 0) {
-        // Best-effort upsert. Fails silently if migration 010 not applied or RLS blocks.
+      const chunks: NewsItem[][] = [];
+      for (let i = 0; i < missing.length; i += JUDGE_CHUNK) chunks.push(missing.slice(i, i + JUDGE_CHUNK));
+      const results = await Promise.all(chunks.map((c) => judgeChunk(client, desk, allowedCodes, c)));
+
+      const rows: Array<{ url_key: string; scope_key: string; title: string; ai_insight: string; relevance: number; matched_code: string | null; ai_insight_generated_at: string }> = [];
+      const now = new Date().toISOString();
+      const byLink = new Map(missing.map((m) => [m.link, m] as const));
+      for (const r of results) {
+        for (const [link, j] of r) {
+          insightMap.set(link, j);
+          judged++;
+          rows.push({
+            url_key: link,
+            scope_key,
+            title: byLink.get(link)?.title ?? "",
+            ai_insight: j.why,
+            relevance: j.relevance,
+            matched_code: j.code,
+            ai_insight_generated_at: now
+          });
+        }
+      }
+      if (rows.length > 0) {
+        // Best-effort. A failure here costs a re-judge next request, not a wrong
+        // answer — so it is logged and the response still carries the judgements.
         await supabase
           .from("defense_news_insights")
-          .upsert(
-            ok.map((g) => ({ ...g, ai_insight_generated_at: new Date().toISOString() })),
-            { onConflict: "url_key" }
-          )
+          .upsert(rows, { onConflict: "url_key,scope_key" })
           .then(() => null, (err) => {
-            console.error("[defense-news] insight upsert failed", { count: ok.length, error: err?.message || String(err) });
+            console.error("[defense-news] insight upsert failed", { count: rows.length, error: err?.message || String(err) });
           });
       }
     }
   }
 
-  const enriched = items.map((it) => ({
-    ...it,
-    ai_insight: it.link ? insightMap.get(it.link) ?? null : null
-  }));
-
-  // The customer's own codes, so the page can state them instead of printing
-  // three that were typed into the markup and belong to nobody.
-  const scope = await resolveFeedScope(supabase);
+  const enriched = items.map((it) => {
+    const j = it.link ? insightMap.get(it.link) ?? null : null;
+    return {
+      ...it,
+      ai_insight: j ? j.why : null,
+      // Null, not 0, when nothing judged this story: "not scored" and "scored
+      // irrelevant" are different states and the page renders them differently.
+      desk_relevance: j ? j.relevance : null,
+      // ── Precedence ──
+      // A judgement that READ the story outranks a word that merely appeared in
+      // it, INCLUDING when the judgement is "no code applies". The word layer is
+      // the fallback for stories nothing judged.
+      //
+      // Not theoretical: 336412's own title contributes the term "parts", and
+      // "FAR Overhaul Updates for Parts 9, 12, 22 and 52" contains it — that
+      // rulemaking notice would otherwise carry an Aircraft Engine and Engine
+      // Parts Manufacturing badge. Lifting the term floor past "parts" would fix
+      // that one headline and leave the class untouched; federal prose reuses
+      // industry nouns as structure throughout.
+      desk_code: j ? j.code : it.desk_code,
+      desk_code_title: j ? (j.code ? naicsTitle(j.code) : null) : it.desk_code_title,
+      desk_terms: j ? [] : it.desk_terms
+    };
+  });
 
   // Image coverage per source, so "the pictures stopped" is a number that moved
   // rather than something a reader has to notice. A source at 0 with items > 0
@@ -298,6 +377,20 @@ export async function GET() {
     items: enriched,
     sources,
     naics: scope.codes,
+    // Lets the page tell "no codes on file — go add them" apart from "codes on
+    // file, nothing matched today". Both arrive as zero desk-relevant stories and
+    // only one of them is the customer's to fix.
+    naics_source: scope.source,
+    desk: {
+      // Whether anything actually judged this page against the codes. Without it,
+      // a page with no ANTHROPIC_API_KEY looks identical to one where the reader's
+      // codes genuinely match nothing.
+      judged: apiKey ? enriched.filter((i) => i.desk_relevance !== null).length : 0,
+      judged_this_request: judged,
+      relevant: enriched.filter((i) => (i.desk_relevance ?? 0) >= DESK_RELEVANT).length,
+      threshold: DESK_RELEVANT,
+      available: Boolean(apiKey)
+    },
     image_coverage: imageCoverage,
     degraded: sources.some((s) => !s.ok),
     fetched_at: new Date().toISOString()
