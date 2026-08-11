@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createServerClient } from "@/lib/supabase-server";
 import { extractFeedImage, extractOgImage, type ImageCarrier } from "@/lib/news-images";
+import { resolveFeedScope } from "@/lib/bd-os/live-opportunities";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -277,6 +278,10 @@ export async function GET() {
     ai_insight: it.link ? insightMap.get(it.link) ?? null : null
   }));
 
+  // The customer's own codes, so the page can state them instead of printing
+  // three that were typed into the markup and belong to nobody.
+  const scope = await resolveFeedScope(supabase);
+
   // Image coverage per source, so "the pictures stopped" is a number that moved
   // rather than something a reader has to notice. A source at 0 with items > 0
   // means its carrier changed shape.
@@ -292,6 +297,7 @@ export async function GET() {
   return NextResponse.json({
     items: enriched,
     sources,
+    naics: scope.codes,
     image_coverage: imageCoverage,
     degraded: sources.some((s) => !s.ok),
     fetched_at: new Date().toISOString()

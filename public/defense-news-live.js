@@ -93,6 +93,15 @@
       }
       if (typeof LIVE_ARTICLES === 'undefined' || !Array.isArray(LIVE_ARTICLES)) return;
 
+      // The account's own codes, from the capability statement. The sub-line
+      // used to print three that were typed into the markup and belong to
+      // nobody, under a claim that the feed was scored against them.
+      var sub = document.getElementById('dn-subline');
+      if (sub && Array.isArray(data.naics) && data.naics.length) {
+        sub.textContent = 'Defense, acquisition and regulatory reporting · your codes on file: '
+          + data.naics.join(' · ');
+      }
+
       const mapped = items.map(mapItem);
       LIVE_ARTICLES.length = 0;
       LIVE_ARTICLES.push.apply(LIVE_ARTICLES, mapped);

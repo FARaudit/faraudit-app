@@ -207,7 +207,8 @@ button{font-family:inherit}
 .dn-ticker-wrap{background:#0A1628;padding:10px 28px;display:flex;align-items:center;gap:16px;overflow:hidden;margin-bottom:24px}
 .dn-ticker-label{font-family:"IBM Plex Mono",monospace;font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:#378ADD;font-weight:700;white-space:nowrap;flex-shrink:0}
 .dn-ticker-track{flex:1;overflow:hidden}
-.dn-ticker-inner{display:flex;gap:0;white-space:nowrap;animation:dn-scroll 30s linear infinite;width:max-content}
+.dn-ticker-inner{display:flex;gap:0;white-space:nowrap;width:max-content}
+.dn-ticker-inner.scrolling{animation:dn-scroll var(--dn-ticker-dur,30s) linear infinite}
 .dn-ticker-item{display:inline-flex;align-items:center;gap:8px;padding:0 24px;border-right:1px solid rgba(255,255,255,0.1)}
 .dn-ticker-agency{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:#B5D4F4}
 .dn-ticker-val{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:800;color:#378ADD}
@@ -445,7 +446,7 @@ button{font-family:inherit}
           <div class="heading">
             <p class="eyebrow">Industry Intelligence</p>
             <h1>Defense News</h1>
-            <p class="sub">Real-time defense intelligence, scored for your codes — <b>NAICS 336413 · 332710 · 332721</b></p>
+            <p class="sub" id="dn-subline">Defense, acquisition and regulatory reporting from four wire sources</p>
           </div>
           <div class="dn-mast-meta">
             <span class="dn-live">Live</span>
@@ -540,15 +541,17 @@ function relativeTime(dateStr){
   } catch(e){ return ''; }
 }
 
+/* The fallback line for a story Claude has not written an insight for. It is
+   generic by construction — it is the same sentence for every story in a
+   category — so it must not pretend to be about the reader's codes. */
 function insightForCat(cat){
   if (cat === 'CMMC') return 'Verify your SPRS score is current before bidding on any CUI contract.';
-  if (cat === 'CONTRACTS') return 'Monitor SAM.gov for sub-tier notices in NAICS 336413/332710/332721.';
+  if (cat === 'CONTRACTS') return 'Watch SAM.gov for sub-tier notices following this award.';
   if (cat === 'NDAA') return 'Review proposal templates for clauses affected by FY2026 NDAA provisions.';
   if (cat === 'REGULATORY') return 'Check solicitations for updated FAR/DFARS clause language before submitting.';
-  if (cat === 'INDUSTRY') return 'Rising DoD SB obligations favor NAICS 336413/332710/332721 manufacturers.';
+  if (cat === 'INDUSTRY') return 'Small-business obligation shifts change which set-asides are worth pursuing.';
   if (cat === 'SUPPLY CHAIN') return 'Certify tier-2 suppliers against DFARS 252.225-7060 Xinjiang prohibition.';
-  if (cat === 'DEFENSE') return 'Monitor SAM.gov for related solicitation activity affecting NAICS 336413/332710/332721.';
-  return 'This affects your NAICS codes and upcoming bid strategy.';
+  return 'A defense-contracting signal worth monitoring.';
 }
 
 /* Articles arrive at runtime from /api/defense-news. Nothing is seeded here:
@@ -561,7 +564,7 @@ function mergeArticles(){
 
 /* ─── Modern news-outlet rendering ─── */
 var DN_CAT = 'all';
-var DN_NAV = [['all','All'],['contracts','Contracts'],['cmmc','CMMC'],['ndaa','NDAA'],['regulatory','Regulatory'],['industry','Industry'],['supplychain','Supply Chain']];
+var DN_NAV = [['all','All'],['defense','Defense'],['contracts','Contracts'],['cmmc','CMMC'],['ndaa','NDAA'],['regulatory','Regulatory'],['industry','Industry'],['supplychain','Supply Chain']];
 
 function dnCat(a){ return a.__c || (a.__c = categorizeArticle(a.title, a.description)); }
 function dnAge(a){ return a.publishedAt ? relativeTime(a.publishedAt) : ''; }
@@ -741,6 +744,16 @@ function renderTicker(){
   if (!el) return;
   el.innerHTML = TICKER_ITEMS.length ? html
     : '<div class="dn-ticker-item"><span class="dn-ticker-company">Award feed unavailable — no live award source is connected.</span></div>';
+  // Speed, not duration, is what a reader perceives. A fixed 30s over one short
+  // sentence is a crawl; over forty awards it is a blur. ~90px/s either way, and
+  // a strip with nothing to scroll does not move at all.
+  el.classList.toggle('scrolling', TICKER_ITEMS.length > 0);
+  if (TICKER_ITEMS.length > 0) {
+    var travel = el.scrollWidth / 2;                       // the duplicated half
+    el.style.setProperty('--dn-ticker-dur', Math.max(12, Math.round(travel / 90)) + 's');
+  } else {
+    el.style.removeProperty('--dn-ticker-dur');
+  }
 }
 
 // Regulatory highlights require a live source. None is wired, so it stays empty.
