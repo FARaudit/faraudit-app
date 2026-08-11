@@ -5,7 +5,7 @@ import { extractFeedImage, extractOgImage, type ImageCarrier } from "@/lib/news-
 import { resolveFeedScope } from "@/lib/bd-os/live-opportunities";
 import { scoreArticle, scopeKey, deskDescription, distinctiveTerms } from "@/lib/defense-news-naics";
 import { naicsTitle } from "@/lib/naics-titles";
-import { judgeChunk, type Judgement } from "@/lib/defense-news-judge";
+import { judgeChunk, RATE_PER_MTOK, type Judgement, type ChunkUsage } from "@/lib/defense-news-judge";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -431,6 +431,10 @@ export async function GET() {
   let judged = 0;
   // Links the judge identified as re-reporting an event another story already covers.
   const collapsed: string[] = [];
+  // What the judgement actually consumed on THIS request, from the API's own
+  // usage field. Reported so the page's running cost is auditable against the
+  // billing console instead of resting on an estimate.
+  const spend: ChunkUsage[] = [];
   if (apiKey) {
     const missing: NewsItem[] = [];
     for (let idx = 0; idx < items.length && missing.length < JUDGE_LIMIT; idx++) {
@@ -441,7 +445,7 @@ export async function GET() {
       const client = new Anthropic({ apiKey });
       const chunks: NewsItem[][] = [];
       for (let i = 0; i < missing.length; i += JUDGE_CHUNK) chunks.push(missing.slice(i, i + JUDGE_CHUNK));
-      const results = await Promise.all(chunks.map((c) => judgeChunk(client, desk, allowedCodes, c)));
+      const results = await Promise.all(chunks.map((c) => judgeChunk(client, desk, allowedCodes, c, spend)));
 
       // ━━ Same-event collapse ━━
       // The judge reads a whole chunk at once and marks a story that covers an
@@ -480,6 +484,17 @@ export async function GET() {
             ai_insight_generated_at: now
           });
         }
+      }
+      if (spend.length > 0) {
+        const inTok = spend.reduce((t, u) => t + u.input_tokens, 0);
+        const outTok = spend.reduce((t, u) => t + u.output_tokens, 0);
+        console.log("[defense-news] judged", {
+          calls: spend.length,
+          stories: spend.reduce((t, u) => t + u.stories, 0),
+          input_tokens: inTok,
+          output_tokens: outTok,
+          usd: Number((inTok / 1e6 * RATE_PER_MTOK.input + outTok / 1e6 * RATE_PER_MTOK.output).toFixed(5))
+        });
       }
       if (rows.length > 0) {
         // Best-effort. A failure here costs a re-judge next request, not a wrong
@@ -543,6 +558,19 @@ export async function GET() {
     // file, nothing matched today". Both arrive as zero desk-relevant stories and
     // only one of them is the customer's to fix.
     naics_source: scope.source,
+    // Zero on a fully-cached request — the common case, since insights are stored
+    // per article per desk and only new stories are judged.
+    spend: {
+      model: "claude-sonnet-4-6",
+      calls: spend.length,
+      stories_judged: spend.reduce((t, u) => t + u.stories, 0),
+      input_tokens: spend.reduce((t, u) => t + u.input_tokens, 0),
+      output_tokens: spend.reduce((t, u) => t + u.output_tokens, 0),
+      usd: Number((
+        spend.reduce((t, u) => t + u.input_tokens, 0) / 1e6 * RATE_PER_MTOK.input +
+        spend.reduce((t, u) => t + u.output_tokens, 0) / 1e6 * RATE_PER_MTOK.output
+      ).toFixed(5))
+    },
     desk: {
       // Whether anything actually judged this page against the codes. Without it,
       // a page with no ANTHROPIC_API_KEY looks identical to one where the reader's

@@ -9,6 +9,12 @@ import type Anthropic from "@anthropic-ai/sdk";
 
 export const CLAUDE_MODEL = "claude-sonnet-4-6";
 
+/** Published per-million-token rates for CLAUDE_MODEL, used only to turn the
+ *  API's reported token counts into a dollar figure in the response and the
+ *  logs. A rate change here does not change behaviour — it changes a number the
+ *  reader can check against the billing console. */
+export const RATE_PER_MTOK = { input: 3, output: 15 } as const;
+
 /** A story as the judge needs to see it. Structurally the subset of the route's
  *  NewsItem that the prompt reads, so the route passes its items straight in. */
 export interface JudgeableItem {
@@ -111,11 +117,20 @@ export function judgePrompt(desk: string | null): string {
 /** One call per chunk of stories. The whole list is judged against one desk in one
  *  request, so the model ranks stories against EACH OTHER rather than scoring each
  *  in isolation with no sense of what else is on the page that day. */
+export interface ChunkUsage {
+  input_tokens: number;
+  output_tokens: number;
+  stories: number;
+}
+
 export async function judgeChunk(
   client: Anthropic,
   desk: string | null,
   allowedCodes: Set<string>,
-  chunk: JudgeableItem[]
+  chunk: JudgeableItem[],
+  /** Filled with what this call actually consumed, so the page's cost is read
+   *  off the API's own usage numbers rather than off an estimate. */
+  usage?: ChunkUsage[]
 ): Promise<Map<string, Judgement>> {
   const out = new Map<string, Judgement>();
   const listing = chunk
@@ -132,6 +147,11 @@ export async function judgeChunk(
           `Return ONLY a JSON array, one object per story, no prose and no code fence:\n` +
           `[{"i":1,"relevance":0-100,"code":"<code or null>","domain":"<domain>","agency":"<agency or null>","dup":null,"why":"..."}]`
       }]
+    });
+    usage?.push({
+      input_tokens: msg.usage.input_tokens,
+      output_tokens: msg.usage.output_tokens,
+      stories: chunk.length
     });
     const text = msg.content
       .filter((c) => c.type === "text")

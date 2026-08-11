@@ -258,21 +258,36 @@ console.log("\n── I · landing tab, agency chip, pictures ──");
 // ── J · panels must not restate what the tabs already say ──
 console.log("\n── J · desk panel, sources, attribution ──");
 {
-  check("the intel panel breaks down the reader's OWN codes", HTML.includes("deskRows") && HTML.includes("agencyRows"));
-  check(
-    "it no longer re-counts stories by domain",
-    !HTML.includes("topicCounts"),
-    "the tab strip already prints those six numbers one row above"
-  );
-  check("a code with no hits stays on the chart at zero", /A code with no hits this week is a real answer/.test(HTML));
+  check("no intel band restates the tab counts", !HTML.includes("topicCounts") && !HTML.includes("deskRows"),
+    "the tab strip and the per-card chips already carry that breakdown");
+  check("its one irreducible number survives in the masthead", HTML.includes("renderDeskStat") && /match your codes/.test(HTML));
+  check("awards render once, at full width", HTML.includes('id="dn-awards"') && !HTML.includes("dn-ticker-inner"),
+    "they were a scrolling marquee AND a sidebar card");
+  check("the marquee renderer is gone", !HTML.includes("TICKER_ITEMS") && !LIVE.includes("renderTicker"));
+  check("the story column is no longer sharing width with a sidebar", !HTML.includes('id="dn-sidebar-col"'));
 
-  // The per-source counts were the per-feed cap, identical on every row forever.
+  // The per-source panel is gone: its counts were the per-feed cap, identical on
+  // every row forever, and a single dead feed among eleven is an operator concern
+  // rather than something a reader can act on. What must NOT go with it is the
+  // ability to notice a feed has died — that is how Federal Register's stayed
+  // dead. Both signals are asserted here rather than the panel that showed them.
+  check("no per-source panel ships to the reader", !HTML.includes("dn-sw-title"),
+    "eleven rows all printing the same cap told the reader nothing");
   check(
-    "the sidebar no longer prints a per-source count",
-    !/esc\(!s\.ok \? 'down' : String\(s\.count/.test(HTML),
-    "every feed is read to the same cap, so the number could not move"
+    "a failing feed is still logged server-side",
+    ROUTE.includes("[defense-news] feed non-OK") && ROUTE.includes("[defense-news] feed threw"),
+    "the operator signal must outlive the panel"
   );
-  check("a dead source is still surfaced", /responding/.test(HTML) && HTML.includes("dead.length"));
+  check(
+    "the route still reports per-source outcomes to the caller",
+    /sources,/.test(ROUTE) && ROUTE.includes("ok: r.ok"),
+    "so a monitor can see a dead feed even with no panel on the page"
+  );
+  check(
+    "a total outage still reaches the reader",
+    LIVE.includes("news sources responded"),
+    "one dead source of eleven is invisible and should be; all eleven is not"
+  );
 
   // Aggregated stories must be credited to the outlet, not to the query.
   check("the publisher is parsed off aggregated items", ROUTE.includes("<source") && ROUTE.includes("attributed"));
@@ -283,6 +298,22 @@ console.log("\n── J · desk panel, sources, attribution ──");
   check("the AI variant uses the accent palette", /\.dn-insight\.is-ai\{border-left-color:var\(--accent\)/.test(HTML));
   check("it carries a visual mark", /\.dn-insight\.is-ai b::before/.test(HTML));
   check("the fallback is visually quieter", /\.dn-insight:not\(\.is-ai\)\{background:transparent/.test(HTML));
+}
+
+// ── K · the page's own cost is auditable ──
+console.log("\n── K · spend reporting ──");
+{
+  check("token usage is read from the API response", JUDGE.includes("msg.usage.input_tokens") && JUDGE.includes("msg.usage.output_tokens"),
+    "an estimate cannot be checked against a bill");
+  check("the route accumulates it per request", ROUTE.includes("const spend: ChunkUsage[]"));
+  check("it is reported to the caller", /spend: \{[\s\S]{0,400}usd:/.test(ROUTE));
+  check("and logged server-side", /\[defense-news\] judged/.test(ROUTE));
+  check(
+    "the dollar figure is derived from tokens, not hardcoded",
+    /RATE_PER_MTOK\.input/.test(ROUTE) && /RATE_PER_MTOK\.output/.test(ROUTE),
+    "a fixed number would drift silently from the real rate"
+  );
+  check("a fully-cached request reports zero calls", ROUTE.includes("calls: spend.length"));
 }
 
 // ── G · SELF-ARM ──
