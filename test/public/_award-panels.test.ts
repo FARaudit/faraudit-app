@@ -147,6 +147,26 @@ function main() {
   assert(/pct != null/.test(acc),
     "it reads the latest year with a MEASURED share, so dollars and percentage come from the same point");
 
+  // ── ⛔ THE CODE PILL SCOPES EVERY PANEL THAT CLAIMS TO BE SCOPED ──────────
+  // Concentration ignored it while the recipients table it shares a widget with
+  // honoured it: pick 336412 and the table narrowed to 336412 while the block
+  // above it went on leading with 336611 — two answers to one question, under one
+  // heading, with nothing on screen saying they disagreed. The insight bar
+  // promises a click scopes every panel; a panel that opts out silently is the one
+  // a reader will quote.
+  const conc = fnOf("renderConcentration", "renderSbWinners");
+  assert(conc.length > 0, "the concentration renderer is findable");
+  assert(/rows\.filter\(r => r\.naics === S\.code\)/.test(conc),
+    "concentration filters on the selected code");
+  assert(/if \(S\.code\)/.test(conc), "…only when one is selected — the aggregate is a real view");
+  assert(/gap in our data, not a code no one holds/.test(conc),
+    "a code with no measured concentration says the gap is OURS, rather than falling back to every code");
+  // The neighbours that already honoured it, asserted so this cannot regress into
+  // consistency-by-everyone-ignoring-it.
+  const win = fnOf("renderSbWinners", "renderAll");
+  assert(/if \(S\.code\) rows = rows\.filter\(r => r\.naics === S\.code\)/.test(win),
+    "the set-aside winners list still honours the pill");
+
   // ── CSS shipped ───────────────────────────────────────────────────────────
   for (const cls of ["sn-two", "sn-fig", "sn-n", "sn-k", "sn-note",
                      "pt-list", "pt-r", "pt-n", "pt-v", "pt-m", "pt-cap", "an-none"]) {
