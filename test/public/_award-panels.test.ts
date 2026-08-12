@@ -102,6 +102,21 @@ function main() {
   assert(/not a market with nothing/i.test(none), "and not the market's");
   for (const fn of [sz, sn, pt]) assert(/anNone\(/.test(fn), "every panel uses it");
 
+  // ── ⛔ THE SB PANEL MUST NOT RANK BACKWARDS FROM THE MONEY ────────────────
+  // SB_SHARE arrives NAICS-ascending, so the panel led with 332710 (29.5%,
+  // $8.88M) and put 336611 last (3.1%, $768.71M) — 86x more small-business money
+  // presented as the weakest of the three. Read top to bottom that says
+  // machining is open and shipbuilding is closed. The reverse is true.
+  const sb = fnOf("renderSbShare", "renderConcentration");
+  const sbAny = sb || app.slice(app.indexOf("function renderSbShare"), app.indexOf("function renderSbShare") + 2600);
+  assert(/\.sort\(\s*\(a, b\)\s*=>\s*sbDollarsOf\(b\) - sbDollarsOf\(a\)\s*\)/.test(sbAny),
+    "rows are sorted by small-business DOLLARS, not by code number");
+  assert(/sbs-money/.test(sbAny), "and the dollar figure leads the row, not just the percentage");
+  assert(/function sbDollarsOf/.test(app), "the dollar figure has a named accessor");
+  const acc = fnOf("sbDollarsOf", "renderSbShare");
+  assert(/pct != null/.test(acc),
+    "it reads the latest year with a MEASURED share, so dollars and percentage come from the same point");
+
   // ── CSS shipped ───────────────────────────────────────────────────────────
   for (const cls of ["sz-band", "sz-mid", "sz-scale", "sz-rail", "sz-fill", "sz-tick", "sz-note",
                      "sn-grid", "sn-col", "sn-b", "sn-l", "sn-note",
