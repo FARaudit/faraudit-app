@@ -10,11 +10,15 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { pageSource } from "./_page-styles";
 
 const ROOT = join(import.meta.dirname ?? __dirname, "..", "..");
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
 const APP = read("public/dsb-app.js");
-const HTML = read("public/defense-spending.html");
+// Markup PLUS the stylesheet the page links — the map's CSS moved into a shared
+// file when a second page began rendering these panels, and this gate is about
+// whether the muted treatment SHIPS, not which file it was written in.
+const HTML = pageSource("defense-spending.html");
 
 let pass = 0;
 let fail = 0;

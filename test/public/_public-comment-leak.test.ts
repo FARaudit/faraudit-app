@@ -54,8 +54,8 @@ const PUBLIC_DIR = join(process.cwd(), "public");
 // internal tooling path, a workstream codename. That reference pattern is the shape, and it is what
 // actually leaked here (`CEO ruling 2026-07-28`, `ARC #747`, `Card #769`, `pending Design card #775`
 // all shipped in View-Source).
-function servedFiles(dir: string): { path: string; kind: "html" | "js" }[] {
-  const out: { path: string; kind: "html" | "js" }[] = [];
+function servedFiles(dir: string): { path: string; kind: "html" | "js" | "css" }[] {
+  const out: { path: string; kind: "html" | "js" | "css" }[] = [];
   for (const entry of readdirSync(dir)) {
     const p = join(dir, entry);
     if (statSync(p).isDirectory()) {
@@ -63,6 +63,12 @@ function servedFiles(dir: string): { path: string; kind: "html" | "js" }[] {
       out.push(...servedFiles(p));
     } else if (entry.endsWith(".html")) out.push({ path: p, kind: "html" });
     else if (entry.endsWith(".js")) out.push({ path: p, kind: "js" });
+    /* ⛔ SCOPE WIDENED TO STYLESHEETS. This gate already swept the `/* *\/` inside an .html <style>
+       block — but the moment 54 KB of that CSS moved into public/dsb.css so two pages could share it,
+       every one of those comments left the sweep. Nothing about them changed except the file
+       extension. A gate scoped by extension rather than by "is this served verbatim" loses coverage
+       to an ordinary refactor, silently, which is the failure this file was written about. */
+    else if (entry.endsWith(".css")) out.push({ path: p, kind: "css" });
   }
   return out;
 }
@@ -157,7 +163,7 @@ const INTERNAL_REF = new RegExp([
   String.raw`\bGauntlet\b`, String.raw`\bflag-OFF\b`, String.raw`AUDIT_[A-Z0-9_]{3,}`
 ].join("|"), "i");
 
-function findLeaks(src: string, kind: "html" | "js" = "html"): { payload: string; why: string }[] {
+function findLeaks(src: string, kind: "html" | "js" | "css" = "html"): { payload: string; why: string }[] {
   const leaks: { payload: string; why: string }[] = [];
 
   const judgeHtml = (raw: string) => {
@@ -178,6 +184,13 @@ function findLeaks(src: string, kind: "html" | "js" = "html"): { payload: string
     const sup = payload.match(SUPERSEDED), def = payload.match(DEFECT);
     if (sup && def) leaks.push({ payload, why: `confession: "${sup[0]}" + "${def[0]}"` });
   };
+
+  // A stylesheet is judged like a script: `/* *\/` only, no prose ceiling (a rules-file header is
+  // documentation), and an internal reference of any length is a leak.
+  if (kind === "css") {
+    for (const m of src.matchAll(JS_BLOCK)) judgeJs(m[1]);
+    return leaks;
+  }
 
   if (kind === "html") {
     for (const m of src.matchAll(COMMENT)) judgeHtml(m[1]);
@@ -342,6 +355,8 @@ function findLeaks(src: string, kind: "html" | "js" = "html"): { payload: string
   const nJs = files.filter(f => f.kind === "js").length;
   assert(nHtml > 0, `sweep reached the real public/ tree (${nHtml} html files)`);
   assert(nJs > 0, `sweep covers served scripts too (${nJs} js files)`);
+  const nCss = files.filter(f => f.kind === "css").length;
+  assert(nCss > 0, `sweep covers served stylesheets too (${nCss} css files)`);
 
   let total = 0;
   for (const f of files) {
