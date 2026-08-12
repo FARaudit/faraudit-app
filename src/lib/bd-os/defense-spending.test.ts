@@ -296,6 +296,52 @@ async function main() {
   assert(out.unsupported.every((u) => u.needs.length > 20),
     "each states the measurement it would need — an unsourced panel and an empty one must not read alike");
 
+  // ── SB SHARE · the number that answers "should I be here at all" ──────────
+  assert(out.SB_SHARE.length === out.coverage.tracked.length,
+    "every tracked code carries a small-business share series");
+  const share = out.SB_SHARE[0];
+  assert(share.points.length === out.FYS.length,
+    "one point per measured year, so direction is visible");
+  assert(share.points.some((p) => p.open === true) && share.points.some((p) => p.open === false),
+    "the open year is flagged as partial and the closed ones are not");
+  // Derived, not restated: the share must equal sb/total from the fixture row.
+  const fy24 = share.points.find((p) => p.fy === "FY2024")!;
+  assert(near(fy24.pct!, (fy24.sb / fy24.total) * 100, 0.001),
+    "the percentage is derived from the two dollar figures beside it");
+  // NEGATIVE CONTROL — a year with nothing obligated has NO share, never 0%.
+  // Driven through a fixture that actually contains such a year: asserting the
+  // branch against rows that all have obligations proves only that the branch was
+  // never reached.
+  const ZERO_ROWS = [
+    { ...ROWS[0], fiscal_year: 2024, total_obligations: 0, sb_obligations: 0, top_recipients: [], sb_recipients: [] },
+    { ...ROWS[0], fiscal_year: 2025 }
+  ];
+  const zOut = await fetchDefenseSpending(fakeClient(ZERO_ROWS), ["336412"]);
+  assert(zOut.state === "ok", "the zero-year fixture still produces a page");
+  const zPts = (zOut as typeof out).SB_SHARE[0].points;
+  const zeroPt = zPts.find((p) => p.total === 0);
+  assert(!!zeroPt, "fixture reaches a year with nothing obligated");
+  assert(zeroPt!.pct === null,
+    "a code that obligated nothing in a year reports null, not a 0% share of nothing");
+  assert(zPts.some((p) => p.pct !== null),
+    "and the year that DID obligate still reports its share");
+
+  // ── CONCENTRATION · exact share, and NO firm count ────────────────────────
+  const conc = out.CONCENTRATION[0];
+  assert(conc.leaders.length <= 5, "at most five leaders are named");
+  assert(near(conc.top5_pct!, (conc.top5_val / conc.total) * 100, 0.001),
+    "the share is the top five over the code's WHOLE total, not over the rows we hold");
+  assert(conc.total >= conc.top5_val,
+    "the denominator is the code total, so the share can never exceed 100%");
+  assert(conc.firms_below_unknown === true,
+    "the payload states outright that the number of firms below the listed ones is unknown");
+  assert(!Object.keys(conc).some((k) => /firm_count|competitors|distinct/i.test(k)),
+    "NEGATIVE CONTROL — no field claims a competitor count; the feed lists ten per code and counting them would report our own cap as a market size");
+  // Leaders are merged entities, not raw award rows.
+  const lkeys = conc.leaders.map((l) => recipientKey(l.name));
+  assert(new Set(lkeys).size === lkeys.length,
+    "one company appears at most once among the leaders");
+
   // ── THE EMPTY CASES ARE DISTINCT ──────────────────────────────────────────
   const noCodes = await fetchDefenseSpending(fakeClient(ROWS), []);
   assert(noCodes.state === "no-profile-codes",
