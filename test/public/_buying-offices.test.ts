@@ -46,7 +46,10 @@ function main() {
   // ── the tail is collapsed, never dropped ──────────────────────────────────
   assert(/\.slice\(BO_SHOW\)|rest\s*=/.test(fn), "the overflow offices are captured, not discarded");
   assert(/rest\.reduce/.test(fn), "and summed, so the dollars outside the visible set stay visible");
-  assert(/other office/.test(fn), "the collapsed row is LABELLED with how many it stands for");
+  // Matches the COUNT + a noun, not the word "office": the panel showed
+  // sub-agencies under an "office" heading and the copy was corrected to say so.
+  assert(/rest\.length \+ ' other (office|agenc)/.test(fn),
+    "the collapsed row is LABELLED with how many it stands for");
 
   // ── a never-pulled column is not a market with no buyers ──────────────────
   assert(/box\.measured/.test(fn), "the renderer branches on `measured`");
