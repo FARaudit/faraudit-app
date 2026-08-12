@@ -125,6 +125,7 @@
 
   /* ════════════════ CONTROLS ════════════════ */
   function buildControls() {
+    if (!$('segFY')) return;
     setHTML($('segFY'), D.FYS.map(f =>
       `<button data-fy="${esc(f)}" class="${f === S.fy ? 'active' : ''}">${esc(f.replace('FY20', "'"))}</button>`).join(''));
     $('segFY').querySelectorAll('button').forEach(b => b.onclick = () => { setScope({ fy: b.dataset.fy }); });
@@ -139,6 +140,7 @@
     $('selChipX').onclick = () => { S.state = null; syncControls(); renderAll(); };
   }
   function syncControls() {
+    if (!$('segFY')) { renderCodePills(); return; }
     $('segFY').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.fy === S.fy));
     const chip = $('selChip'); const st = view().states[S.state];
     if (S.state && st) { chip.classList.add('show'); $('selChipText').textContent = 'Focus: ' + st.name; }
@@ -194,8 +196,15 @@
     renderCodePills();
   }
 
+  /* ⛔ EVERY RENDERER RETURNS WHEN ITS HOST IS ABSENT, and that is the mounting
+     mechanism, not defensive noise. This file renders a SET of panels; a page
+     that carries only some of their hosts gets only those panels, one renderer
+     set, no fork. Most already guarded — these did not, and an unguarded
+     `$(id).querySelectorAll` throws, which takes the whole page down rather
+     than skipping one panel. */
   /* ════════════════ KPIs ════════════════ */
   function renderKPIs() {
+    if (!$('kpiStrip')) return;
     const cards = view().kpis;
     setHTML($('kpiStrip'), cards.map((c, idx) => {
       const dtone = !c.delta ? 'flat' : c.delta[0] === '+' ? 'up' : 'down';
@@ -350,6 +359,7 @@
      Two modes. A third, keyed to your firm's own activity, would need a
      dimension this feed does not carry. */
   function renderRankTabs() {
+    if (!$('rankTabs')) return;
     const tabs = [['top', 'Top'], ['growth', 'Growth']];
     setHTML($('rankTabs'), tabs.map(t => `<button class="rank-tab ${t[0] === S.rankMode ? 'active' : ''}" data-rm="${t[0]}">${t[1]}</button>`).join(''));
     $('rankTabs').querySelectorAll('button').forEach(b => b.onclick = () => { S.rankMode = b.dataset.rm; renderRankList(); });
@@ -370,6 +380,7 @@
   }
 
   function renderRankList() {
+    if (!$('rankTabs') || !$('rankList')) return;
     $('rankTabs').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.rm === S.rankMode));
     let arr = Object.entries(view().states).map(([fips, s]) => ({ fips, ...s }));
     if (S.rankMode === 'growth') {
@@ -404,6 +415,7 @@
      One bar. Small-business dollars arrive per NAICS, never per agency, so no
      SB segment can be drawn here. */
   function renderAgencyList() {
+    if (!$('agencyList')) return;
     /* The column header was the literal string FY26 in the markup, so it kept
        naming FY26 while the reader was looking at FY24. A header over a number
        has to name the year that number is. */
@@ -920,6 +932,7 @@
      No agency column: the feed ranks recipients per NAICS across all agencies,
      so no agency is attributable to a row. */
   function renderIncumbents() {
+    if (!$('iiBody')) return;
     const rows = view().incumbents;
     /* This block follows the concentration rows, which carry their own year on
        every row. This one follows the year control, so it has to say which year
@@ -960,6 +973,7 @@
 
   /* ════════════════ INSIGHT BAR ════════════════ */
   function renderInsight() {
+    if (!$('insightBar')) return;
     const v = view();
     let html;
     if (S.state && v.states[S.state]) {
