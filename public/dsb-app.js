@@ -328,15 +328,32 @@
     setHTML($('rankTabs'), tabs.map(t => `<button class="rank-tab ${t[0] === S.rankMode ? 'active' : ''}" data-rm="${t[0]}">${t[1]}</button>`).join(''));
     $('rankTabs').querySelectorAll('button').forEach(b => b.onclick = () => { S.rankMode = b.dataset.rm; renderRankList(); });
   }
+  /* The total the map and the leaderboard are both drawing. It is deliberately
+     NOT the headline obligations figure: the feed stores the top ten states per
+     code, so this sums the states it ranks and says so. Printing the headline
+     here would claim the map covers the whole country, and the legend's own
+     "outside the top ten" key says it does not. */
+  function renderGeoTotal() {
+    const el = $('geoTotal'); if (!el) return;
+    const rows = Object.values(view().states);
+    if (!rows.length) { clear(el); return; }
+    const sum = rows.reduce((n, s) => n + (s.val || 0), 0);
+    const scope = S.code ? 'NAICS ' + S.code : 'your codes';
+    setHTML(el, '<b>' + fmtM(sum) + '</b><span>' + rows.length + ' states the feed ranks · '
+      + esc(scope) + ' · ' + esc(S.fy || '') + '</span>');
+  }
+
   function renderRankList() {
     $('rankTabs').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.rm === S.rankMode));
     let arr = Object.entries(view().states).map(([fips, s]) => ({ fips, ...s }));
     if (S.rankMode === 'growth') {
       arr = arr.filter(s => s.yoy != null).sort((a, b) => b.yoy - a.yoy).slice(0, 12);
-      $('rankSub').textContent = 'Fastest year-on-year change · states in both years’ top ten';
+      $('rankSub').textContent = 'Fastest year-on-year change · states in both years’ top ten'
+        + ' · click a state on the map or in the list to scope every panel to it';
     } else {
       arr = arr.sort((a, b) => b.val - a.val).slice(0, 14);
-      $('rankSub').textContent = 'Top states by obligations · ' + S.fy;
+      $('rankSub').textContent = 'Top states by obligations · ' + S.fy
+        + ' · click a state on the map or in the list to scope every panel to it';
     }
     const max = d3.max(arr, d => d.val) || 1;
     setHTML($('rankList'), arr.map((s, i) => {
@@ -606,8 +623,9 @@
     const cap = $('boCap'), sub = $('boSub');
     const box = (D.BUYING_OFFICES || {})[S.fy] || null;
     const scoped = S.code ? 'NAICS ' + S.code : 'your NAICS codes';
-    if (sub) sub.textContent = 'The buying offices inside the departments above · '
-      + scoped + ' · ' + (S.fy || '');
+    // The heading beside it already says "inside them", so this states only what
+    // the numbers are scoped to.
+    if (sub) sub.textContent = scoped + ' · ' + (S.fy || '');
 
     if (!box) { setHTML(host, ''); if (cap) setHTML(cap, ''); return; }
     const list = (S.code ? (box.byCode || {})[S.code] || [] : box.offices || [])
@@ -877,6 +895,13 @@
      so no agency is attributable to a row. */
   function renderIncumbents() {
     const rows = view().incumbents;
+    /* This block follows the concentration rows, which carry their own year on
+       every row. This one follows the year control, so it has to say which year
+       it is — an unlabelled table under a labelled one reads as the same year. */
+    const sub = $('iiPartSub');
+    if (sub) sub.textContent = 'Ranked by obligations · '
+      + (S.code ? 'NAICS ' + S.code : 'your NAICS codes') + ' · ' + (S.fy || '')
+      + ' · SB flagged from the feed’s own list';
     setHTML($('iiBody'), rows.map(r => `<tr>
         <td class="ii-awd">${esc(r.name)}</td>
         <td class="ii-val">${fmtM(r.val)}</td>
@@ -921,7 +946,9 @@
       html = '<span class="ib-label">Read</span>'
         + (top ? `<b>${esc(top.short)}</b> is the largest buyer in your codes` : 'No agency breakdown for this year')
         + (st ? ` and <b>${esc(st.name)}</b> the largest place of performance` : '')
-        + ` in ${esc(S.fy)}. Click a state to scope the leaderboard to it.`;
+        // A state selection scopes every panel on the tab, not the leaderboard
+        // alone — the sentence understated what the click does.
+        + ` in ${esc(S.fy)}. Click a state to scope every panel to it.`;
     }
     setHTML($('insightBar'), '<span class="ib-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a7 7 0 00-4 12.7V17a1 1 0 001 1h6a1 1 0 001-1v-2.3A7 7 0 0012 2z"></path><path d="M9 21h6"></path></svg></span><span>' + html + '</span>');
   }
@@ -1034,16 +1061,27 @@
      It states no FIRM COUNT. The feed lists ten recipients per code, so everything
      below tenth is invisible, and counting the visible ones would report our own
      cap as a market size. */
+  /* The shades the leader bar draws, darkest first. These were read out of the
+     map's ramp by index arithmetic, so removing the map removed the constant and
+     left this the only reference to it — a name inside a template literal, which
+     no syntax check and no render-caller check can see. It threw on the first
+     row with leaders and took the whole page down with it, because renderAll()
+     has no per-panel isolation. Declared here, beside its one consumer. */
+  const CONC_RAMP = ['--geo-6', '--geo-5', '--geo-4', '--geo-2', '--geo-1'];
   function renderConcentration() {
     const el = $('concList'); if (!el) return;
-    const rows = D.CONCENTRATION || [];
+    /* ⛔ ORDERED BY THE SIZE OF THE CODE, NOT BY CODE NUMBER. The payload arrives
+       NAICS-ascending, which led with a $30M code and put a $25.04B one last. It
+       also makes the rows line up with the small-business list in the widget
+       alongside, which is sorted the same way, so a reader can read across. */
+    const rows = (D.CONCENTRATION || []).slice().sort((a, b) => (b.total || 0) - (a.total || 0));
     if (!rows.length) { setHTML(el, '<div class="conc-note">No codes tracked.</div>'); return; }
     setHTML(el, rows.map(r => {
       const leaders = r.leaders || [];
       return `<div class="conc-row">
         <div class="conc-top"><span class="sbs-code">${esc(r.naics)} · ${esc(r.fy)}</span>
           <span class="conc-pct">${r.top5_pct == null ? '—' : r.top5_pct.toFixed(0) + '%'}</span></div>
-        <div class="conc-bar">${leaders.map((l, i) => `<i style="width:${l.pct == null ? 0 : Math.min(100, l.pct).toFixed(2)}%;background:${css(GEO_RAMP[Math.max(1, 5 - i)])}" title="${esc(l.name)}"></i>`).join('')}</div>
+        <div class="conc-bar">${leaders.map((l, i) => `<i style="width:${l.pct == null ? 0 : Math.min(100, l.pct).toFixed(2)}%;background:${css(CONC_RAMP[Math.min(i, CONC_RAMP.length - 1)])}" title="${esc(l.name)}"></i>`).join('')}</div>
         <div class="conc-lead">${leaders.length ? esc(leaders[0].name) + ' alone holds ' + (leaders[0].pct == null ? '—' : leaders[0].pct.toFixed(0) + '%') : 'No recipients recorded.'}</div>
         <div class="conc-lead">Top five hold ${fmtM(r.top5_val)} of ${fmtM(r.total)}.</div>
       </div>`;
@@ -1062,7 +1100,11 @@
      $29M, and conflating them overstates it threefold. */
   function renderSbWinners() {
     const el = $('sbWinnersList'); if (!el) return;
-    let rows = D.SB_WINNERS || [];
+    /* Sorted by the small-business dollars in the code, because it now sits
+       directly under the share list, which is sorted the same way. Left
+       unsorted the two blocks disagreed inside one card: the share list led
+       with the $769M code and this one led with the $9M code. */
+    let rows = (D.SB_WINNERS || []).slice().sort((a, b) => (b.sb_total || 0) - (a.sb_total || 0));
     if (S.code) rows = rows.filter(r => r.naics === S.code);
     if (!rows.length) { setHTML(el, emptyLine('No set-aside recipients recorded for these codes.')); return; }
     setHTML(el, rows.map(r => {
@@ -1081,7 +1123,7 @@
 
   function renderAll() {
     computeBreaks();
-    renderKPIs(); renderLegend(); renderMap(); renderRankList();
+    renderKPIs(); renderLegend(); renderMap(); renderGeoTotal(); renderRankList();
     renderStatusPill();
     renderAgencyList(); renderBuyingOffices(); renderAwardSize(); renderSeasonality();
     renderPrimeTargets(); renderCeilings(); renderRecompetes(); renderIncumbents(); renderInsight();
