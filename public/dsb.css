@@ -523,6 +523,21 @@ a.blk .rc-row:hover,.blk a.rc-row:hover{background:rgba(255,255,255,.55)}
 [data-theme="dark"] .blk-s{color:var(--accent-light)}
 [data-theme="dark"] .blk .rc-row,[data-theme="dark"] .blk .rc-row:first-of-type{border-top:1px solid rgba(181,212,244,.16)}
 [data-theme="dark"] a.blk .rc-row:hover,[data-theme="dark"] .blk a.rc-row:hover{background:rgba(255,255,255,.06)}
+/* WHO YOU ACTUALLY CALL — the officer block under a recompete row. Outside the
+   row's own anchor, because a mailto nested in a link is invalid markup. */
+.rc-item{display:block}
+.rc-call{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;padding:7px 8px 10px;margin:0 -8px 2px;font-size:11.5px;line-height:1.5;color:var(--ink-2)}
+.rc-call.none,.rc-call.pending{color:var(--mute);font-size:11px}
+.rc-call-o{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--accent-deep);background:var(--accent-pale);border-radius:5px;padding:2px 7px;white-space:nowrap}
+[data-theme="dark"] .rc-call-o{color:var(--accent-light);background:rgba(55,138,221,0.16)}
+.rc-call-lede{flex-basis:100%;font-size:10.5px;color:var(--mute);line-height:1.4}
+.rc-p{display:inline-flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.rc-p b{font-weight:700;color:var(--ink)}
+.rc-p a{color:var(--accent-deep);text-decoration:none;border-bottom:1px solid transparent}
+.rc-p a:hover{border-bottom-color:currentColor}
+[data-theme="dark"] .rc-p a{color:var(--accent-light)}
+.rc-p i{font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute-2)}
+.rc-call-more{font-size:10.5px;color:var(--mute-2)}
 .rc-row{display:grid;grid-template-columns:104px minmax(0,1fr) 152px;gap:1px 18px;align-items:baseline;padding:10px 8px;margin:0 -8px;text-decoration:none;color:inherit;border-top:1px solid var(--line-3)}
 .rc-row:first-of-type{border-top:0}
 a.rc-row:hover{background:var(--card-soft)}
