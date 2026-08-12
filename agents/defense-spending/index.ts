@@ -2,7 +2,11 @@
 // For each NAICS code, queries USAspending API v2 for FY2026 + FY2025 metrics
 // and UPSERTs one row per (naics_code, fiscal_year) into defense_spending_intel.
 //
-// Env: NAICS_CODES (comma-separated, default "336413") ·
+// Codes to pull are read from capability_statements.naics_codes — the customer
+// profile — NOT from an environment variable. NAICS_CODES remains an OPTIONAL
+// supplement for prospect/demo codes nobody has declared yet; it can only add.
+//
+// Env: NAICS_CODES (optional supplement, comma-separated) ·
 //      NEXT_PUBLIC_SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY
 //
 // Schedule (Railway): suggest 0 4 * * * (04:00 UTC = 23:00 prior-day CT) so
@@ -24,14 +28,65 @@ const usaNs: any = await import("./usaspending.ts");
 const usa = usaNs.default ?? usaNs;
 
 import { createClient } from "@supabase/supabase-js";
+import { unionNaicsCodes, customerCodeCount } from "./naics";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-const NAICS_CODES = (process.env.NAICS_CODES || "336413")
+/** Extra codes to pull beyond what customers have declared — prospect research,
+ *  a demo, a market we want data on before anyone asks. OPTIONAL, and a
+ *  SUPPLEMENT: it can only ever add codes, never restrict the set. */
+const EXTRA_NAICS = (process.env.NAICS_CODES || "")
   .split(",").map((s) => s.trim()).filter(Boolean);
+
+/* WHICH CODES TO PULL IS A QUESTION ABOUT CUSTOMERS, SO IT IS ASKED OF THE
+   CUSTOMER TABLE — not of a hand-maintained environment variable.
+
+   `capability_statements.naics_codes` is what scopes this customer's SAM feed,
+   Teaming, KO intel and the engine's bidder profile. It is the platform key. If
+   this worker pulls from a list somebody typed into Railway once, then the day a
+   customer adds a code, /defense-spending has no row for it — and the page shows
+   an empty market rather than a wrong one, so nothing looks broken and nobody
+   finds out. The env var could only ever be a snapshot of the answer, and it
+   goes stale the moment a customer edits their profile.
+
+   Measured 2026-08-12: the Railway variable listed 11 codes; the one capability
+   statement on record declares 3 (332710, 336412, 336611). The list was a
+   superset that day, so nothing was being lost — but nothing kept it that way,
+   and the failure it protects against is silent.
+
+   ⛔ A FAILED READ THROWS. It must not fall back to the env var: that would pull
+   a stale set while reporting success, which is the exact drift this removes. A
+   nightly that fails loudly is retried; one that silently refreshes the wrong
+   codes is not noticed. An EMPTY read is different — zero customers is a real
+   answer, not a failure, and is reported as such. */
+async function resolveNaicsCodes(): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("capability_statements")
+    .select("naics_codes");
+  if (error) {
+    throw new Error(
+      `[defense-spending] could not read capability_statements: ${error.message}. ` +
+      `Refusing to run — pulling a stale code list would look like success.`
+    );
+  }
+
+  const declared = customerCodeCount(data);
+  const all = unionNaicsCodes(data, EXTRA_NAICS);
+  console.log(
+    `[defense-spending] codes: ${declared} from ${(data ?? []).length} capability statement(s)` +
+    `${EXTRA_NAICS.length ? ` + ${EXTRA_NAICS.length} from NAICS_CODES` : ""} = ${all.length} to pull`
+  );
+  if (declared === 0) {
+    console.warn(
+      `[defense-spending] ⚠ NO customer declares a NAICS code. ` +
+      `${EXTRA_NAICS.length ? "Pulling only the NAICS_CODES supplement." : "Nothing to pull."}`
+    );
+  }
+  return all;
+}
 
 // FY definition: fiscal year N = Oct 1 (N-1) through Sep 30 N
 // FY2026 = 2025-10-01 → 2026-09-30 (current, in progress)
@@ -177,9 +232,10 @@ async function upsert(row: IntelRow): Promise<void> {
 
 async function main() {
   const startedAt = new Date();
-  console.log(`[defense-spending] started ${startedAt.toISOString()} · NAICS ${NAICS_CODES.join(",")}`);
+  const codes = await resolveNaicsCodes();
+  console.log(`[defense-spending] started ${startedAt.toISOString()} · NAICS ${codes.join(",")}`);
 
-  for (const naics of NAICS_CODES) {
+  for (const naics of codes) {
     console.log(`[defense-spending] processing NAICS ${naics}...`);
     // Process FY2024 → FY2025 → FY2026 sequentially so each year's YoY can
     // reference the prior year's total. FY2024 has no prior reference → yoy=null.
