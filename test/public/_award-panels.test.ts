@@ -54,6 +54,7 @@ function main() {
 
   // ── 4 · ⛔ a call list must not include firms with no obligation ──────────
   const pt = fnOf("renderPrimeTargets", "renderCeilings");
+  const app2 = app;
   assert(pt.length > 0, "the prime renderer is findable");
   assert(/19\.702/.test(pt), "the FAR authority is cited, not implied");
   assert(/t\.threshold/.test(pt), "the dollar threshold is printed from the data, not hardcoded in prose");
@@ -62,6 +63,35 @@ function main() {
   assert(/Size is not verified/i.test(pt),
     "and the panel states that size is UNVERIFIED for the firms it does list");
   assert(/not a claim/i.test(pt), "explicitly not a claim that all of them are large");
+
+  // ── ⛔ 4 · LIFETIME VALUE MUST NOT WEAR A FISCAL YEAR ──────────────────────
+  // The panel printed Huntington Ingalls at $90.76B and Electric Boat at $88.57B
+  // under "in your NAICS codes · FY2026", on a page whose own headline is
+  // $30.06B obligated for FY2026 — two firms exceeding the whole market by 6x,
+  // in the same view. award-analytics' own AwardSample note says these amounts
+  // must never be shown against total_obligations; the panel did exactly that.
+  assert(/lifetime award value/i.test(pt),
+    "the subhead names the figure as LIFETIME award value");
+  assert(/sampled from/i.test(pt),
+    "the fiscal year is stated as which awards were SAMPLED, not as the money's period");
+  assert(/larger than this page/i.test(pt),
+    "and the caption says outright why these exceed the page's annual total");
+
+  // ── ⛔ THE STATUS PILL IS DERIVED, NOT MARKUP ─────────────────────────────
+  // It was typed into the HTML as data-state="unwired" / NOT CONNECTED and never
+  // updated, so the page announced itself disconnected above $30B it had fetched.
+  assert(/function renderStatusPill/.test(app), "a renderer owns the status pill");
+  assert(/renderStatusPill\(\)/.test(app.slice(app.indexOf("renderAll"))) ||
+         /renderStatusPill\(\);/.test(app), "and it runs on every render");
+  const pill = fnOf("renderStatusPill", "renderUnavailable");
+  assert(/dsbState\(\)/.test(pill), "the pill reads the real status");
+  assert(/'LIVE'/.test(pill) && /'NOT CONNECTED'/.test(pill),
+    "and can show either state, so it is not a constant");
+
+  // ── ⛔ a panel about ROOM must not list rows with none ────────────────────
+  const ch2 = fnOf("renderCeilings", "renderBuyingOffices");
+  assert(/headroom > 0/.test(ch2), "rows with no headroom are filtered out");
+  assert(/fullyUsed/.test(ch2), "and counted in the caption rather than dropped silently");
 
   // ── shared · never measured is not an empty market ───────────────────────
   assert(/function anNone/.test(app), "there is a distinct not-measured state");
