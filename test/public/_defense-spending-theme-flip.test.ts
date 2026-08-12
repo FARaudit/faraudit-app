@@ -110,6 +110,20 @@ function scanBodyChildren(html: string): Kid[] | null {
     const lt = html.indexOf("<", i);
     if (lt === -1) break;
 
+    /* ⛔ A COMMENT IS NOT A TAG, and treating it as one is how this scanner
+       lied. It stepped to the first ">" and then quote-tracked what it found,
+       so a single apostrophe inside a comment — "the panel's header" — opened a
+       quote that ran past the "-->" and swallowed the markup after it. The scan
+       returned 3 of the page's 8 body children, R2 still printed a tick because
+       it only checks the count is above one, and R5/R7 went on asserting things
+       about a DOM missing most of the page. A comment ends at "-->", full stop. */
+    if (html.startsWith("<!--", lt)) {
+      const end = html.indexOf("-->", lt + 4);
+      if (end === -1) break;
+      i = end + 3;
+      continue;
+    }
+
     let j = lt + 1, quote = "";
     while (j < html.length) {
       const ch = html[j];
@@ -419,6 +433,22 @@ function run(appSrc: string, settle: "none" | "ok" | "unwired", dataSrc = DATA_S
 
 const describe = (e: Error | null) => (e ? `${e.constructor.name}: ${e.message}` : "");
 
+/* ⛔ A COUNT ABOVE ONE IS NOT A COMPLETE SCAN. This assertion used to be
+   `length > 1`, and it printed a tick while the scanner was stopping a third of
+   the way down the page — every check below it was then reasoning about a DOM
+   that was missing five of eight panels. The scan is complete only if every id
+   inside the .body markup came back with it. */
+const BODY_REGION = (() => {
+  const a = COMPOSED.indexOf('<div class="body">');
+  const b = COMPOSED.indexOf("</main>", a);
+  return a === -1 || b === -1 ? "" : COMPOSED.slice(a, b);
+})();
+const bodyIds = [...new Set([...BODY_REGION.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]))];
+const scannedIds = new Set((bodyKids ?? []).flatMap((k) => k.ids.map((x) => x.id)));
+const dropped = bodyIds.filter((id) => !scannedIds.has(id));
+ok(bodyIds.length > 5, "the .body markup carries a real set of ids", `${bodyIds.length}`);
+ok(dropped.length === 0, "the scan reached EVERY id in the .body markup",
+  dropped.length ? `stopped early — never registered: ${dropped.join(", ")}` : `${bodyIds.length} ids`);
 ok(bodyKids !== null && bodyKids.length > 1, ".body children scanned from the markup",
   bodyKids ? `${bodyKids.length} direct children, ${bodyKids.filter((k) => k.isHeader).length} page-header`
            : "scan failed — .body not found");

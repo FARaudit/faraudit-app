@@ -202,40 +202,96 @@
      set, no fork. Most already guarded — these did not, and an unguarded
      `$(id).querySelectorAll` throws, which takes the whole page down rather
      than skipping one panel. */
-  /* ════════════════ KPIs ════════════════ */
-  function renderKPIs() {
-    if (!$('kpiStrip')) return;
-    const cards = view().kpis;
-    setHTML($('kpiStrip'), cards.map((c, idx) => {
-      const dtone = !c.delta ? 'flat' : c.delta[0] === '+' ? 'up' : 'down';
-      return `<div class="kpi" data-tone="${esc(c.tone)}">
-        <div class="kpi-top"><p class="lbl">${esc(c.label)}</p>${c.delta ? `<span class="delta ${dtone}">${esc(c.delta)}</span>` : ''}</div>
-        <div class="kpi-val">${esc(c.val)}<span class="unit">${esc(c.unit)}</span></div>
-        <svg class="spark" id="kspark${idx}"></svg>
-        <div class="foot">${esc(c.sub)}</div>
-      </div>`;
+  /* ════════════════ WHICH WAY YOUR CODES ARE MOVING ════════════════
+     MARKET_TREND has been in the payload since the first deploy and nothing
+     drew it. It carries the most decision-useful pattern on the tab: every
+     tracked code roughly DOUBLED and then roughly HALVED across three years.
+
+     ⛔ THE OPEN YEAR IS MARKED, and that is the whole risk in the panel. The
+     last label is obligations TO DATE, not a full year, so an unmarked bar
+     reports a collapse that has not happened. The flag comes from the payload
+     (`MARKET_TREND.open`, parallel to `labels`) rather than from a date
+     comparison here — the builder already knows which year is running, and a
+     second derivation is a second thing to be wrong.
+
+     The two headline figures live in this panel's header because they are the
+     CURRENT POINT of this same series. As a separate KPI strip they read as an
+     independent measurement, and a reader had no way to see that the $30.06B
+     is the third bar of every row below it. */
+  function renderMarketYoY() {
+    const host = $('myoyBody'); if (!host) return;
+    const T = D.MARKET_TREND || { labels: [], series: {}, open: [] };
+    const labels = T.labels || [];
+    const openFlags = Array.isArray(T.open) ? T.open : [];
+    const codes = Object.keys(T.series || {})
+      .filter(c => !S.code || c === S.code)
+      .sort((a, b) => (last(T.series[b]) || 0) - (last(T.series[a]) || 0));
+
+    renderNowFigures();
+
+    const sub = $('myoySub');
+    if (sub) sub.textContent = labels.length
+      ? 'Obligations by fiscal year in ' + (S.code ? 'NAICS ' + S.code : 'each tracked code')
+        + ' · ' + labels[0] + '–' + labels[labels.length - 1]
+      : '';
+
+    if (!codes.length || !labels.length) {
+      setHTML(host, emptyLine('No fiscal-year series for these codes.'));
+      setHTML($('myoyNote'), '');
+      return;
+    }
+
+    setHTML(host, codes.map(code => {
+      const vals = T.series[code] || [];
+      const max = Math.max.apply(null, vals.map(v => Math.abs(v || 0)).concat([1]));
+      // Direction is first-to-last across the whole series. It is NOT a
+      // forecast and it is NOT annualised: the last point may be a part year,
+      // which is exactly why the bar beside it is marked.
+      const first = vals[0], lastV = last(vals);
+      const chg = first > 0 && lastV != null ? ((lastV - first) / first) * 100 : null;
+      const dir = chg == null ? 'flat' : chg > 2 ? 'up' : chg < -2 ? 'down' : 'flat';
+      const dirTxt = chg == null ? 'no prior-year base'
+        : dir === 'flat' ? 'flat across the series'
+        : (chg > 0 ? '▲ ' : '▼ ') + Math.abs(chg).toFixed(0) + '% vs ' + esc(labels[0]);
+      const col = naicsColor[code] || css('--accent');
+      return '<div class="myoy-r">'
+        + '<div class="myoy-rh"><span class="myoy-code">' + esc(code) + '</span>'
+        + '<span class="myoy-dir ' + dir + '">' + dirTxt + '</span></div>'
+        + labels.map((lb, i) => {
+          const v = vals[i] || 0;
+          const isOpen = openFlags[i] === true;
+          return '<div class="myoy-y' + (isOpen ? ' open' : '') + '">'
+            + '<span class="myoy-yl">' + esc(String(lb).replace('FY20', "'")) + '</span>'
+            + '<span class="myoy-track"><i style="width:' + Math.max(1, (Math.abs(v) / max) * 100).toFixed(1)
+            + '%;background:' + col + '"></i></span>'
+            + '<span class="myoy-yv">' + fmtM(v) + '</span>'
+            + '<span class="myoy-yt">' + (isOpen ? 'to date' : 'final') + '</span>'
+            + '</div>';
+        }).join('')
+        + '</div>';
     }).join(''));
-    cards.forEach((c, idx) => sparkline($('kspark' + idx), c.spark, c.tone));
+
+    const openLabels = labels.filter((_, i) => openFlags[i] === true);
+    setHTML($('myoyNote'), openLabels.length
+      ? '<b>' + esc(openLabels.join(' · ')) + ' is still open</b> — that bar is obligations '
+        + 'to date, not a full year, so the fall into it is not a measured decline. The '
+        + 'closed years beside it are final.'
+      : 'Every year shown is closed and final.');
   }
 
-  function sparkline(svg, data, tone) {
-    if (!svg || !data || data.length < 2) return;
-    const w = svg.clientWidth || 200, h = 30, pad = 3;
-    const x = d3.scaleLinear().domain([0, data.length - 1]).range([pad, w - pad]);
-    const y = d3.scaleLinear().domain([d3.min(data) * 0.96, d3.max(data) * 1.02]).range([h - pad, pad]);
-    const col = tone === 'amber' ? css('--amber-600') : tone === 'green' ? css('--green-600') : css('--accent');
-    const area = d3.area().x((d, i) => x(i)).y0(h).y1(d => y(d)).curve(d3.curveMonotoneX);
-    const line = d3.line().x((d, i) => x(i)).y(d => y(d)).curve(d3.curveMonotoneX);
-    const sel = d3.select(svg); sel.selectAll('*').remove();
-    sel.attr('viewBox', `0 0 ${w} ${h}`);
-    const gid = 'g' + Math.random().toString(36).slice(2, 7);
-    const grad = sel.append('defs').append('linearGradient').attr('id', gid).attr('x1', 0).attr('x2', 0).attr('y1', 0).attr('y2', 1);
-    grad.append('stop').attr('offset', '0%').attr('stop-color', col).attr('stop-opacity', .28);
-    grad.append('stop').attr('offset', '100%').attr('stop-color', col).attr('stop-opacity', 0);
-    sel.append('path').attr('d', area(data)).attr('fill', `url(#${gid})`);
-    sel.append('path').attr('d', line(data)).attr('fill', 'none').attr('stroke', col).attr('stroke-width', 1.8);
-    sel.append('circle').attr('cx', x(data.length - 1)).attr('cy', y(data[data.length - 1])).attr('r', 2.6).attr('fill', col);
+  /* The two figures the page used to carry in a four-up strip. They are the
+     current point of the series above, so they are stated with it rather than
+     recomputed: `view()` already scopes them to a selected code. */
+  function renderNowFigures() {
+    const el = $('myoyNow'); if (!el) return;
+    const cards = (view().kpis || []).filter(c => c && c.val != null);
+    if (!cards.length) { clear(el); return; }
+    setHTML(el, cards.map(c => '<div class="myoy-now-k" data-tone="' + esc(c.tone) + '">'
+      + '<p class="lbl">' + esc(c.label) + '</p>'
+      + '<div class="v">' + esc(c.val) + '<span>' + esc(c.unit) + '</span></div>'
+      + '<div class="foot">' + esc(c.sub) + '</div></div>').join(''));
   }
+  const last = (a) => (a && a.length ? a[a.length - 1] : null);
 
   /* ════════════════ GEO MAP ════════════════
      The colour ramp is rebuilt from the values present. Fixed dollar
@@ -402,52 +458,79 @@
       const yo = s.yoy == null ? '<span class="rank-yoy">—</span>'
         : s.yoy >= 0 ? `<span class="rank-yoy up">▲${s.yoy.toFixed(0)}%</span>`
         : `<span class="rank-yoy down">▼${Math.abs(s.yoy).toFixed(0)}%</span>`;
+      /* ONE LINE PER STATE. The abbreviation sat on the row above its own full
+         name, which is the same fact twice at double the height. Rank, code,
+         name, bar, value and change now share a line — nothing is lost and the
+         list stops outrunning the map it belongs to. */
       return `<div class="rank-row${sel}" data-fips="${esc(s.fips)}">
         <span class="rank-n">${i + 1}</span>
         <span class="rank-st">${esc(s.abbr)}</span>
-        <span class="rank-mid">
-          <span class="rank-bar"><i style="width:${Math.max(6, s.val / max * 100)}%"></i></span>
-          <span class="rank-note">${esc(s.name)}</span>
-        </span>
-        <span class="rank-right"><span class="rank-val">${fmtM(s.val)}</span>${yo}</span>
+        <span class="rank-note">${esc(s.name)}</span>
+        <span class="rank-bar"><i style="width:${Math.max(6, s.val / max * 100)}%"></i></span>
+        <span class="rank-val">${fmtM(s.val)}</span>${yo}
       </div>`;
     }).join('') || emptyLine('No state breakdown for ' + S.fy + '.'));
     $('rankList').querySelectorAll('.rank-row').forEach(r => r.onclick = () => { const f = r.dataset.fips; S.state = (S.state === f ? null : f); syncControls(); renderAll(); });
   }
 
-  /* ════════════════ AGENCY BREAKDOWN ════════════════
-     One bar. Small-business dollars arrive per NAICS, never per agency, so no
-     SB segment can be drawn here. */
+  /* ════════════════ THE DEPARTMENTS ════════════════
+     LINES, NOT A RANKED BLOCK. Twelve rows to draw one real department and
+     eleven rounding errors is a chart whose whole message is one number.
+
+     ⛔ BUT THE CUT IS BY WEIGHT, NOT BY RANK, and the difference is the panel.
+     Collapsing everything below first place holds for FY2024 and FY2025, where
+     Defense takes 96.1% and 97.8%. In FY2026 — the year this page OPENS on —
+     Defense takes 72.8% and Homeland Security takes 26.0%: $7.81B, against
+     $0.80B the year before. Ranking second does not make a buyer a rounding
+     error, and "11 other departments" would have hidden the largest movement on
+     the tab. Every department carrying at least AG_MATERIAL_PCT of the total is
+     NAMED; only the genuine tail collapses, summed and labelled.
+
+     Small-business dollars arrive per NAICS, never per agency, so no SB split
+     can be drawn here either. */
+  const AG_MATERIAL_PCT = 1;
+  const AG_MAX_NAMED = 4;
   function renderAgencyList() {
     if (!$('agencyList')) return;
-    /* The column header was the literal string FY26 in the markup, so it kept
-       naming FY26 while the reader was looking at FY24. A header over a number
-       has to name the year that number is. */
-    const fyCol = $('agFyCol');
-    if (fyCol) fyCol.textContent = String(S.fy || '').replace('FY20', 'FY');
-    const rows = view().agencies;
+    const sub = $('agSub');
+    const rows = (view().agencies || []).slice().sort((a, b) => b.val - a.val);
+    if (sub) sub.textContent = 'Obligations in ' + (S.code ? 'NAICS ' + S.code : 'your codes')
+      + ' · ' + (S.fy || '');
+    if (!rows.length) { setHTML($('agencyList'), emptyLine('No agency breakdown for ' + S.fy + '.')); return; }
+
     const prevFy = D.FYS[fyIdx() - 1];
     const prev = prevFy ? (D.BY_FY[prevFy] || { agencies: [] }).agencies : [];
-    const max = d3.max(rows, r => r.val) || 1;
-    setHTML($('agencyList'), rows.map(a => {
+    const total = rows.reduce((n, a) => n + (a.val || 0), 0);
+    const pct = (v) => total > 0 ? (v / total) * 100 : null;
+    // At least one row always shows: a market with a single buyer still has one.
+    const named = rows.filter((a, i) => i === 0
+      || (i < AG_MAX_NAMED && (pct(a.val) == null || pct(a.val) >= AG_MATERIAL_PCT)));
+    const rest = rows.slice(named.length);
+    const restV = rest.reduce((n, a) => n + (a.val || 0), 0);
+
+    const line = (a) => {
       const was = prev.find(p => p.key === a.key);
       const g = was && was.val > 0 ? (a.val - was.val) / was.val * 100 : null;
       const gcls = g == null ? 'flat' : g > 2 ? 'up' : g < -2 ? 'down' : 'flat';
-      const gtxt = g == null ? '—' : gcls === 'flat' ? '— flat' : (g >= 0 ? '▲ ' : '▼ ') + Math.abs(g).toFixed(0) + '%';
-      const barW = Math.max(3, a.val / max * 100);
-      // One segment per code, in proportion — the agency-by-code split the
-      // treemap was drawing, in the panel that already ranks agencies.
-      const segs = Object.entries(a.naics).sort((x, y) => y[1] - x[1]).map(([code, v]) =>
-        `<i style="width:${(v / a.val) * 100}%;background:${naicsColor[code] || css('--accent')}" title="${esc(code)}"></i>`).join('');
-      return `<div class="ag-row" data-agency="${esc(a.key)}" title="${esc(a.name)}">
-        <span class="ag-name">${esc(a.short)}</span>
-        <div class="ag-bar2"><div class="seg-split" style="width:${barW}%">${segs}</div></div>
-        <span class="ag-val">${fmtM(a.val)}</span>
-        <span class="ag-grow ${gcls}">${gtxt}</span>
-      </div>`;
-    }).join('') || emptyLine('No agency breakdown for ' + S.fy + '.'));
-    setHTML($('agencyLegend'), Object.entries(naicsColor).map(([c, col]) =>
-      `<span class="lg"><i style="background:${col}"></i>${esc(c)}</span>`).join(''));
+      const gtxt = g == null ? 'no prior-year figure'
+        : gcls === 'flat' ? 'flat on ' + esc(prevFy || 'the prior year')
+        : (g >= 0 ? '▲ ' : '▼ ') + Math.abs(g).toFixed(0) + '% on ' + esc(prevFy || 'the prior year');
+      const sh = pct(a.val);
+      return '<div class="ag-one" title="' + esc(a.name) + '">'
+        + '<b>' + esc(a.short) + '</b>'
+        + '<span class="ag-one-v">' + fmtM(a.val) + '</span>'
+        + (sh != null ? '<span class="ag-one-s">' + sh.toFixed(1) + '% of the total</span>' : '')
+        + '<span class="ag-one-g ' + gcls + '">' + gtxt + '</span></div>';
+    };
+
+    setHTML($('agencyList'), named.map(line).join('')
+      + (rest.length
+        ? '<div class="ag-one rest">' + rest.length + ' smaller department'
+          + (rest.length === 1 ? '' : 's') + '<span class="ag-one-v">' + fmtM(restV) + '</span>'
+          + '<span class="ag-one-s">'
+          + (pct(restV) != null ? pct(restV).toFixed(1) + '% between them' : '') + '</span>'
+          + '<span class="ag-one-g flat">each under ' + AG_MATERIAL_PCT + '%, summed not dropped</span></div>'
+        : ''));
   }
 
   /* ════════════════ MARKET TREND ════════════════
@@ -473,47 +556,25 @@
       + 'in it.</b> It refreshes nightly.</div>';
   }
 
-  /* ── 3 · HOW BIG IS A DEAL HERE ──────────────────────────────────────────
-     ⛔ NO MEAN. These markets are bimodal — a $150,310 electronics job sits in
-     the same code as a $1.90B shipbuilding contract, 12,600x apart. An average
-     over that describes no award that exists and reads as a target to aim at.
-     The middle 50% is a range real awards actually occupy. */
-  function renderAwardSize() {
-    const host = $('szBody'); if (!host) return;
-    const sub = $('szSub'); const box = anBox(); const d = box && box.size;
-    if (sub) sub.textContent = 'The middle 50% of awards in ' + anScope() + ' · ' + (S.fy || '');
-    if (!d) { setHTML(host, anNone('Award size')); return; }
+  /* ── HOW BIG IS A DEAL HERE — CUT, and this note is why ──────────────────
+     Its p25–p75 was pooled across every tracked code at once, so a $30M code
+     and a $25B code produced one band: $69K to $23M, a 333x spread that
+     describes no award that exists. The panel was honest about having no mean
+     and still could not be read. A per-code band would be a different panel
+     built on a different derivation; until that exists, nothing here is better
+     than a range nobody can act on. `AWARD_ANALYTICS.size` stays in the payload
+     and stays derived — this is a rendering decision, not a data deletion. */
 
-    // Log positions: a linear rail puts p25 and the median on top of each other
-    // when the max is three orders of magnitude away.
-    const lg = (n) => Math.log10(Math.max(1, n));
-    const lo = lg(d.min || 1), hi = lg(d.max || 1);
-    const at = (n) => hi > lo ? ((lg(n) - lo) / (hi - lo)) * 100 : 50;
-    const p25 = at(d.p25 || 0), p75 = at(d.p75 || 0), med = at(d.median || 0);
+  /* ── 5 · WHEN THE MONEY MOVES — TWO NUMBERS, NOT TWELVE BARS ─────────────
+     ⛔ THE WHOLE PAYLOAD OF THIS PANEL IS TWO NUMBERS: the share of value
+     starting in the fiscal fourth quarter, and the heaviest month. The
+     twelve-column grid drew them at four times the height and left the reader
+     to squint the peak out of a bar. If a chart's entire message is one or two
+     numbers, it should be those numbers.
 
-    setHTML(host, '<div class="sz-band">'
-      + '<p class="sz-mid">Half of awards fall between <b>' + fmtM((d.p25 || 0) / 1e6)
-      + '</b> and <b>' + fmtM((d.p75 || 0) / 1e6) + '</b>.</p>'
-      + '<div class="sz-scale"><span class="sz-rail"></span>'
-      + '<span class="sz-fill" style="left:' + p25.toFixed(1) + '%;width:'
-      + Math.max(1, p75 - p25).toFixed(1) + '%"></span>'
-      + '<span class="sz-tick" style="left:0%"><i></i><span>' + fmtM((d.min || 0) / 1e6) + '</span></span>'
-      + '<span class="sz-tick" style="left:' + med.toFixed(1) + '%"><i></i><span>median '
-      + fmtM((d.median || 0) / 1e6) + '</span></span>'
-      + '<span class="sz-tick" style="left:100%"><i></i><span>' + fmtM((d.max || 0) / 1e6) + '</span></span>'
-      + '</div>'
-      + '<p class="sz-note"><b>' + d.inBand + ' of ' + d.count + '</b> sampled awards sit inside '
-      + 'that band. The scale is logarithmic because the smallest and largest are '
-      + Math.round((d.max || 1) / Math.max(1, d.min || 1)).toLocaleString('en-US')
-      + '× apart. <b>No average is shown</b> — an average across that spread describes no '
-      + 'award that exists.'
-      + (d.truncated ? ' Based on the largest ' + d.count + ' awards, not the whole market.' : '')
-      + '</p></div>');
-  }
-
-  /* ── 5 · WHEN THE MONEY MOVES ────────────────────────────────────────────
-     A hiring and material-purchase decision, not a chart. Federal buying
-     clusters at fiscal year end because unobligated funds expire 30 September. */
+     Federal buying clusters at fiscal year end because unobligated funds expire
+     30 September, so the number carries an action: capacity and bid timing
+     before that date. */
   function renderSeasonality() {
     const host = $('snBody'); if (!host) return;
     const sub = $('snSub'); const box = anBox(); const q = box && box.season;
@@ -521,21 +582,27 @@
       + ' · ' + (S.fy || '');
     if (!q) { setHTML(host, anNone('Award timing')); return; }
 
-    const max = Math.max.apply(null, q.months.map(m => m.value).concat([1]));
-    const grid = q.months.map(m => {
-      const isQ4 = m.month >= 7 && m.month <= 9;
-      return '<div class="sn-col' + (isQ4 ? ' q4' : '') + '">'
-        + '<i class="sn-b" style="height:' + Math.max(2, (m.value / max) * 100).toFixed(1) + '%"></i>'
-        + '<span class="sn-l">' + esc(m.label) + '</span></div>';
-    }).join('');
-    setHTML(host, '<div class="sn-grid">' + grid + '</div>'
+    // The Q4 months are still identified by the FEDERAL fiscal calendar, not a
+    // calendar year — the figure means nothing if July–September is not the
+    // fourth quarter.
+    const q4 = q.months.filter(m => m.month >= 7 && m.month <= 9).map(m => m.label);
+    setHTML(host, '<div class="sn-two">'
+      + '<div class="sn-fig">'
+      + '<span class="sn-n">' + (q.q4Share != null ? q.q4Share.toFixed(0) + '<i>%</i>' : '—')
+      + '</span>'
+      + '<span class="sn-k">of sampled value starts in ' + esc(q4.length ? q4[0] + '–' + q4[q4.length - 1] : 'July–September')
+      + '</span></div>'
+      + '<div class="sn-fig">'
+      + '<span class="sn-n">' + (q.peak ? esc(q.peak.label) : '—') + '</span>'
+      + '<span class="sn-k">is the heaviest month</span></div>'
+      + '</div>'
       + '<p class="sn-note">'
-      + (q.q4Share != null ? '<b>' + q.q4Share.toFixed(0) + '%</b> of sampled value starts in '
-        + 'July–September (shaded) — the fiscal fourth quarter, when unobligated funds '
-        + 'expire on 30 September. ' : '')
-      + (q.peak ? '<b>' + esc(q.peak.label) + '</b> is the heaviest month. ' : '')
-      + 'Months with no sampled award show zero rather than being omitted.'
-      + (q.truncated ? ' Counted over the largest awards, so this is when BIG money moves.' : '')
+      + 'July–September is the fiscal fourth quarter, when unobligated funds '
+      + '<b>expire on 30 September</b> — so plan capacity and get bids in before that date, '
+      + 'not after it. '
+      + (q.truncated ? 'Counted over the largest awards, so this is when <b>BIG</b> money '
+        + 'moves, not every award. ' : '')
+      + 'Months with no sampled award count as zero rather than being omitted.'
       + '</p>');
   }
 
@@ -670,7 +737,7 @@
        a department, not the office that signs. A buying office looks like "SUP OF
        SHIPBUILDING CONV AND REPAIR", and this feed carries none: the award-search
        endpoint returns null for that field. The copy states the tier it has. */
-    if (sub) sub.textContent = 'Services and agencies within those departments · '
+    if (sub) sub.textContent = 'Services and agencies inside the departments below · '
       + scoped + ' · ' + (S.fy || '');
 
     if (!box) { setHTML(host, ''); if (cap) setHTML(cap, ''); return; }
@@ -1010,11 +1077,17 @@
     /* This block follows the concentration rows, which carry their own year on
        every row. This one follows the year control, so it has to say which year
        it is — an unlabelled table under a labelled one reads as the same year. */
+    /* ⛔ THE SIZE COLUMN IS NOT DEAD, IT IS QUIET — measured 19 `not SB` against
+       1 `SB` in FY2026. That ratio IS the finding, and it says the opposite of
+       what a competitor list would: almost everyone here is a large prime, so
+       for a small sub these are TEAMING TARGETS, not rivals. The single small
+       business is marked so it does not vanish into nineteen rows that look
+       alike. */
     const sub = $('iiPartSub');
     if (sub) sub.textContent = 'Ranked by obligations · '
       + (S.code ? 'NAICS ' + S.code : 'your NAICS codes') + ' · ' + (S.fy || '')
       + ' · SB flagged from the feed’s own list';
-    setHTML($('iiBody'), rows.map(r => `<tr>
+    setHTML($('iiBody'), rows.map(r => `<tr${r.sb === true ? ' class="is-sb"' : ''}>
         <td class="ii-awd">${esc(r.name)}</td>
         <td class="ii-val">${fmtM(r.val)}</td>
         <td class="ii-naics">${esc(r.naics)}</td>
@@ -1022,6 +1095,21 @@
             title="${r.sb === null ? 'The feed supplied no small-business list for this code' : ''}"
             >${r.sb === true ? 'SB' : r.sb === false ? 'not SB' : '—'}</span></td>
       </tr>`).join('') || `<tr><td colspan="4">${esc('No recipients recorded for ' + S.fy + '.')}</td></tr>`);
+
+    const cap = $('iiCap');
+    if (cap) {
+      const known = rows.filter(r => r.sb !== null);
+      const sb = known.filter(r => r.sb === true).length;
+      const notSb = known.filter(r => r.sb === false).length;
+      setHTML(cap, known.length
+        ? '<b>' + notSb + ' of these ' + known.length + '</b> are recorded as <b>not</b> small '
+          + 'business' + (sb ? ', and ' + sb + ' as small business' : '') + '. For a small '
+          + 'subcontractor that makes this a list of <b>teaming targets, not competitors</b> — '
+          + 'the firms holding the work you would sub into. Who you compete with is the '
+          + 'set-aside list in the panel alongside.'
+        : 'The feed supplied no small-business list for these codes, so no row here can be '
+          + 'called large or small — and none is.');
+    }
   }
 
   /* ════════════════ PANELS WITH NO SOURCE ════════════════
@@ -1151,19 +1239,31 @@
         const d = known[known.length - 1].pct - known[0].pct;
         if (Math.abs(d) >= 0.1) { dir = d > 0 ? 'up' : 'down'; dirTxt = (d > 0 ? '▲ ' : '▼ ') + Math.abs(d).toFixed(1) + ' pts'; }
       } else if (known.length < 2) { dirTxt = 'one year only'; }
-      const max = Math.max(1, ...known.map(p => p.pct));
+      /* ⛔ THE BAR AND THE NUMBER SAID THE SAME THING. Each point drew a bar
+         scaled to the row's own maximum and printed the percentage directly
+         beneath it — the same value, encoded twice, at double the height. The
+         number stays; the bar goes. */
       return `<div class="sbs-row">
         <div class="sbs-head"><span class="sbs-code">${esc(r.naics)}</span>
           <span class="sbs-money">${sbDollarsOf(r) > 0 ? fmtM(sbDollarsOf(r)) + ' to small business' : 'none measured'}</span>
           <span class="sbs-dir ${dir}">${esc(dirTxt)}</span></div>
         <div class="sbs-pts">${pts.map(p => `<div class="sbs-pt">
-            <div class="sbs-bar"><i style="width:${p.pct == null ? 0 : Math.round((p.pct / max) * 100)}%"></i></div>
+            <div class="sbs-yr">${esc(p.fy)}${p.open ? ' · to date' : ''}</div>
             <div class="sbs-pct">${p.pct == null ? '<span class="sbs-unknown">—</span>' : p.pct.toFixed(1) + '%'}</div>
-            <div class="sbs-meta">${esc(p.fy)}${p.open ? ' to date' : ''}</div>
             <div class="sbs-meta">${p.pct == null ? 'nothing obligated' : fmtM(p.sb) + ' of ' + fmtM(p.total)}</div>
           </div>`).join('')}</div>
       </div>`;
-    }).join(''));
+    }).join('')
+      /* ⚠ SHARE, NOT GROWTH. The figure is sb_obligations ÷ total_obligations
+         per code and year, and the direction beside it is the change in that
+         SHARE between the first and last measured year — in percentage POINTS.
+         A share can fall while the dollars rise, so a caption that said
+         "growth" would be false in exactly the case that matters. */
+      + '<div class="sbs-cap">Each figure is the <b>share</b> of that code reaching small '
+      + 'business — set-aside dollars over the code’s whole obligations, that year. The '
+      + 'arrow is the change in that <b>share</b> between the first and last measured year, '
+      + 'in percentage points: <b>it is not growth</b>, and a share can fall in a year the '
+      + 'dollars rise.</div>');
   }
 
   /* ════════════════ HOW CONCENTRATED IS EACH CODE ════════════════
@@ -1174,13 +1274,6 @@
      It states no FIRM COUNT. The feed lists ten recipients per code, so everything
      below tenth is invisible, and counting the visible ones would report our own
      cap as a market size. */
-  /* The shades the leader bar draws, darkest first. These were read out of the
-     map's ramp by index arithmetic, so removing the map removed the constant and
-     left this the only reference to it — a name inside a template literal, which
-     no syntax check and no render-caller check can see. It threw on the first
-     row with leaders and took the whole page down with it, because renderAll()
-     has no per-panel isolation. Declared here, beside its one consumer. */
-  const CONC_RAMP = ['--geo-6', '--geo-5', '--geo-4', '--geo-2', '--geo-1'];
   function renderConcentration() {
     const el = $('concList'); if (!el) return;
     /* ⛔ ORDERED BY THE SIZE OF THE CODE, NOT BY CODE NUMBER. The payload arrives
@@ -1189,14 +1282,25 @@
        alongside, which is sorted the same way, so a reader can read across. */
     const rows = (D.CONCENTRATION || []).slice().sort((a, b) => (b.total || 0) - (a.total || 0));
     if (!rows.length) { setHTML(el, '<div class="conc-note">No codes tracked.</div>'); return; }
+    /* ⛔ THE FIVE COLOUR SEGMENTS WERE DECORATION. The percentage is the
+       information: 70%, 91%, 34% is the finding, and a reader cannot name the
+       fourth-largest holder off a 3%-wide band anyway. The number leads, one
+       sentence names the largest holder, and the segments are gone — which also
+       retires the ramp constant that once outlived its own definition and blanked
+       the whole tab. */
     setHTML(el, rows.map(r => {
       const leaders = r.leaders || [];
+      const lead = leaders[0];
       return `<div class="conc-row">
-        <div class="conc-top"><span class="sbs-code">${esc(r.naics)} · ${esc(r.fy)}</span>
-          <span class="conc-pct">${r.top5_pct == null ? '—' : r.top5_pct.toFixed(0) + '%'}</span></div>
-        <div class="conc-bar">${leaders.map((l, i) => `<i style="width:${l.pct == null ? 0 : Math.min(100, l.pct).toFixed(2)}%;background:${css(CONC_RAMP[Math.min(i, CONC_RAMP.length - 1)])}" title="${esc(l.name)}"></i>`).join('')}</div>
-        <div class="conc-lead">${leaders.length ? esc(leaders[0].name) + ' alone holds ' + (leaders[0].pct == null ? '—' : leaders[0].pct.toFixed(0) + '%') : 'No recipients recorded.'}</div>
-        <div class="conc-lead">Top five hold ${fmtM(r.top5_val)} of ${fmtM(r.total)}.</div>
+        <div class="conc-top">
+          <span class="conc-pct">${r.top5_pct == null ? '—' : r.top5_pct.toFixed(0) + '%'}</span>
+          <span class="conc-id"><span class="sbs-code">${esc(r.naics)}</span><span class="conc-fy">${esc(r.fy)}</span></span>
+          <span class="conc-lead">${lead
+            ? 'held by the top five &mdash; <b>' + esc(lead.name) + '</b> alone holds '
+              + (lead.pct == null ? '—' : lead.pct.toFixed(0) + '%') + ', or '
+              + fmtM(r.top5_val) + ' of ' + fmtM(r.total) + ' across the five'
+            : 'No recipients recorded.'}</span>
+        </div>
       </div>`;
     }).join('') + `<div class="conc-note">The feed lists the top ${esc(String((D.coverage || {}).top_n || 10))} recipients per code, so the number of firms below them is not known here and is not stated.</div>`);
   }
@@ -1220,25 +1324,40 @@
     let rows = (D.SB_WINNERS || []).slice().sort((a, b) => (b.sb_total || 0) - (a.sb_total || 0));
     if (S.code) rows = rows.filter(r => r.naics === S.code);
     if (!rows.length) { setHTML(el, emptyLine('No set-aside recipients recorded for these codes.')); return; }
+    /* THE TAIL IS COLLAPSED, NOT DROPPED — the treatment the buying-office panel
+       already gives its overflow. Ten rows per code across three codes is thirty
+       rows to answer "who competes at my size", and that answer is at the top of
+       each list. The rest are summed into one labelled row, so the dollars
+       outside the visible set stay visible and the count stays true. */
+    const SBW_SHOW = 4;
     setHTML(el, rows.map(r => {
       const ws = r.winners || [];
+      const shown = ws.slice(0, SBW_SHOW);
+      const rest = ws.slice(SBW_SHOW);
+      const restV = rest.reduce((n, w) => n + (w.val || 0), 0);
+      const restP = rest.reduce((n, w) => n + (w.pct_of_sb || 0), 0);
       return `<div class="sbw-code"><b>${esc(r.naics)} · ${esc(r.fy)}</b>
           <span>${r.sb_pct == null ? '—' : r.sb_pct.toFixed(1) + '% of the code'} · ${fmtM(r.sb_total)} to small business</span></div>`
-        + (ws.length
-            ? ws.map(w => `<div class="sbw-row">
+        + (shown.length
+            ? shown.map(w => `<div class="sbw-row">
                 <span class="sbw-nm" title="${esc(w.name)}">${esc(w.name)}</span>
                 <span class="sbw-v">${fmtM(w.val)}</span>
                 <span class="sbw-p">${w.pct_of_sb == null ? '—' : w.pct_of_sb.toFixed(0) + '%'}</span>
               </div>`).join('')
+              + (rest.length ? `<div class="sbw-row rest">
+                <span class="sbw-nm">${rest.length} more set-aside recipient${rest.length === 1 ? '' : 's'} we hold</span>
+                <span class="sbw-v">${fmtM(restV)}</span>
+                <span class="sbw-p">${restP > 0 ? restP.toFixed(0) + '%' : '—'}</span>
+              </div>` : '')
             : `<div class="sbw-note">No set-aside recipients recorded in this code.</div>`);
-    }).join('') + `<div class="sbw-note">Share is of the set-aside dollars in that code, not of the code total. The feed lists the top ${esc(String((D.coverage || {}).top_n || 10))} per code, so firms below them are not shown and their number is not known.</div>`);
+    }).join('') + `<div class="sbw-note">Share is of the set-aside dollars in that code, not of the code total. The feed lists the top ${esc(String((D.coverage || {}).top_n || 10))} per code, so firms below them are not shown and their number is not known — the collapsed row stands for the ones we hold, never for the whole tail.</div>`);
   }
 
   function renderAll() {
     computeBreaks();
-    renderKPIs(); renderLegend(); renderMap(); renderGeoTotal(); renderRankList();
+    renderMarketYoY(); renderLegend(); renderMap(); renderGeoTotal(); renderRankList();
     renderStatusPill();
-    renderAgencyList(); renderBuyingOffices(); renderAwardSize(); renderSeasonality();
+    renderAgencyList(); renderBuyingOffices(); renderSeasonality();
     renderPrimeTargets(); renderCeilings(); renderRecompetes(); renderIncumbents(); renderInsight();
     // Both read every measured year, so they are painted with the rest but do
     // not change with the year control.

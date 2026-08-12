@@ -47,8 +47,17 @@ ok(RAILED.includes('href="/who-to-call"'), "the composed page renders that link"
 console.log("\nR2  THE SPLIT IS EXACTLY THE THREE PANELS");
 const MOVED = ["ptList", "ptSub", "ptCap", "chList", "chBig", "chSay", "chCap", "chSub",
   "rcList", "whSub", "bigN", "bigSay", "lede", "footL", "footR"];
+/* `szBody` and `kpiStrip` LEFT THIS LIST because they left the product, not
+   because the check was inconvenient: "How big is a deal here" was cut (a
+   p25-p75 pooled across a $30M and a $25B code), and the KPI strip merged into
+   the year-over-year panel it is the last point of. An id that no page carries
+   cannot prove a page did not take it — so the ABSENCE check below keeps its
+   teeth only over ids that still exist somewhere. */
 const STAYED = ["geoSvg", "geoLegend", "rankList", "rankTabs", "agencyList", "boList",
-  "sbShareList", "sbWinnersList", "concList", "iiBody", "szBody", "snBody", "kpiStrip", "insightBar"];
+  "sbShareList", "sbWinnersList", "concList", "iiBody", "snBody", "myoyBody", "insightBar"];
+/* Retired hosts, asserted GONE FROM BOTH PAGES. Dropping them from STAYED alone
+   would have let a copy of either one reappear unnoticed. */
+const RETIRED = ["szBody", "szSub", "kpiStrip", "agencyLegend", "agFyCol"];
 const missing = MOVED.filter((id) => !HTML.includes(`id="${id}"`));
 ok(missing.length === 0, "every host the three panels write into is here",
   missing.length ? `missing: ${missing.join(", ")}` : `${MOVED.length} hosts`);
@@ -72,6 +81,10 @@ const stayedPut = STAYED.filter((id) => SPENDING_HTML.includes(`id="${id}"`));
 ok(stayedPut.length === STAYED.length,
   "…while everything that was meant to stay is still there",
   `${stayedPut.length}/${STAYED.length}`);
+const resurrected = RETIRED.filter((id) => HTML.includes(`id="${id}"`) || SPENDING_HTML.includes(`id="${id}"`));
+ok(resurrected.length === 0,
+  "and a RETIRED host has not come back on either page",
+  resurrected.length ? `back in the markup: ${resurrected.join(", ")}` : `${RETIRED.length} checked`);
 
 // The controls DO come along: a destination the reader cannot scope is a report,
 // not a view. These are the scope's own inputs, not the other page's panels.

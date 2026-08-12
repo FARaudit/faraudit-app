@@ -245,13 +245,19 @@ function stillResolves(src: string): string[] {
     .filter((n) => !c.declared.has(n) && !cross.has(n) && !BROWSER_GLOBALS.has(n)).sort();
 }
 
-// (1) The historical defect, reproduced exactly: remove the concentration bar's colour ramp and leave
-//     its one reader in place.
-const rampDecl = /^\s*const CONC_RAMP = \[[^\]]*\];\s*$/m;
-ok(rampDecl.test(APP_SRC), "CONC_RAMP is declared in the real file (the fixture is anchored to reality)");
-const cutRamp = APP_SRC.replace(rampDecl, "");
-ok(stillResolves(cutRamp).includes("CONC_RAMP"),
-  "deleting CONC_RAMP is reported", `found: ${stillResolves(cutRamp).join(", ") || "(nothing)"}`);
+// (1) A top-level const whose only reader is an expression, not a call.
+//
+// ⛔ THIS PLANT USED TO ANCHOR ON CONC_RAMP, and CONC_RAMP is gone — retired with the concentration
+//    bars it coloured, which were five segments saying what the percentage beside them already said.
+//    The plant's SUBJECT is unchanged and so is its strength: delete a top-level declaration, leave a
+//    reader standing, and the analyzer must name it. PALETTE is the same shape and is read the same
+//    way. Case (2) below still carries the exact historical defect — GEO_RAMP was read from inside a
+//    TEMPLATE LITERAL, which is the form no syntax check and no render-caller check can see.
+const paletteDecl = /^\s*const PALETTE = \[[^\]]*\];\s*$/m;
+ok(paletteDecl.test(APP_SRC), "PALETTE is declared in the real file (the fixture is anchored to reality)");
+const cutPalette = APP_SRC.replace(paletteDecl, "");
+ok(stillResolves(cutPalette).includes("PALETTE"),
+  "deleting PALETTE is reported", `found: ${stillResolves(cutPalette).join(", ") || "(nothing)"}`);
 
 // (2) The map's own ramp — the constant the trim actually deleted.
 const geoDecl = /^\s*const GEO_RAMP = \[[^\]]*\];\s*$/m;

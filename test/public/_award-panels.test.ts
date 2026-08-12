@@ -30,9 +30,15 @@ const fnOf = (name: string, next: string) => {
 };
 
 function main() {
-  // ── all three are called, and their ids exist ─────────────────────────────
+  // ── the panels that exist are called, and their ids exist ─────────────────
+  // ⛔ AWARD SIZE WAS RETIRED, not quietly dropped from this gate. Its p25-p75 was
+  // pooled across every tracked code at once, so a $30M code and a $25B code
+  // produced one band — $69K to $23M, a 333x spread that describes no award that
+  // exists. The panel was scrupulously honest about showing no mean and was still
+  // unreadable. The derivation stays in the payload; the rendering is gone. Part D
+  // below asserts it is gone from BOTH pages, so this is a retirement with a check
+  // on it rather than an assertion deleted because it went red.
   for (const [fn, ids] of [
-    ["renderAwardSize", ["szBody", "szSub"]],
     ["renderSeasonality", ["snBody", "snSub"]],
     ["renderPrimeTargets", ["ptList", "ptSub", "ptCap"]]
   ] as Array<[string, string[]]>) {
@@ -40,24 +46,41 @@ function main() {
     for (const id of ids) assert(html.includes(`id="${id}"`), `markup carries #${id}`);
   }
 
-  // ── 3 · ⛔ NO AVERAGE across a bimodal market ─────────────────────────────
-  const sz = fnOf("renderAwardSize", "renderSeasonality");
-  assert(sz.length > 0, "the size renderer is findable");
-  assert(/No average is shown/i.test(sz), "the panel states that no average is shown");
-  assert(!/\bmean\b|\baverage of\b|avg/i.test(sz.replace(/No average is shown/gi, "")),
-    "and never computes or prints one");
-  assert(/d\.p25/.test(sz) && /d\.p75/.test(sz), "it states the middle 50%, p25 to p75");
-  assert(/d\.inBand/.test(sz), "and how many awards actually fall inside that band");
-  assert(/logarithmic/i.test(sz), "the log scale is declared, not silent");
+  // ── D · the retirement is real on every page that mounts this script ──────
+  assert(!/function renderAwardSize/.test(app), "renderAwardSize is gone from the renderer set");
+  assert(!/renderAwardSize\(\)/.test(app), "and nothing still calls it");
+  for (const id of ["szBody", "szSub"]) {
+    assert(!html.includes(`id="${id}"`), `no page still carries the retired #${id}`);
+  }
+
+  // ── ⛔ NO AVERAGE SURVIVES ANYWHERE ───────────────────────────────────────
+  // The band is gone, and the reason it existed must not come back as a mean:
+  // these markets are bimodal, a $150,310 electronics job sits in the same code
+  // as a $1.90B shipbuilding contract, and an average across that describes no
+  // award that exists while reading as a target to aim at.
+  // ⛔ SCOPED TO THE WORD THAT MAKES THE CLAIM. `\bmean\b` also matches "this does
+  // not mean nothing is coming" in the recompete empty state — a verb, not a
+  // statistic. A recognizer that fires on an unrelated sentence gets loosened by
+  // the next person who trips it, which costs more than it catches.
+  assert(!/\baverage\b|\bavg\b|\bmean of\b|arithmetic mean/i.test(app),
+    "no renderer computes or prints an average award size");
 
   // ── 5 · ⛔ a FEDERAL fiscal calendar, not a calendar year ─────────────────
+  // The twelve-bar grid became two numbers — the panel's entire payload was the
+  // Q4 share and the peak month. The FISCAL definition is what makes either
+  // figure mean anything, so it is still asserted at the same strength.
   const sn = fnOf("renderSeasonality", "renderPrimeTargets");
   assert(sn.length > 0, "the seasonality renderer is findable");
-  assert(/q\.months/.test(sn), "it renders the twelve fiscal months from the derivation");
-  assert(/m\.month >= 7 && m\.month <= 9/.test(sn), "July-September is marked as the fiscal fourth quarter");
-  assert(/30 September/.test(sn), "and the caption says why — funds expire 30 September");
-  assert(/zero rather than being omitted/i.test(sn),
+  assert(/q\.months/.test(sn), "it reads the fiscal months from the derivation");
+  assert(/m\.month >= 7 && m\.month <= 9/.test(sn),
+    "July-September is identified as the fiscal fourth quarter, not a calendar one");
+  assert(/q\.q4Share/.test(sn), "the Q4 share is printed from the derivation");
+  assert(/q\.peak/.test(sn), "and so is the heaviest month");
+  assert(/30 September/.test(sn), "the caption says why — funds expire 30 September");
+  assert(/count as zero rather than being omitted/i.test(sn),
     "quiet months are declared as zero, since an absent month reads as missing data");
+  assert(/truncated/.test(sn),
+    "and the largest-awards bias is still declared — it is when BIG money moves");
 
   // ── 4 · ⛔ a call list must not include firms with no obligation ──────────
   const pt = fnOf("renderPrimeTargets", "renderCeilings");
@@ -102,12 +125,12 @@ function main() {
 
   // ── shared · never measured is not an empty market ───────────────────────
   assert(/function anNone/.test(app), "there is a distinct not-measured state");
-  const none = fnOf("anNone", "renderAwardSize");
+  const none = fnOf("anNone", "renderSeasonality");
   assert(/gap in our data/.test(none), "which calls the gap ours");
   // The sentence is split across a string concatenation in the source, so match
   // the distinctive fragment rather than the rendered phrase.
   assert(/not a market with nothing/i.test(none), "and not the market's");
-  for (const fn of [sz, sn, pt]) assert(/anNone\(/.test(fn), "every panel uses it");
+  for (const fn of [sn, pt]) assert(/anNone\(/.test(fn), "every panel uses it");
 
   // ── ⛔ THE SB PANEL MUST NOT RANK BACKWARDS FROM THE MONEY ────────────────
   // SB_SHARE arrives NAICS-ascending, so the panel led with 332710 (29.5%,
@@ -125,12 +148,16 @@ function main() {
     "it reads the latest year with a MEASURED share, so dollars and percentage come from the same point");
 
   // ── CSS shipped ───────────────────────────────────────────────────────────
-  for (const cls of ["sz-band", "sz-mid", "sz-scale", "sz-rail", "sz-fill", "sz-tick", "sz-note",
-                     "sn-grid", "sn-col", "sn-b", "sn-l", "sn-note",
+  for (const cls of ["sn-two", "sn-fig", "sn-n", "sn-k", "sn-note",
                      "pt-list", "pt-r", "pt-n", "pt-v", "pt-m", "pt-cap", "an-none"]) {
     assert(new RegExp(`(^|\\n)\\.${cls}\\s*[,{]`).test(html), `CSS rule for .${cls} shipped`);
   }
-  assert(/(^|\n)\.sn-col\.q4 \.sn-b\s*\{/.test(html), "fiscal Q4 columns are visually distinct");
+  // The retired panel's rules must leave with it: dead CSS on a served, unminified
+  // stylesheet is shipped bytes that describe markup nobody renders.
+  for (const cls of ["sz-band", "sz-mid", "sz-scale", "sz-rail", "sz-fill", "sz-tick", "sz-note",
+                     "sn-grid", "sn-col", "sn-b", "sn-l"]) {
+    assert(!new RegExp(`(^|\\n)\\.${cls}\\s*[,{]`).test(html), `retired CSS rule .${cls} is gone`);
+  }
 
   console.log(failures === 0 ? "\n✅ ALL PASS" : `\n❌ ${failures} FAILED`);
   process.exit(failures === 0 ? 0 : 1);

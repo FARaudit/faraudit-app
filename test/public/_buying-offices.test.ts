@@ -55,7 +55,43 @@ function main() {
   assert(/box\.measured/.test(fn), "the renderer branches on `measured`");
   assert(/gap in our data/.test(fn), "and says a gap is ours, not the market's");
 
+  // ── THE DEPARTMENTS ABOVE THEM ────────────────────────────────────────────
+  // The ranked twelve-row block became lines, because eleven of the twelve rows
+  // drew a rounding error. The risk that creates is the opposite one:
+  //
+  // ⛔ COLLAPSING BY RANK RATHER THAN BY WEIGHT. Everything-below-first holds at
+  // FY2024 (DoD 96.1%) and FY2025 (97.8%) and is FALSE at FY2026, where DoD is
+  // 72.8% and Homeland Security is 26.0% — $7.81B against $0.80B a year earlier.
+  // A rank cut would have printed "11 other departments" over the largest
+  // movement on the tab. The cut must be a share test, and the tail must still
+  // be summed and labelled rather than dropped.
+  const ag = app.slice(app.indexOf("function renderAgencyList"), app.indexOf("function renderBuyingOffices"));
+  assert(ag.length > 0, "the departments renderer is findable");
+  assert(/renderAgencyList\(\)/.test(app), "and is called from renderAll");
+  assert(/const AG_MATERIAL_PCT = \d/.test(app),
+    "a named materiality threshold exists — the cut is a share, not a rank");
+  // (a rank cut — slice(1) — would bury a 26% buyer behind "other departments")
+  assert(/pct\(a\.val\) >= AG_MATERIAL_PCT/.test(ag),
+    "every department at or above that share is NAMED");
+  assert(/i === 0/.test(ag), "…and the largest always shows, even in a single-buyer market");
+  assert(/rest\.reduce/.test(ag), "the tail is summed");
+  assert(/rest\.length \+ ' smaller department/.test(ag),
+    "and the collapsed row is LABELLED with how many it stands for");
+  assert(/summed not dropped|summed, not dropped/.test(ag),
+    "the row says outright that the tail was kept, not discarded");
+  assert(/no prior-year figure/.test(ag),
+    "a department with no prior year says so rather than printing a change it cannot compute");
+  assert(!/id="agencyLegend"|id="agFyCol"/.test(html),
+    "the per-code legend and the year column left with the bars they labelled");
+
   // ── CSS shipped ───────────────────────────────────────────────────────────
+  for (const cls of ["ag-one", "ag-one-v", "ag-one-s", "ag-one-g"]) {
+    assert(new RegExp(`(^|\\n)\\.${cls}\\s*[,{]`).test(html), `CSS rule for .${cls} shipped`);
+  }
+  assert(/(^|\n)\.ag-one\.rest\s*[,{]/.test(html), "the collapsed department row is visually distinguished");
+  for (const cls of ["ag-row", "ag-bar2", "ag-legend2", "seg-split"]) {
+    assert(!new RegExp(`(^|\\n)\\.${cls}\\s*[,{]`).test(html), `retired CSS rule .${cls} is gone`);
+  }
   for (const cls of ["bo-list", "bo-row", "bo-n", "bo-v", "bo-bar", "bo-cap", "bo-none"]) {
     assert(new RegExp(`(^|\\n)\\.${cls}\\s*[,{]`).test(html), `CSS rule for .${cls} shipped`);
   }

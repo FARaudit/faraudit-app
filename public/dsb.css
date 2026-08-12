@@ -120,22 +120,52 @@ button{font-family:inherit}
 .reset-btn:hover{color:var(--accent-deep);text-decoration:underline}
 
 /* ═══ KPI STRIP ═══ */
-.kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-sm);padding:16px 18px;display:flex;flex-direction:column;gap:9px;position:relative;overflow:hidden}
-.kpi-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.kpi .lbl{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);margin:0}
-.kpi .delta{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px}
-.kpi .delta.up{background:var(--green-50);color:var(--green-700)} .kpi .delta.down{background:var(--red-50);color:var(--red-700)} .kpi .delta.flat{background:var(--line-3);color:var(--mute)}
-[data-theme="dark"] .kpi .delta.up{background:rgba(16,185,129,.16);color:#6ee7b7}[data-theme="dark"] .kpi .delta.down{background:rgba(220,38,38,.16);color:#fca5a5}
-.kpi-val{font-family:"Manrope",sans-serif;font-size:32px;font-weight:800;letter-spacing:-.03em;color:var(--ink);line-height:.95;display:flex;align-items:baseline;gap:3px}
-.kpi-val .unit{font-size:15px;font-weight:700;color:var(--mute)}
 .kpi[data-tone="amber"] .kpi-val{color:var(--amber-700)} .kpi[data-tone="green"] .kpi-val{color:var(--green-700)} .kpi[data-tone="blue"] .kpi-val{color:var(--accent-deep)}
 [data-theme="dark"] .kpi[data-tone="amber"] .kpi-val{color:#fcd34d}[data-theme="dark"] .kpi[data-tone="green"] .kpi-val{color:#6ee7b7}[data-theme="dark"] .kpi[data-tone="blue"] .kpi-val{color:var(--accent-light)}
-.kpi .foot{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute)}
-.kpi .spark{height:30px;width:100%}
+
+/* ═══ WHICH WAY YOUR CODES ARE MOVING ═══
+   Horizontal bars, one line per fiscal year. Vertical bars would need their own
+   value labels above them and cost three times the height to say the same thing.
+   The open year is marked in the row itself, not only in the note beneath. */
+.myoy-rows{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px 22px}
+.myoy-r{display:flex;flex-direction:column;gap:3px;min-width:0}
+.myoy-rh{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:3px}
+.myoy-code{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:800;color:var(--ink)}
+.myoy-dir{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.03em;white-space:nowrap}
+.myoy-dir.up{color:var(--green-700)}.myoy-dir.down{color:var(--red-700)}.myoy-dir.flat{color:var(--mute)}
+[data-theme="dark"] .myoy-dir.up{color:#6ee7b7}[data-theme="dark"] .myoy-dir.down{color:#fca5a5}
+.myoy-y{display:grid;grid-template-columns:30px minmax(0,1fr) 60px 46px;gap:8px;align-items:center}
+.myoy-yl{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--mute)}
+.myoy-track{height:9px;border-radius:3px;background:var(--line-2);overflow:hidden}
+.myoy-track i{display:block;height:100%;border-radius:3px}
+.myoy-yv{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:800;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums}
+.myoy-yt{font-family:"IBM Plex Mono",monospace;font-size:8.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--mute)}
+/* AN OPEN YEAR IS NOT A SHORT YEAR. The hatch says the bar is still filling, so
+   the drop into it is not read as a measured decline. */
+.myoy-y.open .myoy-track i{background-image:repeating-linear-gradient(115deg,rgba(255,255,255,.55) 0 4px,transparent 4px 9px)}
+.myoy-y.open .myoy-yt{color:var(--amber-700);font-weight:700}
+[data-theme="dark"] .myoy-y.open .myoy-yt{color:#fcd34d}
+[data-theme="dark"] .myoy-y.open .myoy-track i{background-image:repeating-linear-gradient(115deg,rgba(5,13,26,.55) 0 4px,transparent 4px 9px)}
+.myoy-note{font-size:11.5px;line-height:1.55;color:var(--mute);margin:12px 2px 0}
+.myoy-note b{color:var(--ink-2);font-weight:700}
+/* The two headline figures, in the header of the series they are the last point
+   of. As a separate strip they read as an independent measurement. */
+.myoy-now{display:flex;gap:22px;flex-shrink:0}
+.myoy-now-k{display:flex;flex-direction:column;gap:3px;align-items:flex-end;text-align:right}
+.myoy-now-k .lbl{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--mute);margin:0}
+.myoy-now-k .v{font-family:"Manrope",sans-serif;font-size:27px;font-weight:800;letter-spacing:-.03em;color:var(--ink);line-height:1;display:flex;align-items:baseline;gap:2px}
+.myoy-now-k .v span{font-size:14px;font-weight:700;color:var(--mute)}
+.myoy-now-k[data-tone="amber"] .v{color:var(--amber-700)}
+[data-theme="dark"] .myoy-now-k[data-tone="amber"] .v{color:#fcd34d}
+.myoy-now-k .foot{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--mute)}
 
 /* ═══ Rows + widgets ═══ */
 .row{display:grid;gap:16px;align-items:stretch}
+/* A two-number widget beside a tall one should be a SHORT CARD, not a tall card
+   holding 250px of nothing. The row's height is set by its tallest member
+   either way, so this costs no page height and stops the empty space reading
+   as a panel that failed to load. */
+.row.top{align-items:start}
 .row.hero{grid-template-columns:1.62fr 1fr}
 .row.two{grid-template-columns:1fr 1fr}
 .row.three{grid-template-columns:1fr 1fr 1fr}
@@ -149,7 +179,7 @@ button{font-family:inherit}
 .wh-text{display:flex;flex-direction:column;gap:2px;min-width:0}
 .wh-text h3{font-family:"Manrope",sans-serif;font-size:14.5px;font-weight:800;letter-spacing:-.01em;color:var(--ink);margin:0;line-height:1.2}
 .wh-text .wh-sub{font-size:11.5px;color:var(--mute);margin:0;line-height:1.35}
-.wh-source{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mute-2);background:var(--card-soft);border:1px solid var(--line);padding:3px 7px;border-radius:5px;white-space:nowrap;flex-shrink:0}
+.wh-source{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);background:var(--card-soft);border:1px solid var(--line);padding:3px 7px;border-radius:5px;white-space:nowrap;flex-shrink:0}
 
 /* Two reads of one question, split by a rule inside a single widget. `> b` is
    deliberate: a nested <b> in the caption is emphasis, not a second heading. */
@@ -162,7 +192,7 @@ button{font-family:inherit}
 /* ═══ Provenance, empty states, and unsourced panels ═══ */
 .dsb-provenance{font-size:11.5px;line-height:1.6;color:var(--mute);margin:0 0 14px;display:flex;flex-wrap:wrap;gap:0 8px;align-items:baseline}
 .dsb-provenance b{color:var(--ink-2);font-weight:700}
-.dsb-prov-dot{color:var(--mute-2);padding:0 2px}
+.dsb-prov-dot{color:var(--mute);padding:0 2px}
 .dsb-provenance .dsb-gap{color:#b45309}
 [data-theme="dark"] .dsb-provenance .dsb-gap{color:#fbbf24}
 .dsb-provenance .dsb-gap b{color:inherit}
@@ -180,7 +210,7 @@ button{font-family:inherit}
 .geo-total b{font-family:"Manrope",sans-serif;font-size:16px;font-weight:800;letter-spacing:-.02em;color:var(--ink);line-height:1.1}
 .geo-total span{font-size:10px;color:var(--mute);line-height:1.3}
 .geo-wrap{display:grid;grid-template-columns:1fr;gap:8px;min-height:0}
-.geo-svg{width:100%;height:520px;display:block;cursor:default}
+.geo-svg{width:100%;aspect-ratio:960/500;height:auto;display:block;cursor:default}
 .geo-svg path.state{cursor:pointer;stroke:var(--geo-stroke);stroke-width:.7;transition:opacity .12s,stroke .12s}
 .geo-svg path.state:hover{opacity:.82}
 .geo-svg path.state.selected{stroke:var(--accent-deep);stroke-width:2}
@@ -204,8 +234,10 @@ button{font-family:inherit}
 .geo-tip .gapflag{display:inline-block;margin-top:4px;font-family:"IBM Plex Mono";font-size:9px;font-weight:700;color:#fca5a5;background:rgba(220,38,38,.2);padding:2px 6px;border-radius:4px}
 
 /* ═══ Ranked list (linked to map) ═══ */
-.rank-list{display:flex;flex-direction:column;gap:2px;overflow-y:auto;max-height:520px;padding-right:2px}
-.rank-row{display:grid;grid-template-columns:20px 30px 1fr 56px;gap:9px;align-items:center;padding:7px 8px;border-radius:8px;cursor:pointer;border:1px solid transparent;transition:background .12s,border-color .12s}
+.rank-list{display:flex;flex-direction:column;gap:2px;overflow-y:auto;max-height:460px;padding-right:2px}
+/* ONE LINE PER STATE. The abbreviation used to sit on the row above its own
+   full name — the same fact twice, at double the height. */
+.rank-row{display:grid;grid-template-columns:18px 26px minmax(0,1fr) 62px 56px 40px;gap:8px;align-items:center;padding:5px 8px;border-radius:8px;cursor:pointer;border:1px solid transparent;transition:background .12s,border-color .12s}
 .rank-row:hover{background:var(--card-soft)}
 .rank-row.selected{background:var(--accent-pale);border-color:var(--accent-light)}
 [data-theme="dark"] .rank-row.selected{background:rgba(55,138,221,0.16)}
@@ -213,16 +245,16 @@ button{font-family:inherit}
    text at 4.04:1 — under AA on the one row the reader just picked. */
 [data-theme="dark"] .rank-row.selected .rank-note{color:var(--ink-2)}
 .rank-row.dim{opacity:.4}
-.rank-n{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute-2);font-weight:700;text-align:center}
-.rank-st{font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:800;color:var(--ink)}
-.rank-mid{min-width:0;display:flex;flex-direction:column;gap:3px}
+/* --mute-2 on a card measured 2.56:1 in light — under AA for a rank a reader
+   uses to count position. --mute clears 4.5:1 on both card surfaces. */
+.rank-n{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute);font-weight:700;text-align:center}
+.rank-st{font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:800;color:var(--ink)}
 .rank-bar{height:6px;border-radius:3px;background:var(--line-2);overflow:hidden}
 .rank-bar i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent),var(--accent-deep))}
-.rank-note{font-size:9.5px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rank-right{display:flex;flex-direction:column;align-items:flex-end;gap:1px}
-.rank-val{font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:800;color:var(--accent-deep)}
+.rank-note{font-size:10.5px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rank-val{font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:800;color:var(--accent-deep);text-align:right}
 [data-theme="dark"] .rank-val{color:var(--accent-light)}
-.rank-yoy{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700}
+.rank-yoy{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;text-align:right}
 .rank-yoy.up{color:var(--green-700)}.rank-yoy.down{color:var(--red-700)}
 [data-theme="dark"] .rank-yoy.up{color:#6ee7b7}[data-theme="dark"] .rank-yoy.down{color:#fca5a5}
 .rank-gap{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:8px;font-weight:800;color:var(--red-700);background:var(--red-50);border:1px solid var(--red-200);padding:1px 5px;border-radius:4px;letter-spacing:.04em}
@@ -263,25 +295,6 @@ button{font-family:inherit}
 .scatter-legend .lg i{width:9px;height:9px;border-radius:50%}
 
 /* ═══ Agency breakdown (sparklines) ═══ */
-.ag-list{display:flex;flex-direction:column;gap:3px}
-.ag-row{display:grid;grid-template-columns:58px 1fr 62px 60px;gap:11px;align-items:center;padding:8px 8px;border-radius:8px;cursor:pointer;border:1px solid transparent;transition:background .12s,border-color .12s}
-.ag-row:hover{background:var(--card-soft)}
-.ag-row.active{background:var(--accent-pale);border-color:var(--accent-light)}
-[data-theme="dark"] .ag-row.active{background:rgba(55,138,221,0.16)}
-.ag-name{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:800;color:var(--ink)}
-.seg-split{display:flex;height:100%;border-radius:inherit;overflow:hidden}
-.seg-split i{display:block;height:100%}
-.ag-bar2{position:relative;height:18px;border-radius:5px;background:var(--line-2);overflow:hidden}
-.ag-bar2 .seg-lp{position:absolute;left:0;top:0;height:100%;background:linear-gradient(90deg,#274d80,#0A1628);border-radius:5px}
-.ag-bar2 .seg-sb{position:absolute;left:0;top:0;height:100%;background:linear-gradient(90deg,#10b981,#047857);border-radius:5px 0 0 5px}
-.ag-val{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:800;color:var(--accent-deep);text-align:right}
-[data-theme="dark"] .ag-val{color:var(--accent-light)}
-.ag-grow{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:800;text-align:right;white-space:nowrap}
-.ag-grow.up{color:var(--green-700)}.ag-grow.flat{color:var(--mute)}.ag-grow.down{color:var(--red-700)}
-[data-theme="dark"] .ag-grow.up{color:#6ee7b7}[data-theme="dark"] .ag-grow.down{color:#fca5a5}
-.ag-legend2{display:flex;gap:16px;justify-content:center;align-items:center;padding-top:10px;margin-top:2px;border-top:1px solid var(--line-2);font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--mute)}
-.ag-legend2 .lg{display:inline-flex;align-items:center;gap:6px}
-.ag-legend2 .lg i{width:11px;height:11px;border-radius:3px}
 /* Three states, not two: a small business, a firm known not to be one, and a
    firm whose status the feed never supplied. The third used to render as the
    second. */
@@ -292,37 +305,75 @@ button{font-family:inherit}
 .sbs-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:7px}
 .sbs-money{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:800;color:var(--ink);letter-spacing:.01em;margin-left:8px}
 [data-theme="dark"] .sbs-money{color:var(--ink)}
-.sbs-code{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--ink)}
+/* PILL TREATMENT on the code, the year and the percent. Three monospace strings
+   at three weights, unboxed, read as one run of text — which is how a code got
+   mistaken for a year. */
+.sbs-code{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--accent-deep);background:var(--accent-pale);border:1px solid var(--accent-light);border-radius:20px;padding:2px 9px}
+[data-theme="dark"] .sbs-code{color:var(--accent-light);background:rgba(55,138,221,0.18);border-color:rgba(181,212,244,.3)}
 .sbs-dir{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.04em}
-.sbs-dir.up{color:var(--green-600,#059669)}.sbs-dir.down{color:var(--amber-800,#92400e)}.sbs-dir.flat{color:var(--mute)}
+.sbs-dir.up{color:var(--green-700)}.sbs-dir.down{color:var(--amber-800,#92400e)}.sbs-dir.flat{color:var(--mute)}
+/* --amber-800 on the dark card measured 2.44:1 — the direction arrow, unreadable
+   in the theme it was never checked in. */
+[data-theme="dark"] .sbs-dir.up{color:#6ee7b7}[data-theme="dark"] .sbs-dir.down{color:#fcd34d}
 .sbs-pts{display:flex;gap:8px}
-.sbs-pt{flex:1;min-width:0}
-.sbs-bar{height:6px;border-radius:3px;background:var(--line-2);overflow:hidden;margin-bottom:4px}
-.sbs-bar i{display:block;height:100%;background:var(--accent);border-radius:3px}
+.sbs-pt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.sbs-yr{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2);background:var(--line-3);border-radius:5px;padding:2px 6px;align-self:flex-start;white-space:nowrap}
+[data-theme="dark"] .sbs-yr{background:rgba(255,255,255,.06)}
 .sbs-meta{font-family:"IBM Plex Mono",monospace;font-size:9px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sbs-pct{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;color:var(--ink)}
+.sbs-pct{font-family:"IBM Plex Mono",monospace;font-size:16px;font-weight:800;color:var(--ink);letter-spacing:-.02em}
 .sbs-unknown{color:var(--mute);font-style:italic}
-.conc-row{padding:11px 0;border-bottom:1px solid var(--line-2)}
+.sbs-cap{font-size:10.5px;color:var(--mute);line-height:1.55;padding-top:10px}
+.sbs-cap b{color:var(--ink-2);font-weight:700}
+/* CONCENTRATION IS A NUMBER, NOT FIVE BANDS. The percentage was the finding; the
+   segments were decoration nobody could read a name off. */
+.conc-row{padding:9px 0;border-bottom:1px solid var(--line-2)}
 .conc-row:last-child{border-bottom:0}
-.conc-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:6px}
-.conc-pct{font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:800;color:var(--ink)}
-.conc-bar{height:7px;border-radius:4px;background:var(--line-2);display:flex;overflow:hidden;margin-bottom:6px}
-.conc-bar i{display:block;height:100%;border-right:1px solid var(--card)}
-.conc-lead{font-size:10.5px;color:var(--mute);line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.conc-top{display:grid;grid-template-columns:58px max-content minmax(0,1fr);gap:4px 12px;align-items:baseline}
+.conc-pct{font-family:"IBM Plex Mono",monospace;font-size:22px;font-weight:800;color:var(--ink);letter-spacing:-.03em;line-height:1}
+.conc-id{display:flex;align-items:baseline;gap:6px}
+.conc-fy{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--mute)}
+.conc-lead{font-size:11px;color:var(--ink-2);line-height:1.5}
+.conc-lead b{color:var(--ink);font-weight:700}
 .conc-note{font-size:10px;color:var(--mute);line-height:1.5;padding-top:9px}
 /* ── small businesses winning in each code ── */
 .sbw-code{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:11px 0 6px;border-bottom:1px solid var(--line-2)}
 .sbw-code b{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--ink)}
 .sbw-code span{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--mute)}
-.sbw-row{display:grid;grid-template-columns:1fr 70px 48px;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--line-2)}
+.sbw-row{display:grid;grid-template-columns:1fr 70px 48px;gap:10px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--line-2)}
 .sbw-row:last-child{border-bottom:0}
 .sbw-nm{font-size:11.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sbw-v{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--accent-deep);text-align:right}
+/* --accent-deep is a LIGHT-THEME ink. On the dark card it measured 2.65:1 —
+   every set-aside dollar figure in the panel, invisible in one theme. */
+[data-theme="dark"] .sbw-v{color:var(--accent-light)}
 .sbw-p{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--mute);text-align:right}
+/* The collapsed tail: summed and labelled, never dropped. */
+.sbw-row.rest .sbw-nm{font-weight:500;color:var(--ink-2);font-style:italic}
+.sbw-row.rest .sbw-v{color:var(--mute)}
 .sbw-note{font-size:10px;color:var(--mute);line-height:1.5;padding-top:9px}
-.ag-head{display:grid;grid-template-columns:58px 1fr 62px 60px;gap:11px;padding:0 8px 7px;border-bottom:1px solid var(--line-2)}
-.ag-head span{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
-.ag-head span:nth-child(3),.ag-head span:nth-child(4){text-align:right}
+/* Two unlabelled numeric columns read as one figure and its footnote. */
+.sbw-head{display:grid;grid-template-columns:1fr 70px 48px;gap:10px;padding:0 0 6px;border-bottom:1.5px solid var(--line)}
+.sbw-head span{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+.sbw-head span:nth-child(2),.sbw-head span:nth-child(3){text-align:right}
+/* THE DEPARTMENTS, IN ONE LINE. A ranked block whose second bar is invisible is
+   showing a share, so the share is what it states. */
+.ag-oneline{display:flex;flex-direction:column;gap:2px}
+.ag-one{display:grid;grid-template-columns:max-content 84px max-content minmax(0,1fr);gap:10px;align-items:baseline;padding:7px 8px;border-radius:8px;font-size:12.5px;color:var(--ink)}
+.ag-one b{font-weight:750}
+.ag-one.rest{color:var(--ink-2);font-style:italic;opacity:.86}
+.ag-one-v{font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:800;color:var(--accent-deep);text-align:right;font-variant-numeric:tabular-nums;font-style:normal}
+[data-theme="dark"] .ag-one-v{color:var(--accent-light)}
+.ag-one-s{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute);font-style:normal;white-space:nowrap}
+.ag-one-g{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;font-style:normal;white-space:nowrap;justify-self:end}
+.ag-one-g.up{color:var(--green-700)}.ag-one-g.flat{color:var(--mute)}.ag-one-g.down{color:var(--red-700)}
+[data-theme="dark"] .ag-one-g.up{color:#6ee7b7}[data-theme="dark"] .ag-one-g.down{color:#fca5a5}
+.ii-cap{font-size:11.5px;line-height:1.55;color:var(--mute);margin:10px 2px 0}
+.ii-cap b{color:var(--ink-2);font-weight:700}
+/* One small business among nineteen primes disappears into rows that look
+   alike. The ratio IS the finding, so the exception is marked. */
+.ii-table tr.is-sb td{background:var(--green-50)}
+.ii-table tr.is-sb .ii-awd{font-weight:800}
+[data-theme="dark"] .ii-table tr.is-sb td{background:rgba(16,185,129,.10)}
 
 /* charts */
 .chart-wrap{position:relative;width:100%}
@@ -361,9 +412,9 @@ button{font-family:inherit}
 
 /* ═══ Incumbent table ═══ */
 .ii-table{width:100%;border-collapse:collapse;font-size:11.5px}
-.ii-table thead th{padding:8px 8px;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);border-bottom:1.5px solid var(--line);text-align:left;white-space:nowrap}
+.ii-table thead th{padding:6px 8px;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);border-bottom:1.5px solid var(--line);text-align:left;white-space:nowrap}
 .ii-table thead th.r{text-align:right}
-.ii-table td{padding:8px 8px;border-bottom:1px solid var(--line-2);color:var(--ink-2);white-space:nowrap}
+.ii-table td{padding:5px 8px;border-bottom:1px solid var(--line-2);color:var(--ink-2);white-space:nowrap}
 .ii-table tr:last-child td{border-bottom:0}
 .ii-table tr.dim td{opacity:.34}
 .ii-table tbody tr{transition:background .12s}
@@ -567,7 +618,7 @@ a.rc-row:hover .rc-name{color:var(--accent-deep)}
 .viz.off,.rc-lede.off,.cap.off,.rc-foot.off,.rc-head2.off{display:none}
 
 .bo-list{display:flex;flex-direction:column;gap:2px}
-.bo-row{display:grid;grid-template-columns:minmax(0,1fr) 88px;gap:12px;align-items:center;padding:7px 8px;border-radius:8px}
+.bo-row{display:grid;grid-template-columns:minmax(0,1fr) 88px;gap:5px 12px;align-items:center;padding:5px 8px;border-radius:8px}
 .bo-row:hover{background:var(--card-soft)}
 .bo-row.rest{opacity:.72}
 .bo-n{font-size:12.5px;font-weight:650;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -598,23 +649,15 @@ a.rc-row:hover .rc-name{color:var(--accent-deep)}
 .ch-none{font-size:12px;line-height:1.6;color:var(--mute);background:var(--card-soft);border:1px dashed var(--line);border-radius:9px;padding:14px 16px}
 .ch-none b{color:var(--ink-2)}
 
-.sz-band{display:flex;flex-direction:column;gap:9px;padding:4px 2px 2px}
-.sz-mid{font-size:15px;font-weight:750;color:var(--ink);line-height:1.35}
-.sz-mid b{font-family:"IBM Plex Mono",monospace;font-size:19px;font-weight:800;letter-spacing:-.02em}
-.sz-scale{position:relative;height:34px;margin:6px 0 2px}
-.sz-rail{position:absolute;left:0;right:0;top:14px;height:4px;border-radius:3px;background:var(--line-2)}
-.sz-fill{position:absolute;top:14px;height:4px;border-radius:3px;background:var(--accent);opacity:.85}
-.sz-tick{position:absolute;top:0;transform:translateX(-50%);text-align:center}
-.sz-tick i{display:block;width:1px;height:11px;background:var(--mute-2);margin:0 auto 3px;opacity:.7}
-.sz-tick span{font-family:"IBM Plex Mono",monospace;font-size:9px;color:var(--mute);white-space:nowrap}
-.sz-note{font-size:11.5px;line-height:1.55;color:var(--mute);margin:8px 2px 0}
-.sz-note b{color:var(--ink-2);font-weight:650}
-.sn-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;align-items:end;height:104px;padding:4px 2px 0}
-.sn-col{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;gap:4px}
-.sn-b{width:100%;border-radius:3px 3px 0 0;background:var(--accent);opacity:.82;min-height:2px}
-.sn-col.q4 .sn-b{background:var(--amber-600);opacity:.9}
-.sn-l{font-family:"IBM Plex Mono",monospace;font-size:8.5px;color:var(--mute);letter-spacing:.02em}
-.sn-note{font-size:11.5px;line-height:1.55;color:var(--mute);margin:10px 2px 0}
+/* WHEN THE MONEY MOVES — two numbers, where twelve bars used to be. The whole
+   payload of the panel was a share and a month name; the grid drew them at four
+   times the height and made the reader squint the peak out of a column. */
+.sn-two{display:flex;gap:34px;flex-wrap:wrap;align-items:flex-end;padding:2px 2px 0}
+.sn-fig{display:flex;flex-direction:column;gap:3px;min-width:0}
+.sn-n{font-family:"Manrope",sans-serif;font-size:34px;font-weight:800;letter-spacing:-.035em;line-height:1;color:var(--ink)}
+.sn-n i{font-style:normal;font-size:18px;font-weight:700;color:var(--mute);margin-left:1px}
+.sn-k{font-size:11.5px;line-height:1.4;color:var(--mute)}
+.sn-note{font-size:11.5px;line-height:1.55;color:var(--mute);margin:12px 2px 0}
 .sn-note b{color:var(--ink-2);font-weight:650}
 .pt-list{display:flex;flex-direction:column;gap:1px}
 .pt-r{display:grid;grid-template-columns:minmax(0,1fr) 92px;gap:12px;align-items:baseline;padding:8px;border-radius:8px}

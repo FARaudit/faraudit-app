@@ -141,7 +141,14 @@ export interface SpendingPayload {
   coverage: { requested: string[]; tracked: string[]; untracked: string[]; top_n: number };
   FYS: string[];
   BY_FY: Record<string, FyView>;
-  MARKET_TREND: { labels: string[]; series: Record<string, number[]> };
+  /* `open` runs parallel to `labels`: true where that fiscal year is still
+     running, so its figure is obligations TO DATE rather than a full year. The
+     panel drawing this series reports every code roughly halving between the
+     last two labels, and under an unlabelled open year that reads as a collapse
+     which has not happened. No new measurement — the builder already derives
+     this for the KPI sub-line; the flag carries it to the panel that must
+     state it, instead of leaving the panel to infer it from a sentence. */
+  MARKET_TREND: { labels: string[]; series: Record<string, number[]>; open: boolean[] };
   RECOMPETES: Array<RecompeteRow & { naics: string; expired: boolean }>;
   /* FALSE means no row has ever carried recompetes_upcoming, so RECOMPETES is
      empty because nothing was MEASURED — not because the market is quiet. The
@@ -663,7 +670,10 @@ export async function fetchDefenseSpending(
           return r ? toM(r.total_obligations || 0) : 0;
         })
       ])
-    )
+    ),
+    // Same test the KPI sub-line uses, carried per label rather than buried in
+    // a sentence, so the panel can mark the bar instead of guessing.
+    open: years.map((fy) => fy >= currentFy)
   };
 
   // ── SB share by code, every measured year ────────────────────────────────

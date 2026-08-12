@@ -11,7 +11,7 @@
 window.DSB = {
   FYS: [],
   BY_FY: {},
-  MARKET_TREND: { labels: [], series: {} },
+  MARKET_TREND: { labels: [], series: {}, open: [] },
   RECOMPETES: [],
   AGENCY_FILTERS: [{ key: 'all', label: 'All' }],
   coverage: null,

@@ -62,7 +62,10 @@
 
       window.DSB.FYS = Array.isArray(data.FYS) ? data.FYS : [];
       window.DSB.BY_FY = data.BY_FY || {};
-      window.DSB.MARKET_TREND = data.MARKET_TREND || { labels: [], series: {} };
+      // `open` comes across with the series it belongs to. Defaulted to [] and
+      // never to a fabricated run of false: an unlabelled open year is the one
+      // way this panel can report a collapse that has not happened.
+      window.DSB.MARKET_TREND = data.MARKET_TREND || { labels: [], series: {}, open: [] };
       window.DSB.RECOMPETES = Array.isArray(data.RECOMPETES) ? data.RECOMPETES : [];
       // NULL column and empty array are different answers. Without this line the
       // panel would read a never-measured market as a quiet one — and its empty
