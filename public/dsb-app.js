@@ -1226,8 +1226,24 @@
        The percentage answers "can I get in". The dollars answer "is it worth
        getting in". The panel is titled "is there money here", so it sorts by the
        money and prints it first. The share stays as the second read. */
-    const rows = (D.SB_SHARE || []).slice().sort((a, b) => sbDollarsOf(b) - sbDollarsOf(a));
+    let rows = (D.SB_SHARE || []).slice().sort((a, b) => sbDollarsOf(b) - sbDollarsOf(a));
     if (!rows.length) { setHTML(el, '<div class="conc-note">No codes tracked.</div>'); return; }
+    /* ⛔ THE CODE PILL SCOPES THIS BLOCK, like the set-aside list beneath it. Two
+       blocks in one card must name the same market.
+
+       ⛔ THE YEAR CONTROL DOES NOT. The panel exists to show direction across
+       years, and one year cannot carry it. Year and code are different axes; only
+       the code is a claim about which market this is. */
+    if (S.code) {
+      const scoped = rows.filter(r => r.naics === S.code);
+      if (!scoped.length) {
+        setHTML(el, '<div class="conc-note">The small-business share has not been measured for '
+          + '<b>NAICS ' + esc(S.code) + '</b> yet. <b>That is a gap in our data, not a code that '
+          + 'reaches no small business.</b> It refreshes nightly.</div>');
+        return;
+      }
+      rows = scoped;
+    }
     setHTML(el, rows.map(r => {
       const pts = r.points || [];
       // Direction is read from the first and last year that HAVE a share. A code

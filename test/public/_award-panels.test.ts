@@ -163,6 +163,18 @@ function main() {
     "a code with no measured concentration says the gap is OURS, rather than falling back to every code");
   // The neighbours that already honoured it, asserted so this cannot regress into
   // consistency-by-everyone-ignoring-it.
+  // The mirror, one widget over: the share block ignored the pill while the
+  // set-aside list beneath it honoured it — three codes here, one there, inside a
+  // single card.
+  const sbs = fnOf("renderSbShare", "renderConcentration");
+  assert(/rows\.filter\(r => r\.naics === S\.code\)/.test(sbs),
+    "the small-business share block filters on the selected code");
+  assert(/gap in our data, not a code that/.test(sbs),
+    "…and an unmeasured code says the gap is OURS rather than falling back to every code");
+  // ⛔ AND IT MUST STAY CROSS-YEAR. Year and code are different axes; scoping by
+  // year would delete the direction the panel exists to show.
+  assert(!/p\.fy === S\.fy|points.*S\.fy/.test(sbs),
+    "the share block is still NOT filtered by the year control — direction needs every year");
   const win = fnOf("renderSbWinners", "renderAll");
   assert(/if \(S\.code\) rows = rows\.filter\(r => r\.naics === S\.code\)/.test(win),
     "the set-aside winners list still honours the pill");
