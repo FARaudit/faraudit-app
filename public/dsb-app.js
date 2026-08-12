@@ -350,7 +350,11 @@
         <div class="mkt-track"><div class="mkt-solid" style="width:${r.now / maxRef * 100}%;background:${col}"></div></div>
         <div class="mkt-foot"><span>${esc(t.labels[0])} · ${fmtM(r.first)}</span><span>${esc(t.labels[last])} · ${fmtM(r.now)}</span></div>
       </div>`;
-    }).join('') + `<div class="mkt-note"><span class="tam">${fmtM(total)}</span>&nbsp;obligated across your tracked codes in ${esc(S.fy || t.labels[last])}</div>`);
+    // NOT bound to the FY filter, deliberately. This panel draws every measured
+    // year at once — its own subtitle says so — and `total` is the LATEST year's
+    // figure. Naming the selected year here would have put an FY2024 label over
+    // an FY2026 number, which is worse than the mismatch it was meant to fix.
+    }).join('') + `<div class="mkt-note"><span class="tam">${fmtM(total)}</span>&nbsp;obligated across your tracked codes in ${esc(t.labels[last])} · all years shown</div>`);
   }
 
   /* ════════════════ RECOMPETE RADAR ════════════════
