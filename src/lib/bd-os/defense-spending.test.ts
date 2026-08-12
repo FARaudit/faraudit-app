@@ -203,14 +203,24 @@ async function main() {
       && inc24.find((i) => i.name === "AERO TURBINE, INC")?.sb === false,
     "two large primes whose names end in INC are NOT flagged SB — the flag is READ, never inferred from the name");
 
-  // ── THE KPI COUNTS THE PANEL'S OWN ROWS ──────────────────────────────────
-  // USAspending lists a recipient more than once when it holds separate award
-  // records, so a count of DISTINCT NAMES sits below a count of ROWS. The
-  // fixture carries that duplication on purpose.
+  // ── SMALL-BUSINESS STATUS IS READ, NEVER ASSUMED ─────────────────────────
+  // ⛔ FOUR ASSERTIONS WERE DELETED HERE, and this note is why. They checked the
+  // "Top recipients listed" KPI — its count, its "top N" caption, and its
+  // refusal to print "0 of them small business" from an absent list. That KPI
+  // was removed from the payload in #656 as feed metadata: it answered how many
+  // rows we loaded, not anything about the market. The assertions outlived their
+  // subject and were failing on `recipientKpi === undefined`.
+  //
+  // ⛔ AND NOTHING CAUGHT IT. This suite lives in src/lib/bd-os/, and CI's
+  // discovery was `readdirSync(src/lib)` — not recursive. It had never run here.
+  // The fix ships in the same change as this deletion.
+  //
+  // The INVARIANT those assertions existed for is not lost: a small-business
+  // status may only be stated where the feed supplied the list it comes from.
+  // That is what the `sb === null` checks below test, on `incumbents`, which is
+  // where the flag actually lives — a stronger place to test it than a KPI's
+  // sub-line, because the sub-line was prose about the array.
   const dupFy = out.BY_FY.FY2026;
-  const recipientKpi = dupFy.kpis.find((k) => /recipient/i.test(k.label));
-  assert(!!recipientKpi && Number(recipientKpi.val) === dupFy.incumbents.length,
-    "the recipients KPI states the number of rows the panel renders, not a distinct-name count");
   // A small-business COUNT may only be stated when the feed supplied the list it
   // would be counted from. "0 of them small business" over a SIZE column reading
   // "—" for every row was a measured zero nobody measured.
@@ -234,12 +244,11 @@ async function main() {
   // year has a knowable status and the sub-line must say exactly that rather
   // than print a zero.
   assert(known.length === 0, "fixture: FY2026 supplies no small-business list at all");
-  assert(!!recipientKpi && /small-business status not supplied/.test(recipientKpi.sub),
-    "with no list supplied, the sub-line says so instead of stating '0 of them small business'");
-  assert(!!recipientKpi && !/^0 of them/.test(recipientKpi.sub),
-    "NEGATIVE CONTROL — the old wording asserted a measured zero from an absent list");
-  assert(!!recipientKpi && recipientKpi.sub.includes("top "),
-    "the recipients KPI names itself a display cap — the count is ours, not the market's");
+  // NEGATIVE CONTROL — an absent list must never become a measured `false`. This
+  // is the claim the deleted KPI assertions were really making, tested on the
+  // field the page reads rather than on a sentence about it.
+  assert(dupFy.incumbents.length > 0 && dupFy.incumbents.every((i) => i.sb !== false),
+    "with no small-business list supplied, NOTHING is asserted as 'not small business'");
 
   // ── ONE COMPANY IS ONE ROW ────────────────────────────────────────────────
   // USAspending does not normalise legal names, so the same firm arrives as

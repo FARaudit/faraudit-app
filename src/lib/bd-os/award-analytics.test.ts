@@ -12,20 +12,23 @@
 // Run: npx tsx src/lib/bd-os/award-analytics.test.ts
 import {
   awardSizeDistribution, primeSubcontractTargets, seasonality,
-  normaliseRecipient, SUBCONTRACT_PLAN_THRESHOLD
+  normaliseRecipient, SUBCONTRACT_PLAN_THRESHOLD, parseAwardSample
 } from "./award-analytics";
-import type { AwardRecord, AwardSample } from "./award-analytics";
+import type { RawAwardRecord, RawAwardSample } from "./award-analytics";
 
 let failures = 0;
 const assert = (cond: boolean, msg: string) => {
   console.log(`${cond ? "✅" : "❌"} ${msg}`);
   if (!cond) failures++;
 };
+/** Every fixture enters through the real parse boundary, so the gate exercises
+ *  the wrap as well as the maths. */
+const P = parseAwardSample;
 const near = (a: number | null, b: number, tol = 0.01) => a != null && Math.abs(a - b) <= tol;
 
 const aw = (
   recipient: string, amount: number, start: string, sub_agency = "Department of the Navy"
-): AwardRecord => ({
+): RawAwardRecord => ({
   award_id: `A${Math.round(amount)}`, recipient, amount, agency: "Department of Defense",
   sub_agency, award_type: "DEFINITIVE CONTRACT", start_date: start, end_date: "2027-09-30"
 });
@@ -36,12 +39,12 @@ function main() {
     // Nine values, chosen so every quartile is checkable by hand:
     // 100 200 300 400 500 600 700 800 900
     // p25 = index 2 = 300 · median = index 4 = 500 · p75 = index 6 = 700
-    const s: AwardSample = {
+    const s: RawAwardSample = {
       awards: [100, 900, 300, 700, 500, 200, 800, 400, 600].map((n, i) =>
         aw(`FIRM ${i}`, n, "2026-03-01")),
       sampled: 9, cap: 500, truncated: false
     };
-    const d = awardSizeDistribution(s)!;
+    const d = awardSizeDistribution(P(s))!;
     assert(d.count === 9, "counts every positive award");
     assert(d.min === 100 && d.max === 900, "min and max are the real extremes");
     assert(near(d.p25, 300), `p25 = 300 (got ${d.p25})`);
@@ -52,9 +55,9 @@ function main() {
     // ⛔ THE MEAN MUST NOT BE REPORTED. A bimodal market's average describes no
     // award that exists. Structural check: no field on the result equals it.
     const real = [150310, 1895991038, 7122077, 14384084];
-    const bimodal = awardSizeDistribution({
+    const bimodal = awardSizeDistribution(P({
       awards: real.map((n, i) => aw(`F${i}`, n, "2026-03-01")), truncated: true
-    })!;
+    }))!;
     const mean = real.reduce((a, b) => a + b, 0) / real.length;
     assert(
       !Object.values(bimodal).some((v) => typeof v === "number" && near(v, mean, 1)),
@@ -63,13 +66,13 @@ function main() {
     assert(near(bimodal.median, (7122077 + 14384084) / 2),
       "the median sits between the two middle awards, not near the $1.9B outlier");
     assert(bimodal.truncated === true, "truncated rides along so no reader calls it the whole market");
-    assert(awardSizeDistribution({ awards: [] }) === null, "an empty sample yields null, never a zeroed shape");
-    assert(awardSizeDistribution(null) === null, "a missing sample yields null");
+    assert(awardSizeDistribution(P({ awards: [] })) === null, "an empty sample yields null, never a zeroed shape");
+    assert(awardSizeDistribution(P(null)) === null, "a missing sample yields null");
   }
 
   // ── 4 · PRIME SUBCONTRACTING TARGETS ──────────────────────────────────────
   {
-    const s: AwardSample = {
+    const s: RawAwardSample = {
       awards: [
         aw("HUNTINGTON INGALLS INCORPORATED", 5_000_000, "2026-02-01", "Department of the Navy"),
         aw("HUNTINGTON INGALLS INC", 2_360_000, "2026-05-01", "Department of the Army"),
@@ -79,7 +82,7 @@ function main() {
       ],
       sampled: 5, cap: 500, truncated: true
     };
-    const t = primeSubcontractTargets(s, ["ACMT, INC."])!;
+    const t = primeSubcontractTargets(P(s), ["ACMT, INC."])!;
 
     assert(t.threshold === SUBCONTRACT_PLAN_THRESHOLD && t.threshold === 750_000,
       "the FAR 19.702 threshold is stated, not implied");
@@ -113,7 +116,7 @@ function main() {
 
   // ── 5 · SEASONALITY ───────────────────────────────────────────────────────
   {
-    const s: AwardSample = {
+    const s: RawAwardSample = {
       awards: [
         aw("A", 100, "2025-10-15"),   // Oct — fiscal month 1
         aw("B", 200, "2026-09-20"),   // Sep — fiscal month 12, Q4
@@ -123,7 +126,7 @@ function main() {
       ],
       sampled: 5, cap: 500, truncated: true
     };
-    const q = seasonality(s)!;
+    const q = seasonality(P(s))!;
     assert(q.months.length === 12, "all twelve months present — an absent month reads as missing data");
     assert(q.months[0].label === "Oct" && q.months[0].fiscalMonth === 1,
       "the fiscal year starts in October, not January");
@@ -140,7 +143,7 @@ function main() {
     const jan = q.months.find((m) => m.label === "Jan")!;
     assert(jan.count === 0, "the undated award did NOT land in January");
     assert(q.truncated === true, "biased-to-largest is declared");
-    assert(seasonality({ awards: [aw("Z", 1, "")] }) === null,
+    assert(seasonality(P({ awards: [aw("Z", 1, "")] })) === null,
       "a sample with no usable dates yields null rather than twelve zeroes");
   }
 
