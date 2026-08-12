@@ -289,6 +289,10 @@
   }
 
   function renderMap() {
+    // Guarded on the HOST, not just on the topology: a page that mounts these
+    // renderers without a map has no #geoSvg, and d3's empty-selection tolerance
+    // is not a contract worth leaning on.
+    if (!$('geoSvg')) return;
     const svg = d3.select('#geoSvg'); svg.selectAll('*').remove();
     if (!usGeo) return;
     const ST = view().states;
@@ -353,7 +357,7 @@
     tip.style.left = Math.min(ev.clientX + 14, window.innerWidth - 200) + 'px';
     tip.style.top = (ev.clientY + 14) + 'px';
   }
-  const hideTip = () => { $('geoTip').style.display = 'none'; };
+  const hideTip = () => { const t = $('geoTip'); if (t) t.style.display = 'none'; };
 
   /* ════════════════ RANKED LIST ════════════════
      Two modes. A third, keyed to your firm's own activity, would need a
@@ -1185,10 +1189,17 @@
     S.fy = rec.fy || D.FYS[D.FYS.length - 1];
     S.code = rec.code || null;
     scopeNote = rec.note || '';
+    /* PUBLISH WHAT IS ACTUALLY ON SCREEN, so the next destination inherits it.
+       Reading a URL persists nothing on its own, and continuity between pages is
+       the whole reason the scope is shared. The url option is off here, leaving
+       the address bar exactly as the reader typed it — when a request cannot be
+       honoured the note beside the measurement date says so, and rewriting the
+       URL to the fallback would erase the reader's own request. */
+    if (SCOPE) SCOPE.set({ fy: S.fy, code: S.code }, { url: false });
     assignColors();
     renderProvenance();
     buildControls(); renderRankTabs(); renderUnsupported();
-    fetch('/vendor/states-10m.json')
+    if ($('geoSvg')) fetch('/vendor/states-10m.json')
       .then(r => r.json()).then(j => { usGeo = j; renderMap(); })
       .catch(() => { console.warn('us-atlas failed'); });
     let to; window.addEventListener('resize', () => { clearTimeout(to); to = setTimeout(renderMap, 220); });
