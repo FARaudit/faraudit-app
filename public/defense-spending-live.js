@@ -10,6 +10,37 @@
     if (window.DSB_APP && typeof window.DSB_APP.render === 'function') window.DSB_APP.render();
   }
 
+  /* THE CONTRACTING OFFICERS BEHIND A RECOMPETE ROW.
+     Fetched SEPARATELY and AFTER the panels are already on screen: it calls a
+     live SAM feed, and putting that upstream in front of the whole tab would
+     make every panel wait on the slowest thing here. A failure costs the officer
+     names and nothing else.
+
+     ⛔ THREE STATES, NOT TWO. 'loading' and 'unwired' are not 'no officer at this
+     office' — one is a claim about the directory, the others are claims about our
+     ability to read it, and a row that showed nothing for all three would be
+     saying something false in two of them. */
+  function loadOfficers() {
+    // Only the page that renders recompete rows needs this.
+    if (!document.getElementById('rcList')) return;
+    window.DSB.OFFICERS = { state: 'loading', offices: {} };
+    fetch('/api/office-officers', { credentials: 'include' })
+      .then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function (d) {
+        if (!d || d.state !== 'ok') throw new Error((d && d.reason) || 'not ok');
+        window.DSB.OFFICERS = { state: 'ok', offices: d.offices || {}, match: d.match || 'exact' };
+        paint();
+      })
+      .catch(function (e) {
+        window.DSB.OFFICERS = { state: 'unwired', offices: {},
+          reason: (e && e.message) || 'unavailable' };
+        paint();
+      });
+  }
+
   function unwired(reason) {
     window.DSB.STATUS = { state: 'unwired', reason: reason || '' };
     paint();
@@ -67,6 +98,7 @@
 
       window.DSB.STATUS = { state: 'ok', reason: '' };
       paint();
+      loadOfficers();
     } catch (e) {
       console.error('[defense-spending-live] wire failed:', e);
       unwired('Spending data could not be loaded.');

@@ -773,10 +773,75 @@
       + '<span class="rc-sub">' + (opts.inBlock ? 'NAICS ' + esc(r.naics)
         : esc(r.agency) + '<span class="sep">·</span>' + esc(r.naics)
           + '<span class="sep">·</span>' + esc(r.award_id)) + '</span>';
-    return href
+    const row = href
       ? '<a class="rc-row" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">'
         + inner + '</a>'
       : '<div class="rc-row">' + inner + '</div>';
+    /* The call block sits OUTSIDE the anchor. A mailto or tel nested inside the
+       row's own link is invalid markup, and the browser resolves it by dropping
+       one of the two — not a choice to leave to the parser. */
+    return '<div class="rc-item">' + row + rcCall(r) + '</div>';
+  }
+
+  /* ════════════════ WHO YOU ACTUALLY CALL ════════════════
+     A recompete row carries the BUYING OFFICE that signed. The officer directory
+     keys on SAM's own office leaf, and the two agree byte-for-byte: measured on
+     21 real rows, 12 matched with ZERO normalisation.
+
+     ⛔ EXACT MATCH ONLY. Nothing here folds, trims or fuzzy-matches. The cost of
+     a bad match is a real officer's phone number printed beside someone else's
+     contract, and a miss that says so beats a plausible guess.
+
+     ⛔ AND IT NEVER SAYS "THE OFFICER ON THIS CONTRACT". Neither source records
+     who signed. These are the officers posting FROM that office in your codes,
+     which is a different and weaker claim — the copy makes it.
+
+     Four states, kept apart because only ONE of them is a fact about the
+     directory; collapsing them would state that fact in three cases it does not
+     hold:
+       no office on the row   · the feed had not captured one
+       lookup still running   · not "no officer"
+       lookup failed          · not "no officer"
+       office known, no match · the only case that says something real */
+  const RC_CALL_SHOW = 2;
+  function rcCall(r) {
+    const office = r && r.office;
+    if (!office) {
+      return '<div class="rc-call none">No buying office recorded on this award, '
+        + 'so there is no office to look up.</div>';
+    }
+    const box = D.OFFICERS || { state: 'loading', offices: {} };
+    const head = '<span class="rc-call-o">' + esc(office) + '</span>';
+    if (box.state === 'loading') {
+      return '<div class="rc-call pending">' + head + ' · looking up contracting officers…</div>';
+    }
+    if (box.state !== 'ok') {
+      return '<div class="rc-call none">' + head + ' · <b>the contracting-officer feed '
+        + 'could not be read</b>, so nobody is listed. That is our gap, not an office with '
+        + 'no officers.</div>';
+    }
+    const list = (box.offices || {})[office] || [];
+    if (!list.length) {
+      return '<div class="rc-call none">' + head + ' · no officer at this office has posted '
+        + 'a notice in your codes recently, so we hold no contact for it.</div>';
+    }
+    const shown = list.slice(0, RC_CALL_SHOW);
+    return '<div class="rc-call">' + head
+      + '<span class="rc-call-lede">Contracting officers who post from this office '
+      + '&mdash; not necessarily the officer on this contract</span>'
+      + shown.map(function (o) {
+        return '<span class="rc-p">'
+          + '<b>' + esc(o.name) + '</b>'
+          + '<a href="mailto:' + esc(o.email) + '">' + esc(o.email) + '</a>'
+          + (o.phone ? '<a href="tel:' + esc(String(o.phone).replace(/[^0-9+]/g, ''))
+              + '">' + esc(o.phone) + '</a>' : '')
+          + '<i>' + o.notices + ' notice' + (o.notices === 1 ? '' : 's') + ' in your codes</i>'
+          + '</span>';
+      }).join('')
+      + (list.length > shown.length
+          ? '<span class="rc-call-more">+' + (list.length - shown.length)
+            + ' more at this office</span>' : '')
+      + '</div>';
   }
 
   /* NEVER MEASURED IS NOT QUIET. The empty state below states that nothing in

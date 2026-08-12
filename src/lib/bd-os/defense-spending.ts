@@ -31,6 +31,10 @@ export interface RecompeteRow {
   award_id: string | null;
   end_date: string | null;
   recipient: string | null;
+  /** The buying office that signed. NULL on rows written before the worker
+   *  started capturing it, and null is a real state the page states rather than
+   *  fills in. It is the join key to the contracting-officer directory. */
+  office?: string | null;
 }
 
 interface IntelRow {

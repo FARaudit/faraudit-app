@@ -299,6 +299,15 @@ export interface RecompeteRow {
   amount: number;
   agency: string;
   end_date: string;
+  /** The BUYING OFFICE that signed — "SUP OF SHIPBUILDING CONV AND REPAIR", not
+   *  the sub-agency. NULL when the detail lookup did not answer, and null is a
+   *  real state: the page says "no office recorded" rather than guessing one.
+   *
+   *  ⛔ IT IS NOT ON THE SEARCH ENDPOINT. `spending_by_award` ACCEPTS an
+   *  "Awarding Office" field and returns null for every row — probed on 336611.
+   *  The only source is the award DETAIL endpoint, one request per award, which
+   *  is why this is capped and spaced below. */
+  office: string | null;
 }
 
 // FA-96b · Recompete radar via /spending_by_award/. Notes from probing the
@@ -438,7 +447,10 @@ export async function fetchRecompetes(
           award_type_codes: awardTypes,
           time_period: [{ start_date: fmtDate(actionStart), end_date: fmtDate(today), date_type: "action_date" }]
         },
-        fields: ["Award ID", "Recipient Name", "Award Amount", "Awarding Sub Agency", "End Date"],
+        // generated_internal_id is the ONLY handle the detail endpoint accepts;
+        // the PIID in "Award ID" will not resolve one.
+        fields: ["Award ID", "Recipient Name", "Award Amount", "Awarding Sub Agency", "End Date",
+          "generated_internal_id"],
         limit: RECOMPETE_PAGE_SIZE,
         page,
         sort: "End Date",
@@ -459,14 +471,45 @@ export async function fetchRecompetes(
         recipient: String(r["Recipient Name"] ?? ""),
         amount: Number(r["Award Amount"] ?? 0),
         agency: String(r["Awarding Sub Agency"] ?? ""),
-        end_date: endStr
-      });
-      if (out.length >= 10) return out;
+        end_date: endStr,
+        office: null,
+        internal_id: String(r["generated_internal_id"] ?? "")
+      } as RecompeteRow & { internal_id: string });
+      if (out.length >= 10) return attachOffices(out);
     }
     if (pastCutoff) break;
     if (!d?.page_metadata?.hasNext) break;
   }
-  return out;
+  return attachOffices(out);
+}
+
+/* THE BUYING OFFICE, one detail request per row.
+   The office is what makes a recompete row callable: it joins EXACTLY to the
+   contracting-officer directory, which keys on SAM's own office leaf. Measured
+   2026-08-12 across the customer's 21 real rows — 21/21 returned an office and
+   12 matched an officer we hold, byte-for-byte, with zero normalisation.
+
+   ⛔ AT MOST TEN REQUESTS PER (code, window), and they go through getJson, which
+   shares this file's single paced queue — the same REQUEST_GAP_MS spacing every
+   other call obeys. The award-sample fetch above carries a note about a request
+   burst getting this worker rate-limited; adding a second delay on top of the
+   pacer would only double the nightly runtime for no protection.
+
+   A failed lookup leaves `office` null. Never a guess, and never a throw: a
+   missing string must not cost the caller its whole recompete list. */
+async function attachOffices(rows: RecompeteRow[]): Promise<RecompeteRow[]> {
+  for (const row of rows) {
+    const carrier = row as RecompeteRow & { internal_id?: string };
+    const gid = carrier.internal_id;
+    delete carrier.internal_id;   // a transport handle, not something we store
+    if (!gid) continue;
+    try {
+      const d = await getJson<{ awarding_agency?: { office_agency_name?: string | null } }>(
+        `/awards/${encodeURIComponent(gid)}/`);
+      row.office = d?.awarding_agency?.office_agency_name || null;
+    } catch { row.office = null; }
+  }
+  return rows;
 }
 
 /* THE RECOMPETE WINDOW — definitive contracts, 12 to 18 months out.
