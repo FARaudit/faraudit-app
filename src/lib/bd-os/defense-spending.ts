@@ -458,34 +458,7 @@ export async function fetchDefenseSpending(
           tone: sbPct >= 20 ? "green" : "amber",
           spark: sbPctSeries
         },
-        {
-          label: "Top recipients listed",
-          val: String(shownIncumbents.length),
-          unit: "",
-          // The count is a DISPLAY CAP, not a market size, and the small-business
-          // line may not be knowable: "0 of them small business" over a SIZE
-          // column reading "—" for every row was a measured zero the feed never
-          // supplied.
-          sub: sbCounted === 0
-            ? `top ${TOP_N} per code · small-business status not supplied for these`
-            : `top ${TOP_N} per code · ${sbYes} of ${sbCounted} small business`,
-          delta: null,
-          tone: "accent",
-          spark: []
-        },
-        {
-          label: "Awards ending ≤180d",
-          val: String(recompeteCount),
-          unit: "",
-          // Measured forward from the refresh date, NOT within the selected
-          // fiscal year — the worker's 180-day question carries no year, so the
-          // same list is stored on every FY row. It read as a per-year figure
-          // that never moved; it is a window on today and now says so.
-          sub: "in the next 180 days from the refresh · not year-scoped",
-          delta: null,
-          tone: recompeteCount > 0 ? "amber" : "accent",
-          spark: []
-        }
+        
       ],
       states,
       agencies,

@@ -123,7 +123,7 @@ button{font-family:inherit}
 .reset-btn:hover{color:var(--accent-deep);text-decoration:underline}
 
 /* ═══ KPI STRIP ═══ */
-.kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.kpi-strip{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
 .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-sm);padding:16px 18px;display:flex;flex-direction:column;gap:9px;position:relative;overflow:hidden}
 .kpi-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .kpi .lbl{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);margin:0}
@@ -166,29 +166,6 @@ button{font-family:inherit}
 /* A recompete whose end date has already passed: marked, never hidden. */
 
 /* ═══ Geo map ═══ */
-.geo-wrap{display:grid;grid-template-columns:1fr;gap:8px;min-height:0}
-.geo-svg{width:100%;height:520px;display:block;cursor:default}
-.geo-svg path.state{cursor:pointer;stroke:var(--geo-stroke);stroke-width:.7;transition:opacity .12s,stroke .12s}
-.geo-svg path.state:hover{opacity:.82}
-.geo-svg path.state.selected{stroke:var(--accent-deep);stroke-width:2}
-.geo-svg path.state.dim{opacity:.35}
-.geo-lab{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;fill:var(--ink);pointer-events:none}
-.geo-lab.lt{fill:#fff}
-.geo-lab.nodata{fill:var(--mute-2,#94a3b8);font-weight:600;opacity:.72}
-.geo-callout.nodata{fill:var(--mute-2,#94a3b8);opacity:.72}
-.geo-callout{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;fill:var(--ink-2);pointer-events:none}
-.geo-legend{display:flex;align-items:center;gap:7px;justify-content:center;flex-wrap:wrap;font-family:"IBM Plex Mono",monospace;font-size:9px;color:var(--mute);letter-spacing:.02em}
-.geo-legend .sw{display:inline-flex;align-items:center;gap:5px}
-.geo-legend .sw i{width:13px;height:11px;border-radius:2px;display:inline-block}
-.geo-legend .gap-key{display:inline-flex;align-items:center;gap:5px;margin-left:4px}
-.geo-legend .gap-key i{width:11px;height:11px;border-radius:3px;border:1.5px dashed var(--red-500);display:inline-block}
-.geo-tip{position:fixed;z-index:200;display:none;pointer-events:none;background:#050d1a;color:#fff;padding:9px 11px;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.35);min-width:150px}
-.geo-tip .t{font-family:"Manrope";font-weight:800;font-size:12.5px;margin-bottom:4px;display:flex;justify-content:space-between;gap:10px}
-.geo-tip .t .v{color:#7FB4EC}
-.geo-tip .r{font-family:"IBM Plex Mono";font-size:10px;color:#cbd5e1;letter-spacing:.02em;line-height:1.5}
-.geo-tip .r b{color:#fff}
-.geo-tip .up{color:#6ee7b7}.geo-tip .down{color:#fca5a5}
-.geo-tip .gapflag{display:inline-block;margin-top:4px;font-family:"IBM Plex Mono";font-size:9px;font-weight:700;color:#fca5a5;background:rgba(220,38,38,.2);padding:2px 6px;border-radius:4px}
 
 /* ═══ Ranked list (linked to map) ═══ */
 .rank-list{display:flex;flex-direction:column;gap:2px;overflow-y:auto;max-height:520px;padding-right:2px}
@@ -589,8 +566,6 @@ a.rc-row:hover .rc-name{color:var(--accent-deep)}
 </head>
 <body>
 
-<div class="geo-tip" id="geoTip"></div>
-
 <div class="frame">
 
   <!-- ═════════ SIDEBAR ═════════ -->
@@ -681,18 +656,7 @@ a.rc-row:hover .rc-name{color:var(--accent-deep)}
       <section class="kpi-strip" id="kpiStrip"></section>
 
       <!-- HERO: map + ranked list -->
-      <section class="row hero">
-        <section class="widget">
-          <header class="widget-head">
-            <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
-              <div class="wh-text"><h3>Obligations by place of performance</h3><p class="wh-sub">Click any state to scope every panel to it</p></div></div>
-          </header>
-          <div class="geo-wrap">
-            <svg class="geo-svg" id="geoSvg" viewBox="0 0 960 500" preserveAspectRatio="xMidYMid meet"></svg>
-            <div class="geo-legend" id="geoLegend"></div>
-          </div>
-        </section>
-
+      <section class="row">
         <section class="widget">
           <header class="widget-head">
             <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h12M3 18h7"/></svg></span>
@@ -848,7 +812,6 @@ a.rc-row:hover .rc-name{color:var(--accent-deep)}
 </div>
 
 <script src="/vendor/d3.min.js"></script>
-<script src="/vendor/topojson-client.min.js"></script>
 <script src="dsb-data.js"></script>
 <script src="dsb-app.js"></script>
 <script src="defense-spending-live.js"></script>

@@ -100,7 +100,6 @@
       .forEach((c, i) => { naicsColor[c] = PALETTE[i % PALETTE.length]; });
   }
 
-  let usGeo = null;
   const emptyLine = (t) => '<div class="dsb-empty">' + esc(t) + '</div>';
 
   /* ════════════════ CONTROLS ════════════════ */
@@ -205,20 +204,6 @@
   /* ════════════════ GEO MAP ════════════════
      The colour ramp is rebuilt from the values present. Fixed dollar
      thresholds would suit one customer's codes and not another's. */
-  let geoBreaks = [];
-  const GEO_RAMP = ['--geo-0', '--geo-1', '--geo-2', '--geo-4', '--geo-5', '--geo-6'];
-  function computeBreaks() {
-    const vals = Object.values(view().states).map(s => s.val).filter(v => v > 0).sort((a, b) => a - b);
-    geoBreaks = vals.length ? [0.2, 0.4, 0.6, 0.8].map(q => vals[Math.floor(q * (vals.length - 1))]) : [];
-  }
-  function lvl(v) {
-    if (v == null || !geoBreaks.length) return 0;
-    let i = 1; for (const b of geoBreaks) { if (v > b) i++; }
-    return Math.min(i, 5);
-  }
-  const geoColor = (v) => css(GEO_RAMP[lvl(v)]);
-  const LABEL_LONLAT = { FL: [-81.4, 28.4], MI: [-84.6, 43.4], LA: [-92.2, 30.9] };
-  const FORCE_CALLOUT = new Set(['MD', 'DE', 'DC', 'RI', 'CT', 'NJ']);
 
   /* Every state carries its abbreviation, whether or not it holds obligations.
      The feed only names the top ten per code, so an unnamed state is one we did
@@ -238,87 +223,8 @@
   };
   const abbrFor = (d) => (view().states[d.id] || {}).abbr || FIPS_ABBR[d.id] || '';
 
-  function renderLegend() {
-    const el = $('geoLegend'); if (!el) return;
-    if (!geoBreaks.length) { clear(el); return; }
-    const edges = [0].concat(geoBreaks);
-    const bands = edges.map((lo, i) => {
-      const hi = edges[i + 1];
-      const label = hi == null ? fmtM(lo) + '+' : (i === 0 ? '<' + fmtM(hi) : fmtM(lo) + '–' + fmtM(hi));
-      return `<span class="sw"><i style="background:${css(GEO_RAMP[i + 1])}"></i>${esc(label)}</span>`;
-    });
-    /* Every state is named on the map, so the fill of an unnamed-in-the-feed state
-       needs its own key — otherwise a muted label reads as a measured zero. */
-    bands.push(`<span class="sw"><i style="background:${css(GEO_RAMP[0])}"></i>outside the top ten</span>`);
-    setHTML(el, bands.join(''));
-  }
 
-  function renderMap() {
-    const svg = d3.select('#geoSvg'); svg.selectAll('*').remove();
-    if (!usGeo) return;
-    const ST = view().states;
-    const states = topojson.feature(usGeo, usGeo.objects.states);
-    const proj = d3.geoAlbersUsa().fitSize([960, 500], states);
-    const path = d3.geoPath(proj);
-    const g = svg.append('g');
-    g.selectAll('path').data(states.features).join('path')
-      .attr('d', path)
-      .attr('class', d => {
-        let c = 'state';
-        if (S.state && S.state !== d.id) c += ' dim';
-        if (S.state === d.id) c += ' selected';
-        return c;
-      })
-      .attr('fill', d => { const s = ST[d.id]; return geoColor(s ? s.val : null); })
-      .attr('stroke', css('--geo-stroke')).attr('stroke-width', .9)
-      .on('mousemove', (ev, d) => showStateTip(ev, d.id))
-      .on('mouseleave', hideTip)
-      .on('click', (ev, d) => { if (ST[d.id]) { S.state = (S.state === d.id ? null : d.id); syncControls(); renderAll(); } });
 
-    const labeled = states.features.filter(d => abbrFor(d) && abbrFor(d) !== 'HI');
-    const inlineFeats = [], callItems = [];
-    labeled.forEach(d => {
-      const ab = abbrFor(d), b = path.bounds(d);
-      const w = b[1][0] - b[0][0], h = b[1][1] - b[0][1];
-      if (!FORCE_CALLOUT.has(ab) && (LABEL_LONLAT[ab] || (w >= 13 && h >= 10))) inlineFeats.push(d);
-      else callItems.push({ s: ST[d.id] || null, abbr: ab, c: path.centroid(d) });
-    });
-    g.selectAll('text.geo-lab').data(inlineFeats).join('text')
-      .attr('class', d => {
-        const s = ST[d.id];
-        if (!s) return 'geo-lab nodata';
-        return 'geo-lab' + (lvl(s.val) >= 4 ? ' lt' : '');
-      })
-      .attr('transform', d => { const ab = abbrFor(d); const ov = LABEL_LONLAT[ab]; const p = (ov && proj(ov)) ? proj(ov) : path.centroid(d); return `translate(${p[0]},${p[1]})`; })
-      .attr('text-anchor', 'middle').attr('dy', 3).text(d => abbrFor(d));
-
-    callItems.sort((a, b) => a.c[1] - b.c[1]);
-    const colX = 930, startY = 170, stepY = 16;
-    const cg = g.append('g').attr('class', 'callouts');
-    callItems.forEach((it, i) => {
-      const ly = startY + i * stepY;
-      cg.append('line').attr('x1', it.c[0]).attr('y1', it.c[1]).attr('x2', colX - 6).attr('y2', ly).attr('stroke', css('--mute-2')).attr('stroke-width', .7).attr('opacity', .55);
-      cg.append('circle').attr('cx', colX).attr('cy', ly).attr('r', 3.2).attr('fill', geoColor(it.s ? it.s.val : null)).attr('stroke', css('--mute-2')).attr('stroke-width', .6);
-      cg.append('text').attr('x', colX + 7).attr('y', ly).attr('dy', 3.2)
-        .attr('class', 'geo-callout' + (it.s ? '' : ' nodata')).text(it.abbr);
-    });
-  }
-
-  function showStateTip(ev, fips) {
-    const s = view().states[fips]; const tip = $('geoTip');
-    if (!s) { hideTip(); return; }
-    // A state outside the prior year's top ten has no comparable base, so its
-    // change is unknown rather than zero — and the tooltip says which.
-    const yo = s.yoy == null
-      ? '<span class="flat">no prior-year figure</span>'
-      : (s.yoy >= 0 ? `<span class="up">▲ +${s.yoy.toFixed(0)}%</span>` : `<span class="down">▼ ${s.yoy.toFixed(0)}%</span>`);
-    setHTML(tip, `<div class="t">${esc(s.name)}<span class="v">${fmtM(s.val)}</span></div>`
-      + `<div class="r">obligated in ${esc(S.fy)} · YoY ${yo}</div>`);
-    tip.style.display = 'block';
-    tip.style.left = Math.min(ev.clientX + 14, window.innerWidth - 200) + 'px';
-    tip.style.top = (ev.clientY + 14) + 'px';
-  }
-  const hideTip = () => { $('geoTip').style.display = 'none'; };
 
   /* ════════════════ RANKED LIST ════════════════
      Two modes. A third, keyed to your firm's own activity, would need a
@@ -1080,8 +986,7 @@
   }
 
   function renderAll() {
-    computeBreaks();
-    renderKPIs(); renderLegend(); renderMap(); renderRankList();
+    renderKPIs(); renderRankList();
     renderStatusPill();
     renderAgencyList(); renderBuyingOffices(); renderAwardSize(); renderSeasonality();
     renderPrimeTargets(); renderCeilings(); renderRecompetes(); renderIncumbents(); renderInsight();
@@ -1098,10 +1003,6 @@
     assignColors();
     renderProvenance();
     buildControls(); renderRankTabs(); renderUnsupported();
-    fetch('/vendor/states-10m.json')
-      .then(r => r.json()).then(j => { usGeo = j; renderMap(); })
-      .catch(() => { console.warn('us-atlas failed'); });
-    let to; window.addEventListener('resize', () => { clearTimeout(to); to = setTimeout(renderMap, 220); });
   }
 
   function render() {
