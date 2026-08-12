@@ -376,6 +376,14 @@ export async function fetchCeilings(awards: AwardRecord[]): Promise<CeilingSampl
     const ceiling = Number(d.base_and_all_options ?? NaN);
     const obligated = Number(d.total_obligation ?? NaN);
     if (!Number.isFinite(ceiling) || !Number.isFinite(obligated)) { unreadable++; continue; }
+    /* ⛔ A ZERO CEILING IS A MISSING VALUE, NOT A CEILING. Number.isFinite()
+       rejects null and undefined but 0 passes it, and USAspending returns 0 for
+       awards whose base_and_all_options was never populated. Measured 2026-08-12
+       on 336611 FY2025: N0002403C2101 came back with ceiling 0 against
+       $9,397,332,305 obligated, which this computed as −$9.4B of "room left" —
+       a nonsense figure headed for a customer-facing panel. No contract carries
+       $9B of obligations under a $0 ceiling. Unknown, so omitted and counted. */
+    if (ceiling <= 0) { unreadable++; continue; }
     rows.push({
       award_id: a.award_id,
       recipient: a.recipient,

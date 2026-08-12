@@ -59,6 +59,12 @@ function main() {
     "an unreadable award is OMITTED and counted, never defaulted to zero");
   assert(!/ceiling:\s*0\b|headroom:\s*0\b/.test(agent),
     "no zero-valued default is ever constructed — unknown is not zero");
+  /* A ZERO CEILING IS A MISSING VALUE. Number.isFinite() rejects null but 0
+     passes it, and USAspending returns 0 for an unpopulated base_and_all_options
+     — which produced −$9.4B of "room left" against a $9.4B obligated award.
+     Finiteness alone is not enough and this pins the second check. */
+  assert(/ceiling <= 0[\s\S]{0,60}unreadable\+\+/.test(agent),
+    "a ZERO ceiling is treated as unknown, not as a real $0 ceiling");
 
   // ── CSS shipped ───────────────────────────────────────────────────────────
   for (const cls of ["ch-top", "ch-big", "ch-say", "ch-list", "ch-r", "ch-n", "ch-h", "ch-m",
