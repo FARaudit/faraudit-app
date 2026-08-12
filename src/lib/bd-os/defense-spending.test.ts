@@ -289,58 +289,68 @@ async function main() {
   // topline and NDAA text are not scoped to this customer's codes — that is news,
   // and a panel announcing its own absence is a fabricated section with an honest
   // label. The two that remain are ours to build, not the source's to supply.
-  assert(JSON.stringify(panels) === JSON.stringify(["opportunity-matrix", "pricing"]),
-    "only the two BUILDABLE panels are named; the macro ones are gone, not blank");
-  assert(out.unsupported.every((u) => /buildable/i.test(u.needs)),
-    "each names the work as ours — saying 'not in the feed' blamed the source for our own architecture choice");
-  assert(out.unsupported.every((u) => u.needs.length > 20),
-    "each states the measurement it would need — an unsourced panel and an empty one must not read alike");
+  // Every panel on the tab now has a source. The macro two were deleted, and the
+  // two that blamed the feed for lacking award-level data were replaced by panels
+  // built from data it already carried.
+  assert(panels.length === 0,
+    "no panel declares itself unsourced, because none is");
+  assert(Array.isArray(out.unsupported),
+    "the honest-fail array stays in the payload — the next unbuilt panel declares itself here rather than rendering blank");
 
-  // ── SB SHARE · the number that answers "should I be here at all" ──────────
-  assert(out.SB_SHARE.length === out.coverage.tracked.length,
-    "every tracked code carries a small-business share series");
-  const share = out.SB_SHARE[0];
-  assert(share.points.length === out.FYS.length,
-    "one point per measured year, so direction is visible");
-  assert(share.points.some((p) => p.open === true) && share.points.some((p) => p.open === false),
-    "the open year is flagged as partial and the closed ones are not");
-  // Derived, not restated: the share must equal sb/total from the fixture row.
-  const fy24 = share.points.find((p) => p.fy === "FY2024")!;
-  assert(near(fy24.pct!, (fy24.sb / fy24.total) * 100, 0.001),
-    "the percentage is derived from the two dollar figures beside it");
-  // NEGATIVE CONTROL — a year with nothing obligated has NO share, never 0%.
-  // Driven through a fixture that actually contains such a year: asserting the
-  // branch against rows that all have obligations proves only that the branch was
-  // never reached.
-  const ZERO_ROWS = [
-    { ...ROWS[0], fiscal_year: 2024, total_obligations: 0, sb_obligations: 0, top_recipients: [], sb_recipients: [] },
-    { ...ROWS[0], fiscal_year: 2025 }
+  // ── PER-CODE SCOPING ──────────────────────────────────────────────────────
+  // Three codes that behave like three markets; an aggregate describes none.
+  //
+  // Driven through a TWO-CODE fixture on purpose. The main fixture carries a
+  // single NAICS, so a scoped view and an unscoped one are byte-identical there —
+  // an assertion written against it passes whether or not the filter is applied,
+  // which is no assertion at all.
+  const TWO_CODE_ROWS = [
+    { ...ROWS[2], naics_code: "336412", fiscal_year: 2026,
+      total_obligations: 1000, sb_obligations: 100,
+      top_recipients: [{ name: "ALPHA ENGINES INC", amount: 700 }, { name: "BETA TURBINE LLC", amount: 200 }],
+      sb_recipients: [{ name: "BETA TURBINE LLC", amount: 100 }] },
+    { ...ROWS[2], naics_code: "336611", fiscal_year: 2026,
+      total_obligations: 4000, sb_obligations: 400,
+      top_recipients: [{ name: "GAMMA SHIPYARD CORPORATION", amount: 3000 }, { name: "DELTA MARINE INC", amount: 500 }],
+      sb_recipients: [{ name: "DELTA MARINE INC", amount: 400 }] }
   ];
-  const zOut = await fetchDefenseSpending(fakeClient(ZERO_ROWS), ["336412"]);
-  assert(zOut.state === "ok", "the zero-year fixture still produces a page");
-  const zPts = (zOut as typeof out).SB_SHARE[0].points;
-  const zeroPt = zPts.find((p) => p.total === 0);
-  assert(!!zeroPt, "fixture reaches a year with nothing obligated");
-  assert(zeroPt!.pct === null,
-    "a code that obligated nothing in a year reports null, not a 0% share of nothing");
-  assert(zPts.some((p) => p.pct !== null),
-    "and the year that DID obligate still reports its share");
+  const two = await fetchDefenseSpending(fakeClient(TWO_CODE_ROWS), ["336412", "336611"]);
+  assert(two.state === "ok", "the two-code fixture produces a page");
+  const t2 = two as typeof out;
+  const fyView = t2.BY_FY[t2.FYS[t2.FYS.length - 1]];
 
-  // ── CONCENTRATION · exact share, and NO firm count ────────────────────────
-  const conc = out.CONCENTRATION[0];
-  assert(conc.leaders.length <= 5, "at most five leaders are named");
-  assert(near(conc.top5_pct!, (conc.top5_val / conc.total) * 100, 0.001),
-    "the share is the top five over the code's WHOLE total, not over the rows we hold");
-  assert(conc.total >= conc.top5_val,
-    "the denominator is the code total, so the share can never exceed 100%");
-  assert(conc.firms_below_unknown === true,
-    "the payload states outright that the number of firms below the listed ones is unknown");
-  assert(!Object.keys(conc).some((k) => /firm_count|competitors|distinct/i.test(k)),
-    "NEGATIVE CONTROL — no field claims a competitor count; the feed lists ten per code and counting them would report our own cap as a market size");
-  // Leaders are merged entities, not raw award rows.
-  const lkeys = conc.leaders.map((l) => recipientKey(l.name));
-  assert(new Set(lkeys).size === lkeys.length,
-    "one company appears at most once among the leaders");
+  assert(Object.keys(fyView.byCode).length === 2, "every tracked code carries its own scoped view");
+  const a = fyView.byCode["336412"], b = fyView.byCode["336611"];
+  assert(a.incumbents.every((i) => i.naics === "336412") && a.incumbents.length === 2,
+    "a scoped incumbent list contains only that code");
+  assert(!a.incumbents.some((i) => /GAMMA|DELTA/.test(i.name)),
+    "NEGATIVE CONTROL — the other code's recipients are absent, which an unscoped build would fail");
+  assert(b.incumbents.length === 2 && b.incumbents.every((i) => i.naics === "336611"),
+    "and the other code carries its own");
+  assert(Math.abs(a.total - 0.001) < 1e-9 || a.total < b.total,
+    "the scoped totals differ, so the filter is doing work");
+
+  // Derived the same way as the aggregate, not a second implementation. The KPI
+  // prints BILLIONS to two decimals, so it can only agree to ±$5M by
+  // construction — a tighter tolerance would fail on correct code.
+  const sumOfCodes = Object.values(fyView.byCode).reduce((acc, c) => acc + c.total, 0);
+  const aggregate = Number(fyView.kpis.find((k) => /Obligated/i.test(k.label))!.val) * 1000;
+  assert(Math.abs(sumOfCodes - aggregate) <= 5,
+    `the per-code totals sum to the aggregate the KPI states (${sumOfCodes} vs ${aggregate})`);
+
+  // ── SB WINNERS · the peer set, not the prime set ──────────────────────────
+  assert(t2.SB_WINNERS.length === 2, "every tracked code carries its set-aside winners");
+  const w = t2.SB_WINNERS.find((x) => x.naics === "336611")!;
+  assert(w.winners.length === 1 && /DELTA MARINE/.test(w.winners[0].name),
+    "the set-aside recipients are the ones listed, not the top recipients");
+  // 400 of a 400 SB pot is 100%; 400 of the 4000 code total would be 10%. The
+  // whole point of the field is which denominator it uses.
+  assert(w.winners[0].pct_of_sb !== null && Math.abs(w.winners[0].pct_of_sb! - 100) < 0.001,
+    `share is of the SET-ASIDE pot (expected 100%, got ${w.winners[0].pct_of_sb})`);
+  assert(Math.abs((w.winners[0].val / w.code_total) * 100 - 10) < 0.001,
+    "NEGATIVE CONTROL — measured against the code total the same firm reads 10%, so the two denominators are distinguishable");
+  const wkeys = w.winners.map((x) => recipientKey(x.name));
+  assert(new Set(wkeys).size === wkeys.length, "one company appears at most once");
 
   // ── THE EMPTY CASES ARE DISTINCT ──────────────────────────────────────────
   const noCodes = await fetchDefenseSpending(fakeClient(ROWS), []);

@@ -33,9 +33,51 @@
   const clear = (el) => { if (el) el.replaceChildren(); };
 
   /* ─── global state ─── */
-  const S = { fy: null, state: null, rankMode: 'top' };
+  const S = { fy: null, state: null, rankMode: 'top', code: null };
 
-  const view = () => (D.BY_FY && D.BY_FY[S.fy]) || { kpis: [], states: {}, agencies: [], incumbents: [] };
+  /* The view every panel reads. With no code selected it is the aggregate the
+     route built; with one selected it is that code's slice of the SAME build —
+     the server derives both through one set of helpers, so a scoped panel can
+     never disagree with the total it sits inside.
+
+     The KPI cards are patched rather than recomputed: the two that carry money
+     take the code's own figures, and the recipients card takes the length of the
+     list actually rendered beside it. The recompete card is left alone because it
+     is a window on today across the whole feed and is labelled as such. */
+  const view = () => {
+    const base = (D.BY_FY && D.BY_FY[S.fy]) || { kpis: [], states: {}, agencies: [], incumbents: [], byCode: {} };
+    if (!S.code) return base;
+    const c = (base.byCode || {})[S.code];
+    if (!c) return base;
+    const kpis = (base.kpis || []).map(k => {
+      if (/^Obligated/i.test(k.label)) {
+        return Object.assign({}, k, {
+          val: (c.total / 1000).toFixed(2),
+          sub: S.code + ' · ' + String(k.sub || '').replace(/^\d+ tracked codes? · /, ''),
+          // A single code has no multi-code series behind it, and the sparkline
+          // would otherwise keep drawing the aggregate under a scoped number.
+          spark: []
+        });
+      }
+      if (/small business/i.test(k.label)) {
+        return Object.assign({}, k, {
+          val: c.sb_pct == null ? '—' : c.sb_pct.toFixed(1),
+          sub: '$' + (c.sb / 1000).toFixed(2) + 'B of $' + (c.total / 1000).toFixed(2) + 'B · ' + S.code,
+          spark: []
+        });
+      }
+      if (/Top recipients/i.test(k.label)) {
+        return Object.assign({}, k, { val: String((c.incumbents || []).length) });
+      }
+      return k;
+    });
+    return Object.assign({}, base, {
+      kpis,
+      states: c.states || {},
+      agencies: c.agencies || [],
+      incumbents: c.incumbents || []
+    });
+  };
   const fyIdx = () => D.FYS.indexOf(S.fy);
 
   // One colour per tracked NAICS, assigned in the order the feed lists them.
@@ -89,19 +131,22 @@
     // The account's own codes. One with no rows behind it is marked.
     const pills = $('hdrNaicsPills');
     if (pills) {
-      const all = (c.requested && c.requested.length ? c.requested : c.tracked) || [];
-      setHTML(pills, all.map(code => {
-        const covered = (c.tracked || []).indexOf(code) !== -1;
-        return `<span class="hdr-naics-pill${covered ? '' : ' untracked'}"`
-          + ` title="${covered ? 'Obligations pulled for this code' : 'No obligations pulled for this code yet'}">`
-          + esc(code) + '</span>';
-      }).join(''));
+      const tracked = ((D.coverage || {}).tracked) || [];
+      const untracked = ((D.coverage || {}).untracked) || [];
+      setHTML(pills,
+        tracked.map(c => `<button type="button" class="hdr-naics-pill${S.code === c ? ' on' : ''}" data-code="${esc(c)}"
+            aria-pressed="${S.code === c ? 'true' : 'false'}"
+            title="Show only ${esc(c)}">${esc(c)}</button>`).join('') +
+        untracked.map(c => `<span class="hdr-naics-pill untracked" title="Not pulled for this account yet">${esc(c)}</span>`).join(''));
+      pills.querySelectorAll('button[data-code]').forEach(b => {
+        b.onclick = () => {
+          // Second click on the selected code clears it — the aggregate is a
+          // real view, not a null state, so there has to be a way back to it.
+          S.code = (S.code === b.dataset.code) ? null : b.dataset.code;
+          syncControls(); renderAll();
+        };
+      });
     }
-
-    // Named source, NOT a live stream — these figures were pulled on a date,
-    // and the pill must not pulse as though they were arriving now.
-    const pill = $('dsbPill');
-    if (pill) { pill.dataset.state = 'measured'; pill.textContent = 'USASPENDING'; }
   }
 
   /* ════════════════ KPIs ════════════════ */
@@ -330,32 +375,6 @@
   /* ════════════════ MARKET TREND ════════════════
      Closed fiscal years and the open one. No projected bar: the feed does not
      forecast. */
-  function renderTrend() {
-    const el = $('trendList'); if (!el) return;
-    const t = D.MARKET_TREND, codes = Object.keys((t && t.series) || {});
-    if (!codes.length) { setHTML(el, emptyLine('No market series available.')); return; }
-    const last = t.labels.length - 1;
-    const rows = codes.map(c => ({ code: c, first: t.series[c][0], now: t.series[c][last] })).sort((a, b) => b.now - a.now);
-    const maxRef = d3.max(rows, r => r.now) || 1;
-    const total = rows.reduce((a, r) => a + r.now, 0);
-    setHTML(el, rows.map(r => {
-      const col = naicsColor[r.code];
-      const g = r.first > 0 ? Math.round((r.now - r.first) / r.first * 100) : null;
-      const gtxt = g == null ? '' : `<span class="mkt-growth ${g >= 0 ? 'up' : 'down'}">${g >= 0 ? '▲ +' : '▼ '}${Math.abs(g)}% since ${esc(t.labels[0])}</span>`;
-      return `<div class="mkt-row">
-        <div class="mkt-top">
-          <div class="mkt-id"><span class="mkt-dot" style="background:${col}"></span><span class="mkt-code">${esc(r.code)}</span></div>
-          <div class="mkt-vals"><span class="mkt-val">${fmtM(r.now)}</span>${gtxt}</div>
-        </div>
-        <div class="mkt-track"><div class="mkt-solid" style="width:${r.now / maxRef * 100}%;background:${col}"></div></div>
-        <div class="mkt-foot"><span>${esc(t.labels[0])} · ${fmtM(r.first)}</span><span>${esc(t.labels[last])} · ${fmtM(r.now)}</span></div>
-      </div>`;
-    // NOT bound to the FY filter, deliberately. This panel draws every measured
-    // year at once — its own subtitle says so — and `total` is the LATEST year's
-    // figure. Naming the selected year here would have put an FY2024 label over
-    // an FY2026 number, which is worse than the mismatch it was meant to fix.
-    }).join('') + `<div class="mkt-note"><span class="tam">${fmtM(total)}</span>&nbsp;obligated across your tracked codes in ${esc(t.labels[last])} · all years shown</div>`);
-  }
 
   /* ════════════════ RECOMPETE RADAR ════════════════
      Grouped by the month each award ends. The 180-day window is cut at the
@@ -409,9 +428,7 @@
   /* ════════════════ PANELS WITH NO SOURCE ════════════════
      Named, not blanked. Each states which measurement it needs. */
   const UNSUPPORTED_HOSTS = {
-    'opportunity-matrix': 'scatterSvg',
 
-    'pricing': 'priceSvg',
 
   };
   function renderUnsupported() {
@@ -534,13 +551,42 @@
     }).join('') + `<div class="conc-note">The feed lists the top ${esc(String((D.coverage || {}).top_n || 10))} recipients per code, so the number of firms below them is not known here and is not stated.</div>`);
   }
 
+
+  /* ════════════════ WHO IS WINNING AT YOUR SIZE ════════════════
+     The set-aside recipients the feed already stored and only ever used to flag
+     rows in the incumbent table beside this one. Those two panels answer
+     different questions: the incumbents are who a small shop SUBS TO, these are
+     who it COMPETES WITH.
+
+     Percentages are of the SMALL-BUSINESS pot, not of the code. A firm holding
+     40% of set-aside dollars in a $29M code is a different fact from 40% of
+     $29M, and conflating them overstates it threefold. */
+  function renderSbWinners() {
+    const el = $('sbWinnersList'); if (!el) return;
+    let rows = D.SB_WINNERS || [];
+    if (S.code) rows = rows.filter(r => r.naics === S.code);
+    if (!rows.length) { setHTML(el, emptyLine('No set-aside recipients recorded for these codes.')); return; }
+    setHTML(el, rows.map(r => {
+      const ws = r.winners || [];
+      return `<div class="sbw-code"><b>${esc(r.naics)} · ${esc(r.fy)}</b>
+          <span>${r.sb_pct == null ? '—' : r.sb_pct.toFixed(1) + '% of the code'} · ${fmtM(r.sb_total)} to small business</span></div>`
+        + (ws.length
+            ? ws.map(w => `<div class="sbw-row">
+                <span class="sbw-nm" title="${esc(w.name)}">${esc(w.name)}</span>
+                <span class="sbw-v">${fmtM(w.val)}</span>
+                <span class="sbw-p">${w.pct_of_sb == null ? '—' : w.pct_of_sb.toFixed(0) + '%'}</span>
+              </div>`).join('')
+            : `<div class="sbw-note">No set-aside recipients recorded in this code.</div>`);
+    }).join('') + `<div class="sbw-note">Share is of the set-aside dollars in that code, not of the code total. The feed lists the top ${esc(String((D.coverage || {}).top_n || 10))} per code, so firms below them are not shown and their number is not known.</div>`);
+  }
+
   function renderAll() {
     computeBreaks();
     renderKPIs(); renderLegend(); renderMap(); renderRankList();
     renderAgencyList(); renderRecompetes(); renderIncumbents(); renderInsight();
     // Both read every measured year, so they are painted with the rest but do
     // not change with the year control.
-    renderSbShare(); renderConcentration();
+    renderSbShare(); renderConcentration(); renderSbWinners();
   }
 
   let built = false;
@@ -562,7 +608,7 @@
     if (st === 'loading') return;      // nothing drawn, nothing removed
     if (st !== 'ok') return renderUnavailable();
     build();
-    renderTrend(); renderAll();
+    renderAll();
   }
 
   // A theme flip re-reads every colour through css(), so it needs a full pass
@@ -570,7 +616,7 @@
   // a failure has replaced the region, there is nothing to re-render.
   function onThemeChange() {
     if (dsbState() !== 'ok' || !built) return;
-    renderTrend(); renderAll();
+    renderAll();
   }
 
   window.DSB_APP = { render, onThemeChange };

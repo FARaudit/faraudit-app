@@ -103,6 +103,13 @@ export interface FyView {
   // `sb: null` = the feed supplied no small-business list for this code, which
   // is NOT the same as 'not a small business'.
   incumbents: Array<{ name: string; val: number; naics: string; sb: boolean | null }>;
+  /** The same view, scoped to one NAICS. Keyed by code. */
+  byCode: Record<string, {
+    total: number; sb: number; sb_pct: number | null;
+    states: FyView["states"];
+    agencies: FyView["agencies"];
+    incumbents: FyView["incumbents"];
+  }>;
 }
 
 export interface SpendingPayload {
@@ -126,6 +133,11 @@ export interface SpendingPayload {
    *  the denominator is the code's real total, so the share is exact.
    *  `firms_below_unknown` is always true: the feed lists ten per code, so the
    *  NUMBER of firms under them is not knowable here and is never stated. */
+  SB_WINNERS: Array<{
+    naics: string; fy: string; sb_total: number; code_total: number;
+    sb_pct: number | null; listed: number;
+    winners: Array<{ name: string; val: number; pct_of_sb: number | null }>;
+  }>;
   CONCENTRATION: Array<{
     naics: string;
     fy: string;
@@ -168,21 +180,17 @@ export function recipientKey(name: string): string {
     .trim();
 }
 
-const UNSUPPORTED: SpendingPayload["unsupported"] = [
-  // These two are OURS to build, not the source's to supply. USAspending's award
-  // endpoint returns per-award records carrying value, set-aside, pricing type
-  // and extent competed; this table stores recipient TOTALS because that is what
-  // the worker asks for. Saying "not in the feed" described our own architecture
-  // choice as a limit of the data, on a customer-facing surface.
-  {
-    panel: "opportunity-matrix",
-    needs: "distinct firms per segment and dollars per award — buildable from USAspending's award-level records; this table stores recipient totals, so the worker has to pull them"
-  },
-  {
-    panel: "pricing",
-    needs: "the value of individual awards — buildable from USAspending's award-level records; this table stores recipient totals, so the worker has to pull them"
-  }
-];
+/* No panel on this tab now claims a source it does not have. The two macro
+ * panels were deleted on CEO ruling (they needed sources not scoped to the
+ * customer's codes), and the two that blamed the obligations feed for lacking
+ * award-level data are gone too — Opportunity Matrix because Concentration
+ * answers its question more simply, Pricing Intelligence because it was replaced
+ * by the set-aside winners the feed already carried.
+ *
+ * Kept as an EMPTY array rather than removed from the payload: the honest-fail
+ * mechanism is the best thing on this tab and the next unbuilt panel should
+ * declare itself here rather than render blank. */
+const UNSUPPORTED: SpendingPayload["unsupported"] = [];
 
 export async function fetchDefenseSpending(
   client: SupabaseClient,
@@ -213,9 +221,16 @@ export async function fetchDefenseSpending(
     .sort()
     .pop() ?? null;
 
-  const rowsFor = (fy: number) => rows.filter((r) => r.fiscal_year === fy);
-  const totalFor = (fy: number) => rowsFor(fy).reduce((a, r) => a + (r.total_obligations || 0), 0);
-  const sbFor = (fy: number) => rowsFor(fy).reduce((a, r) => a + (r.sb_obligations || 0), 0);
+  // `code` scopes every aggregate to ONE NAICS. The three codes on this account
+  // behave like three different markets — 332710 runs 30% small business with the
+  // top five holding 35%, 336412 runs 0.4% with the top five holding 91% — so an
+  // aggregate across them describes none of them. Every helper below takes the
+  // filter so the scoped view is derived the same way the total is, rather than
+  // being a second implementation that can disagree with it.
+  const rowsFor = (fy: number, code?: string) =>
+    rows.filter((r) => r.fiscal_year === fy && (!code || r.naics_code === code));
+  const totalFor = (fy: number, code?: string) => rowsFor(fy, code).reduce((a, r) => a + (r.total_obligations || 0), 0);
+  const sbFor = (fy: number, code?: string) => rowsFor(fy, code).reduce((a, r) => a + (r.sb_obligations || 0), 0);
 
   // Per-FY totals in $M — the spark under every KPI, and the only series the
   // trend panel draws. Three closed-or-open fiscal years, no projected fourth.
@@ -226,9 +241,9 @@ export async function fetchDefenseSpending(
   });
 
   // ── states ──
-  const statesFor = (fy: number) => {
+  const statesFor = (fy: number, code?: string) => {
     const acc = new Map<string, number>();
-    for (const r of rowsFor(fy)) {
+    for (const r of rowsFor(fy, code)) {
       for (const s of r.state_breakdown || []) {
         if (!s?.state) continue;
         acc.set(s.state, (acc.get(s.state) || 0) + (s.amount || 0));
@@ -238,9 +253,9 @@ export async function fetchDefenseSpending(
   };
 
   // ── agencies: one row per agency, with its per-NAICS split for the treemap ──
-  const agenciesFor = (fy: number) => {
+  const agenciesFor = (fy: number, code?: string) => {
     const acc = new Map<string, { name: string; val: number; naics: Record<string, number> }>();
-    for (const r of rowsFor(fy)) {
+    for (const r of rowsFor(fy, code)) {
       for (const a of r.agency_breakdown || []) {
         if (!a?.name) continue;
         const cur = acc.get(a.name) || { name: a.name, val: 0, naics: {} };
@@ -257,6 +272,73 @@ export async function fetchDefenseSpending(
   // has to know which one that is.
   const asOfDate = new Date(asOf || Date.now());
   const currentFy = asOfDate.getUTCMonth() >= 9 ? asOfDate.getUTCFullYear() + 1 : asOfDate.getUTCFullYear();
+
+  /** Recipients for one (year, code-or-all), merged so one legal entity is one
+   *  row. Shared by the aggregate view and every per-code view, so a code's
+   *  incumbent list can never be built a different way from the total's. */
+  function incumbentsFor(fy: number, code?: string): FyView["incumbents"] {
+    const merged = new Map<string, { name: string; val: number; naics: string; sb: boolean | null }>();
+    for (const r of rowsFor(fy, code)) {
+      const sbList = r.sb_recipients || [];
+      const sbKnown = sbList.length > 0;
+      const sbNames = new Set(sbList.map((x) => recipientKey(x.name || "")));
+      for (const t of r.top_recipients || []) {
+        if (!t?.name) continue;
+        const key = `${recipientKey(t.name)}|${r.naics_code}`;
+        const hit = merged.get(key);
+        const isSb = sbKnown ? sbNames.has(recipientKey(t.name)) : null;
+        if (hit) {
+          hit.val += toM(t.amount || 0);
+          if (t.name.length > hit.name.length) hit.name = t.name;
+          if (isSb === true) hit.sb = true;
+          else if (hit.sb === null) hit.sb = isSb;
+        } else {
+          merged.set(key, { name: t.name, val: toM(t.amount || 0), naics: r.naics_code, sb: isSb });
+        }
+      }
+    }
+    return Array.from(merged.values()).sort((a, b) => b.val - a.val);
+  }
+
+  /** The small businesses actually winning in each code — the feed's own
+   *  set-aside recipient list, which was already stored and only ever used to
+   *  flag rows in the incumbent table. On this account it holds ten per code.
+   *
+   *  This is the reader's real peer set: the incumbent list is who he subs to,
+   *  this is who he competes with, and the two answer different questions. */
+  const SB_WINNERS = years.length
+    ? tracked.map((code) => {
+        const fy = years[years.length - 1];
+        const r = rows.find((x) => x.naics_code === code && x.fiscal_year === fy);
+        const merged = new Map<string, { name: string; val: number }>();
+        for (const x of r?.sb_recipients || []) {
+          if (!x?.name) continue;
+          const k = recipientKey(x.name);
+          const hit = merged.get(k);
+          if (hit) { hit.val += x.amount || 0; if (x.name.length > hit.name.length) hit.name = x.name; }
+          else merged.set(k, { name: x.name, val: x.amount || 0 });
+        }
+        const ranked = Array.from(merged.values()).sort((a, b) => b.val - a.val);
+        const codeTotal = r?.total_obligations || 0;
+        const sbTotal = r?.sb_obligations || 0;
+        return {
+          naics: code,
+          fy: fyLabel(fy),
+          sb_total: toM(sbTotal),
+          code_total: toM(codeTotal),
+          sb_pct: codeTotal > 0 ? (sbTotal / codeTotal) * 100 : null,
+          listed: ranked.length,
+          winners: ranked.map((x) => ({
+            name: x.name,
+            val: toM(x.val),
+            // Share of the SMALL-BUSINESS pot, not of the code. A firm holding
+            // 40% of the set-aside dollars in a $29M code is a different fact
+            // from 40% of $29M, and conflating them overstates them by 3x.
+            pct_of_sb: sbTotal > 0 ? (x.val / sbTotal) * 100 : null
+          }))
+        };
+      })
+    : [];
 
   const BY_FY: Record<string, FyView> = {};
   years.forEach((fy, idx) => {
@@ -294,47 +376,7 @@ export async function fetchDefenseSpending(
         naics: Object.fromEntries(Object.entries(a.naics).map(([c, v]) => [c, toM(v)]))
       }));
 
-    // Recipients, with the small-business flag taken from the feed's own SB
-    // recipient list for the same code — not guessed from the company name.
-    //
-    // ONE COMPANY IS ONE ROW. USAspending returns a recipient once per award
-    // record and does not normalise its legal name, so HUNTINGTON INGALLS
-    // INCORPORATED and HUNTINGTON INGALLS INC arrived as two entries — $3.49B
-    // and $2.73B, 26% of the whole tab, rendered as two different companies —
-    // and GENERAL ELECTRIC COMPANY arrived twice under the IDENTICAL string.
-    // Concentration is the number this panel exists to convey, and split rows
-    // understate it in the one direction that flatters the market.
-    //
-    // Merged on (normalised name, NAICS): the code stays a real column, and a
-    // firm that genuinely wins under two codes stays two rows, which is true.
-    const merged = new Map<string, { name: string; val: number; naics: string; sb: boolean | null }>();
-    for (const r of rowsFor(fy)) {
-      const sbList = r.sb_recipients || [];
-      // An EMPTY small-business list is not a list of no small businesses. When
-      // the feed shipped none for this code, membership is UNKNOWN and the flag
-      // must stay null — a false here becomes "0 of them small business" on the
-      // KPI, which is a measurement nobody made.
-      const sbKnown = sbList.length > 0;
-      const sbNames = new Set(sbList.map((x) => recipientKey(x.name || "")));
-      for (const t of r.top_recipients || []) {
-        if (!t?.name) continue;
-        const key = `${recipientKey(t.name)}|${r.naics_code}`;
-        const hit = merged.get(key);
-        const isSb = sbKnown ? sbNames.has(recipientKey(t.name)) : null;
-        if (hit) {
-          hit.val += toM(t.amount || 0);
-          // The fuller legal name is the better label for a merged entity.
-          if (t.name.length > hit.name.length) hit.name = t.name;
-          if (isSb === true) hit.sb = true;
-          else if (hit.sb === null) hit.sb = isSb;
-        } else {
-          merged.set(key, { name: t.name, val: toM(t.amount || 0), naics: r.naics_code, sb: isSb });
-        }
-      }
-    }
-    const incumbents: FyView["incumbents"] = Array.from(merged.values());
-    incumbents.sort((a, b) => b.val - a.val);
-    // A number stated beside a panel has to be the panel's own number.
+    const incumbents = incumbentsFor(fy);
     const shownIncumbents = incumbents.slice(0, 20);
     const sbCounted = shownIncumbents.filter((i) => i.sb !== null).length;
     const sbYes = shownIncumbents.filter((i) => i.sb === true).length;
@@ -401,7 +443,36 @@ export async function fetchDefenseSpending(
       ],
       states,
       agencies,
-      incumbents: shownIncumbents
+      incumbents: shownIncumbents,
+      // One entry per tracked code, built through the SAME helpers as the
+      // aggregate above so a scoped view can never be derived differently from
+      // the total it sits inside.
+      byCode: Object.fromEntries(tracked.map((code) => {
+        const cTotal = totalFor(fy, code);
+        const cSb = sbFor(fy, code);
+        const cStates: FyView["states"] = {};
+        for (const [abbr, amount] of statesFor(fy, code)) {
+          const meta = STATE_FIPS[abbr];
+          if (!meta) continue;
+          cStates[meta[0]] = { abbr, name: meta[1], val: toM(amount), yoy: null };
+        }
+        return [code, {
+          total: toM(cTotal),
+          sb: toM(cSb),
+          sb_pct: cTotal > 0 ? (cSb / cTotal) * 100 : null,
+          states: cStates,
+          agencies: Array.from(agenciesFor(fy, code).values())
+            .sort((a, b) => b.val - a.val)
+            .map((a) => ({
+              key: agencyKeyOf(a.name),
+              short: AGENCY_SHORT[a.name] || a.name,
+              name: a.name,
+              val: toM(a.val),
+              naics: Object.fromEntries(Object.entries(a.naics).map(([c, v]) => [c, toM(v)]))
+            })),
+          incumbents: incumbentsFor(fy, code).slice(0, 20)
+        }];
+      }))
     };
   });
 
@@ -519,6 +590,7 @@ export async function fetchDefenseSpending(
     RECOMPETES,
     SB_SHARE,
     CONCENTRATION,
+    SB_WINNERS,
     unsupported: UNSUPPORTED
   };
 }
