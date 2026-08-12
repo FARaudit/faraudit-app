@@ -66,6 +66,25 @@ function main() {
   assert(/ceiling <= 0[\s\S]{0,60}unreadable\+\+/.test(agent),
     "a ZERO ceiling is treated as unknown, not as a real $0 ceiling");
 
+  // ── ⛔ ONE FIRM IS ONE ROW ─────────────────────────────────────────────────
+  // Rendered award-by-award, the live panel listed HUNTINGTON INGALLS
+  // INCORPORATED and HUNTINGTON INGALLS INC as two rows — the $7.36B name split,
+  // reintroduced because normaliseRecipient was applied to the prime list and not
+  // to this one. 24 rows against a stated cap of 8 also printed
+  // "24 of at most 8" and made this the tallest panel on the tab.
+  const analytics = readFileSync(path.join(ROOT, "src/lib/bd-os/award-analytics.ts"), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const ch = analytics.slice(analytics.indexOf("export function ceilingHeadroom"));
+  assert(/normaliseRecipient\(/.test(ch),
+    "ceilingHeadroom folds recipient name spellings — INC and INCORPORATED are one firm");
+  assert(/byFirm/.test(ch), "and groups by firm, so one company is one row");
+  assert(/firms:/.test(ch), "the firm count is reported separately from the award count");
+  assert(/c\.firms/.test(fn), "and the caption distinguishes firms from awards");
+
+  const dsl = readFileSync(path.join(ROOT, "src/lib/bd-os/defense-spending.ts"), "utf8");
+  assert(/merged\.ceilings\.cap = \(merged\.ceilings\.cap \|\| 0\) \+/.test(dsl),
+    "merging codes SUMS their caps — carrying one code's cap printed '24 of at most 8'");
+
   // ── CSS shipped ───────────────────────────────────────────────────────────
   for (const cls of ["ch-top", "ch-big", "ch-say", "ch-list", "ch-r", "ch-n", "ch-h", "ch-m",
                      "ch-track", "ch-fill", "ch-cap", "ch-none"]) {

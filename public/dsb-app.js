@@ -548,7 +548,9 @@
     const max = Math.max.apply(null, c.rows.map(r => Math.abs(r.ceiling)).concat([1]));
     setHTML(host, c.rows.map(r => {
       const pct = r.ceiling > 0 ? Math.max(0, Math.min(100, (r.obligated / r.ceiling) * 100)) : 0;
-      const sub2 = 'obligated ' + fmtM(r.obligated / 1e6) + ' of ' + fmtM(r.ceiling / 1e6)
+      const n = r.contracts || 1;
+      const sub2 = (n > 1 ? n + ' contracts · ' : '')
+        + 'obligated ' + fmtM(r.obligated / 1e6) + ' of ' + fmtM(r.ceiling / 1e6)
         + ' ceiling · ' + pct.toFixed(0) + '% used'
         + (r.subaward_count != null && r.subaward_count > 0
           ? ' · ' + r.subaward_count.toLocaleString('en-US') + ' subawards already placed' : '');
@@ -561,6 +563,8 @@
 
     if (cap) setHTML(cap, '<b>A capped sample of the largest awards</b> — ' + c.sampled
       + ' of at most ' + (c.cap == null ? c.sampled : c.cap)
+      + (c.firms != null && c.firms !== c.sampled ? ', grouped into ' + c.firms + ' firm'
+        + (c.firms === 1 ? '' : 's') : '')
       + (c.unreadable ? ', with ' + c.unreadable + ' whose detail could not be read' : '')
       + '. Not the whole market, and <b>not margin</b>: USAspending carries no cost, rate or '
       + 'profit data, so this is contract capacity and nothing about what anyone earns on it. '
@@ -584,7 +588,7 @@
     const cap = $('boCap'), sub = $('boSub');
     const box = (D.BUYING_OFFICES || {})[S.fy] || null;
     const scoped = S.code ? 'NAICS ' + S.code : 'your NAICS codes';
-    if (sub) sub.textContent = 'Contracting offices inside each department, by obligations in '
+    if (sub) sub.textContent = 'The buying offices inside the departments above · '
       + scoped + ' · ' + (S.fy || '');
 
     if (!box) { setHTML(host, ''); if (cap) setHTML(cap, ''); return; }
