@@ -398,35 +398,216 @@
   /* ════════════════ RECOMPETE RADAR ════════════════
      Grouped by the month each award ends. The 180-day window is cut at the
      measurement date, so rows already past are MARKED, never dropped. */
-  function renderRecompetes() {
-    const host = $('rcQuarters'); if (!host) return;
-    const rows = D.RECOMPETES || [];
-    if (!rows.length) { setHTML(host, emptyLine('No awards with an end date inside the measured window.')); return; }
-    const byMonth = new Map();
-    rows.forEach(r => {
-      const key = (r.end_date || '').slice(0, 7) || 'undated';
-      if (!byMonth.has(key)) byMonth.set(key, []);
-      byMonth.get(key).push(r);
+  /* ════════════════ RECOMPETE RADAR ════════════════
+     Time no longer separates and size cannot be banded, so INCUMBENT
+     CONCENTRATION organises the panel: a firm holding more than one expiring
+     contract renders as ONE block, because four contracts with one buying
+     office ending in one week is one phone call, not four rows that share a
+     name. Everything else lists by end date underneath. */
+  const RC_LO = 365, RC_HI = 548;
+  const rcMeas = () => String(D.as_of || '').slice(0, 10);
+  const rcMs = () => Date.parse(rcMeas() + 'T00:00:00Z');
+  const rcDays = (d) => Math.round((Date.parse(d + 'T00:00:00Z') - rcMs()) / 864e5);
+  const rcIso = (d) => new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB',
+    { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  const rcDm = (d) => new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB',
+    { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  const rcMoney = (n) => '$' + Math.round(n || 0).toLocaleString('en-US');
+  /* Sign and digits are separate cells so the sign pins left and the digits
+     align on place value — magnitude reads from digit count, which is the only
+     honest encoding when the set spans $150,310 to $1.9B. */
+  const rcAcct = (n) => { const s = rcMoney(n); return '<i>$</i><b>' + s.slice(1) + '</b>'; };
+  const rcCompact = (n) => n >= 1e9 ? '$' + (n / 1e9).toFixed(2) + 'B'
+    : n >= 1e6 ? '$' + (n / 1e6).toFixed(1) + 'M'
+    : n >= 1e3 ? '$' + Math.round(n / 1e3) + 'K' : '$' + Math.round(n);
+
+  const RC_KEEP = { LLC: 1, LLP: 1, LP: 1, PLLC: 1, USA: 1, US: 1, LTD: 1, ACMT: 1, ATEC: 1,
+    SKF: 1, BAE: 1, JGW: 1 };
+  function rcTc(s) {
+    return String(s || '').replace(/[A-Za-z0-9&.']+/g, (w) => {
+      const u = w.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (RC_KEEP[u]) return w.toUpperCase();
+      if (/\d/.test(w)) return w.toUpperCase();
+      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
     });
-    setHTML(host, Array.from(byMonth.keys()).sort().map(mk => {
-      const list = byMonth.get(mk);
-      const label = mk === 'undated' ? 'No end date'
-        : new Date(mk + '-01T00:00:00Z').toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
-      return `<div class="rc-q">
-        <div class="rc-qhead">${esc(label)}</div>
-        ${list.slice(0, 8).map(r => {
-          // The award id is the key to the public record, so the card opens it.
-          const href = r.award_id ? 'https://www.usaspending.gov/search/?hash=&query=' + encodeURIComponent(r.award_id) : null;
-          const inner = `<div class="rc-name">${esc(r.recipient || 'Recipient not stated')}</div>
-            <div class="rc-meta"><span class="rc-inc">${esc(r.award_id || '')}</span><span class="rc-val">${fmtM((r.amount || 0) / 1e6)}</span></div>
-            <span class="rc-agy">${esc(r.agency || '')} · ${esc(r.naics)}${r.expired ? ' · already ended' : ''}</span>`;
-          return href
-            ? `<a class="rc-card${r.expired ? ' expired' : ''}" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${inner}</a>`
-            : `<div class="rc-card${r.expired ? ' expired' : ''}">${inner}</div>`;
-        }).join('')}
-        ${list.length > 8 ? `<div class="rc-more">+${list.length - 8} more</div>` : ''}
-      </div>`;
-    }).join(''));
+  }
+  const rcByDate = (a, b) => (a.end_date || '').localeCompare(b.end_date || '')
+    || (b.amount || 0) - (a.amount || 0);
+
+  function rcScopeLabel() { return S.code ? 'NAICS ' + S.code : 'your NAICS codes'; }
+
+  function rcRow(r, opts) {
+    const href = r.award_id
+      ? 'https://www.usaspending.gov/search/?hash=&query=' + encodeURIComponent(r.award_id) : null;
+    const inner = '<span class="rc-when' + (opts.dim ? ' dim' : '') + '">'
+      + '<b class="rc-d">' + esc(rcIso(r.end_date)) + '</b>'
+      + '<i class="rc-dd">' + rcDays(r.end_date) + ' days</i></span>'
+      + '<span class="rc-name">' + esc(opts.inBlock ? r.award_id : rcTc(r.recipient)) + '</span>'
+      + '<span class="rc-val">' + rcAcct(r.amount) + '</span>'
+      + '<span class="rc-sub">' + (opts.inBlock ? 'NAICS ' + esc(r.naics)
+        : esc(r.agency) + '<span class="sep">·</span>' + esc(r.naics)
+          + '<span class="sep">·</span>' + esc(r.award_id)) + '</span>';
+    return href
+      ? '<a class="rc-row" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">'
+        + inner + '</a>'
+      : '<div class="rc-row">' + inner + '</div>';
+  }
+
+  /* NEVER MEASURED IS NOT QUIET. The empty state below states that nothing in
+     these codes expires in this window — a claim about the MARKET. Under a
+     never-pulled column that claim is false, and the row count cannot tell the
+     two apart, so the payload carries the distinction and the panel prints it. */
+  function rcUnmeasured() {
+    return '<div class="rc-none"><h5>Not measured yet</h5>'
+      + '<p>The award-level pull that finds recompetes has not run for '
+      + esc(rcScopeLabel()) + ' yet, so this panel has nothing to show. '
+      + '<b>That is a gap in our data, not a statement about your market.</b></p>'
+      + '<p>It refreshes nightly.</p></div>';
+  }
+
+  function rcEmpty() {
+    const codes = esc(rcScopeLabel());
+    return '<div class="rc-none"><h5>Nothing in ' + codes + ' expires in this window</h5>'
+      + '<p>No <b>definitive contract</b> in ' + codes + ' has a period of performance ending '
+      + 'between <b>' + RC_LO + '</b> and <b>' + RC_HI + '</b> days from '
+      + esc(rcIso(rcMeas())) + '. That is the window a recompete is solicited in.</p>'
+      + '<p><b>This does not mean nothing is coming.</b> Three things sit outside what this '
+      + 'panel can see, by design:</p><ul>'
+      + '<li><b>Delivery and purchase orders are excluded.</b> An order ending is the parent '
+      + 'IDIQ placing its next one — nothing is competed and there is nothing to bid.</li>'
+      + '<li><b>IDVs are excluded.</b> A recompeted IDIQ is the largest opportunity in this '
+      + 'market and it expires on different rules. It is not in these rows.</li>'
+      + '<li><b>Work expiring sooner or later than the window is excluded</b> — anything '
+      + 'inside ' + RC_LO + ' days is already solicited, and beyond ' + RC_HI + ' is too early '
+      + 'to act on.</li></ul>'
+      + '<p>An empty panel is a statement about <b>this window and these codes</b>, and '
+      + 'nothing wider.</p></div>';
+  }
+
+  function renderRecompetes() {
+    const list = $('rcList'); if (!list) return;
+    const off = (sel, hide) => { const e = document.querySelector(sel); if (e) e.classList.toggle('off', !!hide); };
+    const rows = (D.RECOMPETES || []).filter(r => !S.code || r.naics === S.code).sort(rcByDate);
+
+    const sub = $('whSub');
+    if (sub) sub.textContent = 'Definitive contracts in ' + rcScopeLabel() + ' ending '
+      + RC_LO + '–' + RC_HI + ' days from ' + (rcMeas() ? rcIso(rcMeas()) : 'the measurement date')
+      + ' — the window a recompete is solicited in';
+
+    if (!rows.length) {
+      setHTML(list, D.RECOMPETES_MEASURED ? rcEmpty() : rcUnmeasured());
+      ['#viz', '#cap', '#lede', '.rc-foot', '.rc-head2'].forEach(s => off(s, true));
+      return;
+    }
+
+    // Group by incumbent across whatever is in scope. The aggregate view is the
+    // DEFAULT, so a firm holding contracts in two codes is one block there and
+    // splits under a pill — which is correct: a pill is a claim about one market.
+    const m = new Map();
+    rows.forEach(r => {
+      const k = r.recipient || '';
+      if (!m.has(k)) m.set(k, { k, rows: [], v: 0 });
+      const g = m.get(k); g.rows.push(r); g.v += r.amount || 0;
+    });
+    const holders = Array.from(m.values());
+    const blocks = holders.filter(h => h.rows.length > 1);
+    const singles = holders.filter(h => h.rows.length === 1).map(h => h.rows[0]).sort(rcByDate);
+    // A summary earns its space only by being SMALLER than the thing it
+    // summarises. One row summarised as one bar and one sentence is the panel
+    // reading itself back.
+    const summarise = rows.length >= 3 && holders.length < rows.length;
+    const order = (a, b) => b.rows.length - a.rows.length || b.v - a.v;
+
+    ['#viz', '#cap', '#lede'].forEach(s => off(s, !summarise));
+    off('.rc-foot', false); off('.rc-head2', false);
+
+    let h = '';
+    blocks.slice().sort(order).forEach(b => {
+      const rs = b.rows.slice().sort(rcByDate);
+      const ags = Array.from(new Set(rs.map(r => r.agency).filter(Boolean)));
+      const span = rcDays(rs[rs.length - 1].end_date) - rcDays(rs[0].end_date);
+      h += '<div class="blk"><div class="blk-h">'
+        + '<span class="blk-n">' + esc(rcTc(b.k)) + '</span>'
+        + '<span class="blk-v">' + rcAcct(b.v) + '</span>'
+        + '<span class="blk-s">' + rs.length + ' contracts · '
+        + (ags.length === 1 ? esc(ags[0]) : ags.length + ' agencies') + ' · '
+        + (span === 0 ? 'all ending ' + rcDm(rs[0].end_date)
+          : 'ending ' + rcDm(rs[0].end_date) + '–' + rcDm(rs[rs.length - 1].end_date))
+        + ' ' + String(rs[0].end_date).slice(0, 4)
+        + (span <= 7 ? ' · inside one week' : '') + '</span></div>'
+        + rs.map((r, i) => rcRow(r, { inBlock: 1, dim: i > 0 && r.end_date === rs[i - 1].end_date })).join('')
+        + '</div>';
+    });
+    if (blocks.length) h += '<div class="sec">Single contracts, by end date</div>';
+    singles.forEach((r, i) => {
+      h += rcRow(r, { dim: i > 0 && r.end_date === singles[i - 1].end_date });
+    });
+    setHTML(list, h);
+
+    // ── the focal claim, derived ──
+    const lead = blocks.slice().sort(order)[0];
+    if (lead) {
+      const rs = lead.rows.slice().sort(rcByDate);
+      const span = rcDays(rs[rs.length - 1].end_date) - rcDays(rs[0].end_date) + 1;
+      const ags = Array.from(new Set(rs.map(r => r.agency).filter(Boolean)));
+      $('bigN').textContent = lead.rows.length;
+      setHTML($('bigSay'), 'contracts held by <b>' + esc(rcTc(lead.k)) + '</b>, worth <b>'
+        + rcMoney(lead.v) + '</b> — ' + (ags.length === 1 ? 'one buying agency' : ags.length
+        + ' buying agencies') + ', all expiring within <b>' + span + ' days</b> of each other. '
+        + 'That is one relationship, not ' + lead.rows.length + ' opportunities.');
+    } else {
+      $('bigN').textContent = rows.length;
+      setHTML($('bigSay'), 'contract' + (rows.length === 1 ? '' : 's') + ' in ' + esc(rcScopeLabel())
+        + ' reach' + (rows.length === 1 ? 'es' : '') + ' the end of ' + (rows.length === 1 ? 'its' : 'their')
+        + ' period of performance inside the solicitation window. <b>No incumbent here holds more '
+        + 'than one</b>, so there is no concentration to point at — the '
+        + (rows.length === 1 ? 'row below is' : 'rows below are') + ' the whole finding.');
+    }
+
+    if (summarise) {
+      const multi = blocks.slice().sort(order);
+      const rest = holders.filter(x => x.rows.length === 1);
+      const restV = rest.reduce((n, x) => n + x.v, 0);
+      const vs = multi.map(x => x.v).concat(restV ? [restV] : []);
+      const lo = Math.log10(Math.max(1, Math.min.apply(null, vs)));
+      const hi = Math.log10(Math.max(1, Math.max.apply(null, vs)));
+      // Blocks = contracts held by one firm. A bar chart topping out at four is
+      // a unit count pretending to be a scale, so the unit channel draws units.
+      const units = (n) => '<span class="cf-u">' + new Array(n + 1).join('<i></i>') + '</span>';
+      let cf = multi.map(x => '<div class="cf-r" data-n="' + x.rows.length + '">'
+        + '<span class="cf-rk">' + esc(rcTc(x.k)) + '</span>' + units(x.rows.length)
+        + '<span class="cf-meta"><span class="cf-rn">' + x.rows.length + ' contracts</span>'
+        + '<span class="cf-rv">' + rcAcct(x.v) + '</span></span></div>').join('');
+      // The collapsed row draws NO blocks: it is N separate firms, not one firm
+      // holding N, and reusing the unit channel for it would give the row
+      // standing for the most contracts the shortest mark on the chart.
+      if (rest.length) cf += '<div class="cf-r rest" data-n="0"><span class="cf-rk">'
+        + rest.length + ' other firms</span><span class="cf-u none"></span>'
+        + '<span class="cf-meta"><span class="cf-rn">1 each</span>'
+        + '<span class="cf-rv">' + rcAcct(restV) + '</span></span></div>';
+      setHTML($('viz'), '<div class="cf-sort">Ordered by contracts held</div>'
+        + '<div class="cf-rows">' + cf + '</div>');
+      $('viz').style.height = 'auto';
+      setHTML($('cap'), '<b>Where the work is concentrated.</b> Blocks are contracts held by one '
+        + 'firm. The collapsed row draws none — it is ' + rest.length + ' separate firms, not '
+        + 'one firm holding ' + rest.length + '. Firms holding one contract are listed '
+        + 'individually below, with dates and exact values.');
+
+      const fy = {}; rows.forEach(r => { fy[r.end_date] = (fy[r.end_date] || 0) + 1; });
+      const top = Object.keys(fy).sort((a, b) => fy[b] - fy[a])[0];
+      const amts = rows.map(r => r.amount || 0);
+      setHTML($('lede'), '<span><b>' + fy[top] + '</b> of ' + rows.length + ' end on '
+        + esc(rcIso(top)) + ' — fiscal year end.</span>'
+        + '<span class="d">│</span><span>Values run <b>' + rcCompact(Math.min.apply(null, amts))
+        + '</b> to <b>' + rcCompact(Math.max.apply(null, amts)) + '</b>.</span>'
+        + '<span class="d">│</span><span><b>' + holders.length + '</b> firms hold these '
+        + rows.length + '.</span>');
+    }
+
+    const total = rows.reduce((n, r) => n + (r.amount || 0), 0);
+    setHTML($('footL'), '<b>' + rows.length + '</b> contract' + (rows.length === 1 ? '' : 's')
+      + ' · all shown');
+    setHTML($('footR'), 'Combined value <b>' + rcMoney(total) + '</b>');
   }
 
   /* ════════════════ RECIPIENTS ════════════════

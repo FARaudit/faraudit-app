@@ -164,9 +164,6 @@ button{font-family:inherit}
 .dsb-empty{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute);padding:18px 4px;text-align:center}
 .dsb-nosource{font-size:12px;line-height:1.6;color:var(--mute);background:var(--card-soft);border:1px dashed var(--line);border-radius:9px;padding:16px 18px;margin:2px 0}
 /* A recompete whose end date has already passed: marked, never hidden. */
-.rc-card.expired{opacity:.55}
-.rc-card.expired .rc-name{text-decoration:line-through;text-decoration-thickness:1px}
-.rc-more{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute);padding:6px 0 0;text-align:center}
 
 /* ═══ Geo map ═══ */
 .geo-wrap{display:grid;grid-template-columns:1fr;gap:8px;min-height:0}
@@ -343,20 +340,6 @@ button{font-family:inherit}
 .bud-legend .lg i,.trend-legend .lg i{width:10px;height:10px;border-radius:3px}
 
 /* ═══ Recompete timeline ═══ */
-.rc-timeline{display:flex;flex-direction:column;gap:8px}
-.rc-quarters{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.rc-q{display:flex;flex-direction:column;gap:7px;min-width:0}
-.rc-qhead{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);text-align:center;padding-bottom:6px;border-bottom:2px solid var(--line-2)}
-.rc-card{background:var(--card-soft);border:1px solid var(--line-2);border-left:3px solid var(--amber-600);border-radius:9px;padding:9px 10px;display:flex;flex-direction:column;gap:5px;cursor:pointer;transition:box-shadow .12s,transform .12s}
-.rc-card:hover{box-shadow:var(--shadow-sm);transform:translateY(-1px)}
-.rc-card.dim{opacity:.32}
-.rc-name{font-size:11.5px;font-weight:700;color:var(--ink);line-height:1.25}
-.rc-meta{display:flex;align-items:center;justify-content:space-between;gap:6px}
-.rc-inc{font-family:"IBM Plex Mono",monospace;font-size:9px;color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.rc-val{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:800;color:var(--amber-700)}
-[data-theme="dark"] .rc-val{color:#fcd34d}
-.rc-agy{font-family:"IBM Plex Mono",monospace;font-size:8px;font-weight:700;letter-spacing:.04em;color:var(--accent-deep);background:var(--accent-pale);padding:2px 6px;border-radius:4px;width:max-content}
-[data-theme="dark"] .rc-agy{background:rgba(55,138,221,0.18);color:var(--accent-light)}
 
 /* ═══ Incumbent table ═══ */
 .ii-table{width:100%;border-collapse:collapse;font-size:11.5px}
@@ -461,6 +444,84 @@ button{font-family:inherit}
 .sb-bottom{margin-top:auto;display:flex;flex-direction:column;gap:6px;align-items:center}
 [data-sb="open"] .sb-bottom{align-items:flex-start;width:100%;padding:0 4px}
 
+
+/* Recompete Radar. Concentration leads: repeat incumbents render as one block,
+   everything else lists by end date beneath. */
+.cf-sort{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--mute-2);margin-bottom:10px}
+.viz{position:relative}
+.rc-head2{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:0 22px;align-items:center;margin-bottom:20px}
+.rc-big{font-size:64px;font-weight:800;letter-spacing:-.045em;line-height:.86;color:var(--ink);font-variant-numeric:tabular-nums}
+.rc-say{font-size:13.5px;line-height:1.5;color:var(--ink-2);max-width:48ch;margin:0}
+.rc-say b{color:var(--ink);font-weight:700}
+.cap{margin:11px 0 0;font-size:11.5px;line-height:1.5;color:var(--mute)}
+.cap b{color:var(--ink-2);font-weight:600}
+.cf-rows{display:grid;grid-template-columns:minmax(0,max-content) minmax(120px,1fr) 236px;gap:8px 12px;align-items:center}
+.cf-r.rest .cf-rk,.cf-r.rest .cf-rn,.cf-r.rest .cf-rv{color:var(--mute-2)}
+.cf-r{display:contents}
+.cf-meta{display:grid;grid-template-columns:98px minmax(0,1fr);align-items:baseline;justify-self:start;width:100%}
+.cf-rk{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--ink-2);font-weight:600;line-height:1.35}
+.cf-rn{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--ink-2);font-weight:600;text-align:left}
+.cf-rv{display:grid;grid-template-columns:10px minmax(0,1fr);font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--mute);font-variant-numeric:tabular-nums}
+.cf-rv i{font-style:normal}
+.cf-rv b{font-weight:inherit;text-align:right}
+.cf-u{display:flex;gap:3px;align-items:center;min-height:16px}
+.cf-u i{width:15px;height:16px;border-radius:3px;background:var(--accent-deep);display:block}
+.cf-u.one i{background:var(--accent);opacity:.5}
+.cf-u.none{min-height:16px}
+.cf-tr{display:flex;height:16px;border-radius:4px;overflow:hidden;background:var(--line-3)}
+.cf-sg{height:100%;background:var(--accent-deep)}
+.cf-sg.one{background:var(--accent);opacity:.4}
+.cf-both{display:flex;flex-direction:column;gap:4px}
+.cf-both .cf-tr{height:5px;border-radius:3px}
+.rc-axis{position:absolute;left:0;right:0;bottom:20px;height:1px;background:var(--line)}
+.rc-mon{position:absolute;bottom:0;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px}
+.rc-mon i{width:1px;height:7px;background:var(--line)}
+.rc-mon span{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute-2);white-space:nowrap}
+.rc-bar{position:absolute;bottom:21px;background:var(--accent-deep);border-radius:2px 2px 0 0}
+.rc-blab{position:absolute;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--ink-2);transform:translateX(-50%);white-space:nowrap}
+.rc-lede{display:flex;flex-wrap:wrap;align-items:baseline;font-size:13px;line-height:1.5;color:var(--ink-2);background:var(--card-soft);border:1px solid var(--line-2);border-radius:9px;padding:11px 13px;margin:0}
+.rc-lede b{color:var(--ink);font-weight:700}
+.rc-lede span{white-space:nowrap}
+.rc-lede .d{color:var(--line);padding:0 10px}
+.rc-list{display:flex;flex-direction:column}
+.blk{outline:1px solid var(--accent);outline-offset:-1px;border-radius:11px;background:var(--accent-pale);padding:12px 14px 6px;margin:14px -14px 4px}
+.blk-h{display:grid;grid-template-columns:minmax(0,1fr) 152px;gap:2px 18px;align-items:baseline;margin-bottom:8px}
+.blk .rc-row,.blk-h{margin:0 -8px;padding-left:8px;padding-right:8px}
+.blk-n{font-size:16px;font-weight:800;letter-spacing:-.015em;color:var(--ink)}
+.blk-v{display:grid;grid-template-columns:10px minmax(0,1fr);font-family:"IBM Plex Mono",monospace;font-size:14px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+.blk-v i{font-style:normal}
+.blk-v b{font-weight:inherit;text-align:right}
+.blk-s{grid-column:1;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--accent-deep);line-height:1.45}
+.blk .rc-row{border-top:1px solid rgba(24,95,165,.16)}
+.blk .rc-row:first-of-type{border-top:1px solid rgba(24,95,165,.16)}
+a.blk .rc-row:hover,.blk a.rc-row:hover{background:rgba(255,255,255,.55)}
+.rc-row{display:grid;grid-template-columns:104px minmax(0,1fr) 152px;gap:1px 18px;align-items:baseline;padding:10px 8px;margin:0 -8px;text-decoration:none;color:inherit;border-top:1px solid var(--line-3)}
+.rc-row:first-of-type{border-top:0}
+a.rc-row:hover{background:var(--card-soft)}
+a.rc-row:hover .rc-name{color:var(--accent-deep)}
+.rc-when{grid-row:span 2;align-self:start;display:flex;flex-direction:column;gap:1px}
+.rc-d{font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:600;color:var(--ink-2);white-space:nowrap}
+.rc-dd{font-family:"IBM Plex Mono",monospace;font-size:11px;font-style:normal;color:var(--mute-2);white-space:nowrap}
+.rc-when.dim .rc-d{color:var(--mute-2);font-weight:400}
+.rc-when.dim .rc-dd{color:transparent}
+.rc-name{font-size:14.5px;font-weight:700;line-height:1.3;letter-spacing:-.01em;min-width:0}
+.blk .rc-name{font-size:13px;font-weight:600;font-family:"IBM Plex Mono",monospace;letter-spacing:0;color:var(--ink-2)}
+.rc-val{grid-row:span 2;align-self:start;display:grid;grid-template-columns:10px minmax(0,1fr);font-family:"IBM Plex Mono",monospace;font-size:14px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.rc-val i{font-style:normal}
+.rc-val b{font-weight:inherit;text-align:right}
+.blk .rc-val{font-size:14px}
+.rc-sub{grid-column:2;font-size:11px;line-height:1.5;color:var(--mute-2);font-family:"IBM Plex Mono",monospace;min-width:0;overflow-wrap:anywhere}
+.rc-sub .sep{padding:0 6px;color:var(--line)}
+.sec{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--mute-2);padding:20px 0 4px}
+.rc-foot{display:flex;justify-content:space-between;align-items:baseline;gap:12px;border-top:1px solid var(--line-2);padding-top:12px;font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--mute)}
+.rc-foot b{color:var(--ink-2);font-weight:700}
+.rc-none{border:1px dashed var(--line);border-radius:11px;background:var(--card-soft);padding:18px 20px;margin:6px 0 2px;display:flex;flex-direction:column;gap:9px}
+.rc-none h5{margin:0;font-size:14.5px;font-weight:800;letter-spacing:-.01em;color:var(--ink)}
+.rc-none p{margin:0;font-size:12.5px;line-height:1.6;color:var(--ink-2);max-width:64ch}
+.rc-none b{color:var(--ink);font-weight:700}
+.rc-none ul{margin:0;padding-left:18px;font-size:12.5px;line-height:1.7;color:var(--ink-2)}
+.rc-none li{padding-left:2px}
+.viz.off,.rc-lede.off,.cap.off,.rc-foot.off,.rc-head2.off{display:none}
 </style>
 </head>
 <body>
@@ -610,15 +671,18 @@ button{font-family:inherit}
 
       
 
-      <!-- recompete timeline -->
+      <!-- recompete radar -->
       <section class="row">
         <section class="widget">
           <header class="widget-head">
-            <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg></span>
-              <div class="wh-text"><h3>Recompete Radar</h3><p class="wh-sub">Awards ending within 180 days of the measurement date, by end month</p></div></div>
-            
+            <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+              <div class="wh-text"><h3>Recompete Radar</h3><p class="wh-sub" id="whSub"></p></div></div>
+            <span class="wh-source">USAspending</span>
           </header>
-          <div class="rc-timeline"><div class="rc-quarters" id="rcQuarters"></div></div>
+          <div><div class="rc-head2"><span class="rc-big" id="bigN"></span><p class="rc-say" id="bigSay"></p></div><div class="viz" id="viz"></div><p class="cap" id="cap"></p></div>
+          <p class="rc-lede" id="lede"></p>
+          <div class="rc-list" id="rcList"></div>
+          <div class="rc-foot"><span id="footL"></span><span id="footR"></span></div>
         </section>
       </section>
 
