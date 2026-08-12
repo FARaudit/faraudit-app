@@ -56,6 +56,23 @@ const leaked = STAYED.filter((id) => HTML.includes(`id="${id}"`));
 ok(leaked.length === 0, "and nothing that stayed on Defense Spending came along",
   leaked.length ? `also present: ${leaked.join(", ")}` : `${STAYED.length} checked`);
 
+/* ⛔ THE OTHER DIRECTION, WHICH THIS GATE ORIGINALLY DID NOT CHECK — and the
+   omission shipped. Every assertion above was about what is ON this page, so a
+   COPY passed all of them: the three panels went to /who-to-call and stayed on
+   /defense-spending too, 9 widgets on a page that was supposed to have 6. The
+   CEO caught it by asking. "Moved" and "copied" are indistinguishable from the
+   new page alone — the evidence is only ever on the page they left. */
+const SPENDING_HTML = readFileSync(join(ROOT, "public", "defense-spending.html"), "utf8");
+const stillThere = MOVED.filter((id) => SPENDING_HTML.includes(`id="${id}"`));
+ok(stillThere.length === 0,
+  "THEY LEFT: no panel host from this page survives on defense-spending.html",
+  stillThere.length ? `still on the old page — this is a COPY: ${stillThere.join(", ")}` : "");
+// And the mirror, so the check above cannot pass by reading an empty file.
+const stayedPut = STAYED.filter((id) => SPENDING_HTML.includes(`id="${id}"`));
+ok(stayedPut.length === STAYED.length,
+  "…while everything that was meant to stay is still there",
+  `${stayedPut.length}/${STAYED.length}`);
+
 // The controls DO come along: a destination the reader cannot scope is a report,
 // not a view. These are the scope's own inputs, not the other page's panels.
 for (const id of ["segFY", "hdrNaicsPills", "dsbProvenance", "resetBtn", "selChip"]) {
@@ -110,6 +127,10 @@ ok(STAYED.filter((id) => withMapHost.includes(`id="${id}"`)).length > 0,
 const withoutPanel = HTML.replace('id="ptList"', 'id="ptListX"');
 ok(MOVED.filter((id) => !withoutPanel.includes(`id="${id}"`)).length > 0,
   "a missing panel host IS detected when removed");
+// The copy that actually shipped: put one panel host back on the old page.
+const copied = SPENDING_HTML.replace("</body>", '<div id="ptList"></div></body>');
+ok(MOVED.filter((id) => copied.includes(`id="${id}"`)).length > 0,
+  "PLANTED: a panel left behind on defense-spending IS detected — the case that shipped");
 
 console.log(`\n${fail === 0 ? "✅" : "❌"} ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

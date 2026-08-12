@@ -74,8 +74,15 @@ ok(COMPOSED.includes('id="geoLegend"'), "#geoLegend present in the composed page
 console.log("\nR2  EVERY LOOKUP RESOLVES");
 const lookedUp = [...new Set([...APP_SRC.matchAll(/\$\('([A-Za-z0-9_-]+)'\)/g)].map((m) => m[1]))].sort();
 ok(lookedUp.length > 15, "id census is non-empty", `${lookedUp.length} ids read via $()`);
-const unresolved = lookedUp.filter((id) => !COMPOSED.includes(`id="${id}"`));
-ok(unresolved.length === 0, "every $() target exists in the markup",
+/* ⛔ dsb-app.js NOW MOUNTS ON TWO PAGES, so "the markup" is both of them. Primes, Ceilings and
+   Recompete Radar moved to /who-to-call; their ids are read by this shared script and exist only
+   there. Checking one page would report 17 unresolved lookups for a renderer set that resolves
+   perfectly — and the fix a reader would reach for is to delete the assertion. The invariant is
+   unchanged: every id this script reads exists on a page that serves it. */
+const WTC = injectRail(readFileSync(path.join(PUB, "who-to-call.html"), "utf8"), "who-to-call");
+const MOUNTED = COMPOSED + "\n" + WTC;
+const unresolved = lookedUp.filter((id) => !MOUNTED.includes(`id="${id}"`));
+ok(unresolved.length === 0, "every $() target exists on a page that mounts this script",
   unresolved.length ? `unresolved: ${unresolved.join(", ")}` : `${lookedUp.length}/${lookedUp.length} resolve`);
 
 // ─────────────────────────────────────────────────────────────────────────────
