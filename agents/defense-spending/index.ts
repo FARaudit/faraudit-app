@@ -137,8 +137,13 @@ interface IntelRow {
   refreshed_at: string;
 }
 
+/* Thrown when a row could not be MEASURED, as distinct from a market that is
+   empty. The caller skips the write and leaves whatever is stored alone. */
+class UnmeasuredRow extends Error {}
+
 async function buildRow(naics: string, win: FYWindow, priorTotal: number | null): Promise<IntelRow> {
   const f = { naics, fyStart: win.start, fyEnd: win.end };
+  usa.resetTransportFailures();
   const [total, sb, recipients, sbRecipients, agencies, states, contractTypes, rec90, rec180, recUpcoming, awardSample, setAsideMix] = await Promise.all([
     usa.fetchTotalObligations(f),
     usa.fetchSmallBusinessObligations(f),
@@ -156,6 +161,23 @@ async function buildRow(naics: string, win: FYWindow, priorTotal: number | null)
     // hand in Studio is a second chance for the schema to lag the worker.
     usa.fetchSetAsideMix(f)
   ]);
+  /* ⛔ NEVER WRITE AN UNPROVEN ZERO OVER A MEASURED ROW.
+     On 2026-08-12 USAspending's WAF blocked this worker mid-run — 326 requests
+     refused — and because a blocked request and an empty market both arrive as
+     null, the run wrote nulls over 14 of 33 rows and exited 0. 336412 FY2026
+     went from $4.99B to NULL; all three 336611 rows were emptied. The page reads
+     those rows as a market with no spending, which is a fabricated fact about
+     the customer's market, not a gap.
+     A transport failure anywhere in this row makes every zero in it unproven, so
+     the row is abandoned rather than written. Yesterday's measured row survives
+     with its own refreshed_at, which is honest: it says when it was true. */
+  const failures = usa.transportFailureCount();
+  if (failures > 0) {
+    throw new UnmeasuredRow(
+      `${naics}/FY${win.fy}: ${failures} request(s) never answered — refusing to write. ` +
+      `Stored values kept; they carry their own refreshed_at.`
+    );
+  }
   const sbPct = total && total > 0 && sb != null ? (sb / total) * 100 : null;
   const yoy = priorTotal != null && priorTotal > 0 && total != null ? ((total - priorTotal) / priorTotal) * 100 : null;
   return {
@@ -232,6 +254,7 @@ async function upsert(row: IntelRow): Promise<void> {
 
 async function main() {
   const startedAt = new Date();
+  let skipped = 0;
   const codes = await resolveNaicsCodes();
   console.log(`[defense-spending] started ${startedAt.toISOString()} · NAICS ${codes.join(",")}`);
 
@@ -241,7 +264,20 @@ async function main() {
     // reference the prior year's total. FY2024 has no prior reference → yoy=null.
     let priorTotal: number | null = null;
     for (const win of FY_WINDOWS) {
-      const row = await buildRow(naics, win, priorTotal);
+      let row: IntelRow;
+      try {
+        row = await buildRow(naics, win, priorTotal);
+      } catch (err) {
+        if (err instanceof UnmeasuredRow) {
+          console.warn(`[defense-spending] ⚠ SKIPPED ${err.message}`);
+          skipped++;
+          // priorTotal is deliberately NOT advanced — a year we could not measure
+          // must not become the denominator of the next year's YoY.
+          priorTotal = null;
+          continue;
+        }
+        throw err;
+      }
       await upsert(row);
       const sbCount = Array.isArray(row.sb_recipients) ? row.sb_recipients.length : 0;
       const sample = row.award_sample as { sampled?: number; truncated?: boolean; set_aside_mix?: { unaccounted?: number | null } };
@@ -257,7 +293,17 @@ async function main() {
     }
   }
 
-  console.log(`[defense-spending] done ${new Date().toISOString()} · duration=${Date.now() - startedAt.getTime()}ms`);
+  console.log(
+    `[defense-spending] done ${new Date().toISOString()} · duration=${Date.now() - startedAt.getTime()}ms` +
+    ` · skipped=${skipped}`
+  );
+  // A run that could not measure anything is a FAILED run, not a quiet one. Exit
+  // non-zero so Railway shows it red rather than reporting SUCCESS over a night
+  // where nothing was written.
+  if (skipped > 0) {
+    console.error(`[defense-spending] ${skipped} row(s) unmeasured — see the SKIPPED lines above.`);
+    process.exitCode = 1;
+  }
 }
 
 main().catch((e) => { console.error("[defense-spending] fatal", e); process.exit(1); });
