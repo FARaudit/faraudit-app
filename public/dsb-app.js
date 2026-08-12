@@ -946,7 +946,9 @@
       html = '<span class="ib-label">Read</span>'
         + (top ? `<b>${esc(top.short)}</b> is the largest buyer in your codes` : 'No agency breakdown for this year')
         + (st ? ` and <b>${esc(st.name)}</b> the largest place of performance` : '')
-        + ` in ${esc(S.fy)}. Click a state to scope the leaderboard to it.`;
+        // A state selection scopes every panel on the tab, not the leaderboard
+        // alone — the sentence understated what the click does.
+        + ` in ${esc(S.fy)}. Click a state to scope every panel to it.`;
     }
     setHTML($('insightBar'), '<span class="ib-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a7 7 0 00-4 12.7V17a1 1 0 001 1h6a1 1 0 001-1v-2.3A7 7 0 0012 2z"></path><path d="M9 21h6"></path></svg></span><span>' + html + '</span>');
   }
