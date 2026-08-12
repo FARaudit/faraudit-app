@@ -33,6 +33,8 @@
       window.DSB.BY_FY = data.BY_FY || {};
       window.DSB.MARKET_TREND = data.MARKET_TREND || { labels: [], series: {} };
       window.DSB.RECOMPETES = Array.isArray(data.RECOMPETES) ? data.RECOMPETES : [];
+      window.DSB.SB_SHARE = Array.isArray(data.SB_SHARE) ? data.SB_SHARE : [];
+      window.DSB.CONCENTRATION = Array.isArray(data.CONCENTRATION) ? data.CONCENTRATION : [];
       window.DSB.AGENCY_FILTERS = Array.isArray(data.AGENCY_FILTERS) ? data.AGENCY_FILTERS : [{ key: 'all', label: 'All' }];
       window.DSB.coverage = data.coverage || null;
       window.DSB.as_of = data.as_of || null;
