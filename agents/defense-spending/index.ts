@@ -55,8 +55,16 @@ interface IntelRow {
   agency_breakdown: unknown;
   state_breakdown: unknown;
   contract_type_breakdown: unknown;
+  // Kept, and still written. These are "contracts expiring in N days", which is
+  // not a recompete — 85% of what they return is delivery/purchase orders that
+  // are never competed. _180d is read live by src/lib/bd-os/defense-spending.ts
+  // and Design holds card 826 against the panel it feeds, so it is replaced when
+  // the refinement lands, not emptied underneath a surface still in flight.
   recompetes_expiring_90d: unknown;
   recompetes_expiring_180d: unknown;
+  // Definitive contracts ending 12-18 months out — the window a recompete is
+  // actually solicited in. Migration 034.
+  recompetes_upcoming: unknown;
   // Award-level records — the panels that need a single award's value, buying
   // office and duration. A SAMPLE of the largest, with its own count and cap
   // stored beside it so no reader can mistake it for the whole. Also carries
@@ -76,7 +84,7 @@ interface IntelRow {
 
 async function buildRow(naics: string, win: FYWindow, priorTotal: number | null): Promise<IntelRow> {
   const f = { naics, fyStart: win.start, fyEnd: win.end };
-  const [total, sb, recipients, sbRecipients, agencies, states, contractTypes, rec90, rec180, awardSample, setAsideMix] = await Promise.all([
+  const [total, sb, recipients, sbRecipients, agencies, states, contractTypes, rec90, rec180, recUpcoming, awardSample, setAsideMix] = await Promise.all([
     usa.fetchTotalObligations(f),
     usa.fetchSmallBusinessObligations(f),
     usa.fetchTopRecipients(f),
@@ -86,6 +94,7 @@ async function buildRow(naics: string, win: FYWindow, priorTotal: number | null)
     usa.fetchContractTypeBreakdown(f),
     usa.fetchRecompetes(f, 0, 90),
     usa.fetchRecompetes(f, 90, 180),
+    usa.fetchUpcomingRecompetes(f),
     usa.fetchAwardSample(f),
     // Rides inside award_sample rather than taking a column of its own — the
     // column is JSONB, it has no readers yet, and a second migration applied by
@@ -107,24 +116,39 @@ async function buildRow(naics: string, win: FYWindow, priorTotal: number | null)
     contract_type_breakdown: contractTypes,
     recompetes_expiring_90d: rec90,
     recompetes_expiring_180d: rec180,
+    recompetes_upcoming: recUpcoming,
     award_sample: { ...awardSample, set_aside_mix: setAsideMix },
     yoy_delta_pct: yoy,
     refreshed_at: new Date().toISOString()
   };
 }
 
-/** Deploy order must not matter. This worker and the migration that adds
- *  `award_sample` land through different systems — a push to main deploys the
+/** Columns this worker writes that are applied BY HAND in Studio, with the
+ *  migration that adds each. Every entry here is a column that can legitimately
+ *  be missing at runtime. */
+const HAND_APPLIED_COLUMNS: Array<{ column: keyof IntelRow; migration: string }> = [
+  { column: "award_sample", migration: "033_defense_spending_award_sample.sql" },
+  { column: "recompetes_upcoming", migration: "034_defense_spending_recompetes_upcoming.sql" }
+];
+
+/** Deploy order must not matter. This worker and the migrations that add its
+ *  newer columns land through different systems — a push to main deploys the
  *  Railway service, while the column is applied by hand in Studio — so for some
  *  window one will exist without the other. PostgREST rejects the WHOLE row when
  *  it carries an unknown column, so an unguarded write would have taken down the
  *  nightly refresh of every field that already worked, in order to add one that
  *  did not.
  *
- *  So: write the full row, and if the schema has not caught up, drop the new
- *  field and write everything else. The retry is narrow on purpose — it fires
- *  only on an unknown-column error naming award_sample, and it says so in the log
- *  rather than degrading silently. */
+ *  So: write the full row, and if the schema has not caught up, drop whichever
+ *  new fields it does not know and write everything else. The retry stays narrow
+ *  — it fires only on an unknown-column error naming a column on the list above,
+ *  and it says which one in the log rather than degrading silently.
+ *
+ *  ⚠ THE LIST IS THE GUARD. When this guard named only `award_sample`, adding a
+ *  second hand-applied column meant an unapplied migration no longer matched the
+ *  narrow test and threw instead — taking down the whole nightly refresh, which
+ *  is precisely the outcome the guard was written to prevent. A new hand-applied
+ *  column goes on the list in the same change that starts writing it. */
 async function upsert(row: IntelRow): Promise<void> {
   const { error } = await supabase
     .from("defense_spending_intel")
@@ -132,19 +156,22 @@ async function upsert(row: IntelRow): Promise<void> {
   if (!error) return;
 
   const msg = error.message || "";
-  const schemaLagging = /award_sample/.test(msg) && /(column|schema cache|PGRST204)/i.test(msg);
-  if (!schemaLagging) {
+  const isSchemaError = /(column|schema cache|PGRST204)/i.test(msg);
+  const missing = HAND_APPLIED_COLUMNS.filter((c) => new RegExp(String(c.column)).test(msg));
+  if (!isSchemaError || missing.length === 0) {
     throw new Error(`upsert ${row.naics_code}/${row.fiscal_year}: ${msg}`);
   }
 
   console.warn(
-    `[defense-spending] award_sample column not present yet — writing ${row.naics_code}/FY${row.fiscal_year} without it. ` +
-    `Apply supabase/migrations/033_defense_spending_award_sample.sql to enable the award-level panels.`
+    `[defense-spending] column(s) not present yet: ${missing.map((c) => c.column).join(", ")} — ` +
+    `writing ${row.naics_code}/FY${row.fiscal_year} without them. ` +
+    `Apply supabase/migrations/${missing.map((c) => c.migration).join(" + ")} to enable the affected panels.`
   );
-  const { award_sample: _dropped, ...withoutSample } = row;
+  const reduced = { ...row };
+  for (const c of missing) delete reduced[c.column];
   const { error: retryErr } = await supabase
     .from("defense_spending_intel")
-    .upsert(withoutSample, { onConflict: "naics_code,fiscal_year" });
+    .upsert(reduced, { onConflict: "naics_code,fiscal_year" });
   if (retryErr) throw new Error(`upsert ${row.naics_code}/${row.fiscal_year}: ${retryErr.message}`);
 }
 
@@ -168,7 +195,8 @@ async function main() {
       // nothing said so, because the only place it would have shown was a panel
       // nobody had built yet.
       const gap = sample?.set_aside_mix?.unaccounted;
-      console.log(`  · FY${win.fy}: total=$${(row.total_obligations || 0).toLocaleString()} · sb_pct=${row.sb_pct?.toFixed(1)}% · yoy=${row.yoy_delta_pct?.toFixed(1)}% · sb_recipients=${sbCount} · awards=${sample?.sampled ?? 0}${sample?.truncated ? ' (capped)' : ''} · pricing=${ctCount}${ctCount === 0 ? ' ⚠ EMPTY' : ''} · setaside_gap=${gap == null ? 'n/a' : '$' + Math.round(gap).toLocaleString()}`);
+      const upcoming = Array.isArray(row.recompetes_upcoming) ? row.recompetes_upcoming.length : 0;
+      console.log(`  · FY${win.fy}: total=$${(row.total_obligations || 0).toLocaleString()} · sb_pct=${row.sb_pct?.toFixed(1)}% · yoy=${row.yoy_delta_pct?.toFixed(1)}% · sb_recipients=${sbCount} · awards=${sample?.sampled ?? 0}${sample?.truncated ? ' (capped)' : ''} · pricing=${ctCount}${ctCount === 0 ? ' ⚠ EMPTY' : ''} · setaside_gap=${gap == null ? 'n/a' : '$' + Math.round(gap).toLocaleString()} · recompetes_12_18mo=${upcoming}`);
       priorTotal = row.total_obligations;
     }
   }

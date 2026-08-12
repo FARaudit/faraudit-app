@@ -25,7 +25,8 @@ import {
   fetchAwardSample,
   fetchContractTypeBreakdown,
   fetchSetAsideMix,
-  fetchPricingMix
+  fetchPricingMix,
+  fetchUpcomingRecompetes
 } from "./usaspending";
 
 let failures = 0;
@@ -221,6 +222,59 @@ async function main() {
       mix.unaccounted === 1000,
       "and the residual equals the WHOLE total, so a dead endpoint is loud instead of an empty chart"
     );
+  }
+
+  // ── 7 · THE RECOMPETE WINDOW ASKS FOR RECOMPETES ──────────────────────────
+  // The radar was a list of expiring periods of performance. Measured across
+  // five codes: 85% delivery orders, purchase orders and BPA calls, none of
+  // which are ever competed. A=BPA CALL, B=PURCHASE ORDER, C=DELIVERY ORDER,
+  // D=DEFINITIVE CONTRACT — verified live, and the reverse of what this
+  // module's header comment used to claim.
+  {
+    const { calls, restore } = intercept(() => ({ results: [], page_metadata: { hasNext: false } }));
+    await fetchUpcomingRecompetes(F);
+    restore();
+
+    const body = calls[0].body as Record<string, unknown>;
+    const filters = body.filters as Record<string, unknown>;
+    const types = filters.award_type_codes as string[];
+    assert(types.length === 1 && types[0] === "D", `definitive contracts only — asked for [${types.join(", ")}]`);
+
+    // The window and the lookback are coupled: a 90-day lookback cannot reach a
+    // 365-day window and returns an empty list, which reads as "nothing coming".
+    const tp = (filters.time_period as Array<Record<string, string>>)[0];
+    const lookbackDays = Math.round(
+      (Date.parse(tp.end_date) - Date.parse(tp.start_date)) / 86400_000
+    );
+    assert(
+      lookbackDays >= 365,
+      `the action-date lookback reaches the window — ${lookbackDays}d (under 365 this returns zero rows on every code tested)`
+    );
+  }
+
+  // ── 8 · A DISTANT WINDOW CANNOT INHERIT THE SHORT LOOKBACK ────────────────
+  // Guards the coupling directly: the same rows, sorted by end date, must be
+  // reachable. A caller that widens the window without widening the lookback
+  // gets silence, not an error.
+  {
+    const day = 86400_000;
+    const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+    const now = Date.now();
+    const { restore } = intercept((c) => {
+      const tp = ((c.body.filters as Record<string, unknown>).time_period as Array<Record<string, string>>)[0];
+      const lookback = (Date.parse(tp.end_date) - Date.parse(tp.start_date)) / day;
+      // Stand-in for USAspending's behaviour: a contract ending 400 days out is
+      // only in the candidate set when the lookback is wide enough to include
+      // its most recent action.
+      const rows = lookback >= 365
+        ? [{ "Award ID": "N0001926C0777", "Recipient Name": "ACME DEFENSE", "Award Amount": 4200000, "Awarding Sub Agency": "Department of the Navy", "End Date": iso(now + 400 * day) }]
+        : [];
+      return { results: rows, page_metadata: { hasNext: false } };
+    });
+    const wide = await fetchUpcomingRecompetes(F);
+    restore();
+    assert(wide.length === 1, "the 12-18 month window returns rows when the lookback reaches it");
+    assert(wide[0].award_id === "N0001926C0777", "and the row survives the client-side window filter");
   }
 
   console.log(failures === 0 ? "\n✅ ALL PASS" : `\n❌ ${failures} FAILED`);

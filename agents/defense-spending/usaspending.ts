@@ -3,8 +3,15 @@
 //
 // All calls share the same time-period + award-type filters (FY def: federal
 // fiscal year = Oct 1 (prior calendar year) through Sep 30). award_type_codes
-// "A,B,C,D" = DEFINITIVE / PURCHASE ORDER / DELIVERY ORDER / BPA CALL — the
-// four core prime-contract types USAspending categorizes for defense spend.
+// "A,B,C,D" are the four core prime-contract types USAspending categorizes for
+// defense spend, and the mapping is:
+//
+//   A = BPA CALL   B = PURCHASE ORDER   C = DELIVERY ORDER   D = DEFINITIVE CONTRACT
+//
+// Verified against the live API 2026-08-12 by querying each code alone and
+// reading back "Contract Award Type". This comment previously listed the four
+// labels in the reverse order, which matters the moment anyone filters on a
+// single code: "definitive contracts only" reads as A and returns BPA calls.
 
 const API_BASE = "https://api.usaspending.gov/api/v2";
 
@@ -237,12 +244,34 @@ export interface RecompeteRow {
 const RECOMPETE_PAGE_SIZE = 100;
 const RECOMPETE_MAX_PAGES = 6;
 
-export async function fetchRecompetes(f: Filters, minDays: number, maxDays: number): Promise<RecompeteRow[]> {
+export interface RecompeteOpts {
+  /** Contract types to consider. Verified against the live API 2026-08-12 —
+   *  A=BPA CALL, B=PURCHASE ORDER, C=DELIVERY ORDER, D=DEFINITIVE CONTRACT. */
+  awardTypes?: string[];
+  /** How far back on action_date to look for "still active" evidence. */
+  lookbackDays?: number;
+}
+
+export async function fetchRecompetes(
+  f: Filters,
+  minDays: number,
+  maxDays: number,
+  opts: RecompeteOpts = {}
+): Promise<RecompeteRow[]> {
+  const awardTypes = opts.awardTypes ?? ["A", "B", "C", "D"];
+  // THE LOOKBACK AND THE WINDOW ARE COUPLED, and getting that wrong returns an
+  // empty list rather than an error. The lookback bounds the candidate set to
+  // contracts with recent obligation activity; the window then selects from it.
+  // Push the window far enough out and a short lookback simply cannot reach it:
+  // measured 2026-08-12, definitive contracts at 365-548 days returned 0 rows
+  // on 336411, 336412 AND 332710 under the 90-day lookback, and 23 / 18 / 1
+  // under 365. An empty radar reads as "nothing coming", so the failure is
+  // silent and it is worse than a crash. Callers asking for a distant window
+  // must widen this to match.
+  const lookbackDays = opts.lookbackDays ?? 90;
   const today = new Date();
   const fmtDate = (d: Date) => d.toISOString().slice(0, 10);
-  // 90-day lookback on action_date keeps the candidate set to contracts that
-  // had any obligation/mod activity recently — a proxy for "still active."
-  const actionStart = new Date(today.getTime() - 90 * 86400_000);
+  const actionStart = new Date(today.getTime() - lookbackDays * 86400_000);
   const minMs = today.getTime() + minDays * 86400_000;
   const maxMs = today.getTime() + maxDays * 86400_000;
   const out: RecompeteRow[] = [];
@@ -253,7 +282,7 @@ export async function fetchRecompetes(f: Filters, minDays: number, maxDays: numb
       {
         filters: {
           naics_codes: [f.naics],
-          award_type_codes: ["A", "B", "C", "D"],
+          award_type_codes: awardTypes,
           time_period: [{ start_date: fmtDate(actionStart), end_date: fmtDate(today), date_type: "action_date" }]
         },
         fields: ["Award ID", "Recipient Name", "Award Amount", "Awarding Sub Agency", "End Date"],
@@ -285,6 +314,35 @@ export async function fetchRecompetes(f: Filters, minDays: number, maxDays: numb
     if (!d?.page_metadata?.hasNext) break;
   }
   return out;
+}
+
+/* THE RECOMPETE WINDOW — definitive contracts, 12 to 18 months out.
+   The existing 90/180-day columns are not this, and never were. Two things were
+   wrong with them and only one is about timing.
+
+   WHAT IT LOOKED AT. Measured 2026-08-12 across five NAICS codes, 48 rows in the
+   180-day window: 26 delivery orders (54%), 14 purchase orders (29%), 1 BPA call
+   and 7 definitive contracts (15%). A delivery order ending is the parent IDIQ
+   placing its next order — no competition, nothing to bid on. On 336412 it was 8
+   of 8 non-recompetable, showing GE and StandardAero orders expiring on schedule
+   as though they were opportunity. Restricting to "D" is what makes the row mean
+   something a bidder can act on.
+
+   WHEN IT LOOKED. A recompete is solicited 12-18 months before the incumbent
+   expires, so a 90/180-day window lands after the solicitation has dropped and
+   often after award. It was pointed at the wrong end of the timeline — and at
+   the opposite end from the upstream-signal claim the product is sold on.
+
+   ⚠ The 365-day lookback is not a spare knob. Under the inherited 90-day default
+   this window returns ZERO rows on every code tested. See fetchRecompetes.
+
+   ⛔ STILL NOT COMPLETE, and the gap is IDVs. A recompeted IDIQ is the largest
+   opportunity in this market and it does not appear here: IDV award types are
+   IDV_A…IDV_E, outside the A-D contract set, and their expiry behaves
+   differently (an IDV's ceiling can be reached before its end date). That is a
+   separate query and a separate ruling, not something to fold in silently. */
+export function fetchUpcomingRecompetes(f: Filters): Promise<RecompeteRow[]> {
+  return fetchRecompetes(f, 365, 548, { awardTypes: ["D"], lookbackDays: 365 });
 }
 
 /* ── AWARD-LEVEL RECORDS ─────────────────────────────────────────────────────
