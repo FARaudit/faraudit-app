@@ -977,9 +977,28 @@
 
      Not filtered by the year control — the whole point is the direction across
      years, and a single year cannot show it. */
+  /* Small-business dollars in the LATEST year that has a measured share. The
+     panel sorts and leads on this, so it has to come from the same point the
+     percentage does rather than from a different year. */
+  function sbDollarsOf(r) {
+    const pts = (r && r.points) || [];
+    for (let i = pts.length - 1; i >= 0; i--) if (pts[i].pct != null) return pts[i].sb || 0;
+    return 0;
+  }
+
   function renderSbShare() {
     const el = $('sbShareList'); if (!el) return;
-    const rows = D.SB_SHARE || [];
+    /* ⛔ ORDERED BY SMALL-BUSINESS DOLLARS, NOT BY CODE NUMBER.
+       The payload arrives NAICS-ascending, so the panel led with 332710 —
+       29.5%, and $8.88M — and put 336611 last on 3.1%, which is $768.71M. That
+       is 86x more money for a small business, presented as the weakest of the
+       three. A reader going top to bottom concludes machining is open and
+       shipbuilding is closed; the opposite is true.
+
+       The percentage answers "can I get in". The dollars answer "is it worth
+       getting in". The panel is titled "is there money here", so it sorts by the
+       money and prints it first. The share stays as the second read. */
+    const rows = (D.SB_SHARE || []).slice().sort((a, b) => sbDollarsOf(b) - sbDollarsOf(a));
     if (!rows.length) { setHTML(el, '<div class="conc-note">No codes tracked.</div>'); return; }
     setHTML(el, rows.map(r => {
       const pts = r.points || [];
@@ -995,6 +1014,7 @@
       const max = Math.max(1, ...known.map(p => p.pct));
       return `<div class="sbs-row">
         <div class="sbs-head"><span class="sbs-code">${esc(r.naics)}</span>
+          <span class="sbs-money">${sbDollarsOf(r) > 0 ? fmtM(sbDollarsOf(r)) + ' to small business' : 'none measured'}</span>
           <span class="sbs-dir ${dir}">${esc(dirTxt)}</span></div>
         <div class="sbs-pts">${pts.map(p => `<div class="sbs-pt">
             <div class="sbs-bar"><i style="width:${p.pct == null ? 0 : Math.round((p.pct / max) * 100)}%"></i></div>
