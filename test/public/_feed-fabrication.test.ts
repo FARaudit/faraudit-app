@@ -37,6 +37,7 @@ const check = (label: string, ok: boolean, detail = "") => {
 // Gates public/ assets but must not LIVE in public/ — everything there is served
 // verbatim and a gate file is not an asset. test/public/ -> public/.
 const PUBLIC = join(import.meta.dirname ?? __dirname, "..", "..", "public");
+const ROOT = join(PUBLIC, "..");
 const read = (f: string) => readFileSync(join(PUBLIC, f), "utf8");
 
 // ── Shared shape helpers (same contract as _today-fabrication.test.ts) ───────────
@@ -225,10 +226,31 @@ check(
   !/class="live-pill"[^>]*>\s*LIVE/i.test(dsbHtml),
   "a LIVE pill is asserted",
 );
+/* REVISED 2026-08-12 — the rule was "this page must not name USAspending",
+   written when /defense-spending rendered a client-side mock. It is wired now:
+   agents/defense-spending queries api.usaspending.gov nightly into
+   defense_spending_intel, and src/lib/bd-os/defense-spending.ts reads it. A flat
+   ban would now forbid the page from naming its REAL source, which is the
+   opposite of what this file is for.
+
+   So the check is CONDITIONAL and it still fails closed: cite USAspending only
+   if the path to USAspending exists in the tree. Naming a source stays a claim
+   that has to be true — it is just checkable now instead of forbidden. */
+const dsbLib = readFileSync(join(ROOT, "src/lib/bd-os/defense-spending.ts"), "utf8");
+const dsbAgent = readFileSync(join(ROOT, "agents/defense-spending/usaspending.ts"), "utf8");
+const citesUsa = /FPDS-NG|USAspending/i.test(dsbHtml);
+const pathExists =
+  /from\(["']defense_spending_intel["']\)/.test(dsbLib) &&
+  /api\.usaspending\.gov/.test(dsbAgent);
 check(
-  "defense-spending.html · does not cite FPDS-NG / USAspending as its source",
-  !/FPDS-NG|USAspending/i.test(dsbHtml),
-  "cites a federal source the route never queries",
+  "defense-spending.html · cites USAspending only because the route actually reads it",
+  !citesUsa || pathExists,
+  "cites a federal source with no query path behind it",
+);
+check(
+  "defense-spending.html · no FPDS-NG claim (nothing queries FPDS-NG)",
+  !/FPDS-NG/i.test(dsbHtml),
+  "FPDS-NG is named and never queried",
 );
 
 // ── Part D · planted positives: prove every checker can fail ─────────────────────
