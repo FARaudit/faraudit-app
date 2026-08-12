@@ -13,8 +13,20 @@
 // FY2026 award on 336412 is $7.50B against a $4.99B total for the entire code
 // and year. Nothing here sums amounts against total_obligations or expresses one
 // as a share of the other.
+//
+// THAT WARNING USED TO BE THE ONLY GUARD, and the file violated it thirty lines
+// down. Every money value in here is now a `Dollars`, which is an OBJECT — so
+// adding one to a `Millions` is `error TS2365`, not a plausible number. See
+// `./money`. The exported result interfaces stay plain `number`, because they
+// are the WIRE: the browser gets JSON, and wrapping them would change its shape.
 
-export interface AwardRecord {
+import {
+  dollars, sumD, addD, maxD, gtD, gteD, pctOfD, wire, wireOrNull,
+  ascD, cmpD, lerpD, type Dollars
+} from "./money";
+
+/** What the `award_sample` JSONB column actually holds: plain numbers. */
+export interface RawAwardRecord {
   award_id: string;
   recipient: string;
   amount: number;
@@ -25,9 +37,12 @@ export interface AwardRecord {
   end_date: string;
 }
 
-export interface CeilingRow {
+export interface AwardRecord extends Omit<RawAwardRecord, "amount"> {
+  amount: Dollars;
+}
+
+export interface RawCeilingRow {
   award_id: string;
-  /** How many of this firm's awards the row folds together. 1 unless grouped. */
   contracts?: number;
   recipient: string;
   ceiling: number;
@@ -37,24 +52,73 @@ export interface CeilingRow {
   subaward_count: number | null;
 }
 
-export interface AwardSample {
-  awards?: AwardRecord[] | null;
-  ceilings?: { rows?: CeilingRow[] | null; sampled?: number | null; cap?: number | null; unreadable?: number | null } | null;
+export interface CeilingRow extends Omit<RawCeilingRow, "ceiling" | "obligated" | "headroom" | "subawarded"> {
+  /** How many of this firm's awards the row folds together. 1 unless grouped. */
+  contracts?: number;
+  ceiling: Dollars;
+  obligated: Dollars;
+  headroom: Dollars;
+  subawarded: Dollars | null;
+}
+
+interface CeilingBox<R> {
+  rows?: R[] | null; sampled?: number | null; cap?: number | null; unreadable?: number | null;
+}
+
+/** The shape the database returns. Never used for arithmetic. */
+export interface RawAwardSample {
+  awards?: RawAwardRecord[] | null;
+  ceilings?: CeilingBox<RawCeilingRow> | null;
   sampled?: number | null;
   cap?: number | null;
   truncated?: boolean | null;
 }
 
+export interface AwardSample {
+  awards?: AwardRecord[] | null;
+  ceilings?: CeilingBox<CeilingRow> | null;
+  sampled?: number | null;
+  cap?: number | null;
+  truncated?: boolean | null;
+}
+
+/** THE PARSE BOUNDARY — the one place raw JSON becomes typed money. Everything
+ *  downstream is unit-checked; nothing upstream is, so nothing upstream does
+ *  arithmetic. A non-finite amount lands as $0 rather than NaN (see ./money). */
+export function parseAwardSample(raw: RawAwardSample | null | undefined): AwardSample | null {
+  if (!raw) return null;
+  const awards = Array.isArray(raw.awards)
+    ? raw.awards.map((a) => ({ ...a, amount: dollars(Number(a.amount)) }))
+    : raw.awards ?? null;
+  const c = raw.ceilings;
+  const ceilings: CeilingBox<CeilingRow> | null = c
+    ? {
+        ...c,
+        rows: Array.isArray(c.rows)
+          ? c.rows.map((r) => ({
+              ...r,
+              ceiling: dollars(Number(r.ceiling)),
+              obligated: dollars(Number(r.obligated)),
+              headroom: dollars(Number(r.headroom)),
+              subawarded: r.subawarded == null ? null : dollars(Number(r.subawarded))
+            }))
+          : c.rows ?? null
+      }
+    : c ?? null;
+  return { ...raw, awards, ceilings };
+}
+
+const ZERO = dollars(0);
 const nums = (aw: AwardRecord[]) =>
-  aw.map((a) => Number(a.amount) || 0).filter((n) => n > 0).sort((a, b) => a - b);
+  aw.map((a) => a.amount).filter((d) => gtD(d, ZERO)).sort(ascD);
 
 /** Linear-interpolated percentile on a sorted ascending array. */
-function pct(sorted: number[], p: number): number | null {
+function pct(sorted: Dollars[], p: number): Dollars | null {
   if (!sorted.length) return null;
   if (sorted.length === 1) return sorted[0];
   const i = (sorted.length - 1) * p;
   const lo = Math.floor(i), hi = Math.ceil(i);
-  return lo === hi ? sorted[lo] : sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
+  return lo === hi ? sorted[lo] : lerpD(sorted[lo], sorted[hi], i - lo);
 }
 
 /* ── 3 · AWARD-SIZE DISTRIBUTION ────────────────────────────────────────────
@@ -82,14 +146,16 @@ export function awardSizeDistribution(sample: AwardSample | null | undefined): S
   const s = nums(aw);
   if (!s.length) return null;
   const p25 = pct(s, 0.25), p75 = pct(s, 0.75);
+  // wire(): the result interface is plain `number` because it is serialised to
+  // the browser. This is the boundary, and it is the only one in this function.
   return {
     count: s.length,
-    min: s[0],
-    p25,
-    median: pct(s, 0.5),
-    p75,
-    max: s[s.length - 1],
-    inBand: p25 == null || p75 == null ? 0 : s.filter((n) => n >= p25 && n <= p75).length,
+    min: wire(s[0]),
+    p25: wireOrNull(p25),
+    median: wireOrNull(pct(s, 0.5)),
+    p75: wireOrNull(p75),
+    max: wire(s[s.length - 1]),
+    inBand: p25 == null || p75 == null ? 0 : s.filter((n) => gteD(n, p25) && gteD(p75, n)).length,
     truncated: sample?.truncated === true
   };
 }
@@ -107,7 +173,9 @@ export function awardSizeDistribution(sample: AwardSample | null | undefined): S
    That is a partial filter and it says so — `unverifiedSize` counts the primes
    we could not check. It is not a claim that every remaining firm is large. */
 export const SUBCONTRACT_PLAN_THRESHOLD = 750_000;
+const THRESHOLD = dollars(SUBCONTRACT_PLAN_THRESHOLD);
 
+/** Wire shape — plain numbers, raw dollars. */
 export interface PrimeTarget {
   recipient: string;
   /** Combined LIFETIME value of that prime's qualifying awards in the sample. */
@@ -115,6 +183,15 @@ export interface PrimeTarget {
   contracts: number;
   agencies: string[];
   largest: number;
+}
+
+/** The same row while it is still being computed, with its units intact. */
+interface PrimeAcc {
+  recipient: string;
+  value: Dollars;
+  contracts: number;
+  agencies: string[];
+  largest: Dollars;
 }
 
 export interface PrimeTargets {
@@ -134,27 +211,29 @@ export function primeSubcontractTargets(
   const aw = sample?.awards;
   if (!Array.isArray(aw) || aw.length === 0) return null;
   const sb = new Set(smallBusinessNames.map((n) => normaliseRecipient(n)));
-  const m = new Map<string, PrimeTarget & { agencySet: Set<string> }>();
+  const m = new Map<string, PrimeAcc & { agencySet: Set<string> }>();
   let excluded = 0;
   for (const a of aw) {
-    const amount = Number(a.amount) || 0;
-    if (amount < SUBCONTRACT_PLAN_THRESHOLD) continue;
+    const amount = a.amount;
+    if (!gteD(amount, THRESHOLD)) continue;
     const key = normaliseRecipient(a.recipient);
     if (!key) continue;
     if (sb.has(key)) { excluded++; continue; }
     const cur = m.get(key) || {
-      recipient: a.recipient, value: 0, contracts: 0, agencies: [], largest: 0,
+      recipient: a.recipient, value: ZERO, contracts: 0, agencies: [], largest: ZERO,
       agencySet: new Set<string>()
     };
-    cur.value += amount;
+    cur.value = addD(cur.value, amount);
     cur.contracts += 1;
-    cur.largest = Math.max(cur.largest, amount);
+    cur.largest = maxD(cur.largest, amount);
     if (a.sub_agency) cur.agencySet.add(a.sub_agency);
     m.set(key, cur);
   }
-  const primes = [...m.values()]
-    .map(({ agencySet, ...p }) => ({ ...p, agencies: [...agencySet].sort() }))
-    .sort((a, b) => b.value - a.value || b.contracts - a.contracts);
+  const primes: PrimeTarget[] = [...m.values()]
+    .sort((a, b) => cmpD(a.value, b.value) || b.contracts - a.contracts)
+    .map(({ agencySet, value, largest, ...p }) => ({
+      ...p, agencies: [...agencySet].sort(), value: wire(value), largest: wire(largest)
+    }));
   return {
     primes,
     threshold: SUBCONTRACT_PLAN_THRESHOLD,
@@ -213,25 +292,27 @@ export function seasonality(sample: AwardSample | null | undefined): Seasonality
     const cal = ((i + 9) % 12) + 1;
     return { fiscalMonth: i + 1, month: cal, label: MONTH_LABELS[cal - 1], count: 0, value: 0 };
   });
-  let dated = 0, total = 0, q4 = 0;
+  const value: Dollars[] = months.map(() => ZERO);
+  let dated = 0, total = ZERO, q4 = ZERO;
   for (const a of aw) {
     const d = String(a.start_date || "");
     const cal = Number(d.slice(5, 7));
     if (!(cal >= 1 && cal <= 12)) continue;   // undated rows contribute nothing
     const fm = ((cal - 10 + 12) % 12) + 1;
-    const slot = months[fm - 1];
-    const amount = Number(a.amount) || 0;
-    slot.count += 1; slot.value += amount;
-    dated++; total += amount;
-    if (cal >= 7 && cal <= 9) q4 += amount;   // fiscal Q4 = Jul/Aug/Sep
+    months[fm - 1].count += 1;
+    value[fm - 1] = addD(value[fm - 1], a.amount);
+    dated++; total = addD(total, a.amount);
+    if (cal >= 7 && cal <= 9) q4 = addD(q4, a.amount);   // fiscal Q4 = Jul/Aug/Sep
   }
   if (!dated) return null;
-  const peak = months.reduce<SeasonalityMonth | null>(
-    (best, m) => (!best || m.value > best.value ? m : best), null);
+  months.forEach((m, i) => { m.value = wire(value[i]); });
+  let peakIdx = -1;
+  value.forEach((v, i) => { if (peakIdx < 0 || gtD(v, value[peakIdx])) peakIdx = i; });
+  const peak = peakIdx >= 0 && gtD(value[peakIdx], ZERO) ? months[peakIdx] : null;
   return {
     months,
-    q4Share: total > 0 ? (q4 / total) * 100 : null,
-    peak: peak && peak.value > 0 ? peak : null,
+    q4Share: pctOfD(q4, total),
+    peak,
     truncated: sample?.truncated === true
   };
 }
@@ -251,8 +332,16 @@ export function seasonality(sample: AwardSample | null | undefined): Seasonality
 
    ⛔ NO MARGIN, NO COST, NO LABOUR RATES. USAspending does not carry them and
    never will. Headroom is contract capacity, NOT profit available to anyone. */
+/** Wire shape of a ceiling row — plain numbers, raw dollars. */
+export interface CeilingRowWire extends Omit<CeilingRow, "ceiling" | "obligated" | "headroom" | "subawarded"> {
+  ceiling: number;
+  obligated: number;
+  headroom: number;
+  subawarded: number | null;
+}
+
 export interface CeilingHeadroom {
-  rows: CeilingRow[];
+  rows: CeilingRowWire[];
   totalCeiling: number;
   totalObligated: number;
   totalHeadroom: number;
@@ -270,7 +359,7 @@ export function ceilingHeadroom(sample: AwardSample | null | undefined): Ceiling
   const c = sample?.ceilings;
   const rows = Array.isArray(c?.rows) ? c!.rows! : [];
   if (!rows.length) return null;
-  const sum = (f: (r: CeilingRow) => number) => rows.reduce((n, r) => n + (Number(f(r)) || 0), 0);
+  const sum = (f: (r: CeilingRow) => Dollars) => sumD(rows.map(f));
 
   /* GROUPED BY FIRM, and it has to be — the panel answers "who has room left",
      which is a question about a company, not about a contract. Rendered award by
@@ -287,11 +376,11 @@ export function ceilingHeadroom(sample: AwardSample | null | undefined): Ceiling
       byFirm.set(key, { ...r, contracts: 1 });
       continue;
     }
-    cur.ceiling += r.ceiling;
-    cur.obligated += r.obligated;
-    cur.headroom += r.headroom;
+    cur.ceiling = addD(cur.ceiling, r.ceiling);
+    cur.obligated = addD(cur.obligated, r.obligated);
+    cur.headroom = addD(cur.headroom, r.headroom);
     cur.contracts += 1;
-    cur.subawarded = (cur.subawarded || 0) + (r.subawarded || 0);
+    cur.subawarded = addD(cur.subawarded || ZERO, r.subawarded || ZERO);
     cur.subaward_count = (cur.subaward_count || 0) + (r.subaward_count || 0);
     // Keep the longer spelling: "INCORPORATED" over "INC" reads as the company.
     if (r.recipient.length > cur.recipient.length) cur.recipient = r.recipient;
@@ -299,10 +388,16 @@ export function ceilingHeadroom(sample: AwardSample | null | undefined): Ceiling
 
   return {
     // Largest headroom first — that is the reading the panel exists to give.
-    rows: [...byFirm.values()].sort((a, b) => b.headroom - a.headroom),
-    totalCeiling: sum((r) => r.ceiling),
-    totalObligated: sum((r) => r.obligated),
-    totalHeadroom: sum((r) => r.headroom),
+    rows: [...byFirm.values()]
+      .sort((a, b) => cmpD(a.headroom, b.headroom))
+      .map((r) => ({
+        ...r,
+        ceiling: wire(r.ceiling), obligated: wire(r.obligated),
+        headroom: wire(r.headroom), subawarded: wireOrNull(r.subawarded)
+      })),
+    totalCeiling: wire(sum((r) => r.ceiling)),
+    totalObligated: wire(sum((r) => r.obligated)),
+    totalHeadroom: wire(sum((r) => r.headroom)),
     subcontracting: rows.filter((r) => (r.subaward_count || 0) > 0).length,
     /** AWARDS sampled, not firms — the cap is an award cap, so the two numbers
      *  have to be counted in the same unit or the caption contradicts itself. */

@@ -19,7 +19,9 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { awardSizeDistribution, primeSubcontractTargets, seasonality, ceilingHeadroom } from "./award-analytics";
-import type { AwardSample, SizeDistribution, PrimeTargets, Seasonality, CeilingHeadroom } from "./award-analytics";
+import { parseAwardSample } from "./award-analytics";
+import type { UnitManifest } from "./money";
+import type { AwardSample, RawAwardSample, SizeDistribution, PrimeTargets, Seasonality, CeilingHeadroom } from "./award-analytics";
 
 export interface NamedAmount { name: string; amount: number }
 export interface StateAmount { state: string; amount: number }
@@ -51,7 +53,11 @@ interface IntelRow {
   // The 500 largest awards for this (code, year). Everything the recipient
   // TOTALS aggregate away — a single deal's size, its buying office, when it
   // started. NULL means never pulled.
-  award_sample: AwardSample | null;
+  // RAW shape — plain numbers, exactly as the JSONB column holds them. It becomes
+  // typed money only through parseAwardSample(); typing this field as the parsed
+  // shape would let the `as unknown as IntelRow[]` cast below smuggle unwrapped
+  // numbers past every unit check in the file.
+  award_sample: RawAwardSample | null;
   yoy_delta_pct: number | null;
   refreshed_at: string | null;
 }
@@ -197,6 +203,17 @@ export interface SpendingPayload {
   // Panels the stored table cannot support. Each names the measurement that is
   // missing, so the page says what is not connected instead of rendering blank.
   unsupported: Array<{ panel: string; needs: string }>;
+  /* ⛔ WHICH UNIT EACH MONEY BRANCH IS IN. This payload carries BOTH — derived
+     totals in MILLIONS, award-level figures in RAW DOLLARS — and until this
+     existed nothing said so. A raw dollar figure formatted by a helper that
+     assumes millions printed $90.76B beside a $30.06B headline.
+
+     The server is unit-safe by type (see ./money): mixing them is a compile
+     error. The BROWSER is plain JavaScript and gets none of that, so the only
+     thing that can stop the next mis-format is the payload declaring itself.
+     Every money-bearing top-level branch appears here — `_units-manifest`
+     enforces it, and a new branch fails that gate rather than shipping silent. */
+  units: UnitManifest;
 }
 
 export type SpendingResult =
@@ -205,6 +222,22 @@ export type SpendingResult =
   | { state: "no-rows"; requested: string[] };
 
 const TOP_N = 10;
+
+/* ⛔ THE UNIT OF EVERY MONEY BRANCH ON THE WIRE. Derived totals are converted to
+   millions by toM(); award-level branches are passed through in the raw dollars
+   USAspending stores. Both are correct; carrying both undeclared is what was
+   not. Add a money branch to SpendingPayload and `_units-manifest` fails until
+   its unit is named here. */
+export const PAYLOAD_UNITS: UnitManifest = {
+  BY_FY: "millions",
+  MARKET_TREND: "millions",
+  SB_SHARE: "millions",
+  SB_WINNERS: "millions",
+  CONCENTRATION: "millions",
+  AWARD_ANALYTICS: "dollars",
+  BUYING_OFFICES: "dollars",
+  RECOMPETES: "dollars"
+};
 
 const fyLabel = (fy: number) => `FY${fy}`;
 const toM = (dollars: number) => dollars / 1_000_000;
@@ -577,7 +610,10 @@ export async function fetchDefenseSpending(
     const sbAll: string[] = [];
     const byCode: SpendingPayload["AWARD_ANALYTICS"][string]["byCode"] = {};
     for (const r of fyRows) {
-      const smp = r.award_sample;
+      // THE PARSE BOUNDARY — raw JSONB in, typed money out, once per row. Every
+      // read below is unit-checked, and nothing downstream can see a bare number
+      // it might add into a millions total.
+      const smp = parseAwardSample(r.award_sample);
       const sbNames = (r.sb_recipients || []).map((x) => x.name);
       sbAll.push(...sbNames);
       byCode[r.naics_code] = {
@@ -705,6 +741,7 @@ export async function fetchDefenseSpending(
     SB_SHARE,
     CONCENTRATION,
     SB_WINNERS,
-    unsupported: UNSUPPORTED
+    unsupported: UNSUPPORTED,
+    units: PAYLOAD_UNITS
   };
 }

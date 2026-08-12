@@ -51,6 +51,12 @@
       window.DSB.as_of = data.as_of || null;
       window.DSB.window_note = data.window_note || '';
       window.DSB.unsupported = Array.isArray(data.unsupported) ? data.unsupported : [];
+      /* Which unit each money branch is in. This file copies ONE FIELD AT A TIME,
+         so a payload field with no line here reaches the browser and stops — the
+         manifest would have sat on the wire, unreadable by the only code that
+         needs it. Default {} rather than null: a reader asking units.BY_FY of an
+         older payload gets undefined, not a crash. */
+      window.DSB.units = data.units || {};
 
       // A payload with no fiscal years is not a dashboard with nothing in it —
       // it is a read that produced nothing, and it says so.
