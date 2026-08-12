@@ -212,6 +212,9 @@ button{font-family:inherit}
 .rank-row:hover{background:var(--card-soft)}
 .rank-row.selected{background:var(--accent-pale);border-color:var(--accent-light)}
 [data-theme="dark"] .rank-row.selected{background:rgba(55,138,221,0.16)}
+/* The selected row's tint lifts its background, which leaves --mute secondary
+   text at 4.04:1 — under AA on the one row the reader just picked. */
+[data-theme="dark"] .rank-row.selected .rank-note{color:var(--ink-2)}
 .rank-row.dim{opacity:.4}
 .rank-n{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute-2);font-weight:700;text-align:center}
 .rank-st{font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:800;color:var(--ink)}
@@ -513,6 +516,16 @@ button{font-family:inherit}
 .blk .rc-row{border-top:1px solid rgba(24,95,165,.16)}
 .blk .rc-row:first-of-type{border-top:1px solid rgba(24,95,165,.16)}
 a.blk .rc-row:hover,.blk a.rc-row:hover{background:rgba(255,255,255,.55)}
+/* A FIXED-LIGHT SURFACE UNDER THEME-FOLLOWING TEXT. --accent-pale is one value
+   in both themes, and the two lines that carry this block's whole point take
+   --ink, which inverts. In dark that put #e8eef6 on #E6F1FB: measured 1.02:1,
+   so the incumbent's name and a $2,090,829,187 total were invisible. Every
+   fixed-light surface here gets a dark counterpart, and --accent-deep flips to
+   a light accent because it is text ON that surface, not the surface. */
+[data-theme="dark"] .blk{background:rgba(55,138,221,0.16)}
+[data-theme="dark"] .blk-s{color:var(--accent-light)}
+[data-theme="dark"] .blk .rc-row,[data-theme="dark"] .blk .rc-row:first-of-type{border-top:1px solid rgba(181,212,244,.16)}
+[data-theme="dark"] a.blk .rc-row:hover,[data-theme="dark"] .blk a.rc-row:hover{background:rgba(255,255,255,.06)}
 .rc-row{display:grid;grid-template-columns:104px minmax(0,1fr) 152px;gap:1px 18px;align-items:baseline;padding:10px 8px;margin:0 -8px;text-decoration:none;color:inherit;border-top:1px solid var(--line-3)}
 .rc-row:first-of-type{border-top:0}
 a.rc-row:hover{background:var(--card-soft)}
