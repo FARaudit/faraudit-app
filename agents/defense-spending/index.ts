@@ -57,6 +57,10 @@ interface IntelRow {
   contract_type_breakdown: unknown;
   recompetes_expiring_90d: unknown;
   recompetes_expiring_180d: unknown;
+  // Award-level records — the panels that need a single award's value, set-aside,
+  // pricing type and buying office. A SAMPLE of the largest, with its own count
+  // and cap stored beside it so no reader can mistake it for the whole.
+  award_sample: unknown;
   yoy_delta_pct: number | null;
   // WRITTEN EXPLICITLY, not left to the column default. The default fires on
   // INSERT only, so an upsert that UPDATES an existing row left this reading
@@ -69,7 +73,7 @@ interface IntelRow {
 
 async function buildRow(naics: string, win: FYWindow, priorTotal: number | null): Promise<IntelRow> {
   const f = { naics, fyStart: win.start, fyEnd: win.end };
-  const [total, sb, recipients, sbRecipients, agencies, states, contractTypes, rec90, rec180] = await Promise.all([
+  const [total, sb, recipients, sbRecipients, agencies, states, contractTypes, rec90, rec180, awardSample] = await Promise.all([
     usa.fetchTotalObligations(f),
     usa.fetchSmallBusinessObligations(f),
     usa.fetchTopRecipients(f),
@@ -78,7 +82,8 @@ async function buildRow(naics: string, win: FYWindow, priorTotal: number | null)
     usa.fetchStateBreakdown(f),
     usa.fetchContractTypeBreakdown(f),
     usa.fetchRecompetes(f, 0, 90),
-    usa.fetchRecompetes(f, 90, 180)
+    usa.fetchRecompetes(f, 90, 180),
+    usa.fetchAwardSample(f)
   ]);
   const sbPct = total && total > 0 && sb != null ? (sb / total) * 100 : null;
   const yoy = priorTotal != null && priorTotal > 0 && total != null ? ((total - priorTotal) / priorTotal) * 100 : null;
@@ -95,16 +100,45 @@ async function buildRow(naics: string, win: FYWindow, priorTotal: number | null)
     contract_type_breakdown: contractTypes,
     recompetes_expiring_90d: rec90,
     recompetes_expiring_180d: rec180,
+    award_sample: awardSample,
     yoy_delta_pct: yoy,
     refreshed_at: new Date().toISOString()
   };
 }
 
+/** Deploy order must not matter. This worker and the migration that adds
+ *  `award_sample` land through different systems — a push to main deploys the
+ *  Railway service, while the column is applied by hand in Studio — so for some
+ *  window one will exist without the other. PostgREST rejects the WHOLE row when
+ *  it carries an unknown column, so an unguarded write would have taken down the
+ *  nightly refresh of every field that already worked, in order to add one that
+ *  did not.
+ *
+ *  So: write the full row, and if the schema has not caught up, drop the new
+ *  field and write everything else. The retry is narrow on purpose — it fires
+ *  only on an unknown-column error naming award_sample, and it says so in the log
+ *  rather than degrading silently. */
 async function upsert(row: IntelRow): Promise<void> {
   const { error } = await supabase
     .from("defense_spending_intel")
     .upsert(row, { onConflict: "naics_code,fiscal_year" });
-  if (error) throw new Error(`upsert ${row.naics_code}/${row.fiscal_year}: ${error.message}`);
+  if (!error) return;
+
+  const msg = error.message || "";
+  const schemaLagging = /award_sample/.test(msg) && /(column|schema cache|PGRST204)/i.test(msg);
+  if (!schemaLagging) {
+    throw new Error(`upsert ${row.naics_code}/${row.fiscal_year}: ${msg}`);
+  }
+
+  console.warn(
+    `[defense-spending] award_sample column not present yet — writing ${row.naics_code}/FY${row.fiscal_year} without it. ` +
+    `Apply supabase/migrations/033_defense_spending_award_sample.sql to enable the award-level panels.`
+  );
+  const { award_sample: _dropped, ...withoutSample } = row;
+  const { error: retryErr } = await supabase
+    .from("defense_spending_intel")
+    .upsert(withoutSample, { onConflict: "naics_code,fiscal_year" });
+  if (retryErr) throw new Error(`upsert ${row.naics_code}/${row.fiscal_year}: ${retryErr.message}`);
 }
 
 async function main() {
@@ -120,7 +154,7 @@ async function main() {
       const row = await buildRow(naics, win, priorTotal);
       await upsert(row);
       const sbCount = Array.isArray(row.sb_recipients) ? row.sb_recipients.length : 0;
-      console.log(`  · FY${win.fy}: total=$${(row.total_obligations || 0).toLocaleString()} · sb_pct=${row.sb_pct?.toFixed(1)}% · yoy=${row.yoy_delta_pct?.toFixed(1)}% · sb_recipients=${sbCount}`);
+      console.log(`  · FY${win.fy}: total=$${(row.total_obligations || 0).toLocaleString()} · sb_pct=${row.sb_pct?.toFixed(1)}% · yoy=${row.yoy_delta_pct?.toFixed(1)}% · sb_recipients=${sbCount} · awards=${(row.award_sample as {sampled?:number})?.sampled ?? 0}${(row.award_sample as {truncated?:boolean})?.truncated ? ' (capped)' : ''}`);
       priorTotal = row.total_obligations;
     }
   }
