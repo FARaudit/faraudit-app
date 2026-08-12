@@ -18,6 +18,8 @@
 //     the date rather than implying the number is today's.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { awardSizeDistribution, primeSubcontractTargets, seasonality } from "./award-analytics";
+import type { AwardSample, SizeDistribution, PrimeTargets, Seasonality } from "./award-analytics";
 
 export interface NamedAmount { name: string; amount: number }
 export interface StateAmount { state: string; amount: number }
@@ -40,6 +42,14 @@ interface IntelRow {
   agency_breakdown: NamedAmount[] | null;
   state_breakdown: StateAmount[] | null;
   recompetes_expiring_180d: RecompeteRow[] | null;
+  // Definitive contracts ending 365-548 days out — the window a recompete is
+  // actually solicited in. NULL means the worker has never pulled it, which is
+  // NOT the same as a market with no recompetes; see RECOMPETES_MEASURED.
+  recompetes_upcoming: RecompeteRow[] | null;
+  // The 500 largest awards for this (code, year). Everything the recipient
+  // TOTALS aggregate away — a single deal's size, its buying office, when it
+  // started. NULL means never pulled.
+  award_sample: AwardSample | null;
   yoy_delta_pct: number | null;
   refreshed_at: string | null;
 }
@@ -121,6 +131,27 @@ export interface SpendingPayload {
   BY_FY: Record<string, FyView>;
   MARKET_TREND: { labels: string[]; series: Record<string, number[]> };
   RECOMPETES: Array<RecompeteRow & { naics: string; expired: boolean }>;
+  /* FALSE means no row has ever carried recompetes_upcoming, so RECOMPETES is
+     empty because nothing was MEASURED — not because the market is quiet. The
+     panel's empty state says "nothing in your codes expires in this window",
+     which is a claim about the market and would be a lie under a NULL column.
+     Migration 034 drew this line in the schema; it has to survive to the page. */
+  RECOMPETES_MEASURED: boolean;
+  /* Award-level views, per fiscal year: the size of a real deal, the primes
+     carrying a subcontracting-plan obligation, and when the money moves. All
+     three are DERIVED from the stored award_sample — no extra USAspending
+     request, which matters because a burst of them is what got this worker
+     IP-blocked on 2026-08-12. `null` for a year nothing was sampled in. */
+  AWARD_ANALYTICS: Record<string, {
+    size: SizeDistribution | null;
+    primes: PrimeTargets | null;
+    season: Seasonality | null;
+    byCode: Record<string, {
+      size: SizeDistribution | null;
+      primes: PrimeTargets | null;
+      season: Seasonality | null;
+    }>;
+  }>;
   /** "Is there money here for a company my size?" — the share of each code that
    *  reaches small business, across every measured year. Computed from the two
    *  figures the table already stores per (code, year); no new source. */
@@ -203,7 +234,7 @@ export async function fetchDefenseSpending(
     .from("defense_spending_intel")
     .select(
       "naics_code,fiscal_year,total_obligations,sb_obligations,sb_pct,top_recipients,sb_recipients," +
-        "agency_breakdown,state_breakdown,recompetes_expiring_180d,yoy_delta_pct,refreshed_at"
+        "agency_breakdown,state_breakdown,recompetes_expiring_180d,recompetes_upcoming,award_sample,yoy_delta_pct,refreshed_at"
     )
     .in("naics_code", requested);
   if (error) throw new Error(`defense_spending_intel read failed: ${error.message}`);
@@ -478,15 +509,24 @@ export async function fetchDefenseSpending(
 
   // ── recompetes: one flat list, DEDUPED, each marked against today ──
   //
-  // The worker asks USAspending for awards ending in the next 180 days and
-  // stores the answer on EVERY fiscal-year row — the question has no fiscal
-  // year in it, so all three rows hold the same awards. Flattening them gave
-  // the page each award three times: measured 39 entries, 13 distinct. An
+  // The worker stores the answer on EVERY fiscal-year row — the question has no
+  // fiscal year in it, so all three rows hold the same awards. Flattening them
+  // gave the page each award three times: measured 39 entries, 13 distinct. An
   // award_id is unique, so it is the key.
+  //
+  // SOURCE CHANGED (card 828): recompetes_upcoming, not recompetes_expiring_180d.
+  // The old column is "contracts expiring within 180 days", which is not a
+  // recompete — measured across five codes, 85% of it was delivery and purchase
+  // orders, and an order ending is the parent IDIQ placing its next one. The new
+  // column is definitive contracts 365-548 days out. The old column is still
+  // written and still stored; it simply no longer feeds this panel.
   const today = new Date().toISOString().slice(0, 10);
+  // NULL and [] are different answers and the page must not conflate them. A
+  // single row carrying a non-null array is enough to prove the worker has run.
+  const RECOMPETES_MEASURED = rows.some((r) => Array.isArray(r.recompetes_upcoming));
   const byAward = new Map<string, RecompeteRow & { naics: string; expired: boolean }>();
   for (const r of rows) {
-    for (const x of r.recompetes_expiring_180d || []) {
+    for (const x of r.recompetes_upcoming || []) {
       const key = x.award_id || `${x.recipient}|${x.end_date}|${x.amount}`;
       if (byAward.has(key)) continue;
       byAward.set(key, {
@@ -501,6 +541,50 @@ export async function fetchDefenseSpending(
   }
   const RECOMPETES = Array.from(byAward.values())
     .sort((a, b) => (a.end_date || "").localeCompare(b.end_date || ""));
+
+  /* ── AWARD-LEVEL VIEWS (items 3, 4, 5 of the tab's path) ──────────────────
+     Derived from the stored sample, so this costs ZERO USAspending requests.
+     That is a deliberate constraint, not a convenience: a burst of ~800 calls
+     in 24 seconds got this worker's IP blocked by USAspending's WAF on
+     2026-08-12 and nulled 14 of 33 rows. Panels that can be computed from what
+     is already stored are computed from what is already stored.
+
+     Aggregating across codes CONCATENATES the samples rather than summing any
+     derived figure — a median of medians is not a median. `truncated` ORs, so
+     one capped code makes the aggregate honest about being a sample.
+     Small-business names come from this code's own sb_recipients, which is why
+     the prime filter is per-code before it is aggregated. */
+  const AWARD_ANALYTICS: SpendingPayload["AWARD_ANALYTICS"] = {};
+  for (const year of years) {
+    const fy = fyLabel(year);
+    const fyRows = rowsFor(year);
+    const merged: AwardSample = { awards: [], sampled: 0, cap: null, truncated: false };
+    const sbAll: string[] = [];
+    const byCode: SpendingPayload["AWARD_ANALYTICS"][string]["byCode"] = {};
+    for (const r of fyRows) {
+      const smp = r.award_sample;
+      const sbNames = (r.sb_recipients || []).map((x) => x.name);
+      sbAll.push(...sbNames);
+      byCode[r.naics_code] = {
+        size: awardSizeDistribution(smp),
+        primes: primeSubcontractTargets(smp, sbNames),
+        season: seasonality(smp)
+      };
+      if (smp && Array.isArray(smp.awards)) {
+        merged.awards!.push(...smp.awards);
+        merged.sampled = (merged.sampled || 0) + (smp.sampled || smp.awards.length);
+        merged.cap = smp.cap ?? merged.cap;
+        if (smp.truncated) merged.truncated = true;
+      }
+    }
+    const any = (merged.awards || []).length > 0;
+    AWARD_ANALYTICS[fy] = {
+      size: any ? awardSizeDistribution(merged) : null,
+      primes: any ? primeSubcontractTargets(merged, sbAll) : null,
+      season: any ? seasonality(merged) : null,
+      byCode
+    };
+  }
 
   const MARKET_TREND = {
     labels: FYS,
@@ -588,6 +672,8 @@ export async function fetchDefenseSpending(
     BY_FY,
     MARKET_TREND,
     RECOMPETES,
+    RECOMPETES_MEASURED,
+    AWARD_ANALYTICS,
     SB_SHARE,
     CONCENTRATION,
     SB_WINNERS,

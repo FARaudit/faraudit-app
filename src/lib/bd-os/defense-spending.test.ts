@@ -48,6 +48,9 @@ const ROWS = [
     // year-on-year rather than a fabricated zero.
     state_breakdown: [{ state: "CT", amount: 2880321754 }, { state: "OH", amount: 839018472 }],
     recompetes_expiring_180d: [REC],
+    // SOURCE OF THE PANEL as of card 828 — the 180d column is still stored but no
+    // longer feeds it; it was 85% delivery/purchase orders, which are never competed.
+    recompetes_upcoming: [REC],
     refreshed_at: "2026-05-20T05:36:30.623201+00:00"
   },
   {
@@ -58,6 +61,9 @@ const ROWS = [
     agency_breakdown: [{ name: "Department of Defense", amount: 11968722542 }],
     state_breakdown: [{ state: "CT", amount: 5375688319 }],
     recompetes_expiring_180d: [REC],
+    // SOURCE OF THE PANEL as of card 828 — the 180d column is still stored but no
+    // longer feeds it; it was 85% delivery/purchase orders, which are never competed.
+    recompetes_upcoming: [REC],
     refreshed_at: "2026-05-20T05:36:31.882989+00:00"
   },
   {
@@ -75,6 +81,9 @@ const ROWS = [
     agency_breakdown: [{ name: "Department of Defense", amount: 2471563423 }],
     state_breakdown: [{ state: "CT", amount: 702326852 }],
     recompetes_expiring_180d: [REC],
+    // SOURCE OF THE PANEL as of card 828 — the 180d column is still stored but no
+    // longer feeds it; it was 85% delivery/purchase orders, which are never competed.
+    recompetes_upcoming: [REC],
     refreshed_at: "2026-05-20T05:36:32.881704+00:00"
   }
 ];
@@ -361,6 +370,25 @@ async function main() {
     "codes on file with nothing pulled is a DIFFERENT state — never another code's figures under theirs");
   assert(noRows.state === "no-rows" && JSON.stringify(noRows.requested) === JSON.stringify(["541330"]),
     "and it names which code was asked for");
+
+  // ── NULL COLUMN vs EMPTY MARKET ───────────────────────────────────────────
+  // The panel's empty state says "nothing in your codes expires in this window",
+  // which is a claim about the MARKET. Under a never-pulled column that claim is
+  // false, and the two states are one value apart in the payload.
+  {
+    const nulled = ROWS.map((r) => ({ ...r, recompetes_upcoming: null }));
+    const out = await fetchDefenseSpending(fakeClient(nulled), ["336412"]);
+    assert(out.state === "ok" && out.RECOMPETES_MEASURED === false,
+      "a NULL recompetes_upcoming reports MEASURED=false — the market was never asked");
+    assert(out.state === "ok" && out.RECOMPETES.length === 0, "and yields no rows");
+
+    const emptied = ROWS.map((r) => ({ ...r, recompetes_upcoming: [] }));
+    const out2 = await fetchDefenseSpending(fakeClient(emptied), ["336412"]);
+    assert(out2.state === "ok" && out2.RECOMPETES_MEASURED === true,
+      "an EMPTY array reports MEASURED=true — asked and answered, the market is quiet");
+    assert(out2.state === "ok" && out2.RECOMPETES.length === 0,
+      "and also yields no rows — the row count alone cannot tell these apart");
+  }
 
   // ── A READ FAILURE IS A THROW, NOT AN EMPTY DASHBOARD ─────────────────────
   const broken = {
