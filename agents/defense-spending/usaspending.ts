@@ -23,23 +23,61 @@ export interface Filters {
 
 interface CategoryResult { name?: string; code?: string; amount: number }
 
+/* FAILURE AND EMPTY ARE THE SAME VALUE HERE, AND THAT COST US 14 ROWS.
+   post() returns null on a network error, on an HTTP error, and on a genuinely
+   empty answer. Every caller maps null to 0 or []. So when USAspending blocked
+   us, the worker built rows full of zeroes and UPSERTED THEM OVER GOOD DATA:
+   2026-08-12T04:03Z, 326 blocked requests, 14 of 33 rows overwritten with nulls
+   including 336412 FY2026 ($4.99B -> NULL) and all three 336611 rows. The run
+   exited 0 and the deployment read SUCCESS.
+
+   The fix is not to make post() throw — a genuinely empty facet is legitimate
+   and must stay cheap. It is to COUNT transport failures so the caller can tell
+   "this market is empty" from "we were not allowed to ask", and refuse to write
+   in the second case. */
+let transportFailures = 0;
+/** Reset before a unit of work; read after. Non-zero means at least one request
+ *  never got an answer, so any zero in that unit is unproven. */
+export function resetTransportFailures(): void { transportFailures = 0; }
+export function transportFailureCount(): number { return transportFailures; }
+
+/* USAspending's WAF blocks bursts, and it blocks the IP rather than the request
+   — once tripped, everything after it fails too, which is why the damage ran in
+   NAICS order and hit the last six codes. Requests are serialised with a gap so
+   the nightly stays under it. 33 row-builds x ~25 requests at 120ms is roughly
+   100 seconds of pacing, against a 24-second run that got us blocked. */
+const REQUEST_GAP_MS = Number(process.env.USASPENDING_GAP_MS || 120);
+let queue: Promise<unknown> = Promise.resolve();
+function paced<T>(fn: () => Promise<T>): Promise<T> {
+  const next = queue.then(fn, fn);
+  queue = next.then(
+    () => new Promise((r) => setTimeout(r, REQUEST_GAP_MS)),
+    () => new Promise((r) => setTimeout(r, REQUEST_GAP_MS))
+  );
+  return next;
+}
+
 async function post<T>(path: string, body: unknown): Promise<T | null> {
-  try {
-    const res = await fetch(`${API_BASE}${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify(body)
-    });
-    if (!res.ok) {
-      const txt = await res.text();
-      console.warn(`[usaspending] ${path} HTTP ${res.status}: ${txt.slice(0, 200)}`);
+  return paced(async () => {
+    try {
+      const res = await fetch(`${API_BASE}${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        transportFailures++;
+        console.warn(`[usaspending] ${path} HTTP ${res.status}: ${txt.slice(0, 200)}`);
+        return null;
+      }
+      return (await res.json()) as T;
+    } catch (err) {
+      transportFailures++;
+      console.warn(`[usaspending] ${path} threw: ${err instanceof Error ? err.message : String(err)}`);
       return null;
     }
-    return (await res.json()) as T;
-  } catch (err) {
-    console.warn(`[usaspending] ${path} threw: ${err instanceof Error ? err.message : String(err)}`);
-    return null;
-  }
+  });
 }
 
 function baseFilters(f: Filters) {
