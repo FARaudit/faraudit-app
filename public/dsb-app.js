@@ -100,6 +100,7 @@
       .forEach((c, i) => { naicsColor[c] = PALETTE[i % PALETTE.length]; });
   }
 
+  let usGeo = null;
   const emptyLine = (t) => '<div class="dsb-empty">' + esc(t) + '</div>';
 
   /* ════════════════ CONTROLS ════════════════ */
@@ -204,6 +205,20 @@
   /* ════════════════ GEO MAP ════════════════
      The colour ramp is rebuilt from the values present. Fixed dollar
      thresholds would suit one customer's codes and not another's. */
+  let geoBreaks = [];
+  const GEO_RAMP = ['--geo-0', '--geo-1', '--geo-2', '--geo-4', '--geo-5', '--geo-6'];
+  function computeBreaks() {
+    const vals = Object.values(view().states).map(s => s.val).filter(v => v > 0).sort((a, b) => a - b);
+    geoBreaks = vals.length ? [0.2, 0.4, 0.6, 0.8].map(q => vals[Math.floor(q * (vals.length - 1))]) : [];
+  }
+  function lvl(v) {
+    if (v == null || !geoBreaks.length) return 0;
+    let i = 1; for (const b of geoBreaks) { if (v > b) i++; }
+    return Math.min(i, 5);
+  }
+  const geoColor = (v) => css(GEO_RAMP[lvl(v)]);
+  const LABEL_LONLAT = { FL: [-81.4, 28.4], MI: [-84.6, 43.4], LA: [-92.2, 30.9] };
+  const FORCE_CALLOUT = new Set(['MD', 'DE', 'DC', 'RI', 'CT', 'NJ']);
 
   /* Every state carries its abbreviation, whether or not it holds obligations.
      The feed only names the top ten per code, so an unnamed state is one we did
@@ -223,8 +238,87 @@
   };
   const abbrFor = (d) => (view().states[d.id] || {}).abbr || FIPS_ABBR[d.id] || '';
 
+  function renderLegend() {
+    const el = $('geoLegend'); if (!el) return;
+    if (!geoBreaks.length) { clear(el); return; }
+    const edges = [0].concat(geoBreaks);
+    const bands = edges.map((lo, i) => {
+      const hi = edges[i + 1];
+      const label = hi == null ? fmtM(lo) + '+' : (i === 0 ? '<' + fmtM(hi) : fmtM(lo) + '–' + fmtM(hi));
+      return `<span class="sw"><i style="background:${css(GEO_RAMP[i + 1])}"></i>${esc(label)}</span>`;
+    });
+    /* Every state is named on the map, so the fill of an unnamed-in-the-feed state
+       needs its own key — otherwise a muted label reads as a measured zero. */
+    bands.push(`<span class="sw"><i style="background:${css(GEO_RAMP[0])}"></i>outside the top ten</span>`);
+    setHTML(el, bands.join(''));
+  }
 
+  function renderMap() {
+    const svg = d3.select('#geoSvg'); svg.selectAll('*').remove();
+    if (!usGeo) return;
+    const ST = view().states;
+    const states = topojson.feature(usGeo, usGeo.objects.states);
+    const proj = d3.geoAlbersUsa().fitSize([960, 500], states);
+    const path = d3.geoPath(proj);
+    const g = svg.append('g');
+    g.selectAll('path').data(states.features).join('path')
+      .attr('d', path)
+      .attr('class', d => {
+        let c = 'state';
+        if (S.state && S.state !== d.id) c += ' dim';
+        if (S.state === d.id) c += ' selected';
+        return c;
+      })
+      .attr('fill', d => { const s = ST[d.id]; return geoColor(s ? s.val : null); })
+      .attr('stroke', css('--geo-stroke')).attr('stroke-width', .9)
+      .on('mousemove', (ev, d) => showStateTip(ev, d.id))
+      .on('mouseleave', hideTip)
+      .on('click', (ev, d) => { if (ST[d.id]) { S.state = (S.state === d.id ? null : d.id); syncControls(); renderAll(); } });
 
+    const labeled = states.features.filter(d => abbrFor(d) && abbrFor(d) !== 'HI');
+    const inlineFeats = [], callItems = [];
+    labeled.forEach(d => {
+      const ab = abbrFor(d), b = path.bounds(d);
+      const w = b[1][0] - b[0][0], h = b[1][1] - b[0][1];
+      if (!FORCE_CALLOUT.has(ab) && (LABEL_LONLAT[ab] || (w >= 13 && h >= 10))) inlineFeats.push(d);
+      else callItems.push({ s: ST[d.id] || null, abbr: ab, c: path.centroid(d) });
+    });
+    g.selectAll('text.geo-lab').data(inlineFeats).join('text')
+      .attr('class', d => {
+        const s = ST[d.id];
+        if (!s) return 'geo-lab nodata';
+        return 'geo-lab' + (lvl(s.val) >= 4 ? ' lt' : '');
+      })
+      .attr('transform', d => { const ab = abbrFor(d); const ov = LABEL_LONLAT[ab]; const p = (ov && proj(ov)) ? proj(ov) : path.centroid(d); return `translate(${p[0]},${p[1]})`; })
+      .attr('text-anchor', 'middle').attr('dy', 3).text(d => abbrFor(d));
+
+    callItems.sort((a, b) => a.c[1] - b.c[1]);
+    const colX = 930, startY = 170, stepY = 16;
+    const cg = g.append('g').attr('class', 'callouts');
+    callItems.forEach((it, i) => {
+      const ly = startY + i * stepY;
+      cg.append('line').attr('x1', it.c[0]).attr('y1', it.c[1]).attr('x2', colX - 6).attr('y2', ly).attr('stroke', css('--mute-2')).attr('stroke-width', .7).attr('opacity', .55);
+      cg.append('circle').attr('cx', colX).attr('cy', ly).attr('r', 3.2).attr('fill', geoColor(it.s ? it.s.val : null)).attr('stroke', css('--mute-2')).attr('stroke-width', .6);
+      cg.append('text').attr('x', colX + 7).attr('y', ly).attr('dy', 3.2)
+        .attr('class', 'geo-callout' + (it.s ? '' : ' nodata')).text(it.abbr);
+    });
+  }
+
+  function showStateTip(ev, fips) {
+    const s = view().states[fips]; const tip = $('geoTip');
+    if (!s) { hideTip(); return; }
+    // A state outside the prior year's top ten has no comparable base, so its
+    // change is unknown rather than zero — and the tooltip says which.
+    const yo = s.yoy == null
+      ? '<span class="flat">no prior-year figure</span>'
+      : (s.yoy >= 0 ? `<span class="up">▲ +${s.yoy.toFixed(0)}%</span>` : `<span class="down">▼ ${s.yoy.toFixed(0)}%</span>`);
+    setHTML(tip, `<div class="t">${esc(s.name)}<span class="v">${fmtM(s.val)}</span></div>`
+      + `<div class="r">obligated in ${esc(S.fy)} · YoY ${yo}</div>`);
+    tip.style.display = 'block';
+    tip.style.left = Math.min(ev.clientX + 14, window.innerWidth - 200) + 'px';
+    tip.style.top = (ev.clientY + 14) + 'px';
+  }
+  const hideTip = () => { $('geoTip').style.display = 'none'; };
 
   /* ════════════════ RANKED LIST ════════════════
      Two modes. A third, keyed to your firm's own activity, would need a
@@ -234,15 +328,32 @@
     setHTML($('rankTabs'), tabs.map(t => `<button class="rank-tab ${t[0] === S.rankMode ? 'active' : ''}" data-rm="${t[0]}">${t[1]}</button>`).join(''));
     $('rankTabs').querySelectorAll('button').forEach(b => b.onclick = () => { S.rankMode = b.dataset.rm; renderRankList(); });
   }
+  /* The total the map and the leaderboard are both drawing. It is deliberately
+     NOT the headline obligations figure: the feed stores the top ten states per
+     code, so this sums the states it ranks and says so. Printing the headline
+     here would claim the map covers the whole country, and the legend's own
+     "outside the top ten" key says it does not. */
+  function renderGeoTotal() {
+    const el = $('geoTotal'); if (!el) return;
+    const rows = Object.values(view().states);
+    if (!rows.length) { clear(el); return; }
+    const sum = rows.reduce((n, s) => n + (s.val || 0), 0);
+    const scope = S.code ? 'NAICS ' + S.code : 'your codes';
+    setHTML(el, '<b>' + fmtM(sum) + '</b><span>' + rows.length + ' states the feed ranks · '
+      + esc(scope) + ' · ' + esc(S.fy || '') + '</span>');
+  }
+
   function renderRankList() {
     $('rankTabs').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.rm === S.rankMode));
     let arr = Object.entries(view().states).map(([fips, s]) => ({ fips, ...s }));
     if (S.rankMode === 'growth') {
       arr = arr.filter(s => s.yoy != null).sort((a, b) => b.yoy - a.yoy).slice(0, 12);
-      $('rankSub').textContent = 'Fastest year-on-year change · states in both years’ top ten';
+      $('rankSub').textContent = 'Fastest year-on-year change · states in both years’ top ten'
+        + ' · click a state on the map or in the list to scope every panel to it';
     } else {
       arr = arr.sort((a, b) => b.val - a.val).slice(0, 14);
-      $('rankSub').textContent = 'Top states by obligations · ' + S.fy;
+      $('rankSub').textContent = 'Top states by obligations · ' + S.fy
+        + ' · click a state on the map or in the list to scope every panel to it';
     }
     const max = d3.max(arr, d => d.val) || 1;
     setHTML($('rankList'), arr.map((s, i) => {
@@ -512,8 +623,9 @@
     const cap = $('boCap'), sub = $('boSub');
     const box = (D.BUYING_OFFICES || {})[S.fy] || null;
     const scoped = S.code ? 'NAICS ' + S.code : 'your NAICS codes';
-    if (sub) sub.textContent = 'The buying offices inside the departments above · '
-      + scoped + ' · ' + (S.fy || '');
+    // The heading beside it already says "inside them", so this states only what
+    // the numbers are scoped to.
+    if (sub) sub.textContent = scoped + ' · ' + (S.fy || '');
 
     if (!box) { setHTML(host, ''); if (cap) setHTML(cap, ''); return; }
     const list = (S.code ? (box.byCode || {})[S.code] || [] : box.offices || [])
@@ -783,6 +895,13 @@
      so no agency is attributable to a row. */
   function renderIncumbents() {
     const rows = view().incumbents;
+    /* This block follows the concentration rows, which carry their own year on
+       every row. This one follows the year control, so it has to say which year
+       it is — an unlabelled table under a labelled one reads as the same year. */
+    const sub = $('iiPartSub');
+    if (sub) sub.textContent = 'Ranked by obligations · '
+      + (S.code ? 'NAICS ' + S.code : 'your NAICS codes') + ' · ' + (S.fy || '')
+      + ' · SB flagged from the feed’s own list';
     setHTML($('iiBody'), rows.map(r => `<tr>
         <td class="ii-awd">${esc(r.name)}</td>
         <td class="ii-val">${fmtM(r.val)}</td>
@@ -940,16 +1059,27 @@
      It states no FIRM COUNT. The feed lists ten recipients per code, so everything
      below tenth is invisible, and counting the visible ones would report our own
      cap as a market size. */
+  /* The shades the leader bar draws, darkest first. These were read out of the
+     map's ramp by index arithmetic, so removing the map removed the constant and
+     left this the only reference to it — a name inside a template literal, which
+     no syntax check and no render-caller check can see. It threw on the first
+     row with leaders and took the whole page down with it, because renderAll()
+     has no per-panel isolation. Declared here, beside its one consumer. */
+  const CONC_RAMP = ['--geo-6', '--geo-5', '--geo-4', '--geo-2', '--geo-1'];
   function renderConcentration() {
     const el = $('concList'); if (!el) return;
-    const rows = D.CONCENTRATION || [];
+    /* ⛔ ORDERED BY THE SIZE OF THE CODE, NOT BY CODE NUMBER. The payload arrives
+       NAICS-ascending, which led with a $30M code and put a $25.04B one last. It
+       also makes the rows line up with the small-business list in the widget
+       alongside, which is sorted the same way, so a reader can read across. */
+    const rows = (D.CONCENTRATION || []).slice().sort((a, b) => (b.total || 0) - (a.total || 0));
     if (!rows.length) { setHTML(el, '<div class="conc-note">No codes tracked.</div>'); return; }
     setHTML(el, rows.map(r => {
       const leaders = r.leaders || [];
       return `<div class="conc-row">
         <div class="conc-top"><span class="sbs-code">${esc(r.naics)} · ${esc(r.fy)}</span>
           <span class="conc-pct">${r.top5_pct == null ? '—' : r.top5_pct.toFixed(0) + '%'}</span></div>
-        <div class="conc-bar">${leaders.map((l, i) => `<i style="width:${l.pct == null ? 0 : Math.min(100, l.pct).toFixed(2)}%;background:${css(GEO_RAMP[Math.max(1, 5 - i)])}" title="${esc(l.name)}"></i>`).join('')}</div>
+        <div class="conc-bar">${leaders.map((l, i) => `<i style="width:${l.pct == null ? 0 : Math.min(100, l.pct).toFixed(2)}%;background:${css(CONC_RAMP[Math.min(i, CONC_RAMP.length - 1)])}" title="${esc(l.name)}"></i>`).join('')}</div>
         <div class="conc-lead">${leaders.length ? esc(leaders[0].name) + ' alone holds ' + (leaders[0].pct == null ? '—' : leaders[0].pct.toFixed(0) + '%') : 'No recipients recorded.'}</div>
         <div class="conc-lead">Top five hold ${fmtM(r.top5_val)} of ${fmtM(r.total)}.</div>
       </div>`;
@@ -968,7 +1098,11 @@
      $29M, and conflating them overstates it threefold. */
   function renderSbWinners() {
     const el = $('sbWinnersList'); if (!el) return;
-    let rows = D.SB_WINNERS || [];
+    /* Sorted by the small-business dollars in the code, because it now sits
+       directly under the share list, which is sorted the same way. Left
+       unsorted the two blocks disagreed inside one card: the share list led
+       with the $769M code and this one led with the $9M code. */
+    let rows = (D.SB_WINNERS || []).slice().sort((a, b) => (b.sb_total || 0) - (a.sb_total || 0));
     if (S.code) rows = rows.filter(r => r.naics === S.code);
     if (!rows.length) { setHTML(el, emptyLine('No set-aside recipients recorded for these codes.')); return; }
     setHTML(el, rows.map(r => {
@@ -986,7 +1120,8 @@
   }
 
   function renderAll() {
-    renderKPIs(); renderRankList();
+    computeBreaks();
+    renderKPIs(); renderLegend(); renderMap(); renderGeoTotal(); renderRankList();
     renderStatusPill();
     renderAgencyList(); renderBuyingOffices(); renderAwardSize(); renderSeasonality();
     renderPrimeTargets(); renderCeilings(); renderRecompetes(); renderIncumbents(); renderInsight();
@@ -1003,6 +1138,10 @@
     assignColors();
     renderProvenance();
     buildControls(); renderRankTabs(); renderUnsupported();
+    fetch('/vendor/states-10m.json')
+      .then(r => r.json()).then(j => { usGeo = j; renderMap(); })
+      .catch(() => { console.warn('us-atlas failed'); });
+    let to; window.addEventListener('resize', () => { clearTimeout(to); to = setTimeout(renderMap, 220); });
   }
 
   function render() {
