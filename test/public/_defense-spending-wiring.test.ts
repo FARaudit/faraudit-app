@@ -86,8 +86,28 @@ console.log("\n── C · an empty panel must mean empty data ──");
     "a seeded array would render as measured data before the feed answered");
 }
 
-// ── D · self-arm ──
-console.log("\n── D · self-arm ──");
+// ── D · state that changes must be RE-rendered, not rendered once ──
+console.log("\n── D · the code filter repaints on every change ──");
+{
+  check("the code pills have their own renderer",
+    /function renderCodePills\(\)/.test(APP),
+    "living inside a build-once function is what froze their active state");
+  check("and it is called from syncControls, not only from build",
+    /else chip\.classList\.remove\('show'\);\s*\n\s*renderCodePills\(\);/.test(APP),
+    "the filter worked while the pills never showed which code was active");
+  check("the pill reflects S.code rather than a fixed value",
+    /S\.code === code \? ' on' : ''/.test(APP) && /aria-pressed=/.test(APP));
+  check("a second click clears the selection",
+    /S\.code = \(S\.code === b\.dataset\.code\) \? null : b\.dataset\.code/.test(APP),
+    "without it the aggregate view is unreachable once a code is picked");
+  // The sub-line under a patched KPI must move with the number above it.
+  check("the scoped recipients card patches its sub-line, not just its count",
+    /val: String\(list\.length\),\s*\n\s*sub:/.test(APP),
+    "patching only the number printed '1 of 20 small business' beside a list of 7");
+}
+
+// ── E · self-arm ──
+console.log("\n── E · self-arm ──");
 {
   const before = fail;
   const realLog = console.log;
