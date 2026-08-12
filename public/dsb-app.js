@@ -396,6 +396,61 @@
      forecast. */
 
 
+
+  /* ════════════════ ROOM LEFT ON CONTRACTS ALREADY AWARDED ════════════════
+     Ceiling minus obligated: money a prime can still spend on a contract it
+     already holds, without any new competition. A subcontractor already on the
+     vehicle reaches it; one waiting for a solicitation never sees it. That is
+     why it belongs on a BD tab and not in an accounting report.
+
+     ⛔ IT IS NOT MARGIN. USAspending carries no cost, no rate and no profit
+     data, so this is contract CAPACITY and the caption says exactly that. */
+  function renderCeilings() {
+    const host = $('chList'); if (!host) return;
+    const cap = $('chCap'), sub = $('chSub'), big = $('chBig'), say = $('chSay');
+    const box = (D.AWARD_ANALYTICS || {})[S.fy] || null;
+    const c = box ? (S.code ? ((box.byCode || {})[S.code] || {}).ceilings : box.ceilings) : null;
+    const scoped = S.code ? 'NAICS ' + S.code : 'your NAICS codes';
+    if (sub) sub.textContent = 'Ceiling minus obligated on the largest awards in ' + scoped
+      + ' · ' + (S.fy || '');
+
+    if (!c || !c.rows || !c.rows.length) {
+      setHTML(host, '<div class="ch-none">Contract ceilings have not been read for <b>'
+        + esc(scoped) + '</b> yet. <b>That is a gap in our data, not contracts with no room '
+        + 'left.</b> It refreshes nightly.</div>');
+      [big, say, cap].forEach(e => { if (e) setHTML(e, ''); });
+      return;
+    }
+
+    if (big) big.textContent = fmtM(c.totalHeadroom / 1e6);
+    if (say) setHTML(say, 'is committed to contracts in <b>' + esc(scoped) + '</b> that has '
+      + '<b>not been obligated yet</b>. It can be spent on the ' + c.sampled + ' award'
+      + (c.sampled === 1 ? '' : 's') + ' below without a new competition — so it never appears '
+      + 'as a solicitation. Reaching it means being on the vehicle, not watching SAM.');
+
+    const max = Math.max.apply(null, c.rows.map(r => Math.abs(r.ceiling)).concat([1]));
+    setHTML(host, c.rows.map(r => {
+      const pct = r.ceiling > 0 ? Math.max(0, Math.min(100, (r.obligated / r.ceiling) * 100)) : 0;
+      const sub2 = 'obligated ' + fmtM(r.obligated / 1e6) + ' of ' + fmtM(r.ceiling / 1e6)
+        + ' ceiling · ' + pct.toFixed(0) + '% used'
+        + (r.subaward_count != null && r.subaward_count > 0
+          ? ' · ' + r.subaward_count.toLocaleString('en-US') + ' subawards already placed' : '');
+      return '<div class="ch-r"><span class="ch-n">' + esc(r.recipient) + '</span>'
+        + '<span class="ch-h">' + fmtM(r.headroom / 1e6) + '</span>'
+        + '<span class="ch-m">' + esc(sub2) + '</span>'
+        + '<span class="ch-track" style="width:' + Math.max(4, (Math.abs(r.ceiling) / max) * 100).toFixed(1)
+        + '%"><i class="ch-fill" style="width:' + pct.toFixed(1) + '%"></i></span></div>';
+    }).join(''));
+
+    if (cap) setHTML(cap, '<b>A capped sample of the largest awards</b> — ' + c.sampled
+      + ' of at most ' + (c.cap == null ? c.sampled : c.cap)
+      + (c.unreadable ? ', with ' + c.unreadable + ' whose detail could not be read' : '')
+      + '. Not the whole market, and <b>not margin</b>: USAspending carries no cost, rate or '
+      + 'profit data, so this is contract capacity and nothing about what anyone earns on it. '
+      + (c.subcontracting > 0 ? c.subcontracting + ' of these primes have already placed '
+        + 'subawards, which is evidence they subcontract rather than an assumption.' : ''));
+  }
+
   /* ════════════════ WHO ACTUALLY BUYS ════════════════
      One level below the agency panel. "Department of Defense" is not a buyer —
      it contains the Navy, the Army, the Air Force and the Defense Logistics
@@ -851,7 +906,7 @@
   function renderAll() {
     computeBreaks();
     renderKPIs(); renderLegend(); renderMap(); renderRankList();
-    renderAgencyList(); renderBuyingOffices(); renderRecompetes(); renderIncumbents(); renderInsight();
+    renderAgencyList(); renderBuyingOffices(); renderCeilings(); renderRecompetes(); renderIncumbents(); renderInsight();
     // Both read every measured year, so they are painted with the rest but do
     // not change with the year control.
     renderSbShare(); renderConcentration(); renderSbWinners();

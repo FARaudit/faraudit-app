@@ -18,8 +18,8 @@
 //     the date rather than implying the number is today's.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { awardSizeDistribution, primeSubcontractTargets, seasonality } from "./award-analytics";
-import type { AwardSample, SizeDistribution, PrimeTargets, Seasonality } from "./award-analytics";
+import { awardSizeDistribution, primeSubcontractTargets, seasonality, ceilingHeadroom } from "./award-analytics";
+import type { AwardSample, SizeDistribution, PrimeTargets, Seasonality, CeilingHeadroom } from "./award-analytics";
 
 export interface NamedAmount { name: string; amount: number }
 export interface StateAmount { state: string; amount: number }
@@ -158,10 +158,13 @@ export interface SpendingPayload {
     size: SizeDistribution | null;
     primes: PrimeTargets | null;
     season: Seasonality | null;
+    /** Ceiling headroom — contract capacity that is never re-solicited. */
+    ceilings: CeilingHeadroom | null;
     byCode: Record<string, {
       size: SizeDistribution | null;
       primes: PrimeTargets | null;
       season: Seasonality | null;
+      ceilings: CeilingHeadroom | null;
     }>;
   }>;
   /** "Is there money here for a company my size?" — the share of each code that
@@ -607,8 +610,15 @@ export async function fetchDefenseSpending(
       byCode[r.naics_code] = {
         size: awardSizeDistribution(smp),
         primes: primeSubcontractTargets(smp, sbNames),
-        season: seasonality(smp)
+        season: seasonality(smp),
+        ceilings: ceilingHeadroom(smp)
       };
+      if (smp?.ceilings && Array.isArray(smp.ceilings.rows)) {
+        merged.ceilings = merged.ceilings || { rows: [], sampled: 0, cap: smp.ceilings.cap ?? null, unreadable: 0 };
+        merged.ceilings.rows!.push(...smp.ceilings.rows);
+        merged.ceilings.sampled = (merged.ceilings.sampled || 0) + (smp.ceilings.sampled || 0);
+        merged.ceilings.unreadable = (merged.ceilings.unreadable || 0) + (smp.ceilings.unreadable || 0);
+      }
       if (smp && Array.isArray(smp.awards)) {
         merged.awards!.push(...smp.awards);
         merged.sampled = (merged.sampled || 0) + (smp.sampled || smp.awards.length);
@@ -621,6 +631,7 @@ export async function fetchDefenseSpending(
       size: any ? awardSizeDistribution(merged) : null,
       primes: any ? primeSubcontractTargets(merged, sbAll) : null,
       season: any ? seasonality(merged) : null,
+      ceilings: ceilingHeadroom(merged),
       byCode
     };
   }

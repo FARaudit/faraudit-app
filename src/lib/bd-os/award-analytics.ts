@@ -25,8 +25,19 @@ export interface AwardRecord {
   end_date: string;
 }
 
+export interface CeilingRow {
+  award_id: string;
+  recipient: string;
+  ceiling: number;
+  obligated: number;
+  headroom: number;
+  subawarded: number | null;
+  subaward_count: number | null;
+}
+
 export interface AwardSample {
   awards?: AwardRecord[] | null;
+  ceilings?: { rows?: CeilingRow[] | null; sampled?: number | null; cap?: number | null; unreadable?: number | null } | null;
   sampled?: number | null;
   cap?: number | null;
   truncated?: boolean | null;
@@ -220,5 +231,50 @@ export function seasonality(sample: AwardSample | null | undefined): Seasonality
     q4Share: total > 0 ? (q4 / total) * 100 : null,
     peak: peak && peak.value > 0 ? peak : null,
     truncated: sample?.truncated === true
+  };
+}
+
+
+/* ── 6 · CEILING vs OBLIGATED ───────────────────────────────────────────────
+   The money already inside a contract that will never be re-solicited. A prime
+   holding $40.78B of ceiling against $34.92B obligated can spend $5.86B more
+   without any new competition — and a subcontractor already on that vehicle
+   reaches it, while one waiting for a solicitation never sees it. Measured
+   2026-08-12 across eight sampled 336611 awards: $31.96B of combined headroom.
+
+   ⛔ A CAPPED SAMPLE OF THE LARGEST AWARDS, and it must say so. `unreadable`
+   counts awards whose detail could not be fetched — carried so a short list
+   reads as "we could not ask" rather than "these have no headroom". Zero
+   headroom is a real and very different claim from unknown headroom.
+
+   ⛔ NO MARGIN, NO COST, NO LABOUR RATES. USAspending does not carry them and
+   never will. Headroom is contract capacity, NOT profit available to anyone. */
+export interface CeilingHeadroom {
+  rows: CeilingRow[];
+  totalCeiling: number;
+  totalObligated: number;
+  totalHeadroom: number;
+  /** Awards in the sample that have already subcontracted, with the evidence. */
+  subcontracting: number;
+  sampled: number;
+  cap: number | null;
+  unreadable: number;
+}
+
+export function ceilingHeadroom(sample: AwardSample | null | undefined): CeilingHeadroom | null {
+  const c = sample?.ceilings;
+  const rows = Array.isArray(c?.rows) ? c!.rows! : [];
+  if (!rows.length) return null;
+  const sum = (f: (r: CeilingRow) => number) => rows.reduce((n, r) => n + (Number(f(r)) || 0), 0);
+  return {
+    // Largest headroom first — that is the reading the panel exists to give.
+    rows: rows.slice().sort((a, b) => b.headroom - a.headroom),
+    totalCeiling: sum((r) => r.ceiling),
+    totalObligated: sum((r) => r.obligated),
+    totalHeadroom: sum((r) => r.headroom),
+    subcontracting: rows.filter((r) => (r.subaward_count || 0) > 0).length,
+    sampled: rows.length,
+    cap: c?.cap ?? null,
+    unreadable: c?.unreadable ?? 0
   };
 }

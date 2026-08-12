@@ -536,6 +536,24 @@ a.rc-row:hover .rc-name{color:var(--accent-deep)}
 .bo-cap b{color:var(--ink-2);font-weight:650}
 .bo-none{font-size:12px;line-height:1.6;color:var(--mute);background:var(--card-soft);border:1px dashed var(--line);border-radius:9px;padding:14px 16px}
 .bo-none b{color:var(--ink-2)}
+
+.ch-top{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:0 20px;align-items:center;margin-bottom:16px}
+.ch-big{font-size:46px;font-weight:800;letter-spacing:-.04em;line-height:.9;color:var(--ink);font-variant-numeric:tabular-nums}
+.ch-say{font-size:13px;line-height:1.5;color:var(--ink-2);max-width:52ch;margin:0}
+.ch-say b{color:var(--ink);font-weight:700}
+.ch-list{display:flex;flex-direction:column;gap:1px}
+.ch-r{display:grid;grid-template-columns:minmax(0,1fr) 96px;gap:12px;align-items:baseline;padding:8px;border-radius:8px}
+.ch-r:hover{background:var(--card-soft)}
+.ch-n{font-size:12.5px;font-weight:650;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ch-h{font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:800;color:var(--accent-deep);text-align:right;font-variant-numeric:tabular-nums}
+[data-theme="dark"] .ch-h{color:var(--accent-light)}
+.ch-m{grid-column:1/-1;font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute);letter-spacing:.02em}
+.ch-track{grid-column:1/-1;height:5px;border-radius:3px;background:var(--line-2);overflow:hidden;margin-top:3px}
+.ch-fill{display:block;height:100%;background:var(--accent);opacity:.8}
+.ch-cap{font-size:11.5px;line-height:1.55;color:var(--mute);margin:12px 2px 0}
+.ch-cap b{color:var(--ink-2);font-weight:650}
+.ch-none{font-size:12px;line-height:1.6;color:var(--mute);background:var(--card-soft);border:1px dashed var(--line);border-radius:9px;padding:14px 16px}
+.ch-none b{color:var(--ink-2)}
 </style>
 </head>
 <body>
@@ -684,6 +702,20 @@ a.rc-row:hover .rc-name{color:var(--accent-deep)}
       </section>
 
       
+
+      <!-- ceiling headroom -->
+      <section class="row">
+        <section class="widget">
+          <header class="widget-head">
+            <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 20h18"/><path d="M6 20V10"/><path d="M12 20V4"/><path d="M18 20v-7"/></svg></span>
+              <div class="wh-text"><h3>Room left on contracts already awarded</h3><p class="wh-sub" id="chSub"></p></div></div>
+            <span class="wh-source">USAspending</span>
+          </header>
+          <div class="ch-top"><span class="ch-big" id="chBig"></span><p class="ch-say" id="chSay"></p></div>
+          <div class="ch-list" id="chList"></div>
+          <p class="ch-cap" id="chCap"></p>
+        </section>
+      </section>
 
       <!-- buying offices -->
       <section class="row">
