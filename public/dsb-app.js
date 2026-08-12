@@ -1280,8 +1280,29 @@
        NAICS-ascending, which led with a $30M code and put a $25.04B one last. It
        also makes the rows line up with the small-business list in the widget
        alongside, which is sorted the same way, so a reader can read across. */
-    const rows = (D.CONCENTRATION || []).slice().sort((a, b) => (b.total || 0) - (a.total || 0));
+    let rows = (D.CONCENTRATION || []).slice().sort((a, b) => (b.total || 0) - (a.total || 0));
     if (!rows.length) { setHTML(el, '<div class="conc-note">No codes tracked.</div>'); return; }
+    /* ⛔ THE CODE PILL SCOPES THIS PANEL. It did not, and the panel it shares a
+       widget with always did — pick 336412 and the recipients table beneath it
+       narrowed to 336412 while this block went on leading with 336611. Two blocks
+       under one heading, answering the same question about different markets,
+       with nothing on screen saying so. The pill is not a hint: the insight bar
+       promises a click scopes every panel, and a panel that opts out silently is
+       the one a reader will quote.
+
+       A code with no measured concentration gets its OWN empty state. Falling
+       back to every code would answer a question nobody asked, and an empty block
+       would read as a code no one holds. */
+    if (S.code) {
+      const scoped = rows.filter(r => r.naics === S.code);
+      if (!scoped.length) {
+        setHTML(el, '<div class="conc-note">Concentration has not been measured for <b>NAICS '
+          + esc(S.code) + '</b> yet. <b>That is a gap in our data, not a code no one holds.</b> '
+          + 'It refreshes nightly.</div>');
+        return;
+      }
+      rows = scoped;
+    }
     /* ⛔ THE FIVE COLOUR SEGMENTS WERE DECORATION. The percentage is the
        information: 70%, 91%, 34% is the finding, and a reader cannot name the
        fourth-largest holder off a 3%-wide band anyway. The number leads, one
