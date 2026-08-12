@@ -100,7 +100,9 @@ export interface FyView {
   kpis: KpiCard[];
   states: Record<string, { abbr: string; name: string; val: number; yoy: number | null }>;
   agencies: Array<{ key: string; short: string; name: string; val: number; naics: Record<string, number> }>;
-  incumbents: Array<{ name: string; val: number; naics: string; sb: boolean }>;
+  // `sb: null` = the feed supplied no small-business list for this code, which
+  // is NOT the same as 'not a small business'.
+  incumbents: Array<{ name: string; val: number; naics: string; sb: boolean | null }>;
 }
 
 export interface SpendingPayload {
@@ -129,22 +131,34 @@ const toM = (dollars: number) => dollars / 1_000_000;
 
 /** Panels whose measurement this table does not carry. Named rather than left
  *  blank: "no source" and "no obligations" are different facts. */
+/** One legal entity, one key. USAspending does not normalise recipient names, so
+ *  the same company arrives as "HUNTINGTON INGALLS INCORPORATED" and "HUNTINGTON
+ *  INGALLS INC". Only the corporate-form suffixes are stripped — nothing that
+ *  could merge two genuinely different firms. */
+export function recipientKey(name: string): string {
+  return String(name || "")
+    .toUpperCase()
+    .replace(/[.,]/g, "")
+    .replace(/&/g, " AND ")
+    .replace(/\b(INCORPORATED|INC|CORPORATION|CORP|COMPANY|CO|LLC|L L C|LP|LLP|LTD|PLC|OY|AB|GMBH|SA|NV|BV)\b/g, " ")
+    .replace(/[^A-Z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 const UNSUPPORTED: SpendingPayload["unsupported"] = [
+  // These two are OURS to build, not the source's to supply. USAspending's award
+  // endpoint returns per-award records carrying value, set-aside, pricing type
+  // and extent competed; this table stores recipient TOTALS because that is what
+  // the worker asks for. Saying "not in the feed" described our own architecture
+  // choice as a limit of the data, on a customer-facing surface.
   {
     panel: "opportunity-matrix",
-    needs: "the number of firms competing per segment and the dollars per award — neither is in the obligations feed"
-  },
-  {
-    panel: "budget-trajectory",
-    needs: "the enacted DoD topline by year and its continuing-resolution status — a budget source, not an obligations one"
+    needs: "distinct firms per segment and dollars per award — buildable from USAspending's award-level records; this table stores recipient totals, so the worker has to pull them"
   },
   {
     panel: "pricing",
-    needs: "award-level contract values, to distribute them — the feed stores recipient totals, not individual awards"
-  },
-  {
-    panel: "ndaa",
-    needs: "the NDAA provision text for the current authorization — no legislative source is connected"
+    needs: "the value of individual awards — buildable from USAspending's award-level records; this table stores recipient totals, so the worker has to pull them"
   }
 ];
 
@@ -216,9 +230,16 @@ export async function fetchDefenseSpending(
     return acc;
   };
 
+  // The federal year runs 1 Oct - 30 Sep, so the year containing the refresh
+  // date is still accumulating. Everything that compares one year with another
+  // has to know which one that is.
+  const asOfDate = new Date(asOf || Date.now());
+  const currentFy = asOfDate.getUTCMonth() >= 9 ? asOfDate.getUTCFullYear() + 1 : asOfDate.getUTCFullYear();
+
   const BY_FY: Record<string, FyView> = {};
   years.forEach((fy, idx) => {
     const label = fyLabel(fy);
+    const openFy = fy >= currentFy;
     const total = totalFor(fy);
     const prev = idx > 0 ? totalFor(years[idx - 1]) : null;
     const yoy = prev && prev > 0 ? ((total - prev) / prev) * 100 : null;
@@ -253,26 +274,48 @@ export async function fetchDefenseSpending(
 
     // Recipients, with the small-business flag taken from the feed's own SB
     // recipient list for the same code — not guessed from the company name.
-    const incumbents: FyView["incumbents"] = [];
+    //
+    // ONE COMPANY IS ONE ROW. USAspending returns a recipient once per award
+    // record and does not normalise its legal name, so HUNTINGTON INGALLS
+    // INCORPORATED and HUNTINGTON INGALLS INC arrived as two entries — $3.49B
+    // and $2.73B, 26% of the whole tab, rendered as two different companies —
+    // and GENERAL ELECTRIC COMPANY arrived twice under the IDENTICAL string.
+    // Concentration is the number this panel exists to convey, and split rows
+    // understate it in the one direction that flatters the market.
+    //
+    // Merged on (normalised name, NAICS): the code stays a real column, and a
+    // firm that genuinely wins under two codes stays two rows, which is true.
+    const merged = new Map<string, { name: string; val: number; naics: string; sb: boolean | null }>();
     for (const r of rowsFor(fy)) {
-      const sbNames = new Set((r.sb_recipients || []).map((s) => (s.name || "").toUpperCase()));
+      const sbList = r.sb_recipients || [];
+      // An EMPTY small-business list is not a list of no small businesses. When
+      // the feed shipped none for this code, membership is UNKNOWN and the flag
+      // must stay null — a false here becomes "0 of them small business" on the
+      // KPI, which is a measurement nobody made.
+      const sbKnown = sbList.length > 0;
+      const sbNames = new Set(sbList.map((x) => recipientKey(x.name || "")));
       for (const t of r.top_recipients || []) {
         if (!t?.name) continue;
-        incumbents.push({
-          name: t.name,
-          val: toM(t.amount || 0),
-          naics: r.naics_code,
-          sb: sbNames.has(t.name.toUpperCase())
-        });
+        const key = `${recipientKey(t.name)}|${r.naics_code}`;
+        const hit = merged.get(key);
+        const isSb = sbKnown ? sbNames.has(recipientKey(t.name)) : null;
+        if (hit) {
+          hit.val += toM(t.amount || 0);
+          // The fuller legal name is the better label for a merged entity.
+          if (t.name.length > hit.name.length) hit.name = t.name;
+          if (isSb === true) hit.sb = true;
+          else if (hit.sb === null) hit.sb = isSb;
+        } else {
+          merged.set(key, { name: t.name, val: toM(t.amount || 0), naics: r.naics_code, sb: isSb });
+        }
       }
     }
+    const incumbents: FyView["incumbents"] = Array.from(merged.values());
     incumbents.sort((a, b) => b.val - a.val);
-    // ONE list, counted once. The KPI beside this panel used to count DISTINCT
-    // NAMES while the panel rendered ROWS, and USAspending lists the same
-    // recipient more than once when it holds separate award records — so the
-    // card read 9 above a table of 10. A number stated beside a panel has to be
-    // the panel's own number.
+    // A number stated beside a panel has to be the panel's own number.
     const shownIncumbents = incumbents.slice(0, 20);
+    const sbCounted = shownIncumbents.filter((i) => i.sb !== null).length;
+    const sbYes = shownIncumbents.filter((i) => i.sb === true).length;
 
     const recompeteCount = rowsFor(fy).reduce((a, r) => a + (r.recompetes_expiring_180d || []).length, 0);
 
@@ -282,8 +325,17 @@ export async function fetchDefenseSpending(
           label: "Obligated · your NAICS",
           val: (toM(total) / 1000).toFixed(2),
           unit: "B",
-          sub: `${tracked.length} tracked code${tracked.length === 1 ? "" : "s"} · ${label}`,
-          delta: yoy == null ? null : `${yoy >= 0 ? "+" : "−"}${Math.abs(yoy).toFixed(1)}%`,
+          sub: openFy
+            ? `${tracked.length} tracked code${tracked.length === 1 ? "" : "s"} · ${label} to date · year still open`
+            : `${tracked.length} tracked code${tracked.length === 1 ? "" : "s"} · ${label}`,
+          // NO YEAR-OVER-YEAR ON AN OPEN YEAR. The stored total for the current
+          // fiscal year is obligations TO DATE, and Q4 is the heaviest quarter
+          // in the federal year — so dividing a part-year by a whole one printed
+          // −43.1% beside $28.07B and read as a collapsing market. The feed
+          // carries annual totals only, so a like-for-like part-year comparison
+          // cannot be computed here; stating nothing is the honest option, and
+          // the closed years still carry theirs.
+          delta: openFy || yoy == null ? null : `${yoy >= 0 ? "+" : "−"}${Math.abs(yoy).toFixed(1)}%`,
           tone: "accent",
           spark: totalsM
         },
@@ -300,7 +352,13 @@ export async function fetchDefenseSpending(
           label: "Top recipients listed",
           val: String(shownIncumbents.length),
           unit: "",
-          sub: `${shownIncumbents.filter((i) => i.sb).length} of them small business`,
+          // The count is a DISPLAY CAP, not a market size, and the small-business
+          // line may not be knowable: "0 of them small business" over a SIZE
+          // column reading "—" for every row was a measured zero the feed never
+          // supplied.
+          sub: sbCounted === 0
+            ? `top ${TOP_N} per code · small-business status not supplied for these`
+            : `top ${TOP_N} per code · ${sbYes} of ${sbCounted} small business`,
           delta: null,
           tone: "accent",
           spark: []
@@ -309,7 +367,11 @@ export async function fetchDefenseSpending(
           label: "Awards ending ≤180d",
           val: String(recompeteCount),
           unit: "",
-          sub: "recompete candidates in the feed",
+          // Measured forward from the refresh date, NOT within the selected
+          // fiscal year — the worker's 180-day question carries no year, so the
+          // same list is stored on every FY row. It read as a per-year figure
+          // that never moved; it is a window on today and now says so.
+          sub: "in the next 180 days from the refresh · not year-scoped",
           delta: null,
           tone: recompeteCount > 0 ? "amber" : "accent",
           spark: []

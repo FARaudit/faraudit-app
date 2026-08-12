@@ -297,6 +297,11 @@
      One bar. Small-business dollars arrive per NAICS, never per agency, so no
      SB segment can be drawn here. */
   function renderAgencyList() {
+    /* The column header was the literal string FY26 in the markup, so it kept
+       naming FY26 while the reader was looking at FY24. A header over a number
+       has to name the year that number is. */
+    const fyCol = $('agFyCol');
+    if (fyCol) fyCol.textContent = String(S.fy || '').replace('FY20', 'FY');
     const rows = view().agencies;
     const prevFy = D.FYS[fyIdx() - 1];
     const prev = prevFy ? (D.BY_FY[prevFy] || { agencies: [] }).agencies : [];
@@ -345,7 +350,7 @@
         <div class="mkt-track"><div class="mkt-solid" style="width:${r.now / maxRef * 100}%;background:${col}"></div></div>
         <div class="mkt-foot"><span>${esc(t.labels[0])} · ${fmtM(r.first)}</span><span>${esc(t.labels[last])} · ${fmtM(r.now)}</span></div>
       </div>`;
-    }).join('') + `<div class="mkt-note"><span class="tam">${fmtM(total)}</span>&nbsp;obligated across your tracked codes in ${esc(t.labels[last])}</div>`);
+    }).join('') + `<div class="mkt-note"><span class="tam">${fmtM(total)}</span>&nbsp;obligated across your tracked codes in ${esc(S.fy || t.labels[last])}</div>`);
   }
 
   /* ════════════════ RECOMPETE RADAR ════════════════
@@ -391,7 +396,9 @@
         <td class="ii-awd">${esc(r.name)}</td>
         <td class="ii-val">${fmtM(r.val)}</td>
         <td class="ii-naics">${esc(r.naics)}</td>
-        <td><span class="sa-bdg ${r.sb ? 'sb' : 'prime'}">${r.sb ? 'SB' : '—'}</span></td>
+        <td><span class="sa-bdg ${r.sb === true ? 'sb' : r.sb === false ? 'prime' : 'unknown'}"
+            title="${r.sb === null ? 'The feed supplied no small-business list for this code' : ''}"
+            >${r.sb === true ? 'SB' : r.sb === false ? 'not SB' : '—'}</span></td>
       </tr>`).join('') || `<tr><td colspan="4">${esc('No recipients recorded for ' + S.fy + '.')}</td></tr>`);
   }
 
@@ -399,9 +406,9 @@
      Named, not blanked. Each states which measurement it needs. */
   const UNSUPPORTED_HOSTS = {
     'opportunity-matrix': 'scatterSvg',
-    'budget-trajectory': 'budgetSvg',
+
     'pricing': 'priceSvg',
-    'ndaa': 'ndaaList'
+
   };
   function renderUnsupported() {
     (D.unsupported || []).forEach(u => {

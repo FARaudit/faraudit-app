@@ -266,6 +266,10 @@ button{font-family:inherit}
 .ag-legend2{display:flex;gap:16px;justify-content:center;align-items:center;padding-top:10px;margin-top:2px;border-top:1px solid var(--line-2);font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--mute)}
 .ag-legend2 .lg{display:inline-flex;align-items:center;gap:6px}
 .ag-legend2 .lg i{width:11px;height:11px;border-radius:3px}
+/* Three states, not two: a small business, a firm known not to be one, and a
+   firm whose status the feed never supplied. The third used to render as the
+   second. */
+.sa-bdg.unknown{opacity:.5}
 .ag-head{display:grid;grid-template-columns:58px 1fr 62px 60px;gap:11px;padding:0 8px 7px;border-bottom:1px solid var(--line-2)}
 .ag-head span{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
 .ag-head span:nth-child(3),.ag-head span:nth-child(4){text-align:right}
@@ -557,20 +561,8 @@ button{font-family:inherit}
         </section>
       </section>
 
-      <!-- budget trajectory + market trend -->
-      <section class="row two">
-        <section class="widget">
-          <header class="widget-head">
-            <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20h18"/><rect x="5" y="10" width="3" height="10"/><rect x="10.5" y="6" width="3" height="14"/><rect x="16" y="13" width="3" height="7"/></svg></span>
-              <div class="wh-text"><h3>DoD Budget Trajectory</h3><p class="wh-sub">Not connected</p></div></div>
-          </header>
-          <div class="chart-wrap"><svg id="budgetSvg" class="bud-svg"></svg></div>
-          <div class="bud-legend">
-            <span class="lg"><i style="background:#378ADD"></i>Enacted</span>
-            <span class="lg"><i style="background:#d97706"></i>CR year</span>
-            <span class="lg"><i style="background:#ef4444"></i>Shutdown</span>
-          </div>
-        </section>
+      <!-- market trend -->
+      <section class="row one">
 
         <section class="widget">
           <header class="widget-head">
@@ -616,14 +608,14 @@ button{font-family:inherit}
         </section>
       </section>
 
-      <!-- agency breakdown + ndaa -->
-      <section class="row two">
+      <!-- agency breakdown -->
+      <section class="row one">
         <section class="widget">
           <header class="widget-head">
             <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/></svg></span>
               <div class="wh-text"><h3>Who buys your codes</h3><p class="wh-sub">Obligations in <b>your NAICS codes only</b> — not the agency's budget · segments = code</p></div></div>
           </header>
-          <div class="ag-head"><span>Agency</span><span>Spend · SB shaded</span><span>FY26</span><span>YoY</span></div>
+          <div class="ag-head"><span>Agency</span><span>Spend · SB shaded</span><span id="agFyCol">FY26</span><span>YoY</span></div>
           <div class="ag-list" id="agencyList"></div>
           <!-- Legend is the NAICS split the bars actually draw. It read
                "Small Business / Large Prime" over a bar with no such segment:
@@ -631,13 +623,6 @@ button{font-family:inherit}
           <div class="ag-legend2" id="agencyLegend"></div>
         </section>
 
-        <section class="widget">
-          <header class="widget-head">
-            <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h6"/></svg></span>
-              <div class="wh-text"><h3>NDAA Highlights</h3><p class="wh-sub">Not connected</p></div></div>
-          </header>
-          <div class="ndaa-list" id="ndaaList"></div>
-        </section>
       </section>
 
     </div>
