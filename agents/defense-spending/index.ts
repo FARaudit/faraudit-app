@@ -181,6 +181,12 @@ async function buildRow(naics: string, win: FYWindow, priorTotal: number | null)
       `Stored values kept; they carry their own refreshed_at.`
     );
   }
+  /* Ceilings need the award sample's internal ids, so they run after it rather
+     than beside it. One GET per award, capped, paced, and inside the same
+     transport-failure window — a refused ceiling call makes the row unmeasured
+     exactly as a refused total does. */
+  const ceilings = await usa.fetchCeilings((awardSample && awardSample.awards) || []);
+
   const sbPct = total && total > 0 && sb != null ? (sb / total) * 100 : null;
   const yoy = priorTotal != null && priorTotal > 0 && total != null ? ((total - priorTotal) / priorTotal) * 100 : null;
   return {
@@ -198,7 +204,9 @@ async function buildRow(naics: string, win: FYWindow, priorTotal: number | null)
     recompetes_expiring_90d: rec90,
     recompetes_expiring_180d: rec180,
     recompetes_upcoming: recUpcoming,
-    award_sample: { ...awardSample, set_aside_mix: setAsideMix },
+    // Rides in award_sample: it IS award-level data about these same sampled
+    // awards, so it needs no column of its own and no third hand-applied migration.
+    award_sample: { ...awardSample, set_aside_mix: setAsideMix, ceilings },
     yoy_delta_pct: yoy,
     refreshed_at: new Date().toISOString()
   };
@@ -292,6 +300,7 @@ async function main() {
       // nothing said so, because the only place it would have shown was a panel
       // nobody had built yet.
       const gap = sample?.set_aside_mix?.unaccounted;
+      const ceil = (row.award_sample as { ceilings?: { sampled?: number; unreadable?: number } })?.ceilings;
       const upcoming = Array.isArray(row.recompetes_upcoming) ? row.recompetes_upcoming.length : 0;
       console.log(`  · FY${win.fy}: total=$${(row.total_obligations || 0).toLocaleString()} · sb_pct=${row.sb_pct?.toFixed(1)}% · yoy=${row.yoy_delta_pct?.toFixed(1)}% · sb_recipients=${sbCount} · awards=${sample?.sampled ?? 0}${sample?.truncated ? ' (capped)' : ''} · pricing=${ctCount}${ctCount === 0 ? ' ⚠ EMPTY' : ''} · setaside_gap=${gap == null ? 'n/a' : '$' + Math.round(gap).toLocaleString()} · recompetes_12_18mo=${upcoming}`);
       priorTotal = row.total_obligations;

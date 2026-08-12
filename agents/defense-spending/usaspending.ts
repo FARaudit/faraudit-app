@@ -57,6 +57,30 @@ function paced<T>(fn: () => Promise<T>): Promise<T> {
   return next;
 }
 
+/* GET twin of post(). Shares the SAME queue and the SAME failure counter — a
+   ceiling call that is refused has to make its row unmeasured exactly as a POST
+   does, or the fail-closed write stops covering half the requests. */
+async function getJson<T>(path: string): Promise<T | null> {
+  return paced(async () => {
+    try {
+      const res = await fetch(`${API_BASE}${path}`, {
+        method: "GET",
+        headers: { Accept: "application/json" }
+      });
+      if (!res.ok) {
+        transportFailures++;
+        console.warn(`[usaspending] GET ${path} HTTP ${res.status}`);
+        return null;
+      }
+      return (await res.json()) as T;
+    } catch (err) {
+      transportFailures++;
+      console.warn(`[usaspending] GET ${path} threw: ${err instanceof Error ? err.message : String(err)}`);
+      return null;
+    }
+  });
+}
+
 async function post<T>(path: string, body: unknown): Promise<T | null> {
   return paced(async () => {
     try {
@@ -300,6 +324,71 @@ export interface RecompeteRow {
 const RECOMPETE_PAGE_SIZE = 100;
 const RECOMPETE_MAX_PAGES = 6;
 
+/* ── CEILING vs OBLIGATED ───────────────────────────────────────────────────
+   The money already inside a contract that will never be re-solicited. A prime
+   holding a $40.78B ceiling against $34.92B obligated has $5.86B of headroom it
+   can spend without any new competition — and a subcontractor who is already on
+   that vehicle reaches it, while one waiting for a solicitation never sees it.
+
+   ⛔ NOT AVAILABLE IN BULK. `spending_by_award` does not return a ceiling under
+   any documented field, so this is one GET per award. That is the request
+   pattern that got this worker IP-blocked, so it is CAPPED and it is paced with
+   everything else. A capped sample says so: `sampled` and `cap` ride out with
+   the rows, exactly as the award sample does.
+
+   Awards with no internal id, or whose detail call fails, are OMITTED rather
+   than defaulted — a missing ceiling is unknown, never zero, and zero headroom
+   is a real and very different claim. */
+const CEILING_SAMPLE_MAX = 8;
+
+export interface CeilingRow {
+  award_id: string;
+  recipient: string;
+  /** base_and_all_options — every option, exercised or not. */
+  ceiling: number;
+  /** total_obligation — what has actually been put on the contract. */
+  obligated: number;
+  /** ceiling − obligated. Never negative-clamped; an over-obligated award is a
+   *  real record and hiding it would flatter the number. */
+  headroom: number;
+  /** What this prime has already pushed to subcontractors, and how many. Direct
+   *  evidence that it subcontracts at all — stronger than any size heuristic. */
+  subawarded: number | null;
+  subaward_count: number | null;
+}
+
+export interface CeilingSample {
+  rows: CeilingRow[];
+  sampled: number;
+  cap: number;
+  /** Awards whose detail could not be read. Carried so a short list reads as
+   *  "we could not ask" rather than "these awards have no headroom". */
+  unreadable: number;
+}
+
+export async function fetchCeilings(awards: AwardRecord[]): Promise<CeilingSample> {
+  const take = awards.filter((a) => a.internal_id).slice(0, CEILING_SAMPLE_MAX);
+  const rows: CeilingRow[] = [];
+  let unreadable = 0;
+  for (const a of take) {
+    const d = await getJson<Record<string, unknown>>(`/awards/${encodeURIComponent(a.internal_id)}/`);
+    if (!d) { unreadable++; continue; }
+    const ceiling = Number(d.base_and_all_options ?? NaN);
+    const obligated = Number(d.total_obligation ?? NaN);
+    if (!Number.isFinite(ceiling) || !Number.isFinite(obligated)) { unreadable++; continue; }
+    rows.push({
+      award_id: a.award_id,
+      recipient: a.recipient,
+      ceiling,
+      obligated,
+      headroom: ceiling - obligated,
+      subawarded: Number.isFinite(Number(d.total_subaward_amount)) ? Number(d.total_subaward_amount) : null,
+      subaward_count: Number.isFinite(Number(d.subaward_count)) ? Number(d.subaward_count) : null
+    });
+  }
+  return { rows, sampled: rows.length, cap: CEILING_SAMPLE_MAX, unreadable };
+}
+
 export interface RecompeteOpts {
   /** Contract types to consider. Verified against the live API 2026-08-12 —
    *  A=BPA CALL, B=PURCHASE ORDER, C=DELIVERY ORDER, D=DEFINITIVE CONTRACT. */
@@ -453,6 +542,9 @@ export interface AwardRecord {
   award_type: string;
   start_date: string;
   end_date: string;
+  /** USAspending's own key for the award — the ONLY handle the detail endpoint
+   *  accepts. `award_id` (the PIID) will not resolve one. */
+  internal_id: string;
 }
 
 export interface AwardSample {
@@ -493,7 +585,8 @@ export async function fetchAwardSample(f: Filters): Promise<AwardSample> {
         // false impression that the data is empty. See the AwardRecord note.
         fields: [
           "Award ID", "Recipient Name", "Award Amount", "Awarding Agency",
-          "Awarding Sub Agency", "Contract Award Type", "Start Date", "End Date"
+          "Awarding Sub Agency", "Contract Award Type", "Start Date", "End Date",
+          "generated_internal_id"
         ],
         limit: AWARD_PAGE,
         page,
@@ -515,7 +608,8 @@ export async function fetchAwardSample(f: Filters): Promise<AwardSample> {
         // that answers; "" means the record did not say, never a guessed default.
         award_type: String(r["Contract Award Type"] ?? ""),
         start_date: String(r["Start Date"] ?? ""),
-        end_date: String(r["End Date"] ?? "")
+        end_date: String(r["End Date"] ?? ""),
+        internal_id: String(r["generated_internal_id"] ?? "")
       });
     }
     if (!d?.page_metadata?.hasNext) break;
