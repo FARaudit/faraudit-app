@@ -20,7 +20,10 @@ const ROOT = process.cwd();
 // The page's styles moved into a shared stylesheet when a second page began rendering these panels.
 // `pageSource` is the markup PLUS whatever CSS the page actually links, so this gate keeps asking
 // whether the rule SHIPS rather than which file someone wrote it in.
-const html = pageSource("defense-spending.html");
+// ⛔ THE PANELS MOVED. This gate's markup half now reads who-to-call.html, which is where these
+// hosts live; the ENGINE half still reads the shared dsb-app.js and the library, which did not move.
+// A gate keeps its subject, not its file path.
+const html = pageSource("who-to-call.html");
 const app = readFileSync(path.join(ROOT, "public/dsb-app.js"), "utf8");
 // Comments are stripped before searching so no assertion can pass by matching
 // the paragraph that explains it.

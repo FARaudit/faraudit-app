@@ -17,7 +17,10 @@ const ROOT = process.cwd();
 // The page's styles moved into a shared stylesheet when a second page began rendering these panels.
 // `pageSource` is the markup PLUS whatever CSS the page actually links, so this gate keeps asking
 // whether the rule SHIPS rather than which file someone wrote it in.
-const html = pageSource("defense-spending.html");
+// ⛔ THIS GATE SPANS BOTH PAGES NOW. Award size and seasonality stayed on Defense Spending; the primes
+// panel moved to Who to Call. The three are one subject — everything derived from the stored award
+// sample — so the markup half reads BOTH served pages. A gate keeps its subject, not its file path.
+const html = pageSource("defense-spending.html") + "\n" + pageSource("who-to-call.html");
 const appRaw = readFileSync(path.join(ROOT, "public/dsb-app.js"), "utf8");
 const app = appRaw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 const fnOf = (name: string, next: string) => {
