@@ -397,6 +397,123 @@
 
 
 
+
+  /* ════════════════ AWARD-LEVEL VIEWS ════════════════
+     All three read AWARD_ANALYTICS, which is derived from the stored sample of
+     the 500 LARGEST awards. That bias is real and every panel below declares it
+     rather than letting the reader assume a whole-market view. */
+  function anBox() {
+    const fyBox = (D.AWARD_ANALYTICS || {})[S.fy] || null;
+    if (!fyBox) return null;
+    return S.code ? (fyBox.byCode || {})[S.code] || null : fyBox;
+  }
+  function anScope() { return S.code ? 'NAICS ' + S.code : 'your NAICS codes'; }
+  function anNone(what) {
+    return '<div class="an-none">' + esc(what) + ' has not been measured for <b>'
+      + esc(anScope()) + '</b> yet. <b>That is a gap in our data, not a market with nothing '
+      + 'in it.</b> It refreshes nightly.</div>';
+  }
+
+  /* ── 3 · HOW BIG IS A DEAL HERE ──────────────────────────────────────────
+     ⛔ NO MEAN. These markets are bimodal — a $150,310 electronics job sits in
+     the same code as a $1.90B shipbuilding contract, 12,600x apart. An average
+     over that describes no award that exists and reads as a target to aim at.
+     The middle 50% is a range real awards actually occupy. */
+  function renderAwardSize() {
+    const host = $('szBody'); if (!host) return;
+    const sub = $('szSub'); const box = anBox(); const d = box && box.size;
+    if (sub) sub.textContent = 'The middle 50% of awards in ' + anScope() + ' · ' + (S.fy || '');
+    if (!d) { setHTML(host, anNone('Award size')); return; }
+
+    // Log positions: a linear rail puts p25 and the median on top of each other
+    // when the max is three orders of magnitude away.
+    const lg = (n) => Math.log10(Math.max(1, n));
+    const lo = lg(d.min || 1), hi = lg(d.max || 1);
+    const at = (n) => hi > lo ? ((lg(n) - lo) / (hi - lo)) * 100 : 50;
+    const p25 = at(d.p25 || 0), p75 = at(d.p75 || 0), med = at(d.median || 0);
+
+    setHTML(host, '<div class="sz-band">'
+      + '<p class="sz-mid">Half of awards fall between <b>' + fmtM((d.p25 || 0) / 1e6)
+      + '</b> and <b>' + fmtM((d.p75 || 0) / 1e6) + '</b>.</p>'
+      + '<div class="sz-scale"><span class="sz-rail"></span>'
+      + '<span class="sz-fill" style="left:' + p25.toFixed(1) + '%;width:'
+      + Math.max(1, p75 - p25).toFixed(1) + '%"></span>'
+      + '<span class="sz-tick" style="left:0%"><i></i><span>' + fmtM((d.min || 0) / 1e6) + '</span></span>'
+      + '<span class="sz-tick" style="left:' + med.toFixed(1) + '%"><i></i><span>median '
+      + fmtM((d.median || 0) / 1e6) + '</span></span>'
+      + '<span class="sz-tick" style="left:100%"><i></i><span>' + fmtM((d.max || 0) / 1e6) + '</span></span>'
+      + '</div>'
+      + '<p class="sz-note"><b>' + d.inBand + ' of ' + d.count + '</b> sampled awards sit inside '
+      + 'that band. The scale is logarithmic because the smallest and largest are '
+      + Math.round((d.max || 1) / Math.max(1, d.min || 1)).toLocaleString('en-US')
+      + '× apart. <b>No average is shown</b> — an average across that spread describes no '
+      + 'award that exists.'
+      + (d.truncated ? ' Based on the largest ' + d.count + ' awards, not the whole market.' : '')
+      + '</p></div>');
+  }
+
+  /* ── 5 · WHEN THE MONEY MOVES ────────────────────────────────────────────
+     A hiring and material-purchase decision, not a chart. Federal buying
+     clusters at fiscal year end because unobligated funds expire 30 September. */
+  function renderSeasonality() {
+    const host = $('snBody'); if (!host) return;
+    const sub = $('snSub'); const box = anBox(); const q = box && box.season;
+    if (sub) sub.textContent = 'Award starts by federal fiscal month in ' + anScope()
+      + ' · ' + (S.fy || '');
+    if (!q) { setHTML(host, anNone('Award timing')); return; }
+
+    const max = Math.max.apply(null, q.months.map(m => m.value).concat([1]));
+    const grid = q.months.map(m => {
+      const isQ4 = m.month >= 7 && m.month <= 9;
+      return '<div class="sn-col' + (isQ4 ? ' q4' : '') + '">'
+        + '<i class="sn-b" style="height:' + Math.max(2, (m.value / max) * 100).toFixed(1) + '%"></i>'
+        + '<span class="sn-l">' + esc(m.label) + '</span></div>';
+    }).join('');
+    setHTML(host, '<div class="sn-grid">' + grid + '</div>'
+      + '<p class="sn-note">'
+      + (q.q4Share != null ? '<b>' + q.q4Share.toFixed(0) + '%</b> of sampled value starts in '
+        + 'July–September (shaded) — the fiscal fourth quarter, when unobligated funds '
+        + 'expire on 30 September. ' : '')
+      + (q.peak ? '<b>' + esc(q.peak.label) + '</b> is the heaviest month. ' : '')
+      + 'Months with no sampled award show zero rather than being omitted.'
+      + (q.truncated ? ' Counted over the largest awards, so this is when BIG money moves.' : '')
+      + '</p>');
+  }
+
+  /* ── 4 · PRIMES WHO OWE A SUBCONTRACTING PLAN ────────────────────────────
+     FAR 19.702: a contract over the threshold awarded to a LARGE business
+     requires a subcontracting plan with small-business goals. Those primes are
+     legally motivated to find subcontractors, which makes this the
+     highest-conversion call list on the tab. */
+  function renderPrimeTargets() {
+    const host = $('ptList'); if (!host) return;
+    const sub = $('ptSub'), cap = $('ptCap'); const box = anBox(); const t = box && box.primes;
+    if (sub) sub.textContent = 'Large primes over $750K in ' + anScope() + ' · ' + (S.fy || '');
+    if (!t || !t.primes.length) {
+      setHTML(host, anNone('Prime contractors'));
+      if (cap) setHTML(cap, '');
+      return;
+    }
+    setHTML(host, t.primes.slice(0, 10).map(p => '<div class="pt-r">'
+      + '<span class="pt-n">' + esc(p.recipient) + '</span>'
+      + '<span class="pt-v">' + fmtM(p.value / 1e6) + '</span>'
+      + '<span class="pt-m">' + p.contracts + ' contract' + (p.contracts === 1 ? '' : 's')
+      + ' · largest ' + fmtM(p.largest / 1e6)
+      + (p.agencies.length ? ' · ' + esc(p.agencies.slice(0, 2).join(', '))
+        + (p.agencies.length > 2 ? ' +' + (p.agencies.length - 2) : '') : '')
+      + '</span></div>').join(''));
+    if (cap) setHTML(cap, 'Awards over <b>$' + t.threshold.toLocaleString('en-US')
+      + '</b> carry a FAR 19.702 subcontracting-plan requirement when the prime is a large '
+      + 'business — so these firms have a documented obligation to find small '
+      + 'subcontractors. '
+      + (t.excludedSmallBusiness > 0 ? '<b>' + t.excludedSmallBusiness + '</b> qualifying award'
+        + (t.excludedSmallBusiness === 1 ? ' was' : 's were') + ' excluded because the recipient '
+        + 'is on this code’s small-business list; they carry no such obligation. ' : '')
+      + '<b>Size is not verified for the rest.</b> An award record does not state whether its '
+      + 'recipient is large, so this is every prime we could not rule out — not a claim '
+      + 'that all ' + t.primes.length + ' are large.');
+  }
+
   /* ════════════════ ROOM LEFT ON CONTRACTS ALREADY AWARDED ════════════════
      Ceiling minus obligated: money a prime can still spend on a contract it
      already holds, without any new competition. A subcontractor already on the
@@ -906,7 +1023,8 @@
   function renderAll() {
     computeBreaks();
     renderKPIs(); renderLegend(); renderMap(); renderRankList();
-    renderAgencyList(); renderBuyingOffices(); renderCeilings(); renderRecompetes(); renderIncumbents(); renderInsight();
+    renderAgencyList(); renderBuyingOffices(); renderAwardSize(); renderSeasonality();
+    renderPrimeTargets(); renderCeilings(); renderRecompetes(); renderIncumbents(); renderInsight();
     // Both read every measured year, so they are painted with the rest but do
     // not change with the year control.
     renderSbShare(); renderConcentration(); renderSbWinners();
