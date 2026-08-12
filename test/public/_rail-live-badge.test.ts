@@ -239,9 +239,12 @@ console.log("\n── Part H · card 807 workflow rail ──");
   const R = renderRail("opportunities");
   const S = railStyle();
   const J = railScript();
-  const ROUTES = ["/command-center","/notices","/audits","/past-audits","/pipeline","/cmmc","/capability-statement","/teaming-partners","/defense-news","/defense-spending","/agencies","/contracting-officers","/naics","/far-dfars-updates","/wage-benchmarks"];
+  // The list is spelled out rather than derived from rail.ts, on purpose: derived
+  // from the source it would agree with any rail, including one that lost a
+  // destination. Adding a page means adding it HERE too — that edit is the review.
+  const ROUTES = ["/command-center","/notices","/audits","/past-audits","/pipeline","/who-to-call","/cmmc","/capability-statement","/teaming-partners","/defense-news","/defense-spending","/agencies","/contracting-officers","/naics","/far-dfars-updates","/wage-benchmarks"];
   const hrefs = [...R.matchAll(/href="([^"]+)"/g)].map((m) => m[1]).filter((h) => h !== "/settings");
-  check("15 destinations, exactly the source routes", JSON.stringify(hrefs) === JSON.stringify(ROUTES), hrefs.join(" "));
+  check(`${ROUTES.length} destinations, exactly the source routes`, JSON.stringify(hrefs) === JSON.stringify(ROUTES), hrefs.join(" "));
 
   // §6: counts derive live or do not ship. The handoff MARKUP shipped 4, 19 and a 72% with no
   // source named anywhere — a stale number in the rail is on every page, all day.

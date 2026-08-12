@@ -34,6 +34,7 @@
 
   /* ─── global state ─── */
   const S = { fy: null, state: null, rankMode: 'top', code: null };
+  let scopeNote = '';
 
   /* The view every panel reads. With no code selected it is the aggregate the
      route built; with one selected it is that code's slice of the SAME build —
@@ -103,19 +104,43 @@
   let usGeo = null;
   const emptyLine = (t) => '<div class="dsb-empty">' + esc(t) + '</div>';
 
+  /* ════════════════ THE SCOPE IS SHARED, NOT LOCAL ════════════════
+     `S.fy` and `S.code` used to be private to this file, which is why the three
+     panels that read them could not become their own destination. They now
+     mirror `window.BD_SCOPE` — one scope, addressable in the URL, carried
+     between pages. `S.state` and `S.rankMode` stay local: nothing outside this
+     page renders a state focus or a leaderboard tab.
+
+     BD_SCOPE is optional on purpose. A page that forgets the script tag keeps
+     working on its own local scope rather than throwing — the panels are the
+     product, the scope is how they are addressed. */
+  const SCOPE = window.BD_SCOPE || null;
+
+  function setScope(patch) {
+    if (patch && 'fy' in patch) S.fy = patch.fy;
+    if (patch && 'code' in patch) S.code = patch.code;
+    if (SCOPE) SCOPE.set(patch);
+    syncControls(); renderAll();
+  }
+
   /* ════════════════ CONTROLS ════════════════ */
   function buildControls() {
+    if (!$('segFY')) return;
     setHTML($('segFY'), D.FYS.map(f =>
       `<button data-fy="${esc(f)}" class="${f === S.fy ? 'active' : ''}">${esc(f.replace('FY20', "'"))}</button>`).join(''));
-    $('segFY').querySelectorAll('button').forEach(b => b.onclick = () => { S.fy = b.dataset.fy; syncControls(); renderAll(); });
+    $('segFY').querySelectorAll('button').forEach(b => b.onclick = () => { setScope({ fy: b.dataset.fy }); });
 
     $('resetBtn').onclick = () => {
-      S.fy = D.FYS[D.FYS.length - 1]; S.state = null; S.rankMode = 'top';
-      syncControls(); renderRankTabs(); renderAll();
+      S.state = null; S.rankMode = 'top';
+      // The state focus and the rank tab are page-local — nothing else reads
+      // them. The YEAR and the CODE are not, so reset publishes them.
+      setScope({ fy: D.FYS[D.FYS.length - 1], code: null });
+      renderRankTabs();
     };
     $('selChipX').onclick = () => { S.state = null; syncControls(); renderAll(); };
   }
   function syncControls() {
+    if (!$('segFY')) { renderCodePills(); return; }
     $('segFY').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.fy === S.fy));
     const chip = $('selChip'); const st = view().states[S.state];
     if (S.state && st) { chip.classList.add('show'); $('selChipText').textContent = 'Focus: ' + st.name; }
@@ -143,8 +168,7 @@
       b.onclick = () => {
         // Second click on the selected code clears it — the aggregate is a real
         // view, not a null state, so there has to be a way back to it.
-        S.code = (S.code === b.dataset.code) ? null : b.dataset.code;
-        syncControls(); renderAll();
+        setScope({ code: (S.code === b.dataset.code) ? null : b.dataset.code });
       };
     });
   }
@@ -163,13 +187,24 @@
     }
     bits.push('States, agencies and recipients are each the <b>top ' + esc(c.top_n)
       + '</b> per code — a name that is absent is outside that ten, not a zero');
+    // A link can carry a year or a code this feed never measured. Showing the
+    // fallback silently would put one year's numbers under another year's URL,
+    // so the substitution is stated where the measurement date is stated.
+    if (scopeNote) bits.push('<span class="dsb-gap">' + esc(scopeNote) + '</span>');
     setHTML(el, bits.join('<span class="dsb-prov-dot">·</span>'));
 
     renderCodePills();
   }
 
+  /* ⛔ EVERY RENDERER RETURNS WHEN ITS HOST IS ABSENT, and that is the mounting
+     mechanism, not defensive noise. This file renders a SET of panels; a page
+     that carries only some of their hosts gets only those panels, one renderer
+     set, no fork. Most already guarded — these did not, and an unguarded
+     `$(id).querySelectorAll` throws, which takes the whole page down rather
+     than skipping one panel. */
   /* ════════════════ KPIs ════════════════ */
   function renderKPIs() {
+    if (!$('kpiStrip')) return;
     const cards = view().kpis;
     setHTML($('kpiStrip'), cards.map((c, idx) => {
       const dtone = !c.delta ? 'flat' : c.delta[0] === '+' ? 'up' : 'down';
@@ -254,6 +289,10 @@
   }
 
   function renderMap() {
+    // Guarded on the HOST, not just on the topology: a page that mounts these
+    // renderers without a map has no #geoSvg, and d3's empty-selection tolerance
+    // is not a contract worth leaning on.
+    if (!$('geoSvg')) return;
     const svg = d3.select('#geoSvg'); svg.selectAll('*').remove();
     if (!usGeo) return;
     const ST = view().states;
@@ -318,12 +357,13 @@
     tip.style.left = Math.min(ev.clientX + 14, window.innerWidth - 200) + 'px';
     tip.style.top = (ev.clientY + 14) + 'px';
   }
-  const hideTip = () => { $('geoTip').style.display = 'none'; };
+  const hideTip = () => { const t = $('geoTip'); if (t) t.style.display = 'none'; };
 
   /* ════════════════ RANKED LIST ════════════════
      Two modes. A third, keyed to your firm's own activity, would need a
      dimension this feed does not carry. */
   function renderRankTabs() {
+    if (!$('rankTabs')) return;
     const tabs = [['top', 'Top'], ['growth', 'Growth']];
     setHTML($('rankTabs'), tabs.map(t => `<button class="rank-tab ${t[0] === S.rankMode ? 'active' : ''}" data-rm="${t[0]}">${t[1]}</button>`).join(''));
     $('rankTabs').querySelectorAll('button').forEach(b => b.onclick = () => { S.rankMode = b.dataset.rm; renderRankList(); });
@@ -344,6 +384,7 @@
   }
 
   function renderRankList() {
+    if (!$('rankTabs') || !$('rankList')) return;
     $('rankTabs').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.rm === S.rankMode));
     let arr = Object.entries(view().states).map(([fips, s]) => ({ fips, ...s }));
     if (S.rankMode === 'growth') {
@@ -378,6 +419,7 @@
      One bar. Small-business dollars arrive per NAICS, never per agency, so no
      SB segment can be drawn here. */
   function renderAgencyList() {
+    if (!$('agencyList')) return;
     /* The column header was the literal string FY26 in the markup, so it kept
        naming FY26 while the reader was looking at FY24. A header over a number
        has to name the year that number is. */
@@ -894,6 +936,7 @@
      No agency column: the feed ranks recipients per NAICS across all agencies,
      so no agency is attributable to a row. */
   function renderIncumbents() {
+    if (!$('iiBody')) return;
     const rows = view().incumbents;
     /* This block follows the concentration rows, which carry their own year on
        every row. This one follows the year control, so it has to say which year
@@ -934,6 +977,7 @@
 
   /* ════════════════ INSIGHT BAR ════════════════ */
   function renderInsight() {
+    if (!$('insightBar')) return;
     const v = view();
     let html;
     if (S.state && v.states[S.state]) {
@@ -1136,11 +1180,26 @@
   function build() {
     if (built) return;
     built = true;
-    S.fy = D.FYS[D.FYS.length - 1];
+    /* ⛔ A REQUESTED YEAR IS NOT A MEASURED ONE. reconcile() returns what can
+       actually be shown plus a sentence naming what was asked for; printing the
+       fallback without the sentence is a page lying about its own year. */
+    const rec = SCOPE
+      ? SCOPE.reconcile(D.FYS, ((D.coverage || {}).tracked) || [])
+      : { fy: D.FYS[D.FYS.length - 1], code: null, note: '' };
+    S.fy = rec.fy || D.FYS[D.FYS.length - 1];
+    S.code = rec.code || null;
+    scopeNote = rec.note || '';
+    /* PUBLISH WHAT IS ACTUALLY ON SCREEN, so the next destination inherits it.
+       Reading a URL persists nothing on its own, and continuity between pages is
+       the whole reason the scope is shared. The url option is off here, leaving
+       the address bar exactly as the reader typed it — when a request cannot be
+       honoured the note beside the measurement date says so, and rewriting the
+       URL to the fallback would erase the reader's own request. */
+    if (SCOPE) SCOPE.set({ fy: S.fy, code: S.code }, { url: false });
     assignColors();
     renderProvenance();
     buildControls(); renderRankTabs(); renderUnsupported();
-    fetch('/vendor/states-10m.json')
+    if ($('geoSvg')) fetch('/vendor/states-10m.json')
       .then(r => r.json()).then(j => { usGeo = j; renderMap(); })
       .catch(() => { console.warn('us-atlas failed'); });
     let to; window.addEventListener('resize', () => { clearTimeout(to); to = setTimeout(renderMap, 220); });

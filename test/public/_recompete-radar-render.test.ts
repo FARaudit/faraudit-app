@@ -10,13 +10,17 @@
 //
 // Run: npx tsx test/public/_recompete-radar-render.test.ts
 import { readFileSync } from "node:fs";
+import { pageSource } from "./_page-styles";
 import path from "node:path";
 
 let failures = 0;
 const assert = (c: boolean, m: string) => { console.log(`${c ? "✅" : "❌"} ${m}`); if (!c) failures++; };
 
 const ROOT = process.cwd();
-const html = readFileSync(path.join(ROOT, "public/defense-spending.html"), "utf8");
+// The page's styles moved into a shared stylesheet when a second page began rendering these panels.
+// `pageSource` is the markup PLUS whatever CSS the page actually links, so this gate keeps asking
+// whether the rule SHIPS rather than which file someone wrote it in.
+const html = pageSource("defense-spending.html");
 const app = readFileSync(path.join(ROOT, "public/dsb-app.js"), "utf8");
 // Comments are stripped before searching so no assertion can pass by matching
 // the paragraph that explains it.

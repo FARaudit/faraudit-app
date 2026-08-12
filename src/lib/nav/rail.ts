@@ -64,6 +64,7 @@ const I = {
   runAudit: '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/>',
   pastAudits: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   pipeline: '<path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/>',
+  whoToCall: '<path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1.9.4 1.8.7 2.7a2 2 0 01-.5 2.1L8.1 9.8a16 16 0 006 6l1.3-1.2a2 2 0 012.1-.5c.9.3 1.8.6 2.7.7a2 2 0 011.8 2.1z"/>',
   capability: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
   opportunities: '<circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/>',
   defenseIntel: '<path d="M12 3L4 8v8l8 5 8-5V8l-8-5z"/>',
@@ -99,6 +100,13 @@ export const WORKFLOW: RailItem[] = [
   // "Decisions" names the artifact the engine produces. The ROUTE is unchanged.
   { key: "past-audits", label: "Decisions", href: "/past-audits", icon: I.pastAudits },
   { key: "pipeline", label: "Pipeline", href: "/pipeline", icon: I.pipeline },
+  /* Openings on contracts that ALREADY EXIST — primes carrying a subcontracting-plan
+     obligation, unobligated ceiling on live awards, and contracts inside their
+     recompete window. None of it reaches SAM.gov as a solicitation, so it is
+     invisible to anyone watching notices. It sits in Workflow because it is a
+     WEEKLY read; it lived at the bottom of Defense Spending, which is a
+     twice-a-year orientation, and a weekly list loses to a long scroll. */
+  { key: "who-to-call", label: "Who to call", href: "/who-to-call", icon: I.whoToCall },
 ];
 
 export const SECTIONS: RailSection[] = [

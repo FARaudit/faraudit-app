@@ -253,6 +253,8 @@ type RunResult = {
   legendAttached: boolean;
   noticePainted: boolean;
   recipientRows: number;
+  /** renderAll() passes counted AFTER the theme flip — 0 means the guard held. */
+  passesAfterFlip: number;
 };
 
 /** A minimal but SHAPED payload: three fiscal years, one tracked code, one
@@ -330,7 +332,7 @@ function buildDom() {
  *  settles the feed to `settle`, then flips the theme. */
 function run(appSrc: string, settle: "none" | "ok" | "unwired", dataSrc = DATA_SRC): RunResult {
   const { document, bodyEl, attached, byId } = buildDom();
-  const out: RunResult = { loadError: null, renderError: null, themeError: null, legendAttached: false, noticePainted: false, recipientRows: 0 };
+  const out: RunResult = { loadError: null, renderError: null, themeError: null, legendAttached: false, noticePainted: false, recipientRows: 0, passesAfterFlip: 0 };
 
   const win: Record<string, unknown> = { addEventListener: () => {}, innerWidth: 1440 };
   /** Models ONE rule of the real HTML parser, because that rule caused a real
@@ -400,7 +402,11 @@ function run(appSrc: string, settle: "none" | "ok" | "unwired", dataSrc = DATA_S
   const tbody = byId.get("iiBody");
   out.recipientRows = tbody && attached(tbody) ? tbody.children.length : 0;
 
+  // Zeroed FIRST so only passes caused by the flip are counted — render() above
+  // legitimately runs one, and counting it would make every case look unguarded.
+  win.__passes = 0;
   try { app?.onThemeChange?.(); } catch (e) { out.themeError = e as Error; }
+  out.passesAfterFlip = Number(win.__passes) || 0;
   return out;
 }
 
@@ -462,14 +468,33 @@ ok(preStripped.renderError !== null || !preStripped.legendAttached,
   preStripped.renderError ? describe(preStripped.renderError)
     : (preStripped.legendAttached ? "NO BREAK — R4 proves nothing" : "panels stripped before the payload arrived"));
 
-// (1) Remove the theme guard. A flip into the stripped DOM must throw.
+// (1) Remove the theme guard. A flip into the stripped DOM must RUN THE RENDERERS.
+//
+// ⛔ THIS ASSERTED A THROW, AND THE THROW IS GONE ON PURPOSE. Every renderer now
+// returns when its host is absent, because dsb-app.js mounts on more than one page
+// and a page carrying only some hosts must get only those panels rather than a
+// stack trace. That made the page robust and this plant inert — it would have gone
+// on "passing" by asserting an exception that can no longer happen.
+//
+// The INVARIANT never was about exceptions: after honest-fail has replaced the data
+// region, a theme flip must not re-run the renderers, because re-running them is
+// what repaints a dead page. So the plant asserts the thing that actually goes
+// wrong — the guarded source performs NO render pass on a flip into a stripped DOM,
+// and the unguarded one performs one.
 const GUARD = "if (dsbState() !== 'ok' || !built) return;";
 const guardFound = APP_SRC.includes(GUARD);
 ok(guardFound, "the theme guard is where the plant expects it",
   guardFound ? "" : "guard text moved — this plant is inert; update it");
-const unguarded = run(APP_SRC.replace(GUARD, ""), "unwired");
-ok(unguarded.themeError !== null, "the unguarded source throws on a flip into a stripped DOM",
-  describe(unguarded.themeError) || "NO THROW — the shim is inert and R6 proves nothing");
+const COUNT_MARK = "function renderAll() {";
+ok(APP_SRC.includes(COUNT_MARK), "renderAll() is where the counter splices in");
+const counted = (src: string) =>
+  src.replace(COUNT_MARK, COUNT_MARK + " window.__passes = (window.__passes || 0) + 1;");
+const guardedPasses = run(counted(APP_SRC), "unwired").passesAfterFlip;
+const unguardedPasses = run(counted(APP_SRC.replace(GUARD, "")), "unwired").passesAfterFlip;
+ok(guardedPasses === 0,
+  "the GUARDED source runs NO render pass on a flip into a stripped DOM", `${guardedPasses} pass(es)`);
+ok(unguardedPasses > 0, "the unguarded source DOES run one — the guard is load-bearing",
+  unguardedPasses > 0 ? `${unguardedPasses} pass(es)` : "NO PASS — the plant is inert and R6 proves nothing");
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? "PASS" : "FAIL"} — ${pass} passed, ${fail} failed`);
