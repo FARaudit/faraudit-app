@@ -665,9 +665,13 @@
     const cap = $('boCap'), sub = $('boSub');
     const box = (D.BUYING_OFFICES || {})[S.fy] || null;
     const scoped = S.code ? 'NAICS ' + S.code : 'your NAICS codes';
-    // The heading beside it already says "inside them", so this states only what
-    // the numbers are scoped to.
-    if (sub) sub.textContent = scoped + ' · ' + (S.fy || '');
+    /* ⛔ THESE ARE SUB-AGENCIES, NOT BUYING OFFICES. The values are "Department of
+       the Navy", "U.S. Coast Guard", "Defense Logistics Agency" — the tier below
+       a department, not the office that signs. A buying office looks like "SUP OF
+       SHIPBUILDING CONV AND REPAIR", and this feed carries none: the award-search
+       endpoint returns null for that field. The copy states the tier it has. */
+    if (sub) sub.textContent = 'Services and agencies within those departments · '
+      + scoped + ' · ' + (S.fy || '');
 
     if (!box) { setHTML(host, ''); if (cap) setHTML(cap, ''); return; }
     const list = (S.code ? (box.byCode || {})[S.code] || [] : box.offices || [])
@@ -676,8 +680,8 @@
     if (!list.length) {
       // A never-pulled column must not render as a market with no buyers.
       setHTML(host, '<div class="bo-none">' + (box.measured
-        ? 'No awarding office in <b>' + esc(scoped) + '</b> recorded obligations in ' + esc(S.fy || '') + '.'
-        : 'Buying offices have not been pulled for <b>' + esc(scoped) + '</b> yet. '
+        ? 'No agency inside those departments recorded obligations in <b>' + esc(scoped) + '</b> in ' + esc(S.fy || '') + '.'
+        : 'The agency split has not been pulled for <b>' + esc(scoped) + '</b> yet. '
           + '<b>That is a gap in our data, not a market with no buyers.</b> It refreshes nightly.')
         + '</div>');
       if (cap) setHTML(cap, '');
@@ -697,8 +701,8 @@
         + '<i class="bo-bar" style="width:' + w.toFixed(1) + '%"></i></div>';
     }).join('');
     if (rest.length) {
-      h += '<div class="bo-row rest"><span class="bo-n">' + rest.length + ' other office'
-        + (rest.length === 1 ? '' : 's') + '</span>'
+      h += '<div class="bo-row rest"><span class="bo-n">' + rest.length + ' other agenc'
+        + (rest.length === 1 ? 'y' : 'ies') + '</span>'
         + '<span class="bo-v">' + fmtM(restV / 1e6) + '</span>'
         + '<i class="bo-bar" style="width:' + Math.max(2, (Math.abs(restV) / max) * 100).toFixed(1) + '%"></i></div>';
     }
@@ -710,10 +714,10 @@
       setHTML(cap, '<b>' + esc(lead.name) + '</b> is the buyer'
         + (share != null ? ', at ' + share.toFixed(0) + '% of obligations in ' + esc(scoped) : '')
         + '. ' + (rest.length
-          ? 'The remaining ' + rest.length + ' office' + (rest.length === 1 ? ' is' : 's are')
+          ? 'The remaining ' + rest.length + ' agenc' + (rest.length === 1 ? 'y is' : 'ies are')
             + ' collapsed into one row — they are listed here rather than dropped, so the '
             + fmtM(restV / 1e6) + ' outside the visible set stays visible.'
-          : 'Every office with obligations is shown.'));
+          : 'Every agency with obligations is shown.'));
     }
   }
 
