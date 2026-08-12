@@ -473,10 +473,74 @@
     body.appendChild(box);
   }
 
+
+  /* ════════════════ IS THERE MONEY HERE FOR A COMPANY THIS SIZE ════════════════
+     The share of each code that reaches small business, every measured year. Both
+     figures were already stored per (code, year) and the answer was sitting in a
+     footnote tile: 2.8% of $28.07B is $0.79B, and THAT is the market, not $28B.
+
+     Not filtered by the year control — the whole point is the direction across
+     years, and a single year cannot show it. */
+  function renderSbShare() {
+    const el = $('sbShareList'); if (!el) return;
+    const rows = D.SB_SHARE || [];
+    if (!rows.length) { setHTML(el, '<div class="conc-note">No codes tracked.</div>'); return; }
+    setHTML(el, rows.map(r => {
+      const pts = r.points || [];
+      // Direction is read from the first and last year that HAVE a share. A code
+      // that obligated nothing in a year has no share, and calling that 0% would
+      // invent a market that closed.
+      const known = pts.filter(p => p.pct != null);
+      let dir = 'flat', dirTxt = 'no change';
+      if (known.length >= 2) {
+        const d = known[known.length - 1].pct - known[0].pct;
+        if (Math.abs(d) >= 0.1) { dir = d > 0 ? 'up' : 'down'; dirTxt = (d > 0 ? '▲ ' : '▼ ') + Math.abs(d).toFixed(1) + ' pts'; }
+      } else if (known.length < 2) { dirTxt = 'one year only'; }
+      const max = Math.max(1, ...known.map(p => p.pct));
+      return `<div class="sbs-row">
+        <div class="sbs-head"><span class="sbs-code">${esc(r.naics)}</span>
+          <span class="sbs-dir ${dir}">${esc(dirTxt)}</span></div>
+        <div class="sbs-pts">${pts.map(p => `<div class="sbs-pt">
+            <div class="sbs-bar"><i style="width:${p.pct == null ? 0 : Math.round((p.pct / max) * 100)}%"></i></div>
+            <div class="sbs-pct">${p.pct == null ? '<span class="sbs-unknown">—</span>' : p.pct.toFixed(1) + '%'}</div>
+            <div class="sbs-meta">${esc(p.fy)}${p.open ? ' to date' : ''}</div>
+            <div class="sbs-meta">${p.pct == null ? 'nothing obligated' : fmtM(p.sb) + ' of ' + fmtM(p.total)}</div>
+          </div>`).join('')}</div>
+      </div>`;
+    }).join(''));
+  }
+
+  /* ════════════════ HOW CONCENTRATED IS EACH CODE ════════════════
+     What the five largest recipients hold of the code's WHOLE total. Exact: the
+     numerator is the feed's top five, the denominator is the code's own stored
+     total — not a sum of the rows we happen to hold.
+
+     It states no FIRM COUNT. The feed lists ten recipients per code, so everything
+     below tenth is invisible, and counting the visible ones would report our own
+     cap as a market size. */
+  function renderConcentration() {
+    const el = $('concList'); if (!el) return;
+    const rows = D.CONCENTRATION || [];
+    if (!rows.length) { setHTML(el, '<div class="conc-note">No codes tracked.</div>'); return; }
+    setHTML(el, rows.map(r => {
+      const leaders = r.leaders || [];
+      return `<div class="conc-row">
+        <div class="conc-top"><span class="sbs-code">${esc(r.naics)} · ${esc(r.fy)}</span>
+          <span class="conc-pct">${r.top5_pct == null ? '—' : r.top5_pct.toFixed(0) + '%'}</span></div>
+        <div class="conc-bar">${leaders.map((l, i) => `<i style="width:${l.pct == null ? 0 : Math.min(100, l.pct).toFixed(2)}%;background:${css(GEO_RAMP[Math.max(1, 5 - i)])}" title="${esc(l.name)}"></i>`).join('')}</div>
+        <div class="conc-lead">${leaders.length ? esc(leaders[0].name) + ' alone holds ' + (leaders[0].pct == null ? '—' : leaders[0].pct.toFixed(0) + '%') : 'No recipients recorded.'}</div>
+        <div class="conc-lead">Top five hold ${fmtM(r.top5_val)} of ${fmtM(r.total)}.</div>
+      </div>`;
+    }).join('') + `<div class="conc-note">The feed lists the top ${esc(String((D.coverage || {}).top_n || 10))} recipients per code, so the number of firms below them is not known here and is not stated.</div>`);
+  }
+
   function renderAll() {
     computeBreaks();
     renderKPIs(); renderLegend(); renderMap(); renderRankList();
     renderAgencyList(); renderRecompetes(); renderIncumbents(); renderInsight();
+    // Both read every measured year, so they are painted with the rest but do
+    // not change with the year control.
+    renderSbShare(); renderConcentration();
   }
 
   let built = false;

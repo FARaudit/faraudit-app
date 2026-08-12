@@ -114,6 +114,28 @@ export interface SpendingPayload {
   BY_FY: Record<string, FyView>;
   MARKET_TREND: { labels: string[]; series: Record<string, number[]> };
   RECOMPETES: Array<RecompeteRow & { naics: string; expired: boolean }>;
+  /** "Is there money here for a company my size?" — the share of each code that
+   *  reaches small business, across every measured year. Computed from the two
+   *  figures the table already stores per (code, year); no new source. */
+  SB_SHARE: Array<{
+    naics: string;
+    points: Array<{ fy: string; pct: number | null; sb: number; total: number; open: boolean }>;
+  }>;
+  /** "How many people am I bidding against?" — what the largest recipients hold
+   *  of each code's WHOLE total. The numerator is the top five the feed lists;
+   *  the denominator is the code's real total, so the share is exact.
+   *  `firms_below_unknown` is always true: the feed lists ten per code, so the
+   *  NUMBER of firms under them is not knowable here and is never stated. */
+  CONCENTRATION: Array<{
+    naics: string;
+    fy: string;
+    top5_val: number;
+    total: number;
+    top5_pct: number | null;
+    listed: number;
+    firms_below_unknown: true;
+    leaders: Array<{ name: string; val: number; pct: number | null }>;
+  }>;
   // Panels the stored table cannot support. Each names the measurement that is
   // missing, so the page says what is not connected instead of rendering blank.
   unsupported: Array<{ panel: string; needs: string }>;
@@ -422,6 +444,69 @@ export async function fetchDefenseSpending(
     )
   };
 
+  // ── SB share by code, every measured year ────────────────────────────────
+  // The one number that answers "should I be here at all". Both figures are
+  // already stored per (code, year); this only puts them side by side and keeps
+  // the direction visible. `pct` is null when the code obligated nothing that
+  // year — a 0% share of nothing is not a market that closed.
+  const SB_SHARE = tracked.map((code) => ({
+    naics: code,
+    points: years.map((fy) => {
+      const r = rows.find((x) => x.naics_code === code && x.fiscal_year === fy);
+      const total = r?.total_obligations || 0;
+      const sb = r?.sb_obligations || 0;
+      return {
+        fy: fyLabel(fy),
+        pct: total > 0 ? (sb / total) * 100 : null,
+        sb: toM(sb),
+        total: toM(total),
+        open: fy >= currentFy
+      };
+    })
+  }));
+
+  // ── Concentration ────────────────────────────────────────────────────────
+  // What the largest recipients hold of the code's WHOLE total. This is exact:
+  // the numerator is the feed's top five and the denominator is the code's own
+  // stored total, not a sum of the rows we happen to hold.
+  //
+  // What it deliberately does NOT state is how many firms compete. The feed
+  // lists ten recipients per code, so everything below tenth is invisible —
+  // counting the visible ones would report our own cap as a market size, which
+  // is the defect this tab already had on another panel.
+  const CONCENTRATION = tracked.map((code) => {
+    const fy = years[years.length - 1];
+    const r = rows.find((x) => x.naics_code === code && x.fiscal_year === fy);
+    const total = r?.total_obligations || 0;
+    const merged = new Map<string, { name: string; val: number }>();
+    for (const t of r?.top_recipients || []) {
+      if (!t?.name) continue;
+      const k = recipientKey(t.name);
+      const hit = merged.get(k);
+      if (hit) {
+        hit.val += t.amount || 0;
+        if (t.name.length > hit.name.length) hit.name = t.name;
+      } else merged.set(k, { name: t.name, val: t.amount || 0 });
+    }
+    const ranked = Array.from(merged.values()).sort((a, b) => b.val - a.val);
+    const top5 = ranked.slice(0, 5);
+    const top5Val = top5.reduce((a, x) => a + x.val, 0);
+    return {
+      naics: code,
+      fy: fyLabel(fy),
+      top5_val: toM(top5Val),
+      total: toM(total),
+      top5_pct: total > 0 ? (top5Val / total) * 100 : null,
+      listed: ranked.length,
+      firms_below_unknown: true as const,
+      leaders: top5.map((x) => ({
+        name: x.name,
+        val: toM(x.val),
+        pct: total > 0 ? (x.val / total) * 100 : null
+      }))
+    };
+  });
+
   return {
     state: "ok",
     as_of: asOf,
@@ -432,6 +517,8 @@ export async function fetchDefenseSpending(
     BY_FY,
     MARKET_TREND,
     RECOMPETES,
+    SB_SHARE,
+    CONCENTRATION,
     unsupported: UNSUPPORTED
   };
 }

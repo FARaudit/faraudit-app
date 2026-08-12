@@ -270,6 +270,28 @@ button{font-family:inherit}
    firm whose status the feed never supplied. The third used to render as the
    second. */
 .sa-bdg.unknown{opacity:.5}
+/* ── small-business share by code, and concentration ── */
+.sbs-row{padding:11px 0;border-bottom:1px solid var(--line-2)}
+.sbs-row:last-child{border-bottom:0}
+.sbs-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:7px}
+.sbs-code{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--ink)}
+.sbs-dir{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.04em}
+.sbs-dir.up{color:var(--green-600,#059669)}.sbs-dir.down{color:var(--amber-800,#92400e)}.sbs-dir.flat{color:var(--mute)}
+.sbs-pts{display:flex;gap:8px}
+.sbs-pt{flex:1;min-width:0}
+.sbs-bar{height:6px;border-radius:3px;background:var(--line-2);overflow:hidden;margin-bottom:4px}
+.sbs-bar i{display:block;height:100%;background:var(--accent);border-radius:3px}
+.sbs-meta{font-family:"IBM Plex Mono",monospace;font-size:9px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sbs-pct{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;color:var(--ink)}
+.sbs-unknown{color:var(--mute);font-style:italic}
+.conc-row{padding:11px 0;border-bottom:1px solid var(--line-2)}
+.conc-row:last-child{border-bottom:0}
+.conc-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:6px}
+.conc-pct{font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:800;color:var(--ink)}
+.conc-bar{height:7px;border-radius:4px;background:var(--line-2);display:flex;overflow:hidden;margin-bottom:6px}
+.conc-bar i{display:block;height:100%;border-right:1px solid var(--card)}
+.conc-lead{font-size:10.5px;color:var(--mute);line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.conc-note{font-size:10px;color:var(--mute);line-height:1.5;padding-top:9px}
 .ag-head{display:grid;grid-template-columns:58px 1fr 62px 60px;gap:11px;padding:0 8px 7px;border-bottom:1px solid var(--line-2)}
 .ag-head span{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
 .ag-head span:nth-child(3),.ag-head span:nth-child(4){text-align:right}
@@ -545,6 +567,25 @@ button{font-family:inherit}
       </section>
 
       <div class="insight-bar" id="insightBar"></div>
+
+      <!-- can a company this size win here, and who already does -->
+      <section class="row two">
+        <section class="widget">
+          <header class="widget-head">
+            <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg></span>
+              <div class="wh-text"><h3>Is there money here for a company your size?</h3><p class="wh-sub">Share of each code that reaches <b>small business</b> · every measured year</p></div></div>
+          </header>
+          <div class="sbs-list" id="sbShareList"></div>
+        </section>
+
+        <section class="widget">
+          <header class="widget-head">
+            <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l6 3"/></svg></span>
+              <div class="wh-text"><h3>How concentrated is each code?</h3><p class="wh-sub">What the five largest recipients hold of the code's <b>whole</b> total</p></div></div>
+          </header>
+          <div class="conc-list" id="concList"></div>
+        </section>
+      </section>
 
       <!-- treemap + scatter -->
       <section class="row two">
