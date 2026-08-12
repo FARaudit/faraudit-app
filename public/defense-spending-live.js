@@ -42,6 +42,7 @@
       // seasonality). One mapper line per payload field — a field added to the
       // route and not copied here ships the panel EMPTY with every gate green.
       window.DSB.AWARD_ANALYTICS = data.AWARD_ANALYTICS || {};
+      window.DSB.BUYING_OFFICES = data.BUYING_OFFICES || {};
       window.DSB.SB_SHARE = Array.isArray(data.SB_SHARE) ? data.SB_SHARE : [];
       window.DSB.CONCENTRATION = Array.isArray(data.CONCENTRATION) ? data.CONCENTRATION : [];
       window.DSB.SB_WINNERS = Array.isArray(data.SB_WINNERS) ? data.SB_WINNERS : [];

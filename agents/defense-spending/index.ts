@@ -108,6 +108,8 @@ interface IntelRow {
   top_recipients: unknown;
   sb_recipients: unknown;          // FA-96b
   agency_breakdown: unknown;
+  // One level below agency: the buying offices inside a department. Migration 035.
+  sub_agency_breakdown: unknown;
   state_breakdown: unknown;
   contract_type_breakdown: unknown;
   // Kept, and still written. These are "contracts expiring in N days", which is
@@ -144,12 +146,13 @@ class UnmeasuredRow extends Error {}
 async function buildRow(naics: string, win: FYWindow, priorTotal: number | null): Promise<IntelRow> {
   const f = { naics, fyStart: win.start, fyEnd: win.end };
   usa.resetTransportFailures();
-  const [total, sb, recipients, sbRecipients, agencies, states, contractTypes, rec90, rec180, recUpcoming, awardSample, setAsideMix] = await Promise.all([
+  const [total, sb, recipients, sbRecipients, agencies, subAgencies, states, contractTypes, rec90, rec180, recUpcoming, awardSample, setAsideMix] = await Promise.all([
     usa.fetchTotalObligations(f),
     usa.fetchSmallBusinessObligations(f),
     usa.fetchTopRecipients(f),
     usa.fetchSBRecipients(f),       // FA-96b
     usa.fetchAgencyBreakdown(f),
+    usa.fetchSubAgencyBreakdown(f),
     usa.fetchStateBreakdown(f),
     usa.fetchContractTypeBreakdown(f),
     usa.fetchRecompetes(f, 0, 90),
@@ -189,6 +192,7 @@ async function buildRow(naics: string, win: FYWindow, priorTotal: number | null)
     top_recipients: recipients,
     sb_recipients: sbRecipients,
     agency_breakdown: agencies,
+    sub_agency_breakdown: subAgencies,
     state_breakdown: states,
     contract_type_breakdown: contractTypes,
     recompetes_expiring_90d: rec90,
@@ -205,7 +209,8 @@ async function buildRow(naics: string, win: FYWindow, priorTotal: number | null)
  *  be missing at runtime. */
 const HAND_APPLIED_COLUMNS: Array<{ column: keyof IntelRow; migration: string }> = [
   { column: "award_sample", migration: "033_defense_spending_award_sample.sql" },
-  { column: "recompetes_upcoming", migration: "034_defense_spending_recompetes_upcoming.sql" }
+  { column: "recompetes_upcoming", migration: "034_defense_spending_recompetes_upcoming.sql" },
+  { column: "sub_agency_breakdown", migration: "035_defense_spending_sub_agency.sql" }
 ];
 
 /** Deploy order must not matter. This worker and the migrations that add its
