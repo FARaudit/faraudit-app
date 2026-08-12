@@ -27,6 +27,8 @@ export interface AwardRecord {
 
 export interface CeilingRow {
   award_id: string;
+  /** How many of this firm's awards the row folds together. 1 unless grouped. */
+  contracts?: number;
   recipient: string;
   ceiling: number;
   obligated: number;
@@ -256,7 +258,10 @@ export interface CeilingHeadroom {
   totalHeadroom: number;
   /** Awards in the sample that have already subcontracted, with the evidence. */
   subcontracting: number;
+  /** Awards behind the rows. */
   sampled: number;
+  /** Distinct firms after folding name spellings — what `rows` actually holds. */
+  firms: number;
   cap: number | null;
   unreadable: number;
 }
@@ -266,14 +271,43 @@ export function ceilingHeadroom(sample: AwardSample | null | undefined): Ceiling
   const rows = Array.isArray(c?.rows) ? c!.rows! : [];
   if (!rows.length) return null;
   const sum = (f: (r: CeilingRow) => number) => rows.reduce((n, r) => n + (Number(f(r)) || 0), 0);
+
+  /* GROUPED BY FIRM, and it has to be — the panel answers "who has room left",
+     which is a question about a company, not about a contract. Rendered award by
+     award it listed HUNTINGTON INGALLS INCORPORATED and HUNTINGTON INGALLS INC as
+     two separate rows: the same $7.36B name split this file already has a
+     normaliser for, reintroduced because that normaliser was applied to the prime
+     list and not here. It also put Electric Boat on screen twice, which is
+     truthful award-by-award and reads as duplication in a firm list. */
+  const byFirm = new Map<string, CeilingRow & { contracts: number }>();
+  for (const r of rows) {
+    const key = normaliseRecipient(r.recipient);
+    const cur = byFirm.get(key);
+    if (!cur) {
+      byFirm.set(key, { ...r, contracts: 1 });
+      continue;
+    }
+    cur.ceiling += r.ceiling;
+    cur.obligated += r.obligated;
+    cur.headroom += r.headroom;
+    cur.contracts += 1;
+    cur.subawarded = (cur.subawarded || 0) + (r.subawarded || 0);
+    cur.subaward_count = (cur.subaward_count || 0) + (r.subaward_count || 0);
+    // Keep the longer spelling: "INCORPORATED" over "INC" reads as the company.
+    if (r.recipient.length > cur.recipient.length) cur.recipient = r.recipient;
+  }
+
   return {
     // Largest headroom first — that is the reading the panel exists to give.
-    rows: rows.slice().sort((a, b) => b.headroom - a.headroom),
+    rows: [...byFirm.values()].sort((a, b) => b.headroom - a.headroom),
     totalCeiling: sum((r) => r.ceiling),
     totalObligated: sum((r) => r.obligated),
     totalHeadroom: sum((r) => r.headroom),
     subcontracting: rows.filter((r) => (r.subaward_count || 0) > 0).length,
+    /** AWARDS sampled, not firms — the cap is an award cap, so the two numbers
+     *  have to be counted in the same unit or the caption contradicts itself. */
     sampled: rows.length,
+    firms: byFirm.size,
     cap: c?.cap ?? null,
     unreadable: c?.unreadable ?? 0
   };

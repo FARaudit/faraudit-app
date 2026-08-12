@@ -614,10 +614,14 @@ export async function fetchDefenseSpending(
         ceilings: ceilingHeadroom(smp)
       };
       if (smp?.ceilings && Array.isArray(smp.ceilings.rows)) {
-        merged.ceilings = merged.ceilings || { rows: [], sampled: 0, cap: smp.ceilings.cap ?? null, unreadable: 0 };
+        merged.ceilings = merged.ceilings || { rows: [], sampled: 0, cap: 0, unreadable: 0 };
         merged.ceilings.rows!.push(...smp.ceilings.rows);
         merged.ceilings.sampled = (merged.ceilings.sampled || 0) + (smp.ceilings.sampled || 0);
         merged.ceilings.unreadable = (merged.ceilings.unreadable || 0) + (smp.ceilings.unreadable || 0);
+        /* THE CAP IS PER CODE, SO MERGING CODES MERGES CAPS. Carrying one code's
+           cap across an aggregate of three printed "24 of at most 8" on the live
+           panel — a number contradicting itself in the same sentence. */
+        merged.ceilings.cap = (merged.ceilings.cap || 0) + (smp.ceilings.cap || 0);
       }
       if (smp && Array.isArray(smp.awards)) {
         merged.awards!.push(...smp.awards);

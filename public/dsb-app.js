@@ -488,7 +488,17 @@
   function renderPrimeTargets() {
     const host = $('ptList'); if (!host) return;
     const sub = $('ptSub'), cap = $('ptCap'); const box = anBox(); const t = box && box.primes;
-    if (sub) sub.textContent = 'Large primes over $750K in ' + anScope() + ' · ' + (S.fy || '');
+    /* ⛔ THE VALUE IS LIFETIME AWARD VALUE, NOT FISCAL-YEAR OBLIGATIONS, and
+       labelling it with a fiscal year made two firms exceed the whole market.
+       Huntington Ingalls printed $90.76B and Electric Boat $88.57B under
+       "in your NAICS codes · FY2026", on a page whose own headline is $30.06B
+       obligated for FY2026 — 6x the market, in the same view. This file's own
+       AwardSample note says these amounts must never be shown against
+       total_obligations; the sum below it did exactly that. The fiscal year is
+       which awards were SAMPLED; the money is what those awards are worth over
+       their whole life. */
+    if (sub) sub.textContent = 'Large primes on awards over $750K in ' + anScope()
+      + ' · sampled from ' + (S.fy || '') + ' · combined lifetime award value';
     if (!t || !t.primes.length) {
       setHTML(host, anNone('Prime contractors'));
       if (cap) setHTML(cap, '');
@@ -505,7 +515,7 @@
     if (cap) setHTML(cap, 'Awards over <b>$' + t.threshold.toLocaleString('en-US')
       + '</b> carry a FAR 19.702 subcontracting-plan requirement when the prime is a large '
       + 'business — so these firms have a documented obligation to find small '
-      + 'subcontractors. '
+      + 'subcontractors. <b>Values are each prime’s combined LIFETIME award value</b>, not one year of obligations — which is why they run larger than this page’s annual total. '
       + (t.excludedSmallBusiness > 0 ? '<b>' + t.excludedSmallBusiness + '</b> qualifying award'
         + (t.excludedSmallBusiness === 1 ? ' was' : 's were') + ' excluded because the recipient '
         + 'is on this code’s small-business list; they carry no such obligation. ' : '')
@@ -545,13 +555,23 @@
       + (c.sampled === 1 ? '' : 's') + ' below without a new competition — so it never appears '
       + 'as a solicitation. Reaching it means being on the vehicle, not watching SAM.');
 
-    const max = Math.max.apply(null, c.rows.map(r => Math.abs(r.ceiling)).concat([1]));
-    setHTML(host, c.rows.map(r => {
+    /* ROWS WITH NO ROOM DO NOT BELONG IN A PANEL ABOUT ROOM. Seven of
+       twenty-four sat at 100% used, printing "$0K" under a heading that offers
+       headroom. They are fully obligated — a real state, and stated in the
+       caption rather than padding the list. */
+    const withRoom = c.rows.filter(r => r.headroom > 0);
+    const fullyUsed = c.rows.length - withRoom.length;
+    const shown = withRoom.length ? withRoom : c.rows;
+    const max = Math.max.apply(null, shown.map(r => Math.abs(r.ceiling)).concat([1]));
+    setHTML(host, shown.map(r => {
       const pct = r.ceiling > 0 ? Math.max(0, Math.min(100, (r.obligated / r.ceiling) * 100)) : 0;
-      const sub2 = 'obligated ' + fmtM(r.obligated / 1e6) + ' of ' + fmtM(r.ceiling / 1e6)
+      const n = r.contracts || 1;
+      const sub2 = (n > 1 ? n + ' contracts · ' : '')
+        + 'obligated ' + fmtM(r.obligated / 1e6) + ' of ' + fmtM(r.ceiling / 1e6)
         + ' ceiling · ' + pct.toFixed(0) + '% used'
         + (r.subaward_count != null && r.subaward_count > 0
-          ? ' · ' + r.subaward_count.toLocaleString('en-US') + ' subawards already placed' : '');
+          ? ' · ' + r.subaward_count.toLocaleString('en-US') + ' subaward'
+          + (r.subaward_count === 1 ? '' : 's') + ' already placed' : '');
       return '<div class="ch-r"><span class="ch-n">' + esc(r.recipient) + '</span>'
         + '<span class="ch-h">' + fmtM(r.headroom / 1e6) + '</span>'
         + '<span class="ch-m">' + esc(sub2) + '</span>'
@@ -561,6 +581,8 @@
 
     if (cap) setHTML(cap, '<b>A capped sample of the largest awards</b> — ' + c.sampled
       + ' of at most ' + (c.cap == null ? c.sampled : c.cap)
+      + (c.firms != null && c.firms !== c.sampled ? ', grouped into ' + c.firms + ' firm'
+        + (c.firms === 1 ? '' : 's') : '')
       + (c.unreadable ? ', with ' + c.unreadable + ' whose detail could not be read' : '')
       + '. Not the whole market, and <b>not margin</b>: USAspending carries no cost, rate or '
       + 'profit data, so this is contract capacity and nothing about what anyone earns on it. '
@@ -584,7 +606,7 @@
     const cap = $('boCap'), sub = $('boSub');
     const box = (D.BUYING_OFFICES || {})[S.fy] || null;
     const scoped = S.code ? 'NAICS ' + S.code : 'your NAICS codes';
-    if (sub) sub.textContent = 'Contracting offices inside each department, by obligations in '
+    if (sub) sub.textContent = 'The buying offices inside the departments above · '
       + scoped + ' · ' + (S.fy || '');
 
     if (!box) { setHTML(host, ''); if (cap) setHTML(cap, ''); return; }
@@ -907,6 +929,23 @@
   /* ════════════════ ORCHESTRATION ════════════════ */
   function dsbState() { return (D.STATUS && D.STATUS.state) || 'loading'; }
 
+  /* THE PILL WAS MARKUP, NOT A READING. `data-state="unwired"` and the words NOT
+     CONNECTED were typed into defense-spending.html and nothing ever updated
+     them, so the page announced itself disconnected above $30B of live figures
+     it had just fetched. A reader cannot tell which of the two is lying, so the
+     honest assumption is the pill — and they stop reading. It now derives. */
+  function renderStatusPill() {
+    const pill = $('dsbPill'); if (!pill) return;
+    const st = dsbState();
+    const label = st === 'ok' ? 'LIVE' : st === 'loading' ? 'LOADING' : 'NOT CONNECTED';
+    pill.dataset.state = st === 'ok' ? 'live' : st === 'loading' ? 'loading' : 'unwired';
+    pill.textContent = label;
+    const when = D.as_of ? String(D.as_of).slice(0, 10) : '';
+    pill.title = st === 'ok'
+      ? 'USAspending award data' + (when ? ', measured ' + when : '')
+      : (D.STATUS && D.STATUS.reason) || 'No federal spending source connected.';
+  }
+
   /* Replaces the DATA region with one stated notice. Reached only from a
      SETTLED failure, never from the pre-fetch state. */
   function renderUnavailable() {
@@ -1023,6 +1062,7 @@
   function renderAll() {
     computeBreaks();
     renderKPIs(); renderLegend(); renderMap(); renderRankList();
+    renderStatusPill();
     renderAgencyList(); renderBuyingOffices(); renderAwardSize(); renderSeasonality();
     renderPrimeTargets(); renderCeilings(); renderRecompetes(); renderIncumbents(); renderInsight();
     // Both read every measured year, so they are painted with the rest but do
