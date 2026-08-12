@@ -67,7 +67,17 @@
         });
       }
       if (/Top recipients/i.test(k.label)) {
-        return Object.assign({}, k, { val: String((c.incumbents || []).length) });
+        // The SUB-LINE has to move with the count. Patching only the number left
+        // "1 of 20 small business" printed beside a list of 7.
+        const list = c.incumbents || [];
+        const known = list.filter(i => i.sb !== null).length;
+        const yes = list.filter(i => i.sb === true).length;
+        return Object.assign({}, k, {
+          val: String(list.length),
+          sub: known === 0
+            ? S.code + ' · small-business status not supplied for these'
+            : S.code + ' · ' + yes + ' of ' + known + ' small business'
+        });
       }
       return k;
     });
@@ -110,6 +120,33 @@
     const chip = $('selChip'); const st = view().states[S.state];
     if (S.state && st) { chip.classList.add('show'); $('selChipText').textContent = 'Focus: ' + st.name; }
     else chip.classList.remove('show');
+    renderCodePills();
+  }
+
+
+  /* ════════════════ THE CODE FILTER ════════════════
+     Rendered from S.code on every state change, NOT once at build. It lived
+     inside renderProvenance(), which runs a single time — so the filter worked
+     while the pills never showed which code was active, and the page looked
+     unscoped while every panel below it was scoped. */
+  function renderCodePills() {
+    const pills = $('hdrNaicsPills');
+    if (!pills) return;
+    const tracked = ((D.coverage || {}).tracked) || [];
+    const untracked = ((D.coverage || {}).untracked) || [];
+    setHTML(pills,
+      tracked.map(code => `<button type="button" class="hdr-naics-pill${S.code === code ? ' on' : ''}" data-code="${esc(code)}"
+          aria-pressed="${S.code === code ? 'true' : 'false'}"
+          title="${S.code === code ? 'Showing only ' + esc(code) + ' — click to show all codes' : 'Show only ' + esc(code)}">${esc(code)}</button>`).join('') +
+      untracked.map(code => `<span class="hdr-naics-pill untracked" title="Not pulled for this account yet">${esc(code)}</span>`).join(''));
+    pills.querySelectorAll('button[data-code]').forEach(b => {
+      b.onclick = () => {
+        // Second click on the selected code clears it — the aggregate is a real
+        // view, not a null state, so there has to be a way back to it.
+        S.code = (S.code === b.dataset.code) ? null : b.dataset.code;
+        syncControls(); renderAll();
+      };
+    });
   }
 
   /* ════════════════ PROVENANCE ════════════════
@@ -128,25 +165,7 @@
       + '</b> per code — a name that is absent is outside that ten, not a zero');
     setHTML(el, bits.join('<span class="dsb-prov-dot">·</span>'));
 
-    // The account's own codes. One with no rows behind it is marked.
-    const pills = $('hdrNaicsPills');
-    if (pills) {
-      const tracked = ((D.coverage || {}).tracked) || [];
-      const untracked = ((D.coverage || {}).untracked) || [];
-      setHTML(pills,
-        tracked.map(c => `<button type="button" class="hdr-naics-pill${S.code === c ? ' on' : ''}" data-code="${esc(c)}"
-            aria-pressed="${S.code === c ? 'true' : 'false'}"
-            title="Show only ${esc(c)}">${esc(c)}</button>`).join('') +
-        untracked.map(c => `<span class="hdr-naics-pill untracked" title="Not pulled for this account yet">${esc(c)}</span>`).join(''));
-      pills.querySelectorAll('button[data-code]').forEach(b => {
-        b.onclick = () => {
-          // Second click on the selected code clears it — the aggregate is a
-          // real view, not a null state, so there has to be a way back to it.
-          S.code = (S.code === b.dataset.code) ? null : b.dataset.code;
-          syncControls(); renderAll();
-        };
-      });
-    }
+    renderCodePills();
   }
 
   /* ════════════════ KPIs ════════════════ */
