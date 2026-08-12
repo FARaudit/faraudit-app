@@ -97,8 +97,14 @@ console.log("\n── D · the code filter repaints on every change ──");
     "the filter worked while the pills never showed which code was active");
   check("the pill reflects S.code rather than a fixed value",
     /S\.code === code \? ' on' : ''/.test(APP) && /aria-pressed=/.test(APP));
+  // Matches the TOGGLE EXPRESSION, not the assignment statement it used to sit
+  // in. The scope moved out of this file into window.BD_SCOPE, so the pill now
+  // publishes `setScope({ code: <toggle> })` instead of assigning S.code — the
+  // behaviour is identical and the old pattern is gone. A grep gate anchored to
+  // the statement rather than the logic goes red on every extract-refactor and
+  // teaches people to loosen gates, which is worse than the drift it catches.
   check("a second click clears the selection",
-    /S\.code = \(S\.code === b\.dataset\.code\) \? null : b\.dataset\.code/.test(APP),
+    /\(S\.code === b\.dataset\.code\) \? null : b\.dataset\.code/.test(APP),
     "without it the aggregate view is unreachable once a code is picked");
   // The sub-line under a patched KPI must move with the number above it.
   check("the scoped recipients card patches its sub-line, not just its count",

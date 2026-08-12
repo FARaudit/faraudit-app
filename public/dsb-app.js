@@ -34,6 +34,7 @@
 
   /* ─── global state ─── */
   const S = { fy: null, state: null, rankMode: 'top', code: null };
+  let scopeNote = '';
 
   /* The view every panel reads. With no code selected it is the aggregate the
      route built; with one selected it is that code's slice of the SAME build —
@@ -103,15 +104,37 @@
   let usGeo = null;
   const emptyLine = (t) => '<div class="dsb-empty">' + esc(t) + '</div>';
 
+  /* ════════════════ THE SCOPE IS SHARED, NOT LOCAL ════════════════
+     `S.fy` and `S.code` used to be private to this file, which is why the three
+     panels that read them could not become their own destination. They now
+     mirror `window.BD_SCOPE` — one scope, addressable in the URL, carried
+     between pages. `S.state` and `S.rankMode` stay local: nothing outside this
+     page renders a state focus or a leaderboard tab.
+
+     BD_SCOPE is optional on purpose. A page that forgets the script tag keeps
+     working on its own local scope rather than throwing — the panels are the
+     product, the scope is how they are addressed. */
+  const SCOPE = window.BD_SCOPE || null;
+
+  function setScope(patch) {
+    if (patch && 'fy' in patch) S.fy = patch.fy;
+    if (patch && 'code' in patch) S.code = patch.code;
+    if (SCOPE) SCOPE.set(patch);
+    syncControls(); renderAll();
+  }
+
   /* ════════════════ CONTROLS ════════════════ */
   function buildControls() {
     setHTML($('segFY'), D.FYS.map(f =>
       `<button data-fy="${esc(f)}" class="${f === S.fy ? 'active' : ''}">${esc(f.replace('FY20', "'"))}</button>`).join(''));
-    $('segFY').querySelectorAll('button').forEach(b => b.onclick = () => { S.fy = b.dataset.fy; syncControls(); renderAll(); });
+    $('segFY').querySelectorAll('button').forEach(b => b.onclick = () => { setScope({ fy: b.dataset.fy }); });
 
     $('resetBtn').onclick = () => {
-      S.fy = D.FYS[D.FYS.length - 1]; S.state = null; S.rankMode = 'top';
-      syncControls(); renderRankTabs(); renderAll();
+      S.state = null; S.rankMode = 'top';
+      // The state focus and the rank tab are page-local — nothing else reads
+      // them. The YEAR and the CODE are not, so reset publishes them.
+      setScope({ fy: D.FYS[D.FYS.length - 1], code: null });
+      renderRankTabs();
     };
     $('selChipX').onclick = () => { S.state = null; syncControls(); renderAll(); };
   }
@@ -143,8 +166,7 @@
       b.onclick = () => {
         // Second click on the selected code clears it — the aggregate is a real
         // view, not a null state, so there has to be a way back to it.
-        S.code = (S.code === b.dataset.code) ? null : b.dataset.code;
-        syncControls(); renderAll();
+        setScope({ code: (S.code === b.dataset.code) ? null : b.dataset.code });
       };
     });
   }
@@ -163,6 +185,10 @@
     }
     bits.push('States, agencies and recipients are each the <b>top ' + esc(c.top_n)
       + '</b> per code — a name that is absent is outside that ten, not a zero');
+    // A link can carry a year or a code this feed never measured. Showing the
+    // fallback silently would put one year's numbers under another year's URL,
+    // so the substitution is stated where the measurement date is stated.
+    if (scopeNote) bits.push('<span class="dsb-gap">' + esc(scopeNote) + '</span>');
     setHTML(el, bits.join('<span class="dsb-prov-dot">·</span>'));
 
     renderCodePills();
@@ -1136,7 +1162,15 @@
   function build() {
     if (built) return;
     built = true;
-    S.fy = D.FYS[D.FYS.length - 1];
+    /* ⛔ A REQUESTED YEAR IS NOT A MEASURED ONE. reconcile() returns what can
+       actually be shown plus a sentence naming what was asked for; printing the
+       fallback without the sentence is a page lying about its own year. */
+    const rec = SCOPE
+      ? SCOPE.reconcile(D.FYS, ((D.coverage || {}).tracked) || [])
+      : { fy: D.FYS[D.FYS.length - 1], code: null, note: '' };
+    S.fy = rec.fy || D.FYS[D.FYS.length - 1];
+    S.code = rec.code || null;
+    scopeNote = rec.note || '';
     assignColors();
     renderProvenance();
     buildControls(); renderRankTabs(); renderUnsupported();
