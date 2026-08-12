@@ -89,7 +89,10 @@ button{font-family:inherit}
 .hdr-naics{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0}
 .hdr-naics-label{font-family:"IBM Plex Mono",monospace;font-size:9px;text-transform:uppercase;letter-spacing:.10em;color:var(--mute);font-weight:700}
 .hdr-naics-pills{display:flex;gap:6px}
-.hdr-naics-pill{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;padding:4px 11px;border-radius:20px;border:1px solid var(--accent);background:var(--accent-pale);color:var(--accent-deep)}
+.hdr-naics-pill{cursor:pointer;transition:box-shadow .14s;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;padding:4px 11px;border-radius:20px;border:1px solid var(--accent);background:var(--accent-pale);color:var(--accent-deep)}
+.hdr-naics-pill:hover{box-shadow:var(--shadow-sm)}
+.hdr-naics-pill.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.hdr-naics-pill.untracked{cursor:default}
 [data-theme="dark"] .hdr-naics-pill{background:rgba(55,138,221,0.18);border-color:var(--accent-light);color:var(--accent-light)}
 /* A code on file with no obligations pulled: shown, but not as covered. */
 .hdr-naics-pill.untracked{background:transparent;border-style:dashed;border-color:var(--mute-2);color:var(--mute)}
@@ -292,6 +295,16 @@ button{font-family:inherit}
 .conc-bar i{display:block;height:100%;border-right:1px solid var(--card)}
 .conc-lead{font-size:10.5px;color:var(--mute);line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .conc-note{font-size:10px;color:var(--mute);line-height:1.5;padding-top:9px}
+/* ── small businesses winning in each code ── */
+.sbw-code{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:11px 0 6px;border-bottom:1px solid var(--line-2)}
+.sbw-code b{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--ink)}
+.sbw-code span{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--mute)}
+.sbw-row{display:grid;grid-template-columns:1fr 70px 48px;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--line-2)}
+.sbw-row:last-child{border-bottom:0}
+.sbw-nm{font-size:11.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sbw-v{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--accent-deep);text-align:right}
+.sbw-p{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--mute);text-align:right}
+.sbw-note{font-size:10px;color:var(--mute);line-height:1.5;padding-top:9px}
 .ag-head{display:grid;grid-template-columns:58px 1fr 62px 60px;gap:11px;padding:0 8px 7px;border-bottom:1px solid var(--line-2)}
 .ag-head span{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
 .ag-head span:nth-child(3),.ag-head span:nth-child(4){text-align:right}
@@ -592,28 +605,10 @@ button{font-family:inherit}
         <!-- No treemap: the agency bars below carry the agency-by-code split. -->
 
 
-        <section class="widget">
-          <header class="widget-head">
-            <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><circle cx="8" cy="15" r="1.6"/><circle cx="13" cy="9" r="1.6"/><circle cx="18" cy="6" r="1.6"/></svg></span>
-              <div class="wh-text"><h3>Opportunity Matrix · Competition vs Reward</h3><p class="wh-sub">Not connected</p></div></div>
-          </header>
-          <svg class="scatter-svg" id="scatterSvg"></svg>
-          <div class="scatter-legend" id="scatterLegend"></div>
-        </section>
+        
       </section>
 
-      <!-- market trend -->
-      <section class="row one">
-
-        <section class="widget">
-          <header class="widget-head">
-            <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,17 8,12 13,15 21,7"/></svg></span>
-              <div class="wh-text"><h3>Market Trend · Your NAICS</h3><p class="wh-sub">Obligations by code across the measured fiscal years</p></div></div>
-            
-          </header>
-          <div class="mkt-list" id="trendList"></div>
-        </section>
-      </section>
+      
 
       <!-- recompete timeline -->
       <section class="row">
@@ -641,11 +636,10 @@ button{font-family:inherit}
 
         <section class="widget">
           <header class="widget-head">
-            <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></span>
-              <div class="wh-text"><h3>Pricing Intelligence</h3><p class="wh-sub">Not connected</p></div></div>
+            <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/></svg></span>
+              <div class="wh-text"><h3>Who is winning at your size</h3><p class="wh-sub">Small businesses taking set-aside dollars in your codes &mdash; your peers, not your primes</p></div></div>
           </header>
-          <div class="price-wrap"><svg class="price-svg" id="priceSvg"></svg></div>
-          <div class="price-legend" id="priceLegend"></div>
+          <div class="sbw-list" id="sbWinnersList"></div>
         </section>
       </section>
 
