@@ -134,6 +134,24 @@ export async function fetchAgencyBreakdown(f: Filters): Promise<Array<{ name: st
   return (d?.results || []).map((r) => ({ name: r.name || "Unknown", amount: r.amount }));
 }
 
+/* WHO ACTUALLY BUYS. "Department of Defense" is a department, not a buyer — the
+   Navy, the Army, the Air Force and the Defense Logistics Agency each run their
+   own contracting offices, recompete cycles and set-aside behaviour. A customer
+   told "DoD spends $19.89B in your code" has been told nothing they can act on.
+
+   ⛔ NOT derived from award_sample. That sample is the 500 LARGEST awards, which
+   is precisely the bias that over-reports big buying offices and under-reports
+   the small ones a small business can actually reach. This totals every award. */
+export async function fetchSubAgencyBreakdown(f: Filters): Promise<Array<{ name: string; amount: number }>> {
+  const d = await post<{ results: CategoryResult[] }>("/search/spending_by_category/awarding_subagency/", {
+    filters: baseFilters(f),
+    limit: 12
+  });
+  return (d?.results || [])
+    .map((r) => ({ name: r.name || r.code || "Unknown", amount: r.amount }))
+    .filter((r) => r.amount !== 0);
+}
+
 export async function fetchStateBreakdown(f: Filters): Promise<Array<{ state: string; amount: number }>> {
   const d = await post<{ results: Array<{ shape_code?: string; display_name?: string; aggregated_amount?: number }> }>(
     "/search/spending_by_geography/",

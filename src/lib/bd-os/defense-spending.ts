@@ -40,6 +40,8 @@ interface IntelRow {
   top_recipients: NamedAmount[] | null;
   sb_recipients: NamedAmount[] | null;
   agency_breakdown: NamedAmount[] | null;
+  // Buying offices INSIDE a department. NULL = never pulled. Migration 035.
+  sub_agency_breakdown: NamedAmount[] | null;
   state_breakdown: StateAmount[] | null;
   recompetes_expiring_180d: RecompeteRow[] | null;
   // Definitive contracts ending 365-548 days out — the window a recompete is
@@ -142,6 +144,16 @@ export interface SpendingPayload {
      three are DERIVED from the stored award_sample — no extra USAspending
      request, which matters because a burst of them is what got this worker
      IP-blocked on 2026-08-12. `null` for a year nothing was sampled in. */
+  /* WHO ACTUALLY BUYS — one level below agency_breakdown. "Department of
+     Defense" is a department containing the Navy, the Army, the Air Force and
+     the Defense Logistics Agency, each with its own contracting offices and
+     recompete cycle. `measured` is false when no row has ever carried the
+     column, so a never-pulled market cannot render as one with no buyers. */
+  BUYING_OFFICES: Record<string, {
+    offices: Array<{ name: string; amount: number }>;
+    measured: boolean;
+    byCode: Record<string, Array<{ name: string; amount: number }>>;
+  }>;
   AWARD_ANALYTICS: Record<string, {
     size: SizeDistribution | null;
     primes: PrimeTargets | null;
@@ -234,7 +246,7 @@ export async function fetchDefenseSpending(
     .from("defense_spending_intel")
     .select(
       "naics_code,fiscal_year,total_obligations,sb_obligations,sb_pct,top_recipients,sb_recipients," +
-        "agency_breakdown,state_breakdown,recompetes_expiring_180d,recompetes_upcoming,award_sample,yoy_delta_pct,refreshed_at"
+        "agency_breakdown,sub_agency_breakdown,state_breakdown,recompetes_expiring_180d,recompetes_upcoming,award_sample,yoy_delta_pct,refreshed_at"
     )
     .in("naics_code", requested);
   if (error) throw new Error(`defense_spending_intel read failed: ${error.message}`);
@@ -554,6 +566,33 @@ export async function fetchDefenseSpending(
      one capped code makes the aggregate honest about being a sample.
      Small-business names come from this code's own sb_recipients, which is why
      the prime filter is per-code before it is aggregated. */
+  /* Buying offices, per fiscal year. Amounts SUM across codes because each is a
+     dollar total for the same office over disjoint NAICS — unlike a median,
+     which cannot be averaged. Sorted largest-first and capped, with the tail
+     collapsed by the renderer rather than dropped here: a bar chart whose top
+     and bottom differ by 118,000x is unreadable, but silently discarding the
+     tail would misstate the market. */
+  const BUYING_OFFICES: SpendingPayload["BUYING_OFFICES"] = {};
+  for (const year of years) {
+    const fy = fyLabel(year);
+    const fyRows = rowsFor(year);
+    const measured = fyRows.some((r) => Array.isArray(r.sub_agency_breakdown));
+    const agg = new Map<string, number>();
+    const byCode: Record<string, Array<{ name: string; amount: number }>> = {};
+    for (const r of fyRows) {
+      const list = r.sub_agency_breakdown || [];
+      byCode[r.naics_code] = list.map((o) => ({ name: o.name, amount: o.amount }));
+      for (const o of list) agg.set(o.name, (agg.get(o.name) || 0) + (o.amount || 0));
+    }
+    BUYING_OFFICES[fy] = {
+      offices: [...agg.entries()].map(([name, amount]) => ({ name, amount }))
+        .filter((o) => o.amount !== 0)
+        .sort((a, b) => b.amount - a.amount),
+      measured,
+      byCode
+    };
+  }
+
   const AWARD_ANALYTICS: SpendingPayload["AWARD_ANALYTICS"] = {};
   for (const year of years) {
     const fy = fyLabel(year);
@@ -674,6 +713,7 @@ export async function fetchDefenseSpending(
     RECOMPETES,
     RECOMPETES_MEASURED,
     AWARD_ANALYTICS,
+    BUYING_OFFICES,
     SB_SHARE,
     CONCENTRATION,
     SB_WINNERS,

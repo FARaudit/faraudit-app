@@ -395,6 +395,74 @@
      Closed fiscal years and the open one. No projected bar: the feed does not
      forecast. */
 
+
+  /* ════════════════ WHO ACTUALLY BUYS ════════════════
+     One level below the agency panel. "Department of Defense" is not a buyer —
+     it contains the Navy, the Army, the Air Force and the Defense Logistics
+     Agency, each with its own contracting offices and recompete cycle.
+
+     THE TAIL IS COLLAPSED, NOT DROPPED. Measured on 336611 FY2026 the largest
+     office is $16.7B and the smallest in the top twelve is under $200K — a bar
+     chart across that renders everything below second place as nothing. The
+     offices past the visible set are summed into one labelled row so the reader
+     can see how much sits outside the list, which discarding them would hide. */
+  const BO_SHOW = 8;
+  function renderBuyingOffices() {
+    const host = $('boList'); if (!host) return;
+    const cap = $('boCap'), sub = $('boSub');
+    const box = (D.BUYING_OFFICES || {})[S.fy] || null;
+    const scoped = S.code ? 'NAICS ' + S.code : 'your NAICS codes';
+    if (sub) sub.textContent = 'Contracting offices inside each department, by obligations in '
+      + scoped + ' · ' + (S.fy || '');
+
+    if (!box) { setHTML(host, ''); if (cap) setHTML(cap, ''); return; }
+    const list = (S.code ? (box.byCode || {})[S.code] || [] : box.offices || [])
+      .slice().sort((a, b) => b.amount - a.amount);
+
+    if (!list.length) {
+      // A never-pulled column must not render as a market with no buyers.
+      setHTML(host, '<div class="bo-none">' + (box.measured
+        ? 'No awarding office in <b>' + esc(scoped) + '</b> recorded obligations in ' + esc(S.fy || '') + '.'
+        : 'Buying offices have not been pulled for <b>' + esc(scoped) + '</b> yet. '
+          + '<b>That is a gap in our data, not a market with no buyers.</b> It refreshes nightly.')
+        + '</div>');
+      if (cap) setHTML(cap, '');
+      return;
+    }
+
+    const shown = list.slice(0, BO_SHOW);
+    const rest = list.slice(BO_SHOW);
+    const restV = rest.reduce((n, o) => n + o.amount, 0);
+    const max = Math.max.apply(null, shown.map(o => Math.abs(o.amount)).concat([1]));
+    const total = list.reduce((n, o) => n + o.amount, 0);
+
+    let h = shown.map(o => {
+      const w = Math.max(2, (Math.abs(o.amount) / max) * 100);
+      return '<div class="bo-row"><span class="bo-n">' + esc(o.name) + '</span>'
+        + '<span class="bo-v">' + fmtM(o.amount / 1e6) + '</span>'
+        + '<i class="bo-bar" style="width:' + w.toFixed(1) + '%"></i></div>';
+    }).join('');
+    if (rest.length) {
+      h += '<div class="bo-row rest"><span class="bo-n">' + rest.length + ' other office'
+        + (rest.length === 1 ? '' : 's') + '</span>'
+        + '<span class="bo-v">' + fmtM(restV / 1e6) + '</span>'
+        + '<i class="bo-bar" style="width:' + Math.max(2, (Math.abs(restV) / max) * 100).toFixed(1) + '%"></i></div>';
+    }
+    setHTML(host, h);
+
+    if (cap) {
+      const lead = shown[0];
+      const share = total > 0 ? (lead.amount / total) * 100 : null;
+      setHTML(cap, '<b>' + esc(lead.name) + '</b> is the buyer'
+        + (share != null ? ', at ' + share.toFixed(0) + '% of obligations in ' + esc(scoped) : '')
+        + '. ' + (rest.length
+          ? 'The remaining ' + rest.length + ' office' + (rest.length === 1 ? ' is' : 's are')
+            + ' collapsed into one row — they are listed here rather than dropped, so the '
+            + fmtM(restV / 1e6) + ' outside the visible set stays visible.'
+          : 'Every office with obligations is shown.'));
+    }
+  }
+
   /* ════════════════ RECOMPETE RADAR ════════════════
      Grouped by the month each award ends. The 180-day window is cut at the
      measurement date, so rows already past are MARKED, never dropped. */
@@ -783,7 +851,7 @@
   function renderAll() {
     computeBreaks();
     renderKPIs(); renderLegend(); renderMap(); renderRankList();
-    renderAgencyList(); renderRecompetes(); renderIncumbents(); renderInsight();
+    renderAgencyList(); renderBuyingOffices(); renderRecompetes(); renderIncumbents(); renderInsight();
     // Both read every measured year, so they are painted with the rest but do
     // not change with the year control.
     renderSbShare(); renderConcentration(); renderSbWinners();
