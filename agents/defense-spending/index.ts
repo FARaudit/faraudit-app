@@ -57,9 +57,12 @@ interface IntelRow {
   contract_type_breakdown: unknown;
   recompetes_expiring_90d: unknown;
   recompetes_expiring_180d: unknown;
-  // Award-level records — the panels that need a single award's value, set-aside,
-  // pricing type and buying office. A SAMPLE of the largest, with its own count
-  // and cap stored beside it so no reader can mistake it for the whole.
+  // Award-level records — the panels that need a single award's value, buying
+  // office and duration. A SAMPLE of the largest, with its own count and cap
+  // stored beside it so no reader can mistake it for the whole. Also carries
+  // `set_aside_mix`, which is NOT per-award: set-aside is not a field this
+  // endpoint returns, only a filter it accepts, so it arrives as a faceted
+  // distribution with its own total and unaccounted residual.
   award_sample: unknown;
   yoy_delta_pct: number | null;
   // WRITTEN EXPLICITLY, not left to the column default. The default fires on
@@ -73,7 +76,7 @@ interface IntelRow {
 
 async function buildRow(naics: string, win: FYWindow, priorTotal: number | null): Promise<IntelRow> {
   const f = { naics, fyStart: win.start, fyEnd: win.end };
-  const [total, sb, recipients, sbRecipients, agencies, states, contractTypes, rec90, rec180, awardSample] = await Promise.all([
+  const [total, sb, recipients, sbRecipients, agencies, states, contractTypes, rec90, rec180, awardSample, setAsideMix] = await Promise.all([
     usa.fetchTotalObligations(f),
     usa.fetchSmallBusinessObligations(f),
     usa.fetchTopRecipients(f),
@@ -83,7 +86,11 @@ async function buildRow(naics: string, win: FYWindow, priorTotal: number | null)
     usa.fetchContractTypeBreakdown(f),
     usa.fetchRecompetes(f, 0, 90),
     usa.fetchRecompetes(f, 90, 180),
-    usa.fetchAwardSample(f)
+    usa.fetchAwardSample(f),
+    // Rides inside award_sample rather than taking a column of its own — the
+    // column is JSONB, it has no readers yet, and a second migration applied by
+    // hand in Studio is a second chance for the schema to lag the worker.
+    usa.fetchSetAsideMix(f)
   ]);
   const sbPct = total && total > 0 && sb != null ? (sb / total) * 100 : null;
   const yoy = priorTotal != null && priorTotal > 0 && total != null ? ((total - priorTotal) / priorTotal) * 100 : null;
@@ -100,7 +107,7 @@ async function buildRow(naics: string, win: FYWindow, priorTotal: number | null)
     contract_type_breakdown: contractTypes,
     recompetes_expiring_90d: rec90,
     recompetes_expiring_180d: rec180,
-    award_sample: awardSample,
+    award_sample: { ...awardSample, set_aside_mix: setAsideMix },
     yoy_delta_pct: yoy,
     refreshed_at: new Date().toISOString()
   };
@@ -154,7 +161,14 @@ async function main() {
       const row = await buildRow(naics, win, priorTotal);
       await upsert(row);
       const sbCount = Array.isArray(row.sb_recipients) ? row.sb_recipients.length : 0;
-      console.log(`  · FY${win.fy}: total=$${(row.total_obligations || 0).toLocaleString()} · sb_pct=${row.sb_pct?.toFixed(1)}% · yoy=${row.yoy_delta_pct?.toFixed(1)}% · sb_recipients=${sbCount} · awards=${(row.award_sample as {sampled?:number})?.sampled ?? 0}${(row.award_sample as {truncated?:boolean})?.truncated ? ' (capped)' : ''}`);
+      const sample = row.award_sample as { sampled?: number; truncated?: boolean; set_aside_mix?: { unaccounted?: number | null } };
+      const ctCount = Array.isArray(row.contract_type_breakdown) ? row.contract_type_breakdown.length : 0;
+      // pricing= and setaside_gap= are here so the next run is OBSERVABLE. The
+      // pricing breakdown was empty in every stored row for its whole life and
+      // nothing said so, because the only place it would have shown was a panel
+      // nobody had built yet.
+      const gap = sample?.set_aside_mix?.unaccounted;
+      console.log(`  · FY${win.fy}: total=$${(row.total_obligations || 0).toLocaleString()} · sb_pct=${row.sb_pct?.toFixed(1)}% · yoy=${row.yoy_delta_pct?.toFixed(1)}% · sb_recipients=${sbCount} · awards=${sample?.sampled ?? 0}${sample?.truncated ? ' (capped)' : ''} · pricing=${ctCount}${ctCount === 0 ? ' ⚠ EMPTY' : ''} · setaside_gap=${gap == null ? 'n/a' : '$' + Math.round(gap).toLocaleString()}`);
       priorTotal = row.total_obligations;
     }
   }
