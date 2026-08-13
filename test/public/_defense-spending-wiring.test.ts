@@ -130,5 +130,27 @@ console.log("\n── E · self-arm ──");
   console.log("✓ PASS  a deliberate false assertion was counted as a failure, then retracted");
 }
 
+// ── D · A MISSING YEAR IS NOT A YEAR WITH NO BUYERS ─────────────────────────
+// renderBuyingOffices has two empty paths. The `!list.length` one always named
+// the gap; the `!box` one wrote an EMPTY STRING, so with no data for the fiscal
+// year the sub-panel went silently blank while the department list beneath it
+// kept rendering — the panel read as answered. Rule 61: a failed or absent
+// dependency yields a VISIBLE failure state, never a confident blank.
+console.log("\n── D · an absent year names itself ──");
+{
+  const i = APP.indexOf("function renderBuyingOffices");
+  const j = APP.indexOf("function renderRecompetes", i);
+  const BO = i > -1 && j > i ? APP.slice(i, j) : "";
+  check("renderBuyingOffices is findable", BO.length > 0);
+  check("the absent-year branch does not blank the panel",
+    !/if \(!box\) \{ setHTML\(host, ''\)/.test(BO));
+  const absent = BO.slice(BO.indexOf("if (!box)"), BO.indexOf("const list"));
+  check("…it names the gap, in the same words the empty-list branch uses",
+    /gap in our data/.test(absent) && /not a market with no buyers/.test(absent));
+  const blanked = BO.replace(/if \(!box\) \{[\s\S]*?\n    \}/, "if (!box) { setHTML(host, ''); return; }");
+  check("PLANT: reverting to the silent blank is detectable",
+    /if \(!box\) \{ setHTML\(host, ''\)/.test(blanked));
+}
+
 console.log(`\n${fail === 0 ? "✅" : "❌"} ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

@@ -885,7 +885,16 @@
     if (sub) sub.textContent = 'Services and agencies inside the departments below · '
       + scoped + ' · ' + (S.fy || '');
 
-    if (!box) { setHTML(host, ''); if (cap) setHTML(cap, ''); return; }
+    // A YEAR WE HOLD NOTHING FOR IS NOT A YEAR WITH NO BUYERS. This branch used
+    // to write an empty string, so the sub-panel went silently blank while the
+    // department list under it kept rendering — the panel looked answered.
+    if (!box) {
+      setHTML(host, '<div class="bo-none">The agency split has not been pulled for <b>'
+        + esc(scoped) + '</b> in ' + esc(S.fy || 'this year') + ' yet. '
+        + '<b>That is a gap in our data, not a market with no buyers.</b> It refreshes nightly.</div>');
+      if (cap) setHTML(cap, '');
+      return;
+    }
     const list = (S.code ? (box.byCode || {})[S.code] || [] : box.offices || [])
       .slice().sort((a, b) => b.amount - a.amount);
 
