@@ -8,6 +8,7 @@
   // render logic doesn't change.
   window.CC = window.CC || {
     DESK: {
+      pipe:  { label: 'Pipeline', color: '#0f766e', href: '/pipeline', icon: 'M4 5h16M4 12h10M4 19h6', cta: 'Open pursuit' },
       opp:   { label: 'Notices', color: '#378ADD', href: '/notices', icon: 'M12 2a9 9 0 100 18 9 9 0 000-18zM9 12l2 2 4-4', cta: 'View notice' },
       co:    { label: 'Contracting Officers', color: '#185FA5', href: '/contracting-officers', icon: 'M9 9a3 3 0 100-6 3 3 0 000 6zM3 20c1-3 3-5 6-5s5 2 6 5', cta: 'Contact' },
       cmmc:  { label: 'CMMC Readiness', color: '#0891b2', href: '/cmmc', icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4', cta: 'Review' },
@@ -216,7 +217,11 @@
     if (filter !== 'all') data = data.filter(a => filter === 'crit' ? a.urg === 'crit' : a.urg !== 'ok');
     $('actFeed').innerHTML = data.map((a, i) => {
       const d = DESK[a.desk], u = URG[a.urg];
-      const when = a.days === 0 ? 'now' : a.days != null ? `${a.days}d` : 'open';
+      // A NEGATIVE day count is OVERDUE, and it is the one case where the slot
+      // must not read as a countdown. "open" would say there is still time.
+      const when = a.days == null ? 'open'
+        : a.days < 0 ? `${-a.days}d ago`
+        : a.days === 0 ? 'now' : `${a.days}d`;
       const snz = snoozed.has(a.desk);
       return `<a class="act-card${snz ? ' snoozed' : ''}" href="${d.href}" style="--dc:${d.color}">
         <div class="act-rank">${snz ? '·' : i + 1}</div>

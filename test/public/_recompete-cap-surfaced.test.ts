@@ -83,7 +83,7 @@ console.log("\n── Part C · the Today card states the cap when one applies �
   }) as never;
 
   const capped = buildDeskDigest(
-    { opportunities: [], cmmcAudits: [], regRules: [], spending: spending(["336611", "336412"]) },
+    { opportunities: [], cmmcAudits: [], regRules: [], pipeline: [], spending: spending(["336611", "336412"]) },
     Date.parse("2026-08-13T12:00:00Z")
   ).find((d) => d.desk === "spend")!;
   check("C1 · a capped list says so in words", /capped/i.test(capped.why || ""), capped.why || "");
@@ -92,7 +92,7 @@ console.log("\n── Part C · the Today card states the cap when one applies �
   check("C3 · …naming how many codes are pinned", /2 codes/.test(capped.why || ""), capped.why || "");
 
   const clean = buildDeskDigest(
-    { opportunities: [], cmmcAudits: [], regRules: [], spending: spending([]) },
+    { opportunities: [], cmmcAudits: [], regRules: [], pipeline: [], spending: spending([]) },
     Date.parse("2026-08-13T12:00:00Z")
   ).find((d) => d.desk === "spend")!;
   check("C4 · an UNCAPPED list is not hedged", !/at least|capped/i.test((clean.value || "") + (clean.why || "")),
