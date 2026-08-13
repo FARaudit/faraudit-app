@@ -82,19 +82,22 @@
     return new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
-  function avColor(seed) {
-    let n = 0;
-    const s = String(seed || '');
-    for (let i = 0; i < s.length; i++) n = (n * 31 + s.charCodeAt(i)) >>> 0;
-    const hues = [212, 199, 258, 172, 28, 340];
-    const hue = hues[n % hues.length];
-    /* ⛔ THE INITIALS ARE WHITE, SO THE LIGHTEST STOP SETS THE CONTRAST. At 52%
-       the teal measured 1.91:1 and the cyan 2.94:1 — two of the six, and the hue
-       comes from a hash of the officer's email, so roughly one officer in three had
-       initials nobody could read. 32% is the lightest top stop at which ALL SIX
-       clear 4.5:1 (worst 4.53:1, the teal). Lightness carries the contrast here;
-       the hue only has to tell two avatars apart. */
-    return 'background:linear-gradient(155deg,hsl(' + hue + ',62%,32%),hsl(' + hue + ',68%,22%))';
+  /* The avatar tile is one colour for every officer and is set in CSS. The hue used
+     to come from a hash of the email: it encoded nothing a reader could act on, and
+     two of the six hues sat at the contrast floor because of it. */
+
+  /* The list covers a 30-day window, so the year is identical on every row and prints
+     132 times. It is added back whenever the date does NOT fall in the current year,
+     so a January boundary can never read as this year. The panel keeps the full date. */
+  function fmtDateShort(iso) {
+    if (!iso) return '—';
+    const t = Date.parse(iso);
+    if (Number.isNaN(t)) return '—';
+    const d = new Date(t);
+    const opts = d.getFullYear() === new Date().getFullYear()
+      ? { month: 'short', day: 'numeric' }
+      : { month: 'short', day: 'numeric', year: 'numeric' };
+    return d.toLocaleDateString('en-US', opts);
   }
 
   function officers() {
@@ -103,6 +106,50 @@
 
   function meta() {
     return (window.DCO && window.DCO.meta) || { state: 'loading' };
+  }
+
+  /* ── how an agency is named in a list ──
+     SAM qualifies every agency with its department, so five of the ten in a typical
+     feed open with the same eleven characters. A token carried by half the set
+     distinguishes nothing, and it is what makes the filter bar three rows deep and
+     the agency column three lines tall. The sub-agency is printed alone, UNLESS two
+     agencies in this feed share one — then both keep the department, so shortening
+     can never merge two distinct agencies into one label. The detail panel keeps the
+     qualified string, so the department is one click away and never lost. */
+  let shortNames = null;
+  function buildShortNames() {
+    const tail = (s) => { const p = String(s).split('·'); return p[p.length - 1].trim(); };
+    /* "DEPT OF THE" is grammar, not identity — it is carried by three of the ten and
+       distinguishes none of them. Stripped as a rule, not from a list of services, so
+       a service this feed has never seen shortens the same way. */
+    const tidy = (s) => s.replace(/^(DEPARTMENT OF THE|DEPT OF THE|DEPARTMENT OF|DEPT OF)\s+/i, '');
+    const label = (s) => tidy(tail(s));
+    const counts = {};
+    const all = officers().map((o) => o.agency).filter(Boolean);
+    all.forEach((s) => { const t = label(s); (counts[t] = counts[t] || {})[s] = 1; });
+    shortNames = {};
+    all.forEach((s) => { const t = label(s); shortNames[s] = Object.keys(counts[t]).length > 1 ? s : t; });
+  }
+  function agencyShort(a) {
+    if (!a) return a;
+    if (!shortNames) buildShortNames();
+    return shortNames[a] || a;
+  }
+
+  /* ── which code an officer is shown under ──
+     An officer posts in every code their notices carry, so this is a set, not a value.
+     The row prints the one they post in MOST, with a counted overflow marker — a
+     truncation that says how much it hid. The panel lists all of them, same order.
+     Membership comes from the record's own list; the notices only order it, so a code
+     the record does not claim can never appear. */
+  function orderedCodes(o) {
+    const n = {};
+    (o.notices || []).forEach((x) => {
+      if (!x.naics_code) return;
+      n[x.naics_code] = (x.naics_code in n ? n[x.naics_code] : 0) + 1;
+    });
+    const at = (c) => (c in n ? n[c] : 0);
+    return (o.naics || []).slice().sort((a, b) => at(b) - at(a) || String(a).localeCompare(String(b)));
   }
 
   function filtered() {
@@ -191,11 +238,16 @@
     const host = $('agencyFilters');
     if (!host) return;
     const list = Array.isArray(window.DCO.AGENCY_FILTERS) ? window.DCO.AGENCY_FILTERS : ['all'];
-    fill(host, list.map((a) => {
+    /* Ordered by the label the READER sees, not by the stored string. Sorted on the
+       qualified name, half the set sorts under its department and the visible order
+       reads as no order at all. */
+    const ordered = list.filter((a) => a !== 'all').sort((x, y) => agencyShort(x).localeCompare(agencyShort(y)));
+    const head = list.indexOf('all') !== -1 ? ['all'] : [];
+    fill(host, head.concat(ordered).map((a) => {
       const b = h('button', {
         cls: 'fpill' + (S.agency === a ? ' active' : ''),
-        text: a === 'all' ? 'All' : a,
-        attrs: { type: 'button' }
+        text: a === 'all' ? 'All' : agencyShort(a),
+        attrs: { type: 'button', title: a === 'all' ? 'All agencies' : a }
       });
       b.addEventListener('click', () => { S.agency = a; renderAll(); });
       return b;
@@ -211,9 +263,20 @@
     ]);
   }
 
+  /* The panel opens on the first officer rather than on an instruction: half a page
+     telling the reader to click is the page describing itself instead of doing its
+     work. The selection follows the filter — an officer who is no longer in the list
+     cannot stay selected, so the panel and the list can never disagree. */
+  function ensureSelection() {
+    const rows = filtered();
+    if (!rows.length) { S.sel = null; return; }
+    if (!rows.some((o) => o.id === S.sel)) S.sel = rows[0].id;
+  }
+
   function renderPeople() {
     const host = $('pplList');
     if (!host) return;
+    ensureSelection();
     const rows = filtered();
     const total = officers().length;
     const m = meta();
@@ -237,18 +300,22 @@
     }
 
     fill(host, rows.map((o) => {
-      const naics = (o.naics || []).join(' · ');
+      const codes = orderedCodes(o);
+      const naicsCell = h('div', { cls: 'pt-v mono pt-naics', text: codes[0] || '—' });
+      if (codes.length > 1) {
+        naicsCell.appendChild(h('span', { cls: 'more', text: '+' + (codes.length - 1) }));
+        naicsCell.setAttribute('title', codes.join(' · '));
+      }
       const row = h('div', { cls: 'ppl-row' + (S.sel === o.id ? ' sel' : '') }, [
-        h('div', { cls: 'ppl-av', text: o.initials, style: avColor(o.email || o.id) }),
+        h('div', { cls: 'ppl-av', text: o.initials }),
         h('div', { cls: 'ppl-info' }, [
           h('div', { cls: 'ppl-name', text: o.name }),
-          h('div', { cls: 'ppl-sub', text: o.office || o.email })
+          h('div', { cls: 'ppl-sub', text: o.office || o.email, attrs: { title: o.office || o.email } })
         ]),
-        h('div', { cls: 'ppl-touch' }, [h('div', { cls: 'pt-v', text: o.agency || '—' })]),
-        h('div', { cls: 'ppl-touch' }, [h('div', { cls: 'pt-v mono', text: naics || '—' })]),
+        h('div', { cls: 'ppl-touch' }, [h('div', { cls: 'pt-v pt-agy', text: agencyShort(o.agency) || '—' })]),
+        h('div', { cls: 'ppl-touch' }, [naicsCell]),
         h('div', { cls: 'ppl-touch' }, [
-          h('div', { cls: 'pt-v', text: fmtDate(o.latestPosted) }),
-          h('div', { cls: 'pt-l', text: 'POSTED', style: 'color:var(--mute)' })
+          h('div', { cls: 'pt-v', text: fmtDateShort(o.latestPosted) })
         ]),
         h('div', { cls: 'ppl-awd', text: o.noticeCount }, [h('small', { text: 'NOTICES' })])
       ]);
@@ -259,23 +326,24 @@
 
   /* ── detail panel ───────────────────────────────────────────────────── */
 
+  /* Each fact is its own element and none of them wraps internally, so a break can only
+     ever happen BETWEEN facts. The line used to be one long run with separators as
+     text, which is why "closes Aug 20, 2026" split across two lines. Fixing the count
+     of rows would not have fixed that — a notice carries three facts or two. */
   function noticeRow(n) {
     const label = n.solicitation_number || n.notice_id;
-    const bits = [
-      n.naics_code ? ' · ' + n.naics_code : '',
-      n.set_aside ? ' · ' + n.set_aside : '',
-      ' · closes ' + fmtDate(n.response_deadline)
-    ].join('');
-    const line = h('div', { cls: 'mono', style: 'font-size:10.5px;color:var(--mute);margin-top:4px' });
+    const meta = h('div', { cls: 'nt-meta' });
     if (n.ui_link) {
-      line.appendChild(h('a', { text: label, attrs: { href: n.ui_link, target: '_blank', rel: 'noopener noreferrer' } }));
+      meta.appendChild(h('a', { text: label, attrs: { href: n.ui_link, target: '_blank', rel: 'noopener noreferrer' } }));
     } else {
-      line.appendChild(document.createTextNode(String(label || '')));
+      meta.appendChild(h('span', { text: String(label || '') }));
     }
-    line.appendChild(document.createTextNode(bits));
-    return h('div', { style: 'padding:10px 0;border-bottom:1px solid var(--line-3)' }, [
-      h('div', { text: n.title || 'Untitled notice', style: 'font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.35' }),
-      line
+    if (n.naics_code) meta.appendChild(h('span', { text: n.naics_code }));
+    if (n.set_aside) meta.appendChild(h('span', { text: n.set_aside }));
+    meta.appendChild(h('span', { text: 'closes ' + fmtDate(n.response_deadline) }));
+    return h('div', { cls: 'nt-row' }, [
+      h('div', { cls: 'nt-title', text: n.title || 'Untitled notice' }),
+      meta
     ]);
   }
 
@@ -297,7 +365,7 @@
     }
 
     const naicsChips = h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:2px' },
-      (o.naics || []).map((c) => h('span', { cls: 'fpill', text: c })));
+      orderedCodes(o).map((c) => h('span', { cls: 'fpill', text: c })));
 
     const noticeList = h('div', { style: 'max-height:260px;overflow-y:auto' },
       (o.notices || []).map(noticeRow));
@@ -311,7 +379,7 @@
 
     fill(host, [
       h('div', { cls: 'cop-head' }, [
-        h('div', { cls: 'cop-av', text: o.initials, style: avColor(o.email || o.id) }),
+        h('div', { cls: 'cop-av', text: o.initials }),
         h('div', { cls: 'cop-id' }, [
           h('div', { cls: 'cop-name', text: o.name }),
           h('div', { cls: 'cop-title', text: o.contactType ? o.contactType + ' contact on SAM' : 'Point of contact on SAM' }),
@@ -329,6 +397,7 @@
   /* ── wiring ─────────────────────────────────────────────────────────── */
 
   function renderAll() {
+    shortNames = null;
     // The incoming agency can only be resolved once the feed has told us which
     // agencies exist. render() is called again when the live data lands, so this
     // runs then — and applies at most once.
