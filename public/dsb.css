@@ -649,8 +649,6 @@ a.rc-row:hover .rc-name{color:var(--accent-deep)}
 .ch-h{font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:800;color:var(--accent-deep);text-align:right;font-variant-numeric:tabular-nums}
 [data-theme="dark"] .ch-h{color:var(--accent-light)}
 .ch-m{grid-column:1/-1;font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute);letter-spacing:.02em}
-.ch-track{grid-column:1/-1;height:5px;border-radius:3px;background:var(--line-2);overflow:hidden;margin-top:3px}
-.ch-fill{display:block;height:100%;background:var(--accent);opacity:.8}
 .ch-cap{font-size:11.5px;line-height:1.55;color:var(--mute);margin:12px 2px 0}
 .ch-cap b{color:var(--ink-2);font-weight:650}
 .ch-none{font-size:12px;line-height:1.6;color:var(--mute);background:var(--card-soft);border:1px dashed var(--line);border-radius:9px;padding:14px 16px}
