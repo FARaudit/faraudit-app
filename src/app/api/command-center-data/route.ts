@@ -126,6 +126,16 @@ export async function GET() {
     const feedScope = scoped ? scoped.scope : null;
     const opportunities: OpportunityRow[] = liveOpps ?? [];
 
+    // Every count below is derived by filtering `opportunities`, and that array is
+    // `[]` both when the window is genuinely empty AND when the upstream read
+    // failed. Filtering [] yields 0 either way, so each of those counts has to be
+    // nulled explicitly when the feed did not answer — otherwise the page prints a
+    // zero nobody measured next to a rail pill that says "Feed down". `feedAvailable`
+    // is the one fact that separates them, and it ships so the client can say which
+    // it is instead of inferring.
+    const feedAvailable = liveOpps !== null;
+    const feedNum = (n: number): number | null => (feedAvailable ? n : null);
+
     // ── Brief-head "since you last looked" deltas ──
     const newMatches24h = opportunities.filter((o) => {
       const ts = o.created_at ? new Date(o.created_at).getTime() : NaN;
@@ -255,9 +265,14 @@ export async function GET() {
 
     return NextResponse.json({
       // ── existing fields ──
-      liveCount:        liveOpps ? liveOpps.length : (homeStats?.live_sam_gov ?? 0),
+      // The homeStats fallbacks are GONE. Both counted pending_audits rows, which
+      // have been structurally zero since that queue froze — so a failed SAM read
+      // printed "0 live notices matching your NAICS" and an insight bar telling the
+      // customer to widen a window that was never read, while the rail beside it
+      // said "Feed down". null is the only honest answer to a question nothing asked.
+      liveCount:        liveOpps ? liveOpps.length : null,
       trapCount:        homeStats?.total_traps_caught   ?? counters.traps,
-      deadlineSoon:     liveOpps ? deadlineSoon7d : (homeStats?.expiring_7d ?? 0),
+      deadlineSoon:     feedNum(deadlineSoon7d),
       auditsThisMonth:  homeStats?.audit_activity_month ?? counters.audits,
       auditTotal:       auditsAvailable ? audits.length : null,
       // null = live fetch failed (client renders "unavailable", not "empty")
@@ -269,22 +284,24 @@ export async function GET() {
       // The posted-date window the live read actually used. Sent so the empty
       // state can state it instead of hardcoding a number that would rot.
       feedWindowDays:   WINDOW_DAYS,
+      // Whether the live SAM read ANSWERED. Distinct from an empty window.
+      feedAvailable,
       lastSync:         new Date().toISOString(),
 
       // ── Phase 4 additions ──
       user: { firstName, fullName, initials },
 
       // Brief-head deltas (.since-item × 4)
-      newMatches24h,
+      newMatches24h:    feedNum(newMatches24h),
       newTraps,
       pursuitsAdvanced,
-      qaWindowsClosing,
+      qaWindowsClosing: feedNum(qaWindowsClosing),
 
       // Pulse-bar deltas
-      deadlineSoonNext48h,
+      deadlineSoonNext48h: feedNum(deadlineSoonNext48h),
 
       // Sidebar badges
-      agencyCount,
+      agencyCount:      feedNum(agencyCount),
       pipelineAtRisk,
       pipelineTotal,
 

@@ -7,6 +7,7 @@
     { key: 'company', label: 'Company Profile', icon: 'M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6' },
     { key: 'naics', label: 'NAICS Configuration', icon: 'M4 19V5M4 19h16M8 16v-5M13 16V8M18 16v-3' },
     { key: 'notifs', label: 'Notifications', icon: 'M6 8a6 6 0 1112 0c0 7 3 8 3 8H3s3-1 3-8zM10 21a2 2 0 004 0' },
+    { key: 'security', label: 'Security', icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM12 11v4M12 8h.01' },
     { key: 'team', label: 'Team Members', icon: 'M7 9a3 3 0 100-6 3 3 0 000 6zM17 9a3 3 0 100-6 3 3 0 000 6zM2 20c0-3 2.5-5 5-5M22 20c0-3-2.5-5-5-5' },
     { key: 'billing', label: 'Billing & Plan', icon: 'M2 7h20v12H2zM2 11h20' }
   ];
@@ -373,6 +374,31 @@
        template rows with no handler and no backing preference; they are gone. The bell
        is genuinely wired — notifications are written by the watcher and read by the
        page — so that sentence stays. */
+    /* Idle auto sign-out. The copy states what the timer DOES — it posts the same
+       sign-out the rail's button posts — and what it is not: it does not shorten the
+       session's own lifetime, which the auth provider owns. OFF is the default and the
+       only state a failed preference read can produce. */
+    security: () => `
+      <div class="sp-hd"><div class="sp-t">Security</div><div class="sp-s">What happens when you walk away</div></div>
+      <div class="sp-bd" id="security">
+        <div class="nf-row" data-pref-row>
+          <div class="nf-l">
+            <div class="nf-t">Sign me out after a period of inactivity</div>
+            <div class="nf-d">For a shared or unattended machine. After the chosen idle time you get a one-minute warning with a <b>Stay signed in</b> button; if nothing happens, FARaudit signs you out — the same sign-out as the button in the sidebar, so the session really ends. Typing, scrolling or clicking anywhere in FARaudit resets the clock, in any open tab.</div>
+          </div>
+          <select class="ps-sel" id="autoSignoutSel" aria-label="Idle sign-out after">
+            <option value="0">Off</option>
+            <option value="15">15 minutes</option>
+            <option value="30">30 minutes</option>
+            <option value="60">1 hour</option>
+            <option value="120">2 hours</option>
+            <option value="240">4 hours</option>
+          </select>
+        </div>
+        <div class="naics-msg" id="psPrefNote" role="status" hidden></div>
+        <div class="note"><b>What this is not:</b> it is a timer in your browser, not a shorter session. Closing the tab does not sign you out, and the setting cannot end a session on a device you no longer have. It is off unless you turn it on, and if your preferences cannot be read it stays off rather than signing you out on a guess.</div>
+      </div>`,
+
     notifs: () => `
       <div class="sp-hd"><div class="sp-t">Notification Preferences</div><div class="sp-s">What reaches you, and what does not yet</div></div>
       <div class="sp-bd" id="alerts">
@@ -506,11 +532,55 @@
       body: JSON.stringify({ [key]: value })
     }).then(r => r.ok);
   }
-  const PREF_LABELS = { weekly_digest_watched: 'Weekly digest', alerts_email_enabled: 'Alert emails', alerts_in_app_enabled: 'Bell alerts' };
+  const PREF_LABELS = { weekly_digest_watched: 'Weekly digest', alerts_email_enabled: 'Alert emails', alerts_in_app_enabled: 'Bell alerts', auto_signout_minutes: 'Auto sign-out' };
+
+  /* The idle sign-out duration. Same save path and same refused-save reporting as the
+     toggles below; it is a <select> only because the value is a duration, not a state.
+     On a successful save the running timer is re-armed in this tab, so the setting the
+     customer just chose is the one in force without a reload. */
+  function wireAutoSignout(prefs) {
+    var sel = $('autoSignoutSel');
+    if (!sel) return;
+    /* The store has to be able to HOLD this before the control offers to set it. A row
+       came back carrying other keys but not this one means the column is not there yet,
+       and a select that looks live and refuses every save is worse than one that says
+       so. An empty object is "no row yet", which is normal and storable. */
+    var storable = !Object.keys(prefs).length || Object.prototype.hasOwnProperty.call(prefs, 'auto_signout_minutes');
+    if (!storable) {
+      sel.disabled = true;
+      sel.title = 'Not available on this account yet';
+      var msg = $('psPrefNote');
+      if (msg) { msg.hidden = false; msg.textContent = 'Auto sign-out is not available on your account yet — the setting cannot be stored, so it stays off rather than appearing to be on.'; }
+      return;
+    }
+    var cur = prefs.auto_signout_minutes;
+    sel.value = String(typeof cur === 'number' && cur > 0 ? cur : 0);
+    sel.onchange = function () {
+      var mins = parseInt(sel.value, 10) || 0;
+      sel.disabled = true;
+      savePref('auto_signout_minutes', mins === 0 ? null : mins).then(function (ok) {
+        sel.disabled = false;
+        if (ok) {
+          prefs.auto_signout_minutes = mins === 0 ? null : mins;
+          if (typeof window.faSetAutoSignout === 'function') window.faSetAutoSignout(mins === 0 ? null : mins);
+          flash(PREF_LABELS.auto_signout_minutes, true);
+        } else {
+          // A refused save names itself and the control goes back to what is STORED —
+          // leaving the new value selected would show a setting that is not in force.
+          sel.value = String(typeof prefs.auto_signout_minutes === 'number' && prefs.auto_signout_minutes > 0 ? prefs.auto_signout_minutes : 0);
+          flash(PREF_LABELS.auto_signout_minutes, false);
+        }
+      });
+    };
+  }
   function wireServerPrefs() {
     var btns = $('setContent').querySelectorAll('[data-pref-tg]');
-    if (!btns.length) return;
+    // The duration select lives on its own panel, so an early return on "no toggles
+    // here" would have left it unwired — a control that loads, looks live and saves
+    // nothing.
+    if (!btns.length && !$('autoSignoutSel')) return;
     loadPrefs().then(prefs => {
+      wireAutoSignout(prefs);
       btns.forEach(b => {
         var key = b.getAttribute('data-pref-tg');
         var current = prefs[key];

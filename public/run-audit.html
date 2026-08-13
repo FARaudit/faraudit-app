@@ -1039,7 +1039,9 @@ function setState(s){if(__fd)__fd.dataset.state=s||'empty';}
   var retry=$('raRetry');if(retry)retry.addEventListener('click',function(){setState('empty');var i=document.querySelector('.ev-d .sm-input');if(i)i.value='';var lv=$('lvChip');if(lv){lv.className='lvchip';lv.innerHTML='';}});
   ['errUpload','addMissing'].forEach(function(id){var b=$(id);if(b)b.addEventListener('click',function(){setState('empty');showUpload();});});
   // PIEE / eBuy waitlist (quiet secondary)
-  var piee=$('pieeBtn');if(piee)piee.addEventListener('click',function(){alert('Joins the PIEE / eBuy early-access waitlist. We’ll email you when approved access is live.');});
+  /* No waitlist store exists yet, so this may not promise an email. The panel
+     already says "Not yet live"; the button must agree with it. */
+  var piee=$('pieeBtn');if(piee)piee.addEventListener('click',function(){alert('PIEE / eBuy direct pull is not live yet, and there is no waitlist to join — nothing was recorded. Upload the solicitation documents instead and the audit runs on those.');});
 })();
 
 /* ── live-resolve chip — CLIENT-SIDE FORMAT DETECTION ONLY (no fabricated coverage) ──
