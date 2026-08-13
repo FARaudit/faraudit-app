@@ -79,7 +79,10 @@ function main() {
   assert(/30 September/.test(sn), "the caption says why — funds expire 30 September");
   assert(/count as zero rather than being omitted/i.test(sn),
     "quiet months are declared as zero, since an absent month reads as missing data");
-  assert(/truncated/.test(sn),
+  // The bias used to be declared only when the payload's `truncated` flag was
+  // set. It is now stated unconditionally in the note, which is the stronger
+  // claim: grade the sentence the customer reads, not the flag behind it.
+  assert(/largest awards/i.test(sn) && /not every award/i.test(sn),
     "and the largest-awards bias is still declared — it is when BIG money moves");
 
   // ── 4 · ⛔ a call list must not include firms with no obligation ──────────
