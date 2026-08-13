@@ -777,7 +777,7 @@ a.rc-row:hover .rc-name{color:var(--accent-deep)}
 .sn-t{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:4px;padding:11px 12px;min-width:0}
 .sn-tp{align-self:center}
 .sn-t+.sn-t{border-left:1px solid var(--line)}
-.sn-tm{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
+.sn-tm{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
 .sn-tv{font-family:"IBM Plex Mono",monospace;font-size:17px;font-weight:700;color:var(--ink-2);letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums}
 /* Five steps over the year's own range. Ink text throughout — the tint never
    goes dark enough to need a light foreground, so no cell can fall below AA. */
@@ -814,7 +814,7 @@ a.rc-row:hover .rc-name{color:var(--accent-deep)}
 .sn-calh{align-items:flex-start}
 .sn-base{text-align:right;line-height:1.45}
 .sn-base b{color:var(--ink-2);font-weight:700}
-.sn-base i{display:block;font-style:normal;font-weight:600;color:var(--mute-2);text-transform:none;letter-spacing:.02em;font-size:8.5px;margin-top:2px}
+.sn-base i{display:block;font-style:normal;font-weight:600;color:var(--mute);text-transform:none;letter-spacing:.02em;font-size:8.5px;margin-top:2px}
 .sn-base .ph,.sn-k .ph{color:#b45309;font-weight:800}
 [data-theme="dark"] .sn-base .ph,[data-theme="dark"] .sn-k .ph{color:#fcd34d}
 .pt-list{display:flex;flex-direction:column;gap:1px}
