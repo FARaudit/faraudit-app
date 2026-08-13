@@ -88,7 +88,13 @@
     for (let i = 0; i < s.length; i++) n = (n * 31 + s.charCodeAt(i)) >>> 0;
     const hues = [212, 199, 258, 172, 28, 340];
     const hue = hues[n % hues.length];
-    return 'background:linear-gradient(155deg,hsl(' + hue + ',62%,52%),hsl(' + hue + ',68%,34%))';
+    /* ⛔ THE INITIALS ARE WHITE, SO THE LIGHTEST STOP SETS THE CONTRAST. At 52%
+       the teal measured 1.91:1 and the cyan 2.94:1 — two of the six, and the hue
+       comes from a hash of the officer's email, so roughly one officer in three had
+       initials nobody could read. 32% is the lightest top stop at which ALL SIX
+       clear 4.5:1 (worst 4.53:1, the teal). Lightness carries the contrast here;
+       the hue only has to tell two avatars apart. */
+    return 'background:linear-gradient(155deg,hsl(' + hue + ',62%,32%),hsl(' + hue + ',68%,22%))';
   }
 
   function officers() {
