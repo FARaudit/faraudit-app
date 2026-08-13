@@ -135,6 +135,7 @@
         liveCount:             data.liveCount,
         deadlineSoon:          data.deadlineSoon,
         auditsThisMonth:       data.auditsThisMonth,
+        auditRunsThisMonth:    data.auditRunsThisMonth,
         pipelineAvailable:     data.pipelineAvailable !== false,
         pipelineTotal:         data.pipelineTotal,
         pipelineWeightedValue: data.pipelineWeightedValue,
