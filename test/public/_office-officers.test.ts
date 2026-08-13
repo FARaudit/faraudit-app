@@ -136,5 +136,39 @@ ok(named.length > 0,
   named.length ? `resolves via #${named.join(", #")}`
     : `guard names ${guardIds.join(", ")} — none of which is on that page`);
 
+// ── R7 · STAYING LIVE WITHOUT LYING ABOUT IT ─────────────────────────────────
+console.log("\nR7  THE FEED IS RE-CHECKED, AND A FAILED CHECK IS NOT AN ABSENCE");
+/* The record is rebuilt nightly, so a reader with a tab open can sit on
+   yesterday's answer for a whole day. Three mechanisms close that window without
+   asking them to know they should reload. */
+ok(/setInterval\(refresh, REFRESH_MS\)/.test(LIVE), "the feed is re-checked on a timer");
+ok(/visibilitychange/.test(LIVE),
+  "…and again when the tab comes back to the front, the moment staleness shows");
+ok(/setInterval\(repaintStamp, STAMP_MS\)/.test(LIVE),
+  "…and the stamp repaints on its own, so a frozen age cannot outlive the clock");
+ok(/if \(refreshing \|\| document\.hidden\) return;/.test(LIVE),
+  "a hidden tab does not poll — that is the customer's battery, on a page nobody is reading");
+
+/* ⛔ THE INVARIANT THIS SECTION EXISTS FOR. Once a record is on screen, a later
+   fetch that fails must leave it there. Routing a refresh failure into unwired()
+   would blank a real record because the network blinked, telling the reader
+   their data is gone when it is only un-rechecked — and discarding the only copy
+   held. So the refresh path gets its own terminal, and it must NOT set STATUS. */
+const checkFailedFn = LIVE.slice(LIVE.indexOf("function checkFailed"),
+  LIVE.indexOf("async function wire"));
+ok(checkFailedFn.length > 0, "the refresh failure path is its own function");
+ok(!/STATUS/.test(checkFailedFn),
+  "…and it does NOT touch STATUS — a failed re-check never tears down a good record");
+ok(/state: 'failed'/.test(checkFailedFn), "…it records that the check failed");
+ok(/const fail = isRefresh \? checkFailed : unwired;/.test(LIVE),
+  "the first load still tears down honestly; only a REFRESH is non-destructive");
+/* addEventListener hands its listener an Event. Passing `wire` directly would
+   make that Event arrive as `isRefresh`, so a first load against a dead feed
+   would report a failed RE-check over a page that never held a record. */
+ok(!/addEventListener\('DOMContentLoaded', wire\)/.test(LIVE),
+  "wire() is not handed straight to addEventListener, which would pass an Event as isRefresh");
+ok(/addEventListener\('DOMContentLoaded', start\)/.test(LIVE), "…it boots through start()");
+ok(/wire\(false\)/.test(LIVE), "…which calls the first load explicitly as a non-refresh");
+
 console.log(`\n${fail === 0 ? "✅" : "❌"} ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

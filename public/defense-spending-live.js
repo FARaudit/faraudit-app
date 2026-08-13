@@ -55,17 +55,39 @@
     paint();
   }
 
-  async function wire() {
+  /* ⛔ A FAILED RE-CHECK IS NOT AN ABSENCE OF DATA. Once a record is on screen,
+     a later fetch that does not complete must leave it standing. A record that
+     is merely un-rechecked is still a real read, and it is the only copy this
+     browser holds. So `unwired()` is reachable on the FIRST load only; a refresh
+     that does not complete records why and repaints, and the page states that it
+     could not re-check rather than that there is nothing to show. */
+  function checkFailed(reason) {
+    window.DSB.FRESHNESS = {
+      checkedAt: window.DSB.FRESHNESS ? window.DSB.FRESHNESS.checkedAt : null,
+      state: 'failed',
+      reason: reason || 'The feed could not be re-checked.'
+    };
+    paint();
+  }
+
+  async function wire(isRefresh) {
+    /* THE TWO CLOCKS ARE DIFFERENT FACTS AND ARE NEVER CONFLATED. `as_of` is
+       when USAspending was MEASURED by the nightly worker; `checkedAt` is when
+       this browser last asked. A successful re-check against unchanged upstream
+       data moves the second and must not move the first — reporting "updated
+       just now" over a measurement twenty hours old is the staleness this is
+       meant to prevent, wearing a fresh timestamp. */
+    const fail = isRefresh ? checkFailed : unwired;
     try {
       const res = await fetch('/api/defense-spending', { credentials: 'include' });
       const data = await res.json().catch(function () { return null; });
 
       if (!res.ok) {
-        unwired((data && data.reason) || 'Spending data could not be loaded (HTTP ' + res.status + ').');
+        fail((data && data.reason) || 'Spending data could not be loaded (HTTP ' + res.status + ').');
         return;
       }
       if (!data || data.state !== 'ok') {
-        unwired((data && data.reason) || '');
+        fail((data && data.reason) || '');
         return;
       }
 
@@ -104,24 +126,87 @@
       // A payload with no fiscal years is not a dashboard with nothing in it —
       // it is a read that produced nothing, and it says so.
       if (window.DSB.FYS.length === 0) {
-        unwired('Federal spending returned no fiscal years for your codes.');
+        fail('Federal spending returned no fiscal years for your codes.');
         return;
       }
 
       window.DSB.STATUS = { state: 'ok', reason: '' };
+      window.DSB.FRESHNESS = { checkedAt: Date.now(), state: 'ok', reason: '' };
       paint();
       loadOfficers();
     } catch (e) {
       console.error('[defense-spending-live] wire failed:', e);
-      unwired('Spending data could not be loaded.');
+      fail('Spending data could not be loaded.');
     }
   }
+
+  /* ── KEEPING IT LIVE ─────────────────────────────────────────────────────
+     The underlying record is rebuilt nightly, so the window in which a reader
+     can be looking at yesterday's answer is a whole day wide. Three things
+     close it, and none of them asks the reader to know they should reload:
+
+       · a periodic re-check while the tab is open,
+       · a re-check when the tab is brought back to the front, which is the one
+         moment a reader would notice staleness, and
+       · the stamp repainting on its own — "checked 2m ago" frozen at 2m for an
+         hour is a worse lie than printing no stamp at all.
+
+     Hidden tabs are skipped: a background tab polling all night costs the
+     customer's battery to refresh something nobody is reading. */
+  var REFRESH_MS = 5 * 60 * 1000;
+  var STAMP_MS = 30 * 1000;
+  var refreshing = false;
+
+  async function refresh() {
+    if (refreshing || document.hidden) return;
+    refreshing = true;
+    /* ⛔ REPAINT AFTER THE FLAG CLEARS, NOT ONLY INSIDE THE FETCH. wire() paints
+       while `refreshing` is still true, so that paint renders the in-progress
+       wording. Without a second paint here the strip stays on "checking now…"
+       after the attempt has finished — and on a FAILED check that is the worst
+       possible resting state, since it reports work still happening instead of
+       a check that did not complete. */
+    try { await wire(true); } finally {
+      refreshing = false;
+      repaintStamp();
+    }
+  }
+
+  function repaintStamp() {
+    if (document.hidden) return;
+    if (window.WTC_APP && typeof window.WTC_APP.paintFreshness === 'function') {
+      window.WTC_APP.paintFreshness();
+    }
+  }
+
+  /* The manual control exists because automatic refresh is invisible: a reader
+     who suspects the number is old needs something to press, and pressing it
+     must produce a visible answer either way. */
+  window.DSB_LIVE = { refresh: refresh, isRefreshing: function () { return refreshing; } };
 
   const obs = new MutationObserver(function () {
     if (window.DSB_APP && typeof window.DSB_APP.onThemeChange === 'function') window.DSB_APP.onThemeChange();
   });
   obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
-  else wire();
+  function start() {
+    /* ⛔ WRAPPED, NOT PASSED DIRECTLY. addEventListener hands the listener an
+       Event, which would arrive as `isRefresh` and make the very first load take
+       the refresh path — so a genuinely unreachable feed would report "could not
+       re-check" over a page that has never held a record, and the honest-fail
+       teardown would never run. */
+    wire(false);
+    setInterval(refresh, REFRESH_MS);
+    setInterval(repaintStamp, STAMP_MS);
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) return;
+      repaintStamp();
+      var f = window.DSB.FRESHNESS;
+      var last = f && f.checkedAt;
+      if (!last || Date.now() - last > REFRESH_MS) refresh();
+    });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
 })();

@@ -142,10 +142,19 @@
 
     var tracked = (D.coverage && D.coverage.tracked) || [];
 
+    /* THE MASTHEAD STATES THE SCOPE, INCLUDING THAT IT IS A SUBSET. Printing the
+       one selected code alone would let a scoped record be read as the whole
+       account; printing all three while showing one code's contracts would be
+       worse. Named code first, then how many others are on file. */
+    var others = tracked.length - 1;
+    var scopeLine = D.code
+      ? esc(D.code) + (others > 0 ? ' · ' + word(others) + ' more code'
+        + (others === 1 ? '' : 's') + ' on file' : '')
+      : (tracked.length ? tracked.map(esc).join(' · ') : 'none on file');
+
     var mast = '<header class="o4-h"><div class="o4-hk">FARaudit · Recompete record</div>'
       + '<div class="o4-hd">Prepared ' + esc(iso(String(D.as_of || '').slice(0, 10)))
-      + ' · NAICS ' + (tracked.length ? tracked.map(esc).join(' · ') : 'none on file')
-      + '</div></header>';
+      + ' · NAICS ' + scopeLine + '</div></header>';
 
     /* A row with no period-of-performance end cannot be placed on a record
        ordered by expiry. It is held out of the ordering and counted, and §03
@@ -168,13 +177,18 @@
        excludes: a page that only says nothing found cannot be told apart from
        one that failed to run. No hero, no summary strip, no sections. */
     if (!rows.length) {
-      return mast + '<div class="o4-empty"><p class="o4-lede">No contract in your codes comes up '
-        + 'for recompete.</p>'
+      return mast + '<div class="o4-empty"><p class="o4-lede">No contract in '
+        + (D.code ? 'NAICS ' + esc(D.code) : 'your codes') + ' comes up for recompete.</p>'
         + '<p class="o4-p">We looked at every federal contract whose period of performance ends '
         + 'inside the window we monitor, in NAICS '
-        + (tracked.length ? tracked.map(esc).join(', ')
-          : '— no codes are on file for this account')
-        + '. Nothing matched.</p>'
+        + (D.code ? esc(D.code)
+          : tracked.length ? tracked.map(esc).join(', ')
+            : '— no codes are on file for this account')
+        + '. Nothing matched.'
+        + (D.code && tracked.length > 1
+          ? ' This record is scoped to one of your ' + word(tracked.length)
+            + ' codes — clear the scope to see the others.' : '')
+        + '</p>'
         + '<p class="o4-n">' + undatedNote()
         + 'This is a statement about the window and the codes, not about the market: a contract '
         + 'ending outside the window, or in a code you do not track, does not appear here. Add a '
@@ -463,10 +477,17 @@
       var sumTotal = conc.reduce(function (n, c) { return n + (c.total || 0); }, 0);
       h += '<section class="o4-s"><h3><span>04</span> Who already wins here'
         + '<em>' + esc(conc[0].fy) + ' to date · the year is open</em></h3>'
+        /* THE SECOND SENTENCE IS AN AGGREGATE ACROSS CODES, so it only exists
+           when there is more than one code to aggregate. Scoped to a single
+           code it would restate the first sentence with the same two figures
+           and call it a different finding. */
         + '<p class="o4-p">In <b>' + esc(tight.naics) + '</b>, five firms hold <b>'
-        + pc(tight.top5_pct) + '</b> of ' + curM(tight.total) + '. Across your '
-        + word(conc.length) + ' codes the top five take '
-        + pc(sumTotal ? sumTop5 / sumTotal * 100 : null) + ' of ' + curM(sumTotal) + '.</p>'
+        + pc(tight.top5_pct) + '</b> of ' + curM(tight.total) + '.'
+        + (conc.length > 1
+          ? ' Across your ' + word(conc.length) + ' codes the top five take '
+            + pc(sumTotal ? sumTop5 / sumTotal * 100 : null) + ' of ' + curM(sumTotal) + '.'
+          : '')
+        + '</p>'
         + '<table class="o4-t o4-rec o4-conc"><thead><tr><th>NAICS</th><th class="r">#</th>'
         + '<th>Recipient</th><th class="n">Obligated</th><th class="n">Share of code</th>'
         + '<th class="n">Code total</th></tr></thead><tbody>'
@@ -538,9 +559,108 @@
 
      The officer directory arrives on a separate fetch AFTER the first paint, so
      this re-runs when it lands: §02 and §03's contacts column are what change. */
+  /* ── THE NAICS SCOPE ─────────────────────────────────────────────────────
+     Through the shared window.BD_SCOPE, never a local variable: the scope has an
+     address (URL, then localStorage), so a link means what it says and the next
+     destination opens on the code this one was left on.
+
+     reconcile() is what makes a scope a REQUEST rather than a fact. A URL naming
+     a code this account does not track must not quietly render all of them — it
+     returns the note, and the strip prints it. A substitution the reader is not
+     told about is a page misstating its own subject. */
+  function renderScope(tracked, fys) {
+    var el = document.getElementById('wtcScope');
+    if (!el) return { code: null, note: '' };
+    var SC = window.BD_SCOPE;
+    if (!SC || !tracked.length) { setHTML(el, ''); return { code: null, note: '' }; }
+
+    var r = SC.reconcile(fys, tracked);
+    var code = r.code;
+
+    setHTML(el, '<span class="wsk">NAICS</span>'
+      + '<button type="button" data-code="" aria-pressed="' + (code ? 'false' : 'true') + '">'
+      + 'All ' + word(tracked.length) + '</button>'
+      + tracked.map(function (c) {
+        return '<button type="button" data-code="' + esc(c) + '" aria-pressed="'
+          + (code === c ? 'true' : 'false') + '">' + esc(c) + '</button>';
+      }).join('')
+      + (r.note ? '<span class="wsn">' + esc(r.note) + '</span>' : ''));
+
+    el.querySelectorAll('button').forEach(function (b) {
+      b.onclick = function () {
+        SC.set({ code: b.dataset.code || null });
+        render();
+      };
+    });
+    return { code: code, note: r.note };
+  }
+
+  /* ── FRESHNESS ───────────────────────────────────────────────────────────
+     TWO CLOCKS, STATED SEPARATELY, BECAUSE THEY ANSWER DIFFERENT QUESTIONS.
+     "Read" is how old the MEASUREMENT is — the nightly worker's `as_of`, and the
+     only one that bears on whether a figure is current. "Checked" is when this
+     browser last asked. They are printed as two sentences: a re-check confirms
+     that the measurement is unchanged, so it moves the second clock and leaves
+     the first where it is. A single "updated" stamp cannot express that.
+
+     The relative age is recomputed on every paint from the timestamps rather
+     than rendered once, so it cannot sit frozen while the clock moves. */
+  function ago(ms) {
+    if (ms == null) return null;
+    var s = Math.max(0, Math.round((Date.now() - ms) / 1000));
+    var m = Math.floor(s / 60), h = Math.floor(m / 60), d = Math.floor(h / 24);
+    if (s < 60) return 'just now';
+    if (m < 60) return m + ' min ago';
+    if (h < 24) return h + (h === 1 ? ' hour ago' : ' hours ago');
+    return d + (d === 1 ? ' day ago' : ' days ago');
+  }
+
+  function paintFreshness() {
+    var el = document.getElementById('wtcFresh');
+    if (!el) return;
+    var DSB = window.DSB || {};
+    var f = DSB.FRESHNESS || { checkedAt: null, state: 'loading', reason: '' };
+    var busy = !!(window.DSB_LIVE && window.DSB_LIVE.isRefreshing && window.DSB_LIVE.isRefreshing());
+
+    var measured = DSB.as_of ? new Date(DSB.as_of).getTime() : null;
+    if (measured != null && !isFinite(measured)) measured = null;
+
+    var read = measured == null
+      ? 'Measurement date not stated by the feed'
+      : 'Read from USAspending ' + ago(measured);
+
+    var checked = busy ? 'checking now…'
+      : f.state === 'failed'
+        /* The record on screen is still the last good read, and the sentence has
+           to say that rather than implying the data is gone. */
+        ? 'last check did not complete' + (f.checkedAt ? ' · last successful check '
+          + ago(f.checkedAt) : '')
+        : f.checkedAt ? 'checked ' + ago(f.checkedAt) : 'checking…';
+
+    setHTML(el, '<span class="wf-t' + (f.state === 'failed' ? ' warn' : '') + '">'
+      + esc(read) + ' · ' + esc(checked) + '</span>'
+      + '<button type="button" id="wtcRefresh"' + (busy ? ' disabled' : '') + '>'
+      + (busy ? 'Checking…' : 'Refresh') + '</button>'
+      + (f.state === 'failed' && f.reason
+        ? '<span class="wf-n">' + esc(f.reason)
+          + ' The record below is the last one we read in full, not a partial or '
+          + 'a guess.</span>'
+        : ''));
+
+    var btn = document.getElementById('wtcRefresh');
+    if (btn) {
+      btn.onclick = function () {
+        if (!window.DSB_LIVE) return;
+        window.DSB_LIVE.refresh();
+        paintFreshness();
+      };
+    }
+  }
+
   function render() {
     var host = document.getElementById(HOST);
     if (!host) return;
+    paintFreshness();
     var DSB = window.DSB || {};
     var st = DSB.STATUS || { state: 'loading', reason: '' };
 
@@ -557,19 +677,33 @@
       return;
     }
 
+    var tracked = (DSB.coverage && DSB.coverage.tracked) || [];
+    var scope = renderScope(tracked, Array.isArray(DSB.FYS) ? DSB.FYS : []);
+    var code = scope.code;
+
+    /* SCOPING FILTERS THE INPUT, IT DOES NOT HIDE THE OUTPUT. Every figure in
+       the document — the headline, the cluster, the dollar total, the count
+       block, the per-code ceiling sentence, both share tables — is computed from
+       whatever build() is handed. Narrowing the arrays here therefore RECOMPUTES
+       the record rather than re-rendering a filtered view of the wider one:
+       six of twenty-one and one of ten are not the same story, and the page must
+       tell the second one when that is what it is showing. */
+    var byCode = function (x) { return !code || x.naics === code; };
+
     /* ONE FIELD AT A TIME. A payload key with no line here reaches the browser
        and stops, so a field added upstream and not copied leaves the section
        that needs it empty rather than half-built from a stale shape. */
     setHTML(host, build({
-      rows: Array.isArray(DSB.RECOMPETES) ? DSB.RECOMPETES : [],
+      rows: (Array.isArray(DSB.RECOMPETES) ? DSB.RECOMPETES : []).filter(byCode),
       offices: (DSB.OFFICERS && DSB.OFFICERS.offices) || {},
       officerState: (DSB.OFFICERS && DSB.OFFICERS.state) || 'loading',
-      concentration: Array.isArray(DSB.CONCENTRATION) ? DSB.CONCENTRATION : [],
-      winners: Array.isArray(DSB.SB_WINNERS) ? DSB.SB_WINNERS : [],
+      concentration: (Array.isArray(DSB.CONCENTRATION) ? DSB.CONCENTRATION : []).filter(byCode),
+      winners: (Array.isArray(DSB.SB_WINNERS) ? DSB.SB_WINNERS : []).filter(byCode),
       coverage: DSB.coverage || null,
-      as_of: DSB.as_of || null
+      as_of: DSB.as_of || null,
+      code: code
     }));
   }
 
-  window.WTC_APP = { render: render };
+  window.WTC_APP = { render: render, paintFreshness: paintFreshness };
 })();

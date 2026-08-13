@@ -52,6 +52,43 @@
 [data-theme="dark"][data-shell="sheet"] .body{background:#071018}
 [data-theme="dark"][data-shell="sheet"] #o4{background:#0e1a28;border-color:#22344a}
 
+/* THE NAICS SCOPE · chrome, not document. It sits on the app surface above the
+   sheet, because the record has no controls inside it and a picker printed on a
+   document reads as part of the record. Its own inks are declared against the
+   app surface rather than inherited from #o4, which carries the paper ground. */
+.wtc-scope{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.wtc-scope:empty{display:none}
+.wtc-scope .wsk{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:#5d6b7d;margin-right:2px}
+.wtc-scope button{font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:600;color:#28323f;background:#f4f6f9;border:1px solid #c9d2dd;border-radius:7px;padding:6px 11px;cursor:pointer}
+.wtc-scope button:hover{border-color:#8b9bb0}
+/* The selected code is stated by FILL, not by a tint: one pill is the subject of
+   the document below it and the rest are alternatives, which is a difference in
+   kind rather than in degree. aria-pressed carries the same fact to a reader who
+   is not looking at the colour. */
+.wtc-scope button[aria-pressed="true"]{background:#111a26;border-color:#111a26;color:#fff}
+.wtc-scope .wsn{font-family:"Manrope",system-ui,sans-serif;font-size:12.5px;line-height:1.5;color:#5d6b7d;flex-basis:100%}
+[data-theme="dark"] .wtc-scope .wsk,[data-theme="dark"] .wtc-scope .wsn{color:#8b9bb0}
+[data-theme="dark"] .wtc-scope button{background:#0e1a28;border-color:#2a3a4e;color:#b6c2d3}
+[data-theme="dark"] .wtc-scope button:hover{border-color:#5d6b7d}
+[data-theme="dark"] .wtc-scope button[aria-pressed="true"]{background:#e8eef6;border-color:#e8eef6;color:#0e1a28}
+
+/* FRESHNESS · chrome, beside the scope. It states the age of the MEASUREMENT
+   and the time of the last check as two separate facts: a re-check confirms the
+   measurement, it does not renew it. The warn tone is reserved for a check that
+   did not complete, and it stays on this strip — the record below it is a real
+   read, so the document itself is never tinted by it. */
+.wtc-fresh{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:-4px}
+.wtc-fresh:empty{display:none}
+.wtc-fresh .wf-t{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#5d6b7d}
+.wtc-fresh .wf-t.warn{color:#8a5a12}
+.wtc-fresh button{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;letter-spacing:.04em;color:#185FA5;background:none;border:0;padding:2px 0;cursor:pointer;text-decoration:underline}
+.wtc-fresh button[disabled]{color:#5d6b7d;cursor:default;text-decoration:none}
+.wtc-fresh .wf-n{flex-basis:100%;font-family:"Manrope",system-ui,sans-serif;font-size:12.5px;line-height:1.5;color:#5d6b7d}
+[data-theme="dark"] .wtc-fresh .wf-t,[data-theme="dark"] .wtc-fresh .wf-n{color:#8b9bb0}
+[data-theme="dark"] .wtc-fresh .wf-t.warn{color:#e0b155}
+[data-theme="dark"] .wtc-fresh button{color:#B5D4F4}
+[data-theme="dark"] .wtc-fresh button[disabled]{color:#8b9bb0}
+
 .o4-h{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid var(--p-ink);padding-bottom:9px}
 .o4-hk,.o4-hd{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase}
 .o4-hd{color:var(--p-slate);letter-spacing:.05em}
@@ -244,6 +281,12 @@
     </div>
 
     <div class="body">
+      <!-- NAICS scope · chrome, above the sheet. Driven by wtc-app.js
+           through the shared window.BD_SCOPE. -->
+      <div class="wtc-scope" id="wtcScope"></div>
+      <!-- Measurement age and last check · two clocks, one strip.
+           Rendered by wtc-app.js, repainted on a timer. -->
+      <div class="wtc-fresh" id="wtcFresh"></div>
       <!-- The document. Masthead, hero, summary strip and five numbered
            sections, all rendered by wtc-app.js from the live payload. -->
       <div id="o4"></div>

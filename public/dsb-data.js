@@ -17,5 +17,9 @@ window.DSB = {
   coverage: null,
   as_of: null,
   unsupported: [],
-  STATUS: { state: 'loading', reason: '' }
+  STATUS: { state: 'loading', reason: '' },
+  /* WHEN THIS BROWSER LAST ASKED — a different fact from `as_of`, which is when
+     the feed itself was measured. `checkedAt` of null means no read has
+     completed yet, which is not the same as a read that returned nothing. */
+  FRESHNESS: { checkedAt: null, state: 'loading', reason: '' }
 };
