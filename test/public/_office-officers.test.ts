@@ -115,8 +115,26 @@ ok(/replace\(\/\[\^0-9\+\]\/g, ''\)/.test(rcCall), "the tel: href is stripped to
 console.log("\nR6  A SLOW UPSTREAM DOES NOT GATE THE PAGE");
 ok(/paint\(\);\s*\n\s*loadOfficers\(\);/.test(LIVE),
   "the officers load AFTER the panels are painted", "a live SAM call must not gate every panel");
-ok(/if \(!document\.getElementById\('rcList'\)\) return;/.test(LIVE),
-  "…and only on the page that renders recompete rows");
+/* ⛔ THE GUARD IS CHECKED AGAINST THE MARKUP, NOT AGAINST A LITERAL STRING. Pinning the exact text
+   `getElementById('rcList')` proved only that a line had not been edited — and the failure this
+   guard can actually have is the opposite one: the line stays untouched while the page it names is
+   rebuilt around a different host. The fetch then never fires, OFFICERS keeps its default, and the
+   call list states "we hold no contracting officer for any of these offices" — a claim about the
+   offices manufactured out of a lookup that was never attempted.
+   So: read the ids the guard names, and require one of them to exist on the page whose call list
+   depends on this directory. Rebuilding that page without updating the guard now goes red. */
+const guardMatch = LIVE.match(/if \(([^;]*getElementById[^;]*)\) return;/);
+ok(!!guardMatch, "the fetch is guarded by an early return on a host lookup");
+const guardIds = [...(guardMatch?.[1] || "").matchAll(/getElementById\('([^']+)'\)/g)]
+  .map((m) => m[1]);
+ok(guardIds.length > 0, "…and the guard names the hosts that consume the directory",
+  guardIds.join(", "));
+const WTC_HTML = readFileSync(join(ROOT, "public", "who-to-call.html"), "utf8");
+const named = guardIds.filter((id) => WTC_HTML.includes(`id="${id}"`));
+ok(named.length > 0,
+  "…including a host /who-to-call actually carries, so its call list gets its officers",
+  named.length ? `resolves via #${named.join(", #")}`
+    : `guard names ${guardIds.join(", ")} — none of which is on that page`);
 
 console.log(`\n${fail === 0 ? "✅" : "❌"} ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

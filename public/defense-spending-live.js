@@ -6,8 +6,13 @@
 (function () {
   'use strict';
 
+  /* TWO RENDERERS, ONE PAYLOAD. /defense-spending mounts DSB_APP; /who-to-call
+     mounts WTC_APP. Each is asked independently and each is optional, so a page
+     carrying one is not required to carry the other and neither can be silently
+     skipped by a page that loads it. */
   function paint() {
     if (window.DSB_APP && typeof window.DSB_APP.render === 'function') window.DSB_APP.render();
+    if (window.WTC_APP && typeof window.WTC_APP.render === 'function') window.WTC_APP.render();
   }
 
   /* THE CONTRACTING OFFICERS BEHIND A RECOMPETE ROW.
@@ -21,8 +26,12 @@
      ability to read it, and a row that showed nothing for all three would be
      saying something false in two of them. */
   function loadOfficers() {
-    // Only the page that renders recompete rows needs this.
-    if (!document.getElementById('rcList')) return;
+    /* Only a page that renders recompete rows needs this, and the host it looks
+       for must name EVERY such page. A guard naming one host stops fetching the
+       moment that page is rebuilt around a different one, and the section that
+       depends on it then reports an empty directory rather than an unread one —
+       which reads as "no officer works here" instead of "we have not looked". */
+    if (!document.getElementById('rcList') && !document.getElementById('o4')) return;
     window.DSB.OFFICERS = { state: 'loading', offices: {} };
     fetch('/api/office-officers', { credentials: 'include' })
       .then(function (res) {

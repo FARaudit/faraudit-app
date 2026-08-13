@@ -58,9 +58,15 @@ const STAYED = ["geoSvg", "geoLegend", "rankList", "rankTabs", "agencyList", "bo
 /* Retired hosts, asserted GONE FROM BOTH PAGES. Dropping them from STAYED alone
    would have let a copy of either one reappear unnoticed. */
 const RETIRED = ["szBody", "szSub", "kpiStrip", "agencyLegend", "agFyCol"];
-const missing = MOVED.filter((id) => !HTML.includes(`id="${id}"`));
-ok(missing.length === 0, "every host the three panels write into is here",
-  missing.length ? `missing: ${missing.join(", ")}` : `${MOVED.length} hosts`);
+/* ⛔ THE PAGE IS NOW ONE DOCUMENT, NOT THREE WIDGETS. It renders a recompete record into #o4
+   through wtc-app.js: the same RECOMPETES array becomes §01–§03, and CONCENTRATION and SB_WINNERS —
+   which arrived in this payload and had no host on this page at all — become §04 and §05.
+   So the three widgets are UNMOUNTED, and the assertion inverts: they must be on NEITHER page.
+   Their renderers stay in dsb-app.js, which the theme-flip and panel gates hold to. */
+ok(HTML.includes('id="o4"'), "the page carries the document host #o4");
+const stillWidgets = MOVED.filter((id) => HTML.includes(`id="${id}"`));
+ok(stillWidgets.length === 0, "the three widgets are unmounted — none of their hosts remain here",
+  stillWidgets.length ? `still present: ${stillWidgets.join(", ")}` : `${MOVED.length} hosts checked`);
 const leaked = STAYED.filter((id) => HTML.includes(`id="${id}"`));
 ok(leaked.length === 0, "and nothing that stayed on Defense Spending came along",
   leaked.length ? `also present: ${leaked.join(", ")}` : `${STAYED.length} checked`);
@@ -86,10 +92,13 @@ ok(resurrected.length === 0,
   "and a RETIRED host has not come back on either page",
   resurrected.length ? `back in the markup: ${resurrected.join(", ")}` : `${RETIRED.length} checked`);
 
-// The controls DO come along: a destination the reader cannot scope is a report,
-// not a view. These are the scope's own inputs, not the other page's panels.
+/* THE SCOPE CONTROLS ARE GONE, AND THAT IS THE DESIGN. This destination is a document rather than a
+   view: it states its own scope in the masthead — prepared date and the NAICS codes on file — and
+   the reader changes that scope on the capability statement, not with a picker on the report.
+   Asserted as ABSENT rather than deleted, so a control reappearing here is a decision someone has
+   to make on purpose instead of a widget drifting back onto a printed record. */
 for (const id of ["segFY", "hdrNaicsPills", "dsbProvenance", "resetBtn", "selChip"]) {
-  ok(HTML.includes(`id="${id}"`), `the scope control #${id} came along`);
+  ok(!HTML.includes(`id="${id}"`), `the document carries no scope control #${id}`);
 }
 
 // ── R3 · SAMENESS — one renderer set, one stylesheet, one scope ──────────────
@@ -98,14 +107,33 @@ const SPENDING = readFileSync(join(ROOT, "public", "defense-spending.html"), "ut
 const scripts = (src: string) =>
   [...src.matchAll(/<script[^>]*\bsrc="([^"]+)"/g)].map((m) => m[1].replace(/^\//, ""));
 const wtc = scripts(HTML), dsb = scripts(SPENDING);
-for (const s of ["bd-scope.js", "dsb-data.js", "dsb-app.js", "defense-spending-live.js"]) {
+// The data container, the live wiring and the scope module are still SHARED — one payload, one
+// fetch, one scope. Only the render layer differs, because the two pages render different things.
+for (const s of ["bd-scope.js", "dsb-data.js", "defense-spending-live.js"]) {
   ok(wtc.includes(s), `loads the SHARED ${s}`, wtc.join(" "));
+  ok(dsb.includes(s), `…and defense-spending loads the same ${s}`);
 }
-// ⛔ NO FORKED COPY. A `wtc-app.js` beside dsb-app.js is the failure this whole
-// gate exists for — it would look identical on the day it shipped.
-const forked = wtc.filter((s) => /^(wtc|who-to-call)[-.]/i.test(s));
-ok(forked.length === 0, "no page-specific copy of the renderers", forked.join(", "));
-ok(!existsSync(join(ROOT, "public", "wtc-app.js")), "no wtc-app.js on disk either");
+ok(wtc.includes("wtc-app.js"), "and its own render layer for the document", wtc.join(" "));
+ok(!wtc.includes("dsb-app.js"),
+  "it does NOT load the widget renderer set it no longer has hosts for");
+
+/* ⛔ THE FORK CHECK IS ABOUT SUBSTANCE, NOT A FILENAME. This gate used to ban a file called
+   wtc-app.js outright, because on the day a fork ships a copy and a rewrite look identical. A
+   name ban cannot tell them apart either — so the check now asks the question it always meant:
+   does this file DUPLICATE the shared renderers?
+   A copy would carry the same renderer functions. A distinct render layer for a distinct document
+   carries none of them, and the payload keeps arriving through the one shared fetch above. */
+const WTC_APP = join(ROOT, "public", "wtc-app.js");
+ok(existsSync(WTC_APP), "the document's render layer exists on disk");
+const WTC_SRC = existsSync(WTC_APP) ? readFileSync(WTC_APP, "utf8") : "";
+const SHARED_RENDERERS = ["renderPrimeTargets", "renderCeilings", "renderRecompetes",
+  "renderConcentration", "renderSbWinners", "renderIncumbents", "renderSeasonality",
+  "renderBuyingOffices", "renderAll"];
+const duplicated = SHARED_RENDERERS.filter((fn) => WTC_SRC.includes(`function ${fn}`));
+ok(duplicated.length === 0, "it copies NO renderer out of the shared set",
+  duplicated.length ? `forked: ${duplicated.join(", ")}` : `${SHARED_RENDERERS.length} checked`);
+ok(!/window\.DSB\s*=\s*\{/.test(WTC_SRC),
+  "…and it does not fork the data container either — it reads the shared window.DSB");
 
 // One stylesheet, and it is the same file the other page links.
 const sheets = (src: string) =>
@@ -114,12 +142,20 @@ const sheets = (src: string) =>
     .filter((h) => h && !/^https?:|^\/\//.test(h));
 ok(sheets(HTML).includes("/dsb.css") && sheets(SPENDING).includes("/dsb.css"),
   "both pages link the SAME stylesheet", `${sheets(HTML)} vs ${sheets(SPENDING)}`);
-// The panels' rules are reachable from this page, not merely from the other one.
+/* The DOCUMENT's own rules must be reachable from this page. They are inline rather than in
+   dsb.css, which is deliberate: the record has no cards inside it, so none of the widget chrome
+   applies to it, and putting its rules in the shared sheet would ship them to a page that never
+   uses them. pageStyles() reads inline <style> as well as linked files, so this asks whether the
+   rule SHIPS rather than which file it was written in. */
 const CSS = pageStyles("who-to-call.html");
-for (const rule of [".pt-list", ".ch-list", ".rc-list", ".widget", ".w-part"]) {
-  ok(CSS.includes(rule + "{") || CSS.includes(rule + ","),
-    `the page's stylesheet carries ${rule}`);
+for (const rule of [".o4-h", ".o4-hero", ".o4-sum", ".o4-t", ".o4-rec", ".o4-call", ".o4-empty"]) {
+  ok(CSS.includes(rule + "{") || CSS.includes(rule + ",") || CSS.includes(rule + " "),
+    `the page's styles carry ${rule}`);
 }
+/* ⛔ AND THE SHEET IS THE SHIPPING SHELL. The document sits on the platform's app surface as one
+   bordered sheet; without data-shell="sheet" on the root it renders as a bare paper page and the
+   rail stops reading as chrome around a page. */
+ok(/<html[^>]*\bdata-shell="sheet"/.test(HTML), "the root declares the platform sheet shell");
 
 // ── R4 · THE SCOPE IS THE SHARED ONE ─────────────────────────────────────────
 console.log("\nR4  IT READS THE SHARED SCOPE, NOT A LOCAL ONE");
@@ -137,9 +173,17 @@ console.log("\nR5  PLANTED POSITIVES — the split checks can fail");
 const withMapHost = HTML.replace("</body>", '<div id="geoSvg"></div></body>');
 ok(STAYED.filter((id) => withMapHost.includes(`id="${id}"`)).length > 0,
   "a host that should have stayed behind IS detected when planted");
-const withoutPanel = HTML.replace('id="ptList"', 'id="ptListX"');
-ok(MOVED.filter((id) => !withoutPanel.includes(`id="${id}"`)).length > 0,
-  "a missing panel host IS detected when removed");
+/* ⛔ THIS POSITIVE HAD TO BE REBUILT, NOT RE-POINTED. It used to rename `id="ptList"` in the markup
+   and assert the absence was noticed. With the widgets unmounted that string is not in the file, so
+   the replace is a no-op, the filter matches all fifteen ids, and the check passes without testing
+   anything — green for the same reason whether the gate works or not.
+   Both directions are planted against the assertions that now exist: a widget host put BACK, and
+   the document host taken away. */
+const remounted = HTML.replace("</body>", '<div id="ptList"></div></body>');
+ok(MOVED.filter((id) => remounted.includes(`id="${id}"`)).length > 0,
+  "PLANTED: a widget host remounted on this page IS detected");
+const noDoc = HTML.replace('id="o4"', 'id="o4X"');
+ok(!noDoc.includes('id="o4"'), "PLANTED: losing the document host #o4 IS detected");
 // The copy that actually shipped: put one panel host back on the old page.
 const copied = SPENDING_HTML.replace("</body>", '<div id="ptList"></div></body>');
 ok(MOVED.filter((id) => copied.includes(`id="${id}"`)).length > 0,
