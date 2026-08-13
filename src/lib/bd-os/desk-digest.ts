@@ -239,9 +239,20 @@ function deskCmmc(auditRows: Array<Record<string, unknown>> | null, now: number)
 
 /* ── far · FAR/DFARS ──────────────────────────────────────────────────────────
  * The deadline a regulatory change carries is its EFFECTIVE date — the day the
- * customer's obligations change whether or not they read it. A rule that amends
- * no section is a notice, and `affects_clauses` is already a verdict rather than
- * a mention, so it is quoted as-is. */
+ * customer's obligations change whether or not they read it.
+ *
+ * THE CARD MAY NOT SAY "AMENDS". `affects_clauses` on these rows is built from
+ * the title and abstract by a MENTION recognizer, and a mention is not an
+ * amendment: one rule in this corpus carries hundreds of citations and changes
+ * none of them, and another cites a clause only to say a comparable requirement
+ * exists there. The verdict version of that question keys on the amendatory
+ * instruction in the rule's FULL TEXT, which these rows do not carry.
+ *
+ * So the card states what the row supports — which regulation issued it and when
+ * it binds — and offers the clause list as REFERENCES. The empty case says
+ * nothing at all rather than "amends no section": measured over 40 documents the
+ * abstract names a clause on four, so an empty list is overwhelmingly a silent
+ * abstract and not a rule that changes nothing. */
 function deskFar(rules: RegRow[] | null, now: number): DeskSummary {
   if (rules === null) return blank("far", "unavailable", "The Federal Register did not answer.");
   if (rules.length === 0) {
@@ -263,12 +274,14 @@ function deskFar(rules: RegRow[] | null, now: number): DeskSummary {
   }
   const top = dated[0];
   const clauses = Array.isArray(top.r.affects_clauses) ? top.r.affects_clauses : [];
+  const reg = top.r.source === "dfars" ? "DFARS" : "FAR";
   return {
     desk: "far", status: "ok",
     title: cleanTitle(top.r.title) || top.r.link,
-    why: clauses.length > 0
-      ? `Takes effect · amends ${clauses.slice(0, 3).join(", ")}${clauses.length > 3 ? ` +${clauses.length - 3}` : ""}`
-      : "Takes effect · amends no section of the CFR",
+    why: `${reg} rulemaking takes effect`
+       + (clauses.length > 0
+          ? ` · references ${clauses.slice(0, 3).join(", ")}${clauses.length > 3 ? ` +${clauses.length - 3}` : ""}`
+          : ""),
     value, count, days: top.days, urg: urgencyOf(top.days), reason: null
   };
 }

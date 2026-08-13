@@ -147,6 +147,36 @@ console.log("\n── Part C · deadlines: past is not pending, and 0 is not nul
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+console.log("\n── Part C2 · FAR/DFARS states a REFERENCE, never an amendment ──");
+// affects_clauses on these rows comes from a MENTION recognizer over the title
+// and abstract. A rule can cite a clause to say a comparable requirement exists
+// there — the amendment question keys on the amendatory instruction in the full
+// text, which these rows do not carry. A flag is a verdict, not a mention.
+{
+  const rule = (over: Partial<RegRow> = {}): RegRow => ({
+    source: "far", clause: null, title: "Acquisition of commercial products",
+    summary: null, effective_date: iso(9), link: "https://example.gov/1",
+    published_at: iso(-3), affects_clauses: [], ...over,
+  });
+
+  const cited = by(buildDeskDigest(
+    { ...EMPTY, regRules: [rule({ affects_clauses: ["FAR 31.205-26"] })] }, NOW), "far");
+  check("C2a · a cited clause is called a reference", /references/i.test(cited.why || ""), cited.why || "");
+  check("C2b · …and never an amendment", !/amend/i.test(cited.why || ""), cited.why || "");
+
+  const silent = by(buildDeskDigest({ ...EMPTY, regRules: [rule()] }, NOW), "far");
+  check("C2c · an empty clause list claims nothing about what the rule changes",
+    !/amend|no section/i.test(silent.why || ""), silent.why || "");
+  check("C2d · …and still names the regulation and the effective date",
+    /FAR rulemaking takes effect/.test(silent.why || "") && silent.days === 9,
+    `${silent.why} / ${silent.days}`);
+
+  const dfars = by(buildDeskDigest(
+    { ...EMPTY, regRules: [rule({ source: "dfars" })] }, NOW), "far");
+  check("C2e · a DFARS rule is not labelled FAR", /^DFARS/.test(dfars.why || ""), dfars.why || "");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 console.log("\n── Part D · every desk answers, and an unsourced one names its blocker ──");
 {
   const all = buildDeskDigest(EMPTY, NOW);
