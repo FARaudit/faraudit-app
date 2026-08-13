@@ -129,6 +129,9 @@
       // → the render layer prints an em dash, never a zero.
       window.CC.LIVE = {
         user:                  data.user || null,
+        // Did the SAM read ANSWER? An empty window and a failed read are both an
+        // empty array downstream, and every notice count here derives from it.
+        feedAvailable:         data.feedAvailable !== false && Array.isArray(data.opportunities),
         liveCount:             data.liveCount,
         deadlineSoon:          data.deadlineSoon,
         auditsThisMonth:       data.auditsThisMonth,

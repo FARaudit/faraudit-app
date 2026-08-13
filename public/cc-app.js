@@ -62,6 +62,18 @@
     return total + ' active pursuit' + (total === 1 ? '' : 's') + (money ? '' : ' · none carry a stated value');
   }
 
+  // A tile whose number comes from the SAM feed may only describe a feed that
+  // ANSWERED. When it did not, the value is DASH and the foot says why — the same
+  // voice the rail pill and the Week Ahead panel use.
+  function feedFoot(L, whenAnswered) {
+    if (!L) return 'feed not loaded';
+    return L.feedAvailable === false ? 'the SAM.gov feed did not answer' : whenAnswered;
+  }
+  function feedVal(L, v) {
+    if (!L || L.feedAvailable === false) return DASH;
+    return String(num(v) ?? DASH);
+  }
+
   function renderKPIs() {
     const L = window.CC.LIVE;
     const arrow = '<span class="kpi-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M7 17L17 7M9 7h8v8"/></svg></span>';
@@ -70,8 +82,8 @@
     // says why, in the same voice /opportunities uses for absent values.
     const money = L ? fmtMoney(L.pipelineWeightedValue) : null;
     const cards = [
-      { href: '/notices', lbl: 'Live Notices',     val: L ? String(num(L.liveCount) ?? DASH) : DASH,    unit: '',  foot: L ? 'matching your NAICS on SAM.gov' : 'feed not loaded', tone: 'blue' },
-      { href: '/notices', lbl: 'Closing ≤ 7 Days', val: L ? String(num(L.deadlineSoon) ?? DASH) : DASH, unit: '',  foot: L ? 'live notices with a stated deadline' : 'feed not loaded', tone: 'amber' },
+      { href: '/notices', lbl: 'Live Notices',     val: feedVal(L, L && L.liveCount),    unit: '',  foot: feedFoot(L, 'matching your NAICS on SAM.gov'), tone: 'blue' },
+      { href: '/notices', lbl: 'Closing ≤ 7 Days', val: feedVal(L, L && L.deadlineSoon), unit: '',  foot: feedFoot(L, 'live notices with a stated deadline'), tone: 'amber' },
       { href: '/past-audits',   lbl: 'Audits This Month', val: L ? String(num(L.auditsThisMonth) ?? DASH) : DASH, unit: '', foot: L ? 'completed by you' : 'not loaded', tone: 'red' },
       { href: '/pipeline',      lbl: 'Pipeline Value',   val: money ?? DASH, unit: '', foot: pipelineFoot(L), tone: 'green' }
     ];
@@ -90,6 +102,10 @@
       body = `<span class="ib-label">Status</span><b>Your desk data is unavailable.</b> Nothing on this page is sample data — the panels stay empty until the feed answers.`;
     } else if (!L) {
       body = `<span class="ib-label">Status</span>Loading your desks — nothing on this page is sample data.`;
+    } else if (L.feedAvailable === false) {
+      // The feed did not answer. Nothing matched or failed to match, so this may
+      // not describe the window or suggest widening it.
+      body = `<span class="ib-label">Status</span><b>The SAM.gov feed did not answer.</b> Notice counts are unavailable rather than zero — nothing on this page is sample data.`;
     } else {
       const live = num(L.liveCount) ?? 0;
       const soon = num(L.deadlineSoon) ?? 0;
@@ -297,23 +313,30 @@
     }
   }
 
-  // Sidebar badges were three hardcoded counts (past audits, at-risk pipeline,
-  // agencies). All three are real fields on the API response, so they now read
-  // from it — and stay HIDDEN when unknown rather than showing a number nobody
-  // counted. A zero also hides: an empty badge is noise, not information.
+  // Sidebar counts go into the rail's own count slot — <span class="sb-ct"> on a
+  // row, built by renderCount() in src/lib/nav/rail.ts — under that function's
+  // rule: render a live value only, never a zero, never a stale one.
+  function railCount(href, v) {
+    const link = document.querySelector('.sb-step[href="' + href + '"], .sb-icon[href="' + href + '"]');
+    if (!link) return;
+    let el = link.querySelector('.sb-ct');
+    const n = num(v);
+    // A zero is not news and an unknown is not a number: remove the slot rather
+    // than leave a stale count standing (rail.ts renderCount, same rule).
+    if (n === null || n <= 0) { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement('span');
+      el.className = 'sb-ct';
+      const tip = link.querySelector('.sb-tip');
+      if (tip) link.insertBefore(el, tip); else link.appendChild(el);
+    }
+    el.textContent = String(n);
+  }
   function renderSidebarBadges() {
     const L = window.CC.LIVE;
-    const set = (id, v) => {
-      const el = $(id);
-      if (!el) return;
-      const n = num(v);
-      if (n === null || n <= 0) { el.style.display = 'none'; el.textContent = ''; return; }
-      el.textContent = String(n);
-      el.style.display = '';
-    };
-    set('sbAudits',   L ? L.auditTotal : null);
-    set('sbPipeline', L ? L.pipelineAtRisk : null);
-    set('sbAgencies', L ? L.agencyCount : null);
+    railCount('/past-audits', L ? L.auditTotal : null);
+    railCount('/pipeline',    L ? L.pipelineAtRisk : null);
+    railCount('/agencies',    L ? L.agencyCount : null);
   }
 
   function renderAll() { renderDateline(); renderIdentity(); renderSidebarBadges(); renderKPIs(); renderInsight(); renderTabs(); renderFeed(); renderWeek(); renderSignals(); }
