@@ -454,18 +454,25 @@
       (o.notices || []).map(noticeRow));
 
     const ph = phoneParts(o.phone, o.office);
+    /* The note belongs to the NUMBER, so it lives in the number's column rather
+       than under the whole row — centred across both buttons it read as a
+       caption for the email too. */
+    const phoneCtl = ph
+      ? h('a', {
+          cls: 'cop-btn ghost',
+          text: ph.text,
+          attrs: { href: 'tel:' + String(o.phone).replace(/[^0-9+]/g, ''),
+                   title: 'As published by SAM: ' + String(o.phone) }
+        })
+      : h('span', { cls: 'cop-btn ghost', text: 'No phone published', style: 'cursor:default;opacity:.7' });
+    const phoneCol = h('div', { cls: 'cop-phcol' }, [
+      phoneCtl,
+      ph && ph.note ? h('p', { cls: 'cop-phnote', text: ph.note }) : null
+    ]);
     const actions = h('div', { cls: 'cop-actions' }, [
       h('a', { cls: 'cop-btn primary', text: 'Email', attrs: { href: 'mailto:' + o.email } }),
-      ph
-        ? h('a', {
-            cls: 'cop-btn ghost',
-            text: ph.text,
-            attrs: { href: 'tel:' + String(o.phone).replace(/[^0-9+]/g, ''),
-                     title: 'As published by SAM: ' + String(o.phone) }
-          })
-        : h('span', { cls: 'cop-btn ghost', text: 'No phone published', style: 'cursor:default;opacity:.7' })
+      phoneCol
     ]);
-    const phoneNote = ph && ph.note ? h('p', { cls: 'cop-phnote', text: ph.note }) : null;
 
     fill(host, [
       h('div', { cls: 'cop-head' }, [
@@ -480,8 +487,7 @@
       noteBlock('Address', h('span', { cls: 'mono', text: o.email })),
       (o.naics || []).length ? noteBlock('Codes they posted in', naicsChips) : null,
       noteBlock(o.noticeCount + ' notice' + (o.noticeCount === 1 ? '' : 's') + ' in your feed', noticeList),
-      actions,
-      phoneNote
+      actions
     ]);
   }
 
