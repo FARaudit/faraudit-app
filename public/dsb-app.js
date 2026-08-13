@@ -218,16 +218,44 @@
      CURRENT POINT of this same series. As a separate KPI strip they read as an
      independent measurement, and a reader had no way to see that the $30.06B
      is the third bar of every row below it. */
+  /* Three at a time is the lock: a fourth group halves every track and the
+     comparison is between the bars. The picker only appears when there are more
+     than three tracked codes — at exactly three it is a filter over the set
+     already on screen. The selection is a view preference, so it lives in
+     localStorage and a browser that refuses storage simply gets the default. */
+  const SHOW_MAX = 3, PICK_KEY = 'dsb.myoy.codes';
+  let picked = null;
+
+  function trackedCodes() {
+    const T = D.MARKET_TREND || { series: {} };
+    return Object.keys(T.series || {})
+      .sort((a, b) => (last(T.series[b]) || 0) - (last(T.series[a]) || 0));
+  }
+  function readPick(all) {
+    if (picked) return picked;
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(PICK_KEY) || 'null'); } catch (e) { saved = null; }
+    const ok = Array.isArray(saved) ? saved.filter(c => all.indexOf(c) > -1) : [];
+    picked = ok.length ? ok.slice(0, SHOW_MAX) : all.slice(0, SHOW_MAX);
+    return picked;
+  }
+  function writePick() {
+    try { localStorage.setItem(PICK_KEY, JSON.stringify(picked)); } catch (e) { /* storage refused */ }
+  }
+
   function renderMarketYoY() {
     const host = $('myoyBody'); if (!host) return;
-    const T = D.MARKET_TREND || { labels: [], series: {}, open: [] };
+    const T = D.MARKET_TREND || { labels: [], series: {}, open: [], titles: {} };
     const labels = T.labels || [];
     const openFlags = Array.isArray(T.open) ? T.open : [];
-    const codes = Object.keys(T.series || {})
-      .filter(c => !S.code || c === S.code)
-      .sort((a, b) => (last(T.series[b]) || 0) - (last(T.series[a]) || 0));
+    const titles = T.titles || {};
+    const all = trackedCodes();
+    const usePicker = !S.code && all.length > SHOW_MAX;
+    const codes = S.code ? all.filter(c => c === S.code)
+      : usePicker ? readPick(all).slice() : all;
 
-    renderNowFigures();
+    renderPicker(all, usePicker);
+    renderNowFigures(all.length, codes.length, usePicker);
 
     const sub = $('myoySub');
     if (sub) sub.textContent = labels.length
@@ -241,22 +269,29 @@
       return;
     }
 
+    // The last two CLOSED years, both named. The old direction ran first-to-last,
+    // and the last point is a part year — so a code that had grown printed a
+    // double-digit fall. An open year is never an endpoint of a change figure.
+    const closed = labels.map((_, i) => i).filter(i => openFlags[i] !== true);
+    const aIdx = closed.length >= 2 ? closed[closed.length - 2] : -1;
+    const bIdx = closed.length >= 2 ? closed[closed.length - 1] : -1;
+
     setHTML(host, codes.map(code => {
       const vals = T.series[code] || [];
       const max = Math.max.apply(null, vals.map(v => Math.abs(v || 0)).concat([1]));
-      // Direction is first-to-last across the whole series. It is NOT a
-      // forecast and it is NOT annualised: the last point may be a part year,
-      // which is exactly why the bar beside it is marked.
-      const first = vals[0], lastV = last(vals);
-      const chg = first > 0 && lastV != null ? ((lastV - first) / first) * 100 : null;
+      const base = aIdx >= 0 ? vals[aIdx] : null;
+      const head = bIdx >= 0 ? vals[bIdx] : null;
+      const chg = base > 0 && head != null ? ((head - base) / base) * 100 : null;
       const dir = chg == null ? 'flat' : chg > 2 ? 'up' : chg < -2 ? 'down' : 'flat';
-      const dirTxt = chg == null ? 'no prior-year base'
-        : dir === 'flat' ? 'flat across the series'
-        : (chg > 0 ? '▲ ' : '▼ ') + Math.abs(chg).toFixed(0) + '% vs ' + esc(labels[0]);
+      const dirTxt = chg == null ? 'no closed-year pair to compare'
+        : (dir === 'flat' ? 'flat ' : (chg > 0 ? '▲ ' : '▼ ') + Math.abs(chg).toFixed(0) + '% ')
+          + esc(labels[aIdx]) + ' → ' + esc(labels[bIdx]);
       const col = naicsColor[code] || css('--accent');
+      const title = titles[code] || null;
       return '<div class="myoy-r">'
         + '<div class="myoy-rh"><span class="myoy-code">' + esc(code) + '</span>'
         + '<span class="myoy-dir ' + dir + '">' + dirTxt + '</span></div>'
+        + (title ? '<p class="myoy-desc" title="' + esc(title) + '">' + esc(title) + '</p>' : '')
         + labels.map((lb, i) => {
           const v = vals[i] || 0;
           const isOpen = openFlags[i] === true;
@@ -279,17 +314,79 @@
       : 'Every year shown is closed and final.');
   }
 
+  function renderPicker(all, usePicker) {
+    const body = $('myoyBody'); if (!body || !body.parentNode) return;
+    let pick = document.getElementById('myoyPick');
+    if (!usePicker) { if (pick) pick.parentNode.removeChild(pick); return; }
+    if (!pick) {
+      pick = document.createElement('div');
+      pick.className = 'myoy-pick'; pick.id = 'myoyPick';
+      body.parentNode.insertBefore(pick, body);
+    }
+    const shown = readPick(all);
+    setHTML(pick, '<button class="myoy-pick-btn" id="myoyPickBtn" aria-expanded="false">'
+      + '<span class="mp-k">Codes</span>'
+      + shown.map(c => '<span class="mp-chip">' + esc(c) + '</span>').join('')
+      + '<svg class="mp-c" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>'
+      + '<span class="myoy-pick-n">' + shown.length + ' of ' + all.length + ' tracked codes · three at a time</span>'
+      + '<div class="myoy-pop" id="myoyPop" hidden><div class="mp-h"><b>Choose three to compare</b>'
+      + '<span>' + shown.length + ' of ' + SHOW_MAX + ' picked</span></div><ul class="mp-list">'
+      + all.map(c => {
+        const on = shown.indexOf(c) > -1;
+        const off = !on && shown.length >= SHOW_MAX;
+        const t = (D.MARKET_TREND && D.MARKET_TREND.titles && D.MARKET_TREND.titles[c]) || '';
+        return '<li><button type="button" class="mp-row' + (on ? ' on' : '') + (off ? ' off' : '')
+          + '" data-code="' + esc(c) + '"' + (off ? ' disabled' : '') + '><span class="mp-box"></span>'
+          + '<span class="mp-code">' + esc(c) + '</span>'
+          + '<span class="mp-title">' + esc(t) + '</span></button></li>';
+      }).join('')
+      + '</ul><p class="mp-f">Three at a time — deselect one to swap another in.</p></div>');
+
+    const btn = document.getElementById('myoyPickBtn'), pop = document.getElementById('myoyPop');
+    if (!btn || !pop) return;
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = !pop.hidden;
+      pop.hidden = isOpen; btn.setAttribute('aria-expanded', String(!isOpen));
+    });
+    pop.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const row = e.target && e.target.closest ? e.target.closest('.mp-row') : null;
+      if (!row || row.disabled) return;
+      const c = row.getAttribute('data-code'), at = picked.indexOf(c);
+      if (at > -1) picked.splice(at, 1);
+      else if (picked.length < SHOW_MAX) picked.push(c);
+      writePick();
+      renderMarketYoY();
+      const reopened = document.getElementById('myoyPop');
+      if (reopened) reopened.hidden = false;
+    });
+  }
+  if (typeof document !== 'undefined') {
+    document.addEventListener('click', () => {
+      const p = document.getElementById('myoyPop');
+      if (p) p.hidden = true;
+    });
+  }
+
   /* The two figures the page used to carry in a four-up strip. They are the
      current point of the series above, so they are stated with it rather than
      recomputed: `view()` already scopes them to a selected code. */
-  function renderNowFigures() {
+  function renderNowFigures(trackedN, shownN, usePicker) {
     const el = $('myoyNow'); if (!el) return;
     const cards = (view().kpis || []).filter(c => c && c.val != null);
     if (!cards.length) { clear(el); return; }
-    setHTML(el, cards.map(c => '<div class="myoy-now-k" data-tone="' + esc(c.tone) + '">'
-      + '<p class="lbl">' + esc(c.label) + '</p>'
-      + '<div class="v">' + esc(c.val) + '<span>' + esc(c.unit) + '</span></div>'
-      + '<div class="foot">' + esc(c.sub) + '</div></div>').join(''));
+    setHTML(el, cards.map((c, idx) => {
+      // With a picker the headline total and the visible bars describe different
+      // sets, so the footnote says which — otherwise the two silently disagree.
+      const foot = (idx === 0 && usePicker && trackedN)
+        ? trackedN + ' tracked codes · ' + shownN + ' shown · ' + (S.fy || '') + ' to date'
+        : c.sub;
+      return '<div class="myoy-now-k" data-tone="' + esc(c.tone) + '">'
+        + '<p class="lbl">' + esc(c.label) + '</p>'
+        + '<div class="v">' + esc(c.val) + '<span>' + esc(c.unit) + '</span></div>'
+        + '<div class="foot">' + esc(foot) + '</div></div>';
+    }).join(''));
   }
   const last = (a) => (a && a.length ? a[a.length - 1] : null);
 
@@ -586,23 +683,74 @@
     // calendar year — the figure means nothing if July–September is not the
     // fourth quarter.
     const q4 = q.months.filter(m => m.month >= 7 && m.month <= 9).map(m => m.label);
+    // AWARD_ANALYTICS is declared in DOLLARS by PAYLOAD_UNITS; fmtM takes
+    // MILLIONS. Handing it raw dollars prints a number a million times too big.
+    const mo = Array.isArray(q.months) ? q.months : [];
+    const vals = mo.map(m => Math.max(0, Number(m && m.value) || 0));
+    const total = vals.reduce((a, v) => a + v, 0);
+
+    let cal = '';
+    // The headline Q4 figure and the Q4 row state the SAME fact, so they must
+    // come off the SAME arithmetic. Rounding each independently printed 27% in
+    // the figure and 28% in the row beside it — one panel disagreeing with
+    // itself about the number it exists to report.
+    let q4Pct = null;
+    if (mo.length === 12 && total > 0) {
+      // Largest-remainder rounding: the twelve months sum to exactly 100, and
+      // each quarter key is the sum of the three cells beside it, so the row
+      // states its own arithmetic instead of a separately-rounded total.
+      const raw = vals.map(v => (v / total) * 100);
+      const fl = raw.map(Math.floor);
+      const share = fl.slice();
+      const order = raw.map((_, i) => i).sort((a, b) => (raw[b] - fl[b]) - (raw[a] - fl[a]));
+      let rem = 100 - fl.reduce((a, b) => a + b, 0);
+      for (let k = 0; k < order.length && rem > 0; k++, rem--) share[order[k]] += 1;
+      const lo = Math.min.apply(null, share), hi = Math.max.apply(null, share);
+      const step = (v) => Math.min(5, Math.max(1, Math.ceil(((v - lo + 1) / (hi - lo + 1)) * 5)));
+      const QL = [['Q1', 'Oct–Dec'], ['Q2', 'Jan–Mar'], ['Q3', 'Apr–Jun'], ['Q4', 'Jul–Sep']];
+      q4Pct = share[9] + share[10] + share[11];
+      const peakLabel = q.peak ? String(q.peak.label) : null;
+      cal = '<div class="sn-cal">'
+        + '<div class="sn-calh"><span>Fiscal year ' + esc(String(S.fy || '').replace('FY', '')) + ' · Oct → Sep</span>'
+        + '<span class="sn-base">Share of <b>' + esc(fmtM(total / 1e6)) + '</b> largest-award value'
+        + '<i>' + esc(anScope()) + ' · ' + esc(S.fy || '') + ' · not every award</i></span></div>'
+        + QL.map((ql, qi) => {
+          const idx = [qi * 3, qi * 3 + 1, qi * 3 + 2];
+          const isQ4 = qi === 3;
+          return '<div class="sn-q' + (isQ4 ? ' q4' : '') + '">'
+            + '<div class="sn-qk"><b>' + ql[0] + '</b><span>' + ql[1] + '</span>'
+            + '<em>' + idx.reduce((a, i) => a + share[i], 0) + '%</em>'
+            + (isQ4 ? '<span class="sn-qx">Funds expire<br />30 Sep</span>' : '') + '</div>'
+            + '<div class="sn-qm">' + idx.map(i => {
+              const isPeak = peakLabel !== null && mo[i] && String(mo[i].label) === peakLabel;
+              return '<div class="sn-t s' + step(share[i]) + (isPeak ? ' peak' : '') + '">'
+                + '<span class="sn-tm">' + esc(mo[i] ? mo[i].label : '') + '</span>'
+                + '<span class="sn-tv">' + share[i] + '%</span>'
+                + (isPeak ? '<span class="sn-tp">Peak</span>' : '') + '</div>';
+            }).join('') + '</div></div>';
+        }).join('')
+        + '</div>';
+    }
+
     setHTML(host, '<div class="sn-two">'
       + '<div class="sn-fig">'
-      + '<span class="sn-n">' + (q.q4Share != null ? q.q4Share.toFixed(0) + '<i>%</i>' : '—')
+      + '<span class="sn-n">' + (q4Pct != null ? q4Pct + '<i>%</i>'
+        : q.q4Share != null ? q.q4Share.toFixed(0) + '<i>%</i>' : '—')
       + '</span>'
-      + '<span class="sn-k">of sampled value starts in ' + esc(q4.length ? q4[0] + '–' + q4[q4.length - 1] : 'July–September')
+      + '<span class="sn-k">of the largest awards in ' + esc(anScope())
+      + '<span class="sn-k2">starts in ' + esc(q4.length ? q4[0] + '–' + q4[q4.length - 1] : 'July–September') + '</span>'
       + '</span></div>'
       + '<div class="sn-fig">'
       + '<span class="sn-n">' + (q.peak ? esc(q.peak.label) : '—') + '</span>'
       + '<span class="sn-k">is the heaviest month</span></div>'
       + '</div>'
+      + cal
       + '<p class="sn-note">'
       + 'July–September is the fiscal fourth quarter, when unobligated funds '
       + '<b>expire on 30 September</b> — so plan capacity and get bids in before that date, '
       + 'not after it. '
-      + (q.truncated ? 'Counted over the largest awards, so this is when <b>BIG</b> money '
-        + 'moves, not every award. ' : '')
-      + 'Months with no sampled award count as zero rather than being omitted.'
+      + 'Counted over the largest awards, so this is when <b>BIG</b> money moves, not every award. '
+      + 'Months with no award in that set count as zero rather than being omitted.'
       + '</p>');
   }
 
@@ -1276,7 +1424,7 @@
           <span class="sbs-money">${sbDollarsOf(r) > 0 ? fmtM(sbDollarsOf(r)) + ' to small business' : 'none measured'}</span>
           <span class="sbs-dir ${dir}">${esc(dirTxt)}</span></div>
         <div class="sbs-pts">${pts.map(p => `<div class="sbs-pt">
-            <div class="sbs-yr">${esc(p.fy)}${p.open ? ' · to date' : ''}</div>
+            <div class="sbs-yr${p.open ? ' open' : ''}">${esc(p.fy)}${p.open ? ' · to date' : ''}</div>
             <div class="sbs-pct">${p.pct == null ? '<span class="sbs-unknown">—</span>' : p.pct.toFixed(1) + '%'}</div>
             <div class="sbs-meta">${p.pct == null ? 'nothing obligated' : fmtM(p.sb) + ' of ' + fmtM(p.total)}</div>
           </div>`).join('')}</div>
@@ -1385,7 +1533,7 @@
       const rest = ws.slice(SBW_SHOW);
       const restV = rest.reduce((n, w) => n + (w.val || 0), 0);
       const restP = rest.reduce((n, w) => n + (w.pct_of_sb || 0), 0);
-      return `<div class="sbw-code"><b>${esc(r.naics)} · ${esc(r.fy)}</b>
+      return `<div class="sbw-code"><b>${esc(r.naics)} · ${esc(r.fy)}</b><span class="sbw-ch">Set-aside $</span><span class="sbw-ch">Share of SB</span>
           <span>${r.sb_pct == null ? '—' : r.sb_pct.toFixed(1) + '% of the code'} · ${fmtM(r.sb_total)} to small business</span></div>`
         + (shown.length
             ? shown.map(w => `<div class="sbw-row">

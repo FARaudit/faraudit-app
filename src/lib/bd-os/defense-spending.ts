@@ -19,6 +19,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { awardSizeDistribution, primeSubcontractTargets, seasonality, ceilingHeadroom } from "./award-analytics";
+import { naicsTitle } from "../naics-titles";
 import { parseAwardSample } from "./award-analytics";
 import type { UnitManifest } from "./money";
 import type { AwardSample, RawAwardSample, SizeDistribution, PrimeTargets, Seasonality, CeilingHeadroom } from "./award-analytics";
@@ -148,7 +149,10 @@ export interface SpendingPayload {
      which has not happened. No new measurement — the builder already derives
      this for the KPI sub-line; the flag carries it to the panel that must
      state it, instead of leaving the panel to infer it from a sentence. */
-  MARKET_TREND: { labels: string[]; series: Record<string, number[]>; open: boolean[] };
+  /** `titles` is the NAICS description per tracked code. A code is an identifier
+   *  and tells a reader nothing about what is being bought; the title does. Null
+   *  for a code the table does not name — never a guessed description. */
+  MARKET_TREND: { labels: string[]; series: Record<string, number[]>; open: boolean[]; titles: Record<string, string | null> };
   RECOMPETES: Array<RecompeteRow & { naics: string; expired: boolean }>;
   /* FALSE means no row has ever carried recompetes_upcoming, so RECOMPETES is
      empty because nothing was MEASURED — not because the market is quiet. The
@@ -506,7 +510,7 @@ export async function fetchDefenseSpending(
           val: (toM(total) / 1000).toFixed(2),
           unit: "B",
           sub: openFy
-            ? `${tracked.length} tracked code${tracked.length === 1 ? "" : "s"} · ${label} to date · year still open`
+            ? `${tracked.length} tracked code${tracked.length === 1 ? "" : "s"} · ${label} to date`
             : `${tracked.length} tracked code${tracked.length === 1 ? "" : "s"} · ${label}`,
           // NO YEAR-OVER-YEAR ON AN OPEN YEAR. The stored total for the current
           // fiscal year is obligations TO DATE, and Q4 is the heaviest quarter
@@ -711,7 +715,8 @@ export async function fetchDefenseSpending(
     ),
     // Same test the KPI sub-line uses, carried per label rather than buried in
     // a sentence, so the panel can mark the bar instead of guessing.
-    open: years.map((fy) => fy >= currentFy)
+    open: years.map((fy) => fy >= currentFy),
+    titles: Object.fromEntries(tracked.map((code) => [code, naicsTitle(code)]))
   };
 
   // ── SB share by code, every measured year ────────────────────────────────

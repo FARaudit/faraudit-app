@@ -127,33 +127,81 @@ button{font-family:inherit}
    Horizontal bars, one line per fiscal year. Vertical bars would need their own
    value labels above them and cost three times the height to say the same thing.
    The open year is marked in the row itself, not only in the note beneath. */
-.myoy-rows{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px 22px}
+.myoy-rows{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px 46px}
 .myoy-r{display:flex;flex-direction:column;gap:3px;min-width:0}
 .myoy-rh{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:3px}
-.myoy-code{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:800;color:var(--ink)}
+/* Same pill as every other NAICS code on the tab, so a code looks like a code
+   wherever it appears. */
+.myoy-code{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--accent-deep);background:var(--accent-pale);border:1px solid var(--accent-light);border-radius:20px;padding:2px 10px}
+[data-theme="dark"] .myoy-code{color:var(--accent-light);background:rgba(55,138,221,0.18);border-color:rgba(181,212,244,.3)}
 .myoy-dir{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.03em;white-space:nowrap}
 .myoy-dir.up{color:var(--green-700)}.myoy-dir.down{color:var(--red-700)}.myoy-dir.flat{color:var(--mute)}
+/* A code is an identifier, and an identifier tells a reader nothing about what
+   is being bought. The title sits under it, one line, clipped rather than
+   wrapped so the three bar groups start at the same height. */
+.myoy-desc{font-size:10.5px;line-height:1.35;color:var(--mute);margin:0 0 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* CHOOSING WHICH CODES TO COMPARE. Three at a time is the lock: a fourth group
+   halves every track, and the comparison is between the bars. The control only
+   exists when there is something to choose — at three tracked codes it is a
+   filter over the set already shown, which is furniture. */
+.myoy-pick{display:flex;align-items:center;gap:12px;margin:0 0 14px;position:relative;flex-wrap:wrap}
+.myoy-pick-btn{display:flex;align-items:center;gap:7px;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--ink-2);background:var(--card-soft);border:1px solid var(--line);border-radius:9px;padding:5px 10px;cursor:pointer}
+.myoy-pick-btn:hover{border-color:var(--accent-light)}
+.mp-k{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
+.mp-chip{color:var(--accent-deep);background:var(--accent-pale);border:1px solid var(--accent-light);border-radius:20px;padding:1px 8px}
+[data-theme="dark"] .mp-chip{color:var(--accent-light);background:rgba(55,138,221,0.18);border-color:rgba(181,212,244,.3)}
+.mp-c{width:13px;height:13px;color:var(--mute)}
+.myoy-pick-n{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute)}
+.myoy-pop{position:absolute;top:calc(100% + 6px);left:0;z-index:30;width:440px;max-width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:12px}
+.mp-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px}
+.mp-h b{font-size:12.5px;color:var(--ink);font-weight:800}
+.mp-h span{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute)}
+.mp-search{width:100%;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink);background:var(--search-bg);border:1px solid var(--line);border-radius:8px;padding:6px 9px;margin-bottom:6px}
+.mp-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px;max-height:264px;overflow:auto}
+.mp-row{display:grid;grid-template-columns:15px max-content minmax(0,1fr);align-items:center;gap:9px;width:100%;text-align:left;background:none;border:0;border-radius:7px;padding:6px 7px;cursor:pointer}
+.mp-row:hover{background:var(--card-soft)}
+.mp-box{width:14px;height:14px;border:1.5px solid var(--mute-2);border-radius:4px}
+.mp-row.on .mp-box{background:var(--accent);border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--card)}
+.mp-code{font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:700;color:var(--ink)}
+.mp-title{font-size:11.5px;color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mp-row.off{opacity:.45;cursor:not-allowed}
+.mp-f{font-size:10.5px;color:var(--mute);margin:8px 0 0;padding-top:8px;border-top:1px solid var(--line)}
+.myoy-fake{font-family:"IBM Plex Mono",monospace;font-style:normal;font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--amber-800);background:var(--amber-50);border:1px solid var(--amber-200);border-radius:4px;padding:0 4px;margin-left:5px}
+[data-theme="dark"] .myoy-fake{color:#fcd34d;background:rgba(252,211,77,.1);border-color:rgba(252,211,77,.3)}
 [data-theme="dark"] .myoy-dir.up{color:#6ee7b7}[data-theme="dark"] .myoy-dir.down{color:#fca5a5}
-.myoy-y{display:grid;grid-template-columns:30px minmax(0,1fr) 60px 46px;gap:8px;align-items:center}
+.myoy-y{display:grid;grid-template-columns:30px minmax(0,1fr) 64px 52px;gap:12px;align-items:center;padding:3px 6px;margin:0 -6px;border-radius:6px}
 .myoy-yl{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--mute)}
-.myoy-track{height:9px;border-radius:3px;background:var(--line-2);overflow:hidden}
+.myoy-track{height:8px;border-radius:3px;background:var(--line-2);overflow:hidden}
 .myoy-track i{display:block;height:100%;border-radius:3px}
 .myoy-yv{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:800;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums}
 .myoy-yt{font-family:"IBM Plex Mono",monospace;font-size:8.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--mute)}
-/* AN OPEN YEAR IS NOT A SHORT YEAR. The hatch says the bar is still filling, so
-   the drop into it is not read as a measured decline. */
-.myoy-y.open .myoy-track i{background-image:repeating-linear-gradient(115deg,rgba(255,255,255,.55) 0 4px,transparent 4px 9px)}
+/* AN OPEN YEAR IS NOT A SHORT YEAR. The row is banded and its track is drawn as
+   an unclosed frame, so the drop into it is not read as a measured decline.
+   The marking sits on the ROW and the TRACK: the fill carries an inline colour,
+   and an inline background shorthand outranks anything set here. */
+.myoy-y.open{background:var(--amber-50);box-shadow:inset 0 0 0 1px var(--amber-200)}
+[data-theme="dark"] .myoy-y.open{background:rgba(252,211,77,.09);box-shadow:inset 0 0 0 1px rgba(252,211,77,.22)}
+.myoy-y.open .myoy-track{position:relative;background:transparent}
+.myoy-y.open .myoy-track::after{content:"";position:absolute;inset:0;border:1.5px dashed var(--amber-600);border-radius:3px;pointer-events:none}
+[data-theme="dark"] .myoy-y.open .myoy-track::after{border-color:rgba(252,211,77,.6)}
+.myoy-y.open .myoy-yl{color:var(--ink);font-weight:800}
 .myoy-y.open .myoy-yt{color:var(--amber-700);font-weight:700}
 [data-theme="dark"] .myoy-y.open .myoy-yt{color:#fcd34d}
-[data-theme="dark"] .myoy-y.open .myoy-track i{background-image:repeating-linear-gradient(115deg,rgba(5,13,26,.55) 0 4px,transparent 4px 9px)}
 .myoy-note{font-size:11.5px;line-height:1.55;color:var(--mute);margin:12px 2px 0}
 .myoy-note b{color:var(--ink-2);font-weight:700}
 /* The two headline figures, in the header of the series they are the last point
    of. As a separate strip they read as an independent measurement. */
-.myoy-now{display:flex;gap:22px;flex-shrink:0}
-.myoy-now-k{display:flex;flex-direction:column;gap:3px;align-items:flex-end;text-align:right}
+/* One pill each, on equal tracks. The note sits under a rule pinned to the
+   figure, so a note that wraps cannot carry the rule out of line with its pair. */
+/* width:max-content on equal tracks sizes both pills to the WIDER of the two
+   contents: equal boxes with no slack beyond what equality costs. */
+.myoy-now{display:grid;grid-template-columns:repeat(2,1fr);width:max-content;margin-left:auto;gap:10px;align-items:stretch}
+.myoy-now-k{display:grid;grid-template-columns:max-content minmax(0,1fr);align-items:baseline;gap:1px 11px;text-align:left;background:var(--card-soft);border:1px solid var(--line);border-radius:12px;padding:9px 14px 10px}
+.myoy-now-k .v{grid-column:1;grid-row:1}
+.myoy-now-k .lbl{grid-column:2;grid-row:1;white-space:nowrap}
+.myoy-now-k .foot{grid-column:1/-1;grid-row:2;border-top:1px solid var(--line);margin-top:6px;padding-top:6px;width:100%;line-height:1.4;white-space:nowrap}
 .myoy-now-k .lbl{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--mute);margin:0}
-.myoy-now-k .v{font-family:"Manrope",sans-serif;font-size:27px;font-weight:800;letter-spacing:-.03em;color:var(--ink);line-height:1;display:flex;align-items:baseline;gap:2px}
+.myoy-now-k .v{font-family:"Manrope",sans-serif;font-size:24px;font-weight:800;letter-spacing:-.03em;color:var(--ink);line-height:1;display:flex;align-items:baseline;gap:2px}
 .myoy-now-k .v span{font-size:14px;font-weight:700;color:var(--mute)}
 .myoy-now-k[data-tone="amber"] .v{color:var(--amber-700)}
 [data-theme="dark"] .myoy-now-k[data-tone="amber"] .v{color:#fcd34d}
@@ -167,9 +215,14 @@ button{font-family:inherit}
    as a panel that failed to load. */
 .row.top{align-items:start}
 .row.hero{grid-template-columns:1.62fr 1fr}
+/* Squared to the row above, and the two cards run to the same depth: the calendar
+   grows to fill instead of the card being padded out under it. */
+.row.hero-sq{grid-template-columns:1fr 1fr}
+/* Squared to the row above it: two rows of two panels share one column edge. */
+.row.hero.top{grid-template-columns:1fr 1fr}
 .row.two{grid-template-columns:1fr 1fr}
 .row.three{grid-template-columns:1fr 1fr 1fr}
-@media(max-width:1180px){.row.hero,.row.two,.row.three{grid-template-columns:1fr}}
+@media(max-width:1180px){.row.hero,.row.hero-sq,.row.two,.row.three{grid-template-columns:1fr}}
 .widget{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-sm);padding:18px 20px;display:flex;flex-direction:column;gap:14px;overflow:hidden;min-width:0}
 .widget-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-shrink:0}
 .wh-left{display:flex;align-items:flex-start;gap:11px;min-width:0}
@@ -205,7 +258,7 @@ button{font-family:inherit}
    The ratio is the old hero row's, kept so the map keeps its drawing area. */
 .geo-split{display:grid;grid-template-columns:1.62fr 1fr;gap:18px;align-items:start;min-width:0}
 @media(max-width:1180px){.geo-split{grid-template-columns:1fr}}
-.geo-tools{display:flex;align-items:center;gap:14px;flex-shrink:0}
+.geo-tools{display:flex;align-items:center;gap:26px;flex-shrink:0}
 .geo-total{display:flex;flex-direction:column;align-items:flex-end;gap:1px;text-align:right}
 .geo-total b{font-family:"Manrope",sans-serif;font-size:16px;font-weight:800;letter-spacing:-.02em;color:var(--ink);line-height:1.1}
 .geo-total span{font-size:10px;color:var(--mute);line-height:1.3}
@@ -237,7 +290,10 @@ button{font-family:inherit}
 .rank-list{display:flex;flex-direction:column;gap:2px;overflow-y:auto;max-height:460px;padding-right:2px}
 /* ONE LINE PER STATE. The abbreviation used to sit on the row above its own
    full name — the same fact twice, at double the height. */
-.rank-row{display:grid;grid-template-columns:18px 26px minmax(0,1fr) 62px 56px 40px;gap:8px;align-items:center;padding:5px 8px;border-radius:8px;cursor:pointer;border:1px solid transparent;transition:background .12s,border-color .12s}
+/* The name takes a fixed track and the BAR takes the slack: a 1fr name column
+   left a gap between the two on every row. Fixed, not max-content, because each
+   row is its own grid and the columns must line up down the list. */
+.rank-row{display:grid;grid-template-columns:18px 24px 112px minmax(0,1fr) 58px 40px;gap:8px;align-items:center;padding:5px 8px;border-radius:8px;cursor:pointer;border:1px solid transparent;transition:background .12s,border-color .12s}
 .rank-row:hover{background:var(--card-soft)}
 .rank-row.selected{background:var(--accent-pale);border-color:var(--accent-light)}
 [data-theme="dark"] .rank-row.selected{background:rgba(55,138,221,0.16)}
@@ -302,7 +358,10 @@ button{font-family:inherit}
 /* ── small-business share by code, and concentration ── */
 .sbs-row{padding:11px 0;border-bottom:1px solid var(--line-2)}
 .sbs-row:last-child{border-bottom:0}
-.sbs-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:7px}
+/* THE HEADER ROW IS A BAND. Code, dollars and direction unbanded read as one
+   run of text, so the reader has to find where the code ends. */
+.sbs-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:9px;padding:7px 10px;background:var(--line-3);border:1px solid var(--line);border-radius:8px}
+[data-theme="dark"] .sbs-head{background:rgba(255,255,255,.055)}
 .sbs-money{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:800;color:var(--ink);letter-spacing:.01em;margin-left:8px}
 [data-theme="dark"] .sbs-money{color:var(--ink)}
 /* PILL TREATMENT on the code, the year and the percent. Three monospace strings
@@ -316,12 +375,25 @@ button{font-family:inherit}
    in the theme it was never checked in. */
 [data-theme="dark"] .sbs-dir.up{color:#6ee7b7}[data-theme="dark"] .sbs-dir.down{color:#fcd34d}
 .sbs-pts{display:flex;gap:8px}
-.sbs-pt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
-.sbs-yr{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2);background:var(--line-3);border-radius:5px;padding:2px 6px;align-self:flex-start;white-space:nowrap}
+.sbs-pt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;align-items:center;text-align:center}
+.sbs-yr{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2);background:var(--line-3);border-radius:5px;padding:2px 6px;white-space:nowrap}
 [data-theme="dark"] .sbs-yr{background:rgba(255,255,255,.06)}
 .sbs-meta{font-family:"IBM Plex Mono",monospace;font-size:9px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sbs-pct{font-family:"IBM Plex Mono",monospace;font-size:16px;font-weight:800;color:var(--ink);letter-spacing:-.02em}
+/* The open year carries the same banding here as it does on the bars above, so
+   one marking means one thing across the tab. The open point is the last one in
+   the series; a class on the cell would be firmer than its position. */
+/* The chip alone. Its two neighbours are grey chips in the same place, so an
+   amber one is already the difference; a tint behind it states the same thing a
+   second time and louder. */
+.sbs-pt:last-child .sbs-yr{background:var(--amber-100);color:var(--amber-800)}
+[data-theme="dark"] .sbs-pt:last-child .sbs-yr{background:rgba(252,211,77,.18);color:#fcd34d}
 .sbs-unknown{color:var(--mute);font-style:italic}
+/* The two long captions carry an info mark and an indent, so they read as notes
+   against the panel rather than as more of its body copy. Stated in full: these
+   are the caveats that stop the figures being misread. */
+.sbs-cap,.sbw-note{position:relative;padding-left:26px}
+.sbs-cap::before,.sbw-note::before{content:"i";position:absolute;left:0;top:9px;width:16px;height:16px;border-radius:50%;border:1.5px solid var(--mute-2);color:var(--mute);font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:800;display:grid;place-items:center;font-style:normal}
 .sbs-cap{font-size:10.5px;color:var(--mute);line-height:1.55;padding-top:10px}
 .sbs-cap b{color:var(--ink-2);font-weight:700}
 /* CONCENTRATION IS A NUMBER, NOT FIVE BANDS. The percentage was the finding; the
@@ -336,12 +408,19 @@ button{font-family:inherit}
 .conc-lead b{color:var(--ink);font-weight:700}
 .conc-note{font-size:10px;color:var(--mute);line-height:1.5;padding-top:9px}
 /* ── small businesses winning in each code ── */
-.sbw-code{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:11px 0 6px;border-bottom:1px solid var(--line-2)}
+.sbw-code{display:grid;grid-template-columns:1fr 78px 66px;gap:10px;align-items:baseline;padding:7px 10px;margin:12px 0 4px;background:var(--line-3);border:1px solid var(--line);border-radius:8px}
+[data-theme="dark"] .sbw-code{background:rgba(255,255,255,.055)}
+.sbw-code:first-child{margin-top:2px}
 .sbw-code b{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--ink)}
 .sbw-code span{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--mute)}
-.sbw-row{display:grid;grid-template-columns:1fr 70px 48px;gap:10px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--line-2)}
+/* The column names ride the band rather than sitting once at the top: three code
+   groups deep, a reader has lost what the two numbers are. */
+.sbw-ch{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--mute);text-align:right;white-space:nowrap}
+.sbw-row{display:grid;grid-template-columns:1fr 78px 66px;gap:10px;align-items:baseline;padding:5px 8px 5px 0;border-bottom:1px solid var(--line-2)}
 .sbw-row:last-child{border-bottom:0}
-.sbw-nm{font-size:11.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The names sit UNDER a banded header, so they carry no weight of their own and
+   are inset from it: the band reads as a group heading, not another row. */
+.sbw-nm{font-size:11.5px;font-weight:450;color:var(--ink-2);padding-left:28px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sbw-v{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--accent-deep);text-align:right}
 /* --accent-deep is a LIGHT-THEME ink. On the dark card it measured 2.65:1 —
    every set-aside dollar figure in the panel, invisible in one theme. */
@@ -352,7 +431,7 @@ button{font-family:inherit}
 .sbw-row.rest .sbw-v{color:var(--mute)}
 .sbw-note{font-size:10px;color:var(--mute);line-height:1.5;padding-top:9px}
 /* Two unlabelled numeric columns read as one figure and its footnote. */
-.sbw-head{display:grid;grid-template-columns:1fr 70px 48px;gap:10px;padding:0 0 6px;border-bottom:1.5px solid var(--line)}
+.sbw-head{display:grid;grid-template-columns:1fr 78px 66px;gap:10px;padding:0 8px 6px 0;border-bottom:1.5px solid var(--line)}
 .sbw-head span{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
 .sbw-head span:nth-child(2),.sbw-head span:nth-child(3){text-align:right}
 /* THE DEPARTMENTS, IN ONE LINE. A ranked block whose second bar is invisible is
@@ -657,13 +736,87 @@ a.rc-row:hover .rc-name{color:var(--accent-deep)}
 /* WHEN THE MONEY MOVES — two numbers, where twelve bars used to be. The whole
    payload of the panel was a share and a month name; the grid drew them at four
    times the height and made the reader squint the peak out of a column. */
-.sn-two{display:flex;gap:34px;flex-wrap:wrap;align-items:flex-end;padding:2px 2px 0}
-.sn-fig{display:flex;flex-direction:column;gap:3px;min-width:0}
-.sn-n{font-family:"Manrope",sans-serif;font-size:34px;font-weight:800;letter-spacing:-.035em;line-height:1;color:var(--ink)}
-.sn-n i{font-style:normal;font-size:18px;font-weight:700;color:var(--mute);margin-left:1px}
-.sn-k{font-size:11.5px;line-height:1.4;color:var(--mute)}
+.sn-two{display:grid;grid-template-columns:1fr 1fr;background:var(--card-soft);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:2px}
+.sn-fig{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;min-width:0;padding:16px 18px 15px}
+.sn-fig+.sn-fig{border-left:1px solid var(--line)}
+.sn-n{font-family:"Manrope",sans-serif;font-size:44px;font-weight:800;letter-spacing:-.04em;line-height:.95;color:var(--ink)}
+.sn-n i{font-style:normal;font-size:20px;font-weight:700;color:var(--mute);margin-left:2px}
+/* The base on one line, the period on the next: a denominator and a date range
+   are two facts, and letting them run together is what broke "Jul–Sep" across
+   a wrap. Both lines are nowrap, so neither can split mid-phrase. */
+/* The figure's caption names WHOSE money and WHEN — two short lines, both in the
+   UI face. The dollar base is stated once, at the calendar head, rather than a
+   second time here: two long lines under the figure read as a console line, not
+   as a caption. */
+.sn-k{font-size:11.5px;line-height:1.4;color:var(--ink-2);display:block;white-space:nowrap}
+.sn-k2{display:block;margin-top:2px;font-size:11.5px;line-height:1.4;font-weight:600;color:var(--mute);white-space:nowrap}
 .sn-note{font-size:11.5px;line-height:1.55;color:var(--mute);margin:12px 2px 0}
 .sn-note b{color:var(--ink-2);font-weight:650}
+/* THE FISCAL YEAR AS A CALENDAR. The question this panel answers is WHEN, so the
+   instrument is a year, not a chart: four quarters down, three months across,
+   each month a cell carrying its own share. A bar list would have been the sixth
+   bar list on the tab and would have said nothing about quarters — and the
+   quarter is what a capacity decision is actually made against.
+   Magnitude is carried by TINT WEIGHT, not by length, so the whole year is read
+   as a field at a glance and the individual figure is still stated in every cell. */
+.sn-cal{margin-top:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;flex:1}
+/* The calendar takes the slack, so a taller neighbour makes the months breathe
+   rather than leaving a hole under them. */
+#snBody{display:flex;flex-direction:column;flex:1;min-height:0}
+.sn-q{flex:1}
+.sn-calh{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:8px 12px;background:var(--card-soft);border-bottom:1px solid var(--line);font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--mute)}
+.sn-q{display:grid;grid-template-columns:1fr 3fr;align-items:stretch}
+.sn-q+.sn-q{border-top:1px solid var(--line)}
+/* The quarter key is a summary of the three cells beside it and nothing else —
+   its share is their sum, so the row states its own arithmetic. */
+.sn-qk{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:2px;padding:10px 12px;border-right:1px solid var(--line);background:var(--card-soft)}
+.sn-qk b{font-family:"Manrope",sans-serif;font-size:15px;font-weight:800;letter-spacing:-.02em;color:var(--ink);line-height:1}
+.sn-qk span{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--mute)}
+.sn-qk em{font-family:"IBM Plex Mono",monospace;font-style:normal;font-size:12px;font-weight:700;color:var(--ink-2);font-variant-numeric:tabular-nums;margin-top:3px}
+.sn-qm{display:grid;grid-template-columns:repeat(3,1fr)}
+.sn-t{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:4px;padding:11px 12px;min-width:0}
+.sn-tp{align-self:center}
+.sn-t+.sn-t{border-left:1px solid var(--line)}
+.sn-tm{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
+.sn-tv{font-family:"IBM Plex Mono",monospace;font-size:17px;font-weight:700;color:var(--ink-2);letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums}
+/* Five steps over the year's own range. Ink text throughout — the tint never
+   goes dark enough to need a light foreground, so no cell can fall below AA. */
+.sn-t.s1{background:transparent}
+.sn-t.s2{background:rgba(55,138,221,.07)}
+.sn-t.s3{background:rgba(55,138,221,.13)}
+.sn-t.s4{background:rgba(55,138,221,.2)}
+.sn-t.s5{background:rgba(55,138,221,.28)}
+[data-theme="dark"] .sn-t.s2{background:rgba(55,138,221,.09)}
+[data-theme="dark"] .sn-t.s3{background:rgba(55,138,221,.16)}
+[data-theme="dark"] .sn-t.s4{background:rgba(55,138,221,.24)}
+[data-theme="dark"] .sn-t.s5{background:rgba(55,138,221,.34)}
+.sn-t.s4 .sn-tv,.sn-t.s5 .sn-tv{color:var(--ink)}
+/* The heaviest month, named as a figure above. Marked in ink and weight, and
+   labelled — the tint alone would only say "a lot", not "the most". */
+.sn-t.peak .sn-tv{color:var(--ink);font-weight:800;font-size:19px}
+.sn-t.peak .sn-tm{color:var(--accent-deep)}
+[data-theme="dark"] .sn-t.peak .sn-tm{color:var(--accent-light)}
+.sn-tp{font-family:"IBM Plex Mono",monospace;font-size:8px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-deep);border:1px solid var(--accent-200,rgba(55,138,221,.35));border-radius:4px;padding:1px 4px;align-self:flex-start}
+[data-theme="dark"] .sn-tp{color:var(--accent-light);border-color:rgba(55,138,221,.4)}
+/* The fourth quarter is the panel's finding, so the row carries a rule at its
+   edge and the deadline that makes it the finding. The 27% above is this row's
+   own sum — the reader can add the three cells and get there. */
+.sn-q.q4 .sn-qk{border-left:3px solid var(--accent-deep);padding-left:9px}
+.sn-q.q4 .sn-qk b,.sn-q.q4 .sn-qk em{color:var(--accent-deep)}
+[data-theme="dark"] .sn-q.q4 .sn-qk{border-left-color:var(--accent)}
+[data-theme="dark"] .sn-q.q4 .sn-qk b,[data-theme="dark"] .sn-q.q4 .sn-qk em{color:var(--accent-light)}
+.sn-qx{font-family:"IBM Plex Mono",monospace;font-size:8px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--accent-deep);margin-top:4px;line-height:1.3}
+[data-theme="dark"] .sn-qx{color:var(--accent-light)}
+/* Every percentage in this calendar divides into ONE amount, and that amount is
+   stated once, here. $30.06B on the tab is ALL obligations in the codes; this
+   panel counts only the largest awards, and the relationship between the two is
+   Code's to state, so it is not asserted. */
+.sn-calh{align-items:flex-start}
+.sn-base{text-align:right;line-height:1.45}
+.sn-base b{color:var(--ink-2);font-weight:700}
+.sn-base i{display:block;font-style:normal;font-weight:600;color:var(--mute-2);text-transform:none;letter-spacing:.02em;font-size:8.5px;margin-top:2px}
+.sn-base .ph,.sn-k .ph{color:#b45309;font-weight:800}
+[data-theme="dark"] .sn-base .ph,[data-theme="dark"] .sn-k .ph{color:#fcd34d}
 .pt-list{display:flex;flex-direction:column;gap:1px}
 .pt-r{display:grid;grid-template-columns:minmax(0,1fr) 92px;gap:12px;align-items:baseline;padding:8px;border-radius:8px}
 .pt-r:hover{background:var(--card-soft)}
