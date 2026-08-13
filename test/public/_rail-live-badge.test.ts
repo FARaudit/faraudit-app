@@ -257,7 +257,11 @@ console.log("\n── Part H · card 807 workflow rail ──");
 
   // The collapse control must keep the id that 18 pages bind from OUTSIDE the replaced aside.
   check("collapse control keeps id=sbToggle", /id="sbToggle"/.test(R), "renaming it breaks collapse on every page");
-  check("rail does not re-bind faraudit-sb", !/faraudit-sb/.test(J), "double-binding makes every click a no-op");
+  // QUOTE-EXACT, not a bare substring: the key this guards is 'faraudit-sb', and a
+  // substring test also condemns every longer key that merely starts with it —
+  // 'faraudit-rail-sections' was renamed away from 'faraudit-sb-sections' for this
+  // reason, but the next such key should fail review, not this gate.
+  check("rail does not re-bind faraudit-sb", !/['"]faraudit-sb['"]/.test(J), "double-binding makes every click a no-op");
 
   check("3 collapsible sections, Readiness open", (R.match(/class="sb-sec"/g) || []).length === 3 && (R.match(/data-open="true"/g) || []).length === 1);
   check("the active page's section is forced open", (renderRail("naics").match(/data-open="true"/g) || []).length === 2, "landing in a collapsed section hides the active row");

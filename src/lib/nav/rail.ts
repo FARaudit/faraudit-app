@@ -167,6 +167,13 @@ function row(it: RailItem, activeKey: string, counts: RailCounts, cls: "sb-step"
   );
 }
 
+/** Stable per-section key for the stored open/closed state. Derived from the label,
+ *  so a section renamed in SECTIONS forgets its old state rather than inheriting a
+ *  neighbour's — which is the right failure: it reverts to defaultOpen. */
+function secSlug(label: string): string {
+  return label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
 export function renderRail(activeKey: string, counts: RailCounts = {}): string {
   const todayActive = activeKey === "today" ? " active" : "";
   const flow = WORKFLOW.map((it) => row(it, activeKey, counts, "sb-step")).join("\n    ");
@@ -176,8 +183,12 @@ export function renderRail(activeKey: string, counts: RailCounts = {}): string {
     // landing on Contracting Officers shows a collapsed rail with nothing highlighted.
     const open = sec.defaultOpen || sec.items.some((it) => it.key === activeKey);
     const rows = sec.items.map((it) => row(it, activeKey, counts, "sb-icon")).join("\n      ");
+    // The active section OPENS regardless of the stored preference — a rail that hid
+    // the highlight for the page you are on would be worse than one that forgets.
+    // data-active is what tells the restore script below to leave this one alone.
+    const holdsActive = sec.items.some((it) => it.key === activeKey);
     return (
-      `  <div class="sb-sec" data-open="${open}">\n` +
+      `  <div class="sb-sec" data-sec="${secSlug(sec.label)}"${holdsActive ? ' data-active="true"' : ""} data-open="${open}">\n` +
       `    <button class="sb-sech" type="button" aria-expanded="${open}"><span>${esc(sec.label)}</span>` +
       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></button>\n` +
       `    <div class="sb-secb">\n      ${rows}\n    </div>\n` +
@@ -228,7 +239,20 @@ export function renderRail(activeKey: string, counts: RailCounts = {}): string {
     `      <form action="/api/auth/sign-out" method="post" style="display:contents"><button type="submit" class="sb-am-item sb-am-signout" role="menuitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${I.signout}</svg>Sign out</button></form>\n` +
     `    </div>\n` +
     `  </div>\n` +
-    `</aside>`
+    `</aside>` +
+    /* RESTORE THE STORED SECTION STATE, INLINE AND IMMEDIATELY AFTER THE RAIL.
+       Not in railScript() at the end of <body>: .sb-secb animates max-height, so a
+       section restored after first paint visibly swings shut. Parsed here it applies
+       while the parser is still inside <body>, before the rail's subtree is painted.
+       Skips [data-active] — the section holding the current page always shows, which
+       is the rule renderRail() already applies server-side. */
+    `<script>(function(){try{var m=JSON.parse(localStorage.getItem('faraudit-rail-sections')||'{}');` +
+    `document.querySelectorAll('.sb-sec[data-sec]').forEach(function(s){` +
+    `if(s.hasAttribute('data-active'))return;` +
+    `var v=m[s.getAttribute('data-sec')];if(v!==true&&v!==false)return;` +
+    `s.setAttribute('data-open',String(v));` +
+    `var h=s.querySelector('.sb-sech');if(h)h.setAttribute('aria-expanded',String(v));});` +
+    `}catch(e){}})();</script>`
   );
 }
 
@@ -358,7 +382,12 @@ export function railScript(): string {
     `document.addEventListener('click',function(e){if(!e.target.closest)return;` +
     `var h=e.target.closest('.sb-sech');if(!h)return;var s=h.closest('.sb-sec');if(!s)return;` +
     `var o=s.getAttribute('data-open')==='true';s.setAttribute('data-open',String(!o));` +
-    `h.setAttribute('aria-expanded',String(!o));syncInert();});` +
+    `h.setAttribute('aria-expanded',String(!o));` +
+    // Remember it. Without this the control was cosmetic: the rail re-renders from
+    // defaultOpen on every navigation, so opening a section lasted until the next click.
+    `try{var K='faraudit-rail-sections',m=JSON.parse(localStorage.getItem(K)||'{}');` +
+    `var k=s.getAttribute('data-sec');if(k){m[k]=!o;localStorage.setItem(K,JSON.stringify(m));}}catch(e){}` +
+    `syncInert();});` +
     // ── INERT ───────────────────────────────────────────────────────────────────
     // max-height:0 hides pixels but NOT focus, so a collapsed section left its links
     // in the tab order. But data-open only means anything in the OPEN rail: collapsed,
