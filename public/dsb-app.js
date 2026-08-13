@@ -834,7 +834,12 @@
       ? 'https://www.usaspending.gov/search/?hash=&query=' + encodeURIComponent(r.award_id) : null;
     const inner = '<span class="rc-when' + (opts.dim ? ' dim' : '') + '">'
       + '<b class="rc-d">' + esc(rcIso(r.end_date)) + '</b>'
-      + '<i class="rc-dd">' + rcDays(r.end_date) + ' days</i></span>'
+      /* ⛔ NOT RENDERED AT ALL ON A REPEAT, rather than painted transparent. The
+         old rule set color:transparent, which is text at 1.00:1 — invisible to the
+         reader and still ANNOUNCED to a screen reader, so the one audience that
+         could not see the duplicate was the one that heard it twice. */
+      + (opts.dim ? '' : '<i class="rc-dd">' + rcDays(r.end_date) + ' days</i>')
+      + '</span>'
       + '<span class="rc-name">' + esc(opts.inBlock ? r.award_id : rcTc(r.recipient)) + '</span>'
       + '<span class="rc-val">' + rcAcct(r.amount) + '</span>'
       + '<span class="rc-sub">' + (opts.inBlock ? 'NAICS ' + esc(r.naics)
@@ -874,8 +879,8 @@
   function rcCall(r) {
     const office = r && r.office;
     if (!office) {
-      return '<div class="rc-call none">No buying office recorded on this award, '
-        + 'so there is no office to look up.</div>';
+      return '<div class="rc-call none"><span class="rc-call-x">no buying office on this award'
+        + '</span></div>';
     }
     const box = D.OFFICERS || { state: 'loading', offices: {} };
     const head = '<span class="rc-call-o">' + esc(office) + '</span>';
@@ -888,9 +893,14 @@
         + 'no officers.</div>';
     }
     const list = (box.offices || {})[office] || [];
+    /* ⛔ THE OFFICE STILL SHOWS. It is the only fact this row has about who signs,
+       and dropping it would make a looked-up row look like one never looked up —
+       the four states have to stay apart. What does NOT repeat is the sentence
+       explaining it: measured on 21 live rows, ten carried this same explanation
+       at 36px each. The chip states the fact; the panel foot states it once. */
     if (!list.length) {
-      return '<div class="rc-call none">' + head + ' · no officer at this office has posted '
-        + 'a notice in your codes recently, so we hold no contact for it.</div>';
+      return '<div class="rc-call none">' + head
+        + '<span class="rc-call-x">no contact held</span></div>';
     }
     const shown = list.slice(0, RC_CALL_SHOW);
     return '<div class="rc-call">' + head
@@ -954,7 +964,7 @@
 
     if (!rows.length) {
       setHTML(list, D.RECOMPETES_MEASURED ? rcEmpty() : rcUnmeasured());
-      ['#viz', '#cap', '#lede', '.rc-foot', '.rc-head2'].forEach(s => off(s, true));
+      ['#lede', '.rc-foot', '.rc-head2'].forEach(s => off(s, true));
       return;
     }
 
@@ -976,7 +986,7 @@
     const summarise = rows.length >= 3 && holders.length < rows.length;
     const order = (a, b) => b.rows.length - a.rows.length || b.v - a.v;
 
-    ['#viz', '#cap', '#lede'].forEach(s => off(s, !summarise));
+    ['#lede'].forEach(s => off(s, !summarise));
     off('.rc-foot', false); off('.rc-head2', false);
 
     let h = '';
@@ -1022,35 +1032,16 @@
         + (rows.length === 1 ? 'row below is' : 'rows below are') + ' the whole finding.');
     }
 
+    /* ⛔ THE UNIT CHART SAID WHAT ONE CLAUSE SAYS. It drew a row per firm with a
+       block per contract — measured, two firms at four and two, fifteen at one
+       each — under a caption explaining how to read it. Chart plus caption cost
+       123px to carry "two firms hold six of the twenty-one; the other fifteen hold
+       one each", which is a sentence. It is now that sentence, in the lede that was
+       already stating the other three facts about this set. */
     if (summarise) {
       const multi = blocks.slice().sort(order);
       const rest = holders.filter(x => x.rows.length === 1);
-      const restV = rest.reduce((n, x) => n + x.v, 0);
-      const vs = multi.map(x => x.v).concat(restV ? [restV] : []);
-      const lo = Math.log10(Math.max(1, Math.min.apply(null, vs)));
-      const hi = Math.log10(Math.max(1, Math.max.apply(null, vs)));
-      // Blocks = contracts held by one firm. A bar chart topping out at four is
-      // a unit count pretending to be a scale, so the unit channel draws units.
-      const units = (n) => '<span class="cf-u">' + new Array(n + 1).join('<i></i>') + '</span>';
-      let cf = multi.map(x => '<div class="cf-r" data-n="' + x.rows.length + '">'
-        + '<span class="cf-rk">' + esc(rcTc(x.k)) + '</span>' + units(x.rows.length)
-        + '<span class="cf-meta"><span class="cf-rn">' + x.rows.length + ' contracts</span>'
-        + '<span class="cf-rv">' + rcAcct(x.v) + '</span></span></div>').join('');
-      // The collapsed row draws NO blocks: it is N separate firms, not one firm
-      // holding N, and reusing the unit channel for it would give the row
-      // standing for the most contracts the shortest mark on the chart.
-      if (rest.length) cf += '<div class="cf-r rest" data-n="0"><span class="cf-rk">'
-        + rest.length + ' other firms</span><span class="cf-u none"></span>'
-        + '<span class="cf-meta"><span class="cf-rn">1 each</span>'
-        + '<span class="cf-rv">' + rcAcct(restV) + '</span></span></div>';
-      setHTML($('viz'), '<div class="cf-sort">Ordered by contracts held</div>'
-        + '<div class="cf-rows">' + cf + '</div>');
-      $('viz').style.height = 'auto';
-      setHTML($('cap'), '<b>Where the work is concentrated.</b> Blocks are contracts held by one '
-        + 'firm. The collapsed row draws none — it is ' + rest.length + ' separate firms, not '
-        + 'one firm holding ' + rest.length + '. Firms holding one contract are listed '
-        + 'individually below, with dates and exact values.');
-
+      const held = multi.reduce((n, x) => n + x.rows.length, 0);
       const fy = {}; rows.forEach(r => { fy[r.end_date] = (fy[r.end_date] || 0) + 1; });
       const top = Object.keys(fy).sort((a, b) => fy[b] - fy[a])[0];
       const amts = rows.map(r => r.amount || 0);
@@ -1059,12 +1050,36 @@
         + '<span class="d">│</span><span>Values run <b>' + rcCompact(Math.min.apply(null, amts))
         + '</b> to <b>' + rcCompact(Math.max.apply(null, amts)) + '</b>.</span>'
         + '<span class="d">│</span><span><b>' + holders.length + '</b> firms hold these '
-        + rows.length + '.</span>');
+        + rows.length + (multi.length
+          ? ' — <b>' + multi.length + '</b> of them hold <b>' + held + '</b> between them, '
+            + 'the other <b>' + rest.length + '</b> hold one each.'
+          : '.') + '</span>');
     }
 
     const total = rows.reduce((n, r) => n + (r.amount || 0), 0);
+    /* ⛔ SAID ONCE, NOT ONCE PER ROW. Every row still shows its own office and its
+       own state — the four states stay apart — but the SENTENCE explaining what a
+       missing contact means belongs to the panel, not to each of the ten rows that
+       had it. It also answers, on the page, the only question worth asking about
+       this list: how many of these can you actually call today. */
+    const box = D.OFFICERS || { state: 'loading', offices: {} };
+    const withOffice = rows.filter(r => r && r.office);
+    const callable = box.state === 'ok'
+      ? withOffice.filter(r => ((box.offices || {})[r.office] || []).length).length : null;
     setHTML($('footL'), '<b>' + rows.length + '</b> contract' + (rows.length === 1 ? '' : 's')
-      + ' · all shown');
+      + ' · all shown'
+      + (callable == null ? ''
+        : ' · <b>' + callable + '</b> carr' + (callable === 1 ? 'ies' : 'y') + ' a contracting '
+          + 'officer you can call'
+          + (withOffice.length - callable > 0
+            ? '. The other ' + (withOffice.length - callable) + ' name an office where no officer '
+              + 'has posted in your codes recently, so we hold no contact — that is our gap, not an '
+              + 'office without officers' : '')
+          + (rows.length - withOffice.length > 0
+            ? '. ' + (rows.length - withOffice.length) + ' carr'
+              + (rows.length - withOffice.length === 1 ? 'ies' : 'y')
+              + ' no buying office on the award at all' : '')
+          + '.'));
     setHTML($('footR'), 'Combined value <b>' + rcMoney(total) + '</b>');
   }
 

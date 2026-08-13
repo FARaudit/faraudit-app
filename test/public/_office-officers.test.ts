@@ -56,12 +56,39 @@ ok(/match: "exact"/.test(ROUTE), "the route declares its match rule to the clien
 
 // ── R3 · FOUR STATES, KEPT APART ─────────────────────────────────────────────
 console.log("\nR3  FOUR STATES — only ONE is a fact about the directory");
-ok(/No buying office recorded on this award/.test(rcCall), "no office on the row says so");
+/* ⛔ THE STATES ARE ASSERTED AS DISTINCT OUTPUTS, not as four remembered sentences.
+   The explanation that used to sit on every row now sits ONCE in the panel foot —
+   measured, ten rows carried the same 36px paragraph — while each row keeps its own
+   office and its own state. Four greps for four literal strings would have gone red
+   on that move while describing nothing that changed, so the check is now the thing
+   that actually matters: each branch emits DIFFERENT markup, and the claim about
+   whose gap it is still ships. */
+const branches = [
+  /no buying office on this award/,        // the award carries none
+  /looking up contracting officers/,       // the lookup is still running
+  /could not be read/,                     // the lookup failed — OUR gap
+  /no contact held/,                       // office known, directory has nobody
+];
+const hits = branches.map((re) => (rcCall.match(re) || [])[0]).filter(Boolean);
+ok(hits.length === 4, "all four states are emitted", `${hits.length}/4`);
+ok(new Set(hits).size === 4, "…and no two of them produce the same words",
+  "collapsing any pair states a fact about the directory in a case where it does not hold");
+ok(/no buying office on this award/.test(rcCall), "no office on the row says so");
 ok(/looking up contracting officers/.test(rcCall), "the lookup running is its own state");
 ok(/could not be read/.test(rcCall),
   "a failed lookup says OUR gap", "not 'no officer', which would be a claim about the office");
-ok(/no officer at this office has posted/.test(rcCall),
+ok(/no contact held/.test(rcCall),
   "office known + no match is the only case that states something about the directory");
+// The row states the FACT; the panel states the CLAIM, once. Both must ship — a chip
+// with no explanation anywhere reads as "this office has no officers", which is the
+// one thing this feed cannot support.
+const APP_ALL = readFileSync(join(ROOT, "public/dsb-app.js"), "utf8");
+ok(/that is our gap, not an\s*\n?\s*.?office without officers/.test(APP_ALL)
+   || /our gap, not an ' \+ 'office without officers/.test(APP_ALL)
+   || /no contact — that is our gap/.test(APP_ALL),
+  "the panel states ONCE that a missing contact is OUR gap, not an office without officers");
+ok(/carr' \+ \(callable === 1 \? 'ies' : 'y'\) \+ ' a contracting/.test(APP_ALL),
+  "…and it counts how many rows a reader can actually call");
 ok(/state: 'loading'/.test(LIVE) && /state: 'unwired'/.test(LIVE) && /state: 'ok'/.test(LIVE),
   "the fetcher sets all three transport states");
 ok(/state: "unwired"/.test(ROUTE) && /503/.test(ROUTE),
