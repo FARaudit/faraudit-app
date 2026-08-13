@@ -156,7 +156,7 @@ console.log("\n── Part C2 · FAR/DFARS states a REFERENCE, never an amendmen
   const rule = (over: Partial<RegRow> = {}): RegRow => ({
     source: "far", clause: null, title: "Acquisition of commercial products",
     summary: null, effective_date: iso(9), link: "https://example.gov/1",
-    published_at: iso(-3), affects_clauses: [], ...over,
+    published_at: iso(-3), affects_clauses: [], comments_close_on: null, ...over,
   });
 
   const cited = by(buildDeskDigest(
@@ -174,6 +174,58 @@ console.log("\n── Part C2 · FAR/DFARS states a REFERENCE, never an amendmen
   const dfars = by(buildDeskDigest(
     { ...EMPTY, regRules: [rule({ source: "dfars" })] }, NOW), "far");
   check("C2e · a DFARS rule is not labelled FAR", /^DFARS/.test(dfars.why || ""), dfars.why || "");
+
+  // THE DESK MUST RANK ON THE ACTIONABLE DATE. Measured on the live feed
+  // 2026-08-13: 0 of 40 documents carried a future effective date and four
+  // carried an open comment window. A desk keyed on the effective date alone
+  // renders a card and can never surface a deadline — dead, but not visibly so.
+  const commentOnly = by(buildDeskDigest({ ...EMPTY, regRules: [
+    rule({ effective_date: null, comments_close_on: iso(5) }),
+  ] }, NOW), "far");
+  check("C2f · a rule with only a comment window still carries a deadline",
+    commentOnly.days === 5, `days=${commentOnly.days}`);
+  check("C2g · …and the card says which kind of date it is",
+    /comment window closes/i.test(commentOnly.why || ""), commentOnly.why || "");
+
+  // A comment window outranks an effective date even when it is further out:
+  // one can be acted on, the other only prepared for.
+  const both = by(buildDeskDigest({ ...EMPTY, regRules: [
+    rule({ effective_date: iso(2), comments_close_on: null, title: "Effective soon" }),
+    rule({ effective_date: null, comments_close_on: iso(12), title: "Comment window" }),
+  ] }, NOW), "far");
+  check("C2h · the comment window outranks a nearer effective date",
+    both.title === "Comment window" && both.days === 12, `${both.title}/${both.days}`);
+
+  // The regression itself: every row effective-dateless, which is the real corpus.
+  const realShape = by(buildDeskDigest({ ...EMPTY, regRules: [
+    rule({ effective_date: null, comments_close_on: iso(28) }),
+    rule({ effective_date: null, comments_close_on: null }),
+  ] }, NOW), "far");
+  check("C2i · a corpus with no effective dates is not a dead desk",
+    realShape.days === 28, `days=${realShape.days}`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+console.log("\n── Part C3 · transient RegRow fields never reach the INSERT ──");
+// The regulatory_updates upsert spreads `...r`, so any field RegRow gains for a
+// READER reaches a table that has no such column and fails the whole write.
+{
+  const REG = readFileSync(join(ROOT, "src", "app", "api", "regulatory-updates", "route.ts"), "utf8");
+  const SCHEMA = readFileSync(join(ROOT, "supabase", "migrations", "005_platform_intelligence.sql"), "utf8");
+  const table = SCHEMA.slice(SCHEMA.indexOf("CREATE TABLE IF NOT EXISTS regulatory_updates"));
+  const cols = table.slice(0, table.indexOf(");"));
+
+  for (const f of ["raw_text_url", "comments_close_on"]) {
+    check(`C3 · ${f} is NOT a column on regulatory_updates`, !cols.includes(f));
+    check(`C3 · …and the upsert strips it`,
+      new RegExp(`${f}:\\s*_drop`).test(REG), "not destructured out of the spread");
+  }
+  check("C3 · PLANTED: the strip probe rejects an upsert that keeps the field",
+    !/comments_close_on:\s*_drop/.test("rows.map(({ raw_text_url: _drop, ...r }) => r)"));
+  check("C3 · the field is actually requested from the API",
+    /comments_close_on/.test(readFileSync(join(ROOT, "src", "lib", "federal-register.ts"), "utf8")
+      .match(/for \(const f of \[[^\]]+\]/)?.[0] || ""),
+    "federalRegisterUrl does not ask for it");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

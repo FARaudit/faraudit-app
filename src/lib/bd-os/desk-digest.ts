@@ -238,8 +238,16 @@ function deskCmmc(auditRows: Array<Record<string, unknown>> | null, now: number)
 }
 
 /* ── far · FAR/DFARS ──────────────────────────────────────────────────────────
- * The deadline a regulatory change carries is its EFFECTIVE date — the day the
- * customer's obligations change whether or not they read it.
+ * TWO DATES, AND ONLY ONE OF THEM IS ACTIONABLE. A comment window is something a
+ * reader can DO something about; an effective date is something they can only be
+ * ready for. So the comment deadline ranks first and the effective date is the
+ * fallback, and the card always says which kind it is showing.
+ *
+ * Ranking on the effective date alone made this desk structurally dead. Measured
+ * against the live feed 2026-08-13: **0 of 40** documents carried a future
+ * effective date, while four carried an open comment window — so the desk could
+ * never surface a deadline and fell to its own fallback sentence permanently. It
+ * rendered a card, which is why reading the code could not catch it.
  *
  * THE CARD MAY NOT SAY "AMENDS". `affects_clauses` on these rows is built from
  * the title and abstract by a MENTION recognizer, and a mention is not an
@@ -258,17 +266,25 @@ function deskFar(rules: RegRow[] | null, now: number): DeskSummary {
   if (rules.length === 0) {
     return blank("far", "empty", "No FAR or DFARS rulemaking in the current window.");
   }
-  const dated = rules
-    .map((r) => ({ r, days: daysUntil(r.effective_date, now) }))
-    .filter((x) => x.days !== null)
-    .sort((a, b) => (a.days as number) - (b.days as number));
   const value = counted(rules.length, "rule");
   const count = rules.length;
+
+  // Comment windows first, then effective dates. Within each kind, soonest wins.
+  const dated = rules
+    .flatMap((r) => [
+      { r, days: daysUntil(r.comments_close_on, now), kind: "comment" as const },
+      { r, days: daysUntil(r.effective_date, now), kind: "effective" as const },
+    ])
+    .filter((x) => x.days !== null)
+    .sort((a, b) =>
+      (a.kind === b.kind ? 0 : a.kind === "comment" ? -1 : 1)
+      || (a.days as number) - (b.days as number));
+
   if (dated.length === 0) {
     return {
       desk: "far", status: "ok",
       title: cleanTitle(rules[0].title) || rules[0].link,
-      why: "Most recent rulemaking · none carries a future effective date",
+      why: "Most recent rulemaking · no open comment window or future effective date",
       value, count, days: null, urg: "ok", reason: null
     };
   }
@@ -278,7 +294,7 @@ function deskFar(rules: RegRow[] | null, now: number): DeskSummary {
   return {
     desk: "far", status: "ok",
     title: cleanTitle(top.r.title) || top.r.link,
-    why: `${reg} rulemaking takes effect`
+    why: `${reg} ${top.kind === "comment" ? "comment window closes" : "rulemaking takes effect"}`
        + (clauses.length > 0
           ? ` · references ${clauses.slice(0, 3).join(", ")}${clauses.length > 3 ? ` +${clauses.length - 3}` : ""}`
           : ""),

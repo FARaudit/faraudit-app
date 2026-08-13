@@ -32,6 +32,12 @@ export interface RegRow {
   /** TRANSIENT. Where the rule's full text lives, used to read its amendatory instructions.
    *  There is no such column on `regulatory_updates` — strip it before any write. */
   raw_text_url?: string | null;
+  /** TRANSIENT, and the only date on this corpus a reader can ACT on. Measured
+   *  2026-08-13 against the live feed: **0 of 40** documents carry a future
+   *  `effective_on`, while the comment window is populated and open on four —
+   *  so anything ranking these rows by effective date can never surface one.
+   *  There is no such column on `regulatory_updates` — strip it before any write. */
+  comments_close_on?: string | null;
 }
 
 export interface FrDocument {
@@ -40,6 +46,7 @@ export interface FrDocument {
   abstract?: string | null;
   publication_date?: string | null;
   effective_on?: string | null;
+  comments_close_on?: string | null;
   html_url?: string;
   agencies?: Array<{ name?: string; raw_name?: string }> | null;
 }
@@ -67,7 +74,11 @@ export function federalRegisterUrl(): string {
   // raw_text_url is what makes clause extraction possible. Measured 2026-08-10: the ABSTRACT
   // names a clause on 4 of 40 documents and a clause NUMBER on 1; the full text names amended
   // sections on 6 of 12. The clause data was never in the field this parser was reading.
-  for (const f of ["title", "abstract", "publication_date", "effective_on", "html_url", "agencies", "raw_text_url"]) {
+  // `comments_close_on` is requested because it is the actionable date: a reader
+  // can file a comment, and cannot do anything about an effective date but be
+  // ready for it. It was absent from this list, so nothing downstream could rank
+  // by it however much it wanted to.
+  for (const f of ["title", "abstract", "publication_date", "effective_on", "comments_close_on", "html_url", "agencies", "raw_text_url"]) {
     p.append("fields[]", f);
   }
   return `${FR_DOCUMENTS_API}?${p.toString()}`;
@@ -150,7 +161,8 @@ export function parseFederalRegister(body: string): RegRow[] {
       link,
       published_at: doc.publication_date ? new Date(doc.publication_date).toISOString() : null,
       affects_clauses: affects,
-      raw_text_url: doc.raw_text_url || null
+      raw_text_url: doc.raw_text_url || null,
+      comments_close_on: doc.comments_close_on || null
     });
   }
   return rows;
