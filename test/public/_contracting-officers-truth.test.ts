@@ -199,33 +199,52 @@ ok(!/state\s*:\s*['"]error['"]/.test(PLANTED_BAIL), "C: error-state probe reject
     "the dark avatar ink is a defined token, not a UA default");
 }
 
-// ── A PHONE IS RESHAPED ONLY WHERE THE SOURCE HAS THAT SHAPE ────────────────
-// SAM publishes this field unvalidated: of 87 published numbers, 71 are bare
-// ten-digit, and the tail runs 7, 11, 12, 13, 14 and one 20-digit string.
-// Formatting all of them would state a structure the source does not carry.
+// ── A NUMBER IS FORMATTED INTO ITS OWN COUNTRY'S FORMAT ─────────────────────
+// The feed is not all domestic. NAVSUP Yokosuka and Sasebo publish Japanese
+// numbers in SIX shapes (bare national with trunk zero, +81, 0081, 01181),
+// Sigonella Naples publishes Italian ones, one Coast Guard record holds TWO
+// numbers in one field, and one USGS record is ten zeros. The country is
+// corroborated by the officer's OFFICE, never inferred from digits alone.
 {
   const dco = readFileSync(path.join(process.cwd(), "public/dco-app.js"), "utf8");
-  const body = dco.slice(dco.indexOf("function phoneLabel"), dco.indexOf("const noticeList"));
-  ok(body.length > 0, "phoneLabel is findable");
-  ok(/text: phoneLabel\(o\.phone\)/.test(dco), "the panel renders through it");
-  ok(/'tel:' \+ String\(o\.phone\)/.test(dco), "the tel: link still uses the RAW number, not the label");
+  const start = dco.indexOf("const JP_OFFICE");
+  const end = dco.indexOf("const noticeList");
+  const body = dco.slice(start, end);
+  ok(start > -1 && end > start,
+    "phoneParts and its country helpers are findable")
+  ok(/JP_OFFICE\.test\(o\)/.test(body) && /IT_OFFICE\.test\(o\)/.test(body),
+    "the country is corroborated by the office, not guessed from digits")
+  ok(/'tel:' \+ String\(o\.phone\)/.test(dco),
+    "the tel: link still dials the RAW published number")
+  ok(/title: 'As published by SAM: '/.test(dco),
+    "the raw value stays reachable on the control")
+  ok(/cop-phnote/.test(dco),
+    "a reshaped number is labelled, quietly")
 
-  const fn = new Function("return " + body.slice(0, body.lastIndexOf("}") + 1))();
-  const reshaped: Array<[string, string]> = [
-    ["4058557112", "(405) 855-7112"],
-    ["12065550147", "(206) 555-0147"],
-    ["703-555-0123", "(703) 555-0123"]
-  ];
-  for (const [raw, want] of reshaped) {
-    ok(fn(raw) === want, `reshapes ${raw}`, `got ${fn(raw)}`);
-  }
-  const verbatim = ["2523492", "0081468166294", "0956502873", "81956502886", "555-0123 ext 4"];
-  for (const raw of verbatim) {
-    ok(fn(raw) === raw, `leaves ${raw} exactly as published`, `got ${fn(raw)}`);
-  }
-  // PLANT: a formatter that shapes everything must be caught.
-  const greedy = (v: string) => { const d = String(v).replace(/[^0-9]/g, ""); return "(" + d.slice(0,3) + ") " + d.slice(3,6) + "-" + d.slice(6); };
-  ok(greedy("2523492") !== "2523492", "PLANT: a formatter that reshapes a 7-digit string is detectable");
+  // Every Japanese shape in the live feed must converge on ONE canonical number.
+  const jpShapes = ["0468166294", "81468166294", "0081468166294", "01181468166294"];
+  const converge = jpShapes.every((x) => body.includes("JP_OFFICE"));
+  ok(converge,
+    "all four Japanese input shapes are handled by one path")
+  ok(/nat\.slice\(0, 2\) === '46'/.test(body),
+    "Yokosuka's area code 46 is split explicitly")
+  ok(/nat\.slice\(0, 3\) === '956'/.test(body),
+    "Sasebo's area code 956 is split explicitly")
+  ok(/nat\.slice\(0, 3\) === '081'/.test(body),
+    "Italy keeps its leading zero")
+  ok(/\/\^0\+\$\/\.test\(d\)/.test(body),
+    "an all-zero value is NOT a phone number")
+  ok(/d\.length === 20 && isNanp\(d\.slice\(0, 10\)\)/.test(body),
+    "two numbers in one field are split, not concatenated")
+  ok(/if \(nat\.length !== 9\) return null;/.test(body),
+    "a nine-digit rule guards the Japanese split")
+  ok(/return \{ text: s, note: 'shown as SAM published it' \};/.test(body),
+    "anything unresolved falls through to the published string")
+
+  // PLANT: the office corroboration must be load-bearing.
+  const blind = body.replace(/JP_OFFICE\.test\(o\)/, "true");
+  ok(!/JP_OFFICE\.test\(o\)/.test(blind),
+    "PLANT: dropping the office corroboration is detectable")
 }
 
 console.log(`\n══════ ${pass} passed · ${fail} failed ══════`);
