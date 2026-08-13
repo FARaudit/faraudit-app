@@ -55,6 +55,8 @@ const NON_MONEY = [
   "coverage",              // code lists and a display cap
   "FYS",                   // year labels
   "RECOMPETES_MEASURED",   // boolean
+  "RECOMPETES_AT_CAP",     // NAICS codes pinned at our own collection limit
+  "RECOMPETE_STORE_LIMIT", // a ROW count — recompetes stored per code, not money
   "unsupported",           // panel names
   "units"                  // the manifest itself
 ];

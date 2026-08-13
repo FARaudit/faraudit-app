@@ -156,6 +156,24 @@ export interface SpendingPayload {
      which is a claim about the market and would be a lie under a NULL column.
      Migration 034 drew this line in the schema; it has to survive to the page. */
   RECOMPETES_MEASURED: boolean;
+  /* WHICH CODES ARE PINNED AT OUR OWN COLLECTION LIMIT. The worker stops
+     collecting a code's recompetes at RECOMPETE_STORE_LIMIT rows, so a code
+     sitting exactly on that number is reporting a CEILING, not a market. On this
+     account two of three codes are pinned, and the worker's own measurement
+     found roughly twice as many available in the same window.
+
+     A page that foots those rows as a total states our loop bound as a finding.
+     It is surfaced here rather than fixed by raising the limit, because raising
+     it costs USAspending requests and this worker has already been IP-blocked
+     once by a burst of them — and because a page that knows what it does not
+     know can say so today, at no cost.
+
+     ⛔ THE TRUE TOTAL IS NOT KNOWABLE HERE. Only the stored rows exist, so a
+     surface may say "at least this many, and the list is capped" — it may NEVER
+     print "10 of 23". Replacing our cap with a second invented number is the
+     defect, not the cure. */
+  RECOMPETES_AT_CAP: string[];
+  RECOMPETE_STORE_LIMIT: number;
   /* Award-level views, per fiscal year: the size of a real deal, the primes
      carrying a subcontracting-plan obligation, and when the money moves. All
      three are DERIVED from the stored award_sample — no extra USAspending
@@ -233,6 +251,14 @@ export type SpendingResult =
   | { state: "no-rows"; requested: string[] };
 
 const TOP_N = 10;
+
+/* ⛔ THIS NUMBER LIVES IN TWO PLACES AND THEY ARE TWO RULES UNTIL A GATE SAYS
+   OTHERWISE. The value is enforced by the WORKER — `agents/defense-spending/
+   usaspending.ts` returns as soon as `out.length >= 10` — and this module cannot
+   import from `agents/`, so it is restated here to let a reader tell a full list
+   from a truncated one. `test/public/_recompete-cap-surfaced.test.ts` greps the
+   worker for the same number and fails if the two drift. */
+export const RECOMPETE_STORE_LIMIT = 10;
 
 /* ⛔ THE UNIT OF EVERY MONEY BRANCH ON THE WIRE. Derived totals are converted to
    millions by toM(); award-level branches are passed through in the raw dollars
@@ -574,6 +600,18 @@ export async function fetchDefenseSpending(
   const RECOMPETES = Array.from(byAward.values())
     .sort((a, b) => (a.end_date || "").localeCompare(b.end_date || ""));
 
+  /* Counted on the STORED array per code, before the cross-code dedupe above —
+     the cap is applied per code by the worker, so that is the unit it has to be
+     tested at. A code sitting exactly on the limit is at the ceiling; one below
+     it was answered in full. */
+  const RECOMPETES_AT_CAP = Array.from(
+    new Set(
+      rows
+        .filter((r) => (r.recompetes_upcoming?.length ?? 0) >= RECOMPETE_STORE_LIMIT)
+        .map((r) => r.naics_code)
+    )
+  ).sort();
+
   /* ── AWARD-LEVEL VIEWS (items 3, 4, 5 of the tab's path) ──────────────────
      Derived from the stored sample, so this costs ZERO USAspending requests.
      That is a deliberate constraint, not a convenience: a burst of ~800 calls
@@ -749,6 +787,8 @@ export async function fetchDefenseSpending(
     BY_FY,
     MARKET_TREND,
     RECOMPETES,
+    RECOMPETES_AT_CAP,
+    RECOMPETE_STORE_LIMIT,
     RECOMPETES_MEASURED,
     AWARD_ANALYTICS,
     BUYING_OFFICES,

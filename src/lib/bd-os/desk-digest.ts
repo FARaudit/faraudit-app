@@ -327,11 +327,24 @@ function deskSpend(spending: SpendingResult | null, now: number): DeskSummary {
     return blank("spend", "empty", "Nothing in your codes expires in the tracked window.");
   }
   const top = live[0];
+  /* THE COUNT IS OUR OWN CEILING ON SOME CODES. The worker stops collecting a
+     code's recompetes at a fixed limit, so where a code is pinned there the list
+     is truncated and the number under it is a loop bound wearing the clothes of
+     a measurement. The card says so.
+
+     It says "at least", never "N of M": the rows above the cap were never
+     collected, so the true total is not knowable here and inventing one would
+     replace our cap with a second made-up number. */
+  const capped = Array.isArray(spending.RECOMPETES_AT_CAP) ? spending.RECOMPETES_AT_CAP : [];
   return {
     desk: "spend", status: "ok",
     title: top.r.recipient || top.r.award_id || "Contract expiring",
-    why: `Incumbent contract ends${top.r.agency ? ` · ${top.r.agency}` : ""}`,
-    value: counted(live.length, "recompete"), count: live.length,
+    why: `Incumbent contract ends${top.r.agency ? ` · ${top.r.agency}` : ""}`
+       + (capped.length > 0
+          ? ` · list capped in ${counted(capped.length, "code")}, more exist`
+          : ""),
+    value: (capped.length > 0 ? "at least " : "") + counted(live.length, "recompete"),
+    count: live.length,
     days: top.days, urg: urgencyOf(top.days), reason: null
   };
 }
