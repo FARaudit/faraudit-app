@@ -68,10 +68,13 @@ check("the 100-point score badge is gone from the renderer",
 check("its styling went with it",
   !/\.rac-of\{/.test(html),
   "dead CSS for a slot that no longer renders");
-// The reason line must be CONDITIONAL — an empty element reads as missing data.
-check("the reason line renders only when there is a reason",
-  /\(ins\?'<span class="rac-insight"/.test(html),
-  "an empty .rac-insight ships on every row");
+// The reason line's emptiness is a LAYOUT question, not a truth one, and it is the
+// CEO's to rule — reverted 2026-08-13 pending his review. What this suite still owns
+// is that nothing INVENTS a reason: exec_what / exec_factors / recommendation are all
+// 0 of 20 on live, so insightOf() must never fall back to a verdict word.
+check("the reason line is derived, never a verdict word dressed as an insight",
+  /F2-LIVE: the reason line must NEVER fall back to the pole word/.test(html),
+  "the guard against printing the verdict twice is gone");
 
 // ── Part C · the engine panel may only claim what the engine does ──
 console.log("── Part C · what the panel claims ──");
@@ -96,13 +99,10 @@ for (const kept of ["Grounded in source", "Verbatim citations", "Cited findings"
   check(`panel keeps "${kept}" — this one is wired`, html.includes(kept), "a true claim was removed with the false ones");
 }
 
-// ── Part D · both panels lead the page ──
-console.log("── Part D · the collapsibles ──");
-check("Solicitation prep opens by default", /<details class="blk prep-wrap" open>/.test(html));
-check("What runs when you submit opens by default", /<details class="blk blk-stages prep-wrap" open>/.test(html));
-check("and flip() no longer closes it for a returning customer",
-  !/stages\.removeAttribute\('open'\)/.test(html),
-  "a returning customer still gets it collapsed");
+// ── Part D · the collapsibles are the CEO'S CALL, not this suite's ──
+// Expanding them by default was shipped without his review and reverted 2026-08-13.
+// This suite asserts nothing about their open/closed state on purpose: a gate that
+// pins a layout decision takes it away from the person whose decision it is.
 
 // ── Part E · positive controls ──
 console.log("── Part E · positive controls ──");

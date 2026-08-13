@@ -892,7 +892,7 @@ details[open]>summary .chev{transform:rotate(180deg)}
           </div>
           <div class="sam card" style="display:none"></div>
         </div>
-        <details class="blk prep-wrap" open>
+        <details class="blk prep-wrap">
           <summary class="sec-head"><span class="k">Solicitation prep</span><span class="all" style="color:var(--mute);text-decoration:none">reference<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></span></summary>
           <div class="prep-sub">What to grab <span>priority order — more sections, sharper audit</span></div>
           <div class="grab card">
@@ -941,7 +941,7 @@ details[open]>summary .chev{transform:rotate(180deg)}
               </div>
             </div>
           </section>
-          <details class="blk blk-stages prep-wrap" open>
+          <details class="blk blk-stages prep-wrap">
             <summary class="sec-head"><span class="k">What runs when you submit</span><span class="all" style="color:var(--mute);text-decoration:none">how it works<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></span></summary>
             <div class="pipe" style="margin-top:13px">
               <div class="pstep"><div class="ptop"><span class="pn">01</span><span class="ph">Reads every document</span></div><div class="pchips"><span class="pchip">Every posted attachment</span><span class="pchip">Names what it could not read</span></div></div>
@@ -1308,10 +1308,9 @@ var __fdReadyNoticeId=null;
     var ins=insightOf(a);
 
     var dl=dueIn(a,v.label);
-    return '<a class="rac '+v.cls+'" href="/audits/'+slug+'"><div class="rac-main"><div class="rac-title">'+escapeHtml(titleLine)+'</div><div class="rac-sub">'+(office?'<span class="rac-office">'+escapeHtml(office)+'</span>':'')+''+(ins?'<span class="rac-insight"><span class="rac-spark"></span>'+escapeHtml(ins)+'</span>':'')+'</div></div><div class="rac-dl"><span class="lbl">Due in</span><span class="val '+dl.cls+'">'+escapeHtml(dl.txt)+'</span></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>'+escapeHtml(v.label)+'</span><span class="rac-ago">'+escapeHtml(when)+'</span><span class="rac-chev">→</span></div></a>';}
+    return '<a class="rac '+v.cls+'" href="/audits/'+slug+'"><div class="rac-main"><div class="rac-title">'+escapeHtml(titleLine)+'</div><div class="rac-sub">'+(office?'<span class="rac-office">'+escapeHtml(office)+'</span>':'')+'<span class="rac-insight"><span class="rac-spark"></span>'+escapeHtml(ins)+'</span></div></div><div class="rac-dl"><span class="lbl">Due in</span><span class="val '+dl.cls+'">'+escapeHtml(dl.txt)+'</span></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>'+escapeHtml(v.label)+'</span><span class="rac-ago">'+escapeHtml(when)+'</span><span class="rac-chev">→</span></div></a>';}
   // first-run vs returning: flip section order + expand the "what runs" teaching pipeline for first-run.
-  // First run REORDERS the teaching block above the ledger. It no longer closes it.
-  function flip(n){var firstRun=(n===0);if(stack)stack.classList.toggle('flip',firstRun);var stages=document.querySelector('.blk-stages');if(stages&&stages.tagName==='DETAILS')stages.setAttribute('open','');}
+  function flip(n){var firstRun=(n===0);if(stack)stack.classList.toggle('flip',firstRun);var stages=document.querySelector('.blk-stages');if(stages&&stages.tagName==='DETAILS'){if(firstRun)stages.setAttribute('open','');else stages.removeAttribute('open');}}
   function renderCards(audits){if(!audits||!audits.length){list.innerHTML='<div class="ra-empty"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg></div><div class="h">No audits yet</div><div class="s">Upload a solicitation above and your first ranked report lands here — a bid / no-bid call with the KO clarification email drafted and ready.</div></div>';flip(0);return;}list.innerHTML=audits.map(cell).join('');flip(audits.length);}
   /* The green LIVE pill is a claim about THIS page's data, so only a settled fetch may
      turn it on. It ships hidden and stays hidden on any failure.

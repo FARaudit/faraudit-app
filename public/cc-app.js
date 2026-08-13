@@ -11,6 +11,7 @@
       opp:   { label: 'Notices', color: '#378ADD', href: '/notices', icon: 'M12 2a9 9 0 100 18 9 9 0 000-18zM9 12l2 2 4-4' },
       co:    { label: 'Contracting Officers', color: '#185FA5', href: '/contracting-officers', icon: 'M9 9a3 3 0 100-6 3 3 0 000 6zM3 20c1-3 3-5 6-5s5 2 6 5' },
       cmmc:  { label: 'CMMC Readiness', color: '#0891b2', href: '/cmmc', icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4' },
+      gao:   { label: 'GAO Protests', color: '#dc2626', href: '/gao-protests', icon: 'M12 3a9 9 0 100 18 9 9 0 000-18zM3 12h18' },
       far:   { label: 'FAR/DFARS', color: '#7c3aed', href: '/far-dfars-updates', icon: 'M4 3h16v18H4zM8 8h8M8 12h8M8 16h5' },
       wage:  { label: 'Wage Benchmarks', color: '#d97706', href: '/wage-benchmarks', icon: 'M3 20h18M6 16v-5M11 16V8M16 16v-3' },
       team:  { label: 'Teaming Partners', color: '#059669', href: '/teaming-partners', icon: 'M7 9a3 3 0 100-6 3 3 0 000 6zM17 9a3 3 0 100-6 3 3 0 000 6zM2 20c0-3 2.5-5 5-5M22 20c0-3-2.5-5-5-5' },
@@ -285,11 +286,7 @@
   // these render as plain NAVIGATION: every desk reachable, zero assertions
   // about what is in it. A desk card makes a claim only once its query exists.
   function renderSignals() {
-    // GAO Protests is deliberately ABSENT: the desk was retired from the rail, and a
-    // Signals card is a navigation promise. The route still answers, which is exactly
-    // why a link check passed it — "the route resolves" and "this desk is still part
-    // of the product" are different questions.
-    const order = ['spend', 'co', 'cmmc', 'far', 'team'];
+    const order = ['spend', 'co', 'cmmc', 'far', 'gao', 'team'];
     $('sigGrid').innerHTML = order.map(key => {
       const d = DESK[key];
       if (!d) return '';
