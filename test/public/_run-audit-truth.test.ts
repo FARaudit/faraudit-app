@@ -80,6 +80,7 @@ const ENGINE_LIES: Array<[string, string]> = [
   ["BID / NO-BID", "committal decline poles are unreachable in production; Bid 0 · No-bid 0 across 77 audits"],
   ["Full-package map", "names mapDocument(), which has no callers"],
   ["Honest-fail, no charge", "AUDIT_NHR_NOCHARGE_SUPPRESS excludes NHR — the majority outcome — from that promise"],
+  ["Coverage ledger", "names buildCoverageLedger(), which has no callers"],
 ];
 for (const [claim, why] of ENGINE_LIES) {
   check(`panel does not claim "${claim}"`, !html.includes(claim), why);
@@ -88,6 +89,12 @@ for (const [claim, why] of ENGINE_LIES) {
 check("the panel still names the poles the engine does return",
   /Bid · caution · needs review/.test(html),
   "the verdict step now claims nothing at all");
+// The three chips that DO hold, checked so a later cleanup cannot quietly strip them:
+// the grounding gate is imported by agentic-panel-runner and audit-orchestrator with
+// no flag, and the report schema requires a finding to cite a VERIFIED lens claim.
+for (const kept of ["Grounded in source", "Verbatim citations", "Cited findings", "Deterministic verdict"]) {
+  check(`panel keeps "${kept}" — this one is wired`, html.includes(kept), "a true claim was removed with the false ones");
+}
 
 // ── Part D · both panels lead the page ──
 console.log("── Part D · the collapsibles ──");
