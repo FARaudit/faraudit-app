@@ -45,6 +45,9 @@ const FN = (() => {
   const j = APP.indexOf("function renderNowFigures");
   return i > -1 && j > i ? APP.slice(i, j) : "";
 })();
+// Whitespace-normalised copy for the structural checks, so a reformat cannot
+// break a gate and invite someone to "re-point" it at something weaker.
+const FNZ = FN.replace(/\s+/g, " ");
 
 // ── R1 · THE PANEL EXISTS AND IS REACHED ─────────────────────────────────────
 console.log("\nR1  THE PANEL IS MOUNTED AND CALLED");
@@ -94,7 +97,12 @@ ok(/Object\.keys\(T\.series/.test(FN),
   "the code list comes from the series itself, not from a hardcoded set");
 ok(!/\.slice\(0,\s*\d/.test(FN),
   "no bare-numeric cap truncates the code list");
-const CAPPED = /slice\(0,\s*SHOW_MAX\)/.test(FN);
+// A cap through ANY named bound counts. Keying this on the one spelling we ship
+// today would let a rename — slice(0, MAX_BARS) — switch both checks below off
+// and pass an undeclared cap in silence.
+const CAP_NAME = (FN.match(/\.slice\(0,\s*([A-Za-z_$][\w$]*)\s*\)/) || [])[1] || "";
+const CAPPED = CAP_NAME !== "";
+const DECL = new RegExp(`\\b${CAP_NAME || "\\u0000"}\\s*=\\s*\\d`);
 // Graded on the FOOTNOTE ITSELF. Matching the whole file passes on the picker's
 // own "N tracked codes" count line, so the check survived deleting the footnote.
 const FOOT = (() => {
@@ -103,19 +111,24 @@ const FOOT = (() => {
   return i > -1 && j > i ? APP.slice(i, j) : "";
 })();
 ok(!CAPPED || (/tracked codes/.test(FOOT) && /shown/.test(FOOT)),
-  "a cap on the visible codes is DECLARED in the footnote — the total counts codes the bars do not show");
-ok(!CAPPED || /SHOW_MAX = 3\b/.test(FN),
+  "a cap on the visible codes is DECLARED in the footnote — the total counts codes the bars do not show",
+  CAPPED ? `cap = ${CAP_NAME}` : "no cap");
+ok(!CAPPED || DECL.test(FN),
   "…and the cap is a named bound, not a number buried in a slice");
-ok(/c === S\.code/.test(FN),
-  "a selected code narrows it to that code — the only filter applied");
+// Two claims, because there are two paths and the picker IS a second filter on
+// one of them. "the only filter applied" was true before the picker shipped and
+// is not true now; a label that outruns what it tests is the defect this whole
+// file exists to catch.
+ok(/S\.code \? all\.filter\(c => c === S\.code\)/.test(FNZ),
+  "a selected code narrows the series list to exactly that code");
+ok(/: usePicker \? readPick\(all\)[^;]* : all;/.test(FNZ),
+  "…and with nothing selected it is every tracked code, or the DECLARED picked subset — no third filter");
 
 // ── R5 · THE HEADLINE FIGURES ARE THIS SERIES, NOT A SECOND MEASUREMENT ──────
 console.log("\nR5  THE TWO NOW-FIGURES COME FROM THE SCOPED VIEW");
-const NOW = (() => {
-  const i = APP.indexOf("function renderNowFigures");
-  const j = APP.indexOf("const last =", i);
-  return i > -1 && j > i ? APP.slice(i, j) : "";
-})();
+// Same span as FOOT above — computed once, so the two cannot drift apart and
+// grade different code while reading as if they grade the same function.
+const NOW = FOOT;
 ok(NOW.length > 0, "renderNowFigures is findable");
 ok(/view\(\)\.kpis/.test(NOW),
   "it reads the SCOPED view, so picking a code moves the headline with the panel");
@@ -138,6 +151,26 @@ console.log("\nR6  PLANTED POSITIVES");
 
   const clocked = FN + "\nconst x = new Date();";
   ok(/new Date\(\)/.test(clocked), "PLANT: a clock read inside the panel is detectable");
+
+  // The two cap checks are CONDITIONAL on a cap existing, so each plant keeps the
+  // cap and breaks only the thing being graded. Both assert CAPPED as well: if the
+  // cap is ever removed or renamed out of reach, these go red rather than passing
+  // on a guard that switched itself off.
+  const undeclared = FOOT.replace(/tracked codes/g, "codes");
+  ok(CAPPED && !(/tracked codes/.test(undeclared) && /shown/.test(undeclared)),
+    "PLANT: deleting the footnote's split leaves the cap UNDECLARED and is detectable");
+
+  const computed = FN.replace(DECL, `${CAP_NAME} = pick(`);
+  ok(CAPPED && !DECL.test(computed),
+    "PLANT: a cap whose bound is computed instead of declared is detectable");
+
+  const unnarrowed = FNZ.replace("all.filter(c => c === S.code)", "all");
+  ok(!/S\.code \? all\.filter\(c => c === S\.code\)/.test(unnarrowed),
+    "PLANT: a selection that stops narrowing the series is detectable");
+
+  const thirdFilter = FNZ.replace(": all;", ": all.filter(c => c !== 'x');");
+  ok(!/: usePicker \? readPick\(all\)[^;]* : all;/.test(thirdFilter),
+    "PLANT: a third filter on the unselected path is detectable");
 
   const noType = BUILDER.replace(/open: boolean\[\];/, "");
   ok(!/open: boolean\[\]/.test(noType.slice(noType.indexOf("MARKET_TREND:"), noType.indexOf("MARKET_TREND:") + 200)),
