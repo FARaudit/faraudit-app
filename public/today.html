@@ -19,7 +19,7 @@
 :root,[data-theme="light"],[data-theme="auto"]{
   --page-bg:#eef2f7; --bg:#f0f4f8; --card:#ffffff; --card-soft:#fafcfe;
   --ink:#0A1628; --ink-2:#334155; --mute:#64748b; --mute-2:#94a3b8;
-  --line:#e5e7eb; --line-2:#eef2f6; --line-3:#f1f5f9; --search-bg:#f1f5f9;
+  --line:#e5e7eb; --line-2:#eef2f6; --line-3:#f1f5f9;
   --shadow:0 1px 2px rgba(15,23,42,.06), 0 8px 24px -12px rgba(15,23,42,.10);
   --shadow-sm:0 1px 3px rgba(0,0,0,0.06);
   --shadow-pop:0 24px 60px -22px rgba(15,23,42,.28), 0 6px 16px -6px rgba(15,23,42,.12);
@@ -27,7 +27,7 @@
 [data-theme="dark"]{
   --page-bg:#02060c; --bg:#050d1a; --card:#0c1b30; --card-soft:#0a1729;
   --ink:#e8eef6; --ink-2:#b6c2d3; --mute:#7d8ba0; --mute-2:#5b6778;
-  --line:rgba(255,255,255,0.08); --line-2:rgba(255,255,255,0.05); --line-3:rgba(255,255,255,0.04); --search-bg:rgba(255,255,255,0.04);
+  --line:rgba(255,255,255,0.08); --line-2:rgba(255,255,255,0.05); --line-3:rgba(255,255,255,0.04);
   --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px -12px rgba(0,0,0,.6);
   --shadow-sm:0 1px 3px rgba(0,0,0,0.5);
   --shadow-pop:0 1px 2px rgba(0,0,0,.5), 0 28px 64px -22px rgba(0,0,0,.85);
@@ -53,9 +53,11 @@ button{font-family:inherit}
 [data-theme="dark"] .live-pill{background:rgba(16,185,129,0.12);color:#6ee7b7;border-color:rgba(110,231,183,0.30)}
 .live-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green-500);box-shadow:0 0 0 3px rgba(16,185,129,.18);animation:pulse 1.6s ease-out infinite}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(16,185,129,.45)}100%{box-shadow:0 0 0 8px rgba(16,185,129,0)}}
-.tb-search{margin-left:auto;display:flex;align-items:center;gap:10px;height:34px;width:300px;padding:0 12px;border-radius:9px;background:var(--search-bg);border:1px solid var(--line);color:var(--mute);font-size:13px}
-.tb-search .kbd{margin-left:auto;font-family:"IBM Plex Mono";font-size:10.5px;color:var(--mute-2);background:var(--card);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
-.top-actions{display:flex;align-items:center;gap:8px}
+/* `margin-left:auto` moved here from the search box that used to sit between the
+   crumbs and these buttons. It was what pushed this group to the right edge, so
+   deleting the box without carrying it would have collapsed the whole topbar
+   against the breadcrumb. */
+.top-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
 .icon-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;color:var(--ink-2);cursor:pointer;position:relative;transition:background .14s, border-color .14s}
 .icon-btn:hover{border-color:var(--mute-2)}
 .icon-btn svg{width:16px;height:16px}
@@ -488,10 +490,6 @@ button{font-family:inherit}
     <div class="topbar">
       <div class="crumbs"><b>Today</b><span class="sep">/</span><span>Command Center</span></div>
       <span class="live-pill" id="livePill" hidden>LIVE</span>
-      <div class="tb-search">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <span>Search officers, agencies, offices…</span><span class="kbd">⌘K</span>
-      </div>
       <div class="top-actions">
         <button class="icon-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
           <svg id="themeSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
