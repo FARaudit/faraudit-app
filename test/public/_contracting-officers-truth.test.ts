@@ -149,6 +149,39 @@ const bailCaught = /catch\s*\([^)]*\)\s*\{\s*(console[^\n]*\n?\s*)?return[;\s}]/
 ok(bailCaught, "C: bail probe catches a planted silent-return catch");
 ok(!/state\s*:\s*['"]error['"]/.test(PLANTED_BAIL), "C: error-state probe rejects a fetch layer that sets none");
 
+/* ── ⛔ WHITE INITIALS ON A HASHED COLOUR ─────────────────────────────────────
+   The avatar's initials are white and its background is a GRADIENT, so the
+   LIGHTEST stop sets the contrast. At l=52% two of the six hues failed — teal at
+   1.91:1 and cyan at 2.94:1 — and the hue is picked by hashing the officer's own
+   email, so roughly one officer in three had initials nobody could read. A
+   gradient is also invisible to a backgroundColor-based contrast sweep, which is
+   why nothing caught it.
+
+   This RECOMPUTES the ratio from the shipped palette rather than trusting a
+   number in a comment: change a hue or the lightness and it re-derives. */
+{
+  const dco = readFileSync(path.join(process.cwd(), "public/dco-app.js"), "utf8");
+  const hueList = (dco.match(/const hues = \[([^\]]+)\]/) || [])[1];
+  const stop = dco.match(/hsl\(' \+ hue \+ ',(\d+)%,(\d+)%\)/);
+  ok(!!hueList && !!stop, "the avatar palette and its lightest stop are findable");
+  const H = (hueList || "").split(",").map((x) => parseFloat(x.trim()));
+  const S = parseFloat(stop ? stop[1] : "0"), L = parseFloat(stop ? stop[2] : "100");
+  const chan = (h: number, n: number) => {
+    const sN = S / 100, lN = L / 100;
+    const k = (n + h / 30) % 12;
+    const a = sN * Math.min(lN, 1 - lN);
+    return lN - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1)));
+  };
+  const lin = (v: number) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+  const cw = (h: number) =>
+    1.05 / (0.2126 * lin(chan(h, 0)) + 0.7152 * lin(chan(h, 8)) + 0.0722 * lin(chan(h, 4)) + 0.05);
+  const worst = H.map((h) => ({ h, r: cw(h) })).reduce((a, b) => (a.r < b.r ? a : b));
+  ok(H.length >= 2, "the palette carries more than one hue", `${H.length}`);
+  ok(worst.r >= 4.5,
+    "EVERY avatar hue clears 4.5:1 against white initials",
+    `worst ${worst.r.toFixed(2)}:1 at hue ${worst.h} — an officer whose email hashes to it cannot read their own initials`);
+}
+
 console.log(`\n══════ ${pass} passed · ${fail} failed ══════`);
 if (fail > 0) {
   console.error("\nCONTRACTING-OFFICERS TRUTH GATE FAILED — the page can show something the notice did not publish.");
