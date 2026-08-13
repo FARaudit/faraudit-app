@@ -199,6 +199,35 @@ ok(!/state\s*:\s*['"]error['"]/.test(PLANTED_BAIL), "C: error-state probe reject
     "the dark avatar ink is a defined token, not a UA default");
 }
 
+// ── A PHONE IS RESHAPED ONLY WHERE THE SOURCE HAS THAT SHAPE ────────────────
+// SAM publishes this field unvalidated: of 87 published numbers, 71 are bare
+// ten-digit, and the tail runs 7, 11, 12, 13, 14 and one 20-digit string.
+// Formatting all of them would state a structure the source does not carry.
+{
+  const dco = readFileSync(path.join(process.cwd(), "public/dco-app.js"), "utf8");
+  const body = dco.slice(dco.indexOf("function phoneLabel"), dco.indexOf("const noticeList"));
+  ok(body.length > 0, "phoneLabel is findable");
+  ok(/text: phoneLabel\(o\.phone\)/.test(dco), "the panel renders through it");
+  ok(/'tel:' \+ String\(o\.phone\)/.test(dco), "the tel: link still uses the RAW number, not the label");
+
+  const fn = new Function("return " + body.slice(0, body.lastIndexOf("}") + 1))();
+  const reshaped: Array<[string, string]> = [
+    ["4058557112", "(405) 855-7112"],
+    ["12065550147", "(206) 555-0147"],
+    ["703-555-0123", "(703) 555-0123"]
+  ];
+  for (const [raw, want] of reshaped) {
+    ok(fn(raw) === want, `reshapes ${raw}`, `got ${fn(raw)}`);
+  }
+  const verbatim = ["2523492", "0081468166294", "0956502873", "81956502886", "555-0123 ext 4"];
+  for (const raw of verbatim) {
+    ok(fn(raw) === raw, `leaves ${raw} exactly as published`, `got ${fn(raw)}`);
+  }
+  // PLANT: a formatter that shapes everything must be caught.
+  const greedy = (v: string) => { const d = String(v).replace(/[^0-9]/g, ""); return "(" + d.slice(0,3) + ") " + d.slice(3,6) + "-" + d.slice(6); };
+  ok(greedy("2523492") !== "2523492", "PLANT: a formatter that reshapes a 7-digit string is detectable");
+}
+
 console.log(`\n══════ ${pass} passed · ${fail} failed ══════`);
 if (fail > 0) {
   console.error("\nCONTRACTING-OFFICERS TRUTH GATE FAILED — the page can show something the notice did not publish.");

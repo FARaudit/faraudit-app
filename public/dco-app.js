@@ -367,13 +367,26 @@
     const naicsChips = h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:2px' },
       orderedCodes(o).map((c) => h('span', { cls: 'fpill', text: c })));
 
+  /* SAM publishes this field unvalidated. Only a string that is unambiguously a
+     North American number is reshaped; anything else is shown exactly as
+     published, because imposing a shape on a 7- or 20-digit string would state
+     a structure the source does not have. */
+  function phoneLabel(raw) {
+    const s = String(raw).trim();
+    if (/[a-z]/i.test(s)) return s;
+    const d = s.replace(/[^0-9]/g, '');
+    const ten = d.length === 10 ? d : (d.length === 11 && d[0] === '1' ? d.slice(1) : null);
+    if (!ten || ten[0] === '0' || ten[0] === '1' || ten[3] === '0' || ten[3] === '1') return s;
+    return '(' + ten.slice(0, 3) + ') ' + ten.slice(3, 6) + '-' + ten.slice(6);
+  }
+
     const noticeList = h('div', { style: 'max-height:260px;overflow-y:auto' },
       (o.notices || []).map(noticeRow));
 
     const actions = h('div', { cls: 'cop-actions' }, [
       h('a', { cls: 'cop-btn primary', text: 'Email', attrs: { href: 'mailto:' + o.email } }),
       o.phone
-        ? h('a', { cls: 'cop-btn ghost', text: o.phone, attrs: { href: 'tel:' + String(o.phone).replace(/[^0-9+]/g, '') } })
+        ? h('a', { cls: 'cop-btn ghost', text: phoneLabel(o.phone), attrs: { href: 'tel:' + String(o.phone).replace(/[^0-9+]/g, '') } })
         : h('span', { cls: 'cop-btn ghost', text: 'No phone published', style: 'cursor:default;opacity:.7' })
     ]);
 
