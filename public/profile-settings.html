@@ -287,6 +287,11 @@ button{font-family:inherit}
 .fld label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
 .fld input{height:38px;padding:0 12px;border-radius:9px;border:1px solid var(--line);background:var(--card-soft);color:var(--ink);font-family:"Manrope";font-size:13px;outline:none;transition:border-color .14s}
 .fld input:focus{border-color:var(--accent)}
+/* Same control appearance as .fld input above — a select on this page must not
+   introduce a second look for a form field. */
+.ps-sel{height:38px;padding:0 10px;border-radius:9px;border:1px solid var(--line);background:var(--card-soft);color:var(--ink);font-family:"Manrope";font-size:13px;font-weight:600;outline:none;cursor:pointer;flex:none;transition:border-color .14s}
+.ps-sel:focus{border-color:var(--accent)}
+.ps-sel:disabled{opacity:.55;cursor:progress}
 .fld-sec{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);padding-top:4px}
 .cert-row{display:flex;gap:8px;flex-wrap:wrap}
 .cert-tg{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;padding:7px 14px;border-radius:9px;border:1px solid var(--line);background:var(--card-soft);color:var(--ink-2);cursor:pointer;transition:all .14s}

@@ -482,5 +482,14 @@ export function injectRail(html: string, activeKey: string, counts: RailCounts =
     const tag = `<script src="/rail-live-badge.js" defer></script>`;
     out = out.includes("</body>") ? out.replace("</body>", `${tag}</body>`) : out + tag;
   }
+  /* Idle auto sign-out rides with the rail for the same reason the pill does: it is a
+     property of being signed in, not of one page. Per-page <script> tags gave the pill
+     two surfaces out of ten; a timer that only runs on the pages that remembered to
+     load it is not a security control. The script is idempotent and OFF unless the
+     customer's stored preference says otherwise. */
+  if (out.includes("auto-signout.js") === false) {
+    const tag = `<script src="/auto-signout.js" defer></script>`;
+    out = out.includes("</body>") ? out.replace("</body>", `${tag}</body>`) : out + tag;
+  }
   return out;
 }
