@@ -45,10 +45,12 @@
   // therefore PER GROUP, in the render layer where the grouping lives (cc-app.js).
   // This ceiling is only a DOM-size backstop, far above real feed volume.
   var WEEK_MAX_ROWS = 400;
-  function buildWeek(opps) {
-    if (!Array.isArray(opps) || opps.length === 0) return { rows: [], dropped: 0 };
+  function buildWeek(opps, govRows) {
+    var gov = Array.isArray(govRows) ? govRows : [];
+    if ((!Array.isArray(opps) || opps.length === 0) && gov.length === 0) return { rows: [], dropped: 0 };
     var now = Date.now();
-    var items = [];
+    var items = gov.slice();
+    if (!Array.isArray(opps)) opps = [];
     for (var i = 0; i < opps.length; i++) {
       var o = opps[i];
       if (!o || !o.response_deadline) continue;
@@ -70,6 +72,42 @@
     items.sort(function (a, b) { return a.ms - b.ms; });
     var dropped = Math.max(0, items.length - WEEK_MAX_ROWS);
     return { rows: items.slice(0, WEEK_MAX_ROWS), dropped: dropped };
+  }
+
+  // GOVERNMENT EVENTS — the second row type the calendar was designed for and never
+  // given a feed. wkRow() has always supported `gov` (hollow node, ◆ tag) and `big`;
+  // today.html carries the CSS for both. These are dates that are the same for every
+  // customer, unlike a response deadline, which is why they render differently.
+  // Sourced live from /api/proposed-rules (Federal Register). A comment deadline is
+  // the rare government date you can act ON, so it is the `big` one.
+  function buildGovWeek(rules) {
+    if (!Array.isArray(rules) || rules.length === 0) return [];
+    var now = Date.now();
+    var out = [];
+    for (var i = 0; i < rules.length; i++) {
+      var r = rules[i];
+      if (!r) continue;
+      var events = [
+        { when: r.comments_close_on, tag: 'Comment closes', big: true },
+        { when: r.effective_on,      tag: 'Rule effective', big: false }
+      ];
+      for (var j = 0; j < events.length; j++) {
+        var e = events[j];
+        if (!e.when) continue;
+        var ms = new Date(e.when + 'T12:00:00Z').getTime();
+        if (isNaN(ms) || ms < now) continue;
+        var day = Math.max(0, Math.ceil((ms - now) / 86400000));
+        out.push({
+          ms: ms, day: day, gov: true, big: e.big,
+          d: new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          label: cleanLabel(r.title) || 'Federal Register rule',
+          tag: e.tag,
+          tone: day <= 3 ? 'crit' : day <= 7 ? 'warn' : 'ok',
+          desk: 'far'
+        });
+      }
+    }
+    return out;
   }
 
   // Titles arrive SHOUTED and PSC-prefixed from SAM. Trim for the row without
@@ -150,7 +188,16 @@
 
       // Week Ahead: real response deadlines from the live feed. A server-sent
       // WEEK (once the digest ships) wins; otherwise we derive it here.
-      var wk = buildWeek(data.opportunities);
+      // Government events ride alongside the notice deadlines in ONE sorted list —
+      // the calendar's own design, not a second panel. A failure here must not take
+      // the deadlines down with it, so it resolves to [] on its own.
+      var govRules = [];
+      try {
+        var gr = await fetch('/api/proposed-rules', { credentials: 'include' });
+        if (gr.ok) { var gj = await gr.json(); govRules = (gj && gj.rules) || []; }
+      } catch (e) { govRules = []; }
+
+      var wk = buildWeek(data.opportunities, buildGovWeek(govRules));
       window.CC.WEEK_DROPPED = wk.dropped;   // surfaced in the panel, never silent
       window.CC.WEEK_SOURCED = Array.isArray(data.opportunities);
       if (!Array.isArray(data.WEEK)) replaceArr('WEEK', wk.rows);

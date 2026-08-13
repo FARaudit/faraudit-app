@@ -250,9 +250,16 @@
     groups.forEach(g => {
       const items = WEEK.filter(g.test);
       if (!items.length) return;
-      const cap = WEEK_GROUP_CAPS[g.label] || items.length;
-      const shown = items.slice(0, cap);
-      const hidden = items.length - shown.length;
+      // Government events NEVER compete with notice deadlines for cap slots. There are
+      // a handful a quarter and each one binds every customer, so being sorted in among
+      // a hundred response deadlines and truncated away is the one outcome that makes
+      // them worthless. The cap governs notice rows only; gov rows always render.
+      const govItems = items.filter((w) => w.gov);
+      const oppItems = items.filter((w) => !w.gov);
+      const cap = WEEK_GROUP_CAPS[g.label] || oppItems.length;
+      const shownOpps = oppItems.slice(0, cap);
+      const shown = govItems.concat(shownOpps).sort((a, b) => (a.day ?? 0) - (b.day ?? 0));
+      const hidden = oppItems.length - shownOpps.length;
       hiddenTotal += hidden;
       // The group header count is the TRUE total, not the shown count — a
       // header reading "20" over 20 rows would hide that 51 more exist.

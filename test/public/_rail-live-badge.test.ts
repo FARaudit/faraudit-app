@@ -93,9 +93,13 @@ console.log("\n── Part C · Week Ahead calendar ──");
   check("each truncated group says how many it hid", /more in \$\{g\.label/.test(ccApp), "group truncation is silent");
   // The trap: showing N rows under a header reading N hides that more exist.
   // The header must print the group's TRUE total.
+  // The PROPERTY is: the header prints the group's true total while the rows are a
+  // capped subset. The second half used to pin the exact expression `shown =
+  // items.slice`, so exempting government rows from the cap — which does not touch
+  // the header at all — turned this red. Test the property, not the spelling.
   check(
     "group header count is the true total, not the shown count",
-    /<b>\$\{items\.length\}<\/b>/.test(ccApp) && /shown\s*=\s*items\.slice/.test(ccApp),
+    /<b>\$\{items\.length\}<\/b>/.test(ccApp) && /\.slice\(0,\s*cap\)/.test(ccApp),
     "header count derived from the capped slice"
   );
   check("wiring-layer ceiling is a DOM backstop, not the display cap", /WEEK_MAX_ROWS/.test(ccLive), "display cap still lives in the fetch layer");

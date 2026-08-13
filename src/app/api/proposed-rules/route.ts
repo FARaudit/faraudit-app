@@ -80,7 +80,12 @@ export async function GET() {
   params.append("fields[]", "publication_date");
   params.append("fields[]", "effective_on");
   params.append("fields[]", "comments_close_on");
-  params.append("fields[]", "document_type");
+  // "type", not "document_type". The Federal Register API rejects an unknown field
+  // name with a 400 on the WHOLE request, so this one word made every call fail —
+  // and because the route fails honestly (200 with rules: [] and a reason), nothing
+  // went red and no consumer noticed. The only surface that would have shown it is
+  // one that renders comment deadlines, and none does yet.
+  params.append("fields[]", "type");
   params.append("fields[]", "agency_names");
   params.append("fields[]", "html_url");
   params.append("fields[]", "pdf_url");
