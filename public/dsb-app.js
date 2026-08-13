@@ -688,7 +688,6 @@
     const withRoom = c.rows.filter(r => r.headroom > 0);
     const fullyUsed = c.rows.length - withRoom.length;
     const shown = withRoom.length ? withRoom : c.rows;
-    const max = Math.max.apply(null, shown.map(r => Math.abs(r.ceiling)).concat([1]));
     setHTML(host, shown.map(r => {
       const pct = r.ceiling > 0 ? Math.max(0, Math.min(100, (r.obligated / r.ceiling) * 100)) : 0;
       const n = r.contracts || 1;
@@ -700,9 +699,7 @@
           + (r.subaward_count === 1 ? '' : 's') + ' already placed' : '');
       return '<div class="ch-r"><span class="ch-n">' + esc(r.recipient) + '</span>'
         + '<span class="ch-h">' + fmtM(r.headroom / 1e6) + '</span>'
-        + '<span class="ch-m">' + esc(sub2) + '</span>'
-        + '<span class="ch-track" style="width:' + Math.max(4, (Math.abs(r.ceiling) / max) * 100).toFixed(1)
-        + '%"><i class="ch-fill" style="width:' + pct.toFixed(1) + '%"></i></span></div>';
+        + '<span class="ch-m">' + esc(sub2) + '</span></div>';
     }).join(''));
 
     if (cap) setHTML(cap, '<b>A capped sample of the largest awards</b> — ' + c.sampled

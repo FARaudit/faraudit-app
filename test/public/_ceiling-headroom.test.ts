@@ -94,8 +94,17 @@ function main() {
 
   // ── CSS shipped ───────────────────────────────────────────────────────────
   for (const cls of ["ch-top", "ch-big", "ch-say", "ch-list", "ch-r", "ch-n", "ch-h", "ch-m",
-                     "ch-track", "ch-fill", "ch-cap", "ch-none"]) {
+                     "ch-cap", "ch-none"]) {
     assert(new RegExp(`(^|\\n)\\.${cls}\\s*[,{]`).test(html), `CSS rule for .${cls} shipped`);
+  }
+
+  /* ⛔ RETIRED WITH A CHECK, not dropped because it went red. The track drew "% used"
+     and the meta line beneath it PRINTED "N% used" — one value encoded twice on every
+     row, the same rule that retired the small-business bars and the concentration
+     segments. If either comes back, this fails. */
+  for (const cls of ["ch-track", "ch-fill"]) {
+    assert(!new RegExp(`(^|\\n)\\.${cls}\\s*[,{]`).test(html), `retired CSS rule .${cls} is gone`);
+    assert(!html.includes(`class="${cls}`), `…and no page still emits .${cls}`);
   }
 
   console.log(failures === 0 ? "\n✅ ALL PASS" : `\n❌ ${failures} FAILED`);
