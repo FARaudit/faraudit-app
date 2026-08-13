@@ -4,8 +4,8 @@
 
    There is no "bail unless the response carries ACTIONS/WEEK" gate: cc-app.js
    ships those arrays empty, and this file fills in whatever the API genuinely
-   returns. ACTIONS and WEEK have no per-desk digest behind them on this route,
-   so they stay empty and the panels say so.
+   returns. ACTIONS and SIGNALS both come from the cross-desk digest the route
+   computes; a desk absent from it renders as absent, never as quiet.
    Guarded by test/public/_today-fabrication.test.ts. */
 (function () {
   'use strict';
@@ -209,9 +209,24 @@
       window.CC.WEEK_SOURCED = true;
       if (!Array.isArray(data.WEEK)) replaceArr('WEEK', wk.rows);
 
-      // ACTIONS stays empty until fetchCommandCenterDigest ships. If a future
-      // response carries it, it renders for real.
-      replaceArr('ACTIONS', data.ACTIONS);
+      // CROSS-DESK DIGEST — the one query behind BOTH the Priority Action Feed
+      // and the Signals grid. SIGNALS keeps every desk including the ones with
+      // nothing to report, because a card that states why it is quiet is the
+      // panel's job; ACTIONS keeps only desks that produced a real item, because
+      // a feed row is a claim that there is something to act on.
+      var digest = Array.isArray(data.deskDigest) ? data.deskDigest : [];
+      window.CC.SIGNALS = digest;
+      replaceArr('ACTIONS', digest.filter(function (d) { return d && d.status === 'ok'; }).map(function (d) {
+        return {
+          desk: d.desk, urg: d.urg || 'ok', days: d.days,
+          // The feed's value column is narrow and mono — it takes the bare
+          // count. The phrase ("12 live notices") goes to Signals, where the
+          // card has room for it. Both come from the same digest row.
+          title: d.title, why: d.why,
+          val: typeof d.count === 'number' ? String(d.count) : ''
+        };
+      }));
+
       replaceArr('WEEK',    data.WEEK);
       replaceObj('DESK',    data.DESK);
 
@@ -237,6 +252,11 @@
         // unavailable — the panel would be contradicting the page.
         replaceArr('WEEK', []);
         window.CC.WEEK_DROPPED = 0;
+        // Same reason as WEEK: ranked desk cards from an earlier successful
+        // fetch would sit under a banner saying the data is unavailable. null,
+        // not [] — the panels must not read an outage as eight quiet desks.
+        replaceArr('ACTIONS', []);
+        window.CC.SIGNALS = null;
         setRailLiveBadge('unavailable');
         if (window.CC_APP && typeof window.CC_APP.render === 'function') {
           window.CC_APP.render();

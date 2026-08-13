@@ -8,21 +8,23 @@
   // render logic doesn't change.
   window.CC = window.CC || {
     DESK: {
-      opp:   { label: 'Notices', color: '#378ADD', href: '/notices', icon: 'M12 2a9 9 0 100 18 9 9 0 000-18zM9 12l2 2 4-4' },
-      co:    { label: 'Contracting Officers', color: '#185FA5', href: '/contracting-officers', icon: 'M9 9a3 3 0 100-6 3 3 0 000 6zM3 20c1-3 3-5 6-5s5 2 6 5' },
-      cmmc:  { label: 'CMMC Readiness', color: '#0891b2', href: '/cmmc', icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4' },
-      gao:   { label: 'GAO Protests', color: '#dc2626', href: '/gao-protests', icon: 'M12 3a9 9 0 100 18 9 9 0 000-18zM3 12h18' },
-      far:   { label: 'FAR/DFARS', color: '#7c3aed', href: '/far-dfars-updates', icon: 'M4 3h16v18H4zM8 8h8M8 12h8M8 16h5' },
-      wage:  { label: 'Wage Benchmarks', color: '#d97706', href: '/wage-benchmarks', icon: 'M3 20h18M6 16v-5M11 16V8M16 16v-3' },
-      team:  { label: 'Teaming Partners', color: '#059669', href: '/teaming-partners', icon: 'M7 9a3 3 0 100-6 3 3 0 000 6zM17 9a3 3 0 100-6 3 3 0 000 6zM2 20c0-3 2.5-5 5-5M22 20c0-3-2.5-5-5-5' },
-      spend: { label: 'Defense Spending', color: '#2C6CB4', href: '/defense-spending', icon: 'M4 19V5M4 19h16M8 16v-4M13 16V9M18 16v-2' }
+      opp:   { label: 'Notices', color: '#378ADD', href: '/notices', icon: 'M12 2a9 9 0 100 18 9 9 0 000-18zM9 12l2 2 4-4', cta: 'View notice' },
+      co:    { label: 'Contracting Officers', color: '#185FA5', href: '/contracting-officers', icon: 'M9 9a3 3 0 100-6 3 3 0 000 6zM3 20c1-3 3-5 6-5s5 2 6 5', cta: 'Contact' },
+      cmmc:  { label: 'CMMC Readiness', color: '#0891b2', href: '/cmmc', icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4', cta: 'Review' },
+      gao:   { label: 'GAO Protests', color: '#dc2626', href: '/gao-protests', icon: 'M12 3a9 9 0 100 18 9 9 0 000-18zM3 12h18', cta: 'Read' },
+      far:   { label: 'FAR/DFARS', color: '#7c3aed', href: '/far-dfars-updates', icon: 'M4 3h16v18H4zM8 8h8M8 12h8M8 16h5', cta: 'Read rule' },
+      wage:  { label: 'Wage Benchmarks', color: '#d97706', href: '/wage-benchmarks', icon: 'M3 20h18M6 16v-5M11 16V8M16 16v-3', cta: 'Compare' },
+      team:  { label: 'Teaming Partners', color: '#059669', href: '/teaming-partners', icon: 'M7 9a3 3 0 100-6 3 3 0 000 6zM17 9a3 3 0 100-6 3 3 0 000 6zM2 20c0-3 2.5-5 5-5M22 20c0-3-2.5-5-5-5', cta: 'Search' },
+      spend: { label: 'Defense Spending', color: '#2C6CB4', href: '/defense-spending', icon: 'M4 19V5M4 19h16M8 16v-4M13 16V9M18 16v-2', cta: 'View market' }
     },
     // ACTIONS + WEEK ship EMPTY and are filled only from what the API
-    // genuinely returns. Until a per-desk digest exists to populate them,
-    // these panels say so rather than showing anything unearned.
-    // Guarded by test/public/_today-fabrication.test.ts.
+    // genuinely returns. Guarded by test/public/_today-fabrication.test.ts.
     ACTIONS: [],
     WEEK: [],
+    // One row per desk from the cross-desk digest, each carrying its own status.
+    // null = the digest has not arrived, which is not the same as a set of desks
+    // with nothing to report, and the two never render alike.
+    SIGNALS: null,
     // Scalars the /api/command-center-data response already carries. null =
     // not computed; every render site prints an em dash for null and never a
     // zero standing in for "unknown".
@@ -40,6 +42,19 @@
   // is a different claim from "we have not computed this".
   const DASH = '—';
   function num(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
+
+  // EVERY value below that came off a desk is EXTERNAL TEXT — a SAM notice
+  // title, a point-of-contact's name, a Federal Register headline, a recipient
+  // name from USAspending. All four reach these panels verbatim and all four are
+  // written by someone outside this product, so they are escaped before they
+  // enter markup. The panels were safe while they shipped empty; feeding them is
+  // what makes this necessary.
+  function esc(v) {
+    if (v === null || v === undefined) return '';
+    return String(v)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
   function fmtMoney(v) {
     const n = num(v);
     if (n === null || n <= 0) return null;
@@ -159,16 +174,38 @@
     });
   }
 
-  // Two DIFFERENT empty states, because they are two different claims:
-  //   · ACTIONS is empty because no ranking is computed → say exactly that.
-  //     "Inbox zero" here would be a false all-clear on unexamined work.
-  //   · ACTIONS had rows and the user cleared/filtered them → inbox zero is true.
+  // FOUR empty states, because they are four different claims and only one of
+  // them is an all-clear:
+  //   · the digest has not arrived → nothing is examined yet.
+  //   · the data does not answer → nothing is measured. Never an all-clear.
+  //   · every desk answers and none returns a rankable item → say how many
+  //     desks are asked; each one's own reason is in Signals below.
+  //   · the rows are there and the user cleared or filtered them → inbox zero.
   function emptyFeed() {
+    const info = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>';
     const tick = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>';
     if (ACTIONS.length === 0) {
-      return `<div class="feed-clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
-        <div class="fc-t">Cross-desk ranking not built yet</div>
-        <div class="fc-d">This panel will rank the single most urgent item from each desk once the digest query ships. It is empty rather than illustrative — nothing here is sample data. Live data you can use today: <a class="fc-undo" href="/notices">Notices</a> · <a class="fc-undo" href="/past-audits">Past Audits</a> · <a class="fc-undo" href="/pipeline">Pipeline</a></div></div>`;
+      const S = window.CC.SIGNALS;
+      if (window.CC.FEED_ERROR) {
+        return `<div class="feed-clear">${info}<div class="fc-t">Your desks are unavailable</div>
+          <div class="fc-d">The data did not answer, so nothing is ranked rather than ranked from stale rows — nothing here is sample data.</div></div>`;
+      }
+      if (!Array.isArray(S)) {
+        return `<div class="feed-clear">${info}<div class="fc-t">Ranking your desks…</div>
+          <div class="fc-d">Nothing here is sample data.</div></div>`;
+      }
+      // A desk that could not be read is not a quiet desk, so the headline says
+      // which of the two happened rather than letting "nothing to rank" stand
+      // over a set of sources that never answered.
+      const down = S.filter(x => x && x.status === 'unavailable').length;
+      const head = down > 0
+        ? `${down} of your desks could not be read`
+        : 'No desk has an item to rank';
+      const lead = down > 0
+        ? `Nothing is ranked rather than ranked from what is left.`
+        : `All ${S.length} desks were asked and none returned something that needs action.`;
+      return `<div class="feed-clear">${info}<div class="fc-t">${head}</div>
+        <div class="fc-d">${lead} Each states its own reason in Signals below. Live data you can use today: <a class="fc-undo" href="/notices">Notices</a> · <a class="fc-undo" href="/past-audits">Past Audits</a> · <a class="fc-undo" href="/pipeline">Pipeline</a></div></div>`;
     }
     return `<div class="feed-clear">${tick}<div class="fc-t">Inbox zero</div><div class="fc-d">You've cleared every priority in this filter.${dismissed.size ? ` <button class="fc-undo" id="fcUndo">Restore ${dismissed.size} dismissed</button>` : ''}</div></div>`;
   }
@@ -186,13 +223,13 @@
         <div class="act-ico" style="background:${hexA(d.color,.13)};color:${d.color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="${d.icon}"/></svg></div>
         <div class="act-body">
           <div class="act-meta"><span class="act-desk" style="color:${d.color}">${d.label}</span><span class="act-dot">·</span><span class="act-urg" style="color:${u.c}">${snz ? 'Snoozed' : u.l}</span></div>
-          <div class="act-title">${a.title}</div>
-          <div class="act-why">${a.why}</div>
+          <div class="act-title">${esc(a.title || d.label)}</div>
+          <div class="act-why">${esc(a.why)}</div>
         </div>
         <div class="act-right">
-          <div class="act-val">${a.val}</div>
+          <div class="act-val">${esc(a.val)}</div>
           <div class="act-when" style="color:${u.c}">${when}</div>
-          <span class="act-cta">${a.cta}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+          <span class="act-cta">${d.cta || 'Open'}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
         </div>
         <div class="act-ctrls">
           <button class="act-ctrl" data-snooze="${a.desk}" title="${snz ? 'Un-snooze' : 'Snooze'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l2.5 2.5"/></svg></button>
@@ -289,17 +326,44 @@
     $('weekList').innerHTML = html || `<div class="feed-clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>${empty}</div>`;
   }
 
-  // The desk registry (label / colour / route / icon) is real UI config, so
-  // these render as plain NAVIGATION: every desk reachable, zero assertions
-  // about what is in it. A desk card makes a claim only once its query exists.
+  // Every card states its desk's own answer, from the SAME cross-desk digest the
+  // Priority Action Feed ranks — one query, two panels, so a desk can never read
+  // as urgent above and quiet here.
+  //
+  // FOUR OUTCOMES, NEVER COLLAPSED. A desk that measured something states it; a
+  // desk whose source answered with nothing says so; a desk whose source FAILED
+  // says that instead, because an outage is not a quiet market; and a desk with
+  // no query behind it names what is missing rather than implying it is empty.
+  // The one sentence this replaces said the last of those about all six.
   function renderSignals() {
     const order = ['spend', 'co', 'cmmc', 'far', 'gao', 'team'];
+    const S = window.CC.SIGNALS;
+    const byDesk = {};
+    if (Array.isArray(S)) S.forEach(x => { if (x && x.desk) byDesk[x.desk] = x; });
     $('sigGrid').innerHTML = order.map(key => {
       const d = DESK[key];
       if (!d) return '';
+      const s = byDesk[key];
+      let t, body, tone = null;
+      if (!s) {
+        // No row for this desk: the digest has not landed, or the fetch failed.
+        // Neither is a statement about what the desk holds.
+        t = 'Open ' + d.label;
+        body = window.CC.FEED_ERROR
+          ? 'Your data did not answer, so this desk has no summary — open it for its own live data.'
+          : 'Loading this desk…';
+      } else if (s.status === 'ok') {
+        t = s.title || d.label;
+        const when = s.days === 0 ? 'today' : s.days != null ? 'in ' + s.days + 'd' : null;
+        body = [s.why, s.value, when].filter(Boolean).join(' · ');
+        if (URG[s.urg]) tone = URG[s.urg].c;
+      } else {
+        t = 'Open ' + d.label;
+        body = s.reason || 'No summary is computed for this desk.';
+      }
       return `<a class="sig-card" href="${d.href}">
         <div class="sig-top"><span class="sig-ico" style="background:${hexA(d.color,.13)};color:${d.color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="${d.icon}"/></svg></span><span class="sig-desk">${d.label}</span><span class="sig-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
-        <div class="sig-t">Open ${d.label}</div><div class="sig-d">No cross-desk summary is computed yet — open the desk for its own live data.</div>
+        <div class="sig-t"${tone ? ' style="box-shadow:inset 3px 0 0 ' + tone + ';padding-left:9px"' : ''}>${esc(t)}</div><div class="sig-d">${esc(body)}</div>
       </a>`;
     }).join('');
   }
