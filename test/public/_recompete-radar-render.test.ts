@@ -49,9 +49,16 @@ function main() {
   }
   assert(/hold one each/.test(app),
     "the concentration finding survives as a clause in the lede, not as a chart");
+  /* ⛔ THE WIDGET IS UNMOUNTED, NOT RETIRED. /who-to-call was rebuilt as a single recompete
+     document: the same RECOMPETES array is now read by wtc-app.js and rendered as §01–§03 of that
+     document, so this widget has no host on any page while its renderer stays intact.
+     Both directions are asserted, because only the pair distinguishes unmounted from retired — the
+     renderer must still write to every one of these ids (deleting it makes this red) and no page
+     may carry them (remounting makes it red). RC_RETIRED above is what a real retirement looks
+     like: host gone AND nothing writing to it. */
   for (const id of RC_IDS) {
-    assert(html.includes(`id="${id}"`), `markup carries #${id}`);
-    assert(written.has(id), `the renderer writes to #${id}`);
+    assert(!html.includes(`id="${id}"`), `the widget is unmounted — no page carries #${id}`);
+    assert(written.has(id), `…and the renderer is retained, still writing to #${id}`);
   }
   assert(/querySelector\('\.rc-head2'\)|\.rc-head2/.test(appCode),
     "the renderer controls the .rc-head2 focal block");
