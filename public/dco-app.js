@@ -367,28 +367,87 @@
     const naicsChips = h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:2px' },
       orderedCodes(o).map((c) => h('span', { cls: 'fpill', text: c })));
 
-  /* SAM publishes this field unvalidated. Only a string that is unambiguously a
-     North American number is reshaped; anything else is shown exactly as
-     published, because imposing a shape on a 7- or 20-digit string would state
-     a structure the source does not have. */
-  function phoneLabel(raw) {
-    const s = String(raw).trim();
-    if (/[a-z]/i.test(s)) return s;
+  /* SAM publishes this field unvalidated and the feed is not all domestic: the
+     overseas Navy commands carry Japanese and Italian numbers in six different
+     shapes, one record holds two numbers in one field, and one is ten zeros.
+     A number is reshaped only into the format of the country it belongs to, and
+     the country is corroborated by the officer's own office — never inferred
+     from the digits alone. Anything that does not resolve is shown exactly as
+     published. */
+  const JP_OFFICE = /YOKOSUKA|SASEBO|ATSUGI|OKINAWA|IWAKUNI|MISAWA|JAPAN/i;
+  const IT_OFFICE = /NAPLES|SIGONELLA|GAETA|ITALY/i;
+
+  function isNanp(d) {
+    return d.length === 10 && d[0] !== '0' && d[0] !== '1' && d[3] !== '0' && d[3] !== '1';
+  }
+  function nanp(d) {
+    return '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6);
+  }
+  /* Japan: nine significant digits behind the trunk zero. The two area codes in
+     this feed are Yokosuka 46 and Sasebo 956; any other length is left alone
+     rather than split at a guessed boundary. */
+  function jp(nat) {
+    if (nat.length !== 9) return null;
+    if (nat.slice(0, 2) === '46') return '+81 46-' + nat.slice(2, 5) + '-' + nat.slice(5);
+    if (nat.slice(0, 3) === '956') return '+81 956-' + nat.slice(3, 5) + '-' + nat.slice(5);
+    return '+81 ' + nat;
+  }
+  /* Italy keeps its leading zero in the national number. */
+  function it(nat) {
+    if (nat.slice(0, 3) === '081' && nat.length === 10) {
+      return '+39 081 ' + nat.slice(3, 6) + '-' + nat.slice(6);
+    }
+    return '+39 ' + nat;
+  }
+
+  function phoneParts(raw, office) {
+    const s = String(raw == null ? '' : raw).trim();
+    if (!s) return null;
+    if (/[a-z]/i.test(s)) return { text: s, note: null };
     const d = s.replace(/[^0-9]/g, '');
-    const ten = d.length === 10 ? d : (d.length === 11 && d[0] === '1' ? d.slice(1) : null);
-    if (!ten || ten[0] === '0' || ten[0] === '1' || ten[3] === '0' || ten[3] === '1') return s;
-    return '(' + ten.slice(0, 3) + ') ' + ten.slice(3, 6) + '-' + ten.slice(6);
+    if (!d || /^0+$/.test(d)) return null;
+    const o = String(office || '');
+
+    if (isNanp(d)) return { text: nanp(d), note: null };
+
+    if (d.length === 20 && isNanp(d.slice(0, 10)) && isNanp(d.slice(10))) {
+      return { text: nanp(d.slice(0, 10)) + '  ·  ' + nanp(d.slice(10)),
+               note: 'SAM published two numbers in this field' };
+    }
+
+    const intl = d.replace(/^(?:011|00)/, '');
+    if (JP_OFFICE.test(o)) {
+      const nat = intl.slice(0, 2) === '81' ? intl.slice(2) : (d[0] === '0' ? d.slice(1) : null);
+      const f = nat ? jp(nat) : null;
+      if (f) return { text: f, note: 'Japan' };
+      if (d.length === 7) return { text: d, note: 'DSN extension' };
+      return { text: s, note: 'overseas · shown as SAM published it' };
+    }
+    if (IT_OFFICE.test(o)) {
+      const nat = intl.slice(0, 2) === '39' ? intl.slice(2) : null;
+      const f = nat ? it(nat) : null;
+      if (f) return { text: f, note: 'Italy' };
+      return { text: s, note: 'overseas · shown as SAM published it' };
+    }
+    return { text: s, note: 'shown as SAM published it' };
   }
 
     const noticeList = h('div', { style: 'max-height:260px;overflow-y:auto' },
       (o.notices || []).map(noticeRow));
 
+    const ph = phoneParts(o.phone, o.office);
     const actions = h('div', { cls: 'cop-actions' }, [
       h('a', { cls: 'cop-btn primary', text: 'Email', attrs: { href: 'mailto:' + o.email } }),
-      o.phone
-        ? h('a', { cls: 'cop-btn ghost', text: phoneLabel(o.phone), attrs: { href: 'tel:' + String(o.phone).replace(/[^0-9+]/g, '') } })
+      ph
+        ? h('a', {
+            cls: 'cop-btn ghost',
+            text: ph.text,
+            attrs: { href: 'tel:' + String(o.phone).replace(/[^0-9+]/g, ''),
+                     title: 'As published by SAM: ' + String(o.phone) }
+          })
         : h('span', { cls: 'cop-btn ghost', text: 'No phone published', style: 'cursor:default;opacity:.7' })
     ]);
+    const phoneNote = ph && ph.note ? h('p', { cls: 'cop-phnote', text: ph.note }) : null;
 
     fill(host, [
       h('div', { cls: 'cop-head' }, [
@@ -403,7 +462,8 @@
       noteBlock('Address', h('span', { cls: 'mono', text: o.email })),
       (o.naics || []).length ? noteBlock('Codes they posted in', naicsChips) : null,
       noteBlock(o.noticeCount + ' notice' + (o.noticeCount === 1 ? '' : 's') + ' in your feed', noticeList),
-      actions
+      actions,
+      phoneNote
     ]);
   }
 
