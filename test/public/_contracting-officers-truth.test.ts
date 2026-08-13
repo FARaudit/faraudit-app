@@ -245,6 +245,15 @@ ok(!/state\s*:\s*['"]error['"]/.test(PLANTED_BAIL), "C: error-state probe reject
   const blind = body.replace(/JP_OFFICE\.test\(o\)/, "true");
   ok(!/JP_OFFICE\.test\(o\)/.test(blind),
     "PLANT: dropping the office corroboration is detectable")
+
+  // Every resolved number states WHERE it is: a US state from the area code, or
+  // the country. An unassigned code is never given a place.
+  ok(/const US_AREA = \{/.test(body), "the area-code to state table ships")
+  ok(/area code not recognised/.test(body),
+    "an unassigned area code is NOT given a state — 392 is in this feed twice")
+  ok(/note: usPlace\(d\)/.test(body), "a US number is labelled with its state")
+  const noTable = body.replace(/const US_AREA = \{[\s\S]*?\};/, "const US_AREA = {};")
+  ok(!/'405': 'Oklahoma'/.test(noTable), "PLANT: emptying the state table is detectable")
 }
 
 console.log(`\n══════ ${pass} passed · ${fail} failed ══════`);
