@@ -885,9 +885,8 @@
     if (sub) sub.textContent = 'Services and agencies inside the departments below · '
       + scoped + ' · ' + (S.fy || '');
 
-    // A YEAR WE HOLD NOTHING FOR IS NOT A YEAR WITH NO BUYERS. This branch used
-    // to write an empty string, so the sub-panel went silently blank while the
-    // department list under it kept rendering — the panel looked answered.
+    // A year we hold nothing for is not a year with no buyers. Both empty paths
+    // state the gap in the same words.
     if (!box) {
       setHTML(host, '<div class="bo-none">The agency split has not been pulled for <b>'
         + esc(scoped) + '</b> in ' + esc(S.fy || 'this year') + ' yet. '
