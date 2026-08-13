@@ -110,8 +110,14 @@ export async function GET() {
       // PostgrestBuilder is a thenable but not a real Promise, so we use the
       // two-arg .then(onFulfilled, onRejected) form instead of .catch().
       supabase
+        // `title` and `solicitation_number` are selected for the Pipeline DESK,
+        // which names the pursuit it ranks. Without them every card reads
+        // "Untitled pursuit" — the same shape as the CMMC column nothing asked
+        // for. The comment sits ABOVE the chain because _today-fabrication D1
+        // reads `.from("pipeline")` and `.select(...)` as adjacent lines, and
+        // that gate failing closed on a moved select is the point of it.
         .from("pipeline")
-        .select("stage, due_date, updated_at, estimated_value")
+        .select("stage, due_date, updated_at, estimated_value, title, solicitation_number")
         .eq("user_id", user.id)
         .then(
           (r) => (r.error ? null : ((r.data as any[]) || [])),
@@ -350,6 +356,9 @@ export async function GET() {
     const deskDigest = buildDeskDigest({
       opportunities: liveOpps,
       cmmcAudits: (cmmcAudits as any[] | null),
+      // pipeRows, not P — null when the read failed, so an unreadable pipeline
+      // and an empty board stay different facts on the card too.
+      pipeline: pipeRows,
       regRules: (regRules as RegRow[] | null),
       spending: (spending as SpendingResult | null),
     }, nowMs);

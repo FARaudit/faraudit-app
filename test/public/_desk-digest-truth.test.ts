@@ -47,7 +47,7 @@ function notice(over: Partial<OpportunityRow> = {}): OpportunityRow {
   } as OpportunityRow;
 }
 
-const EMPTY: DeskDigestInput = { opportunities: [], cmmcAudits: [], regRules: [], spending: null };
+const EMPTY: DeskDigestInput = { opportunities: [], cmmcAudits: [], regRules: [], spending: null, pipeline: [] };
 const by = (rows: DeskSummary[], desk: string) => rows.find((r) => r.desk === desk)!;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -57,7 +57,7 @@ console.log("── Part A · a FAILED read is never an EMPTY desk ──");
 // their market is quiet when in fact nothing was measured.
 {
   const failed = buildDeskDigest(
-    { opportunities: null, cmmcAudits: null, regRules: null, spending: null }, NOW);
+    { opportunities: null, cmmcAudits: null, regRules: null, spending: null, pipeline: null }, NOW);
   for (const desk of ["opp", "co", "cmmc", "far", "spend"]) {
     const d = by(failed, desk);
     check(`A · ${desk} · a null source reports "unavailable"`, d.status === "unavailable", `got ${d.status}`);
@@ -229,10 +229,73 @@ console.log("\n── Part C3 · transient RegRow fields never reach the INSERT 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+console.log("\n── Part C4 · Pipeline · an OVERDUE pursuit is the loudest thing on the board ──");
+// Every other desk drops a past date: a closed solicitation is off the market.
+// A pursuit is the customer's OWN work, so its date passing is the most
+// important fact about it — dropping it is how a board goes quiet on a date that
+// was missed. Measured live 2026-08-13: two pursuits, one nine days past, and
+// nothing on Today said a word.
+{
+  const pursuit = (over: Record<string, unknown> = {}) => ({
+    stage: "03", title: "Modular approach shoring", due_date: iso(4),
+    estimated_value: null, ...over,
+  });
+
+  const overdue = by(buildDeskDigest({ ...EMPTY, pipeline: [
+    pursuit({ title: "Nine days past", due_date: iso(-9) }),
+    pursuit({ title: "Due in four", due_date: iso(4) }),
+  ] }, NOW), "pipe");
+  check("C4a · the OVERDUE pursuit outranks the one still open",
+    overdue.title === "Nine days past", overdue.title || "");
+  check("C4b · …carrying a NEGATIVE day count, not a dropped date",
+    overdue.days === -9, `days=${overdue.days}`);
+  check("C4c · …rated critical, never 'plan ahead'", overdue.urg === "crit", overdue.urg);
+  check("C4d · …and saying so in words", /passed 9 days ago/.test(overdue.why || ""), overdue.why || "");
+  check("C4e · the count is every pursuit, not just the dated ones", overdue.count === 2,
+    `count=${overdue.count}`);
+
+  // A board with rows but no dates cannot be ranked and is not empty.
+  const undated = by(buildDeskDigest({ ...EMPTY, pipeline: [
+    pursuit({ due_date: null }), pursuit({ due_date: null }),
+  ] }, NOW), "pipe");
+  check("C4f · pursuits with no date are reported, not dropped",
+    undated.status === "ok" && undated.count === 2 && undated.days === null,
+    `${undated.status}/${undated.count}/${undated.days}`);
+  check("C4g · …and the card says the dates are missing",
+    /no date set/.test(undated.why || ""), undated.why || "");
+
+  // Mixed: one dated, one not — the undated one must still be counted and named.
+  const mixed = by(buildDeskDigest({ ...EMPTY, pipeline: [
+    pursuit({ due_date: iso(2) }), pursuit({ due_date: null }),
+  ] }, NOW), "pipe");
+  check("C4h · a mixed board names how many carry no date",
+    /1 with no date set/.test(mixed.why || ""), mixed.why || "");
+
+  check("C4i · an unreadable pipeline is not an empty board",
+    by(buildDeskDigest({ ...EMPTY, pipeline: null }, NOW), "pipe").status === "unavailable");
+  check("C4j · an empty board says so plainly",
+    by(buildDeskDigest(EMPTY, NOW), "pipe").status === "empty");
+
+  // The route must actually SELECT the column the card names the pursuit by.
+  const ROUTE = readFileSync(join(ROOT, "src", "app", "api", "command-center-data", "route.ts"), "utf8");
+  const sel = ROUTE.match(/from\("pipeline"\)[\s\S]{0,400}?\.select\("([^"]+)"\)/);
+  check("C4k · the pipeline select carries `title`", /\btitle\b/.test(sel?.[1] || ""), sel?.[1] || "(not found)");
+  check("C4l · …and the digest gets the null-preserving rows", /pipeline:\s*pipeRows/.test(ROUTE));
+
+  // The page must render a negative as elapsed time, never as a countdown.
+  const CCAPP = readPublic("cc-app.js");
+  check("C4m · the feed renders a negative day count as elapsed",
+    /a\.days < 0 \? `\$\{-a\.days\}d ago`/.test(CCAPP), "no overdue branch in the when slot");
+  // Typed as number so tsc does not narrow -9 and 0 into disjoint literal types.
+  check("C4n · PLANTED: the old slot would have printed a negative countdown",
+    (function () { const days: number = -9; return (days === 0 ? "now" : `${days}d`) === "-9d"; })());
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 console.log("\n── Part D · every desk answers, and an unsourced one names its blocker ──");
 {
   const all = buildDeskDigest(EMPTY, NOW);
-  const DESKS = ["opp", "co", "cmmc", "far", "spend", "gao", "team", "wage"];
+  const DESKS = ["opp", "pipe", "co", "cmmc", "far", "spend", "gao", "team", "wage"];
   check("D1 · the digest returns a row for EVERY desk", DESKS.every((k) => all.some((r) => r.desk === k)),
     "missing: " + DESKS.filter((k) => !all.some((r) => r.desk === k)).join(","));
   // A desk missing from the array and a desk with nothing to report would look
