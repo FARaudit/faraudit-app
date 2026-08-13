@@ -6,9 +6,12 @@ import {
   fetchRecentAudits,
   fetchHomeStats,
 } from "@/lib/bd-os/queries";
-import { fetchLiveOpportunitiesScoped, WINDOW_DAYS } from "@/lib/bd-os/live-opportunities";
+import { fetchLiveOpportunitiesScoped, WINDOW_DAYS, resolveFeedScope } from "@/lib/bd-os/live-opportunities";
 import type { OpportunityRow } from "@/lib/bd-os/queries";
 import { poleToRecommendation } from "@/lib/verdict-pole";
+import { fetchDefenseSpending, type SpendingResult } from "@/lib/bd-os/defense-spending";
+import { federalRegisterUrl, parseFederalRegister, type RegRow } from "@/lib/federal-register";
+import { buildDeskDigest } from "@/lib/bd-os/desk-digest";
 
 export const dynamic = "force-dynamic";
 
@@ -72,7 +75,10 @@ export async function GET() {
         ? _useTokens[0][0].toUpperCase()
         : (_useTokens[0][0] + _useTokens[_useTokens.length - 1][0]).toUpperCase();
 
-    const [counters, homeStats, scoped, recentAudits, pipelineRows] = await Promise.all([
+    const [
+      counters, homeStats, scoped, recentAudits, pipelineRows,
+      cmmcAudits, regRules, spending,
+    ] = await Promise.all([
       fetchHeaderCounter(supabase).catch(() => ({ audits: 0, traps: 0 })),
       fetchHomeStats(supabase).catch(() => null),
       // Live SAM feed (CEO 2026-07-29: go live-source; PR #334 library). null —
@@ -111,6 +117,46 @@ export async function GET() {
           (r) => (r.error ? null : ((r.data as any[]) || [])),
           () => null
         ),
+
+      // ── The three extra reads the CROSS-DESK DIGEST needs ──
+      // Each is null on failure, never [], for the reason stated throughout this
+      // route: a failed read and an empty desk are different facts and the
+      // panels must be able to say which one happened.
+
+      // CMMC needs `compliance_json` itself, and fetchRecentAudits above does NOT
+      // select it — it extracts a handful of sub-fields. Running inferLevel() over
+      // those rows would read every audit as "CMMC not required", turning a column
+      // this query never asked for into an all-clear on the customer's compliance
+      // obligations. So the digest gets its own select, scoped to this user.
+      supabase
+        .from("audits")
+        .select("id, notice_id, solicitation_number, title, agency, created_at, response_deadline, compliance_json")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(200)
+        .then(
+          (r) => (r.error ? null : ((r.data as any[]) || [])),
+          () => null
+        ),
+
+      // Federal Register — free, no key. The same URL /api/proposed-rules builds,
+      // through the shared library rather than a second hand-rolled query, and
+      // behind Next's data cache so Today's own calendar fetch of the same feed
+      // costs one request between them rather than two.
+      fetch(federalRegisterUrl(), {
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(8000),
+        next: { revalidate: 21600 },
+      })
+        .then(async (r): Promise<RegRow[] | null> =>
+          r.ok ? parseFederalRegister(await r.text()) : null)
+        .catch(() => null),
+
+      // Defense spending — a read of `defense_spending_intel`, the same library
+      // call the desk's own route makes, so the two cannot disagree.
+      resolveFeedScope(supabase)
+        .then((s): Promise<SpendingResult> => fetchDefenseSpending(supabase, s.codes))
+        .catch(() => null),
     ]);
 
     const nowMs = Date.now();
@@ -296,6 +342,18 @@ export async function GET() {
       return !isNaN(ms) && ms > nowMs && ms <= nowMs + weekMs;
     }).length;
 
+    // ── THE CROSS-DESK DIGEST ──
+    // One shaping, two panels. The Priority Action Feed ranks these rows and the
+    // Signals grid summarises them, so a desk cannot read as urgent in one panel
+    // and quiet in the other. `liveOpps` is passed — the deduped array, null on a
+    // failed read — not `opportunities`, which is [] in both cases.
+    const deskDigest = buildDeskDigest({
+      opportunities: liveOpps,
+      cmmcAudits: (cmmcAudits as any[] | null),
+      regRules: (regRules as RegRow[] | null),
+      spending: (spending as SpendingResult | null),
+    }, nowMs);
+
     return NextResponse.json({
       // ── existing fields ──
       // The homeStats fallbacks are GONE. Both counted pending_audits rows, which
@@ -360,6 +418,11 @@ export async function GET() {
 
       // Sidebar Opportunities .sb-badge.live indicator
       ingestStatus,
+
+      // Priority Action Feed + Signals grid. One row per desk, each carrying its
+      // own status — never a partial list, because a desk missing from the array
+      // and a desk with nothing to report would look identical.
+      deskDigest,
     });
   } catch (err) {
     console.error("[command-center-data]", err);
