@@ -40,7 +40,8 @@ const BUILDER = read("src/lib/bd-os/defense-spending.ts");
 const HTML = pageSource("defense-spending.html");
 
 const FN = (() => {
-  const i = APP.indexOf("function renderMarketYoY");
+  const anchor = APP.indexOf("const SHOW_MAX");
+  const i = anchor > -1 ? anchor : APP.indexOf("function renderMarketYoY");
   const j = APP.indexOf("function renderNowFigures");
   return i > -1 && j > i ? APP.slice(i, j) : "";
 })();
@@ -91,8 +92,21 @@ ok(!/new Date\(\)|Date\.now\(\)/.test(FN),
 console.log("\nR4  ONE SERIES PER TRACKED CODE");
 ok(/Object\.keys\(T\.series/.test(FN),
   "the code list comes from the series itself, not from a hardcoded set");
-ok(!/\.slice\(0,\s*\d/.test(FN), "no cap truncates the code list");
-ok(/!S\.code \|\| c === S\.code/.test(FN),
+ok(!/\.slice\(0,\s*\d/.test(FN),
+  "no bare-numeric cap truncates the code list");
+const CAPPED = /slice\(0,\s*SHOW_MAX\)/.test(FN);
+// Graded on the FOOTNOTE ITSELF. Matching the whole file passes on the picker's
+// own "N tracked codes" count line, so the check survived deleting the footnote.
+const FOOT = (() => {
+  const i = APP.indexOf("function renderNowFigures");
+  const j = APP.indexOf("const last =", i);
+  return i > -1 && j > i ? APP.slice(i, j) : "";
+})();
+ok(!CAPPED || (/tracked codes/.test(FOOT) && /shown/.test(FOOT)),
+  "a cap on the visible codes is DECLARED in the footnote — the total counts codes the bars do not show");
+ok(!CAPPED || /SHOW_MAX = 3\b/.test(FN),
+  "…and the cap is a named bound, not a number buried in a slice");
+ok(/c === S\.code/.test(FN),
   "a selected code narrows it to that code — the only filter applied");
 
 // ── R5 · THE HEADLINE FIGURES ARE THIS SERIES, NOT A SECOND MEASUREMENT ──────
@@ -105,7 +119,7 @@ const NOW = (() => {
 ok(NOW.length > 0, "renderNowFigures is findable");
 ok(/view\(\)\.kpis/.test(NOW),
   "it reads the SCOPED view, so picking a code moves the headline with the panel");
-ok(/renderNowFigures\(\)/.test(FN), "and it is driven by the panel it belongs to");
+ok(/renderNowFigures\(/.test(FN), "and it is driven by the panel it belongs to");
 ok(!HTML.includes('id="kpiStrip"'),
   "the free-standing KPI strip is gone — the figures are the last point of this series");
 
@@ -125,8 +139,7 @@ console.log("\nR6  PLANTED POSITIVES");
   const clocked = FN + "\nconst x = new Date();";
   ok(/new Date\(\)/.test(clocked), "PLANT: a clock read inside the panel is detectable");
 
-  const noType = BUILDER.replace(/MARKET_TREND: \{ labels: string\[\]; series: Record<string, number\[\]>; open: boolean\[\] \}/,
-    "MARKET_TREND: { labels: string[]; series: Record<string, number[]> }");
+  const noType = BUILDER.replace(/open: boolean\[\];/, "");
   ok(!/open: boolean\[\]/.test(noType.slice(noType.indexOf("MARKET_TREND:"), noType.indexOf("MARKET_TREND:") + 200)),
     "PLANT: dropping `open` from the payload type is detectable");
 }
