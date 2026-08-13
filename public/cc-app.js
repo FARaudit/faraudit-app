@@ -254,12 +254,12 @@
       // a handful a quarter and each one binds every customer, so being sorted in among
       // a hundred response deadlines and truncated away is the one outcome that makes
       // them worthless. The cap governs notice rows only; gov rows always render.
-      const govItems = items.filter((w) => w.gov);
-      const oppItems = items.filter((w) => !w.gov);
-      const cap = WEEK_GROUP_CAPS[g.label] || oppItems.length;
-      const shownOpps = oppItems.slice(0, cap);
-      const shown = govItems.concat(shownOpps).sort((a, b) => (a.day ?? 0) - (b.day ?? 0));
-      const hidden = oppItems.length - shownOpps.length;
+      // The calendar carries major events only, so there is nothing to truncate — a
+      // cap existed to hold back 177 response deadlines, and those are gone. It stays
+      // as a DOM backstop in case a future source floods a group.
+      const cap = WEEK_GROUP_CAPS[g.label] || items.length;
+      const shown = items.slice(0, cap);
+      const hidden = items.length - shown.length;
       hiddenTotal += hidden;
       // The group header count is the TRUE total, not the shown count — a
       // header reading "20" over 20 rows would hide that 51 more exist.
@@ -284,7 +284,7 @@
     if (window.CC.FEED_ERROR || window.CC.WEEK_SOURCED === false) {
       empty = `<div class="fc-t">Deadlines unavailable</div><div class="fc-d">The feed did not answer, so this calendar is empty rather than illustrative — nothing here is sample data.</div>`;
     } else {
-      empty = `<div class="fc-t">No dated deadlines</div><div class="fc-d">No live notice in your NAICS carries a future response deadline right now. Only response deadlines are wired — wage-determination, regulatory and fiscal dates are not sourced yet.</div>`;
+      empty = `<div class="fc-t">No major dates ahead</div><div class="fc-d">No open comment period, rule effective date or fiscal marker falls in the window. Response deadlines are not shown here — they live on <a class="fc-undo" href="/notices">Notices</a>.</div>`;
     }
     $('weekList').innerHTML = html || `<div class="feed-clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>${empty}</div>`;
   }

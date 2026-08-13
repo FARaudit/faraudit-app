@@ -45,33 +45,37 @@
   // therefore PER GROUP, in the render layer where the grouping lives (cc-app.js).
   // This ceiling is only a DOM-size backstop, far above real feed volume.
   var WEEK_MAX_ROWS = 400;
-  function buildWeek(opps, govRows) {
-    var gov = Array.isArray(govRows) ? govRows : [];
-    if ((!Array.isArray(opps) || opps.length === 0) && gov.length === 0) return { rows: [], dropped: 0 };
-    var now = Date.now();
-    var items = gov.slice();
-    if (!Array.isArray(opps)) opps = [];
-    for (var i = 0; i < opps.length; i++) {
-      var o = opps[i];
-      if (!o || !o.response_deadline) continue;
-      var ms = new Date(o.response_deadline).getTime();
-      if (isNaN(ms) || ms < now) continue; // expired rows never enter the feed, but never trust that here
-      var day = Math.max(0, Math.ceil((ms - now) / 86400000));
-      items.push({
-        ms: ms,
-        day: day,
-        // Formatted from the real timestamp — no month-name literals.
-        d: new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        label: cleanLabel(o.title_plain || o.title) || (o.solicitation_number || o.notice_id || 'Untitled notice'),
-        tag: 'Response due',
-        // Tone from proximity only — nothing here scores the opportunity.
-        tone: day <= 3 ? 'crit' : day <= 7 ? 'warn' : 'ok',
-        desk: 'opp'
-      });
-    }
+  function buildWeek(rows) {
+    var items = Array.isArray(rows) ? rows.slice() : [];
+    if (items.length === 0) return { rows: [], dropped: 0 };
     items.sort(function (a, b) { return a.ms - b.ms; });
     var dropped = Math.max(0, items.length - WEEK_MAX_ROWS);
     return { rows: items.slice(0, WEEK_MAX_ROWS), dropped: dropped };
+  }
+
+  // Fiscal markers — from the clock, no source to rot. The 30 September obligation
+  // deadline is the single most consequential recurring date in federal contracting.
+  function buildFiscalWeek() {
+    var now = new Date();
+    var y = now.getFullYear();
+    var out = [];
+    var marks = [
+      { m: 8, d: 30, tag: 'Fiscal year ends', label: 'FY' + String((y + 1) % 100) + ' obligations close — agencies spend or lose it' },
+      { m: 6, d: 1,  tag: 'Q4 begins',        label: 'Q4 obligation surge begins — the busiest quarter for awards' }
+    ];
+    for (var i = 0; i < marks.length; i++) {
+      var mk = marks[i];
+      var when = new Date(y, mk.m, mk.d, 12, 0, 0);
+      if (when.getTime() < now.getTime()) when = new Date(y + 1, mk.m, mk.d, 12, 0, 0);
+      var day = Math.max(0, Math.ceil((when.getTime() - now.getTime()) / 86400000));
+      out.push({
+        ms: when.getTime(), day: day, gov: true, big: mk.m === 8,
+        d: when.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        label: mk.label, tag: mk.tag,
+        tone: day <= 30 ? 'warn' : 'ok', desk: 'spend'
+      });
+    }
+    return out;
   }
 
   // GOVERNMENT EVENTS — the second row type the calendar was designed for and never
@@ -197,9 +201,12 @@
         if (gr.ok) { var gj = await gr.json(); govRules = (gj && gj.rules) || []; }
       } catch (e) { govRules = []; }
 
-      var wk = buildWeek(data.opportunities, buildGovWeek(govRules));
+      // MAJOR EVENTS ONLY. Response deadlines are deliberately NOT here: 177 of them
+      // arrive on a rolling window and burying four government dates under them is
+      // what made this panel unusable. The deadline list lives on Notices.
+      var wk = buildWeek(buildGovWeek(govRules).concat(buildFiscalWeek()));
       window.CC.WEEK_DROPPED = wk.dropped;   // surfaced in the panel, never silent
-      window.CC.WEEK_SOURCED = Array.isArray(data.opportunities);
+      window.CC.WEEK_SOURCED = true;
       if (!Array.isArray(data.WEEK)) replaceArr('WEEK', wk.rows);
 
       // ACTIONS stays empty until fetchCommandCenterDigest ships. If a future
