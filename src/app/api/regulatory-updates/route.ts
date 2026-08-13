@@ -122,8 +122,13 @@ export async function GET(req: NextRequest) {
       await supabase
         .from("regulatory_updates")
         .upsert(
-          // raw_text_url is transient — it is how the clauses were read, not a column.
-          rows.map(({ raw_text_url: _drop, ...r }) => ({ ...r, fetched_at: new Date().toISOString() })),
+          // TRANSIENT FIELDS ARE STRIPPED HERE, and this spread is why it matters:
+          // `...r` carries whatever RegRow gains, so a field added upstream for a
+          // reader reaches this INSERT and fails the whole write on a column the
+          // table does not have. raw_text_url is how the clauses were read;
+          // comments_close_on is a date a reader ranks by. Neither is a column.
+          rows.map(({ raw_text_url: _drop, comments_close_on: _drop2, ...r }) =>
+            ({ ...r, fetched_at: new Date().toISOString() })),
           { onConflict: "source,link" }
         )
         .then(() => null, () => null);
