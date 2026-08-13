@@ -377,6 +377,24 @@
   const JP_OFFICE = /YOKOSUKA|SASEBO|ATSUGI|OKINAWA|IWAKUNI|MISAWA|JAPAN/i;
   const IT_OFFICE = /NAPLES|SIGONELLA|GAETA|ITALY/i;
 
+  /* Area code to state, for the codes this feed actually carries. A code that is
+     not in the table is not labelled with a place — 392 appears twice and is not
+     an assigned NANP code, and naming a state for it would invent a fact. */
+  const US_AREA = {
+    '202': 'District of Columbia', '206': 'Washington', '301': 'Maryland', '315': 'New York',
+    '360': 'Washington', '385': 'Utah', '401': 'Rhode Island', '405': 'Oklahoma',
+    '410': 'Maryland', '415': 'California', '445': 'Pennsylvania', '504': 'Louisiana',
+    '510': 'California', '518': 'New York', '564': 'Washington', '571': 'Virginia',
+    '573': 'Missouri', '603': 'New Hampshire', '614': 'Ohio', '619': 'California',
+    '656': 'Florida', '757': 'Virginia', '801': 'Utah', '808': 'Hawaii',
+    '812': 'Indiana', '937': 'Ohio'
+  };
+  function usPlace(d) {
+    const st = US_AREA[d.slice(0, 3)];
+    return st ? st + ' \u00b7 as published by SAM'
+              : 'area code not recognised \u00b7 as published by SAM';
+  }
+
   function isNanp(d) {
     return d.length === 10 && d[0] !== '0' && d[0] !== '1' && d[3] !== '0' && d[3] !== '1';
   }
@@ -403,30 +421,30 @@
   function phoneParts(raw, office) {
     const s = String(raw == null ? '' : raw).trim();
     if (!s) return null;
-    if (/[a-z]/i.test(s)) return { text: s, note: null };
+    if (/[a-z]/i.test(s)) return { text: s, note: 'as published by SAM' };
     const d = s.replace(/[^0-9]/g, '');
     if (!d || /^0+$/.test(d)) return null;
     const o = String(office || '');
 
-    if (isNanp(d)) return { text: nanp(d), note: null };
+    if (isNanp(d)) return { text: nanp(d), note: usPlace(d) };
 
     if (d.length === 20 && isNanp(d.slice(0, 10)) && isNanp(d.slice(10))) {
       return { text: nanp(d.slice(0, 10)) + '  ·  ' + nanp(d.slice(10)),
-               note: 'SAM published two numbers in this field' };
+               note: US_AREA[d.slice(0, 3)] ? US_AREA[d.slice(0, 3)] + ' \u00b7 SAM published two numbers in this field' : 'SAM published two numbers in this field' };
     }
 
     const intl = d.replace(/^(?:011|00)/, '');
     if (JP_OFFICE.test(o)) {
       const nat = intl.slice(0, 2) === '81' ? intl.slice(2) : (d[0] === '0' ? d.slice(1) : null);
       const f = nat ? jp(nat) : null;
-      if (f) return { text: f, note: 'Japan' };
-      if (d.length === 7) return { text: d, note: 'DSN extension' };
+      if (f) return { text: f, note: 'Japan \u00b7 as published by SAM' };
+      if (d.length === 7) return { text: d, note: 'DSN extension \u00b7 as published by SAM' };
       return { text: s, note: 'overseas · shown as SAM published it' };
     }
     if (IT_OFFICE.test(o)) {
       const nat = intl.slice(0, 2) === '39' ? intl.slice(2) : null;
       const f = nat ? it(nat) : null;
-      if (f) return { text: f, note: 'Italy' };
+      if (f) return { text: f, note: 'Italy \u00b7 as published by SAM' };
       return { text: s, note: 'overseas · shown as SAM published it' };
     }
     return { text: s, note: 'shown as SAM published it' };
