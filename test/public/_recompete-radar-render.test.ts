@@ -36,7 +36,19 @@ function main() {
     // only ids the recompete renderer touches
     written.add(m[1]);
   }
-  const RC_IDS = ["rcList", "bigN", "bigSay", "viz", "cap", "lede", "footL", "footR", "whSub"];
+  /* ⛔ `viz` and `cap` LEFT THE PRODUCT, not just this list. The unit chart drew one
+     row per firm with a block per contract, under a caption explaining how to read
+     it — 123px to carry "two firms hold six of the twenty-one, the other fifteen
+     hold one each", which is a sentence. It is now that sentence, in the lede. The
+     RETIRED check below asserts neither host came back on either page. */
+  const RC_IDS = ["rcList", "bigN", "bigSay", "lede", "footL", "footR", "whSub"];
+  const RC_RETIRED = ["viz", "cap"];
+  for (const id of RC_RETIRED) {
+    assert(!html.includes(`id="${id}"`), `retired host #${id} is gone from the markup`);
+    assert(!new RegExp(`\\$\\('${id}'\\)`).test(app), `…and nothing still writes to #${id}`);
+  }
+  assert(/hold one each/.test(app),
+    "the concentration finding survives as a clause in the lede, not as a chart");
   for (const id of RC_IDS) {
     assert(html.includes(`id="${id}"`), `markup carries #${id}`);
     assert(written.has(id), `the renderer writes to #${id}`);
