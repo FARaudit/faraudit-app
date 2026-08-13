@@ -360,8 +360,6 @@ details[open]>summary .chev{transform:rotate(180deg)}
 .rac.is-incomplete::before{background:none;border-left:3px dashed #94a3b8;width:0}  /* dashed = unfinished, not merely referred */
 .rac.is-unresolved{--v:#64748b;--vt:#f1f5f9;--vl:#dbe2ea;--vi:#475569}
 .rac-badge{width:54px;height:54px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;line-height:1;background:var(--v)}
-.rac-score{font-family:"IBM Plex Mono",monospace;font-size:22px;font-weight:700}
-.rac-of{font-family:"IBM Plex Mono",monospace;font-size:8px;font-weight:600;opacity:.85;margin-top:3px}
 .rac-main{min-width:0}
 .rac-metarow{display:flex;align-items:center;gap:9px;margin-bottom:3px}
 .rac-id{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap}
@@ -690,8 +688,6 @@ details[open]>summary .chev{transform:rotate(180deg)}
 .rac-dl .val.closed{ color:var(--mute); }
 /* 3d · Score box — pastel / tinted (decided) */
 .rac-badge{ background:var(--vt); border:1px solid var(--vl); color:var(--vi); }
-.rac-score{ color:var(--vi); }
-.rac-of{ opacity:.7; }
 /* 5 · first-run / empty state — "No audits yet" card pointing back to the upload */
 .ra-empty{ display:flex; flex-direction:column; align-items:center; text-align:center; gap:8px; padding:36px 20px; border:1px dashed var(--line); border-radius:14px; background:var(--card-soft); }
 .ra-empty .ic{ width:44px; height:44px; border-radius:11px; background:var(--accent-soft); color:var(--accent-on); display:grid; place-items:center; }
@@ -896,7 +892,7 @@ details[open]>summary .chev{transform:rotate(180deg)}
           </div>
           <div class="sam card" style="display:none"></div>
         </div>
-        <details class="blk prep-wrap">
+        <details class="blk prep-wrap" open>
           <summary class="sec-head"><span class="k">Solicitation prep</span><span class="all" style="color:var(--mute);text-decoration:none">reference<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></span></summary>
           <div class="prep-sub">What to grab <span>priority order — more sections, sharper audit</span></div>
           <div class="grab card">
@@ -939,20 +935,18 @@ details[open]>summary .chev{transform:rotate(180deg)}
             <div class="ra-region">
               <div class="ra-scroll">
                 <div class="ra-list">
-              <a class="rac is-nobid" href="#"><div class="rac-badge"><span class="rac-score">50</span><span class="rac-of">/ 100</span></div><div class="rac-main"><div class="rac-title">HM047626R0039 — Solicitation</div><div class="rac-sub"><span class="rac-office">DLA TROOP SUPPORT · PHILADELPHIA PA</span><span class="rac-insight"><span class="rac-spark"></span>No-bid unless SPRS is current today.</span></div></div><div class="rac-dl"><span class="lbl">Due in</span><span class="val closed">—</span></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>NO-BID</span><span class="rac-ago">29m ago</span></div></a>
-              <a class="rac is-caution" href="#"><div class="rac-badge"><span class="rac-score">69</span><span class="rac-of">/ 100</span></div><div class="rac-main"><div class="rac-title">Attachment 1 — PWS — 04.15.26 final</div><div class="rac-sub"><span class="rac-office">AIR FORCE · 55 CONS · OFFUTT AFB NE</span><span class="rac-insight"><span class="rac-spark"></span>Bid with caution — close disqualification first.</span></div></div><div class="rac-dl"><span class="lbl">Due in</span><span class="val">14 days</span></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>CAUTION</span><span class="rac-ago">13h ago</span></div></a>
-              <a class="rac is-caution" href="#"><div class="rac-badge"><span class="rac-score">50</span><span class="rac-of">/ 100</span></div><div class="rac-main"><div class="rac-title">Solicitation — Sol_1232SA26R0020_Amd_0001</div><div class="rac-sub"><span class="rac-office">USDA FOREST SERVICE · ALBUQUERQUE NM</span><span class="rac-insight"><span class="rac-spark"></span>Bid with caution — close disqualification first.</span></div></div><div class="rac-dl"><span class="lbl">Due in</span><span class="val warn">6 days</span></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>CAUTION</span><span class="rac-ago">13h ago</span></div></a>
-              <a class="rac is-proceed" href="#"><div class="rac-badge"><span class="rac-score">75</span><span class="rac-of">/ 100</span></div><div class="rac-main"><div class="rac-title">Attachment 3 — Statement of Work</div><div class="rac-sub"><span class="rac-office">AIR FORCE · AFLCMC · WPAFB OH</span><span class="rac-insight"><span class="rac-spark"></span>Strong fit — file the clarifications below before quoting.</span></div></div><div class="rac-dl"><span class="lbl">Due in</span><span class="val">20 days</span></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>PROCEED</span><span class="rac-ago">13h ago</span></div></a>
+                  <!-- No placeholder rows. Real rows only, from /api/audits. -->
+                  <div class="ra-boot">Loading your audits…</div>
                 </div>
               </div>
             </div>
           </section>
-          <details class="blk blk-stages prep-wrap">
+          <details class="blk blk-stages prep-wrap" open>
             <summary class="sec-head"><span class="k">What runs when you submit</span><span class="all" style="color:var(--mute);text-decoration:none">how it works<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></span></summary>
             <div class="pipe" style="margin-top:13px">
-              <div class="pstep"><div class="ptop"><span class="pn">01</span><span class="ph">Reads every document</span></div><div class="pchips"><span class="pchip">Full-package map</span><span class="pchip">Coverage ledger</span></div></div>
+              <div class="pstep"><div class="ptop"><span class="pn">01</span><span class="ph">Reads every document</span></div><div class="pchips"><span class="pchip">Every posted attachment</span><span class="pchip">Coverage ledger</span></div></div>
               <div class="pstep"><div class="ptop"><span class="pn">02</span><span class="ph">Expert lens panel</span></div><div class="pchips"><span class="pchip">Grounded in source</span><span class="pchip">Verbatim citations</span></div></div>
-              <div class="pstep"><div class="ptop"><span class="pn">03</span><span class="ph">Verdict gate</span></div><div class="pchips"><span class="pchip">BID / NO-BID</span><span class="pchip">Honest-fail, no charge</span></div></div>
+              <div class="pstep"><div class="ptop"><span class="pn">03</span><span class="ph">Verdict gate</span></div><div class="pchips"><span class="pchip">Bid · caution · needs review</span><span class="pchip">Stops rather than guesses</span></div></div>
               <div class="pstep pdeliver"><div><div class="pbadge">DELIVERS</div><span class="ph">Grounded report</span></div><div class="pchips"><span class="pchip">Deterministic verdict</span><span class="pchip">Cited findings</span></div></div>
             </div>
           </details>
@@ -1307,17 +1301,17 @@ var __fdReadyNoticeId=null;
   }
   function insightOf(a){var s='';if(a.insight)s=String(a.insight).trim();if(!s){var w=String(a.exec_what||'').trim();if(w){var p=w.split(' — ');if(p.length>1)s=p.slice(1).join(' — ').trim();}}if(!s){s=String(a.exec_factors||'').split(',')[0].trim().replace(/\s*\([^)]*\)\s*$/,'').trim();}if(!s)return '';s=s.charAt(0).toUpperCase()+s.slice(1);return s.length>90?s.slice(0,89).replace(/\s+$/,'')+'…':s;}
   function cell(a){var v=verdictOf(a);var sol=String(a.solicitation_number||a.notice_id||a.title||'').trim();var slug=a.id?String(a.id):encodeURIComponent(sol.toLowerCase());
-    var score=(typeof a.score==='number')?a.score:(typeof a.compliance_score==='number')?a.compliance_score:null;
     var office=String(a.office_display||a.agency||'').trim();var when=a.ago||ago(a.completed_at||a.created_at);
     var title=String(a.title||'').trim();if(title.toLowerCase()==='untitled solicitation')title='';var titleLine=(title&&title.toUpperCase()!==sol.toUpperCase())?title.slice(0,80):sol;
     // F2-LIVE: the reason line must NEVER fall back to the pole word — that printed the same invented
     // verdict twice in one row and dressed a label up as an engine-derived insight (Design calls it F6).
     var ins=insightOf(a);
-    var badge=(score!=null)?'<span class="rac-score">'+escapeHtml(String(score))+'</span><span class="rac-of">/ 100</span>':'<span class="rac-score">—</span>';
+
     var dl=dueIn(a,v.label);
-    return '<a class="rac '+v.cls+'" href="/audits/'+slug+'"><div class="rac-badge">'+badge+'</div><div class="rac-main"><div class="rac-title">'+escapeHtml(titleLine)+'</div><div class="rac-sub">'+(office?'<span class="rac-office">'+escapeHtml(office)+'</span>':'')+'<span class="rac-insight"><span class="rac-spark"></span>'+escapeHtml(ins)+'</span></div></div><div class="rac-dl"><span class="lbl">Due in</span><span class="val '+dl.cls+'">'+escapeHtml(dl.txt)+'</span></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>'+escapeHtml(v.label)+'</span><span class="rac-ago">'+escapeHtml(when)+'</span><span class="rac-chev">→</span></div></a>';}
+    return '<a class="rac '+v.cls+'" href="/audits/'+slug+'"><div class="rac-main"><div class="rac-title">'+escapeHtml(titleLine)+'</div><div class="rac-sub">'+(office?'<span class="rac-office">'+escapeHtml(office)+'</span>':'')+''+(ins?'<span class="rac-insight"><span class="rac-spark"></span>'+escapeHtml(ins)+'</span>':'')+'</div></div><div class="rac-dl"><span class="lbl">Due in</span><span class="val '+dl.cls+'">'+escapeHtml(dl.txt)+'</span></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>'+escapeHtml(v.label)+'</span><span class="rac-ago">'+escapeHtml(when)+'</span><span class="rac-chev">→</span></div></a>';}
   // first-run vs returning: flip section order + expand the "what runs" teaching pipeline for first-run.
-  function flip(n){var firstRun=(n===0);if(stack)stack.classList.toggle('flip',firstRun);var stages=document.querySelector('.blk-stages');if(stages&&stages.tagName==='DETAILS'){if(firstRun)stages.setAttribute('open','');else stages.removeAttribute('open');}}
+  // First run REORDERS the teaching block above the ledger. It no longer closes it.
+  function flip(n){var firstRun=(n===0);if(stack)stack.classList.toggle('flip',firstRun);var stages=document.querySelector('.blk-stages');if(stages&&stages.tagName==='DETAILS')stages.setAttribute('open','');}
   function renderCards(audits){if(!audits||!audits.length){list.innerHTML='<div class="ra-empty"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg></div><div class="h">No audits yet</div><div class="s">Upload a solicitation above and your first ranked report lands here — a bid / no-bid call with the KO clarification email drafted and ready.</div></div>';flip(0);return;}list.innerHTML=audits.map(cell).join('');flip(audits.length);}
   /* The green LIVE pill is a claim about THIS page's data, so only a settled fetch may
      turn it on. It ships hidden and stays hidden on any failure.

@@ -122,7 +122,24 @@ export async function GET() {
     //   scoped === null              → upstream SAM read FAILED  → opportunities null
     //   scope.source no-profile-codes→ no NAICS on file          → empty + a fixable reason
     //   rows === []                  → codes on file, empty window
-    const liveOpps: OpportunityRow[] | null = scoped ? scoped.rows : null;
+    // DEDUPE HERE, ONCE. The ingest queue can hold several rows for one notice, and
+    // /notices was deduping on the client while this route was not — so the same feed
+    // produced "166 live notices" on Today and "165 open notices" on Notices, from the
+    // same request. A count the customer reads twice must be computed once; a second
+    // consumer that forgets to dedupe would otherwise diverge again.
+    // Key precedence matches opportunities-live.js's DISPLAY identity: a base notice
+    // and its amendment share a solicitation_number but carry different notice_ids.
+    // Rows arrive newest-first, so the first occurrence is the one kept.
+    const _seen = new Set<string>();
+    const liveOpps: OpportunityRow[] | null = scoped
+      ? scoped.rows.filter((o) => {
+          const key = o.solicitation_number || o.notice_id || String(o.id ?? "");
+          if (!key) return true;
+          if (_seen.has(key)) return false;
+          _seen.add(key);
+          return true;
+        })
+      : null;
     const feedScope = scoped ? scoped.scope : null;
     const opportunities: OpportunityRow[] = liveOpps ?? [];
 
@@ -254,6 +271,22 @@ export async function GET() {
       return !isNaN(ts) && (nowMs - ts) < weekMs;
     }).length;
 
+    // AUDITS THIS MONTH counts SOLICITATIONS, not runs. homeStats.audit_activity_month
+    // and counters.audits both count audit ROWS, and one solicitation is routinely
+    // audited several times (W911SG27BA002 shows as 1/3, 2/3, 3/3) — so the tile read
+    // 43 for a customer who had worked 8. The label says "completed by you", which a
+    // customer reads as distinct solicitations, and that is the number now shown.
+    // Runs ship alongside so the tile can state both rather than hide the re-runs.
+    const monthMs = 30 * dayMs;
+    const _monthRows = !auditsAvailable ? null : audits.filter((a) => {
+      const ts = (a.completed_at || a.created_at) ? new Date(a.completed_at || a.created_at).getTime() : NaN;
+      return !isNaN(ts) && (nowMs - ts) <= monthMs;
+    });
+    const auditRunsThisMonth = _monthRows ? _monthRows.length : null;
+    const auditSolicitationsThisMonth = _monthRows
+      ? new Set(_monthRows.map((a) => a.solicitation_number || a.notice_id || a.id)).size
+      : null;
+
     // Live-feed deadline count within 7 days — replaces homeStats.expiring_7d /
     // live_sam_gov, which count pending_audits rows (structurally zero since the
     // queue froze; a hardcoded 0 next to a live feed would be its own lie).
@@ -273,7 +306,9 @@ export async function GET() {
       liveCount:        liveOpps ? liveOpps.length : null,
       trapCount:        homeStats?.total_traps_caught   ?? counters.traps,
       deadlineSoon:     feedNum(deadlineSoon7d),
-      auditsThisMonth:  homeStats?.audit_activity_month ?? counters.audits,
+      // DISTINCT solicitations, not audit rows. See the derivation above.
+      auditsThisMonth:  auditSolicitationsThisMonth,
+      auditRunsThisMonth,
       auditTotal:       auditsAvailable ? audits.length : null,
       // null = live fetch failed (client renders "unavailable", not "empty")
       opportunities:    liveOpps,

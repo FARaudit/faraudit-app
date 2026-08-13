@@ -11,7 +11,6 @@
       opp:   { label: 'Notices', color: '#378ADD', href: '/notices', icon: 'M12 2a9 9 0 100 18 9 9 0 000-18zM9 12l2 2 4-4' },
       co:    { label: 'Contracting Officers', color: '#185FA5', href: '/contracting-officers', icon: 'M9 9a3 3 0 100-6 3 3 0 000 6zM3 20c1-3 3-5 6-5s5 2 6 5' },
       cmmc:  { label: 'CMMC Readiness', color: '#0891b2', href: '/cmmc', icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4' },
-      gao:   { label: 'GAO Protests', color: '#dc2626', href: '/gao-protests', icon: 'M12 3a9 9 0 100 18 9 9 0 000-18zM3 12h18' },
       far:   { label: 'FAR/DFARS', color: '#7c3aed', href: '/far-dfars-updates', icon: 'M4 3h16v18H4zM8 8h8M8 12h8M8 16h5' },
       wage:  { label: 'Wage Benchmarks', color: '#d97706', href: '/wage-benchmarks', icon: 'M3 20h18M6 16v-5M11 16V8M16 16v-3' },
       team:  { label: 'Teaming Partners', color: '#059669', href: '/teaming-partners', icon: 'M7 9a3 3 0 100-6 3 3 0 000 6zM17 9a3 3 0 100-6 3 3 0 000 6zM2 20c0-3 2.5-5 5-5M22 20c0-3-2.5-5-5-5' },
@@ -74,6 +73,18 @@
     return String(num(v) ?? DASH);
   }
 
+  // The tile counts SOLICITATIONS. Runs are usually higher because one solicitation
+  // is audited more than once, so the foot names the unit and surfaces the re-runs
+  // rather than letting the larger number sit behind a smaller one.
+  function auditsFoot(L) {
+    if (!L) return 'not loaded';
+    const sol = num(L.auditsThisMonth), runs = num(L.auditRunsThisMonth);
+    if (sol === null) return 'your audits could not be read';
+    if (sol === 0) return 'no solicitations audited in the last 30 days';
+    const base = 'solicitation' + (sol === 1 ? '' : 's') + ' you audited';
+    return (runs !== null && runs > sol) ? base + ' · ' + runs + ' runs' : base;
+  }
+
   function renderKPIs() {
     const L = window.CC.LIVE;
     const arrow = '<span class="kpi-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M7 17L17 7M9 7h8v8"/></svg></span>';
@@ -84,7 +95,7 @@
     const cards = [
       { href: '/notices', lbl: 'Live Notices',     val: feedVal(L, L && L.liveCount),    unit: '',  foot: feedFoot(L, 'matching your NAICS on SAM.gov'), tone: 'blue' },
       { href: '/notices', lbl: 'Closing ≤ 7 Days', val: feedVal(L, L && L.deadlineSoon), unit: '',  foot: feedFoot(L, 'live notices with a stated deadline'), tone: 'amber' },
-      { href: '/past-audits',   lbl: 'Audits This Month', val: L ? String(num(L.auditsThisMonth) ?? DASH) : DASH, unit: '', foot: L ? 'completed by you' : 'not loaded', tone: 'red' },
+      { href: '/past-audits',   lbl: 'Audits This Month', val: L ? String(num(L.auditsThisMonth) ?? DASH) : DASH, unit: '', foot: auditsFoot(L), tone: 'red' },
       { href: '/pipeline',      lbl: 'Pipeline Value',   val: money ?? DASH, unit: '', foot: pipelineFoot(L), tone: 'green' }
     ];
     $('kpiStrip').innerHTML = cards.map(c => `<a class="kpi" data-tone="${c.tone}" href="${c.href}">${arrow}<p class="lbl">${c.lbl}</p><div class="kpi-val">${c.val}<span class="unit">${c.unit}</span></div><div class="foot">${c.foot}</div></a>`).join('');
@@ -274,7 +285,11 @@
   // these render as plain NAVIGATION: every desk reachable, zero assertions
   // about what is in it. A desk card makes a claim only once its query exists.
   function renderSignals() {
-    const order = ['spend', 'co', 'cmmc', 'far', 'gao', 'team'];
+    // GAO Protests is deliberately ABSENT: the desk was retired from the rail, and a
+    // Signals card is a navigation promise. The route still answers, which is exactly
+    // why a link check passed it — "the route resolves" and "this desk is still part
+    // of the product" are different questions.
+    const order = ['spend', 'co', 'cmmc', 'far', 'team'];
     $('sigGrid').innerHTML = order.map(key => {
       const d = DESK[key];
       if (!d) return '';
