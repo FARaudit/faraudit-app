@@ -20,11 +20,11 @@ import type { SpendingResult } from "@/lib/bd-os/defense-spending";
  * and it does not turn a failed read into a zero — the two states the panels
  * must be able to tell apart are exactly the two this file keeps apart. */
 
-export type DeskKey = "opp" | "co" | "cmmc" | "far" | "gao" | "team" | "spend" | "wage";
+export type DeskKey = "opp" | "pipe" | "co" | "cmmc" | "far" | "gao" | "team" | "spend" | "wage";
 
 /** Every desk on Today, in the order the Feed considers them. The Signals grid
  *  renders its own subset; both read from this one list. */
-export const DESK_KEYS: DeskKey[] = ["opp", "co", "cmmc", "far", "spend", "gao", "team", "wage"];
+export const DESK_KEYS: DeskKey[] = ["opp", "pipe", "co", "cmmc", "far", "spend", "gao", "team", "wage"];
 
 export type DeskStatus =
   /** The headline is a measurement taken from data this desk actually read. */
@@ -72,6 +72,8 @@ export interface DeskDigestInput {
   cmmcAudits: Array<Record<string, unknown>> | null;
   /** Federal Register rows. null = the read FAILED. */
   regRules: RegRow[] | null;
+  /** The customer's own pipeline rows. null = the read FAILED. */
+  pipeline: Array<Record<string, unknown>> | null;
   /** Defense-spending payload or one of its stated non-payload states.
    *  null = the read THREW. */
   spending: SpendingResult | null;
@@ -90,9 +92,23 @@ export function daysUntil(iso: string | null | undefined, now: number): number |
 
 export function urgencyOf(days: number | null): Urgency {
   if (days === null) return "ok";
+  // NEGATIVE IS OVERDUE, and overdue is the most urgent thing a desk can hold —
+  // it is already too late, which no amount of "plan ahead" covers.
   if (days <= 3) return "crit";
   if (days <= 7) return "warn";
   return "ok";
+}
+
+/** Signed days to a date: positive ahead, NEGATIVE once it has passed. Distinct
+ *  from `daysUntil`, which drops past dates because a closed solicitation is not
+ *  an obligation. A pursuit the customer OWNS is the opposite case — its date
+ *  passing is the most important thing about it, so it must survive as a
+ *  negative rather than vanish. */
+export function daysSigned(iso: string | null | undefined, now: number): number | null {
+  if (!iso) return null;
+  const ms = new Date(iso).getTime();
+  if (isNaN(ms)) return null;
+  return Math.ceil((ms - now) / DAY_MS);
 }
 
 /** SAM titles arrive shouted and prefixed. Trimmed for a one-line card without
@@ -349,6 +365,58 @@ function deskSpend(spending: SpendingResult | null, now: number): DeskSummary {
   };
 }
 
+/* ── pipe · Pipeline ──────────────────────────────────────────────────────────
+ * THE CUSTOMER'S OWN PURSUITS, which is the one desk where the rows are theirs
+ * rather than the government's — so an overdue row here is not history, it is a
+ * date they missed on work they were doing.
+ *
+ * That is why this desk ranks on SIGNED days while every other desk drops past
+ * dates. A solicitation whose deadline passed is off the market; a pursuit whose
+ * date passed is still on their board, and saying nothing about it is the
+ * failure. Measured on the live account 2026-08-13: two pursuits, one nine days
+ * past its date, and no surface on Today said a word about either.
+ *
+ * The four values behind this — the funnel, the two closing counts and the top
+ * rows — were all computed by the route and thrown away for want of a panel to
+ * put them in. The panel already existed; it was the desk that was missing. */
+function deskPipe(rows: Array<Record<string, unknown>> | null, now: number): DeskSummary {
+  if (rows === null) return blank("pipe", "unavailable", "Your pipeline could not be read.");
+  if (rows.length === 0) {
+    return blank("pipe", "empty", "You have no active pursuits on your board yet.");
+  }
+  const dated = rows
+    .map((c) => ({ c, days: daysSigned(c.due_date as string | null, now) }))
+    .filter((x) => x.days !== null)
+    .sort((a, b) => (a.days as number) - (b.days as number));
+
+  const value = counted(rows.length, "pursuit");
+  const count = rows.length;
+  const undated = rows.length - dated.length;
+
+  if (dated.length === 0) {
+    // Real pursuits, none carrying a date. That is a fact about the board and it
+    // is said — a pipeline with no dates cannot be ranked, but it is not empty.
+    return {
+      desk: "pipe", status: "ok",
+      title: cleanTitle(rows[0].title as string | null) || "Untitled pursuit",
+      why: `On your board · ${counted(rows.length, "pursuit")} with no date set`,
+      value, count, days: null, urg: "ok", reason: null
+    };
+  }
+  const top = dated[0];
+  const d = top.days as number;
+  const overdue = d < 0;
+  return {
+    desk: "pipe", status: "ok",
+    title: cleanTitle(top.c.title as string | null) || "Untitled pursuit",
+    why: (overdue
+        ? `Your date passed ${counted(-d, "day")} ago`
+        : d === 0 ? "Your date is today" : "Soonest date on your board")
+      + (undated > 0 ? ` · ${undated} with no date set` : ""),
+    value, count, days: d, urg: urgencyOf(d), reason: null
+  };
+}
+
 /* ── The three desks with no cross-desk query, each naming its own blocker ─────
  * These are NOT failures and they are not empty desks. Saying which is which is
  * the whole point: a customer who reads "not pulled" knows the desk is fine and
@@ -362,6 +430,7 @@ const NOT_SOURCED: Record<"gao" | "team" | "wage", string> = {
 export function buildDeskDigest(input: DeskDigestInput, now: number = Date.now()): DeskSummary[] {
   return [
     deskOpp(input.opportunities, now),
+    deskPipe(input.pipeline, now),
     deskCo(input.opportunities, now),
     deskCmmc(input.cmmcAudits, now),
     deskFar(input.regRules, now),
