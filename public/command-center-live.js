@@ -34,11 +34,12 @@
     if (typeof window.setRailLiveBadge === 'function') window.setRailLiveBadge(state, opts);
   }
 
-  // Week Ahead rows, derived from the SAME live notices /opportunities renders.
-  // Only response deadlines are wired: every row here is a real notice with a
-  // real date, and the panel claims nothing else. Wage-determination
-  // expirations, regulatory effective dates and fiscal markers are NOT sourced
-  // yet, so they are simply absent rather than illustrated.
+  // Week Ahead rows. The calendar carries MAJOR GOVERNMENT DATES: comment
+  // windows and effective dates from the Federal Register, plus the two fiscal
+  // markers derived from the clock. Response deadlines are deliberately NOT
+  // here — a rolling window of them buried the handful of dates that bind every
+  // customer, and that list lives on Notices. Wage-determination expirations
+  // have no source and are simply absent rather than illustrated.
   // No flat cap here. Near-term notices outnumber later ones, so any flat cap
   // shows week one and nothing else and the panel's own three-group design
   // (This Week / This Month / Later This Year) could never appear. Truncation is
