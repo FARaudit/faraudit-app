@@ -475,7 +475,7 @@ export async function fetchRecompetes(
         office: null,
         internal_id: String(r["generated_internal_id"] ?? "")
       } as RecompeteRow & { internal_id: string });
-      if (out.length >= 10) return attachOffices(out);
+      if (out.length >= 25) return attachOffices(out);
     }
     if (pastCutoff) break;
     if (!d?.page_metadata?.hasNext) break;
@@ -489,7 +489,7 @@ export async function fetchRecompetes(
    2026-08-12 across the customer's 21 real rows — 21/21 returned an office and
    12 matched an officer we hold, byte-for-byte, with zero normalisation.
 
-   ⛔ AT MOST TEN REQUESTS PER (code, window), and they go through getJson, which
+   ⛔ AT MOST TWENTY-FIVE REQUESTS PER (code, window), and they go through getJson, which
    shares this file's single paced queue — the same REQUEST_GAP_MS spacing every
    other call obeys. The award-sample fetch above carries a note about a request
    burst getting this worker rate-limited; adding a second delay on top of the
