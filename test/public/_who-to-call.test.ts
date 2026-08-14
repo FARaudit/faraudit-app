@@ -106,6 +106,28 @@ for (const id of ["segFY", "hdrNaicsPills", "dsbProvenance", "resetBtn", "selChi
    record can only ever be all codes at once. It sits above the sheet and reads
    and writes window.BD_SCOPE, so the code chosen here has an address (URL, then
    localStorage) and the next destination opens on it. */
+/* ── THE TOPBAR ALIGNMENT THE DELETED SEARCH BOX WAS HOLDING ─────────────────
+   This page carries no search box: a placeholder that performs nothing is a
+   control the page cannot honour, and the standing ruling sends a fabricated
+   surface to deletion rather than to a label. But `.tb-search` in dsb.css holds
+   `margin-left:auto`, and that single declaration is what pushes the theme,
+   notification and account controls to the right edge on every page that has
+   one. Removing the box without carrying that leaves the buttons against the
+   breadcrumb while every other tab keeps them at the edge — measured at 425px
+   short of the right edge on production.
+   This is the same check `_today-no-dead-search` Part B keeps over today.html,
+   which lost the same box for the same reason. It fails CLOSED: if the rule is
+   renamed or moved, the match goes away and this goes red rather than quiet. */
+console.log("\nR2a THE TOPBAR STILL ALIGNS WITHOUT ITS SEARCH BOX");
+ok(!/class="tb-search"/.test(HTML), "the page ships no placeholder search box");
+const taRule = HTML.match(/\.top-actions\s*\{([^}]*)\}/);
+ok(!!taRule, "a .top-actions rule is findable on the page (fails closed if it moves)");
+ok(/margin-left:\s*auto/.test(taRule?.[1] || ""),
+  "…and it carries the right-alignment the search box used to hold",
+  taRule?.[1] || "(not found)");
+ok(/class="crumbs"/.test(HTML) && /class="top-actions"/.test(HTML),
+  "…over a topbar whose two children are still the crumbs and the actions");
+
 console.log("\nR2b THE SCOPE AND FRESHNESS CHROME");
 const WTCJS = readFileSync(join(ROOT, "public", "wtc-app.js"), "utf8");
 ok(HTML.includes('id="wtcScope"'), "the page carries the scope strip");
