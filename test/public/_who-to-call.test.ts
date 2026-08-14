@@ -101,6 +101,42 @@ for (const id of ["segFY", "hdrNaicsPills", "dsbProvenance", "resetBtn", "selChi
   ok(!HTML.includes(`id="${id}"`), `the document carries no scope control #${id}`);
 }
 
+/* ── THE NAICS SCOPE IS CHROME, AND IT GOES THROUGH THE SHARED MODULE ────────
+   The document has no controls inside it, but the page needs one: without it the
+   record can only ever be all codes at once. It sits above the sheet and reads
+   and writes window.BD_SCOPE, so the code chosen here has an address (URL, then
+   localStorage) and the next destination opens on it. */
+console.log("\nR2b THE SCOPE AND FRESHNESS CHROME");
+const WTCJS = readFileSync(join(ROOT, "public", "wtc-app.js"), "utf8");
+ok(HTML.includes('id="wtcScope"'), "the page carries the scope strip");
+ok(/BD_SCOPE/.test(WTCJS), "…and the render layer drives it through window.BD_SCOPE");
+ok(/\.reconcile\(/.test(WTCJS),
+  "…via reconcile(), so a URL naming an untracked code is REPORTED, not swallowed");
+ok(/SC\.set\(\{ code:/.test(WTCJS), "…and a click publishes the code to the shared scope");
+/* ⛔ SCOPING MUST FILTER THE INPUT, NOT THE OUTPUT. Every figure is derived
+   inside build(), so narrowing the arrays before the call RECOMPUTES the record.
+   Filtering rendered rows instead would leave the headline, the cluster and the
+   dollar total describing a set the reader can no longer see. */
+ok(/rows: \(Array\.isArray\(DSB\.RECOMPETES\)[^)]*\)\.filter\(byCode\)/.test(WTCJS),
+  "the scope narrows RECOMPETES before the document is built");
+for (const arr of ["CONCENTRATION", "SB_WINNERS"]) {
+  ok(new RegExp(`Array\\.isArray\\(DSB\\.${arr}\\)[^)]*\\)\\.filter\\(byCode\\)`).test(WTCJS),
+    `…and ${arr} too, so section shares narrow with it`);
+}
+
+/* ── FRESHNESS · TWO CLOCKS, NEVER ONE STAMP ────────────────────────────────
+   `as_of` is when the feed was MEASURED; `checkedAt` is when this browser last
+   asked. A re-check that confirms day-old data must not be able to print
+   "updated just now", so the two are rendered as separate sentences. */
+ok(HTML.includes('id="wtcFresh"'), "the page carries the freshness line");
+ok(/Read from USASpending|Read from USAspending/.test(WTCJS),
+  "…which states how old the MEASUREMENT is");
+ok(/FRESHNESS/.test(WTCJS) && /checkedAt/.test(WTCJS),
+  "…and separately when we last checked");
+ok(/id="wtcRefresh"/.test(WTCJS), "a manual refresh control exists to press");
+ok(/paintFreshness/.test(WTCJS) && /paintFreshness: paintFreshness/.test(WTCJS),
+  "…and the stamp has a repaint entry point, so the age cannot sit frozen");
+
 // ── R3 · SAMENESS — one renderer set, one stylesheet, one scope ──────────────
 console.log("\nR3  ONE RENDERER SET, ONE STYLESHEET, ONE SCOPE");
 const SPENDING = readFileSync(join(ROOT, "public", "defense-spending.html"), "utf8");
