@@ -52,6 +52,17 @@
 [data-theme="dark"][data-shell="sheet"] .body{background:#071018}
 [data-theme="dark"][data-shell="sheet"] #o4{background:#0e1a28;border-color:#22344a}
 
+/* ⛔ THE TOPBAR'S RIGHT ALIGNMENT IS CARRIED HERE, because the element that used
+   to carry it is gone. `.tb-search` in dsb.css holds `margin-left:auto`, and
+   that one declaration is what pushes the theme, notification and account
+   controls to the right edge on every page that has a search box. This page has
+   none — a placeholder search that performs nothing is a control the page cannot
+   honour — so the alignment moves onto the actions themselves. A deleted
+   control hands on whatever it was holding beyond itself, and here that was the
+   whole topbar: without this line the buttons slide left and sit against the
+   breadcrumb while every other tab keeps them at the edge. */
+.topbar .top-actions{margin-left:auto}
+
 /* THE NAICS SCOPE · chrome, not document. It sits on the app surface above the
    sheet, because the record has no controls inside it and a picker printed on a
    document reads as part of the record. Its own inks are declared against the
