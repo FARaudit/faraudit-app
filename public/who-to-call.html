@@ -245,7 +245,15 @@
 .o4-rec td{padding-top:8px;padding-bottom:8px;border-bottom:0;border-top:1px solid var(--p-line2)}
 .o4-rec tr.rep td{border-top:0}
 .o4-in{font-size:13px;font-weight:600;letter-spacing:-.01em;line-height:1.35}
-.o4-id{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--p-slate);white-space:nowrap}
+/* ⛔ THIS CELL WRAPS, AND IT IS THE ONLY ONE OF THE THREE THAT MAY. Agency,
+   code and award id joined on one line runs to 429px, which is what pushes
+   §03 past its container at the 1280px the app declares as its minimum —
+   measured 1088px of table inside 962px of sheet. The dates and the money
+   keep `nowrap` because breaking either mid-value misreads; this one is
+   three separate facts with separators already between them, so a wrap
+   lands on a boundary a reader can follow. At the wider sizes there is
+   room and it stays on one line by itself. */
+.o4-id{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--p-slate)}
 .o4-rec .o4-of{font-family:"IBM Plex Mono",monospace;font-size:11px}
 .o4-rec tr.tot td{border-bottom:0;border-top:2px solid var(--p-ink);padding-top:12px;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--p-slate)}
 .o4-rec tr.tot .o4-vl{font-size:15px;letter-spacing:-.01em;text-transform:none;color:var(--p-ink)}
