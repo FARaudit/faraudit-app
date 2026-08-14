@@ -398,7 +398,13 @@
               + ' officers at this office →</a>' : '') + '</td>'
             + '<td class="o4-oc"><b>' + esc(tc(lead.name)) + '</b>'
             + '<span class="o4-cm">'
-            + (withPhone.phone ? '<a class="o4-tel" href="tel:' + esc(withPhone.phone) + '">'
+            /* THE tel: TARGET IS STRIPPED TO DIALLABLE CHARACTERS, which is what
+               every other surface that emits one already does. The stored value
+               is free text and some of it carries separators, so passing it
+               through unaltered hands the dialler a string it has to interpret.
+               Digits and a leading + only; the DISPLAY keeps its formatting. */
+            + (withPhone.phone ? '<a class="o4-tel" href="tel:'
+              + esc(String(withPhone.phone).replace(/[^0-9+]/g, '')) + '">'
               + esc(tel(withPhone.phone)) + '</a>' : '')
             + '<a class="o4-mail" href="mailto:' + esc(lead.email) + '">' + esc(lead.email) + '</a>'
             + '</span></td><td class="o4-ct">' + o.rows.length + '</td>'

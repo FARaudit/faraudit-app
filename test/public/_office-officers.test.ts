@@ -12,7 +12,7 @@
 //
 // Run: npx tsx test/public/_office-officers.test.ts
 export {}; // module scope (harness memory: tsx script-scope redeclare collisions)
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 let pass = 0, fail = 0;
@@ -110,6 +110,29 @@ ok(/'<div class="rc-item">' \+ row \+ rcCall\(r\) \+ '<\/div>'/.test(APP),
   "the anchor and the call block are siblings, not nested");
 ok(/mailto:/.test(rcCall) && /tel:/.test(rcCall), "the contacts are actually actionable");
 ok(/replace\(\/\[\^0-9\+\]\/g, ''\)/.test(rcCall), "the tel: href is stripped to diallable characters");
+
+/* ⛔ SCOPE WIDENED FROM ONE FUNCTION TO EVERY SERVED SCRIPT THAT EMITS A tel:.
+   This check read `rcCall` and nothing else, so it proved the rule held in the
+   one place it was written — and a second page rendering its own call list in
+   its own file inherited none of it. That is exactly what happened: wtc-app.js
+   put the stored value into the href unaltered, and five of the eighty-seven
+   phones we hold carry separators, so the dialler received a string it had to
+   interpret. Every assertion here stayed green throughout.
+   The rule belongs to the ACT of emitting a tel:, not to the function that
+   happened to do it first. So: sweep public/*.js, find every file that builds
+   one, and require each to strip. A new surface now inherits the rule instead
+   of having to remember it. */
+const SERVED = readdirSync(join(ROOT, "public"))
+  .filter((f) => f.endsWith(".js"))
+  .map((f) => ({ file: f, src: readFileSync(join(ROOT, "public", f), "utf8") }))
+  .filter(({ src }) => /href=['"]?tel:|['"]tel:['"]?\s*\+/.test(src));
+ok(SERVED.length > 0, "at least one served script emits a tel: link",
+  SERVED.map((s) => s.file).join(", "));
+const unstripped = SERVED.filter(({ src }) => !/replace\(\/\[\^0-9\+\]\/g, ''\)/.test(src));
+ok(unstripped.length === 0,
+  "EVERY served script that emits a tel: strips it to diallable characters",
+  unstripped.length ? `raw value reaches the dialler in: ${unstripped.map((s) => s.file).join(", ")}`
+    : `${SERVED.length} files checked`);
 
 // ── R6 · IT IS NOT IN FRONT OF THE PANELS ────────────────────────────────────
 console.log("\nR6  A SLOW UPSTREAM DOES NOT GATE THE PAGE");
