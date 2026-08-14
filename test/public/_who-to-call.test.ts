@@ -191,30 +191,26 @@ ok(/paintFreshness/.test(WTCJS) && /paintFreshness: paintFreshness/.test(WTCJS),
   "…and the stamp has a repaint entry point, so the age cannot sit frozen");
 
 // ── R3 · SAMENESS — one renderer set, one stylesheet, one scope ──────────────
-/* ── NUMBERS COMPARED IN ONE SENTENCE TAKE ONE FORM ─────────────────────────
-   Spelled below a hundred, figures at a hundred and above — applied to the
-   SERIES rather than to each member, because deciding member by member sets
-   "Six of your 120 recompetes": two conventions inside one comparison. Not
-   reachable on today's data (ten per code across three codes tops out at 30),
-   which is exactly why it needs a check rather than a reader noticing.
-   Asserted structurally: the helper exists, it decides on the whole series, and
-   neither headline renders a number any other way. */
-console.log("\nR2d NUMERALS IN A COMPARISON ARE ONE SERIES");
-ok(/function series\(\)/.test(WTCJS), "the series helper exists");
-ok(/ns\.some\(function \(n\) \{ return n >= 100; \}\)/.test(WTCJS),
-  "…and the hundred threshold is decided across the whole series, not per member");
-ok(/var lede = clustered \? series\(peak\[1\], rows\.length\) : series\(rows\.length, byDate\.length\)/
-  .test(WTCJS), "both headlines build their pair through it");
-/* ⛔ THE HALF THAT ACTUALLY ROTS. The helper can be present and correct while a
-   call site still reaches past it for one member of the pair, which is the
-   mixed form returning by the back door. */
+/* ── THE HEADLINE TAKES FIGURES ─────────────────────────────────────────────
+   A headline is scanned and a paragraph is read, so the lede carries digits
+   while the body prose below it still spells ("any of the three buying
+   offices"). Figures also settle parallelism outright: with no threshold to
+   cross, a comparison cannot come out half spelled and half in digits however
+   large the record grows — which is the defect a hundredth row would have set. */
+console.log("\nR2d THE HEADLINE TAKES FIGURES, THE BODY SPELLS");
 const heroBlock = WTCJS.slice(WTCJS.indexOf('<div class="o4-hero">'),
   WTCJS.indexOf('<div class="o4-sum">'));
-ok(heroBlock.length > 100, "the hero block is findable");
+ok(heroBlock.length > 100, "the hero block is findable (fails closed if it moves)");
 ok(!/\bword\(/.test(heroBlock),
-  "no headline formats a number outside the series", heroBlock.match(/\bword\([^)]*\)/g)?.join(", ") || "");
-ok(!/\bWord\(/.test(WTCJS),
-  "the single-number capitaliser is gone, so it cannot be reached for a pair");
+  "no headline spells a number",
+  (heroBlock.match(/\bword\([^)]*\)/g) || []).join(", "));
+ok(/fig\(peak\[1\]\)/.test(heroBlock) && /fig\(rows\.length\)/.test(heroBlock),
+  "…both members of the cluster headline are rendered as figures");
+/* The body keeps its words — deleting the speller entirely would take the
+   sentences with it, and those are prose. */
+ok(/function word\(n\)/.test(WTCJS), "the speller survives for the body prose");
+ok(/word\(byOffice\.length\)/.test(WTCJS) || /word\(conc\.length\)/.test(WTCJS),
+  "…and is still what the body sentences use");
 
 console.log("\nR3  ONE RENDERER SET, ONE STYLESHEET, ONE SCOPE");
 const SPENDING = readFileSync(join(ROOT, "public", "defense-spending.html"), "utf8");

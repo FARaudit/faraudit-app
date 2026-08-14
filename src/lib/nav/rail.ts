@@ -64,7 +64,13 @@ const I = {
   runAudit: '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/>',
   pastAudits: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   pipeline: '<path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/>',
-  whoToCall: '<path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1.9.4 1.8.7 2.7a2 2 0 01-.5 2.1L8.1 9.8a16 16 0 006 6l1.3-1.2a2 2 0 012.1-.5c.9.3 1.8.6 2.7.7a2 2 0 011.8 2.1z"/>',
+  /* A CONTRACT COMING ROUND AGAIN, not a handset. The tab is the recompete
+     record; the phone belonged to the section it used to be named after, and a
+     glyph naming one section of five reads as the whole page's subject.
+     A bare renewal cycle. No hands inside it: a clock face is already the glyph
+     two rows up, and at 22px an arc with a hand in it and an arc without one are
+     the same mark. The gap and the arrowhead carry the meaning on their own. */
+  whoToCall: '<path d="M20.5 12a8.5 8.5 0 11-2.4-5.9"/><path d="M20.5 3.5v5h-5"/>',
   capability: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
   opportunities: '<circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/>',
   defenseIntel: '<path d="M12 3L4 8v8l8 5 8-5V8l-8-5z"/>',

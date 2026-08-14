@@ -130,21 +130,14 @@
     return n < 20 ? ONES[n]
       : n < 100 ? TENS[Math.floor(n / 10)] + (n % 10 ? '-' + ONES[n % 10] : '') : String(n);
   }
-  /* NUMBERS COMPARED IN ONE SENTENCE TAKE ONE FORM. Spelled below a hundred,
-     figures at a hundred and above — and the threshold applies to the SERIES,
-     not to each member of it, so if any one of them needs figures they all do.
-     Deciding member by member sets "Six of your 120 recompetes", which is two
-     conventions inside one comparison and reads as a typo.
-     Returns the series already rendered, so a caller cannot apply the rule to
-     one half of a sentence and forget the other. */
-  function series() {
-    var ns = Array.prototype.slice.call(arguments);
-    var figures = ns.some(function (n) { return n >= 100; });
-    return ns.map(function (n) { return figures ? String(n) : word(n); });
-  }
-  /* Capitalising a figure is a no-op, which is what lets one call site open a
-     sentence with either form without asking which it got. */
-  function cap(s) { return String(s).charAt(0).toUpperCase() + String(s).slice(1); }
+  /* THE HEADLINE TAKES FIGURES; THE BODY PROSE SPELLS. That split is the ordinary
+     editorial one — a headline is scanned and a paragraph is read — and it is why
+     the strip, the tables and this line all agree while "any of the three buying
+     offices" further down still reads as a sentence.
+     Figures also settle the parallelism question outright: there is no threshold
+     to cross, so a comparison can never come out half spelled and half in digits
+     however large the record grows. */
+  function fig(n) { return String(n); }
 
   /* ── THE DOCUMENT ────────────────────────────────────────────────────────*/
   function build(D) {
@@ -299,17 +292,14 @@
 
     var h = mast;
 
-    /* Both figures in each headline are rendered as ONE series, so the pair
-       cannot end up half spelled and half in digits. */
-    var lede = clustered ? series(peak[1], rows.length) : series(rows.length, byDate.length);
-
     h += '<div class="o4-hero"><p class="o4-lede">'
       + (clustered
-        ? cap(lede[0]) + ' of your ' + lede[1] + ' recompetes expire on a single afternoon.'
+        ? fig(peak[1]) + ' of your ' + fig(rows.length) + ' recompetes expire on a single afternoon.'
         : rows.length === 1
           ? 'One contract in ' + subject + ' comes up for recompete, on '
             + esc(iso(rows[0].end_date)) + '.'
-          : 'Your ' + lede[0] + ' recompetes expire on ' + lede[1] + ' separate dates.')
+          : 'Your ' + fig(rows.length) + ' recompetes expire on ' + fig(byDate.length)
+            + ' separate dates.')
       + '</p>'
       + '<div class="o4-fig"><b>' + cur(total) + '</b>'
       + '<i>total award value coming up<br>for recompete in ' + subject + '</i></div></div>';
