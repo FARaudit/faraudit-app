@@ -214,9 +214,15 @@ ok(!/state\s*:\s*['"]error['"]/.test(PLANTED_BAIL), "C: error-state probe reject
     "phoneParts and its country helpers are findable")
   ok(/JP_OFFICE\.test\(o\)/.test(body) && /IT_OFFICE\.test\(o\)/.test(body),
     "the country is corroborated by the office, not guessed from digits")
-  ok(/'tel:' \+ String\(o\.phone\)/.test(dco),
-    "the tel: link still dials the RAW published number")
-  ok(/title: 'As published by SAM: '/.test(dco),
+  /* THE NUMBER COPIES RATHER THAN DIALS. A desktop browser has nothing to dial with, so a tel:
+     target raises an operating-system handler prompt instead of placing a call. The shared control
+     in phone-copy.js owns the click, and the recompete record emits the same markup, so one number
+     behaves the same way on both surfaces. data-phone carries the diallable value. */
+  ok(/'data-phone': String\(o\.phone\)\.replace\(\/\[\^0-9\+\]\/g, ''\)/.test(dco),
+    "the control carries the diallable value in data-phone")
+  ok(/ph-copy/.test(dco), "…and uses the SHARED copy control, not a per-page treatment")
+  ok(!/'tel:'/.test(dco), "…and no longer emits a tel: target the desktop cannot honour")
+  ok(/as published by SAM: '/.test(dco),
     "the raw value stays reachable on the control")
   ok(/cop-phnote/.test(dco),
     "a reshaped number is labelled, quietly")

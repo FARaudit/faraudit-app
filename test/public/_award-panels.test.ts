@@ -45,18 +45,13 @@ function main() {
     for (const id of ids) assert(html.includes(`id="${id}"`), `markup carries #${id}`);
   }
 
-  /* ⛔ PRIMES WHO OWE A SUBCONTRACTING PLAN IS UNMOUNTED, NOT RETIRED — and the difference is the
-     point. /who-to-call was rebuilt as a single recompete document with no widget hosts, so this
-     panel has no host on any page, while its renderer and the FAR 19.702 derivation behind it are
-     untouched and still exercised by the rest of this gate.
-     Asserted in BOTH directions so the state cannot drift unnoticed: the renderer must still be
-     called (deleting it makes this red, which is what separates unmounted from retired) and the
-     hosts must still be absent (remounting the panel makes this red and asks for the assertion
-     back). Part D below is what a real retirement looks like; this is deliberately not that. */
-  assert(/renderPrimeTargets\(\)/.test(app),
-    "renderPrimeTargets is retained and still called from renderAll");
+  /* PRIMES WHO OWE A SUBCONTRACTING PLAN IS MOUNTED AGAIN, on /who-to-call, BELOW the recompete
+     document rather than inside it: the record is ordered by expiry and this panel carries no date.
+     Both directions still hold — the renderer must be called AND its hosts must exist — so the panel
+     cannot become a renderer with nowhere to draw, or markup nothing fills. */
+  assert(/renderPrimeTargets\(\)/.test(app), "renderPrimeTargets is called from renderAll");
   for (const id of ["ptList", "ptSub", "ptCap"]) {
-    assert(!html.includes(`id="${id}"`), `the panel is unmounted — no page carries #${id}`);
+    assert(html.includes(`id="${id}"`), `markup carries #${id}`);
   }
 
   // ── D · the retirement is real on every page that mounts this script ──────

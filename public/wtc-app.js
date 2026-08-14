@@ -398,14 +398,20 @@
               + ' officers at this office →</a>' : '') + '</td>'
             + '<td class="o4-oc"><b>' + esc(tc(lead.name)) + '</b>'
             + '<span class="o4-cm">'
-            /* THE tel: TARGET IS STRIPPED TO DIALLABLE CHARACTERS, which is what
-               every other surface that emits one already does. The stored value
-               is free text and some of it carries separators, so passing it
-               through unaltered hands the dialler a string it has to interpret.
-               Digits and a leading + only; the DISPLAY keeps its formatting. */
-            + (withPhone.phone ? '<a class="o4-tel" href="tel:'
-              + esc(String(withPhone.phone).replace(/[^0-9+]/g, '')) + '">'
-              + esc(tel(withPhone.phone)) + '</a>' : '')
+            /* THE NUMBER COPIES RATHER THAN DIALS. A desktop browser has nothing
+               to dial with, so a tel: link raises an operating-system handler
+               prompt instead of doing anything useful; what a reader does with a
+               contracting officer's number is move it somewhere else. The shared
+               control in phone-copy.js owns the behaviour, so this surface and
+               the officer roster cannot drift apart.
+               data-phone carries the DIALLABLE value — digits and a leading plus
+               only, because the stored value is free text and some of it carries
+               separators. The label keeps its formatting; the title keeps the
+               string exactly as published, so nothing we reshape is lost. */
+            + (withPhone.phone ? '<button type="button" class="o4-tel ph-copy" data-phone="'
+              + esc(String(withPhone.phone).replace(/[^0-9+]/g, ''))
+              + '" title="Click to copy · as published: ' + esc(withPhone.phone) + '">'
+              + esc(tel(withPhone.phone)) + '</button>' : '')
             + '<a class="o4-mail" href="mailto:' + esc(lead.email) + '">' + esc(lead.email) + '</a>'
             + '</span></td><td class="o4-ct">' + o.rows.length + '</td>'
             + '<td class="o4-vl">' + full(o.val) + '</td>'
@@ -591,6 +597,23 @@
     var r = SC.reconcile(fys, tracked);
     var code = r.code;
 
+    /* ⛔ THE REQUEST IS READ FROM THE URL, NOT FROM THE STORE. The widget
+       renderer on this page also reconciles, and it publishes what it resolved
+       back to the shared scope — correctly, so the next destination inherits a
+       year that exists. But that write replaces an unhonourable code with null,
+       so by the time this runs the store no longer remembers what was asked for
+       and reconcile() has nothing to report. The URL is deliberately left alone
+       by that write, which makes it the surviving record of the reader's own
+       request, and a request we could not honour is exactly what has to be said
+       out loud. */
+    var asked = null;
+    try { asked = new URLSearchParams(window.location.search).get('code') || null; }
+    catch (e) { asked = null; }
+    var note = r.note;
+    if (!note && asked && tracked.indexOf(asked) === -1) {
+      note = 'NAICS ' + asked + ' is not one of your tracked codes — showing all of them';
+    }
+
     setHTML(el, '<span class="wsk">NAICS</span>'
       + '<button type="button" data-code="" aria-pressed="' + (code ? 'false' : 'true') + '">'
       + 'All ' + word(tracked.length) + '</button>'
@@ -598,7 +621,7 @@
         return '<button type="button" data-code="' + esc(c) + '" aria-pressed="'
           + (code === c ? 'true' : 'false') + '">' + esc(c) + '</button>';
       }).join('')
-      + (r.note ? '<span class="wsn">' + esc(r.note) + '</span>' : ''));
+      + (note ? '<span class="wsn">' + esc(note) + '</span>' : ''));
 
     el.querySelectorAll('button').forEach(function (b) {
       b.onclick = function () {
@@ -606,7 +629,7 @@
         render();
       };
     });
-    return { code: code, note: r.note };
+    return { code: code, note: note };
   }
 
   /* ── FRESHNESS ───────────────────────────────────────────────────────────
