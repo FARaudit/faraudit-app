@@ -2,7 +2,7 @@
 <html lang="en" data-theme="light" data-sb="open" data-shell="sheet">
 <head>
 <meta charset="utf-8" />
-<title>FARaudit — Who to Call</title>
+<title>FARaudit — Recompetes</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -46,8 +46,15 @@
    untouched — no cards inside it, no tint, no widget per section — so it still
    reads as a record while sitting on the product the way a document sits on a
    desk. The effect depends on the margin of app surface around the sheet, which
-   is what .body's width cap preserves. */
-[data-shell="sheet"] .body{background:#eef2f7}
+   is what .body's width cap preserves.
+   THE GROUND IS ONE STEP DARKER THAN THE PLATFORM DEFAULT so the sheet is
+   actually seen to sit on it: at #eef2f7 the two fills separate by 1.04:1 and
+   the inset is carried by the 1px border alone. #e7ecf3 gives 1.10:1, which is
+   the separation an ordinary card already gets, so this page matches the
+   platform's own figure-on-ground rather than inventing a softer one. The SHEET
+   does not move toward white — white is the card colour here, and the record is
+   not a card. Night already separates cleanly and is left alone. */
+[data-shell="sheet"] .body{background:#e7ecf3}
 [data-shell="sheet"] #o4{background:#f4f6f9;border:1px solid #dde4ed;border-radius:14px;padding:26px 30px 32px}
 [data-theme="dark"][data-shell="sheet"] .body{background:#071018}
 [data-theme="dark"][data-shell="sheet"] #o4{background:#0e1a28;border-color:#22344a}
@@ -204,7 +211,18 @@
 .o4-call td{padding-top:13px;padding-bottom:13px}
 .o4-oc b{display:block;font-size:14px;font-weight:700;letter-spacing:-.01em}
 .o4-oc i{display:block;font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--p-slate);margin-top:4px}
-.o4-tel{font-family:"IBM Plex Mono",monospace;font-size:16px;font-weight:600;letter-spacing:-.01em;color:var(--p-link)}
+/* The number is a BUTTON now, because it copies rather than navigates. Every
+   inherited button style is reset so it still reads as the typeset number it
+   was — the affordance is the pointer and the copy confirmation, not a control
+   that looks like a control. */
+.o4-tel{font-family:"IBM Plex Mono",monospace;font-size:16px;font-weight:600;letter-spacing:-.01em;color:var(--p-link);background:none;border:0;padding:0;cursor:pointer;text-align:left}
+.o4-tel:hover{text-decoration:underline}
+/* The two outcomes read differently. A confirmation that looks the same whether
+   the clipboard was written or refused would be worth nothing. */
+.o4-tel[data-state="ok"]{color:#127a4b;text-decoration:none}
+.o4-tel[data-state="fail"]{color:#8a5a12;text-decoration:none}
+[data-theme="dark"] .o4-tel[data-state="ok"]{color:#4ade80}
+[data-theme="dark"] .o4-tel[data-state="fail"]{color:#e0b155}
 .o4-mail{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--p-link)}
 /* Two contact methods on ONE line, baseline-aligned, so the cell is two lines
    (name, then how to reach them) rather than four. */
@@ -290,7 +308,7 @@
   <!-- ═════════ MAIN ═════════ -->
   <main class="main">
     <div class="topbar">
-      <div class="crumbs"><b>Who to Call</b><span class="sep">/</span><span>Openings on contracts that already exist</span></div>
+      <div class="crumbs"><b>Recompetes</b><span class="sep">/</span><span>Openings on contracts that already exist</span></div>
       <div class="top-actions">
         <button class="icon-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
           <svg id="themeSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
@@ -311,13 +329,45 @@
       <!-- The document. Masthead, hero, summary strip and five numbered
            sections, all rendered by wtc-app.js from the live payload. -->
       <div id="o4"></div>
+
+      <!-- Two openings that are NOT recompetes, so they sit outside the record
+           rather than inside it. The document is ordered by expiry and these
+           carry no date. Rendered by the shared dsb-app.js. -->
+      <section class="row">
+        <section class="widget">
+          <header class="widget-head">
+            <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg></span>
+              <div class="wh-text"><h3>Primes who owe a subcontracting plan</h3><p class="wh-sub" id="ptSub"></p></div></div>
+            <span class="wh-source">USAspending</span>
+          </header>
+          <div class="pt-list" id="ptList"></div>
+          <p class="pt-cap" id="ptCap"></p>
+        </section>
+      </section>
+
+      <section class="row">
+        <section class="widget">
+          <header class="widget-head">
+            <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 20h18"/><path d="M6 20V10"/><path d="M12 20V4"/><path d="M18 20v-7"/></svg></span>
+              <div class="wh-text"><h3>Room left on contracts already awarded</h3><p class="wh-sub" id="chSub"></p></div></div>
+            <span class="wh-source">USAspending</span>
+          </header>
+          <div class="ch-top"><span class="ch-big" id="chBig"></span><p class="ch-say" id="chSay"></p></div>
+          <div class="ch-list" id="chList"></div>
+          <p class="ch-cap" id="chCap"></p>
+        </section>
+      </section>
     </div>
   </main>
 </div>
 
 <script src="bd-scope.js"></script>
 <script src="dsb-data.js"></script>
+<!-- The widget renderer set, for the two panels below the sheet. Every one of
+     its other renderers no-ops here: each returns early on a missing host. -->
+<script src="dsb-app.js"></script>
 <script src="defense-spending-live.js"></script>
+<script src="phone-copy.js"></script>
 <script src="wtc-app.js"></script>
 <script>/* theme + sidebar toggles */
 (function(){

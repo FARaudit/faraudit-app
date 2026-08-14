@@ -106,7 +106,14 @@ export const WORKFLOW: RailItem[] = [
      invisible to anyone watching notices. It sits in Workflow because it is a
      WEEKLY read; it lived at the bottom of Defense Spending, which is a
      twice-a-year orientation, and a weekly list loses to a long scroll. */
-  { key: "who-to-call", label: "Who to call", href: "/who-to-call", icon: I.whoToCall },
+  /* THE LABEL IS `Recompetes`; THE KEY AND THE PATH STAY `who-to-call`. A route
+     is an address other things hold on to — bookmarks, the ?office= deep link
+     out of the record, this rail's own active-item key, and several gates — so
+     renaming an address to match a word breaks every holder to fix the word.
+     `Recompetes` is what the page contains and what its own masthead already
+     calls it; the previous label named one section of five and read as an
+     instruction where every sibling is a noun. */
+  { key: "who-to-call", label: "Recompetes", href: "/who-to-call", icon: I.whoToCall },
 ];
 
 export const SECTIONS: RailSection[] = [

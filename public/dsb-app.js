@@ -1347,6 +1347,18 @@
   function renderUnavailable() {
     const body = document.querySelector('.body');
     if (!body || body.querySelector('.dsb-unavailable')) return;
+    /* ⛔ THIS REMOVES EVERY CHILD OF .body, SO IT MUST NOT RUN ON A PAGE IT DOES
+       NOT OWN. It is written for a page whose entire content is this renderer
+       set, where clearing the panels and keeping the header is exactly right.
+       A page that also mounts a second renderer keeps that renderer's content in
+       the same container — a document, its scope strip, its freshness line —
+       and none of it belongs to this function. The `.page-header` exemption is
+       no protection either: a page carrying none loses everything, including the
+       settled-failure copy its own renderer has just written.
+       Where a second renderer is mounted it states the failure for its own
+       surface, and the panels here fall back to their own empty states, so the
+       reader is told what happened either way. */
+    if (window.WTC_APP) return;
     const reason = (D.STATUS && D.STATUS.reason) || '';
     const header = body.querySelector('.page-header');
     [...body.children].forEach((el) => { if (el !== header) el.remove(); });

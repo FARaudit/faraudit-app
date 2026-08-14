@@ -87,8 +87,10 @@ ok(lookedUp.length > 15, "id census is non-empty", `${lookedUp.length} ids read 
 const WTC = injectRail(readFileSync(path.join(PUB, "who-to-call.html"), "utf8"), "who-to-call");
 const MOUNTED = COMPOSED + "\n" + WTC;
 
-const UNMOUNTED = ["bigN", "bigSay", "chBig", "chCap", "chList", "chSay", "chSub",
-  "footL", "footR", "lede", "ptCap", "ptList", "ptSub", "rcList", "whSub"];
+/* Primes and Ceilings are mounted again on /who-to-call; only the Recompete Radar WIDGET stays
+   unmounted, because the same RECOMPETES array is now rendered as sections 01-03 of the document
+   there. Its renderer is retained, so both halves below still have a subject. */
+const UNMOUNTED = ["bigN", "bigSay", "footL", "footR", "lede", "rcList", "whSub"];
 
 const remounted = UNMOUNTED.filter((id) => MOUNTED.includes(`id="${id}"`));
 ok(remounted.length === 0, "the unmounted panel hosts are still absent from every page",

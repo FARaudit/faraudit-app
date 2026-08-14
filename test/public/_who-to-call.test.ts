@@ -64,9 +64,18 @@ const RETIRED = ["szBody", "szSub", "kpiStrip", "agencyLegend", "agFyCol"];
    So the three widgets are UNMOUNTED, and the assertion inverts: they must be on NEITHER page.
    Their renderers stay in dsb-app.js, which the theme-flip and panel gates hold to. */
 ok(HTML.includes('id="o4"'), "the page carries the document host #o4");
-const stillWidgets = MOVED.filter((id) => HTML.includes(`id="${id}"`));
-ok(stillWidgets.length === 0, "the three widgets are unmounted — none of their hosts remain here",
-  stillWidgets.length ? `still present: ${stillWidgets.join(", ")}` : `${MOVED.length} hosts checked`);
+/* Two of the three came BACK, below the sheet: Primes and Ceilings are openings that carry no date,
+   so they cannot sit inside a record ordered by expiry, but they are still openings on contracts
+   that already exist and that is what this destination is for. Only the Recompete Radar WIDGET
+   stays unmounted — the same RECOMPETES array is what sections 01-03 render. */
+const PANELS_BACK = ["ptList", "ptSub", "ptCap", "chList", "chBig", "chSay", "chCap", "chSub"];
+const RADAR_GONE = ["rcList", "whSub", "bigN", "bigSay", "lede", "footL", "footR"];
+const missingPanels = PANELS_BACK.filter((id) => !HTML.includes(`id="${id}"`));
+ok(missingPanels.length === 0, "Primes and Ceilings are mounted below the document",
+  missingPanels.length ? `missing: ${missingPanels.join(", ")}` : `${PANELS_BACK.length} hosts`);
+const radarBack = RADAR_GONE.filter((id) => HTML.includes(`id="${id}"`));
+ok(radarBack.length === 0, "…and the Recompete Radar widget stays unmounted — 01-03 render it now",
+  radarBack.length ? `back in the markup: ${radarBack.join(", ")}` : `${RADAR_GONE.length} checked`);
 const leaked = STAYED.filter((id) => HTML.includes(`id="${id}"`));
 ok(leaked.length === 0, "and nothing that stayed on Defense Spending came along",
   leaked.length ? `also present: ${leaked.join(", ")}` : `${STAYED.length} checked`);
@@ -128,6 +137,28 @@ ok(/margin-left:\s*auto/.test(taRule?.[1] || ""),
 ok(/class="crumbs"/.test(HTML) && /class="top-actions"/.test(HTML),
   "…over a topbar whose two children are still the crumbs and the actions");
 
+/* ⛔ THE SHARED FAILURE PATH MUST NOT CLEAR A PAGE IT DOES NOT OWN.
+   dsb-app.js's renderUnavailable() removes every child of `.body` except
+   `.page-header` — right for a page whose whole content is that renderer set,
+   and destructive here. This page keeps its document, its scope strip and its
+   freshness line in that same container and carries no `.page-header`, so on a
+   settled feed failure the reader would be left with a bare notice, and the
+   record's own settled-failure copy — written moments earlier — would go with
+   it.
+   Asserted on the SOURCE because the condition is a load-order fact rather than
+   a rendering one, and reproducing it needs a failing feed. */
+console.log("\nR2c THE SHARED FAILURE PATH DEFERS TO THIS PAGE'S OWN");
+const DSB_APP = readFileSync(join(ROOT, "public", "dsb-app.js"), "utf8");
+const uStart = DSB_APP.indexOf("function renderUnavailable");
+const unavailFn = uStart > -1 ? DSB_APP.slice(uStart, uStart + 1600) : "";
+ok(unavailFn.length > 100, "renderUnavailable is findable (fails closed if it moves)");
+ok(/if \(window\.WTC_APP\) return;/.test(unavailFn),
+  "…and it returns early where a second renderer owns the page's failure state");
+ok(/\[\.\.\.body\.children\]\.forEach/.test(unavailFn),
+  "…which matters, because it still clears every child when it does run");
+ok(!HTML.includes('class="page-header"'),
+  "this page carries no .page-header, so nothing would have survived that clear");
+
 console.log("\nR2b THE SCOPE AND FRESHNESS CHROME");
 const WTCJS = readFileSync(join(ROOT, "public", "wtc-app.js"), "utf8");
 ok(HTML.includes('id="wtcScope"'), "the page carries the scope strip");
@@ -172,8 +203,11 @@ for (const s of ["bd-scope.js", "dsb-data.js", "defense-spending-live.js"]) {
   ok(dsb.includes(s), `…and defense-spending loads the same ${s}`);
 }
 ok(wtc.includes("wtc-app.js"), "and its own render layer for the document", wtc.join(" "));
-ok(!wtc.includes("dsb-app.js"),
-  "it does NOT load the widget renderer set it no longer has hosts for");
+/* It loads the SHARED widget renderer too, because the two panels below the sheet are drawn by it.
+   Both files, no copy of either: the document renderer draws the record, dsb-app.js draws the two
+   widgets, and neither reimplements the other. */
+ok(wtc.includes("dsb-app.js"), "and the SHARED widget renderer for the two panels below it");
+ok(dsb.includes("dsb-app.js"), "…the same file defense-spending loads");
 
 /* ⛔ THE FORK CHECK IS ABOUT SUBSTANCE, NOT A FILENAME. This gate used to ban a file called
    wtc-app.js outright, because on the day a fork ships a copy and a rewrite look identical. A
@@ -237,9 +271,12 @@ ok(STAYED.filter((id) => withMapHost.includes(`id="${id}"`)).length > 0,
    anything — green for the same reason whether the gate works or not.
    Both directions are planted against the assertions that now exist: a widget host put BACK, and
    the document host taken away. */
-const remounted = HTML.replace("</body>", '<div id="ptList"></div></body>');
-ok(MOVED.filter((id) => remounted.includes(`id="${id}"`)).length > 0,
-  "PLANTED: a widget host remounted on this page IS detected");
+const radarPlanted = HTML.replace("</body>", '<div id="rcList"></div></body>');
+ok(RADAR_GONE.filter((id) => radarPlanted.includes(`id="${id}"`)).length > 0,
+  "PLANTED: the Radar widget remounted on this page IS detected");
+const panelPulled = HTML.replace('id="ptList"', 'id="ptListX"');
+ok(PANELS_BACK.filter((id) => !panelPulled.includes(`id="${id}"`)).length > 0,
+  "PLANTED: a panel host going missing IS detected");
 const noDoc = HTML.replace('id="o4"', 'id="o4X"');
 ok(!noDoc.includes('id="o4"'), "PLANTED: losing the document host #o4 IS detected");
 // The copy that actually shipped: put one panel host back on the old page.

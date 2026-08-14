@@ -30,15 +30,9 @@ function main() {
   assert(/base_and_all_options/.test(agent), "the worker reads base_and_all_options — the ceiling");
   assert(/total_obligation/.test(agent), "and total_obligation — what is actually committed");
   assert(/ceilingHeadroom/.test(libCode), "the route derives headroom");
-  /* ⛔ THIS PANEL IS CURRENTLY UNMOUNTED. /who-to-call was rebuilt as a single recompete document
-     and carries no widget hosts, so Room left on contracts already awarded has no host on any page.
-     The DERIVATION half of this gate — worker, route, renderer, and the capacity-is-not-margin
-     rule — is untouched and still runs, which is why this assertion is INVERTED rather than
-     deleted: the chain stays proven, and the day a host comes back the line goes red and asks to be
-     turned around rather than silently passing on a panel nobody can see. */
-  assert(!/id="chList"/.test(html) && !/id="chBig"/.test(html) && !/id="chCap"/.test(html),
-    "the panel is unmounted — no page carries the ids the renderer writes to");
-  assert(/renderCeilings\(\)/.test(app), "the renderer is retained and still called from renderAll");
+  /* Room left on contracts already awarded is MOUNTED on /who-to-call, below the recompete document
+     rather than inside it — the record is ordered by expiry and headroom carries no date. */
+  assert(/renderCeilings\(\)/.test(app), "the renderer is called from renderAll");
 
   const fn = app.slice(app.indexOf("function renderCeilings"), app.indexOf("function renderBuyingOffices"));
   assert(fn.length > 0, "the renderer is findable");

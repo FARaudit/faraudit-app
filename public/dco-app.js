@@ -457,12 +457,20 @@
     /* The note belongs to the NUMBER, so it lives in the number's column rather
        than under the whole row — centred across both buttons it read as a
        caption for the email too. */
+    /* THE NUMBER COPIES RATHER THAN DIALS. A desktop browser has nothing to dial
+       with, so a tel: link raises an operating-system handler prompt instead of
+       doing anything useful. The shared control in phone-copy.js owns what
+       happens on click, and the recompete record emits the same markup, so one
+       number behaves the same way whichever surface a reader found it on.
+       data-phone carries the diallable value; the label keeps its formatting and
+       the title keeps the string exactly as SAM published it. */
     const phoneCtl = ph
-      ? h('a', {
-          cls: 'cop-btn ghost',
+      ? h('button', {
+          cls: 'cop-btn ghost ph-copy',
           text: ph.text,
-          attrs: { href: 'tel:' + String(o.phone).replace(/[^0-9+]/g, ''),
-                   title: 'As published by SAM: ' + String(o.phone) }
+          attrs: { type: 'button',
+                   'data-phone': String(o.phone).replace(/[^0-9+]/g, ''),
+                   title: 'Click to copy · as published by SAM: ' + String(o.phone) }
         })
       : h('span', { cls: 'cop-btn ghost', text: 'No phone published', style: 'cursor:default;opacity:.7' });
     const phoneCol = h('div', { cls: 'cop-phcol' }, [
