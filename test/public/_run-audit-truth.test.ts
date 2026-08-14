@@ -89,13 +89,18 @@ for (const [claim, why] of ENGINE_LIES) {
   check(`panel does not claim "${claim}"`, !html.includes(claim), why);
 }
 // And it must still describe SOMETHING — a panel emptied of claims is not the fix.
-check("the panel still names the poles the engine does return",
-  /Bid · caution · needs review/.test(html),
-  "the verdict step now claims nothing at all");
-// The three chips that DO hold, checked so a later cleanup cannot quietly strip them:
-// the grounding gate is imported by agentic-panel-runner and audit-orchestrator with
-// no flag, and the report schema requires a finding to cite a VERIFIED lens claim.
-for (const kept of ["Grounded in source", "Verbatim citations", "Cited findings", "Deterministic verdict"]) {
+// The figure names the four poles LIVE ROWS ACTUALLY CARRY (verdictOf's labels), so the
+// panel and the ledger below it cannot drift apart.
+const POLES = ["Bid · caution", "Needs review", "Incomplete", "Unresolved"];
+for (const pole of POLES) {
+  check(`the panel still names the "${pole}" pole the engine does return`,
+    html.includes(pole), "the verdict step claims nothing at all");
+}
+// The claims that DO hold, checked so a later cleanup cannot quietly strip them: the
+// grounding gate is imported by agentic-panel-runner and audit-orchestrator with no flag,
+// the report schema requires a finding to cite a VERIFIED lens claim, and the engine's
+// refusal to guess is the decline path itself.
+for (const kept of ["Verbatim citation", "Names what it could not read", "traceable to the clause", "stops rather than guesses"]) {
   check(`panel keeps "${kept}" — this one is wired`, html.includes(kept), "a true claim was removed with the false ones");
 }
 
@@ -109,7 +114,8 @@ console.log("── Part E · positive controls ──");
 const controls: Array<[string, string]> = [
   ["a fabricated card returns", html.replace('<div class="ra-list">', '<div class="ra-list">\n<a class="rac is-nobid" href="#"><span class="rac-office">DLA TROOP SUPPORT · PHILADELPHIA PA</span></a>')],
   ["the score badge returns", html.replace("rac-insight", "rac-score")],
-  ["the BID / NO-BID claim returns", html.replace("Bid · caution · needs review", "BID / NO-BID")],
+  ["the BID / NO-BID claim returns", html.replace("Bid · caution", "BID / NO-BID")],
+  ["a wired claim is quietly stripped", html.replace("Verbatim citation", "Reads the document")],
 ];
 for (const [name, planted] of controls) {
   const changed = planted !== html;
@@ -119,7 +125,9 @@ for (const [name, planted] of controls) {
       BANNED.some(([t]) => planted.includes(t)) ||
       (planted.match(/<a class="rac /g) || []).length > 0 ||
       /rac-score/.test(planted) ||
-      ENGINE_LIES.some(([c]) => planted.includes(c));
+      ENGINE_LIES.some(([c]) => planted.includes(c)) ||
+      POLES.some((pole) => !planted.includes(pole)) ||
+      !planted.includes("Verbatim citation");
   }
   check(`positive control · ${name}`, changed && red,
     !changed ? "the replacement matched nothing — control is inert" : "the defect tripped nothing above");
