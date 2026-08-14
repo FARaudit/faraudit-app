@@ -156,6 +156,13 @@
       + '<div class="o4-hd">Prepared ' + esc(iso(String(D.as_of || '').slice(0, 10)))
       + ' · NAICS ' + scopeLine + '</div></header>';
 
+    /* WHAT THIS DOCUMENT IS SPEAKING ABOUT, in prose, derived once. Every
+       sentence that names the searched set takes this, so a record narrowed to
+       one code never describes itself as covering all of the account's codes.
+       Held in one place because a phrase written out at each site is a rule in
+       as many copies as it has sites, and they drift one at a time. */
+    var subject = D.code ? 'NAICS ' + esc(D.code) : 'your codes';
+
     /* A row with no period-of-performance end cannot be placed on a record
        ordered by expiry. It is held out of the ordering and counted, and §03
        states that count, so the set the document prints is never larger or
@@ -170,7 +177,7 @@
     function undatedNote() {
       if (!undated.length) return '';
       return undated.length + ' award' + (undated.length === 1 ? '' : 's')
-        + ' in your codes carry no end date and cannot be placed on a record ordered by expiry. ';
+        + ' in ' + subject + ' carry no end date and cannot be placed on a record ordered by expiry. ';
     }
 
     /* EMPTY. A document with no record states what it looked for and what it
@@ -178,7 +185,7 @@
        one that failed to run. No hero, no summary strip, no sections. */
     if (!rows.length) {
       return mast + '<div class="o4-empty"><p class="o4-lede">No contract in '
-        + (D.code ? 'NAICS ' + esc(D.code) : 'your codes') + ' comes up for recompete.</p>'
+        + subject + ' comes up for recompete.</p>'
         + '<p class="o4-p">We looked at every federal contract whose period of performance ends '
         + 'inside the window we monitor, in NAICS '
         + (D.code ? esc(D.code)
@@ -282,12 +289,13 @@
       + (clustered
         ? Word(peak[1]) + ' of your ' + word(rows.length) + ' recompetes expire on a single afternoon.'
         : rows.length === 1
-          ? 'One contract in your codes comes up for recompete, on ' + esc(iso(rows[0].end_date)) + '.'
+          ? 'One contract in ' + subject + ' comes up for recompete, on '
+            + esc(iso(rows[0].end_date)) + '.'
           : 'Your ' + word(rows.length) + ' recompetes expire on ' + word(byDate.length)
             + ' separate dates.')
       + '</p>'
       + '<div class="o4-fig"><b>' + cur(total) + '</b>'
-      + '<i>total award value coming up<br>for recompete in your codes</i></div></div>';
+      + '<i>total award value coming up<br>for recompete in ' + subject + '</i></div></div>';
 
     var largest = rows.reduce(function (m, r) {
       return r.amount == null ? m : (m == null ? r.amount : Math.max(m, r.amount));

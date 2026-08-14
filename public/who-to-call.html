@@ -93,7 +93,14 @@
 .o4-hk,.o4-hd{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase}
 .o4-hd{color:var(--p-slate);letter-spacing:.05em}
 .o4-hero{display:flex;justify-content:space-between;align-items:flex-end;gap:64px;margin:34px 0 30px}
-.o4-lede{font-family:"Fraunces",Georgia,serif;font-style:italic;font-weight:400;font-size:54px;line-height:1.14;letter-spacing:-.02em;max-width:26ch;text-wrap:pretty}
+/* THE FINDING SITS AT THE PLATFORM'S OWN DISPLAY SIZE — 34px, the same as
+   `.page-header h1` in dsb.css, so the largest line on this document is the same
+   height as the largest line on every other tab. Only the SIZE is shared: the
+   weight stays 400 and the leading 1.14, because this is a sentence carrying a
+   conclusion rather than a title naming a page, and a title's 600/1.04 would set
+   it as a heading. Its measure is in ch, so the line count holds as the size
+   moves. */
+.o4-lede{font-family:"Fraunces",Georgia,serif;font-style:italic;font-weight:400;font-size:34px;line-height:1.14;letter-spacing:-.02em;max-width:26ch;text-wrap:pretty}
 .o4-fig{flex:none;text-align:right}
 .o4-fig b{display:block;font-family:"IBM Plex Mono",monospace;font-size:44px;font-weight:700;letter-spacing:-.04em;line-height:1}
 .o4-fig i{display:block;font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:11px;line-height:1.6;letter-spacing:.04em;color:var(--p-slate);margin-top:10px}
@@ -196,7 +203,10 @@
 /* EMPTY. No hero, no summary strip, no numbered sections: a heading over a dash
    is worse than an absence, and that holds for a document as much as for a cell. */
 .o4-empty{margin-top:34px;max-width:62ch}
-.o4-empty .o4-lede{font-size:38px;max-width:24ch}
+/* The empty lede keeps the RATIO it was drawn at rather than a number typed
+   against the old base: it sat at 38 to the finding's 54, so it follows the new
+   base down and stays visibly subordinate to it. */
+.o4-empty .o4-lede{font-size:24px;max-width:24ch}
 .o4-empty .o4-p{margin-top:20px}
 .o4-empty .o4-n{margin-top:18px;padding-top:14px;border-top:1px solid var(--p-line)}
 /* §03 · the record. Scanning is the whole point, so the rows are tight, the
