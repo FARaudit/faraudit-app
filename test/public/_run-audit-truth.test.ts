@@ -109,6 +109,46 @@ for (const kept of ["Verbatim citation", "Names what it could not read", "tracea
 // This suite asserts nothing about their open/closed state on purpose: a gate that
 // pins a layout decision takes it away from the person whose decision it is.
 
+// ── Part F · one row per NOTICE, and every control it renders must resolve ──
+// The ledger shows 20 RUNS for 8 solicitations; five rows shared one title and the row
+// showed nothing that told them apart. Grouping is only honest if the run count links
+// somewhere that is actually narrowed to that solicitation.
+console.log("── Part F · the row identifies its notice, and its links resolve ──");
+
+const dash = readFileSync(join(ROOT, "public", "dashboard-live.js"), "utf8");
+
+check("the row renders the solicitation number",
+  /class="rac-sol"/.test(html), "the row cannot tell two audits of one title apart");
+check("runs are grouped into one row per notice",
+  /function groupRuns\(/.test(html) && /groupRuns\(audits\)/.test(html),
+  "every re-run renders as its own row again");
+// It links OUT: an <a href>, never a button or a <details> that expands the other runs
+// in place. Two answers to one document side by side, with no account of why they differ,
+// is the one thing this page must not do.
+check("the run count links OUT and nothing expands in place",
+  /class="rac-runs" href=/.test(html) &&
+  !/<(button|summary)[^>]*class="[^"]*rac-runs/.test(html) &&
+  !/class="rac-runs"[^>]*>[^<]*<\/(button|summary)>/.test(html),
+  "the run count expands the verdicts inline instead of linking out");
+// A link to a route that does not exist is a lie the customer only discovers by clicking.
+check("the run count does NOT point at a route we never shipped",
+  !html.includes("/decisions?sol="), "/decisions is not a route in src/app");
+check("...it points at the ledger",
+  html.includes("/past-audits?sol="), "the run count links nowhere useful");
+// …and the ledger must HONOUR the parameter, or the link drops the customer on all 77 rows.
+// Defined AND CALLED. Checking only the definition passes a seeder nothing invokes —
+// a shipped capability with no caller is not shipped, and the link silently drops the
+// customer on the unfiltered ledger exactly as if the parameter were never read.
+const seedsFromUrl =
+  /function seedSearchFromUrl\s*\(/.test(dash) &&
+  /get\("sol"\)/.test(dash) &&
+  /(^|[^.\w])seedSearchFromUrl\(\s*\)\s*;/m.test(dash.replace(/function seedSearchFromUrl\s*\(\s*\)\s*\{/, "function __seedDef() {"));
+check("the ledger reads ?sol= and narrows itself — and something CALLS the seeder",
+  seedsFromUrl, "past-audits ignores the parameter the link sends");
+check("...through the search the customer can SEE and clear, not a hidden filter",
+  /seedSearchFromUrl[^]*?STATE\.search\s*=/.test(dash) && /activateSearchRef/.test(dash),
+  "a filter with no visible cause reads as a broken ledger");
+
 // ── Part E · positive controls ──
 console.log("── Part E · positive controls ──");
 const controls: Array<[string, string]> = [
@@ -116,6 +156,8 @@ const controls: Array<[string, string]> = [
   ["the score badge returns", html.replace("rac-insight", "rac-score")],
   ["the BID / NO-BID claim returns", html.replace("Bid · caution", "BID / NO-BID")],
   ["a wired claim is quietly stripped", html.replace("Verbatim citation", "Reads the document")],
+  ["the dead /decisions link returns", html.replace("/past-audits?sol=", "/decisions?sol=")],
+  ["the solicitation number is dropped from the row", html.replace('class="rac-sol"', 'class="rac-gone"')],
 ];
 for (const [name, planted] of controls) {
   const changed = planted !== html;
@@ -127,7 +169,9 @@ for (const [name, planted] of controls) {
       /rac-score/.test(planted) ||
       ENGINE_LIES.some(([c]) => planted.includes(c)) ||
       POLES.some((pole) => !planted.includes(pole)) ||
-      !planted.includes("Verbatim citation");
+      !planted.includes("Verbatim citation") ||
+      planted.includes("/decisions?sol=") ||
+      !/class="rac-sol"/.test(planted);
   }
   check(`positive control · ${name}`, changed && red,
     !changed ? "the replacement matched nothing — control is inert" : "the defect tripped nothing above");
