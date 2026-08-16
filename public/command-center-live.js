@@ -34,12 +34,19 @@
     if (typeof window.setRailLiveBadge === 'function') window.setRailLiveBadge(state, opts);
   }
 
-  // Week Ahead rows. The calendar carries MAJOR GOVERNMENT DATES: comment
-  // windows and effective dates from the Federal Register, plus the two fiscal
-  // markers derived from the clock. Response deadlines are deliberately NOT
-  // here — a rolling window of them buried the handful of dates that bind every
-  // customer, and that list lives on Notices. Wage-determination expirations
-  // have no source and are simply absent rather than illustrated.
+  /* WEEK AHEAD — every row answers "does this change what I have to do".
+     Three kinds, in the order they matter to a small sub:
+       1. MONEY FLOW  — the Q4 surge and the 30 September obligation deadline, from
+          the clock via federal-fiscal.js. The one rhythm every sub feels.
+       2. HIS OWN DATES — solicitations in HIS feed closing. Truncation is per group
+          in the render layer, which is what makes these survivable here: an earlier
+          version put a flat cap on the whole list and week one crowded out the rest.
+       3. RULES AT THEIR EFFECTIVE DATE — a rule taking effect changes what he must
+          certify. COMMENT WINDOWS ARE NOT CARRIED: filing a comment on a DFARS rule
+          is not something this customer does, and four of six rows were spending the
+          card on it.
+     Wage-determination expirations and SBIR/STTR windows have no reachable source and
+     are absent rather than illustrated. */
   // No flat cap here. Near-term notices outnumber later ones, so any flat cap
   // shows week one and nothing else and the panel's own three-group design
   // (This Week / This Month / Later This Year) could never appear. Truncation is
@@ -104,9 +111,11 @@
     for (var i = 0; i < rules.length; i++) {
       var r = rules[i];
       if (!r) continue;
+      /* EFFECTIVE DATES ONLY. A comment window is an invitation to write to the
+         government; an effective date changes the terms he has to meet. Only the
+         second one alters what he must do. */
       var events = [
-        { when: r.comments_close_on, tag: 'Comment closes', big: true },
-        { when: r.effective_on,      tag: 'Rule effective', big: false }
+        { when: r.effective_on, tag: 'Takes effect', big: true }
       ];
       for (var j = 0; j < events.length; j++) {
         var e = events[j];
@@ -117,7 +126,7 @@
         out.push({
           ms: ms, day: day, gov: true, big: e.big,
           d: new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          label: cleanLabel(r.title) || 'Federal Register rule',
+          label: (cleanLabel(r.title) || 'Federal Register rule') + ' — new terms apply from this date',
           tag: e.tag,
           tone: day <= 3 ? 'crit' : day <= 7 ? 'warn' : 'ok',
           desk: 'far'
@@ -125,6 +134,59 @@
       }
     }
     return out;
+  }
+
+  /* HIS OWN DATES — the solicitations in HIS feed, closing.
+     These were deliberately kept off this calendar once, when a flat cap meant a
+     rolling wall of them crowded out the dates that bind every customer. The render
+     layer now truncates PER GROUP and states what it dropped, so they can sit here
+     without burying anything.
+
+     A closing date is the one row on this card with a consequence he cannot recover
+     from, so the label says what the date DOES rather than naming the notice twice.
+     Nothing is derived: a notice with no response deadline contributes no row. */
+  /* A DIGEST, NOT THE LIST. His feed closes ~100 notices a quarter; carrying all of
+     them put 30 rows in week one and pushed the 30 September deadline — the row that
+     binds every customer — below the fold. That burial is why these were excluded
+     here before. The card takes the SOONEST few and states the true remainder, which
+     is counted from the WHOLE set, never from what survived the cap. The full list is
+     Notices, and the row says so. */
+  var NOTICE_ROWS_ON_CARD = 5;
+  function buildNoticeWeek(opps) {
+    if (!Array.isArray(opps) || opps.length === 0) return [];
+    var now = Date.now();
+    var out = [];
+    for (var i = 0; i < opps.length; i++) {
+      var o = opps[i];
+      if (!o || !o.response_deadline) continue;
+      var ms = new Date(o.response_deadline).getTime();
+      if (isNaN(ms) || ms < now) continue;
+      var day = Math.max(0, Math.ceil((ms - now) / 86400000));
+      var name = cleanLabel(o.title) || o.solicitation_number || o.notice_id || 'Solicitation';
+      out.push({
+        ms: ms, day: day, gov: false, big: false,
+        d: new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        label: name + ' — offers due, after this you cannot submit',
+        tag: 'Offers due',
+        tone: day <= 3 ? 'crit' : day <= 7 ? 'warn' : 'ok',
+        desk: 'opp',
+        href: '/notices'
+      });
+    }
+    out.sort(function (a, b) { return a.ms - b.ms; });
+    var total = out.length;
+    if (total <= NOTICE_ROWS_ON_CARD) return out;
+    var kept = out.slice(0, NOTICE_ROWS_ON_CARD);
+    var hidden = total - kept.length;
+    // The overflow row carries the count from the full set and links where the rest
+    // actually live. It is dated to the last kept row so it sorts beside them.
+    kept.push({
+      ms: kept[kept.length - 1].ms, day: kept[kept.length - 1].day,
+      gov: false, big: false, d: '+' + hidden,
+      label: hidden + ' more solicitation' + (hidden === 1 ? '' : 's') + ' closing — open Notices',
+      tag: 'More', tone: 'ok', desk: 'opp', href: '/notices'
+    });
+    return kept;
   }
 
   // Titles arrive SHOUTED and PSC-prefixed from SAM. Trim for the row without
@@ -217,7 +279,12 @@
       // MAJOR EVENTS ONLY. Response deadlines are deliberately NOT here: 177 of them
       // arrive on a rolling window and burying four government dates under them is
       // what made this panel unusable. The deadline list lives on Notices.
-      var wk = buildWeek(buildGovWeek(govRules).concat(buildFiscalWeek()));
+      /* Money flow · his own dates · rules at their effective date. A null
+         `opportunities` means the feed did not answer, so no notice rows are built
+         and the panel's outage state speaks — a short list must never stand in for
+         a whole one. */
+      var noticeRows = Array.isArray(data.opportunities) ? buildNoticeWeek(data.opportunities) : [];
+      var wk = buildWeek(buildFiscalWeek().concat(noticeRows).concat(buildGovWeek(govRules)));
       window.CC.WEEK_DROPPED = wk.dropped;   // surfaced in the panel, never silent
       window.CC.WEEK_SOURCED = true;
       if (!Array.isArray(data.WEEK)) replaceArr('WEEK', wk.rows);
