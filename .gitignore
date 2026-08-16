@@ -52,6 +52,11 @@ scripts/oauth/*
 
 # Sync log artifacts (launchd output — never source)
 scripts/sync-digest*.log
+# The audit-flow launchd agent (com.faraudit.auditflow, StartInterval 300) writes these
+# two logs every five minutes. PR #708 untracked them but this rule was left out of that
+# commit, so they came straight back as '??' noise — the same dirty tree wearing a
+# different symbol. Its sibling agent's log is ignored on the line above.
+scripts/audit-flow-refresh.*.log
 
 # Local test artifacts
 outputs/
