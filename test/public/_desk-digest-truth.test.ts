@@ -295,7 +295,11 @@ console.log("\n── Part C4 · Pipeline · an OVERDUE pursuit is the loudest t
 console.log("\n── Part D · every desk answers, and an unsourced one names its blocker ──");
 {
   const all = buildDeskDigest(EMPTY, NOW);
-  const DESKS = ["opp", "pipe", "co", "cmmc", "far", "spend", "gao", "team", "wage"];
+  // "news" joined the digest when the permanently-blank GAO card was replaced on the
+  // Signals grid. GAO stays in the digest: the rail still links to that page, and a
+  // desk vanishing from this array would be indistinguishable from a desk with
+  // nothing to report — which is the exact confusion D1/D2 exist to prevent.
+  const DESKS = ["opp", "pipe", "co", "cmmc", "far", "spend", "news", "gao", "team", "wage"];
   check("D1 · the digest returns a row for EVERY desk", DESKS.every((k) => all.some((r) => r.desk === k)),
     "missing: " + DESKS.filter((k) => !all.some((r) => r.desk === k)).join(","));
   // A desk missing from the array and a desk with nothing to report would look
@@ -333,7 +337,19 @@ console.log("\n── Part E · the served page renders the digest, not a placeh
     !/ranking not built yet/i.test(CCAPP));
   check("E2 · Signals no longer ships one sentence for all six desks",
     !/No cross-desk summary is computed yet/i.test(CCAPP));
-  check("E3 · renderSignals reads the digest", /function renderSignals[\s\S]{0,400}CC\.SIGNALS/.test(CCAPP));
+  // Scoped to the FUNCTION, not to a character distance: the previous form matched
+  // within 400 chars of the declaration and went red when a comment was added above
+  // the code it was checking — a gate failing on prose it does not cover.
+  const rsStart = CCAPP.indexOf("function renderSignals");
+  const rsBody = rsStart < 0 ? "" : CCAPP.slice(rsStart, CCAPP.indexOf("\n  }", rsStart) + 4);
+  check("E3 · renderSignals reads the digest",
+    rsBody.length > 0 && /CC\.SIGNALS/.test(rsBody),
+    rsStart < 0 ? "renderSignals not found" : "it no longer reads the digest");
+  // The grid renders SIX cards, and GAO is not one of them — its own summary says the
+  // source refuses us, so that slot could never fill.
+  check("E4 · the grid shows six desks, with news in place of gao",
+    /const order = \[[^\]]*'news'[^\]]*\]/.test(rsBody) && !/const order = \[[^\]]*'gao'[^\]]*\]/.test(rsBody),
+    "the Signals order did not change");
   check("E4 · …and renders each desk's own reason", /s\.reason/.test(CCAPP));
   check("E5 · …and distinguishes a measured desk from an unmeasured one",
     /s\.status\s*===\s*'ok'/.test(CCAPP));
