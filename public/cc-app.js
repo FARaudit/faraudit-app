@@ -13,6 +13,7 @@
       co:    { label: 'Contracting Officers', color: '#185FA5', href: '/contracting-officers', icon: 'M9 9a3 3 0 100-6 3 3 0 000 6zM3 20c1-3 3-5 6-5s5 2 6 5', cta: 'Contact' },
       cmmc:  { label: 'CMMC Readiness', color: '#0891b2', href: '/cmmc', icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4', cta: 'Review' },
       gao:   { label: 'GAO Protests', color: '#dc2626', href: '/gao-protests', icon: 'M12 3a9 9 0 100 18 9 9 0 000-18zM3 12h18', cta: 'Read' },
+      news:  { label: 'Defense News', color: '#b45309', href: '/defense-news', icon: 'M4 4h16v16H4zM8 8h8M8 12h8M8 16h5', cta: 'Read' },
       far:   { label: 'FAR/DFARS', color: '#7c3aed', href: '/far-dfars-updates', icon: 'M4 3h16v18H4zM8 8h8M8 12h8M8 16h5', cta: 'Read rule' },
       wage:  { label: 'Wage Benchmarks', color: '#d97706', href: '/wage-benchmarks', icon: 'M3 20h18M6 16v-5M11 16V8M16 16v-3', cta: 'Compare' },
       team:  { label: 'Teaming Partners', color: '#059669', href: '/teaming-partners', icon: 'M7 9a3 3 0 100-6 3 3 0 000 6zM17 9a3 3 0 100-6 3 3 0 000 6zM2 20c0-3 2.5-5 5-5M22 20c0-3-2.5-5-5-5', cta: 'Search' },
@@ -341,7 +342,12 @@
   // no query behind it names what is missing rather than implying it is empty.
   // The one sentence this replaces said the last of those about all six.
   function renderSignals() {
-    const order = ['spend', 'co', 'cmmc', 'far', 'gao', 'team'];
+    /* SIX CARDS. GAO is not among them: its own summary says GAO refuses the request
+       upstream, so that slot could never fill — a permanently blank card in a grid
+       whose whole job is to say what each desk holds. Defense news takes the slot and
+       carries a real headline. The GAO DESK entry stays: the rail still links to the
+       page, and this list is about what the GRID shows. */
+    const order = ['spend', 'co', 'cmmc', 'far', 'news', 'team'];
     const S = window.CC.SIGNALS;
     const byDesk = {};
     if (Array.isArray(S)) S.forEach(x => { if (x && x.desk) byDesk[x.desk] = x; });

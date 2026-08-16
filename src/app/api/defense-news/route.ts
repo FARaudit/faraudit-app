@@ -6,6 +6,7 @@ import { resolveFeedScope } from "@/lib/bd-os/live-opportunities";
 import { scoreArticle, scopeKey, deskDescription, distinctiveTerms } from "@/lib/defense-news-naics";
 import { naicsTitle } from "@/lib/naics-titles";
 import { decodeEntities } from "@/lib/feed-entities";
+import { NEWS_FEEDS } from "@/lib/bd-os/news-feeds";
 import { recordNewsSpend } from "@/lib/defense-news-usage";
 import { judgeChunk, judgeDuplicatesAcrossRequest, RATE_PER_MTOK, type Judgement, type ChunkUsage, type CrossItem } from "@/lib/defense-news-judge";
 
@@ -99,16 +100,9 @@ interface NewsItem {
 // The additions are weighted to ACQUISITION rather than to geopolitics. A story
 // about a carrier deployment is defense news; a FAR overhaul notice is something
 // a subcontractor has to do something about this week.
-const FEEDS: { source: string; url: string; tag: NewsItem["tag"] }[] = [
-  { source: "Defense News",       url: "https://www.defensenews.com/arc/outboundfeeds/rss/", tag: "defense" },
-  { source: "DoD News",           url: "https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx?ContentType=1&Site=945&max=20", tag: "defense" },
-  { source: "Federal Register",   url: "https://www.federalregister.gov/api/v1/documents.rss?conditions%5Bagencies%5D%5B%5D=defense-department", tag: "policy" },
-  { source: "FedScoop",           url: "https://fedscoop.com/feed/", tag: "policy" },
-  { source: "Acquisition.gov",    url: "https://www.acquisition.gov/rss.xml", tag: "policy" },
-  { source: "Federal News Network", url: "https://federalnewsnetwork.com/category/acquisition-policy/feed/", tag: "policy" },
-  { source: "Breaking Defense",   url: "https://breakingdefense.com/feed/", tag: "defense" },
-  { source: "DefenseScoop",       url: "https://defensescoop.com/feed/", tag: "defense" }
-];
+/* The wire list moved to bd-os/news-feeds.ts so the Signals card on Today reads the
+   SAME feeds this desk does — a card cannot preview a story its desk never carries. */
+const FEEDS: { source: string; url: string; tag: NewsItem["tag"] }[] = NEWS_FEEDS;
 
 /** Google News queries built from the customer's OWN codes.
  *

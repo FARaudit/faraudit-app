@@ -135,7 +135,13 @@ console.log("\n── F · sources ──");
   // Assert against the FEEDS array, not against the whole file. A URL named in a
   // comment explaining why it was dropped is not a URL the route fetches, and a
   // gate that cannot tell those apart is matching prose rather than behaviour.
-  const feedsBlock = (ROUTE.match(/const FEEDS[\s\S]*?\n\];/) || [""])[0];
+  // The list moved to bd-os/news-feeds.ts so the Signals card on Today reads the SAME
+  // wires this desk does. Read it THERE: a gate that greps the route for a literal it
+  // no longer holds reports "no feeds" for a refactor that changed nothing it covers.
+  // Assert the route still consumes that list, so the two cannot drift apart.
+  const feedsBlock = readFileSync(join(ROOT, "src", "lib", "bd-os", "news-feeds.ts"), "utf8");
+  check("the route reads the SHARED feed list", /NEWS_FEEDS/.test(ROUTE),
+    "the route forked its own copy of the wires");
   check("the FEEDS array was located", feedsBlock.length > 100, `${feedsBlock.length} chars`);
   check(
     "no feed URL answering 302-to-empty is still fetched",
