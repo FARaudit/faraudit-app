@@ -1281,7 +1281,9 @@ var __fdReadyNoticeId=null;
     var v=verdictOf(a);
     /* status is populated on every run, so a run that failed is named as such and offered a
        re-run — the same words Decisions uses for it. */
-    if(String(a.status).toLowerCase()==='failed'&&!a.v3_verdict)v={cls:'is-failed',label:'RUN FAILED'};var sol=String(a.solicitation_number||a.notice_id||a.title||'').trim();var slug=a.id?String(a.id):encodeURIComponent(sol.toLowerCase());
+    if(String(a.status).toLowerCase()==='failed'&&!a.v3_verdict)v={cls:'is-failed',label:'RUN FAILED'};var sol=String(a.solicitation_number||a.notice_id||a.title||'').trim();/* the row's three hrefs interpolate this into an attribute, so it is escaped at the
+       source rather than at each use — an id is data, and data reaching markup is escaped. */
+    var slug=escapeHtml(a.id?String(a.id):encodeURIComponent(sol.toLowerCase()));
     var office=String(a.office_display||a.agency||'').trim();var when=a.ago||ago(a.completed_at||a.created_at);
     var title=String(a.title||'').trim();if(title.toLowerCase()==='untitled solicitation')title='';var titleLine=(title&&title.toUpperCase()!==sol.toUpperCase())?title:sol;
     // F2-LIVE: the reason line must NEVER fall back to the pole word — that printed the same invented
