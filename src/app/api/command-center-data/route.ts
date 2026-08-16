@@ -12,6 +12,7 @@ import { poleToRecommendation } from "@/lib/verdict-pole";
 import { fetchDefenseSpending, type SpendingResult } from "@/lib/bd-os/defense-spending";
 import { federalRegisterUrl, parseFederalRegister, type RegRow } from "@/lib/federal-register";
 import { buildDeskDigest } from "@/lib/bd-os/desk-digest";
+import { fetchNewsHeadlines } from "@/lib/bd-os/news-headlines";
 
 export const dynamic = "force-dynamic";
 
@@ -77,7 +78,7 @@ export async function GET() {
 
     const [
       counters, homeStats, scoped, recentAudits, pipelineRows,
-      cmmcAudits, regRules, spending,
+      cmmcAudits, regRules, spending, newsRows,
     ] = await Promise.all([
       fetchHeaderCounter(supabase).catch(() => ({ audits: 0, traps: 0 })),
       fetchHomeStats(supabase).catch(() => null),
@@ -163,6 +164,13 @@ export async function GET() {
       resolveFeedScope(supabase)
         .then((s): Promise<SpendingResult> => fetchDefenseSpending(supabase, s.codes))
         .catch(() => null),
+      // Defence-news headlines for the Signals grid. /api/news-feed is RSS only —
+      // NO model spend — and CDN-cached for 15 minutes, so a dashboard that reloads
+      // on every tab switch costs nothing to run. The judged, desk-ranked read lives
+      // on /defense-news, which is a page you open, not one that opens itself.
+      // In the SAME Promise.all as everything else: an extra sequential hop on the
+      // slowest panel of the slowest page would be paid on every load.
+      fetchNewsHeadlines().catch(() => null),
     ]);
 
     const nowMs = Date.now();
@@ -361,6 +369,7 @@ export async function GET() {
       pipeline: pipeRows,
       regRules: (regRules as RegRow[] | null),
       spending: (spending as SpendingResult | null),
+      news: newsRows,
     }, nowMs);
 
     return NextResponse.json({

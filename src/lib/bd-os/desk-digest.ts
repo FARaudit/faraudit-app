@@ -20,11 +20,11 @@ import type { SpendingResult } from "@/lib/bd-os/defense-spending";
  * and it does not turn a failed read into a zero — the two states the panels
  * must be able to tell apart are exactly the two this file keeps apart. */
 
-export type DeskKey = "opp" | "pipe" | "co" | "cmmc" | "far" | "gao" | "team" | "spend" | "wage";
+export type DeskKey = "opp" | "pipe" | "co" | "cmmc" | "far" | "gao" | "team" | "spend" | "wage" | "news";
 
 /** Every desk on Today, in the order the Feed considers them. The Signals grid
  *  renders its own subset; both read from this one list. */
-export const DESK_KEYS: DeskKey[] = ["opp", "pipe", "co", "cmmc", "far", "spend", "gao", "team", "wage"];
+export const DESK_KEYS: DeskKey[] = ["opp", "pipe", "co", "cmmc", "far", "spend", "news", "gao", "team", "wage"];
 
 export type DeskStatus =
   /** The headline is a measurement taken from data this desk actually read. */
@@ -74,6 +74,10 @@ export interface DeskDigestInput {
   regRules: RegRow[] | null;
   /** The customer's own pipeline rows. null = the read FAILED. */
   pipeline: Array<Record<string, unknown>> | null;
+  /** Defence-news headlines, UNJUDGED. null = the read FAILED. Optional so an
+   *  existing caller that does not supply news gets a "did not answer" row rather
+   *  than a silently absent desk. */
+  news?: NewsRow[] | null;
   /** Defense-spending payload or one of its stated non-payload states.
    *  null = the read THREW. */
   spending: SpendingResult | null;
@@ -427,6 +431,50 @@ const NOT_SOURCED: Record<"gao" | "team" | "wage", string> = {
   wage: "Wage determinations carry no per-customer summary yet."
 };
 
+/** A defence-news headline for the Signals grid.
+ *
+ *  DELIBERATELY UNJUDGED. /api/defense-news runs a Sonnet judge over every story to
+ *  rank it against this customer's desks; that call is what makes the news PAGE worth
+ *  opening, and it is priced for a page you open, not for a dashboard that reloads on
+ *  every tab switch. Today must cost nothing to run, so this row takes the newest
+ *  story from the RSS feed and says only what it can stand behind: what was published
+ *  and when. The ranking lives one click away, on the desk itself.
+ *
+ *  So `why` claims recency, never relevance. Calling an unranked story "most relevant"
+ *  would be the judge's claim made without the judge. */
+export interface NewsRow { title: string; publishedAt: string; source?: string | null }
+
+export function deskNews(articles: NewsRow[] | null, now: number): DeskSummary {
+  if (articles === null) return blank("news", "unavailable", "The news feed did not answer.");
+  if (articles.length === 0) return blank("news", "empty", "No defense reporting in the current window.");
+
+  // Newest by publication date. An unparseable date sorts last rather than winning
+  // the slot on a NaN comparison.
+  const dated = articles
+    .map((a) => ({ a, t: Date.parse(a.publishedAt) }))
+    .filter((x) => Number.isFinite(x.t))
+    .sort((x, y) => y.t - x.t);
+
+  if (dated.length === 0) {
+    return blank("news", "empty", "Defense reporting carries no readable publication date.");
+  }
+
+  const top = dated[0];
+  const ageDays = Math.max(0, Math.floor((now - top.t) / 86_400_000));
+  const when = ageDays === 0 ? "today" : ageDays === 1 ? "yesterday" : `${ageDays}d ago`;
+  return {
+    desk: "news",
+    status: "ok",
+    title: cleanTitle(top.a.title) || top.a.title,
+    why: `Newest defense reporting · published ${when}`,
+    value: counted(articles.length, "story"),
+    count: articles.length,
+    days: null,
+    urg: "ok",
+    reason: null
+  };
+}
+
 export function buildDeskDigest(input: DeskDigestInput, now: number = Date.now()): DeskSummary[] {
   return [
     deskOpp(input.opportunities, now),
@@ -435,6 +483,7 @@ export function buildDeskDigest(input: DeskDigestInput, now: number = Date.now()
     deskCmmc(input.cmmcAudits, now),
     deskFar(input.regRules, now),
     deskSpend(input.spending, now),
+    deskNews(input.news ?? null, now),
     blank("gao", "not-sourced", NOT_SOURCED.gao),
     blank("team", "not-sourced", NOT_SOURCED.team),
     blank("wage", "not-sourced", NOT_SOURCED.wage)
