@@ -18,7 +18,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { buildDeskDigest, daysUntil, urgencyOf, type DeskDigestInput, type DeskSummary } from "@/lib/bd-os/desk-digest";
+import { buildDeskDigest, deskNews, daysUntil, urgencyOf, type DeskDigestInput, type DeskSummary } from "@/lib/bd-os/desk-digest";
 import type { OpportunityRow } from "@/lib/bd-os/queries";
 import type { RegRow } from "@/lib/federal-register";
 
@@ -294,6 +294,25 @@ console.log("\n── Part C4 · Pipeline · an OVERDUE pursuit is the loudest t
 // ─────────────────────────────────────────────────────────────────────────────
 console.log("\n── Part D · every desk answers, and an unsourced one names its blocker ──");
 {
+  /* THE NEWS DESK SAYS "stories". counted() defaults the plural to the singular plus
+     an s, which shipped "24 storys" onto the live grid. Every other desk's noun
+     pluralises that way; this one does not, and a default that is right eleven times
+     out of twelve is how the twelfth reaches a customer. */
+  {
+    const iso = (d: number) => new Date(NOW - d * 86_400_000).toISOString();
+    const many = deskNews(
+      Array.from({ length: 24 }, (_, i) => ({ title: `Story ${i}`, publishedAt: iso(i) })), NOW);
+    check("N1 · the news desk pluralises 'stories'", many.value === "24 stories", String(many.value));
+    const one = deskNews([{ title: "Only one", publishedAt: iso(0) }], NOW);
+    check("N2 · …and stays singular at one", one.value === "1 story", String(one.value));
+    // Recency, never relevance — an unjudged row may not imply a ranking.
+    check("N3 · it claims recency, not relevance",
+      /newest/i.test(String(many.why)) && !/relevan|match|for you/i.test(String(many.why)),
+      String(many.why));
+    check("N4 · a failed read is not an empty desk",
+      deskNews(null, NOW).status === "unavailable" && deskNews([], NOW).status === "empty");
+  }
+
   const all = buildDeskDigest(EMPTY, NOW);
   // "news" joined the digest when the permanently-blank GAO card was replaced on the
   // Signals grid. GAO stays in the digest: the rail still links to that page, and a
