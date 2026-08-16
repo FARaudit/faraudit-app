@@ -54,28 +54,40 @@
     return { rows: items.slice(0, WEEK_MAX_ROWS), dropped: dropped };
   }
 
-  // Fiscal markers — from the clock, no source to rot. The 30 September obligation
-  // deadline is the single most consequential recurring date in federal contracting.
+  /* FISCAL MARKERS — from the clock, no source to rot, and from ONE definition of the
+     1 October boundary (federal-fiscal.js). The label and the date come back from that
+     helper together, so a fiscal year and the date it names cannot drift apart. */
   function buildFiscalWeek() {
+    var F = window.FedFiscal;
+    // The helper is a separate served file. If it did not load, this card renders
+    // NOTHING rather than falling back to a local approximation: a federal deadline
+    // under the wrong fiscal year is worse than a missing row.
+    if (!F) { console.error('[command-center-live] federal-fiscal.js did not load — fiscal markers omitted'); return []; }
     var now = new Date();
-    var y = now.getFullYear();
     var out = [];
-    var marks = [
-      { m: 8, d: 30, tag: 'Fiscal year ends', label: 'FY' + String((y + 1) % 100) + ' obligations close — agencies spend or lose it' },
-      { m: 6, d: 1,  tag: 'Q4 begins',        label: 'Q4 obligation surge begins — the busiest quarter for awards' }
-    ];
-    for (var i = 0; i < marks.length; i++) {
-      var mk = marks[i];
-      var when = new Date(y, mk.m, mk.d, 12, 0, 0);
-      if (when.getTime() < now.getTime()) when = new Date(y + 1, mk.m, mk.d, 12, 0, 0);
-      var day = Math.max(0, Math.ceil((when.getTime() - now.getTime()) / 86400000));
-      out.push({
-        ms: when.getTime(), day: day, gov: true, big: mk.m === 8,
-        d: when.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        label: mk.label, tag: mk.tag,
-        tone: day <= 30 ? 'warn' : 'ok', desk: 'spend'
-      });
-    }
+
+    var ob = F.obligationDeadline(now);
+    out.push({
+      ms: ob.when.getTime(), day: ob.days, gov: true, big: true,
+      d: ob.when.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      label: F.shortFY(ob.fy) + ' obligations close — agencies spend or lose it',
+      tag: 'Fiscal year ends',
+      tone: ob.days <= 30 ? 'warn' : 'ok', desk: 'spend'
+    });
+
+    var q4 = F.q4Window(now);
+    out.push({
+      ms: q4.when.getTime(), day: q4.days, gov: true, big: false,
+      d: q4.when.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      // The label states which side of the window we are on. "Begins" while it is
+      // already running is the failure this replaces.
+      label: q4.state === 'in-progress'
+        ? 'Q4 obligation surge under way — ' + F.shortFY(q4.fy) + ' awards land before this date'
+        : 'Q4 obligation surge begins — the busiest quarter for awards',
+      tag: q4.state === 'in-progress' ? 'Q4 closes' : 'Q4 begins',
+      tone: q4.days <= 30 ? 'warn' : 'ok', desk: 'spend'
+    });
+
     return out;
   }
 
