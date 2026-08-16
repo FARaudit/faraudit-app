@@ -82,6 +82,13 @@
     + '[data-theme="dark"] .np-item.unread:hover{background:rgba(55,138,221,.16)}'
     + '.np-dot{width:9px;height:9px;border-radius:50%;margin-top:5px}'
     + '.np-body{min-width:0}'
+    /* The empty and failure states are NOT rows. .np-item is a 3-column grid
+       (dot | body | time) and these carry only a body, so as an .np-item the text
+       landed in the 9px DOT track and wrapped one word per line. A track belongs to
+       the row, never to whichever child happens to be present. */
+    + '.np-note{display:block;padding:18px 16px 20px;cursor:default}'
+    + '.np-note .np-t{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.32}'
+    + '.np-note .np-d{font-size:11px;color:var(--mute);line-height:1.45;margin-top:3px}'
     + '.np-t{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.32}'
     + '.np-t .np-desk{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-right:6px}'
     + '.np-d{font-size:11px;color:var(--mute);line-height:1.45;margin-top:2px}'
@@ -180,8 +187,8 @@
       else if (loaded) { t = 'No notifications';          d = "You're all caught up."; }
       else             { t = 'Loading…';                  d = 'Reading your notifications.'; }
 
-      scroll.innerHTML = html || '<div class="np-item" style="cursor:default"><div class="np-body"><div class="np-t">'
-        + t + '</div><div class="np-d">' + d + '</div></div></div>';
+      scroll.innerHTML = html || '<div class="np-note"><div class="np-t">'
+        + t + '</div><div class="np-d">' + d + '</div></div>';
 
       var unread = ITEMS.filter(function (n) { return n.unread; }).length;
       if (count) count.textContent = String(unread);
