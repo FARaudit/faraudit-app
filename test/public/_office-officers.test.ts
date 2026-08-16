@@ -12,7 +12,7 @@
 //
 // Run: npx tsx test/public/_office-officers.test.ts
 export {}; // module scope (harness memory: tsx script-scope redeclare collisions)
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 let pass = 0, fail = 0;
@@ -111,12 +111,87 @@ ok(/'<div class="rc-item">' \+ row \+ rcCall\(r\) \+ '<\/div>'/.test(APP),
 ok(/mailto:/.test(rcCall) && /tel:/.test(rcCall), "the contacts are actually actionable");
 ok(/replace\(\/\[\^0-9\+\]\/g, ''\)/.test(rcCall), "the tel: href is stripped to diallable characters");
 
+/* ⛔ SCOPE WIDENED FROM ONE FUNCTION TO EVERY SERVED SCRIPT THAT EMITS A tel:.
+   This check read `rcCall` and nothing else, so it proved the rule held in the
+   one place it was written — and a second page rendering its own call list in
+   its own file inherited none of it. That is exactly what happened: wtc-app.js
+   put the stored value into the href unaltered, and five of the eighty-seven
+   phones we hold carry separators, so the dialler received a string it had to
+   interpret. Every assertion here stayed green throughout.
+   The rule belongs to the ACT of emitting a tel:, not to the function that
+   happened to do it first. So: sweep public/*.js, find every file that builds
+   one, and require each to strip. A new surface now inherits the rule instead
+   of having to remember it. */
+const SERVED = readdirSync(join(ROOT, "public"))
+  .filter((f) => f.endsWith(".js"))
+  .map((f) => ({ file: f, src: readFileSync(join(ROOT, "public", f), "utf8") }))
+  .filter(({ src }) => /href=['"]?tel:|['"]tel:['"]?\s*\+/.test(src));
+ok(SERVED.length > 0, "at least one served script emits a tel: link",
+  SERVED.map((s) => s.file).join(", "));
+const unstripped = SERVED.filter(({ src }) => !/replace\(\/\[\^0-9\+\]\/g, ''\)/.test(src));
+ok(unstripped.length === 0,
+  "EVERY served script that emits a tel: strips it to diallable characters",
+  unstripped.length ? `raw value reaches the dialler in: ${unstripped.map((s) => s.file).join(", ")}`
+    : `${SERVED.length} files checked`);
+
 // ── R6 · IT IS NOT IN FRONT OF THE PANELS ────────────────────────────────────
 console.log("\nR6  A SLOW UPSTREAM DOES NOT GATE THE PAGE");
 ok(/paint\(\);\s*\n\s*loadOfficers\(\);/.test(LIVE),
   "the officers load AFTER the panels are painted", "a live SAM call must not gate every panel");
-ok(/if \(!document\.getElementById\('rcList'\)\) return;/.test(LIVE),
-  "…and only on the page that renders recompete rows");
+/* ⛔ THE GUARD IS CHECKED AGAINST THE MARKUP, NOT AGAINST A LITERAL STRING. Pinning the exact text
+   `getElementById('rcList')` proved only that a line had not been edited — and the failure this
+   guard can actually have is the opposite one: the line stays untouched while the page it names is
+   rebuilt around a different host. The fetch then never fires, OFFICERS keeps its default, and the
+   call list states "we hold no contracting officer for any of these offices" — a claim about the
+   offices manufactured out of a lookup that was never attempted.
+   So: read the ids the guard names, and require one of them to exist on the page whose call list
+   depends on this directory. Rebuilding that page without updating the guard now goes red. */
+const guardMatch = LIVE.match(/if \(([^;]*getElementById[^;]*)\) return;/);
+ok(!!guardMatch, "the fetch is guarded by an early return on a host lookup");
+const guardIds = [...(guardMatch?.[1] || "").matchAll(/getElementById\('([^']+)'\)/g)]
+  .map((m) => m[1]);
+ok(guardIds.length > 0, "…and the guard names the hosts that consume the directory",
+  guardIds.join(", "));
+const WTC_HTML = readFileSync(join(ROOT, "public", "who-to-call.html"), "utf8");
+const named = guardIds.filter((id) => WTC_HTML.includes(`id="${id}"`));
+ok(named.length > 0,
+  "…including a host /who-to-call actually carries, so its call list gets its officers",
+  named.length ? `resolves via #${named.join(", #")}`
+    : `guard names ${guardIds.join(", ")} — none of which is on that page`);
+
+// ── R7 · STAYING LIVE WITHOUT LYING ABOUT IT ─────────────────────────────────
+console.log("\nR7  THE FEED IS RE-CHECKED, AND A FAILED CHECK IS NOT AN ABSENCE");
+/* The record is rebuilt nightly, so a reader with a tab open can sit on
+   yesterday's answer for a whole day. Three mechanisms close that window without
+   asking them to know they should reload. */
+ok(/setInterval\(refresh, REFRESH_MS\)/.test(LIVE), "the feed is re-checked on a timer");
+ok(/visibilitychange/.test(LIVE),
+  "…and again when the tab comes back to the front, the moment staleness shows");
+ok(/setInterval\(repaintStamp, STAMP_MS\)/.test(LIVE),
+  "…and the stamp repaints on its own, so a frozen age cannot outlive the clock");
+ok(/if \(refreshing \|\| document\.hidden\) return;/.test(LIVE),
+  "a hidden tab does not poll — that is the customer's battery, on a page nobody is reading");
+
+/* ⛔ THE INVARIANT THIS SECTION EXISTS FOR. Once a record is on screen, a later
+   fetch that fails must leave it there. Routing a refresh failure into unwired()
+   would blank a real record because the network blinked, telling the reader
+   their data is gone when it is only un-rechecked — and discarding the only copy
+   held. So the refresh path gets its own terminal, and it must NOT set STATUS. */
+const checkFailedFn = LIVE.slice(LIVE.indexOf("function checkFailed"),
+  LIVE.indexOf("async function wire"));
+ok(checkFailedFn.length > 0, "the refresh failure path is its own function");
+ok(!/STATUS/.test(checkFailedFn),
+  "…and it does NOT touch STATUS — a failed re-check never tears down a good record");
+ok(/state: 'failed'/.test(checkFailedFn), "…it records that the check failed");
+ok(/const fail = isRefresh \? checkFailed : unwired;/.test(LIVE),
+  "the first load still tears down honestly; only a REFRESH is non-destructive");
+/* addEventListener hands its listener an Event. Passing `wire` directly would
+   make that Event arrive as `isRefresh`, so a first load against a dead feed
+   would report a failed RE-check over a page that never held a record. */
+ok(!/addEventListener\('DOMContentLoaded', wire\)/.test(LIVE),
+  "wire() is not handed straight to addEventListener, which would pass an Event as isRefresh");
+ok(/addEventListener\('DOMContentLoaded', start\)/.test(LIVE), "…it boots through start()");
+ok(/wire\(false\)/.test(LIVE), "…which calls the first load explicitly as a non-refresh");
 
 console.log(`\n${fail === 0 ? "✅" : "❌"} ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

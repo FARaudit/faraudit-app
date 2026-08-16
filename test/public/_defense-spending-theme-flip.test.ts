@@ -74,16 +74,39 @@ ok(COMPOSED.includes('id="geoLegend"'), "#geoLegend present in the composed page
 console.log("\nR2  EVERY LOOKUP RESOLVES");
 const lookedUp = [...new Set([...APP_SRC.matchAll(/\$\('([A-Za-z0-9_-]+)'\)/g)].map((m) => m[1]))].sort();
 ok(lookedUp.length > 15, "id census is non-empty", `${lookedUp.length} ids read via $()`);
-/* ⛔ dsb-app.js NOW MOUNTS ON TWO PAGES, so "the markup" is both of them. Primes, Ceilings and
-   Recompete Radar moved to /who-to-call; their ids are read by this shared script and exist only
-   there. Checking one page would report 17 unresolved lookups for a renderer set that resolves
-   perfectly — and the fix a reader would reach for is to delete the assertion. The invariant is
-   unchanged: every id this script reads exists on a page that serves it. */
+/* ⛔ /who-to-call NO LONGER MOUNTS THIS SCRIPT. It renders one document through wtc-app.js, so the
+   three panels that used to live there — Primes who owe a subcontracting plan, Room left on
+   contracts already awarded, and Recompete Radar — have no host on any page. Their renderers are
+   RETAINED in dsb-app.js and each returns early on a missing host, so nothing throws.
+
+   The set is ENUMERATED rather than tolerated by a rule. A blanket "ignore anything unresolved"
+   would swallow the next genuine typo, which is what this assertion exists to catch. Every id below
+   is checked BOTH ways: it must be absent from the markup (a host that reappears means a panel was
+   remounted and this list is stale) and it must still be read by the script (an id that stops being
+   read means the renderer went and the entry is dead). */
 const WTC = injectRail(readFileSync(path.join(PUB, "who-to-call.html"), "utf8"), "who-to-call");
 const MOUNTED = COMPOSED + "\n" + WTC;
-const unresolved = lookedUp.filter((id) => !MOUNTED.includes(`id="${id}"`));
-ok(unresolved.length === 0, "every $() target exists on a page that mounts this script",
-  unresolved.length ? `unresolved: ${unresolved.join(", ")}` : `${lookedUp.length}/${lookedUp.length} resolve`);
+
+/* Primes and Ceilings are mounted again on /who-to-call; only the Recompete Radar WIDGET stays
+   unmounted, because the same RECOMPETES array is now rendered as sections 01-03 of the document
+   there. Its renderer is retained, so both halves below still have a subject. */
+const UNMOUNTED = ["bigN", "bigSay", "footL", "footR", "lede", "rcList", "whSub"];
+
+const remounted = UNMOUNTED.filter((id) => MOUNTED.includes(`id="${id}"`));
+ok(remounted.length === 0, "the unmounted panel hosts are still absent from every page",
+  remounted.length ? `back in the markup, update this list: ${remounted.join(", ")}`
+    : `${UNMOUNTED.length} ids accounted for`);
+
+const staleEntries = UNMOUNTED.filter((id) => !lookedUp.includes(id));
+ok(staleEntries.length === 0, "…and every one of them is still read by the script",
+  staleEntries.length ? `no longer read, drop from this list: ${staleEntries.join(", ")}`
+    : "no dead entries");
+
+const unresolved = lookedUp.filter(
+  (id) => !MOUNTED.includes(`id="${id}"`) && !UNMOUNTED.includes(id));
+ok(unresolved.length === 0, "every other $() target exists on a page that mounts this script",
+  unresolved.length ? `unresolved: ${unresolved.join(", ")}`
+    : `${lookedUp.length - UNMOUNTED.length} of ${lookedUp.length} resolve, ${UNMOUNTED.length} unmounted`);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DOM SHIM. Models only what this page touches, and its element set comes from

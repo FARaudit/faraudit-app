@@ -254,7 +254,7 @@ export type SpendingResult =
   | { state: "no-profile-codes" }
   | { state: "no-rows"; requested: string[] };
 
-const TOP_N = 10;
+const TOP_N = 25;
 
 /* ⛔ THIS NUMBER LIVES IN TWO PLACES AND THEY ARE TWO RULES UNTIL A GATE SAYS
    OTHERWISE. The value is enforced by the WORKER — `agents/defense-spending/
@@ -262,7 +262,7 @@ const TOP_N = 10;
    import from `agents/`, so it is restated here to let a reader tell a full list
    from a truncated one. `test/public/_recompete-cap-surfaced.test.ts` greps the
    worker for the same number and fails if the two drift. */
-export const RECOMPETE_STORE_LIMIT = 10;
+export const RECOMPETE_STORE_LIMIT = 25;
 
 /* ⛔ THE UNIT OF EVERY MONEY BRANCH ON THE WIRE. Derived totals are converted to
    millions by toM(); award-level branches are passed through in the raw dollars

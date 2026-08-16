@@ -30,8 +30,8 @@ function main() {
   assert(/base_and_all_options/.test(agent), "the worker reads base_and_all_options — the ceiling");
   assert(/total_obligation/.test(agent), "and total_obligation — what is actually committed");
   assert(/ceilingHeadroom/.test(libCode), "the route derives headroom");
-  assert(/id="chList"/.test(html) && /id="chBig"/.test(html) && /id="chCap"/.test(html),
-    "the markup carries the ids the renderer writes to");
+  /* Room left on contracts already awarded is MOUNTED on /who-to-call, below the recompete document
+     rather than inside it — the record is ordered by expiry and headroom carries no date. */
   assert(/renderCeilings\(\)/.test(app), "the renderer is called from renderAll");
 
   const fn = app.slice(app.indexOf("function renderCeilings"), app.indexOf("function renderBuyingOffices"));

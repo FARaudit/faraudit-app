@@ -94,7 +94,6 @@ input{font-family:inherit}
 .sb2{display:inline-flex;align-items:center;height:19px;padding:0 7px;border-radius:5px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.03em;white-space:nowrap;flex:none}
 .sb-main{background:var(--accent);color:#fff}
 .sb-sec{background:var(--accent-soft);color:var(--accent-on);border:1px solid var(--accent-hair)}
-.sb-other{background:var(--chip-bg);color:var(--chip-text);border:1px solid var(--line)}
 .sb-opt{background:transparent;color:var(--mute-2);border:1px dashed var(--line)}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
 
@@ -147,31 +146,10 @@ details[open]>summary .chev{transform:rotate(180deg)}
 .guide-h{display:flex;align-items:center;gap:9px;padding:11px 16px;background:var(--card-soft);border-bottom:1px solid var(--line-2)}
 .guide-h .k{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--mute);text-transform:uppercase}
 .guide-h .hint{margin-left:auto;font-size:11.5px;color:var(--mute-2)}
-.grow{display:grid;grid-template-columns:46px 118px 172px 1fr 84px;gap:14px;align-items:center;padding:9px 16px;border-bottom:1px solid var(--line-3)}
-.grow:last-child{border-bottom:0}
-.ghead{padding:8px 16px;background:var(--card-soft);border-bottom:1px solid var(--line-2)}
-.ghead span{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute-2)}
-.ghead .gh-r{justify-self:end}
-.gdoc{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.gread{display:flex;flex-wrap:wrap;gap:5px;align-content:center;padding-left:20px}
-.rtag{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:600;letter-spacing:.02em;color:var(--ink-2);background:var(--chip-bg);border:1px solid var(--line);border-radius:5px;padding:2px 7px;white-space:nowrap}
-.ghead span:nth-child(4){padding-left:20px}
 .gpri{justify-self:end;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.04em;padding:2px 8px;border-radius:5px;white-space:nowrap}
 .gpri.req{color:var(--accent-on);background:var(--accent-soft);border:1px solid var(--accent-hair)}
 .gpri.core{color:var(--ink-2);background:var(--chip-bg);border:1px solid var(--line)}
 .gpri.opt{color:var(--mute);background:transparent;border:1px dashed var(--line)}
-.grab.card{margin:0 0 6px;overflow:hidden}
-.grab>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:9px;padding:13px 16px;background:var(--card-soft)}
-.grab>summary::-webkit-details-marker{display:none}
-.grab[open]>summary{border-bottom:1px solid var(--line-2)}
-.grab-h .k{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
-.grab-h .hint{margin-left:auto;font-size:11.5px;color:var(--mute-2)}
-.grab-h .chev{margin-left:10px;color:var(--mute-2)}
-.grow:last-child{border-bottom:0}
-.grow .gname{font-size:13px;font-weight:700;color:var(--ink)}
-.grow .gdesc{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute)}
-.grow .gmeta{justify-self:end;font-family:"IBM Plex Mono",monospace;font-size:10.5px}
-.grow.opt .gname{color:var(--mute)}
 .uz-files{display:none;flex-direction:column}
 .uz.loaded .uz-files{display:flex}
 .cov{margin-top:10px;border:0;border-top:1px solid var(--line-2);border-radius:0;background:transparent;padding:13px 2px 3px}
@@ -209,31 +187,13 @@ details[open]>summary .chev{transform:rotate(180deg)}
 .sam-bh{display:flex;align-items:center;gap:9px;margin-bottom:12px}
 .sam-bh .num{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--accent-on);width:18px;height:18px;border-radius:5px;background:var(--accent-soft);border:1px solid var(--accent-hair);display:grid;place-items:center}
 .sam-bh .t{font-size:12.5px;font-weight:800;letter-spacing:.02em;text-transform:uppercase}
-.sam-bh .t span{font-size:10px;letter-spacing:.1em}
-.frule{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12.5px}
-.frule .fk{color:var(--mute);min-width:92px}
-.frule .fv{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:700;color:var(--ink-2);white-space:nowrap;background:var(--card-soft);border:1px solid var(--line);border-radius:6px;padding:2px 8px}
-.fv.on{color:var(--accent-on);border-color:var(--accent-hair);background:var(--accent-soft)}
-.sam-skip{margin-top:10px;display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--mute);padding:8px 10px;border:1px dashed var(--line);border-radius:8px}
-.sam-skip svg{width:13px;height:13px;flex:none;color:var(--miss-text)}.sam-skip b{color:var(--ink-2);font-weight:700}
+.sam-bh .t span{font-size:10px;letter-spacing:.1em}.sam-skip b{color:var(--ink-2);font-weight:700}
 .porder{display:flex;flex-direction:column}
-.pstep{display:grid;grid-template-columns:14px 84px 1fr auto;gap:11px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line-3)}
-.pstep:last-child{border-bottom:0}
-.pstep .arr{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--accent);text-align:center}
-.pstep .pn{font-size:12.5px;font-weight:700;color:var(--ink)}
-.pstep .pd{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pstep.dim .pn{color:var(--mute)}
 .lim-note{margin-top:11px;font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute);white-space:nowrap;display:flex;align-items:center;gap:7px;padding-top:10px;border-top:1px solid var(--line-3)}
 .lim-note b{color:var(--accent-on);font-weight:700}.lim-note .q{margin-left:auto;color:var(--mute-2)}
-.ct-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
 .ct{display:flex;flex-direction:column;gap:2px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--card-soft)}
 .ct .c{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;color:var(--accent-on)}
 .ct .d{font-size:10.5px;color:var(--mute);line-height:1.3}
-.ct-vs{margin-top:9px;display:flex;align-items:stretch;gap:8px}
-.ct-vs .side{flex:1;padding:9px 11px;border:1px solid var(--line);border-radius:8px}
-.ct-vs .side .h{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--ink);margin-bottom:2px}
-.ct-vs .side .d{font-size:10.5px;color:var(--mute);line-height:1.35}
-.ct-vs .mid{align-self:center;font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute-2)}
 
 /* NAICS */
 .naics{overflow:hidden;max-width:1060px}
@@ -272,9 +232,6 @@ details[open]>summary .chev{transform:rotate(180deg)}
 .ncard-title{font-size:15px;font-weight:600;color:var(--ink);line-height:1.3;letter-spacing:-.01em}
 .ncard-facts{display:flex;flex-direction:column;gap:7px;padding:11px 0;border-top:1px solid var(--line-3);border-bottom:1px solid var(--line-3)}
 .ncard-facts .fact{display:flex;align-items:baseline;gap:12px}
-.fact .fk{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mute-2);width:88px;flex:none}
-.fact .fv{font-size:13px;color:var(--ink-2);display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
-.fact .fv .sv2{font-family:"IBM Plex Mono",monospace;font-weight:700;color:var(--ink)}
 .ncard-facts .fnote{font-size:10px;color:var(--mute-2);font-style:italic;margin-left:100px;margin-top:-1px}
 .ncard-insight{display:flex;gap:10px;align-items:flex-start;background:var(--accent-soft);border:1px solid var(--accent-hair);border-radius:9px;padding:11px 12px}
 .ncard-insight .ai-spark{margin-top:4px;margin-right:0}
@@ -336,17 +293,43 @@ details[open]>summary .chev{transform:rotate(180deg)}
 #view-audit .prep-wrap{order:3;margin-top:30px}
 #view-audit .page-h,#view-audit .page-sub{order:0}
 .body-stack.flip .blk-recent{order:2}.body-stack.flip .blk-stages{order:1}
+/* ── 4 · What runs when you submit — always open, the page's one figure ──────────
+   Three stations on one accent line, the ANSWER on navy because the output is the
+   point. No collapsible: a diagram that has to be opened is not a diagram. */
+.blk-flow{max-width:1080px;width:100%}
+.flow-lede{margin:0 2px 14px;font-size:14.5px;line-height:1.58;color:var(--ink-2);max-width:78ch;text-wrap:pretty}
+.flow-lede b{color:var(--ink);font-weight:700}
+.flow{display:grid;grid-template-columns:1fr 34px 1fr 34px 1fr;border:1px solid var(--line);border-radius:16px;background:var(--card);overflow:hidden;position:relative;box-shadow:0 1px 2px rgba(15,23,42,.05),0 18px 40px -28px rgba(15,23,42,.16)}
+.flow::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,var(--accent-hair),var(--accent) 52%,var(--accent-deep));z-index:1}
+.fst{padding:18px 19px 19px;min-width:0}
+.fst-n{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--accent-on)}
+.fst-h{margin-top:7px;font-size:15px;font-weight:700;line-height:1.3;color:var(--ink);text-wrap:pretty}
+.fst-d{margin-top:6px;font-size:13px;line-height:1.5;color:var(--ink-2);text-wrap:pretty}
+.fst-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:11px}
+.ftag{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--ink-2);background:var(--card-soft);border:1px solid var(--line);border-radius:5px;padding:3px 6px;white-space:nowrap}
+.fjoin{display:flex;align-items:center;justify-content:center;color:var(--mute-2);background:var(--card-soft);border-left:1px solid var(--line-2);border-right:1px solid var(--line-2)}
+.fjoin svg{width:13px;height:13px}
+.fst.out{background:#0A1628;box-shadow:inset 2px 0 0 var(--accent)}
+[data-theme="dark"] .fst.out{background:var(--page-bg)}
+.fst.out .fst-n{color:var(--accent-light)}
+.fst.out .fst-h{color:#e8eef6}
+.fst.out .fst-d{color:#b6c2d3}
+.fst.out .ftag{color:#cfe0f2;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.15)}
+@media(max-width:900px){.flow{grid-template-columns:1fr}.fjoin{height:1px;padding:0;border:none;border-top:1px solid var(--line-2)}.fjoin svg{display:none}}
 .sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:13px}
 .sec-head .k{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--mute);text-transform:uppercase}
 .sec-head .all{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600;color:var(--accent-on);text-decoration:none;white-space:nowrap;padding-left:18px}
 .ra-list{display:flex;flex-direction:column;gap:9px}
 .ra-region{position:relative}
-.ra-scroll{max-height:22rem;overflow-y:auto;scroll-behavior:smooth;scrollbar-width:thin;padding-right:4px}
+.ra-scroll{--rac-row:67px;--rac-gap:9px;max-height:calc(5*var(--rac-row) + 5*var(--rac-gap));overflow-y:auto;scroll-behavior:smooth;scrollbar-width:thin;padding-right:4px}
 .ra-scroll::-webkit-scrollbar{width:7px}
 .ra-scroll::-webkit-scrollbar-thumb{background:#cfd8e3;border-radius:4px}
 .ra-region.is-overflowing .ra-scroll{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 34px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 34px),transparent)}
 @media (prefers-reduced-motion: reduce){.ra-scroll{scroll-behavior:auto}}
-.rac{--v:#c2861a;--vt:#fbf1dc;--vl:#ecd5a3;--vi:#8a5d11;display:grid;grid-template-columns:54px 1fr auto;gap:15px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 15px;text-decoration:none;position:relative;box-shadow:var(--shadow)}
+/* Four tracks, four children, declared together and in ONE place — a track is a property of
+   the row, not of any member that sits in it, so the override block below must not restate
+   grid-template-columns. Order: main (1fr) · due-in · pill+age · chevron (auto). */
+.rac{--v:#c2861a;--vt:#fbf1dc;--vl:#ecd5a3;--vi:#8a5d11;display:grid;--rac-col:134px;grid-template-columns:1fr var(--rac-col) var(--rac-col) auto;gap:15px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 15px;text-decoration:none;position:relative;box-shadow:var(--shadow)}
 .rac::before{content:"";position:absolute;left:0;top:11px;bottom:11px;width:3px;border-radius:0 3px 3px 0;background:var(--v)}
 .rac.is-proceed{--v:#1f8a5b;--vt:#e7f4ed;--vl:#bfe3cf;--vi:#15623f}
 .rac.is-caution{--v:#c2861a;--vt:#fbf1dc;--vl:#ecd5a3;--vi:#8a5d11}
@@ -359,20 +342,42 @@ details[open]>summary .chev{transform:rotate(180deg)}
 .rac.is-incomplete{--v:#64748b;--vt:#fafcfe;--vl:#cbd5e1;--vi:#475569}
 .rac.is-incomplete::before{background:none;border-left:3px dashed #94a3b8;width:0}  /* dashed = unfinished, not merely referred */
 .rac.is-unresolved{--v:#64748b;--vt:#f1f5f9;--vl:#dbe2ea;--vi:#475569}
-.rac-badge{width:54px;height:54px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;line-height:1;background:var(--v)}
+/* A run that produced nothing has no verdict, so it carries no verdict rail: the state is the
+   recessed body, the pill and the Re-run action. Hue is never load-bearing. */
+.rac.is-failed{--v:#64748b;--vt:#f1f5f9;--vl:#dbe2ea;--vi:#475569;background:var(--card-soft)}
+.rac.is-failed::before{display:none}
+.rac-runs{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--ink-2);background:var(--chip-bg);border:1px solid var(--line);border-radius:4px;padding:1px 6px;white-space:nowrap;flex:none;text-decoration:none}
+.rac-runs:hover{border-color:var(--accent-hair);color:var(--accent-on)}
+.rac-act{align-self:center;justify-self:end;font-size:12px;font-weight:700;color:var(--accent-on);white-space:nowrap}
+/* No .rac-badge rule: scoring is retired and the element no longer exists. Styling kept for
+   an element that never renders is an invitation to bring the element back. */
 .rac-main{min-width:0}
-.rac-metarow{display:flex;align-items:center;gap:9px;margin-bottom:3px}
-.rac-id{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap}
-.rac-office{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:500;letter-spacing:.06em;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:10px;position:relative}
+.rac-office{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:500;letter-spacing:.06em;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:10px;position:relative}
 .rac-office::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:3px;border-radius:50%;background:var(--mute-2)}
-.rac-title{font-size:15px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* The solicitation number is the only thing on the row that IDENTIFIES the document; titles
+   repeat across notices. The separator dot belongs to the BOUNDARY between the two facts,
+   not to either of them, so it prints only where a boundary exists. */
+.rac-sol{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--ink-2);white-space:nowrap;flex:none}
+.rac-sub .rac-sol + .rac-office{padding-left:10px}
+.rac-sub .rac-sol + .rac-office::before{display:block}
+.rac-title{font-size:15px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;text-decoration:none}
+/* the title IS the row's link: this overlay restores whole-row clicking now that .rac is a div,
+   and the two real controls sit above it. */
+.rac-title::after{content:"";position:absolute;inset:0;z-index:0}
+.rac:hover .rac-title{color:var(--accent-on)}
+.rac-runs,.rac-act,.rac-chev{position:relative;z-index:1}
 .rac-insight{display:flex;align-items:center;gap:8px;margin-top:4px;font-size:13px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rac-spark{flex:none;width:6px;height:6px;background:var(--v);transform:rotate(45deg);border-radius:1px}
-.rac-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
-.rac-pill{display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.06em;padding:4px 9px;border-radius:999px;white-space:nowrap;background:var(--vt);color:var(--vi);border:1px solid var(--vl)}
+.rac-right{display:flex;flex-direction:column;align-items:flex-start;gap:6px;border-left:1px solid var(--line);padding-left:15px}
+.rac-pill{display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.06em;padding:4px 9px;border-radius:999px;white-space:nowrap;background:var(--vt);color:var(--vi);border:1px solid var(--vl)}
 .rac-pill-dot{width:5px;height:5px;border-radius:50%;background:var(--v)}
-.rac-ago{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute)}
-[data-theme="dark"] .rac-pill{background:transparent;color:var(--v)}
+/* 11px floor on everything in the row that is READ (was 10.5 / 10 / 8) — the type floor
+   in _paper-theme §04, which also forbids sub-11px caps-mono outright. */
+.rac-ago{display:flex;align-items:baseline;gap:6px;white-space:nowrap;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute)}
+/* --vd is a dark-theme PILL INK only, lifting the graphite poles to AA. The rail and the dot
+   keep --v, so the encoding does not move — only the text that has to be read. */
+[data-theme="dark"] .rac-pill{background:transparent;color:var(--vd,var(--v))}
+[data-theme="dark"] .rac.is-review,[data-theme="dark"] .rac.is-incomplete,[data-theme="dark"] .rac.is-unresolved{--vd:#94a3b8}
 .stages-strip{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap}
 .stg{flex:1;min-width:158px;display:flex;gap:10px;padding:11px 13px;border:1px solid var(--line);border-radius:14px;background:var(--card-soft)}
 .stg-n{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:#fff;background:var(--accent);border-radius:5px;padding:2px 6px;height:fit-content}
@@ -385,18 +390,7 @@ details[open]>summary .chev{transform:rotate(180deg)}
 .prep-wrap>summary{list-style:none;cursor:pointer}
 .prep-wrap>summary::-webkit-details-marker{display:none}
 .prep-wrap .all{display:inline-flex;align-items:center}
-.prep-sub{display:flex;align-items:center;gap:9px;margin:18px 2px 10px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
-.prep-sub::before{content:"";width:3px;height:11px;border-radius:2px;background:var(--accent);flex:none;opacity:.5}
-.prep-sub span{font-family:"Manrope",sans-serif;font-size:11.5px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--mute-2)}
-.prep-wrap .sam-strip{margin-top:0}
-.sam-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 @media(max-width:880px){.sam-strip{grid-template-columns:1fr}}
-.samp{border:1px solid var(--line);border-radius:14px;background:var(--card);padding:14px 15px}
-.samp-h{display:flex;align-items:center;gap:9px;margin-bottom:12px}
-.samp-h .n{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:#fff;background:var(--accent);border-radius:5px;padding:2px 6px}
-.samp-h .t{font-size:13.5px;font-weight:700;color:var(--ink);letter-spacing:.01em}
-.samp-h .t span{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.08em;color:var(--mute)}
-.samp .ct-vs{margin-top:0}
 
 /* ════ FRONT DOOR — Option D · Live (solicitation-first) ════ */
 .ra-kick{display:flex;align-items:center;gap:10px;width:100%;max-width:1080px;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--accent-on);margin:0 0 13px}
@@ -427,9 +421,9 @@ details[open]>summary .chev{transform:rotate(180deg)}
 .sm-field>svg{width:19px;height:19px;color:var(--mute-2);flex:none}
 .sm-field input{flex:1;min-width:0;border:0;background:transparent;outline:none;color:var(--ink);font-size:15px;font-weight:600}
 .sm-field input::placeholder{font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:500;color:var(--mute-2)}
-.sm-go{height:64px;padding:0 24px;border-radius:15px;border:0;background:linear-gradient(180deg,#4a97e3,var(--accent-deep));color:#fff;font-weight:800;font-size:14px;display:inline-flex;align-items:center;gap:9px;flex:none;box-shadow:0 1px 0 rgba(255,255,255,.25) inset,0 8px 18px -9px rgba(55,138,221,.5);transition:transform .14s,box-shadow .14s}
+.sm-go{height:64px;padding:0 24px;border-radius:15px;border:0;background:var(--accent-deep);color:#fff;font-weight:800;font-size:14px;display:inline-flex;align-items:center;gap:9px;flex:none;box-shadow:0 8px 18px -9px rgba(55,138,221,.5);transition:transform .14s,box-shadow .14s}
 .sm-go svg{width:16px;height:16px}
-.sm-go:hover{transform:translateY(-1px);box-shadow:0 1px 0 rgba(255,255,255,.25) inset,0 12px 24px -9px rgba(55,138,221,.58)}
+.sm-go:hover{transform:translateY(-1px);box-shadow:0 12px 24px -9px rgba(55,138,221,.58)}
 .sm-go:disabled{opacity:.65;cursor:default;transform:none}
 .fd-fmt{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:13px}
 .fd-fmt .lab{font-size:11.5px;color:var(--mute-2)}
@@ -520,15 +514,9 @@ details[open]>summary .chev{transform:rotate(180deg)}
 .fd-err-p{margin:0;font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--mute);line-height:1.65}
 .fd-err-p .sol{color:var(--ink-2);font-weight:600}
 .fd-err-acts{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
-.ra-piee{margin-top:16px;display:flex;align-items:center;gap:13px;padding:14px 16px;border-radius:14px;border:1px solid var(--line);background:var(--card);box-shadow:0 1px 2px rgba(15,23,42,.04),0 14px 30px -24px rgba(15,23,42,.18)}
-.ra-piee-ic{width:34px;height:34px;border-radius:9px;background:var(--card);border:1px solid var(--line);display:grid;place-items:center;color:var(--mute-2);flex:none}
-.ra-piee-ic svg{width:16px;height:16px}
-.ra-piee-tx{flex:1;min-width:0}
-.ra-piee-t{font-size:12.5px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:8px}
-.ra-piee-soon{font-family:"IBM Plex Mono",monospace;font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);background:var(--card);border:1px solid var(--line);border-radius:5px;padding:2px 6px}
-.ra-piee-s{font-family:"Manrope",sans-serif;font-size:12px;color:var(--mute);margin-top:3px;line-height:1.45}
-.ra-piee-btn{flex:none;height:36px;padding:0 15px;border-radius:9px;border:1px solid var(--accent-hair);background:var(--accent-soft);color:var(--accent-on);font-weight:800;font-size:12px}
-.ra-piee-btn:hover{filter:brightness(.97)}
+.ra-cac{margin-top:9px}
+.ra-cac svg{color:var(--mute-2)}
+.ra-cac>span{color:var(--ink-2)}
 @media (prefers-reduced-motion:reduce){.fd-spin,.fd-step.active .dot{animation:none}}
 .ev{display:block}
 .lvchip{display:none;align-items:center;gap:10px;margin-top:12px;padding:11px 14px;border-radius:11px;font-family:"IBM Plex Mono",monospace;font-size:12px;line-height:1.4}
@@ -673,21 +661,31 @@ details[open]>summary .chev{transform:rotate(180deg)}
 .frow .fmeta .fname{ flex:0 1 auto; min-width:0; }
 .frow .fsub{ margin-top:0; flex:none; }
 /* 3a · Recently Audited — 2-row card: title on its own line, office · insight below */
-.rac{ grid-template-columns:54px 1fr 116px auto; padding:10px 16px; }
+/* tracks are declared ONCE, on the base .rac rule — see the note there */
+.rac{ padding:10px 16px; }
 .rac-title{ font-size:14px; }
 .rac-sub{ display:flex; align-items:center; gap:8px; margin-top:3px; min-width:0; }
-.rac-sub .rac-office{ padding-left:0; flex:0 0 auto; }
+/* Below the floor ONE thing gives way, and it is the least critical one: the office shrinks
+   and ellipsises (0 1 auto — an unshrinkable cell overflows the sub-line instead of clipping
+   inside it). .rac-sol never truncates: a shortened identifier is a WRONG identifier. */
+.rac-sub .rac-office{ padding-left:0; flex:0 1 auto; min-width:0; }
 .rac-sub .rac-office::before{ display:none; }
 .rac-sub .rac-insight{ margin-top:0; min-width:0; }
 /* 3b · Due-in column (bound to close date, computed live in JS) */
-.rac-dl{ display:flex; flex-direction:column; gap:2px; border-left:1px solid var(--line-2); padding-left:15px; }
-.rac-dl .lbl{ font-family:"IBM Plex Mono",monospace; font-size:8px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--mute-2); }
-.rac-dl .val{ font-family:"IBM Plex Mono",monospace; font-size:13px; font-weight:700; color:var(--ink); }
+.rac-dl{ display:flex; flex-direction:column; gap:2px; border-left:1px solid var(--line); padding-left:15px; }
+/* --mute-2 measured 2.56:1 light / 3.01:1 dark on these keys — under AA and under Code's own
+   3.25 floor. --mute is 4.76 / 5.00. The key stays quieter than its value by SIZE, CAPS and
+   TRACKING, which is the paper-theme rule: hierarchy from assembly, never from a fainter ink. */
+.rac-dl .lbl,.rac-ago i{ font-family:"IBM Plex Mono",monospace; font-size:11px; font-weight:700; font-style:normal; letter-spacing:.08em; text-transform:uppercase; color:var(--mute); }
+.rac-dl .val{ font-family:"IBM Plex Mono",monospace; font-size:13px; font-weight:700; color:var(--ink); white-space:nowrap; }
 .rac-dl .val.warn{ color:#b45309; }
 .rac-dl .val.due{ color:var(--bad,#c0352b); }
 .rac-dl .val.closed{ color:var(--mute); }
-/* 3d · Score box — pastel / tinted (decided) */
-.rac-badge{ background:var(--vt); border:1px solid var(--vl); color:var(--vi); }
+/* 3c · the chevron is the row's own affordance, so it takes its own track and centres
+   against the whole row — it was stacked as a third item under the pill and the age. */
+.rac-chev{ align-self:center; justify-self:end; font-size:15px; line-height:1; color:var(--accent-on); }
+/* 3d · score box — REMOVED with the score. Scoring is retired: compliance_score is 0 of 20
+   on live and the badge printed an em dash in the row's loudest slot on every row. */
 /* 5 · first-run / empty state — "No audits yet" card pointing back to the upload */
 .ra-empty{ display:flex; flex-direction:column; align-items:center; text-align:center; gap:8px; padding:36px 20px; border:1px dashed var(--line); border-radius:14px; background:var(--card-soft); }
 .ra-empty .ic{ width:44px; height:44px; border-radius:11px; background:var(--accent-soft); color:var(--accent-on); display:grid; place-items:center; }
@@ -697,28 +695,11 @@ details[open]>summary .chev{transform:rotate(180deg)}
 /* first-run order: upload -> What runs (teaching) -> empty Recently Audited */
 .body-stack.flip .blk-recent{ order:2; }
 .body-stack.flip .blk-stages{ order:1; }
+/* superseded — see .blk-flow */
 /* 4 · "What runs when you submit" — connected pipeline (exactly 2 chips per step) */
-.pipe{display:flex;align-items:stretch;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:6px}
-.pipe .pstep{flex:1;display:flex;flex-direction:column;gap:7px;padding:14px 16px 15px;position:relative;border:0;grid-template-columns:none;align-items:stretch}
-.pipe .pstep:not(:last-child)::after{content:"";position:absolute;right:-7px;top:50%;transform:translateY(-50%) rotate(45deg);width:13px;height:13px;border-top:2px solid var(--line);border-right:2px solid var(--line);background:var(--card);z-index:2}
-.pipe .pstep + .pstep{border-left:1px solid var(--line-2)}
-.pipe .pstep:last-child{border-bottom:0}
 .ptop{display:flex;align-items:center;gap:8px}
-.pipe .pn{width:22px;height:22px;border-radius:6px;background:var(--accent-soft);color:var(--accent-on);display:grid;place-items:center;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;flex:none}
-.ph{font-size:13px;font-weight:700;color:var(--ink)}
-.pchips{display:flex;gap:5px}
-.pchip{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:600;color:var(--ink-2);background:var(--chip-bg);border:1px solid var(--line);border-radius:5px;padding:2px 7px;white-space:nowrap}
-.pipe .pstep.pdeliver{background:#0A1628;border-radius:12px;margin:-6px -6px -6px 0;flex:1.05;justify-content:center}
-.pipe .pstep.pdeliver::after{display:none}
-.pipe .pstep.pdeliver .ph{color:#fff}
-.pbadge{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.1em;color:#6ee7b7;margin-bottom:2px}
-.pipe .pstep.pdeliver .pchip{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.14);color:#cdd8e6}
 /* 4 · responsive fallback — below ~800px the 4-across pipeline stacks vertically */
 @media(max-width:800px){
-  .pipe{flex-direction:column;gap:6px}
-  .pipe .pstep:not(:last-child)::after{display:none}
-  .pipe .pstep + .pstep{border-left:0;border-top:1px solid var(--line-2)}
-  .pipe .pstep.pdeliver{margin:0;border-radius:12px}
 }
 /* ===== /Run Audit content ===== */
 </style>
@@ -817,6 +798,7 @@ details[open]>summary .chev{transform:rotate(180deg)}
                     </div>
                     <div class="lvchip" id="lvChip"></div>
                     <div class="fd-note ev-d-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg><span>We resolve it live, then fetch every posted document from SAM.gov — nothing to download first.</span></div>
+                    <div class="fd-note ra-cac"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span>CAC-walled DLA / eBuy postings aren’t on SAM.gov — upload the PIEE package instead. <b>Same audit.</b></span></div>
                   </div>
                 </div>
                 <!-- FETCHING -->
@@ -869,11 +851,6 @@ details[open]>summary .chev{transform:rotate(180deg)}
                   </div>
                 </div>
               </div>
-              <div class="ra-piee">
-                <span class="ra-piee-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></span>
-                <div class="ra-piee-tx"><div class="ra-piee-t">Connect PIEE / eBuy <span class="ra-piee-soon">Not yet live</span></div><div class="ra-piee-s">Direct pull for CAC-walled DLA / eBuy postings. We’re building approved access — join the waitlist.</div></div>
-                <button class="ra-piee-btn" id="pieeBtn">Request access</button>
-              </div>
             </div>
             <div class="uz card" id="uz" hidden>
               <div class="uz-head"><span class="lbl">Upload solicitation</span><span class="uz-hint" id="uzHint"></span></div>
@@ -892,43 +869,6 @@ details[open]>summary .chev{transform:rotate(180deg)}
           </div>
           <div class="sam card" style="display:none"></div>
         </div>
-        <details class="blk prep-wrap">
-          <summary class="sec-head"><span class="k">Solicitation prep</span><span class="all" style="color:var(--mute);text-decoration:none">reference<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></span></summary>
-          <div class="prep-sub">What to grab <span>priority order — more sections, sharper audit</span></div>
-          <div class="grab card">
-            <div class="grow ghead"><span></span><span>Section</span><span>Document</span><span>What FARaudit reads from it</span><span class="gh-r">Priority</span></div>
-            <div class="grow"><span class="sb2 sb-main">MAIN</span><span class="gname">Main solicitation</span><span class="gdoc">SF-1449 / 1442 / 1447 / 18</span><span class="gread"><span class="rtag">CLINs</span><span class="rtag">NAICS</span><span class="rtag">Set-aside</span></span><span class="gpri req">Required</span></div>
-            <div class="grow"><span class="sb2 sb-sec">§C</span><span class="gname">Section C</span><span class="gdoc">SOW / PWS / SOO</span><span class="gread"><span class="rtag">Scope</span><span class="rtag">Deliverables</span><span class="rtag">Place of perf.</span></span><span class="gpri core">Core</span></div>
-            <div class="grow"><span class="sb2 sb-sec">§L</span><span class="gname">Section L</span><span class="gdoc">Instructions to offerors</span><span class="gread"><span class="rtag">Submission</span><span class="rtag">Format</span><span class="rtag">Page limits</span></span><span class="gpri core">Core</span></div>
-            <div class="grow"><span class="sb2 sb-sec">§M</span><span class="gname">Section M</span><span class="gdoc">Evaluation factors</span><span class="gread"><span class="rtag">Award basis</span><span class="rtag">Factor weighting</span></span><span class="gpri core">Core</span></div>
-            <div class="grow"><span class="sb2 sb-sec">§H</span><span class="gname">Section H</span><span class="gdoc">Special contract requirements</span><span class="gread"><span class="rtag">Special terms</span><span class="rtag">CDRLs</span><span class="rtag">Key personnel</span></span><span class="gpri opt">Optional</span></div>
-            <div class="grow"><span class="sb2 sb-other">AMD</span><span class="gname">Latest amendment</span><span class="gdoc">Supersedes prior terms</span><span class="gread"><span class="rtag">Changed terms</span><span class="rtag">Effective date</span></span><span class="gpri opt">Optional</span></div>
-            <div class="grow"><span class="sb2 sb-other">QASP</span><span class="gname">QASP</span><span class="gdoc">Quality surveillance plan</span><span class="gread"><span class="rtag">Perf. standards</span><span class="rtag">Scoring</span></span><span class="gpri opt">Optional</span></div>
-          </div>
-          <div class="prep-sub">Before you go to SAM.gov <span>filters, file types &amp; award basis</span></div>
-          <div class="sam-strip">
-            <div class="samp">
-              <div class="samp-h"><span class="n">1</span><span class="t">Find on <span>SAM.GOV</span></span></div>
-              <div class="frule"><span class="fk">Notice Type</span><span class="fv on">Solicitation</span></div>
-              <div class="frule"><span class="fk">Status</span><span class="fv on">Active</span></div>
-              <div class="frule"><span class="fk">Posted</span><span class="fv on">Last 60 days</span></div>
-              <div class="sam-skip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg><span>Skip <b>Sources Sought</b> &amp; <b>Pre-Solicitation</b></span></div>
-            </div>
-            <div class="samp">
-              <div class="samp-h"><span class="n">2</span><span class="t">Contract types</span></div>
-              <div class="ct-grid">
-                <div class="ct"><span class="c">FFP</span><span class="d">Firm-fixed-price</span></div>
-                <div class="ct"><span class="c">T&amp;M</span><span class="d">Time &amp; materials</span></div>
-                <div class="ct"><span class="c">IDIQ</span><span class="d">Indefinite qty</span></div>
-                <div class="ct"><span class="c">CPFF</span><span class="d">Cost-plus-fixed-fee</span></div>
-              </div>
-            </div>
-            <div class="samp">
-              <div class="samp-h"><span class="n">3</span><span class="t">Award basis</span></div>
-              <div class="ct-vs"><div class="side"><div class="h">LPTA</div><div class="d">Lowest price, technically acceptable</div></div><div class="mid">vs</div><div class="side"><div class="h">Best Value</div><div class="d">Tradeoff: price &amp; merit</div></div></div>
-            </div>
-          </div>
-        </details>
         <div class="body-stack" id="bodyStack">
           <section class="blk blk-recent">
             <div class="sec-head"><span class="k">Recently Audited</span><a class="all" href="/dashboard">View all → Decisions</a></div>
@@ -941,15 +881,32 @@ details[open]>summary .chev{transform:rotate(180deg)}
               </div>
             </div>
           </section>
-          <details class="blk blk-stages prep-wrap">
-            <summary class="sec-head"><span class="k">What runs when you submit</span><span class="all" style="color:var(--mute);text-decoration:none">how it works<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></span></summary>
-            <div class="pipe" style="margin-top:13px">
-              <div class="pstep"><div class="ptop"><span class="pn">01</span><span class="ph">Reads every document</span></div><div class="pchips"><span class="pchip">Every posted attachment</span><span class="pchip">Names what it could not read</span></div></div>
-              <div class="pstep"><div class="ptop"><span class="pn">02</span><span class="ph">Expert lens panel</span></div><div class="pchips"><span class="pchip">Grounded in source</span><span class="pchip">Verbatim citations</span></div></div>
-              <div class="pstep"><div class="ptop"><span class="pn">03</span><span class="ph">Verdict gate</span></div><div class="pchips"><span class="pchip">Bid · caution · needs review</span><span class="pchip">Stops rather than guesses</span></div></div>
-              <div class="pstep pdeliver"><div><div class="pbadge">DELIVERS</div><span class="ph">Grounded report</span></div><div class="pchips"><span class="pchip">Deterministic verdict</span><span class="pchip">Cited findings</span></div></div>
+          <section class="blk blk-stages blk-flow">
+            <div class="sec-head"><span class="k">What runs when you submit</span></div>
+            <p class="flow-lede"><b>Every posted document in. One cited answer out.</b> Nothing to prepare and nothing to download first — paste the notice and the engine fetches the agency's own document set.</p>
+            <div class="flow">
+              <div class="fst">
+                <div class="fst-n">01 · THE PACKAGE</div>
+                <div class="fst-h">Every attachment the agency posted</div>
+                <div class="fst-d">Fetched from SAM.gov at run time, including the ones added by amendment.</div>
+                <div class="fst-tags"><span class="ftag">RFQ</span><span class="ftag">Attachment</span><span class="ftag">Amendment</span><span class="ftag">Q&amp;A</span><span class="ftag">Wage determination</span></div>
+              </div>
+              <div class="fjoin" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 6l6 6-6 6"/></svg></div>
+              <div class="fst">
+                <div class="fst-n">02 · THE READ</div>
+                <div class="fst-h">Read end to end</div>
+                <div class="fst-d">Each finding is quoted from the page it came from, so you can check it against the document.</div>
+                <div class="fst-tags"><span class="ftag">Every page</span><span class="ftag">Verbatim citation</span><span class="ftag">Names what it could not read</span></div>
+              </div>
+              <div class="fjoin" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 6l6 6-6 6"/></svg></div>
+              <div class="fst out">
+                <div class="fst-n">03 · THE ANSWER</div>
+                <div class="fst-h">One verdict, traceable to the clause</div>
+                <div class="fst-d">It stops rather than guesses: where the record does not support a call, it says so.</div>
+                <div class="fst-tags"><span class="ftag">Bid · caution</span><span class="ftag">Needs review</span><span class="ftag">Incomplete</span><span class="ftag">Unresolved</span></div>
+              </div>
             </div>
-          </details>
+          </section>
         </div>
       </div>
 
@@ -1032,10 +989,6 @@ function setState(s){if(__fd)__fd.dataset.state=s||'empty';}
   // error/retry recovery actions (real)
   var retry=$('raRetry');if(retry)retry.addEventListener('click',function(){setState('empty');var i=document.querySelector('.ev-d .sm-input');if(i)i.value='';var lv=$('lvChip');if(lv){lv.className='lvchip';lv.innerHTML='';}});
   ['errUpload','addMissing'].forEach(function(id){var b=$(id);if(b)b.addEventListener('click',function(){setState('empty');showUpload();});});
-  // PIEE / eBuy waitlist (quiet secondary)
-  /* No waitlist store exists yet, so this may not promise an email. The panel
-     already says "Not yet live"; the button must agree with it. */
-  var piee=$('pieeBtn');if(piee)piee.addEventListener('click',function(){alert('PIEE / eBuy direct pull is not live yet, and there is no waitlist to join — nothing was recorded. Upload the solicitation documents instead and the audit runs on those.');});
 })();
 
 /* ── live-resolve chip — CLIENT-SIDE FORMAT DETECTION ONLY (no fabricated coverage) ──
@@ -1249,16 +1202,40 @@ var __fdReadyNoticeId=null;
   if(!list)return;
   function ago(iso){if(!iso)return '';var d=new Date(iso),s=(Date.now()-d.getTime())/1000;if(isNaN(s))return '';if(s<3600)return Math.max(1,Math.floor(s/60))+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
   // live "Due in" off the solicitation close date (response_deadline).
-  // Recomputed every render; NO-BID suppresses the countdown to "—" (decided, no action).
+  /* THE KEY DERIVES FROM THE STATE — a key may only name its own value. A deadline that has
+     passed and a deadline we never received are different facts, and one dash under a fixed
+     DUE IN key cannot tell them apart. Dates print ISO from LOCAL parts: toISOString would
+     roll a late-evening deadline to the following day. */
+  function ymd(d){var m=d.getMonth()+1,day=d.getDate();return d.getFullYear()+'-'+(m<10?'0':'')+m+'-'+(day<10?'0':'')+day;}
+  var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function stampOf(iso){if(!iso)return '';var d=new Date(iso);if(isNaN(d.getTime()))return '';
+    var h=d.getHours(),m=d.getMinutes();return MON[d.getMonth()]+' '+d.getDate()+', '+(h<10?'0':'')+h+':'+(m<10?'0':'')+m;}
+  function runTs(a){return new Date(a.completed_at||a.created_at).getTime();}
+  /* One row per notice. The row reports the notice's current ANSWER — the newest run that produced a
+     verdict — so a failed attempt is a flag on the row, not the row's identity. Nothing is merged
+     across two notices; every run stays in Decisions, which is the audit trail. */
+  function groupRuns(audits){
+    var m={},order=[];
+    audits.forEach(function(a){var k=String(a.solicitation_number||a.notice_id||a.id);
+      if(!m[k]){m[k]=[];order.push(k);}m[k].push(a);});
+    return order.map(function(k){
+      var g=m[k].slice().sort(function(x,y){return runTs(y)-runTs(x);});
+      var withVerdict=g.filter(function(a){return !!a.v3_verdict;});
+      return {sol:k,a:withVerdict[0]||g[0],runs:g.length,
+        lastFailed:String(g[0].status).toLowerCase()==='failed'&&!g[0].v3_verdict};
+    }).sort(function(x,y){return runTs(y.a)-runTs(x.a);});
+  }
   function dueIn(a,verdictLabel){
-    if(verdictLabel==='NO-BID')return{cls:'closed',txt:'—'};
-    var raw=a.response_deadline||a.close_date||a.deadline||'';if(!raw)return{cls:'closed',txt:'—'};
-    var d=new Date(raw);if(isNaN(d.getTime()))return{cls:'closed',txt:'—'};
+    var raw=a.response_deadline||a.close_date||a.deadline||'';
+    if(!raw)return{cls:'closed',key:'Deadline',txt:'not recorded'};
+    var d=new Date(raw);if(isNaN(d.getTime()))return{cls:'closed',key:'Deadline',txt:'not recorded'};
+    // a decided decline states the date and does not count down to it
+    if(verdictLabel==='NO-BID')return{cls:'closed',key:'Closes',txt:ymd(d)};
     var days=Math.ceil((d.getTime()-Date.now())/86400000);
-    if(days>7)return{cls:'',txt:days+' days'};
-    if(days>=1)return{cls:'warn',txt:days+' day'+(days===1?'':'s')};
-    if(days===0)return{cls:'due',txt:'Due today'};
-    return{cls:'closed',txt:'Closed'};
+    if(days>7)return{cls:'',key:'Due in',txt:days+' days'};
+    if(days>=1)return{cls:'warn',key:'Due in',txt:days+' day'+(days===1?'':'s')};
+    if(days===0)return{cls:'due',key:'Due',txt:'Today'};
+    return{cls:'closed',key:'Closed',txt:ymd(d)};
   }
   // ── VERDICT POLE → ROW ───────────────────────────────────────────────────────────────────────────
   // The engine issues SIX poles (audit-decide.ts: BID | BID_WITH_CAUTION | NO_BID | INELIGIBLE |
@@ -1300,18 +1277,42 @@ var __fdReadyNoticeId=null;
     return{cls:'is-unresolved',label:'UNRESOLVED'};
   }
   function insightOf(a){var s='';if(a.insight)s=String(a.insight).trim();if(!s){var w=String(a.exec_what||'').trim();if(w){var p=w.split(' — ');if(p.length>1)s=p.slice(1).join(' — ').trim();}}if(!s){s=String(a.exec_factors||'').split(',')[0].trim().replace(/\s*\([^)]*\)\s*$/,'').trim();}if(!s)return '';s=s.charAt(0).toUpperCase()+s.slice(1);return s.length>90?s.slice(0,89).replace(/\s+$/,'')+'…':s;}
-  function cell(a){var v=verdictOf(a);var sol=String(a.solicitation_number||a.notice_id||a.title||'').trim();var slug=a.id?String(a.id):encodeURIComponent(sol.toLowerCase());
+  function cell(g){var a=(g&&g.a)?g.a:g;var runs=(g&&g.runs)||1;var lastFailed=!!(g&&g.lastFailed);
+    var v=verdictOf(a);
+    /* status is populated on every run, so a run that failed is named as such and offered a
+       re-run — the same words Decisions uses for it. */
+    if(String(a.status).toLowerCase()==='failed'&&!a.v3_verdict)v={cls:'is-failed',label:'RUN FAILED'};var sol=String(a.solicitation_number||a.notice_id||a.title||'').trim();/* the row's three hrefs interpolate this into an attribute, so it is escaped at the
+       source rather than at each use — an id is data, and data reaching markup is escaped. */
+    var slug=escapeHtml(a.id?String(a.id):encodeURIComponent(sol.toLowerCase()));
     var office=String(a.office_display||a.agency||'').trim();var when=a.ago||ago(a.completed_at||a.created_at);
-    var title=String(a.title||'').trim();if(title.toLowerCase()==='untitled solicitation')title='';var titleLine=(title&&title.toUpperCase()!==sol.toUpperCase())?title.slice(0,80):sol;
+    var title=String(a.title||'').trim();if(title.toLowerCase()==='untitled solicitation')title='';var titleLine=(title&&title.toUpperCase()!==sol.toUpperCase())?title:sol;
     // F2-LIVE: the reason line must NEVER fall back to the pole word — that printed the same invented
     // verdict twice in one row and dressed a label up as an engine-derived insight (Design calls it F6).
     var ins=insightOf(a);
 
     var dl=dueIn(a,v.label);
-    return '<a class="rac '+v.cls+'" href="/audits/'+slug+'"><div class="rac-main"><div class="rac-title">'+escapeHtml(titleLine)+'</div><div class="rac-sub">'+(office?'<span class="rac-office">'+escapeHtml(office)+'</span>':'')+'<span class="rac-insight"><span class="rac-spark"></span>'+escapeHtml(ins)+'</span></div></div><div class="rac-dl"><span class="lbl">Due in</span><span class="val '+dl.cls+'">'+escapeHtml(dl.txt)+'</span></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>'+escapeHtml(v.label)+'</span><span class="rac-ago">'+escapeHtml(when)+'</span><span class="rac-chev">→</span></div></a>';}
+    /* AN ABSENT REASON IS ABSENT. The marker lives INSIDE the thing it marks, so a reason
+       with no text paints no spark dot, and the sub-line is omitted entirely when it would
+       hold nothing. When exec_what/exec_factors start arriving the line returns, dot and
+       all, with no further change here. */
+    /* The number prints only when the title is not already the number — a sub-line must never
+       repeat a figure the row is showing one line above it. */
+    var subParts=((sol&&sol!==titleLine)?'<span class="rac-sol">'+escapeHtml(sol)+'</span> ':'')+
+      (office?'<span class="rac-office">'+escapeHtml(office)+'</span>':'')+
+      /* the count LINKS OUT and never renders the verdicts inline: two answers to one document, side
+         by side with no account of why, is the one thing this page must not do */
+      (runs>1?' <a class="rac-runs" href="/past-audits?sol='+encodeURIComponent(sol)+'">'+runs+' runs \u2192</a>':'')+
+      (ins?'<span class="rac-insight"><span class="rac-spark"></span>'+escapeHtml(ins)+'</span>':'');
+    var sub=subParts?'<div class="rac-sub">'+subParts+'</div>':'';
+    /* Two clocks in one row — the solicitation's deadline, and the age of OUR audit run.
+       Each one names itself: an unlabelled figure beside a labelled one reads as the same
+       clock, and these two are not even about the same event. */
+    var stamp=stampOf(a.completed_at||a.created_at);
+    var agoEl=stamp?'<span class="rac-ago"><i>As of</i> '+escapeHtml(stamp)+'</span>':(when?'<span class="rac-ago"><i>Audited</i> '+escapeHtml(when)+'</span>':'');
+    return '<div class="rac '+v.cls+'"><div class="rac-main"><a class="rac-title" href="/audits/'+slug+'">'+escapeHtml(titleLine)+'</a>'+sub+'</div><div class="rac-dl"><span class="lbl">'+escapeHtml(dl.key)+'</span><span class="val '+dl.cls+'">'+escapeHtml(dl.txt)+'</span></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>'+escapeHtml(v.label)+'</span>'+agoEl+'</div>'+(lastFailed?'<a class="rac-act" href="/audits/'+slug+'">Re-run →</a>':'<a class="rac-chev" href="/audits/'+slug+'" aria-hidden="true" tabindex="-1">→</a>')+'</div>';}
   // first-run vs returning: flip section order + expand the "what runs" teaching pipeline for first-run.
   function flip(n){var firstRun=(n===0);if(stack)stack.classList.toggle('flip',firstRun);var stages=document.querySelector('.blk-stages');if(stages&&stages.tagName==='DETAILS'){if(firstRun)stages.setAttribute('open','');else stages.removeAttribute('open');}}
-  function renderCards(audits){if(!audits||!audits.length){list.innerHTML='<div class="ra-empty"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg></div><div class="h">No audits yet</div><div class="s">Upload a solicitation above and your first ranked report lands here — a bid / no-bid call with the KO clarification email drafted and ready.</div></div>';flip(0);return;}list.innerHTML=audits.map(cell).join('');flip(audits.length);}
+  function renderCards(audits){if(!audits||!audits.length){list.innerHTML='<div class="ra-empty"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg></div><div class="h">No audits yet</div><div class="s">Upload a solicitation above and your first ranked report lands here — a bid / no-bid call with the KO clarification email drafted and ready.</div></div>';flip(0);return;}var G=groupRuns(audits);list.innerHTML=G.map(cell).join('');flip(G.length);}
   /* The green LIVE pill is a claim about THIS page's data, so only a settled fetch may
      turn it on. It ships hidden and stays hidden on any failure.
      Gated by test/public/_rail-live-badge.test.ts Part L. */

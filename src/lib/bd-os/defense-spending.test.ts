@@ -11,7 +11,7 @@
 // cut to their first entries. Totals, small-business dollars and the recompete
 // row are verbatim.
 // Run: npx tsx src/lib/bd-os/defense-spending.test.ts
-import { recipientKey, fetchDefenseSpending, agencyKeyOf } from "./defense-spending";
+import { recipientKey, fetchDefenseSpending, agencyKeyOf, RECOMPETE_STORE_LIMIT } from "./defense-spending";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -158,8 +158,16 @@ async function main() {
     "coverage.tracked names only the code that has rows");
   assert(JSON.stringify(out.coverage.untracked) === JSON.stringify(["332710", "336611"]),
     "coverage.untracked names both codes the worker has never pulled");
-  assert(out.coverage.top_n === 10,
-    "coverage states the top-N limit, so an absent name reads as outside the ten and not as a zero");
+  /* ⛔ TIED TO THE CONSTANT, NOT TO A LITERAL. This read `=== 10`, so raising the
+     per-code cap broke a test that has no opinion about the number — it exists to
+     say the payload STATES whatever ceiling is actually enforced, so an absent
+     name reads as "outside the top N" rather than as a zero. Compared against
+     RECOMPETE_STORE_LIMIT it asserts the real invariant and closes the chain: the
+     recompete-cap gate already pins that constant to the worker, so worker,
+     library and payload now agree by construction rather than by three literals
+     someone has to remember to edit together. */
+  assert(out.coverage.top_n === RECOMPETE_STORE_LIMIT,
+    `coverage states the ENFORCED per-code ceiling (${RECOMPETE_STORE_LIMIT}), so an absent name reads as outside it and not as a zero`);
 
   // ── PROVENANCE ─────────────────────────────────────────────────────────────
   assert(out.as_of === "2026-05-20T05:36:32.881704+00:00",

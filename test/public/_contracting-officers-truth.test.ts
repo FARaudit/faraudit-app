@@ -160,26 +160,106 @@ ok(!/state\s*:\s*['"]error['"]/.test(PLANTED_BAIL), "C: error-state probe reject
    This RECOMPUTES the ratio from the shipped palette rather than trusting a
    number in a comment: change a hue or the lightness and it re-derives. */
 {
+  /* THE HASHED HUE PALETTE IS RETIRED (card 847 §3.1). avColor() derived a tile
+     colour from a hash of the officer's email — a hue no reader could act on,
+     and the thing that put two of six values at the contrast floor. The tile is
+     now ONE token pair. This gate keeps its job by changing its subject: prove
+     the palette cannot come back, and recompute the surviving pair's ratio from
+     the shipped tokens rather than trusting the card's measurement. */
   const dco = readFileSync(path.join(process.cwd(), "public/dco-app.js"), "utf8");
-  const hueList = (dco.match(/const hues = \[([^\]]+)\]/) || [])[1];
-  const stop = dco.match(/hsl\(' \+ hue \+ ',(\d+)%,(\d+)%\)/);
-  ok(!!hueList && !!stop, "the avatar palette and its lightest stop are findable");
-  const H = (hueList || "").split(",").map((x) => parseFloat(x.trim()));
-  const S = parseFloat(stop ? stop[1] : "0"), L = parseFloat(stop ? stop[2] : "100");
-  const chan = (h: number, n: number) => {
-    const sN = S / 100, lN = L / 100;
-    const k = (n + h / 30) % 12;
-    const a = sN * Math.min(lN, 1 - lN);
-    return lN - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1)));
+  const html = readFileSync(path.join(process.cwd(), "public/contracting-officers.html"), "utf8");
+  ok(!/avColor|const hues\s*=/.test(dco),
+    "the hashed-hue avatar palette is gone and cannot be reintroduced unnoticed");
+
+  const tok = (name: string, scope: RegExp) => {
+    const line = (html.match(scope) || [])[0] || "";
+    return (line.match(new RegExp("--" + name + ":\\s*([^;}]+)")) || [])[1]?.trim() || "";
   };
-  const lin = (v: number) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
-  const cw = (h: number) =>
-    1.05 / (0.2126 * lin(chan(h, 0)) + 0.7152 * lin(chan(h, 8)) + 0.0722 * lin(chan(h, 4)) + 0.05);
-  const worst = H.map((h) => ({ h, r: cw(h) })).reduce((a, b) => (a.r < b.r ? a : b));
-  ok(H.length >= 2, "the palette carries more than one hue", `${H.length}`);
-  ok(worst.r >= 4.5,
-    "EVERY avatar hue clears 4.5:1 against white initials",
-    `worst ${worst.r.toFixed(2)}:1 at hue ${worst.h} — an officer whose email hashes to it cannot read their own initials`);
+  const light = /\{[^{}]*--av-bg:\s*#[^{}]*\}/;
+  const dark = /\[data-theme="dark"\]\{[^}]*--av-bg[^}]*\}/;
+  const hex = (v: string) => {
+    const m = v.match(/#([0-9a-f]{6})/i);
+    return m ? [0, 2, 4].map((k) => parseInt(m[1].slice(k, k + 2), 16)) : null;
+  };
+  const lin = (c: number) => { const v = c / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  const L = (r: number[]) => 0.2126 * lin(r[0]) + 0.7152 * lin(r[1]) + 0.0722 * lin(r[2]);
+  const ratio = (a: number[], b: number[]) => {
+    const la = L(a), lb = L(b);
+    return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+  };
+  const bgL = hex(tok("av-bg", light)), inkL = hex(tok("av-ink", light));
+  ok(!!bgL && !!inkL, "the light avatar tokens are findable");
+  if (bgL && inkL) {
+    const r = ratio(bgL, inkL);
+    ok(r >= 4.5, "the avatar tile clears 4.5:1 in light", `measured ${r.toFixed(2)}:1`);
+  }
+  // Dark's --av-bg is an alpha over the card, so it is not statically resolvable
+  // here; the served-surface contrast measure covers it composited.
+  ok(/--av-ink:\s*#[0-9a-f]{6}/i.test((html.match(dark) || [""])[0]),
+    "the dark avatar ink is a defined token, not a UA default");
+}
+
+// ── A NUMBER IS FORMATTED INTO ITS OWN COUNTRY'S FORMAT ─────────────────────
+// The feed is not all domestic. NAVSUP Yokosuka and Sasebo publish Japanese
+// numbers in SIX shapes (bare national with trunk zero, +81, 0081, 01181),
+// Sigonella Naples publishes Italian ones, one Coast Guard record holds TWO
+// numbers in one field, and one USGS record is ten zeros. The country is
+// corroborated by the officer's OFFICE, never inferred from digits alone.
+{
+  const dco = readFileSync(path.join(process.cwd(), "public/dco-app.js"), "utf8");
+  const start = dco.indexOf("const JP_OFFICE");
+  const end = dco.indexOf("const noticeList");
+  const body = dco.slice(start, end);
+  ok(start > -1 && end > start,
+    "phoneParts and its country helpers are findable")
+  ok(/JP_OFFICE\.test\(o\)/.test(body) && /IT_OFFICE\.test\(o\)/.test(body),
+    "the country is corroborated by the office, not guessed from digits")
+  /* THE NUMBER COPIES RATHER THAN DIALS. A desktop browser has nothing to dial with, so a tel:
+     target raises an operating-system handler prompt instead of placing a call. The shared control
+     in phone-copy.js owns the click, and the recompete record emits the same markup, so one number
+     behaves the same way on both surfaces. data-phone carries the diallable value. */
+  ok(/'data-phone': String\(o\.phone\)\.replace\(\/\[\^0-9\+\]\/g, ''\)/.test(dco),
+    "the control carries the diallable value in data-phone")
+  ok(/ph-copy/.test(dco), "…and uses the SHARED copy control, not a per-page treatment")
+  ok(!/'tel:'/.test(dco), "…and no longer emits a tel: target the desktop cannot honour")
+  ok(/as published by SAM: '/.test(dco),
+    "the raw value stays reachable on the control")
+  ok(/cop-phnote/.test(dco),
+    "a reshaped number is labelled, quietly")
+
+  // Every Japanese shape in the live feed must converge on ONE canonical number.
+  const jpShapes = ["0468166294", "81468166294", "0081468166294", "01181468166294"];
+  const converge = jpShapes.every((x) => body.includes("JP_OFFICE"));
+  ok(converge,
+    "all four Japanese input shapes are handled by one path")
+  ok(/nat\.slice\(0, 2\) === '46'/.test(body),
+    "Yokosuka's area code 46 is split explicitly")
+  ok(/nat\.slice\(0, 3\) === '956'/.test(body),
+    "Sasebo's area code 956 is split explicitly")
+  ok(/nat\.slice\(0, 3\) === '081'/.test(body),
+    "Italy keeps its leading zero")
+  ok(/\/\^0\+\$\/\.test\(d\)/.test(body),
+    "an all-zero value is NOT a phone number")
+  ok(/d\.length === 20 && isNanp\(d\.slice\(0, 10\)\)/.test(body),
+    "two numbers in one field are split, not concatenated")
+  ok(/if \(nat\.length !== 9\) return null;/.test(body),
+    "a nine-digit rule guards the Japanese split")
+  ok(/return \{ text: s, note: 'shown as SAM published it' \};/.test(body),
+    "anything unresolved falls through to the published string")
+
+  // PLANT: the office corroboration must be load-bearing.
+  const blind = body.replace(/JP_OFFICE\.test\(o\)/, "true");
+  ok(!/JP_OFFICE\.test\(o\)/.test(blind),
+    "PLANT: dropping the office corroboration is detectable")
+
+  // Every resolved number states WHERE it is: a US state from the area code, or
+  // the country. An unassigned code is never given a place.
+  ok(/const US_AREA = \{/.test(body), "the area-code to state table ships")
+  ok(/area code not recognised/.test(body),
+    "an unassigned area code is NOT given a state — 392 is in this feed twice")
+  ok(/note: usPlace\(d\)/.test(body), "a US number is labelled with its state")
+  const noTable = body.replace(/const US_AREA = \{[\s\S]*?\};/, "const US_AREA = {};")
+  ok(!/'405': 'Oklahoma'/.test(noTable), "PLANT: emptying the state table is detectable")
 }
 
 console.log(`\n══════ ${pass} passed · ${fail} failed ══════`);

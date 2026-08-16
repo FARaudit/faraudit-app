@@ -39,11 +39,19 @@ function main() {
   // below asserts it is gone from BOTH pages, so this is a retirement with a check
   // on it rather than an assertion deleted because it went red.
   for (const [fn, ids] of [
-    ["renderSeasonality", ["snBody", "snSub"]],
-    ["renderPrimeTargets", ["ptList", "ptSub", "ptCap"]]
+    ["renderSeasonality", ["snBody", "snSub"]]
   ] as Array<[string, string[]]>) {
     assert(new RegExp(`${fn}\\(\\)`).test(app), `${fn} is called from renderAll`);
     for (const id of ids) assert(html.includes(`id="${id}"`), `markup carries #${id}`);
+  }
+
+  /* PRIMES WHO OWE A SUBCONTRACTING PLAN IS MOUNTED AGAIN, on /who-to-call, BELOW the recompete
+     document rather than inside it: the record is ordered by expiry and this panel carries no date.
+     Both directions still hold — the renderer must be called AND its hosts must exist — so the panel
+     cannot become a renderer with nowhere to draw, or markup nothing fills. */
+  assert(/renderPrimeTargets\(\)/.test(app), "renderPrimeTargets is called from renderAll");
+  for (const id of ["ptList", "ptSub", "ptCap"]) {
+    assert(html.includes(`id="${id}"`), `markup carries #${id}`);
   }
 
   // ── D · the retirement is real on every page that mounts this script ──────
