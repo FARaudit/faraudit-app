@@ -149,6 +149,27 @@ const nextConfig: NextConfig = {
           { key: "Cache-Control", value: "public, max-age=0, must-revalidate, s-maxage=0" }
         ]
       },
+      // Override: PER-USER API RESPONSES ARE NOT `public`.
+      //
+      // The catch-all above exists for un-hashed assets in /public, and `public` is
+      // right for those — they are the same bytes for everyone. It also landed on
+      // /api/*, which is NOT: /api/audits, /api/profile and /api/preferences carry one
+      // account's data. `public` invites any shared cache to store that response and
+      // hand it to the next requester; the only reason it has not is `s-maxage=0`
+      // holding the CDN off. That makes cross-user exposure one header edit away, and
+      // the header would look harmless in the diff that made it.
+      //
+      // `private` states the fact instead of relying on a second directive to contain
+      // it: browser cache only, never a shared one. Freshness is UNCHANGED —
+      // max-age=0 + must-revalidate still forces a conditional request before any
+      // reuse — so this is a labelling fix, not a speed change. Making tab switches
+      // fast needs a different decision (see below) and is the CEO's to make.
+      {
+        source: "/api/:path*",
+        headers: [
+          { key: "Cache-Control", value: "private, max-age=0, must-revalidate" }
+        ]
+      },
       // Override: Next.js content-hashed assets — safe to cache forever.
       {
         source: "/_next/static/:path*",
