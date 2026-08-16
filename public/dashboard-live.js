@@ -810,6 +810,25 @@
     });
   }
 
+  // Set by wireSearch so the ?sol= seed can open the same search UI a click opens.
+  var activateSearchRef = null;
+
+  /* /run-audit renders one row per NOTICE and links its run count here as `N runs →`.
+     That control is only honest if the ledger it lands on is actually narrowed to that
+     solicitation — otherwise it drops the customer on the full ledger and the label lies.
+     The parameter seeds the SAME visible search the customer can read and clear; it is
+     never a hidden filter, and an unmatched value shows the ordinary no-match state
+     rather than an empty page with no explanation. */
+  function seedSearchFromUrl() {
+    var sol = "";
+    try { sol = (new URLSearchParams(window.location.search).get("sol") || "").trim(); } catch (e) { sol = ""; }
+    if (!sol) return;
+    STATE.search = sol.toLowerCase();
+    if (activateSearchRef) activateSearchRef();
+    var input = document.querySelector(".search .cc-search-input");
+    if (input) { input.value = sol; input.blur(); }
+  }
+
   function wireSearch() {
     var sb = document.querySelector(".search");
     if (!sb || sb.dataset.ccWired) return;
@@ -837,6 +856,7 @@
         writeTable();
       });
     }
+    activateSearchRef = activateSearch;
     sb.addEventListener("click", activateSearch);
     window.addEventListener("keydown", function (e) {
       if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
@@ -1053,6 +1073,7 @@
     wireSort();
     wireSearch();
     wireFilterBar();
+    seedSearchFromUrl();
 
     // Loading state before the fetch — the markup ships placeholders, never numbers.
     var body = document.getElementById("ledgerBody");
