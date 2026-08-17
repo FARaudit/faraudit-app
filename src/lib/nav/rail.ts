@@ -125,7 +125,12 @@ export const WORKFLOW: RailItem[] = [
 export const SECTIONS: RailSection[] = [
   {
     label: "Readiness",
-    defaultOpen: true,
+    // EVERY section starts closed. The rail's job on arrival is to show where you are,
+    // not everywhere you could go: three open groups pushed the workflow items — the
+    // ones used every session — below the fold on a laptop. A section holding the
+    // ACTIVE page still opens regardless (see renderRail), and a section the customer
+    // opens stays open, so this is a starting position rather than a restriction.
+    defaultOpen: false,
     items: [
       { key: "cmmc", label: "CMMC readiness", href: "/cmmc", icon: I.cmmc },
       { key: "capability-statement", label: "Capability statement", href: "/capability-statement", icon: I.capability },
