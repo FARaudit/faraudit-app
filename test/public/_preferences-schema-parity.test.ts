@@ -85,7 +85,7 @@ for (const c of ["theme", "alerts_email_enabled", "alerts_in_app_enabled", "week
 console.log("── Part P · positive controls ──");
 const controls: Array<[string, string]> = [
   ["the new column loses its migration",
-    SQL.replace(/alter\s+table\s+public\.user_preferences\s+add\s+column\s+if\s+not\s+exists\s+rail_sections_collapsed[\s\S]*?;/i, "")],
+    SQL.replace(/alter\s+table\s+public\.user_preferences\s+add\s+column\s+if\s+not\s+exists\s+rail_sections_open[\s\S]*?;/i, "")],
   ["every declaration disappears",
     SQL.replace(/alter\s+table\s+(?:public\.)?user_preferences\s+add\s+column[\s\S]*?;/gi, "")],
 ];

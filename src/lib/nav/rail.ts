@@ -272,15 +272,14 @@ export function renderRail(activeKey: string, counts: RailCounts = {}): string {
        localStorage (refreshed in the background by railScript below) and read here
        synchronously. A browser that has never seen the account falls through to the
        server default, which is collapsed. */
-    `var D=localStorage.getItem('faraudit-rail-default');` +
     `var m=JSON.parse(localStorage.getItem('faraudit-rail-sections')||'{}');` +
     `document.querySelectorAll('.sb-sec[data-sec]').forEach(function(s){` +
     `if(s.hasAttribute('data-active'))return;` +
     `var v=m[s.getAttribute('data-sec')];` +
-    /* Per-section memory WINS over the account default: the default says where a
-       section starts, and a section the customer has since opened or closed is no
-       longer starting. */
-    `if(v!==true&&v!==false){if(D!=='expanded')return;v=true;}` +
+    /* ONE MAP, not two competing statements. The account column holds the same shape
+       this reads, so a group the customer opens here and a group they set in Settings
+       are the same fact — the earlier boolean had to wipe this store to take effect. */
+    `if(v!==true&&v!==false)return;` +
     `s.setAttribute('data-open',String(v));` +
     `var h=s.querySelector('.sb-sech');if(h)h.setAttribute('aria-expanded',String(v));});` +
     `}catch(e){}})();</script>`
@@ -441,9 +440,9 @@ export function railScript(): string {
        rather than rearranging the rail under the cursor. */
     `fetch('/api/preferences',{credentials:'include',headers:{accept:'application/json'}})` +
     `.then(function(r){return r.ok?r.json():null;}).then(function(d){` +
-    `if(!d||!d.preferences)return;var c=d.preferences.rail_sections_collapsed;` +
-    `if(c!==true&&c!==false)return;` +
-    `try{localStorage.setItem('faraudit-rail-default',c?'collapsed':'expanded');}catch(e){}` +
+    `if(!d||!d.preferences)return;var o=d.preferences.rail_sections_open;` +
+    `if(!o||typeof o!=='object')return;` +
+    `try{localStorage.setItem('faraudit-rail-sections',JSON.stringify(o));}catch(e){}` +
     `}).catch(function(){});` +
     `syncInert();` +
     // Observe the attribute rather than guessing which controls change it. Bound to
