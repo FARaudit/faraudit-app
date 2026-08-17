@@ -267,8 +267,26 @@ console.log("\n── Part H · card 807 workflow rail ──");
   // reason, but the next such key should fail review, not this gate.
   check("rail does not re-bind faraudit-sb", !/['"]faraudit-sb['"]/.test(J), "double-binding makes every click a no-op");
 
-  check("3 collapsible sections, Readiness open", (R.match(/class="sb-sec"/g) || []).length === 3 && (R.match(/data-open="true"/g) || []).length === 1);
-  check("the active page's section is forced open", (renderRail("naics").match(/data-open="true"/g) || []).length === 2, "landing in a collapsed section hides the active row");
+  // EVERY section starts closed (CEO 2026-08-16). The rail's job on arrival is to show
+  // where you are, not everywhere you could go.
+  check("3 collapsible sections, all closed by default",
+    (R.match(/class="sb-sec"/g) || []).length === 3 && (R.match(/data-open="true"/g) || []).length === 0,
+    "a section opens on a page it does not hold");
+  /* The one exception, and it is asserted as BEHAVIOUR rather than as a count: the
+     section holding the active page opens, whatever the default. The previous form
+     counted open sections and so went red when the default changed — a number that
+     moves for a reason the check does not care about. Checked across all three
+     sections so a rule that happened to work for one is not mistaken for the rule. */
+  for (const [page, sec] of [["naics", "reference"], ["cmmc", "readiness"], ["defense-news", "market-intel"]] as Array<[string, string]>) {
+    const html = renderRail(page);
+    const m = html.match(new RegExp(`data-sec="${sec}"([^>]*)`));
+    check(`the active page's section opens · ${page} → ${sec}`,
+      !!m && /data-open="true"/.test(m[1]) && /data-active="true"/.test(m[1]),
+      "landing in a collapsed section hides the active row");
+    const others = [...html.matchAll(/data-sec="([^"]+)"([^>]*)/g)]
+      .filter((x) => x[1] !== sec && /data-open="true"/.test(x[2])).map((x) => x[1]);
+    check(`…and no OTHER section opens with it · ${page}`, others.length === 0, others.join(","));
+  }
   check("sentence-case group headers", !/MARKET INTEL|READINESS/.test(R), "caps headers returned");
 
   // The base layout block was MISSING from the handoff's rail.css; without it every new class
