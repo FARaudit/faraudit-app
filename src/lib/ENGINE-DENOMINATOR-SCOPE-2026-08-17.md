@@ -148,11 +148,68 @@ It is also precisely the trade in ruling 2 below — arming converts silent inge
 visible honest failures, and there are more of them than the demo would like.
 
 #### What step 0 does NOT license
-It does not license arming. It measures the *element* layer, which is the smaller half. The per-document
-attestation layer — the one that turns 44 named uncovered documents into a real denominator — remains
-unmeasured offline, and `AUDIT_CONSTRUCTION_DECIDED`'s OOS cap is still unruled. **A G1 arm request
-should wait for a re-ingest measurement of `docAttestations` on at least the 4 construction
-solicitations.**
+It does not license arming. It measures the *element* layer, which is the smaller half. See step 0b.
+
+### Step 0b — DONE 2026-08-17. Re-ingested from SAM, and it inverts the expected answer.
+
+Re-ingested **`W911SG27BA002`** — 52 resource links, all 52 downloaded, **0 fetch failures** — and ran
+the production `sweepConstructionManifest` over the REAL per-document `{name,text}` array. Text came
+from `extractText`, the same extractor `buildAgenticDocs` uses. **No model calls: ingest and the
+deterministic sweep only. $0 in spend.** (The 20 MB Files-API upload branch in `fetchDocumentFromSam`
+was never reached — no document came close.)
+
+**Only 1 of the 4 construction solicitations could be re-fetched.** `FA813726R0033`,
+`W9126G26RA087` and `70B01C26R00000096` all return null from `fetchSolicitationByNoticeId` on both
+the `noticeid` and `solnum` arms — they appear to have left SAM's active search index. The one that
+worked is the flagship: `W911SG27BA002` is `3b5bba30`, the package this whole analysis rests on.
+
+| | |
+|---|---|
+| documents ingested | **52** (0 fetch failures) |
+| `hasText = false` — never attestable ⇒ INCOMPLETE | **0** |
+| `hasText`, 0 obligations — attest read-and-empty | 4 |
+| `hasText`, obligations > 0 — **each needs a grounded finding** | **48** |
+| groundable obligation signals over full text | **18,756** |
+| `required` | all 5 elements · `coreMissing` = none |
+
+Anchors resolved to real, distinctive tokens: `"performance bond"` · `"Construction Wage Rate"` ·
+`"bid opening"` · `"SECTION 32 01 16"` · `"set-aside"`.
+
+#### ⚠ The measurement was wrong twice before it was right — both times a FLAG
+
+1. `fetchDocumentFromSam` returns **base64 for PDFs**, not text. A first pass that read `r.text`
+   scored all 52 documents no-text — a spectacular finding, and pure artifact.
+2. More dangerous: `extractText` gates OCR behind **`AUDIT_WORKER_OCR`, default OFF**
+   (`pdf-text-extractor.ts:231`). Run locally at the default, 5 documents came back unreadable and
+   the conclusion was *"arming guarantees INCOMPLETE on this package — 5 posted documents have no
+   text layer."* **`AUDIT_WORKER_OCR=true` is armed on the live worker.** Re-run with it on, OCR
+   recovered every one (`native=0 → ocr=10,731 chars` on the worst) and the count is **0**.
+   A local probe at library defaults is not production. Mirror the flag set or measure nothing.
+
+#### What this actually says about arming
+
+**The blocker is not unreadable documents — it is unanalyzed ones.** The old
+`AUDIT_ATTACHMENT_COVERAGE` warning ("86 truncated reads + 21 named-but-absent ⇒ arming raises
+INCOMPLETE") does **not** reproduce here: on this package every document is readable.
+
+The binding constraint is the other one. **48 documents carry obligations and each needs a grounded
+finding landing in it. The engine produced 40 findings in total for the entire package** — and per
+the plan, zero of those carry a panel seat name. So arming would return INCOMPLETE on the flagship
+package, correctly, and for a reason that names the real defect: the lenses are not reading the
+documents. That is task #9 — *"Read the ones whose subject matter your lens owns; ignore the rest"*
+is an offer, and nobody owns the residue.
+
+**This makes the arm a diagnostic, not a fix.** It would convert a silent 1.7% into a loud, honest
+INCOMPLETE that names 48 unanalyzed documents. Whether that is worth shipping is ruling 2 below,
+and it is now a much sharper question than it was this morning.
+
+#### Residual caveats, stated rather than smoothed
+- The OCR-accuracy gate reported `suspect=1 residual=13` on the one OCR-recovered document. Per
+  `sam-attachments.ts:233`, an `ocr_suspect` doc is held `has_text=false` until layer-3 vision
+  confirms the residual. This probe does not run that gate, so production's unattestable count on
+  this package is **0 or 1**, not certainly 0.
+- **3 of 4 construction solicitations remain unmeasured** and cannot be re-fetched from SAM.
+- `AUDIT_CONSTRUCTION_DECIDED`'s OOS cap is still unruled (`FA667024R0001`).
 
 ### Step 1 — give the gate a document argument (layer B, general path)
 Add a document parameter to `gradeCoverageV2` and thread `documentsCovered`'s real result through
