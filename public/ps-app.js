@@ -404,6 +404,13 @@
       <div class="sp-bd" id="alerts">
         <div class="nf-row" data-pref-row>
           <div class="nf-l">
+            <div class="nf-t">Start sidebar groups collapsed</div>
+            <div class="nf-d">Readiness, Market intel and Reference start closed, so the workflow list stays in one view. The group holding the page you are on always opens regardless, and any group you open stays open. Turn this off to have them all start expanded. This is saved to your account, so it follows you to a new browser.</div>
+          </div>
+          <button class="nf-tg" data-pref-tg="rail_sections_collapsed"><span class="tgl"><i></i></span></button>
+        </div>
+        <div class="nf-row" data-pref-row>
+          <div class="nf-l">
             <div class="nf-t">Weekly digest of watched opportunities</div>
             <div class="nf-d">Monday mornings: what posted that week, what you newly tracked, and anything closing within a fortnight. A quiet week sends nothing — an empty digest reads like a broken pipeline.</div>
           </div>
@@ -532,7 +539,7 @@
       body: JSON.stringify({ [key]: value })
     }).then(r => r.ok);
   }
-  const PREF_LABELS = { weekly_digest_watched: 'Weekly digest', alerts_email_enabled: 'Alert emails', alerts_in_app_enabled: 'Bell alerts', auto_signout_minutes: 'Auto sign-out' };
+  const PREF_LABELS = { rail_sections_collapsed: 'Sidebar groups', weekly_digest_watched: 'Weekly digest', alerts_email_enabled: 'Alert emails', alerts_in_app_enabled: 'Bell alerts', auto_signout_minutes: 'Auto sign-out' };
 
   /* The idle sign-out duration. Same save path and same refused-save reporting as the
      toggles below; it is a <select> only because the value is a duration, not a state.
@@ -573,6 +580,17 @@
       });
     };
   }
+  /* The rail applies this preference BEFORE it paints, which a fetch cannot do, so the
+     account value is mirrored into localStorage and read synchronously there. Written on
+     save so the very next navigation is already right; the rail also refreshes the mirror
+     in the background for a browser that has never seen this account. Mirrored ONLY after
+     the server acknowledged the write — a mirror ahead of the account would show a
+     preference that is not stored. */
+  function mirrorRailDefault(key, value) {
+    if (key !== 'rail_sections_collapsed') return;
+    try { localStorage.setItem('faraudit-rail-default', value ? 'collapsed' : 'expanded'); } catch (e) {}
+  }
+
   function wireServerPrefs() {
     var btns = $('setContent').querySelectorAll('[data-pref-tg]');
     // The duration select lives on its own panel, so an early return on "no toggles
@@ -586,6 +604,10 @@
         var current = prefs[key];
         // Server default for weekly_digest_watched is true — interpret null/undefined as on.
         var on = current === undefined || current === null ? true : !!current;
+        // Seed the mirror from what the ACCOUNT says, not only from a toggle press: a
+        // customer who opens Settings and changes nothing should still leave with the
+        // rail matching their account on the next page.
+        mirrorRailDefault(key, on);
         var tgl = b.querySelector('.tgl');
         if (on) tgl.classList.add('on'); else tgl.classList.remove('on');
         b.onclick = function(e){
@@ -596,7 +618,7 @@
           savePref(key, next).then(ok => { b.disabled = false;
             // NAME what saved. flash() was called bare, so `what` was undefined and the
             // note rendered hidden and empty — a confirmed save reported nothing.
-            if (ok) { prefs[key] = next; flash(PREF_LABELS[key] || key, true); }
+            if (ok) { prefs[key] = next; mirrorRailDefault(key, next); flash(PREF_LABELS[key] || key, true); }
             // A REFUSED SAVE NAMES ITSELF. Reverting the switch is not a message: the
             // route rate-limits at 30/min, and a toggle that will not move with nothing
             // on screen is indistinguishable from a dead control.

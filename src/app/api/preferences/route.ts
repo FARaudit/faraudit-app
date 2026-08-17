@@ -7,7 +7,7 @@ export const maxDuration = 10;
 // `alerts_email_enabled` / `alerts_in_app_enabled` are accepted here ONLY because watcher-tick
 // now reads them before it sends. A preference the API stores and nothing consults is the #514
 // defect wearing a different hat — the switch is the last thing built, never the first.
-const ALLOWED = new Set(["sidebar_pinned", "display_name", "timezone", "alerts_enabled", "theme", "weekly_digest_watched", "alerts_email_enabled", "alerts_in_app_enabled", "auto_signout_minutes"]);
+const ALLOWED = new Set(["sidebar_pinned", "display_name", "timezone", "alerts_enabled", "theme", "weekly_digest_watched", "alerts_email_enabled", "alerts_in_app_enabled", "auto_signout_minutes", "rail_sections_collapsed"]);
 const VALID_THEMES = new Set(["dark", "auto"]);
 // Idle auto sign-out. null (or 0) is OFF and is the default; anything else must be one
 // of the durations the settings control actually offers, so a hand-crafted PATCH cannot
