@@ -164,13 +164,30 @@ takes months.
 
 **Fastest demo-visible wins, all cheap, all stage 07:**
 
-1. **The bond-token mute.** Rule 70 released 2 of 13 capped verdicts because the release label is
-   computed bucket-wide — on `3b5bba30`, 9 of 10 obligations qualified for release and the tenth
-   ("bid bond guarantee shall render your bid non-responsive") muted all ten. **Clear that one item
-   and this audit returns BID WITH CAUTION instead of NHR.** A bid bond appears on essentially every
-   construction IFB, so this single regex is disarming the doctrine on the whole package class.
-   Same filter mis-fires the other way: "or bond paper" muted a verdict on paper stock, while
-   "performance bonds" (plural) does not match at all.
+1. **The bond-token mute.** ⚠ **REPLAYED 2026-08-17 — THE DEMO CLAIM BELOW WAS WRONG. Struck, not
+   deleted, so the error stays legible.** Rule 70 released 2 of 13 capped verdicts because the
+   release label is computed bucket-wide — on `3b5bba30`, 9 of 10 obligations qualified for release
+   and the tenth ("bid bond guarantee shall render your bid non-responsive") muted all ten.
+   ~~**Clear that one item and this audit returns BID WITH CAUTION instead of NHR.**~~ A bid bond
+   appears on essentially every construction IFB, so this single regex is disarming the doctrine on
+   the whole package class. Same filter mis-fires the other way: "or bond paper" muted a verdict on
+   paper stock, while "performance bonds" (plural) does not match at all.
+
+   **CORRECTION — built, replayed, $0 (PR #718, flag `AUDIT_UA_BOND_NOT_FIRM_FACT`).** Clearing the
+   bond item returns **INCOMPLETE**, not BID WITH CAUTION. The release removes only the coverage
+   mute; the next pole down — `documentsComplete === false`, a posted binding document that could
+   not be confirmed read in full — decides instead. Over 50 banked records: NHR 9→7, INCOMPLETE
+   36→38, **BID_WITH_CAUTION unchanged at 4, zero flips toward a plain BID.** The mute was the
+   deciding authority on only **2 of the 10** bond-only records; on the other 8 another pole had
+   already decided. **This buys a more honest label, not a more committal one — it is NOT a demo
+   win.** The token fix is still correct on its own terms (paper stock is not a credential; the
+   singular/plural split is arbitrary), but the demo blocker on this package is unread binding
+   documents — the denominator/ingest work, not Rule 70.
+
+   **The lesson outlives the item: a claim derived from the CAP is not a verdict.** Every pole below
+   the one you release still runs at full force. Replay `deriveVerdict`; never reason forward from
+   `kind`. The same reasoning error produced the panel-suppression inference this document already
+   records as wrong — twice now, the same shape.
 2. **The untyped-bar leak.** 64% of disqualifying findings are missing their type fields, mostly
    emitted by the engine's *own* deterministic detectors. Branch 5a fires first and answers with an
    engineering complaint **that leaks internal field names to the customer**, where the branch below
