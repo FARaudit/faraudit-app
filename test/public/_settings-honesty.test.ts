@@ -405,6 +405,29 @@ console.log("\n── an unfilled chip may not promise a check that never runs �
      the rail reads rail_sections_collapsed — so the list grows with the kinds of
      preference the panel offers. It stays an ALLOWLIST of named files: "read somewhere
      in the repo" would pass on the settings page reading its own switch back. */
+  /* THE SWITCH MUST NOT BE OUTVOTED BY STALE STATE.
+     rail_sections_collapsed shipped inert: the rail writes a per-group open/closed value
+     on every click, the restore was written to let those WIN over the account default,
+     and once a group has been clicked even once it has a stored value forever. So a
+     customer who had used the rail at all could set this switch, watch it save, and see
+     the rail unchanged — a control with no effect, which is the whole subject of this
+     suite. Choosing a starting position is a statement about where every group starts,
+     so an explicit save clears the per-group overrides.
+     Asserted on the SAVE path only: doing it on load would throw away the customer's
+     clicks merely because they opened Settings. */
+  {
+    const saveArm = appCode.match(/if \(ok\) \{[^}]*mirrorRailDefault\([^)]*\)[^}]*\}/);
+    check("saving the collapse preference clears the per-group overrides",
+      !!saveArm && /mirrorRailDefault\(key, next, true\)/.test(saveArm[0]),
+      "the switch saves and the rail ignores it — an inert control");
+    check("...and the clear is implemented, not just requested",
+      /removeItem\('faraudit-rail-sections'\)/.test(appCode),
+      "the flag is passed and nothing acts on it");
+    check("...and loading Settings does NOT clear them",
+      /mirrorRailDefault\(key, on\);/.test(appCode),
+      "opening Settings would discard clicks the customer made");
+  }
+
   const consumers = [
     "src/lib/watcher-tick.ts",
     "src/app/api/cron/watched-digest/route.ts",

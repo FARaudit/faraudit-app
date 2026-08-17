@@ -586,9 +586,22 @@
      in the background for a browser that has never seen this account. Mirrored ONLY after
      the server acknowledged the write — a mirror ahead of the account would show a
      preference that is not stored. */
-  function mirrorRailDefault(key, value) {
+  function mirrorRailDefault(key, value, clearOverrides) {
     if (key !== 'rail_sections_collapsed') return;
-    try { localStorage.setItem('faraudit-rail-default', value ? 'collapsed' : 'expanded'); } catch (e) {}
+    try {
+      localStorage.setItem('faraudit-rail-default', value ? 'collapsed' : 'expanded');
+      /* SAVING THIS PREFERENCE CLEARS THE PER-GROUP OVERRIDES, and without that the
+         control is inert. The rail stores a per-group open/closed value on every click,
+         and those were written to win over the default — correct while the default is
+         just where a group starts. But once a group has been clicked even once it has a
+         stored value forever, so a customer who has used the rail at all would set this
+         switch, watch it save, and see nothing change: a switch with no effect, which is
+         the defect this panel's own gate exists to catch.
+         Choosing a starting position IS a statement about where every group starts, so it
+         resets them. Only on an explicit save — never on load, which would discard the
+         customer's clicks just for opening Settings. */
+      if (clearOverrides) localStorage.removeItem('faraudit-rail-sections');
+    } catch (e) {}
   }
 
   function wireServerPrefs() {
@@ -618,7 +631,7 @@
           savePref(key, next).then(ok => { b.disabled = false;
             // NAME what saved. flash() was called bare, so `what` was undefined and the
             // note rendered hidden and empty — a confirmed save reported nothing.
-            if (ok) { prefs[key] = next; mirrorRailDefault(key, next); flash(PREF_LABELS[key] || key, true); }
+            if (ok) { prefs[key] = next; mirrorRailDefault(key, next, true); flash(PREF_LABELS[key] || key, true); }
             // A REFUSED SAVE NAMES ITSELF. Reverting the switch is not a message: the
             // route rate-limits at 30/min, and a toggle that will not move with nothing
             // on screen is indistinguishable from a dead control.
