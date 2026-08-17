@@ -10,6 +10,10 @@
 -- against a database that already has these columns changes nothing. It exists to make
 -- the file match reality and to be the one place a new preference gets added.
 --
+-- Column list VERIFIED against the live table on 2026-08-17 via /api/preferences,
+-- which selects *, so this is the shape production actually has rather than the shape
+-- the code implies.
+--
 -- Postgres 11+ backfills existing rows when ADD COLUMN carries a NOT NULL DEFAULT, so
 -- the boolean defaults below apply to accounts that already exist — a column default
 -- alone would fire on INSERT only and leave every current customer NULL.
@@ -30,6 +34,20 @@ ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS weekly_digest_watched BOOL
 -- 15 / 30 / 60 / 120 / 240, so a hand-crafted PATCH cannot store a value no control can
 -- show and no customer can undo from the page.
 ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS auto_signout_minutes INTEGER;
+
+-- ── also live, and also unrecorded (confirmed against production 2026-08-17) ─────
+--
+-- Read off the live table rather than inferred. Neither is referenced anywhere in the
+-- app, so both are recorded as facts about the table, not as things to start using.
+ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS notifications_pref TEXT;
+
+-- ⚠ DRIFT IN THE OTHER DIRECTION, AND IT IS NOT FIXED HERE.
+-- fa_intelligence_v2.sql declares `weekly_brief_email TEXT`, and that column DOES NOT
+-- EXIST on the live table. Nothing in the app reads or writes it, so it is a dead
+-- declaration rather than a live defect — but it means the original file describes a
+-- shape production never had. Dropping the line is a decision about history, so it is
+-- left alone and named instead.
 
 -- ── new: the sidebar collapse preference ────────────────────────────────────────
 --
