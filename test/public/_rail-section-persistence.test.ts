@@ -60,7 +60,7 @@ const restoreSrc = m ? m[1] : "";
 check("restore script extracted", restoreSrc.length > 0, "nothing to execute");
 
 type Sec = { sec: string; active: boolean; open: string; aria: string };
-function runRestore(src: string, stored: Record<string, boolean>, secs: Sec[]) {
+function runRestore(src: string, stored: Record<string, boolean>, secs: Sec[], railDefault?: string) {
   const nodes = secs.map((s) => {
     const attrs: Record<string, string> = { "data-sec": s.sec, "data-open": s.open };
     if (s.active) attrs["data-active"] = "true";
@@ -73,7 +73,17 @@ function runRestore(src: string, stored: Record<string, boolean>, secs: Sec[]) {
     };
   });
   const sandbox: any = {
-    localStorage: { getItem: () => JSON.stringify(stored), setItem: () => {} },
+    /* A REAL KEYED STORE. This returned the same JSON for every key, so the script
+       could not tell the per-section store from the account mirror — a harness that
+       answers every question with one answer cannot fail on reading the wrong one. */
+    localStorage: {
+      getItem: (k: string) =>
+        k === "faraudit-rail-sections" ? JSON.stringify(stored)
+        : k === "faraudit-rail-default" ? (railDefault ?? null)
+        : null,
+      setItem: () => {},
+      removeItem: () => {},
+    },
     document: { querySelectorAll: () => nodes },
     JSON, console,
   };
@@ -87,6 +97,20 @@ const base = (): Sec[] => [
   { sec: "market-intel", active: false, open: "false", aria: "false" },
   { sec: "reference", active: false, open: "false", aria: "false" },
 ];
+
+/* ── the ACCOUNT default, for a browser with no per-group history ──────────────── */
+{
+  const openAll = runRestore(restoreSrc, {}, base(), "expanded");
+  check("account default 'expanded' opens groups with no stored state",
+    openAll.every((x) => x.open === "true"), openAll.map((x) => x.sec + "=" + x.open).join(" "));
+  const closedAll = runRestore(restoreSrc, {}, base(), "collapsed");
+  check("account default 'collapsed' leaves them as the server rendered them",
+    closedAll[1].open === "false" && closedAll[2].open === "false",
+    closedAll.map((x) => x.sec + "=" + x.open).join(" "));
+  const noMirror = runRestore(restoreSrc, {}, base(), undefined);
+  check("no mirror yet falls through to the server default",
+    noMirror[1].open === "false", "a browser that has never seen the account must not guess");
+}
 
 const r1 = runRestore(restoreSrc, { readiness: false, "market-intel": true }, base());
 check("a section the customer CLOSED comes back closed", r1[0].open === "false", `got ${r1[0].open}`);
