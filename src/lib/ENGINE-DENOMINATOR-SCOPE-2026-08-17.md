@@ -100,13 +100,59 @@ anchor machinery, the per-doc attestation and `constructionCoreMissing` never ex
 
 ## The work, in the order it should happen
 
-### Step 0 — measure the arm before proposing it ($0, no flag, no CEO gate)
-Replay `sweepConstructionManifest` + `constructionCoverage` over the banked corpus **offline** and
-report: how many packages classify `isConstruction` under the *production* detector (not my string
-match); for those, how `required` changes; how many documents fail `hasText` and would become named
-uncovered; and the resulting verdict distribution vs today. **Until this exists, "arm the two flags"
-is a proposal with no measured blast radius** — and this repo has been burned by exactly that shape
-before. Cheap, and it is the precondition for any G1 request.
+### Step 0 — DONE 2026-08-17. Measured $0 against the production sweep.
+
+Ran `sweepConstructionManifest` + `constructionRequired` + `constructionCoreMissing` — the production
+functions, nothing reimplemented — over the 50 banked records carrying `input.fullSource`.
+
+**Fidelity boundary, because it decides which numbers are quotable.** The records bank the ASSEMBLED
+`fullSource`, never a per-document `{name,text}` array (**0 of 52**). So the sweep was fed one
+pseudo-document:
+
+- **FAITHFUL — `isConstruction` via the NAICS arm.** `input.naics` is banked and `/^23\d{4}$/` fires
+  alone as authoritative SAM metadata (sweep :119–124).
+- **FAITHFUL — element PRESENCE.** Production loops `for (const d of docs)`, so scanning the
+  concatenation finds the identical element set. Only `sourceDoc`/`anchor` attribution differs, and
+  none is reported here.
+- **NOT ANSWERABLE — `docAttestations` (`hasText`, `groundableObligations`).** One pseudo-doc instead
+  of ~45. **This is the layer the arm actually turns on, and it needs a re-ingest to measure.**
+
+#### What it found
+
+| question | answer |
+|---|---|
+| construction-positive, **by solicitation** | **4 of 17 (24%)** — all via the NAICS arm; the header arm fired **0** |
+| construction-positive, by *record* | 20 of 50 (40%) — **inflated**: `FA813726R0033` alone is 16 records |
+| `required` on those packages | **1 → a median of 5** (16 of 20 get the full carrier set) |
+| core gate (`bonding · wage_determination · submission`) | would cap **4 of 20 records** to INCOMPLETE |
+| layer B, measurable offline | **no** — only 2 of 50 records bank a `docCoverage` result at all |
+
+#### The finding that was not on the list — `required` VARIES ON THE SAME SOLICITATION
+
+`FA813726R0033` produced **three different `required` sets across 16 runs**, and it tracks the size of
+what ingest happened to pull:
+
+```
+172,224 chars → [bonding, scope]                                    ← core MISSING ⇒ INCOMPLETE
+250,437 chars → [bonding, scope, set_aside, submission]             ← core MISSING ⇒ INCOMPLETE
+275–277k      → [bonding, scope, set_aside, submission, wage_determination]   ← complete
+```
+
+**The denominator is a function of what ingest pulled, not of what the solicitation contains.** The
+carrier does not fix ingest variance — it *inherits* it.
+
+Read the right way round, this is an argument **for** the arm and a warning about the optics: today
+the short-ingest run sails through on a thin section list; armed, it correctly reports its core
+elements missing and returns INCOMPLETE. **The gate catching a truncated ingest is the gate working.**
+It is also precisely the trade in ruling 2 below — arming converts silent ingest shortfalls into
+visible honest failures, and there are more of them than the demo would like.
+
+#### What step 0 does NOT license
+It does not license arming. It measures the *element* layer, which is the smaller half. The per-document
+attestation layer — the one that turns 44 named uncovered documents into a real denominator — remains
+unmeasured offline, and `AUDIT_CONSTRUCTION_DECIDED`'s OOS cap is still unruled. **A G1 arm request
+should wait for a re-ingest measurement of `docAttestations` on at least the 4 construction
+solicitations.**
 
 ### Step 1 — give the gate a document argument (layer B, general path)
 Add a document parameter to `gradeCoverageV2` and thread `documentsCovered`'s real result through
