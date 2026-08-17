@@ -467,7 +467,9 @@ export function deskNews(articles: NewsRow[] | null, now: number): DeskSummary {
     status: "ok",
     title: cleanTitle(top.a.title) || top.a.title,
     why: `Newest defense reporting · published ${when}`,
-    value: counted(articles.length, "story"),
+    // "stories", not the default "storys" — counted() takes the plural explicitly
+    // for every noun whose plural is not the singular plus an s.
+    value: counted(articles.length, "story", "stories"),
     count: articles.length,
     days: null,
     urg: "ok",
