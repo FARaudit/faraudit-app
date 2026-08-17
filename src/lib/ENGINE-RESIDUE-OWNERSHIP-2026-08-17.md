@@ -29,8 +29,17 @@ the **mandate**, not the tool — `read_document` is already in every lens's han
 The pre-inject seeds each binding document through `readDocument`, which caps at
 `DOC_READ_CAP = 40,000` chars. A capped read returns `truncated: true`, and `audit-expert.ts:151`
 adds to `docsRead` **only when `!truncated`**. A truncated document is therefore never
-provably-read-whole, can never be attested, stays uncovered, and forces INCOMPLETE — **no matter how
-well the lens performs.**
+provably-read-whole and can never be **attested**.
+
+> ⚠ **CORRECTED 2026-08-17.** This paragraph originally ended *"…stays uncovered, and forces
+> INCOMPLETE — no matter how well the lens performs."* **That was wrong**, and the error was reading
+> the flag sweep instead of the function. `documentsCovered` covers a document by a **grounded
+> finding** at `audit-orchestrator.ts:887` with **no `docsRead` requirement**; only the attestation
+> branch at `:895` needs it. So truncation closes the *read-and-empty attestation* route, not every
+> route — a lens that grounds one finding in a truncated document still covers it. The cap-sweep
+> table below counts **packages carrying ≥1 truncated document**, which is what it says; it is not a
+> count of packages forced to INCOMPLETE. See `ENGINE-SECOND-AXIS-2026-08-17.md` for the
+> production-measured delta, which is far smaller.
 
 Measured over the 44 banked packages that carry binding attachments, sweeping the (env-tunable)
 `AGENTIC_DOC_READ_CAP`:

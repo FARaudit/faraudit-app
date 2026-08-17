@@ -113,7 +113,62 @@ the document, not less. But that argument has to be proven, not asserted:
 - The existing cross-attachment uniqueness and shared-excerpt guards in `documentsCovered`
   (`audit-orchestrator.ts:797`) are what keep `analyzed` honest and are untouched by this.
 
+---
+
+# ⛔ CORRECTION 2026-08-17 — DO NOT WIRE THIS. It would ship inert.
+
+Everything above describes the mechanism correctly. **The impact numbers are wrong, and the change
+should not be built.** Found while wiring it, by reading the caller instead of the flag sweep.
+
+### 1. The whole path is disabled in production
+
+```ts
+const attCoverageOpts = ATTACHMENT_COVERAGE_ENABLED ? { docsRead: [...docsRead], attestations: [...attestedDocs] } : undefined;
+```
+`audit-orchestrator.ts:2734`, and **`AUDIT_ATTACHMENT_COVERAGE=false` on the live worker.**
+
+So `docsRead` **never reaches `documentsCovered` in production**. `readSet` and `attSet` are both
+empty, the attestation branch at `:895` can never fire, and **truncation therefore has no effect on
+production coverage at all.** Changing how `docsRead` is populated changes nothing that runs.
+
+This is the exact failure the file next door already warns about
+(`audit-orchestrator.ts:858`): *"A new guard inheriting that gate would ship inert and pass its own
+tests (the placebo shape)."* This change would have inherited that gate.
+
+### 2. Truncation was never the only route to coverage
+
+`documentsCovered` covers a document by a **grounded finding** (`:887`) with no `docsRead`
+requirement. Only **attestation** (`:895`) needs it. So the claim above that truncation forces
+INCOMPLETE *"no matter how well the lens performs"* is false — a lens that grounds one finding in a
+truncated document covers it.
+
+### 3. The real delta, measured through the production function
+
+Driving `documentsCovered` directly with `findings: []` (isolating the attestation path), swapping
+only the truncation gate — `docsRead = !truncated` versus `docsRead = readable`:
+
+| | today | proposed |
+|---|---:|---:|
+| packages INCOMPLETE | 44 of 44 | **44 of 44** |
+| uncovered documents, total | 212 | **176** (−36) |
+| packages whose uncovered count changes | — | 26 of 44 |
+
+**No package flips.** 36 fewer uncovered-document entries, and only if the disarmed flag were armed
+first. The "34 of 44 → 6 of 50" table above measures two different populations — packages carrying a
+truncated document, and packages carrying a genuinely unreadable one — and **neither is the coverage
+delta.** Both should be read as what they are, not as an impact estimate.
+
+### What survives
+
+The *diagnosis* stands and is worth keeping: readability is provable deterministically from
+`docRegions`' full region text, the 40k cap belongs to the tool and not the document, and 76 of 429
+documents exceed it. **What does not survive is the priority.** The dominant reason documents stay
+uncovered is not the truncation gate — it is that they have **no grounded finding**, which the
+hard-bar rejections and the analysis floor in the log make plain. That is task 9's residue problem,
+and it is the third independent measurement this week pointing at the same place: **the bottleneck is
+analysis, not attestation plumbing.**
+
 ## Status
 
-Designed and measured. **Nothing is wired.** Sequencing, and the ruling on accepting a tighter
-`analyzed` requirement in exchange for a looser `readable` one, sit with the CEO.
+Designed, measured, and **deliberately not built.** Wiring it would satisfy its own tests and change
+nothing a customer sees.
