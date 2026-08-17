@@ -98,18 +98,20 @@ const base = (): Sec[] => [
   { sec: "reference", active: false, open: "false", aria: "false" },
 ];
 
-/* ── the ACCOUNT default, for a browser with no per-group history ──────────────── */
+/* ── the ACCOUNT MAP, which is the same shape this store already held ───────────
+   Settings writes rail_sections_open (a per-group map keyed by data-sec) and the rail
+   mirrors it into this very key, so there is ONE statement about which groups are open.
+   The single boolean that preceded it was a second statement, and had to WIPE this
+   store to take effect — a preference that destroyed the customer's own clicks. */
 {
-  const openAll = runRestore(restoreSrc, {}, base(), "expanded");
-  check("account default 'expanded' opens groups with no stored state",
-    openAll.every((x) => x.open === "true"), openAll.map((x) => x.sec + "=" + x.open).join(" "));
-  const closedAll = runRestore(restoreSrc, {}, base(), "collapsed");
-  check("account default 'collapsed' leaves them as the server rendered them",
-    closedAll[1].open === "false" && closedAll[2].open === "false",
-    closedAll.map((x) => x.sec + "=" + x.open).join(" "));
-  const noMirror = runRestore(restoreSrc, {}, base(), undefined);
-  check("no mirror yet falls through to the server default",
-    noMirror[1].open === "false", "a browser that has never seen the account must not guess");
+  const chosen = runRestore(restoreSrc, { readiness: true, "market-intel": false, reference: true }, base());
+  check("a group the account says is OPEN opens", chosen[0].open === "true", `got ${chosen[0].open}`);
+  check("…and one it says is CLOSED stays closed", chosen[1].open === "false", `got ${chosen[1].open}`);
+  check("…per group, not all-or-nothing", chosen[2].open === "true", `got ${chosen[2].open}`);
+  const none = runRestore(restoreSrc, {}, base());
+  check("no stored map falls through to the server default",
+    none[1].open === "false" && none[2].open === "false",
+    "a browser that has never seen the account must not guess");
 }
 
 const r1 = runRestore(restoreSrc, { readiness: false, "market-intel": true }, base());
@@ -170,12 +172,11 @@ const controls: Array<[string, string, (secs: Sec[]) => boolean]> = [
   ["a restore that forgets aria-expanded",
    restoreSrc.replace(/var h=s\.querySelector\('\.sb-sech'\);if\(h\)h\.setAttribute\('aria-expanded',String\(v\)\);/, ""),
    (secs) => secs[0].aria === "true" && secs[0].open === "false"],
-  /* The guard now also carries the ACCOUNT DEFAULT branch, so the planted text had to
-     move with it. A control whose replacement no longer matches is INERT — it proves a
-     gate that checks nothing — and this suite caught its own control going inert when
-     the restore block changed shape, which is the point of asserting `changed`. */
+  /* Re-pointed twice as the guard changed shape. A control whose replacement no longer
+     matches is INERT — it proves a gate that checks nothing — and this suite caught its
+     own control going inert both times, which is the point of asserting `changed`. */
   ["a restore that treats a missing key as closed",
-   restoreSrc.replace("if(v!==true&&v!==false){if(D!=='expanded')return;v=true;}", "if(v===undefined)v=false;"),
+   restoreSrc.replace("if(v!==true&&v!==false)return;", "if(v===undefined)v=false;"),
    (secs) => secs[2].open === "false" && secs[0].open === "false"],
 ];
 

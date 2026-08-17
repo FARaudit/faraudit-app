@@ -405,27 +405,32 @@ console.log("\n── an unfilled chip may not promise a check that never runs �
      the rail reads rail_sections_collapsed — so the list grows with the kinds of
      preference the panel offers. It stays an ALLOWLIST of named files: "read somewhere
      in the repo" would pass on the settings page reading its own switch back. */
-  /* THE SWITCH MUST NOT BE OUTVOTED BY STALE STATE.
-     rail_sections_collapsed shipped inert: the rail writes a per-group open/closed value
-     on every click, the restore was written to let those WIN over the account default,
-     and once a group has been clicked even once it has a stored value forever. So a
-     customer who had used the rail at all could set this switch, watch it save, and see
-     the rail unchanged — a control with no effect, which is the whole subject of this
-     suite. Choosing a starting position is a statement about where every group starts,
-     so an explicit save clears the per-group overrides.
-     Asserted on the SAVE path only: doing it on load would throw away the customer's
-     clicks merely because they opened Settings. */
+  /* THE PER-GROUP CONTROLS MUST REACH THE RAIL.
+     An earlier single boolean shipped INERT: the rail keeps a per-group open/closed map
+     in localStorage, the boolean was a SECOND statement about the same thing, and it had
+     to wipe that map to take effect — so setting a preference destroyed the group clicks
+     the customer had made. The account now stores the map ITSELF, in the rail's own
+     shape, which removes the conflict rather than arbitrating it.
+     What has to stay true: the controls exist, they write the map key, and the mirror is
+     only written once the SERVER took the value — a mirror written first would leave the
+     rail showing a layout the account does not hold. */
   {
-    const saveArm = appCode.match(/if \(ok\) \{[^}]*mirrorRailDefault\([^)]*\)[^}]*\}/);
-    check("saving the collapse preference clears the per-group overrides",
-      !!saveArm && /mirrorRailDefault\(key, next, true\)/.test(saveArm[0]),
-      "the switch saves and the rail ignores it — an inert control");
-    check("...and the clear is implemented, not just requested",
-      /removeItem\('faraudit-rail-sections'\)/.test(appCode),
-      "the flag is passed and nothing acts on it");
-    check("...and loading Settings does NOT clear them",
-      /mirrorRailDefault\(key, on\);/.test(appCode),
-      "opening Settings would discard clicks the customer made");
+    const secBtns = [...appCode.matchAll(/data-rail-sec="([a-z0-9-]+)"/g)].map((m) => m[1]);
+    check("the Interface panel offers a control per sidebar group",
+      secBtns.length >= 3, `found ${secBtns.length}`);
+    check("...and they write the per-group map, not a blunt boolean",
+      /savePref\('rail_sections_open'/.test(appCode),
+      "a single switch cannot say 'this one open, those two closed'");
+    check("...and the mirror is written only after the server accepted it",
+      /if \(ok\) \{[^}]*mirrorRailSections\(map\)/.test(appCode),
+      "the rail would show a layout the account does not hold");
+    check("the retired all-or-nothing switch is gone",
+      !/rail_sections_collapsed/.test(appCode),
+      "two statements about one thing is what made the first one inert");
+    // It moved OFF Notifications: a group's start state is not something that reaches you.
+    check("the sidebar control is not on the Notifications panel",
+      !/notifs: \(\) => \{?[\s\S]{0,2600}data-rail-sec/.test(appCode),
+      "an interface preference filed under notifications");
   }
 
   const consumers = [
