@@ -1,16 +1,20 @@
 // Every preference the API can WRITE must be declared in schema/.
 // Run: npx tsx test/public/_preferences-schema-parity.test.ts
 //
-// user_preferences was created in fa_intelligence_v2.sql and then grew five columns —
-// theme, weekly_digest_watched, alerts_email_enabled, alerts_in_app_enabled,
-// auto_signout_minutes — added directly in Supabase and never written down. The repo
-// therefore could not answer what the table holds, and an absent column was
-// indistinguishable from an unrecorded one without querying production. That is not a
-// cosmetic gap: it blocked a Settings toggle, because "add a column" and "the column is
-// already there" needed a database round trip to tell apart.
+// THIS REPO HAS TWO MIGRATION DIRECTORIES ON PURPOSE, and supabase/migrations/README.md
+// says so: `supabase/migrations/` is the CLI-tracked source of truth for app-wide schema
+// work, and `schema/` holds email-AI-era migrations applied directly through the SQL
+// editor. A column recorded in either one IS recorded.
 //
-// This gate closes the loop the only way a repo can: the API's own ALLOWED set is the
-// list of things it will write, and every one of them must appear in schema/.
+// The first version of this gate read only `schema/` and reported five columns as
+// undocumented. All five had migrations — theme, weekly_digest_watched, both alert
+// toggles and auto_signout_minutes — in the directory it was not reading. Treating one
+// file's silence as evidence, without checking whether it was the file that would have
+// spoken, is exactly the failure this suite exists to catch in the app.
+//
+// So the check stands, and its scope is now both directories: the API's ALLOWED set is
+// the definitive list of what PATCH will write, and every member must be declared
+// somewhere a reader can find it.
 //
 // Part P plants the drift back and asserts this suite goes red.
 
@@ -28,13 +32,19 @@ const check = (label: string, ok: boolean, detail = ""): void => {
 const ROOT = join(import.meta.dirname ?? __dirname, "..", "..");
 const ROUTE = readFileSync(join(ROOT, "src", "app", "api", "preferences", "route.ts"), "utf8");
 
-/** Every .sql file, concatenated — a column may be declared in any of them. */
+/** Every .sql file in BOTH migration directories, concatenated. */
 function allSql(): string {
-  const dir = join(ROOT, "schema");
-  return readdirSync(dir)
-    .filter((f) => f.endsWith(".sql"))
-    .map((f) => readFileSync(join(dir, f), "utf8"))
-    .join("\n");
+  const dirs = ["supabase/migrations", "schema"];
+  const parts: string[] = [];
+  for (const d of dirs) {
+    const dir = join(ROOT, d);
+    let files: string[] = [];
+    try { files = readdirSync(dir); } catch { continue; }
+    for (const f of files.filter((x) => x.endsWith(".sql"))) {
+      parts.push(readFileSync(join(dir, f), "utf8"));
+    }
+  }
+  return parts.join("\n");
 }
 
 /** What the PATCH handler will accept and write. */
@@ -48,7 +58,9 @@ function declaredColumns(sql: string): Set<string> {
   const out = new Set<string>();
   const create = sql.match(/CREATE TABLE IF NOT EXISTS user_preferences\s*\(([\s\S]*?)\n\);/);
   if (create) for (const m of create[1].matchAll(/^\s{2}([a-z_]+)\s/gm)) out.add(m[1]);
-  for (const m of sql.matchAll(/ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS\s+([a-z_]+)/g)) out.add(m[1]);
+  // Both directories are matched, and case-insensitively: the CLI migrations are
+  // written in lower case and the schema/ ones in upper.
+  for (const m of sql.matchAll(/alter\s+table\s+(?:public\.)?user_preferences\s+add\s+column\s+if\s+not\s+exists\s+([a-z_]+)/gi)) out.add(m[1]);
   return out;
 }
 
@@ -67,15 +79,15 @@ check("no column the API writes is missing from schema/",
 
 // Named individually so a bulk revert shows which one went, not just a count.
 for (const c of ["theme", "alerts_email_enabled", "alerts_in_app_enabled", "weekly_digest_watched", "auto_signout_minutes"]) {
-  check(`  ${c} is declared`, declared.has(c), "added in Supabase and never recorded");
+  check(`  ${c} is declared`, declared.has(c), "no migration in either directory");
 }
 
 console.log("── Part P · positive controls ──");
 const controls: Array<[string, string]> = [
-  ["a column is dropped from schema/",
-    SQL.replace(/ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS theme TEXT;/, "")],
-  ["the whole drift file is deleted",
-    SQL.replace(/ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS[\s\S]*?;/g, "")],
+  ["the new column loses its migration",
+    SQL.replace(/alter\s+table\s+public\.user_preferences\s+add\s+column\s+if\s+not\s+exists\s+rail_sections_collapsed[\s\S]*?;/i, "")],
+  ["every declaration disappears",
+    SQL.replace(/alter\s+table\s+(?:public\.)?user_preferences\s+add\s+column[\s\S]*?;/gi, "")],
 ];
 for (const [name, planted] of controls) {
   const changed = planted !== SQL;

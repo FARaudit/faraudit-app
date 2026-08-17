@@ -264,10 +264,23 @@ export function renderRail(activeKey: string, counts: RailCounts = {}): string {
        while the parser is still inside <body>, before the rail's subtree is painted.
        Skips [data-active] — the section holding the current page always shows, which
        is the rule renderRail() already applies server-side. */
-    `<script>(function(){try{var m=JSON.parse(localStorage.getItem('faraudit-rail-sections')||'{}');` +
+    `<script>(function(){try{` +
+    /* THE ACCOUNT DEFAULT, read from a MIRROR rather than fetched. The preference lives
+       on user_preferences.rail_sections_collapsed, but this script has to run before the
+       rail is painted — a fetch cannot, and applying the answer afterwards is the exact
+       swing-shut this block was written to avoid. So the account value is mirrored into
+       localStorage (refreshed in the background by railScript below) and read here
+       synchronously. A browser that has never seen the account falls through to the
+       server default, which is collapsed. */
+    `var D=localStorage.getItem('faraudit-rail-default');` +
+    `var m=JSON.parse(localStorage.getItem('faraudit-rail-sections')||'{}');` +
     `document.querySelectorAll('.sb-sec[data-sec]').forEach(function(s){` +
     `if(s.hasAttribute('data-active'))return;` +
-    `var v=m[s.getAttribute('data-sec')];if(v!==true&&v!==false)return;` +
+    `var v=m[s.getAttribute('data-sec')];` +
+    /* Per-section memory WINS over the account default: the default says where a
+       section starts, and a section the customer has since opened or closed is no
+       longer starting. */
+    `if(v!==true&&v!==false){if(D!=='expanded')return;v=true;}` +
     `s.setAttribute('data-open',String(v));` +
     `var h=s.querySelector('.sb-sech');if(h)h.setAttribute('aria-expanded',String(v));});` +
     `}catch(e){}})();</script>`
@@ -417,6 +430,21 @@ export function railScript(): string {
     `document.querySelectorAll('.sb-sec').forEach(function(s){var b=s.querySelector('.sb-secb');if(!b)return;` +
     `if(strip||s.getAttribute('data-open')==='true'){b.removeAttribute('inert');b.removeAttribute('aria-hidden');}` +
     `else{b.setAttribute('inert','');b.setAttribute('aria-hidden','true');}});}` +
+    /* REFRESH THE ACCOUNT MIRROR, and never apply it to THIS paint.
+       The pre-paint restore above reads a localStorage mirror because it must be
+       synchronous. This keeps that mirror current: one small conditional request per
+       page load — /api/preferences is `private, max-age=0, must-revalidate`, so an
+       unchanged answer is a 304 with no body.
+       It deliberately does NOT re-open or re-close anything now. Applying a freshly
+       fetched value after paint is the swing-shut the inline block exists to prevent,
+       so a browser that has never seen this account converges on the NEXT navigation
+       rather than rearranging the rail under the cursor. */
+    `fetch('/api/preferences',{credentials:'include',headers:{accept:'application/json'}})` +
+    `.then(function(r){return r.ok?r.json():null;}).then(function(d){` +
+    `if(!d||!d.preferences)return;var c=d.preferences.rail_sections_collapsed;` +
+    `if(c!==true&&c!==false)return;` +
+    `try{localStorage.setItem('faraudit-rail-default',c?'collapsed':'expanded');}catch(e){}` +
+    `}).catch(function(){});` +
     `syncInert();` +
     // Observe the attribute rather than guessing which controls change it. Bound to
     // #sbToggle clicks alone the sync went stale on every OTHER path — measured: setting

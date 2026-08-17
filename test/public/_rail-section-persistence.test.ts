@@ -146,8 +146,12 @@ const controls: Array<[string, string, (secs: Sec[]) => boolean]> = [
   ["a restore that forgets aria-expanded",
    restoreSrc.replace(/var h=s\.querySelector\('\.sb-sech'\);if\(h\)h\.setAttribute\('aria-expanded',String\(v\)\);/, ""),
    (secs) => secs[0].aria === "true" && secs[0].open === "false"],
+  /* The guard now also carries the ACCOUNT DEFAULT branch, so the planted text had to
+     move with it. A control whose replacement no longer matches is INERT — it proves a
+     gate that checks nothing — and this suite caught its own control going inert when
+     the restore block changed shape, which is the point of asserting `changed`. */
   ["a restore that treats a missing key as closed",
-   restoreSrc.replace("if(v!==true&&v!==false)return;", "if(v===undefined)v=false;"),
+   restoreSrc.replace("if(v!==true&&v!==false){if(D!=='expanded')return;v=true;}", "if(v===undefined)v=false;"),
    (secs) => secs[2].open === "false" && secs[0].open === "false"],
 ];
 

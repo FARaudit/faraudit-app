@@ -390,20 +390,34 @@ console.log("\n── an unfilled chip may not promise a check that never runs �
       .filter((f) => f.endsWith(".sql"))
       .map((f) => readFileSync(join(ROOT, "supabase/migrations", f), "utf8")).join("\n");
     for (const k of [...appCode.matchAll(/data-pref-tg="([a-z_]+)"/g)].map((m) => m[1])) {
+      // Case-INSENSITIVE: this directory holds both conventions (67 upper, 13 lower),
+      // so matching one spelling reports a migration that exists as missing. The claim
+      // being checked is that the column is created, not how it was typed.
       check(`'${k}' has a migration that adds the column`,
-        new RegExp(`ADD COLUMN IF NOT EXISTS ${k}\\b`).test(migrations),
+        new RegExp(`add\\s+column\\s+if\\s+not\\s+exists\\s+${k}\\b`, "i").test(migrations),
         "PostgREST drops an unknown column — the PATCH would report success and store nothing");
     }
   }
 
+  /* WHO ACTS ON A PREFERENCE depends on what the preference is for. This list was
+     written when every toggle was a notification toggle and the only consumers were the
+     watcher and the digest cron. An interface preference is consumed by the interface —
+     the rail reads rail_sections_collapsed — so the list grows with the kinds of
+     preference the panel offers. It stays an ALLOWLIST of named files: "read somewhere
+     in the repo" would pass on the settings page reading its own switch back. */
   const consumers = [
     "src/lib/watcher-tick.ts",
     "src/app/api/cron/watched-digest/route.ts",
+    "src/lib/nav/rail.ts",
   ].map((f) => { try { return read(f); } catch { return ""; } }).join("\n");
   for (const k of keys) {
     check(`'${k}' is accepted by the preferences API`, new RegExp(`"${k}"`).test(prefRoute),
       "the toggle writes to a key the API will silently drop");
-    check(`'${k}' is READ by something that acts on it`, new RegExp(k).test(consumers),
+    /* WORD-BOUNDED. A bare substring match is satisfied by any longer identifier that
+       merely starts with the key — `rail_sections_collapsed` matched inside
+       `rail_sections_collapsed_UNREAD`, so a consumer that had been renamed away still
+       read as present and the control proving this check could not go red. */
+    check(`'${k}' is READ by something that acts on it`, new RegExp(`\\b${k}\\b`).test(consumers),
       "a switch with no handler — the #514 defect");
   }
 }
