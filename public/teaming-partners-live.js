@@ -19,13 +19,20 @@
       reason: m.reason || null,
       perCode: m.per_code || {},
       stateFilter: m.state || null,
-      setAside: m.set_aside || null
+      setAside: m.set_aside || null,
+      // How many SAM holds vs how many arrived. The renderer says so when they differ.
+      totalAvailable: typeof m.total_available === 'number' ? m.total_available : null,
+      shown: typeof m.shown === 'number' ? m.shown : window.TEAM.PARTNERS.length,
+      // The certifications SAM can actually be filtered on, named by the server so the codes
+      // live in one place. Absent from a response means keep whatever we already had.
+      setAsideOptions: Array.isArray(m.set_aside_options) ? m.set_aside_options : (window.TEAM.meta && window.TEAM.meta.setAsideOptions) || []
     };
   }
 
   function fail(detail) {
     window.TEAM.PARTNERS = [];
-    window.TEAM.meta = { state: 'error', reason: 'fetch-failed', detail: detail || null, perCode: {}, stateFilter: null, setAside: null };
+    const keep = (window.TEAM.meta && window.TEAM.meta.setAsideOptions) || [];
+    window.TEAM.meta = { state: 'error', reason: 'fetch-failed', detail: detail || null, perCode: {}, stateFilter: null, setAside: null, totalAvailable: null, shown: 0, setAsideOptions: keep };
   }
 
   function paint() {

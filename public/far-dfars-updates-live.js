@@ -31,6 +31,10 @@
 
   function mapUpdate(u) {
     return {
+      /* THE ROW'S IDENTITY IS ITS DOCUMENT, NOT ITS CLAUSE. Most rules in this corpus
+         name no clause at all, and a clause is not unique to one rule even when present —
+         two rules may amend the same part. The published document URL is one row, always. */
+      id:      u.link || u.title || '',
       clause:  u.clause || '',
       title:   u.title || '',
       type:    classifyType(u.source, u.title, u.clause),
@@ -38,7 +42,11 @@
       impact:  classifyImpact(u.title, u.summary),
       summary: u.summary || '',
       insight: '', // no insight pass on this route — stays empty
-      affects: Array.isArray(u.affects_clauses) ? u.affects_clauses.length : 0,
+      /* THE NUMBER OF CLAUSES THIS RULE AMENDS. Not contracts, and not this customer's
+         contracts — `affects_clauses` is what the rule changes in the CFR. It was named
+         `affects` and rendered as "contracts hit", which read as true only while it was
+         always 0. */
+      amends: Array.isArray(u.affects_clauses) ? u.affects_clauses.length : 0,
       source:  u.source || '',
       link:    u.link || ''
     };

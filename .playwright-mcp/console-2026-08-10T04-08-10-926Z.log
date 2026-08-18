@@ -1,0 +1,44 @@
+[      42ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://localhost:8811/api/capability-statement:0
+[      49ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://localhost:8811/api/capability-statement:0
+[      49ms] [ERROR] [capability-statement-live] Error: capability statement fetch failed: 404
+    at http://localhost:8811/capability-statement-live.js:1282:26 @ http://localhost:8811/capability-statement-live.js:1302
+[      55ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://localhost:8811/api/notifications?limit=20:0
+[      55ms] [ERROR] [notif-chrome] load failed: Error: notifications 404
+    at http://localhost:8811/notifications-chrome.js:217:26 @ http://localhost:8811/notifications-chrome.js:238
+[   21423ms] TypeError: Cannot read properties of null (reading 'core_competencies_json')
+    at itemsOf (http://localhost:8811/capability-statement-live.js:103:18)
+    at openStructuredEditor (http://localhost:8811/capability-statement-live.js:767:17)
+    at openEditor (http://localhost:8811/capability-statement-live.js:904:35)
+    at HTMLDocument.<anonymous> (http://localhost:8811/capability-statement-live.js:981:37)
+    at eval (eval at <anonymous> (eval at evaluate (:311:30)), <anonymous>:4:7)
+    at eval (eval at evaluate (:311:30), <anonymous>:4:50)
+    at UtilityScript.evaluate (<anonymous>:313:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+[   62051ms] TypeError: Cannot read properties of null (reading 'core_competencies_json')
+    at itemsOf (http://localhost:8811/capability-statement-live.js:103:18)
+    at openStructuredEditor (http://localhost:8811/capability-statement-live.js:767:17)
+    at openEditor (http://localhost:8811/capability-statement-live.js:904:35)
+    at HTMLDocument.<anonymous> (http://localhost:8811/capability-statement-live.js:981:37)
+    at eval (eval at <anonymous> (eval at evaluate (:311:30)), <anonymous>:14:7)
+    at eval (eval at evaluate (:311:30), <anonymous>:4:50)
+    at UtilityScript.evaluate (<anonymous>:313:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+[   77270ms] TypeError: Cannot read properties of null (reading 'core_competencies_json')
+    at itemsOf (http://localhost:8811/capability-statement-live.js:103:18)
+    at openStructuredEditor (http://localhost:8811/capability-statement-live.js:767:17)
+    at openEditor (http://localhost:8811/capability-statement-live.js:904:35)
+    at HTMLDocument.<anonymous> (http://localhost:8811/capability-statement-live.js:981:37)
+    at openF (eval at <anonymous> (eval at evaluate (:311:30)), <anonymous>:9:127)
+    at eval (eval at <anonymous> (eval at evaluate (:311:30)), <anonymous>:13:9)
+    at eval (eval at evaluate (:311:30), <anonymous>:4:50)
+    at UtilityScript.evaluate (<anonymous>:313:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+[   77517ms] TypeError: Cannot read properties of null (reading 'differentiators_json')
+    at itemsOf (http://localhost:8811/capability-statement-live.js:103:18)
+    at openStructuredEditor (http://localhost:8811/capability-statement-live.js:767:17)
+    at openEditor (http://localhost:8811/capability-statement-live.js:904:35)
+    at HTMLDocument.<anonymous> (http://localhost:8811/capability-statement-live.js:981:37)
+    at openF (eval at <anonymous> (eval at evaluate (:311:30)), <anonymous>:9:127)
+    at eval (eval at <anonymous> (eval at evaluate (:311:30)), <anonymous>:22:9)
+    at async eval (eval at evaluate (:311:30), <anonymous>:4:30)
+    at async <anonymous>:337:30

@@ -9,6 +9,13 @@
       "autoPort": true
     },
     {
+      "name": "faraudit-prod",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["next", "start", "-p", "3210"],
+      "port": 3210,
+      "autoPort": true
+    },
+    {
       "name": "public-assets",
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "8811", "--directory", "public"],

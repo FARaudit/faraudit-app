@@ -36,6 +36,12 @@ const ok = (c: boolean, label: string, detail = "") => {
 };
 
 const PUB = path.join(process.cwd(), "public");
+
+// A BARE `return;` is the defect: a catch that swallows the failure and reports nothing.
+// `return { state: "error" }` is the opposite — it hands the failure up to be rendered.
+// Written with `return[;\s}]`, the whitespace class matched the space in `return {` and the
+// check condemned the honest form, which would have forced the silent one.
+const SILENT_CATCH = /catch\s*\([^)]*\)\s*\{\s*(console[^\n]*[\n;]\s*)?return\s*[;}]/;
 const FILES = [
   "cmmc-data.js", "cmmc-app.js", "cmmc-readiness-live.js", "cmmc-readiness.html",
   "wage-data.js", "wage-app.js", "wage-benchmarks-live.js", "wage-benchmarks.html"
@@ -125,7 +131,11 @@ console.log("\n── D · a failed fetch is a visible failure, never a fallback
 for (const [label, src] of [["cmmc-readiness-live.js", CMMC.live], ["wage-benchmarks-live.js", WAGE.live]] as const) {
   const code = strip(src);
   ok(/state\s*:\s*['"]error['"]/.test(code), `${label} sets an explicit error state`);
-  ok(!/catch\s*\([^)]*\)\s*\{\s*(console[^\n]*\n\s*)?return[;\s}]/.test(code), `${label} has no silent-return catch`);
+  // A BARE `return;` IS THE DEFECT — a catch that swallows the failure and reports nothing.
+  // `return { state: 'error' }` is the OPPOSITE: it hands the failure to the caller to render.
+  // Written as `return[;\s}]`, the whitespace class matched the space in `return {`, so the
+  // check condemned the honest form and would have forced the silent one.
+  ok(!SILENT_CATCH.test(code), `${label} has no silent-return catch`);
   ok(/res\.ok/.test(code), `${label} checks the response status`);
 }
 for (const [label, src] of [["cmmc-app.js", CMMC.app], ["wage-app.js", WAGE.app]] as const) {
@@ -150,7 +160,149 @@ ok(!WAGE_NO_SOURCE.some(([, rx]) => rx.test("const m = r.rate_median; const s = 
   "B(−): wage probes do NOT fire on the fields that DO have a source");
 
 const PLANTED_BAIL = `try { const r = await fetch(u); } catch (e) { console.error(e); return; }`;
-ok(/catch\s*\([^)]*\)\s*\{\s*(console[^\n]*\n?\s*)?return[;\s}]/.test(PLANTED_BAIL), "D: bail probe catches a planted silent-return catch");
+// THE PROBE MUST TEST THE REGEX THE CHECK USES. These were two different expressions — the
+// probe's had an optional newline the check's did not, so it proved a pattern that was not
+// guarding anything. A planted positive against a different recognizer certifies nothing.
+ok(SILENT_CATCH.test(PLANTED_BAIL), "D: bail probe catches a planted silent-return catch");
+ok(!SILENT_CATCH.test("catch (e) { return { state: 'error' }; }"),
+  "D(−): a catch that RETURNS AN ERROR STATE is not silent and must pass");
+
+// ── THE PANEL SAYS WHAT THE ROW CANNOT ──────────────────────────────────────
+// CEO review 2026-08-10: "when you click a category the right box brings up further detail but
+// really it's the same thing"; and "where this came from is the same for all — it's fluff".
+// Both were right. The panel restated low/median/high, which the row already prints, and 50 of
+// the 55 reference rows carry the identical source string.
+{
+  const wapp = read("wage-app.js");
+  const wlive = read("wage-benchmarks-live.js");
+  const spec = readFileSync(path.join(PUB, "..", "src", "lib", "labor-category-spec.ts"), "utf8");
+  const route = readFileSync(path.join(PUB, "..", "src", "app", "api", "labor-rates", "route.ts"), "utf8");
+
+  ok(!/\['Low', r\.rate_low\], \['Median', r\.rate_median\], \['High', r\.rate_high\]/.test(wapp), "the panel no longer restates the band the row prints",
+    "the detail panel repeats the three numbers already on the row");
+  ok(/What this role does/.test(wapp), "the panel says what the role does",
+    "clicking a category adds no depth");
+  ok(/Typical qualifications/.test(wapp), "…and what it takes to fill it");
+  ok(/FARaudit editorial, not a government standard/.test(wapp), "the editorial layer is labelled as ours",
+    "an authored role summary reads as a government definition");
+  ok((spec.match(/^  "/gm) || []).length >= 55, "every reference category carries a spec",
+    `${(spec.match(/^  "/gm) || []).length} specs for 55 categories — a row would render without one`);
+  ok(/spec: CATEGORY_SPEC\[r\.category\] \|\| null/.test(route), "the spec travels with the row",
+    "the panel must look it up separately and goes blank for a curated row");
+
+  // COMPARE TO WHAT PRIMES HAVE WON — the CEO's second ask. GSA CALC+ indexes awarded ceiling
+  // rates off GSA schedules, which is the only comparison a sub pricing against a prime can make.
+  ok(/const compare = \(url\.searchParams\.get\("compare"\)/.test(route), "the route answers a single-category comparison",
+    "the awarded-rate layer only fires on a text search, so a selected row cannot ask for it");
+  ok(/WAGE_COMPARE\(r\.category\)/.test(wapp), "the comparison is requested when a row is selected");
+  ok(/window\.WAGE_COMPARE = compare/.test(wlive), "the client exposes that lookup");
+  ok(/\['Difference',/.test(wapp), "the panel prints the difference, not just two numbers",
+    "the customer has to do the subtraction the page could do");
+  ok(/Awarded rates in sample/.test(wapp), "the sample size is shown",
+    "a median over 2 awards reads the same as a median over 200");
+
+  // THREE FAILURE STATES, EACH SAID PLAINLY. A blank panel for all of them tells three
+  // different customers the same untrue thing.
+  for (const [what, re] of [
+    ["not indexed", /indexes no awarded rate under this category name/],
+    ["unreachable", /could not be reached, so no comparison is shown/],
+    ["in flight", /Checking GSA CALC\+/]
+  ] as const) {
+    ok(re.test(wapp), `the ${what} state is stated, not blank`,
+      "an absent comparison is indistinguishable from a rate of zero");
+  }
+  ok(/state: "none"/.test(route) && /state: "error"/.test(route) && /state: "found"/.test(route), "the route distinguishes those states too",
+    "the server collapses them, so the page cannot tell them apart");
+  ok(/if \(S\.sel !== asked\) return;/.test(wapp), "a stale answer cannot land under a new selection",
+    "clicking quickly paints one category's awarded rates under another's name");
+
+  // Source per row was 50-of-55 identical; it prints only when this row differs.
+  // SUPERSEDED BY CEO RULING 2026-08-11. The panel prints BOTH sources always: it now shows a
+  // reference band and an awarded median side by side, two different origins, and the panel has
+  // the room the row does not. The row stays quiet — that is where the repetition was bloat.
+  ok(/Where these came from/.test(wapp), "the panel names where each number came from",
+    "the reader has to infer that an absent source line means the default");
+  ok(!/wr-src', text: r\.source/.test(wapp), "the ROW still does not repeat the source 55 times",
+    "the bloat the CEO flagged is back on the row");
+
+  ok(/\['Low', r\.rate_low\]/.test("[['Low', r.rate_low], ['Median', r.rate_median]]"), "P· the band check can see the restated shape",
+    "the check cannot see the shape it forbids");
+}
+
+// ── THE HEADLINE IS WHAT WAS AWARDED ────────────────────────────────────────
+// CEO ruling 2026-08-10: a band from national BLS medians is where to start; what schedule
+// holders actually won on federal contracts is what a subcontractor prices against. Measured
+// while building: the reference is off by -$43.74 on Program Manager II and +$14.85 on Quality
+// Engineer against awarded medians over 200 and 104 rates.
+{
+  const wapp2 = read("wage-app.js");
+  const whtml = read("wage-benchmarks.html");
+  const route2 = readFileSync(path.join(PUB, "..", "src", "app", "api", "labor-rates", "route.ts"), "utf8");
+  const calc = readFileSync(path.join(PUB, "..", "src", "lib", "calc-rates.ts"), "utf8");
+
+  ok(/function headlineRate\(r\)/.test(wapp2) && /r\.awarded\.median != null \? money\(r\.awarded\.median\)/.test(wapp2),
+    "the row leads with the awarded median when there is one");
+  ok(/: money\(r\.rate_median\);/.test(wapp2),
+    "a row with no awarded rate still shows the reference rather than a blank");
+  ok(/Awarded median · ' \+ r\.awarded\.count \+ ' rates/.test(wapp2),
+    "the row says how many awarded rates the median came from",
+    "a median over 2 awards reads identically to one over 200");
+  ok(/not indexed by CALC\+/.test(wapp2) && /awarded rate not checked/.test(wapp2),
+    "NOT INDEXED and NOT CHECKED are different sentences on the row",
+    "a category we ran out of time to ask about would read as having no market");
+  ok(/Ref low/.test(whtml) && /Ref high/.test(whtml) && !/<span>Median<\/span>/.test(whtml),
+    "the column headers say which number is which");
+  ok(/actually been awarded/.test(whtml),
+    "the page still describes itself as a reference band");
+
+  // The route must ask for every visible row, and keep the three states apart.
+  ok(/calcRateStatsBulk\(merged\.map\(\(r\) => r\.category\)\)/.test(route2),
+    "awarded rates are fetched for every row that survives the filters");
+  ok(/awarded_state: "unresolved"/.test(route2) && /awarded_state: "none"/.test(route2) && /awarded_state: "found"/.test(route2),
+    "the route keeps found, not-indexed and unresolved apart");
+  ok(/!awarded\.has\(r\.category\)/.test(route2),
+    "a category absent from the result is UNRESOLVED, not unindexed",
+    "a missing key would be read as 'CALC+ has no rate', which is a different fact");
+
+  // Bulk lookup: cached, bounded, and it must not hang the page.
+  ok(/RATE_TTL_MS = 6 \* 3600_000/.test(calc), "the awarded-rate cache has a stated TTL");
+  ok(/if \(Date\.now\(\) >= deadline\) break;/.test(calc),
+    "the bulk lookup stops at its deadline",
+    "55 categories measured at 5.8s — without a deadline a slow upstream is a hung page");
+  ok(/catch \{\s*\/\/ Not cached/.test(calc),
+    "a transient failure is not cached as a verdict",
+    "one bad response would pin 'unknown' on a category for six hours");
+  ok(/export function __resetRateCache/.test(calc),
+    "the process-global cache has a test seam");
+
+  ok(/function headlineRate/.test("function headlineRate(r) { return money(r.rate_median); }"),
+    "P· the headline check can see a reference-only implementation");
+}
+
+// ── THE BADGE DESCRIBES WHAT THE ROW ACTUALLY SHOWS ─────────────────────────
+// CEO: "it states source shown per row but I do not see it." Correct — the row's sub-line was
+// changed to say WHAT THE RATE IS ("Awarded median · 22 rates", "Reference — not indexed by
+// CALC+") and the badge kept describing the behaviour it replaced. The band's source is stated
+// ONCE on the panel instead, which is what he asked for: 50 of 55 rows carry the same string.
+{
+  const wh = read("wage-benchmarks.html");
+  const wa = read("wage-app.js");
+  ok(!/source shown per row/i.test(wh),
+    "the badge no longer claims a per-row source the rows do not print");
+  ok(/reference: BLS OES 2024 \+ SCA/i.test(wh),
+    "the band's source is stated once, at the surface that holds it");
+  ok(/WHAT THIS RATE IS/i.test(wh),
+    "the column header no longer says what the sub-line contains");
+  ok(/Awarded median · ' \+ r\.awarded\.count/.test(wa) && /not indexed by CALC\+/.test(wa),
+    "the row sub-line states which of the two numbers it is showing");
+  ok(/source shown per row/i.test('<span class="wh-source">source shown per row</span>'),
+    "P(+): the stale-badge check can see the shipped text");
+  // The panel has the room the row does not, and now holds two numbers from two origins.
+  ok(/Where these came from/.test(wa), "the panel names where each number came from");
+  ok(/\['Reference band', r\.source/.test(wa), "…the reference band's own source");
+  ok(/GSA CALC\+ · awarded ceiling rates/.test(wa), "…and the awarded median's");
+  ok(!/const oddSource/.test(wa), "the conditional source line is gone, not left dead beside it");
+}
 
 console.log(`\n══════ ${pass} passed · ${fail} failed ══════`);
 if (fail > 0) {

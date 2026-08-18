@@ -287,6 +287,11 @@ button{font-family:inherit}
 .fld label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
 .fld input{height:38px;padding:0 12px;border-radius:9px;border:1px solid var(--line);background:var(--card-soft);color:var(--ink);font-family:"Manrope";font-size:13px;outline:none;transition:border-color .14s}
 .fld input:focus{border-color:var(--accent)}
+/* Same control appearance as .fld input above — a select on this page must not
+   introduce a second look for a form field. */
+.ps-sel{height:38px;padding:0 10px;border-radius:9px;border:1px solid var(--line);background:var(--card-soft);color:var(--ink);font-family:"Manrope";font-size:13px;font-weight:600;outline:none;cursor:pointer;flex:none;transition:border-color .14s}
+.ps-sel:focus{border-color:var(--accent)}
+.ps-sel:disabled{opacity:.55;cursor:progress}
 .fld-sec{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);padding-top:4px}
 .cert-row{display:flex;gap:8px;flex-wrap:wrap}
 .cert-tg{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;padding:7px 14px;border-radius:9px;border:1px solid var(--line);background:var(--card-soft);color:var(--ink-2);cursor:pointer;transition:all .14s}
@@ -391,7 +396,10 @@ button{font-family:inherit}
 .ag-pill.base{background:var(--accent-pale);color:var(--accent-deep)}
 .ag-pill.type{background:var(--line-2);color:var(--mute)}
 [data-theme="dark"] .ag-pill.base{background:rgba(55,138,221,.18);color:var(--accent-light)}
-.ag-tg,.nf-tg{background:none;border:0;cursor:pointer;padding:0}
+.ag-tg,.if-secs{display:flex;flex-direction:column;gap:9px;flex:none;min-width:186px}
+.if-sec{display:flex;align-items:center;justify-content:space-between;gap:14px;font-size:13px;color:var(--ink-2);cursor:pointer}
+.if-sec span{white-space:nowrap}
+.nf-tg{background:none;border:0;cursor:pointer;padding:0}
 .tgl{display:inline-flex;width:38px;height:22px;border-radius:11px;background:var(--line);position:relative;transition:background .16s;flex-shrink:0}
 .tgl i{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .16s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
 .tgl.on{background:var(--green-500)}
@@ -491,7 +499,15 @@ button{font-family:inherit}
 [data-sb="open"] .sb-bottom{align-items:flex-start;width:100%;padding:0 4px}
 
 .fld-ro{min-height:36px;display:flex;align-items:center;font-size:13px;color:var(--ink);padding:0 2px}.ps-unwired{margin:10px 0 0;font-size:12px;line-height:1.5;color:var(--mute,#5d6b7e)}
-.fld-none{color:var(--mute);font-style:italic}.fld-note{margin-top:4px;font-size:10.5px;color:var(--mute);line-height:1.4}.note-warn{border-left:2px solid var(--amber-500,#d97706);padding-left:9px}.saved.is-error{color:#dc2626}span.cert-tg{cursor:default}</style>
+.fld-none{color:var(--mute);font-style:italic}.fld-note{margin-top:4px;font-size:10.5px;color:var(--mute);line-height:1.4}.note-warn{border-left:2px solid var(--amber-500,#d97706);padding-left:9px}.saved.is-error{color:#dc2626}span.cert-tg{cursor:default}
+/* NOT-YET-LIVE chip. Same treatment as .ra-piee-soon on the Audits page, so a surface
+   that is committed but unbuilt looks the same wherever it appears. */
+.sp-soon{display:inline-block;vertical-align:middle;margin-left:8px;font-family:"IBM Plex Mono",monospace;font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);background:var(--card);border:1px solid var(--line);border-radius:5px;padding:2px 6px}
+.set-wrap a,.sub a,.pb-text a,.note a,.fld-note a,.ps-unwired a{color:var(--accent-deep);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px;font-weight:600}
+.set-wrap a:hover,.sub a:hover,.pb-text a:hover,.note a:hover,.ps-unwired a:hover{color:var(--accent);text-decoration-thickness:2px}
+.set-wrap a:visited,.sub a:visited,.pb-text a:visited,.note a:visited,.ps-unwired a:visited{color:var(--accent-deep)}
+[data-theme="dark"] .set-wrap a,[data-theme="dark"] .sub a,[data-theme="dark"] .pb-text a,[data-theme="dark"] .note a,[data-theme="dark"] .fld-note a,[data-theme="dark"] .ps-unwired a,[data-theme="dark"] .set-wrap a:visited,[data-theme="dark"] .sub a:visited,[data-theme="dark"] .pb-text a:visited,[data-theme="dark"] .note a:visited,[data-theme="dark"] .ps-unwired a:visited{color:#6db3ff}
+[data-theme="dark"] .set-wrap a:hover,[data-theme="dark"] .sub a:hover,[data-theme="dark"] .pb-text a:hover,[data-theme="dark"] .note a:hover,[data-theme="dark"] .ps-unwired a:hover{color:#9ecbff}</style>
 </head>
 <body>
 
@@ -504,17 +520,17 @@ button{font-family:inherit}
   <div class="sb-logo-row"><div class="sb-logo">F</div><span class="sb-wordmark">FAR<span class="wm-au">audit</span></span></div>
   <div class="sb-group-label">WORKSPACE</div>
   <a class="sb-icon" href="/command-center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="sb-label">Today</span><span class="sb-tip">Today</span></a>
-  <a class="sb-icon" href="/audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg><span class="sb-label">Run Audit</span><span class="sb-badge new">New</span><span class="sb-tip">Run Audit</span></a>
+  <a class="sb-icon" href="/audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg><span class="sb-label">Run Audit</span><span class="sb-tip">Run Audit</span></a>
   <a class="sb-icon" href="/acquisition-stages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span class="sb-label">Acquisition Stages</span><span class="sb-tip">Acquisition Stages</span></a>
-  <a class="sb-icon" href="/dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="sb-label">Past Audits</span><span class="sb-badge count">15</span><span class="sb-tip">Past Audits</span></a>
-  <a class="sb-icon" href="/pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg><span class="sb-label">Pipeline</span><span class="sb-badge danger">3</span><span class="sb-tip">Pipeline</span></a>
+  <a class="sb-icon" href="/dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="sb-label">Past Audits</span><span class="sb-tip">Past Audits</span></a>
+  <a class="sb-icon" href="/pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg><span class="sb-label">Pipeline</span><span class="sb-tip">Pipeline</span></a>
   <a class="sb-icon" href="/capability-statement"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span class="sb-label">Capability Statement</span><span class="sb-tip">Capability Statement</span></a>
   <div class="sb-divider"></div>
   <div class="sb-group-label">INTELLIGENCE</div>
-  <a class="sb-icon" href="/opportunities"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">Opportunities</span><span class="sb-badge live">Live</span><span class="sb-tip">Opportunities</span></a>
+  <a class="sb-icon" href="/opportunities"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">Opportunities</span><span class="sb-tip">Opportunities</span></a>
   <a class="sb-icon" href="/defense-news"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L4 8v8l8 5 8-5V8l-8-5z"/></svg><span class="sb-label">Defense News</span><span class="sb-tip">Defense News</span></a>
   <a class="sb-icon" href="/defense-spending"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="13" width="3" height="4"/></svg><span class="sb-label">Defense Spending</span><span class="sb-tip">Defense Spending</span></a>
-  <a class="sb-icon" href="/agencies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg><span class="sb-label">Defense Agencies</span><span class="sb-badge count">8</span><span class="sb-tip">Defense Agencies</span></a>
+  <a class="sb-icon" href="/agencies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg><span class="sb-label">Defense Agencies</span><span class="sb-tip">Defense Agencies</span></a>
   <a class="sb-icon" href="/contracting-officers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M21 17c-.5-2-2-3.5-4-3.5"/></svg><span class="sb-label">Contracting Officers</span><span class="sb-tip">Contracting Officers</span></a>
   <div class="sb-divider"></div>
   <div class="sb-group-label">COMPLIANCE &amp; BD</div>
@@ -546,7 +562,7 @@ button{font-family:inherit}
           <svg id="themeMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
         </button>
         <button class="icon-btn" title="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1112 0c0 7 3 8 3 8H3s3-1 3-8z"/><path d="M10 21a2 2 0 004 0"/></svg><span class="nbadge" style="display:none"></span></button>
-        <div class="user-chip"><div class="av">JR</div><div><div class="nm">Jose Rodriguez</div></div></div>
+        <div class="user-chip"><div class="av"></div><div><div class="nm"></div></div></div>
       </div>
     </div>
 
@@ -566,7 +582,7 @@ button{font-family:inherit}
       <!-- signature: how your profile powers the platform -->
       <div class="prof-banner">
         <div class="pb-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 00-4 12.7V17a1 1 0 001 1h6a1 1 0 001-1v-2.3A7 7 0 0012 2z"/><path d="M9 21h6"/></svg></div>
-        <div class="pb-text"><b>This record scopes the platform.</b> Your NAICS codes filter Today, Opportunities, Contracting Officers and Teaming Partners, and mark your codes on the NAICS directory. Wage Benchmarks offers them as an optional filter over a national reference table · a certification clears a set-aside bar only once it is verified against SAM, so typing one changes nothing on its own.</div>
+        <div class="pb-text"><b>This record scopes the platform.</b> Your NAICS codes filter Today, Notices, Contracting Officers and Teaming Partners, and mark your codes on the NAICS directory. Wage Benchmarks offers them as an optional filter over a national reference table · a certification clears a set-aside bar only once it is verified against SAM, so typing one changes nothing on its own.</div>
         <a class="pb-link" href="/today">View your Today <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
       </div>
 

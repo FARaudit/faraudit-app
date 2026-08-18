@@ -111,9 +111,9 @@ export function auditDisplayName(
 export function auditHref(a: { id: string; solicitation_number?: string | null }): string {
   const sn = a.solicitation_number?.trim();
   if (sn && !PSC_LEAK_RE.test(sn) && sn.length <= 25) {
-    return `/audit/${sn.toLowerCase()}`;
+    return `/audits/${sn.toLowerCase()}`;
   }
-  return `/audit/${a.id}`;
+  return `/audits/${a.id}`;
 }
 
 // ── V2 "finalizing" window (FA-E2E re-verify Fix D, 2026-06-18) ──────────────

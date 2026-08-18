@@ -110,7 +110,7 @@ export default function SAMFeedPreview() {
 
       <div style={{ marginTop: "12px", fontSize: "11px", color: "#4a6a96" }}>
         {source === "live" ? `Showing ${opps.length} active small business solicitations.` : ""}{" "}
-        <a href="/audit" style={{ color: "#B5D4F4" }}>
+        <a href="/audits" style={{ color: "#B5D4F4" }}>
           Run audit on any solicitation →
         </a>
       </div>

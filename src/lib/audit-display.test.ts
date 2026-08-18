@@ -87,19 +87,19 @@ const run = (label: string, got: string, expected: string | RegExp) => {
 const auditHrefCases: Case[] = [
   { label: "T14 · auditHref lowercases solicitation_number slug",
     input: { id: "abc-uuid", solicitation_number: "FA301626Q0068" },
-    expected: "/audit/fa301626q0068" },
+    expected: "/audits/fa301626q0068" },
   { label: "T15 · auditHref falls back to UUID when sol# null",
     input: { id: "11111111-2222-3333-4444-555555555555", solicitation_number: null },
-    expected: "/audit/11111111-2222-3333-4444-555555555555" },
+    expected: "/audits/11111111-2222-3333-4444-555555555555" },
   { label: "T16 · auditHref falls back to UUID when sol# is blank string",
     input: { id: "abc", solicitation_number: "  " },
-    expected: "/audit/abc" },
+    expected: "/audits/abc" },
   { label: "T17 · auditHref rejects PSC-leak sol# (3990--COMPACT TRACK LOADER)",
     input: { id: "abc", solicitation_number: "3990--COMPACT TRACK LOADER, FULLY ENCLOSED CAB" },
-    expected: "/audit/abc" },
+    expected: "/audits/abc" },
   { label: "T18 · auditHref rejects whitespace-containing sol# (descriptive title leak)",
     input: { id: "abc", solicitation_number: "Some Description Title" },
-    expected: "/audit/abc" }
+    expected: "/audits/abc" }
 ];
 
 // Lock in PSC-leak rejection at the display layer too — existing rows in DB

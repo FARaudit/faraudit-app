@@ -13,7 +13,7 @@ import { extractAllFacts } from "../src/lib/section-extractors";
 import {
   matrixRollup,
   submissionChecklistFiltered,
-} from "../src/app/audit/[id]/_normalizers";
+} from "../src/app/audits/[id]/_normalizers";
 
 interface CheckResult {
   label: string;

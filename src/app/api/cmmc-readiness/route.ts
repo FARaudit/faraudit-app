@@ -37,7 +37,11 @@ export async function GET(req: NextRequest) {
   // about whether this company meets it.
   const { data: audits, error: listError } = await supabase
     .from("audits")
-    .select("id, notice_id, solicitation_number, title, agency, created_at, compliance_json")
+    // response_deadline is SAM's own closing date. Without it the page states a compliance
+    // obligation and says nothing about whether the work can still be bid — and the only date
+    // on the row was the date WE ran the audit, which reads as the solicitation's own. A
+    // requirement on a closed solicitation is history, not a task.
+    .select("id, notice_id, solicitation_number, title, agency, created_at, response_deadline, compliance_json")
     .order("created_at", { ascending: false })
     .limit(500);
 
@@ -51,13 +55,55 @@ export async function GET(req: NextRequest) {
   const distribution: Record<"0" | "1" | "2" | "3", number> = { "0": 0, "1": 0, "2": 0, "3": 0 };
   const byLevel: Record<"1" | "2" | "3", Array<{
     id: string; notice_id: string | null; solicitation_number: string | null;
-    title: string | null; agency: string | null; created_at: string | null; matched_on: string | null;
+    title: string | null; agency: string | null; created_at: string | null;
+    response_deadline: string | null; matched_on: string | null;
   }>> = { "1": [], "2": [], "3": [] };
   // An audit with no compliance_json was never analyzed, so it cannot answer
   // the question either way — counted separately rather than as "not required".
   let unanalyzed = 0;
 
-  for (const a of (audits || []) as Array<Record<string, unknown>>) {
+  // ONE ROW PER SOLICITATION, THE MOST RECENT AUDIT OF IT. Re-auditing a solicitation is
+  // normal — an amendment lands, the customer re-runs it — and every run was its own row
+  // here, so the same requirement appeared three and four times and each repeat counted
+  // again toward "solicitations that require CMMC". The page then stated a number of
+  // SOLICITATIONS that was really a number of AUDIT RUNS.
+  //
+  // The key is the solicitation number, then the notice id, and finally the audit's own id.
+  // Falling back to the id matters: without it every row that carries neither identifier
+  // would share one key and collapse into a single arbitrary survivor, which would hide
+  // real solicitations rather than duplicates.
+  //
+  // The query is already ordered created_at DESC, so the first row seen for a key is the
+  // most recent audit of it — but the order is asserted here rather than assumed, because a
+  // later edit to the query would otherwise silently start keeping the oldest.
+  //
+  // NO "THE LEVEL CHANGED BETWEEN RUNS" FLAG. It was designed and then refuted by the corpus.
+  // The concern is real — an amendment can change the CMMC requirement, and keeping only the
+  // newest audit would hide that — but the flag needs a signal that separates "the solicitation
+  // changed" from "the engine ran again", and there is none: the audit row carries no amendment
+  // or version identifier. Measured over the 116 live audits, every one of the 18 adjacent
+  // re-run pairs whose inferred level differs is under 24 hours apart (median ~3h), 16 of them
+  // used the identical model, and 0 are 24 hours or more apart — while 8 re-run pairs that ARE
+  // a day or more apart all kept the same level. So the flag would have fired 18 times, none of
+  // them an amendment, and told a customer their compliance obligation changed when only the
+  // run did. Shipping it would put the page back in the business of stating something its data
+  // cannot support, which is the defect the dedupe exists to remove.
+  const rawRows = (audits || []) as Array<Record<string, unknown>>;
+  const newestFirst = [...rawRows].sort((x, y) =>
+    Date.parse(String(y.created_at ?? 0)) - Date.parse(String(x.created_at ?? 0)));
+  const seen = new Set<string>();
+  const rows: Array<Record<string, unknown>> = [];
+  for (const a of newestFirst) {
+    const key = String(a.solicitation_number ?? "").trim()
+      || String(a.notice_id ?? "").trim()
+      || `id:${String(a.id)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rows.push(a);
+  }
+  const collapsed = rawRows.length - rows.length;
+
+  for (const a of rows) {
     if (!a.compliance_json) unanalyzed++;
     const { level, trigger } = inferLevel(a);
     distribution[level] += 1;
@@ -69,6 +115,7 @@ export async function GET(req: NextRequest) {
         title: (a.title as string) || null,
         agency: (a.agency as string) || null,
         created_at: (a.created_at as string) || null,
+        response_deadline: (a.response_deadline as string) || null,
         matched_on: trigger
       });
     }
@@ -79,11 +126,18 @@ export async function GET(req: NextRequest) {
     reference: LEVELS,
     distribution,
     by_level: byLevel,
-    total_audited: (audits || []).length,
+    // BOTH NUMBERS, because they answer different questions and the page states one of them.
+    // total_solicitations is what the distribution sums to; total_audited is how many runs
+    // produced it. Returning only the second and labelling it "solicitations" is the defect
+    // this dedupe exists to fix, and returning only the first would hide the re-runs.
+    total_solicitations: rows.length,
+    total_audited: rawRows.length,
+    duplicates_collapsed: collapsed,
     unanalyzed,
     meta: {
       source: "audits.compliance_json",
-      reason: (audits || []).length === 0 ? "no-audits" : flagged === 0 ? "none-flagged" : null
+      deduped_by: "solicitation_number|notice_id|id, most recent kept",
+      reason: rows.length === 0 ? "no-audits" : flagged === 0 ? "none-flagged" : null
     }
   });
 }

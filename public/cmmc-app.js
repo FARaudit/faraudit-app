@@ -45,6 +45,21 @@
     host.replaceChildren.apply(host, children.filter(Boolean));
   }
 
+  /* WHETHER IT CAN STILL BE BID. SAM's own closing date, and the state that follows from
+     it — a Level 2 obligation on a solicitation that closed last month is history, not a
+     task, and the page could not tell the two apart. Null prints nothing: a missing
+     deadline is not an open one. */
+  function deadlineState(iso) {
+    if (!iso) return null;
+    const t = Date.parse(iso);
+    if (Number.isNaN(t)) return null;
+    const days = Math.ceil((t - Date.now()) / 86400000);
+    if (days < 0) return { cls: 'is-closed', text: 'Closed ' + fmtDate(iso) };
+    if (days === 0) return { cls: 'is-due', text: 'Closes today' };
+    if (days <= 14) return { cls: 'is-due', text: 'Closes ' + fmtDate(iso) + ' · ' + days + (days === 1 ? ' day' : ' days') };
+    return { cls: '', text: 'Closes ' + fmtDate(iso) };
+  }
+
   function fmtDate(iso) {
     if (!iso) return '—';
     const t = Date.parse(iso);
@@ -123,7 +138,7 @@
       el.hidden = false;
       fill(el, [
         h('span', { cls: 'sb-label', text: 'Note' }),
-        h('span', { text: m.unanalyzed + ' of your ' + m.totalAudited + ' audits carry no analysis yet, so they answer neither way and are not counted as clear.' })
+        h('span', { text: m.unanalyzed + ' of your ' + m.totalSolicitations + ' solicitations carry no analysis yet, so they answer neither way and are not counted as clear.' })
       ]);
       return;
     }
@@ -139,7 +154,7 @@
     const flagged = d['1'] + d['2'] + d['3'];
     const ready = m.state === 'ready' || m.state === 'empty';
     const put = (id, v) => { const el = $(id); if (el) el.textContent = ready ? String(v) : '—'; };
-    put('hsAudited', m.totalAudited || 0);
+    put('hsAudited', m.totalSolicitations || 0);
     put('hsFlagged', flagged);
     const highest = LEVELS.filter((lv) => d[lv] > 0).pop();
     const hi = $('hsHighest');
@@ -154,16 +169,29 @@
     const d = dist();
     const m = meta();
     const shown = m.state === 'ready' || m.state === 'empty';
+    // Label and requirement count come from the reference the server sent, not from a copy kept
+    // here. They were hardcoded, so the same number lived in two places and only one of them was
+    // ever updated. The descriptor names what actually puts an audit at the level — Level 3 read
+    // "critical programs", which described a trigger the engine no longer uses and never reliably
+    // established.
+    const ref = (window.CMMC && window.CMMC.REFERENCE) || {};
+    const lvl = (k, fallbackLabel, what) => {
+      const r = ref[k] || {};
+      const n = typeof r.requirements === 'number' ? r.requirements : null;
+      return { k: k, label: r.label || fallbackLabel, foot: what + (n ? ' · ' + n + ' requirements' : '') };
+    };
     const cells = [
       { k: '0', label: 'No CMMC named', foot: 'nothing in the audit triggers a level' },
-      { k: '1', label: 'Level 1 — Foundational', foot: 'FCI · 17 practices' },
-      { k: '2', label: 'Level 2 — Advanced', foot: 'CUI · 110 practices' },
-      { k: '3', label: 'Level 3 — Expert', foot: 'critical programs · 134 practices' }
+      lvl('1', 'Level 1 — Foundational', 'FCI'),
+      lvl('2', 'Level 2 — Advanced', 'CUI'),
+      lvl('3', 'Level 3 — Expert', 'NIST SP 800-172')
     ];
     fill(host, cells.map((c) => h('div', { cls: 'kpi' }, [
       h('p', { cls: 'lbl', text: c.label }),
       h('div', { cls: 'kpi-val', text: shown ? String(d[c.k] || 0) : '—' }, [
-        h('span', { cls: 'unit', text: 'audits' })
+        // Singular when there is one. "1 audits" is the kind of seam that makes a reader
+        // wonder what else on the page was not looked at.
+        h('span', { cls: 'unit', text: (shown && d[c.k] === 1) ? 'solicitation' : 'solicitations' })
       ]),
       h('div', { cls: 'foot', text: c.foot })
     ])));
@@ -173,11 +201,24 @@
     const host = $('prioFilters');
     if (!host) return;
     const d = dist();
-    const opts = [{ k: 'all', label: 'All' }].concat(
-      LEVELS.filter((lv) => d[lv] > 0).map((lv) => ({ k: lv, label: 'Level ' + lv }))
+    // EVERY LEVEL THE MODEL HAS, always, and every one of them clickable. These were built
+    // only from levels that happen to have rows, so Level 1 disappeared from the filter while
+    // the strip directly above it still showed a Level 1 card — two controls describing the
+    // same three levels and disagreeing about how many exist.
+    //
+    // NOT DISABLED AT ZERO. A greyed-out chip reads as a control that was never built, which
+    // is the opposite of the truth: the level exists, the filter works, and this customer has
+    // nothing at it. Selecting it shows the honest empty result, which is also the only way a
+    // reader can tell the control is wired at all.
+    const opts = [{ k: 'all', label: 'All', n: null }].concat(
+      LEVELS.map((lv) => ({ k: lv, label: 'Level ' + lv, n: d[lv] || 0 }))
     );
     fill(host, opts.map((o) => {
-      const b = h('button', { cls: 'fpill' + (S.level === o.k ? ' active' : ''), text: o.label, attrs: { type: 'button' } });
+      const b = h('button', {
+        cls: 'fpill' + (S.level === o.k ? ' active' : '') + (o.n === 0 ? ' is-empty' : ''),
+        text: o.label,
+        attrs: { type: 'button', title: o.n === null ? 'Every level' : o.n + (o.n === 1 ? ' audit' : ' audits') }
+      });
       b.addEventListener('click', () => { S.level = o.k; renderAll(); });
       return b;
     }));
@@ -216,10 +257,17 @@
       const card = h('div', { cls: 'feed-card' + (S.sel === r.id ? ' sel' : '') }, [
         h('div', { cls: 'feed-top' }, [
           h('span', { cls: 'feed-clause', text: 'CMMC Level ' + r.level }),
-          h('span', { cls: 'feed-date', text: fmtDate(r.created_at) })
+          // LABELLED, because this is the date WE ran the audit — not the solicitation's
+          // posted date and not its response deadline. A bare date beside a solicitation
+          // number reads as the solicitation's own, and the two lead to opposite actions.
+          h('span', { cls: 'feed-date', text: 'Audited ' + fmtDate(r.created_at) })
         ]),
         h('div', { cls: 'feed-title', text: r.title || r.solicitation_number || r.notice_id || 'Untitled solicitation' }),
         h('div', { cls: 'feed-summary', text: [r.solicitation_number, r.agency].filter(Boolean).join(' · ') || '—' }),
+        (function () {
+          const d = deadlineState(r.response_deadline);
+          return d ? h('div', { cls: 'feed-deadline ' + d.cls, text: d.text }) : null;
+        })(),
         h('div', { cls: 'feed-insight' }, [
           h('b', { text: 'Matched on' }),
           h('span', { text: r.matched_on || 'not recorded' })
@@ -263,8 +311,10 @@
       h('div', { cls: 'cop-head' }, [
         h('div', { cls: 'cop-id' }, [
           h('div', { cls: 'cop-name', text: data.label || 'CMMC Level ' + level }),
-          h('div', { cls: 'cop-title', text: 'DoD CMMC 2.0 model · reference, not your assessment' }),
-          h('div', { cls: 'cop-agy', text: (data.practices || '—') + ' practices' })
+          h('div', { cls: 'cop-title', text: 'CMMC Program final rule, 32 CFR part 170 · reference, not your assessment' }),
+          // The note carries what a bare count cannot: Level 3's 24 sit on top of a Final Level 2,
+          // so "24" alone would read as the smaller obligation when it is the larger one.
+          h('div', { cls: 'cop-agy', text: data.requirements_note || ((data.requirements || '—') + ' requirements') })
         ])
       ]),
       sel
@@ -273,12 +323,22 @@
             h('span', { text: (sel.solicitation_number || sel.notice_id || 'This audit') + ' matched on ' + (sel.matched_on || 'a CMMC signal') + '.' })
           ])
         : null,
+      // The obligation and whether it can still be acted on, together. Absent when SAM
+      // recorded no closing date — an unknown deadline is not an open one.
+      (function () {
+        if (!sel) return null;
+        const d = deadlineState(sel.response_deadline);
+        return d ? h('div', { cls: 'cop-note' }, [
+          h('b', { text: 'Response deadline' }),
+          h('span', { cls: 'cop-deadline ' + d.cls, text: d.text })
+        ]) : null;
+      })(),
       h('div', { cls: 'cop-note' }, [h('b', { text: 'What it covers' }), h('span', { text: data.summary || '' })]),
       h('div', { cls: 'cop-note' }, [h('b', { text: 'Triggering clauses' }), triggers]),
       h('div', { cls: 'cop-note' }, [h('b', { text: 'What the level asks for' }), checklist]),
       sel
         ? h('div', { cls: 'cop-actions' }, [
-            h('a', { cls: 'cop-btn primary', text: 'Open the audit', attrs: { href: '/audit/' + sel.id } })
+            h('a', { cls: 'cop-btn primary', text: 'Open the audit', attrs: { href: '/audits/' + sel.id } })
           ])
         : null
     ]);
@@ -297,7 +357,22 @@
 
   function buildControls() {
     const search = $('searchInput');
+    // `input` fires on every character AND on a paste, a drag-drop and an autofill — which
+    // `keyup` would all miss. The filter runs on each one.
     if (search) search.addEventListener('input', (e) => { S.q = e.target.value; renderList(); });
+
+    // The topbar control and the keyboard hint it advertises both land here.
+    const focusSearch = () => {
+      if (!search) return;
+      search.scrollIntoView({ block: 'center' });
+      search.focus();
+      search.select();
+    };
+    const tb = $('tbSearch');
+    if (tb) tb.addEventListener('click', focusSearch);
+    document.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && String(e.key).toLowerCase() === 'k') { e.preventDefault(); focusSearch(); }
+    });
     const reset = $('resetBtn');
     if (reset) {
       reset.addEventListener('click', () => {

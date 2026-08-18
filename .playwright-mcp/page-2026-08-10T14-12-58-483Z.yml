@@ -1,0 +1,437 @@
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - button "Toggle sidebar" [ref=e4] [cursor=pointer]
+    - generic [ref=e7]:
+      - generic [ref=e8]: F
+      - generic [ref=e9]:
+        - text: FAR
+        - generic [ref=e10]: audit
+    - generic [ref=e11]: WORKSPACE
+    - link "Today" [ref=e12] [cursor=pointer]:
+      - /url: /command-center
+    - link "Run Audit" [ref=e19] [cursor=pointer]:
+      - /url: /audit
+    - link "Acquisition Stages" [ref=e25] [cursor=pointer]:
+      - /url: /acquisition-stages
+    - link "Past Audits" [ref=e30] [cursor=pointer]:
+      - /url: /dashboard
+    - link "Pipeline" [ref=e35] [cursor=pointer]:
+      - /url: /pipeline
+    - link "Capability Statement" [ref=e40] [cursor=pointer]:
+      - /url: /capability-statement
+    - generic [ref=e45]: INTELLIGENCE
+    - link "Opportunities" [ref=e46] [cursor=pointer]:
+      - /url: /opportunities
+    - link "Defense News" [ref=e51] [cursor=pointer]:
+      - /url: /defense-news
+    - link "Defense Spending" [ref=e55] [cursor=pointer]:
+      - /url: /defense-spending
+    - link "Defense Agencies" [ref=e62] [cursor=pointer]:
+      - /url: /agencies
+    - link "Contracting Officers" [ref=e67] [cursor=pointer]:
+      - /url: /contracting-officers
+    - generic [ref=e74]: COMPLIANCE & BD
+    - link "FAR/DFARS Updates" [ref=e75] [cursor=pointer]:
+      - /url: /far-dfars-updates
+    - link "CMMC Readiness" [ref=e81] [cursor=pointer]:
+      - /url: /cmmc
+    - link "Wage Benchmarks" [ref=e86] [cursor=pointer]:
+      - /url: /wage-benchmarks
+    - link "Teaming Partners" [ref=e92] [cursor=pointer]:
+      - /url: /teaming-partners
+    - link "GAO Protests" [ref=e99] [cursor=pointer]:
+      - /url: /gao-protests
+    - generic [ref=e104]: ACCOUNT
+    - link "Profile & Settings" [ref=e105] [cursor=pointer]:
+      - /url: /settings
+    - button "Sign out" [ref=e111] [cursor=pointer]
+    - generic [ref=e116]: JR
+  - main [ref=e118]:
+    - generic [ref=e119]:
+      - generic [ref=e120]:
+        - generic [ref=e121]: CMMC Readiness
+        - generic [ref=e122]: /
+        - generic [ref=e123]: Cybersecurity Compliance
+      - generic [ref=e212]: LIVE
+      - generic [ref=e124]:
+        - generic [ref=e128]: Search domains, controls…
+        - generic [ref=e129]: ⌘K
+      - generic [ref=e130]:
+        - button "Toggle theme" [ref=e131] [cursor=pointer]
+        - button "Notifications" [ref=e134] [cursor=pointer]
+        - dialog "Notifications":
+          - generic:
+            - heading "Notifications" [level=3]
+            - generic: "0"
+          - generic:
+            - generic:
+              - generic:
+                - generic: Notifications unavailable
+                - generic: We could not read them just now — this is not an empty inbox. Retry shortly.
+          - generic:
+            - link "View all activity":
+              - /url: /dashboard
+    - generic [ref=e140]:
+      - generic [ref=e141]:
+        - generic [ref=e142]:
+          - paragraph [ref=e143]: Cybersecurity Compliance
+          - heading "CMMC Readiness" [level=1] [ref=e144]
+          - paragraph [ref=e145]: What the solicitations you have audited require — and what each CMMC level asks for
+        - generic [ref=e146]:
+          - generic [ref=e147]:
+            - generic [ref=e148]: "77"
+            - generic [ref=e149]: Audited
+          - generic [ref=e150]:
+            - generic [ref=e151]: "32"
+            - generic [ref=e152]: Require CMMC
+          - generic [ref=e153]:
+            - generic [ref=e154]: L3
+            - generic [ref=e155]: Highest level
+      - generic [ref=e157]:
+        - generic [ref=e158]: Level
+        - generic [ref=e159]:
+          - button "All" [ref=e213] [cursor=pointer]
+          - button "Level 2" [ref=e214] [cursor=pointer]
+          - button "Level 3" [ref=e215] [cursor=pointer]
+        - textbox "Search solicitation, agency or trigger…" [active] [ref=e165]
+        - button "Reset" [ref=e166] [cursor=pointer]
+      - generic [ref=e167]:
+        - generic [ref=e216]: Note
+        - generic [ref=e217]: 1 of your 77 audits carry no analysis yet, so they answer neither way and are not counted as clear.
+      - generic [ref=e171]:
+        - generic [ref=e218]:
+          - paragraph [ref=e219]: No CMMC named
+          - generic [ref=e220]:
+            - text: "45"
+            - generic [ref=e221]: audits
+          - generic [ref=e222]: nothing in the audit triggers a level
+        - generic [ref=e223]:
+          - paragraph [ref=e224]: Level 1 — Foundational
+          - generic [ref=e225]:
+            - text: "0"
+            - generic [ref=e226]: audits
+          - generic [ref=e227]: FCI · 17 practices
+        - generic [ref=e228]:
+          - paragraph [ref=e229]: Level 2 — Advanced
+          - generic [ref=e230]:
+            - text: "31"
+            - generic [ref=e231]: audits
+          - generic [ref=e232]: CUI · 110 practices
+        - generic [ref=e233]:
+          - paragraph [ref=e234]: Level 3 — Expert
+          - generic [ref=e235]:
+            - text: "1"
+            - generic [ref=e236]: audits
+          - generic [ref=e237]: NIST SP 800-172 · 134 practices
+      - generic [ref=e192]:
+        - generic [ref=e193]:
+          - generic [ref=e194]:
+            - generic [ref=e200]:
+              - heading "Solicitations that require CMMC" [level=3] [ref=e201]
+              - paragraph [ref=e238]: 32 solicitations
+            - generic [ref=e202]: your audits
+          - generic [ref=e203]:
+            - generic [ref=e239] [cursor=pointer]:
+              - generic [ref=e240]:
+                - generic [ref=e241]: CMMC Level 2
+                - generic [ref=e242]: Jul 10, 2026
+              - generic [ref=e243]: 6A1 Preventive Maintenance for Puget Sound Naval Shipyard (PSNS) Barge YR-85 and YR-95
+              - generic [ref=e244]: N6264926RA054 · DEPT OF THE NAVY
+              - generic [ref=e245]:
+                - generic [ref=e246]: Matched on
+                - text: DFARS 252.204-7012
+            - generic [ref=e247] [cursor=pointer]:
+              - generic [ref=e248]:
+                - generic [ref=e249]: CMMC Level 2
+                - generic [ref=e250]: Jul 11, 2026
+              - generic [ref=e251]: Landscaping Services
+              - generic [ref=e252]: W50S6U26QA019 · DEPT OF THE ARMY
+              - generic [ref=e253]:
+                - generic [ref=e254]: Matched on
+                - text: NIST SP 800-171
+            - generic [ref=e255] [cursor=pointer]:
+              - generic [ref=e256]:
+                - generic [ref=e257]: CMMC Level 2
+                - generic [ref=e258]: Jul 12, 2026
+              - generic [ref=e259]: Valley Resident Office - Groundskeeping, West Sacramento, CA.
+              - generic [ref=e260]: W9123826QA032 · DEPT OF THE ARMY
+              - generic [ref=e261]:
+                - generic [ref=e262]: Matched on
+                - text: DFARS 252.204-7012
+            - generic [ref=e263] [cursor=pointer]:
+              - generic [ref=e264]:
+                - generic [ref=e265]: CMMC Level 2
+                - generic [ref=e266]: Jul 13, 2026
+              - generic [ref=e267]: Hydraulic Hardline Piping
+              - generic [ref=e268]: N0016726Q1089 · DEPT OF THE NAVY
+              - generic [ref=e269]:
+                - generic [ref=e270]: Matched on
+                - text: DFARS 252.204-7021
+            - generic [ref=e271] [cursor=pointer]:
+              - generic [ref=e272]:
+                - generic [ref=e273]: CMMC Level 2
+                - generic [ref=e274]: Jul 14, 2026
+              - generic [ref=e275]: Goodfellow Chapel Catholic Music Director
+              - generic [ref=e276]: FA303026Q0020 · DEPT OF THE AIR FORCE
+              - generic [ref=e277]:
+                - generic [ref=e278]: Matched on
+                - text: DFARS 252.204-7012
+            - generic [ref=e279] [cursor=pointer]:
+              - generic [ref=e280]:
+                - generic [ref=e281]: CMMC Level 2
+                - generic [ref=e282]: Jul 15, 2026
+              - generic [ref=e283]: TINKER AFB MAC BOA-WWYK260007- Renovate Pratt & Whitney Area - B3001
+              - generic [ref=e284]: FA813726R0033 · DEPT OF THE AIR FORCE
+              - generic [ref=e285]:
+                - generic [ref=e286]: Matched on
+                - text: DFARS 252.204-7012
+            - generic [ref=e287] [cursor=pointer]:
+              - generic [ref=e288]:
+                - generic [ref=e289]: CMMC Level 2
+                - generic [ref=e290]: Jul 16, 2026
+              - generic [ref=e291]: 6A1 Preventive Maintenance for Puget Sound Naval Shipyard (PSNS) Barge YR-85 and YR-95
+              - generic [ref=e292]: N6264926RA054 · DEPT OF THE NAVY
+              - generic [ref=e293]:
+                - generic [ref=e294]: Matched on
+                - text: DFARS 252.204-7012
+            - generic [ref=e295] [cursor=pointer]:
+              - generic [ref=e296]:
+                - generic [ref=e297]: CMMC Level 2
+                - generic [ref=e298]: Jul 17, 2026
+              - generic [ref=e299]: Landscaping Services
+              - generic [ref=e300]: W50S6U26QA019 · DEPT OF THE ARMY
+              - generic [ref=e301]:
+                - generic [ref=e302]: Matched on
+                - text: NIST SP 800-171
+            - generic [ref=e303] [cursor=pointer]:
+              - generic [ref=e304]:
+                - generic [ref=e305]: CMMC Level 2
+                - generic [ref=e306]: Jul 18, 2026
+              - generic [ref=e307]: Valley Resident Office - Groundskeeping, West Sacramento, CA.
+              - generic [ref=e308]: W9123826QA032 · DEPT OF THE ARMY
+              - generic [ref=e309]:
+                - generic [ref=e310]: Matched on
+                - text: DFARS 252.204-7012
+            - generic [ref=e311] [cursor=pointer]:
+              - generic [ref=e312]:
+                - generic [ref=e313]: CMMC Level 2
+                - generic [ref=e314]: Jul 19, 2026
+              - generic [ref=e315]: Hydraulic Hardline Piping
+              - generic [ref=e316]: N0016726Q1089 · DEPT OF THE NAVY
+              - generic [ref=e317]:
+                - generic [ref=e318]: Matched on
+                - text: DFARS 252.204-7021
+            - generic [ref=e319] [cursor=pointer]:
+              - generic [ref=e320]:
+                - generic [ref=e321]: CMMC Level 2
+                - generic [ref=e322]: Jul 20, 2026
+              - generic [ref=e323]: Goodfellow Chapel Catholic Music Director
+              - generic [ref=e324]: FA303026Q0020 · DEPT OF THE AIR FORCE
+              - generic [ref=e325]:
+                - generic [ref=e326]: Matched on
+                - text: DFARS 252.204-7012
+            - generic [ref=e327] [cursor=pointer]:
+              - generic [ref=e328]:
+                - generic [ref=e329]: CMMC Level 2
+                - generic [ref=e330]: Jul 21, 2026
+              - generic [ref=e331]: TINKER AFB MAC BOA-WWYK260007- Renovate Pratt & Whitney Area - B3001
+              - generic [ref=e332]: FA813726R0033 · DEPT OF THE AIR FORCE
+              - generic [ref=e333]:
+                - generic [ref=e334]: Matched on
+                - text: DFARS 252.204-7012
+            - generic [ref=e335] [cursor=pointer]:
+              - generic [ref=e336]:
+                - generic [ref=e337]: CMMC Level 2
+                - generic [ref=e338]: Jul 22, 2026
+              - generic [ref=e339]: 6A1 Preventive Maintenance for Puget Sound Naval Shipyard (PSNS) Barge YR-85 and YR-95
+              - generic [ref=e340]: N6264926RA054 · DEPT OF THE NAVY
+              - generic [ref=e341]:
+                - generic [ref=e342]: Matched on
+                - text: DFARS 252.204-7012
+            - generic [ref=e343] [cursor=pointer]:
+              - generic [ref=e344]:
+                - generic [ref=e345]: CMMC Level 2
+                - generic [ref=e346]: Jul 23, 2026
+              - generic [ref=e347]: Landscaping Services
+              - generic [ref=e348]: W50S6U26QA019 · DEPT OF THE ARMY
+              - generic [ref=e349]:
+                - generic [ref=e350]: Matched on
+                - text: NIST SP 800-171
+            - generic [ref=e351] [cursor=pointer]:
+              - generic [ref=e352]:
+                - generic [ref=e353]: CMMC Level 2
+                - generic [ref=e354]: Jul 24, 2026
+              - generic [ref=e355]: Valley Resident Office - Groundskeeping, West Sacramento, CA.
+              - generic [ref=e356]: W9123826QA032 · DEPT OF THE ARMY
+              - generic [ref=e357]:
+                - generic [ref=e358]: Matched on
+                - text: DFARS 252.204-7012
+            - generic [ref=e359] [cursor=pointer]:
+              - generic [ref=e360]:
+                - generic [ref=e361]: CMMC Level 2
+                - generic [ref=e362]: Jul 25, 2026
+              - generic [ref=e363]: Hydraulic Hardline Piping
+              - generic [ref=e364]: N0016726Q1089 · DEPT OF THE NAVY
+              - generic [ref=e365]:
+                - generic [ref=e366]: Matched on
+                - text: DFARS 252.204-7021
+            - generic [ref=e367] [cursor=pointer]:
+              - generic [ref=e368]:
+                - generic [ref=e369]: CMMC Level 2
+                - generic [ref=e370]: Jul 26, 2026
+              - generic [ref=e371]: Goodfellow Chapel Catholic Music Director
+              - generic [ref=e372]: FA303026Q0020 · DEPT OF THE AIR FORCE
+              - generic [ref=e373]:
+                - generic [ref=e374]: Matched on
+                - text: DFARS 252.204-7012
+            - generic [ref=e375] [cursor=pointer]:
+              - generic [ref=e376]:
+                - generic [ref=e377]: CMMC Level 2
+                - generic [ref=e378]: Jul 27, 2026
+              - generic [ref=e379]: TINKER AFB MAC BOA-WWYK260007- Renovate Pratt & Whitney Area - B3001
+              - generic [ref=e380]: FA813726R0033 · DEPT OF THE AIR FORCE
+              - generic [ref=e381]:
+                - generic [ref=e382]: Matched on
+                - text: DFARS 252.204-7012
+            - generic [ref=e383] [cursor=pointer]:
+              - generic [ref=e384]:
+                - generic [ref=e385]: CMMC Level 2
+                - generic [ref=e386]: Jul 28, 2026
+              - generic [ref=e387]: 6A1 Preventive Maintenance for Puget Sound Naval Shipyard (PSNS) Barge YR-85 and YR-95
+              - generic [ref=e388]: N6264926RA054 · DEPT OF THE NAVY
+              - generic [ref=e389]:
+                - generic [ref=e390]: Matched on
+                - text: DFARS 252.204-7012
+            - generic [ref=e391] [cursor=pointer]:
+              - generic [ref=e392]:
+                - generic [ref=e393]: CMMC Level 2
+                - generic [ref=e394]: Jul 29, 2026
+              - generic [ref=e395]: Landscaping Services
+              - generic [ref=e396]: W50S6U26QA019 · DEPT OF THE ARMY
+              - generic [ref=e397]:
+                - generic [ref=e398]: Matched on
+                - text: NIST SP 800-171
+            - generic [ref=e399] [cursor=pointer]:
+              - generic [ref=e400]:
+                - generic [ref=e401]: CMMC Level 2
+                - generic [ref=e402]: Jul 10, 2026
+              - generic [ref=e403]: Valley Resident Office - Groundskeeping, West Sacramento, CA.
+              - generic [ref=e404]: W9123826QA032 · DEPT OF THE ARMY
+              - generic [ref=e405]:
+                - generic [ref=e406]: Matched on
+                - text: DFARS 252.204-7012
+            - generic [ref=e407] [cursor=pointer]:
+              - generic [ref=e408]:
+                - generic [ref=e409]: CMMC Level 2
+                - generic [ref=e410]: Jul 11, 2026
+              - generic [ref=e411]: Hydraulic Hardline Piping
+              - generic [ref=e412]: N0016726Q1089 · DEPT OF THE NAVY
+              - generic [ref=e413]:
+                - generic [ref=e414]: Matched on
+                - text: DFARS 252.204-7021
+            - generic [ref=e415] [cursor=pointer]:
+              - generic [ref=e416]:
+                - generic [ref=e417]: CMMC Level 2
+                - generic [ref=e418]: Jul 12, 2026
+              - generic [ref=e419]: Goodfellow Chapel Catholic Music Director
+              - generic [ref=e420]: FA303026Q0020 · DEPT OF THE AIR FORCE
+              - generic [ref=e421]:
+                - generic [ref=e422]: Matched on
+                - text: DFARS 252.204-7012
+            - generic [ref=e423] [cursor=pointer]:
+              - generic [ref=e424]:
+                - generic [ref=e425]: CMMC Level 2
+                - generic [ref=e426]: Jul 13, 2026
+              - generic [ref=e427]: TINKER AFB MAC BOA-WWYK260007- Renovate Pratt & Whitney Area - B3001
+              - generic [ref=e428]: FA813726R0033 · DEPT OF THE AIR FORCE
+              - generic [ref=e429]:
+                - generic [ref=e430]: Matched on
+                - text: DFARS 252.204-7012
+            - generic [ref=e431] [cursor=pointer]:
+              - generic [ref=e432]:
+                - generic [ref=e433]: CMMC Level 2
+                - generic [ref=e434]: Jul 14, 2026
+              - generic [ref=e435]: 6A1 Preventive Maintenance for Puget Sound Naval Shipyard (PSNS) Barge YR-85 and YR-95
+              - generic [ref=e436]: N6264926RA054 · DEPT OF THE NAVY
+              - generic [ref=e437]:
+                - generic [ref=e438]: Matched on
+                - text: DFARS 252.204-7012
+            - generic [ref=e439] [cursor=pointer]:
+              - generic [ref=e440]:
+                - generic [ref=e441]: CMMC Level 2
+                - generic [ref=e442]: Jul 15, 2026
+              - generic [ref=e443]: Landscaping Services
+              - generic [ref=e444]: W50S6U26QA019 · DEPT OF THE ARMY
+              - generic [ref=e445]:
+                - generic [ref=e446]: Matched on
+                - text: NIST SP 800-171
+            - generic [ref=e447] [cursor=pointer]:
+              - generic [ref=e448]:
+                - generic [ref=e449]: CMMC Level 2
+                - generic [ref=e450]: Jul 16, 2026
+              - generic [ref=e451]: Valley Resident Office - Groundskeeping, West Sacramento, CA.
+              - generic [ref=e452]: W9123826QA032 · DEPT OF THE ARMY
+              - generic [ref=e453]:
+                - generic [ref=e454]: Matched on
+                - text: DFARS 252.204-7012
+            - generic [ref=e455] [cursor=pointer]:
+              - generic [ref=e456]:
+                - generic [ref=e457]: CMMC Level 2
+                - generic [ref=e458]: Jul 17, 2026
+              - generic [ref=e459]: Hydraulic Hardline Piping
+              - generic [ref=e460]: N0016726Q1089 · DEPT OF THE NAVY
+              - generic [ref=e461]:
+                - generic [ref=e462]: Matched on
+                - text: DFARS 252.204-7021
+            - generic [ref=e463] [cursor=pointer]:
+              - generic [ref=e464]:
+                - generic [ref=e465]: CMMC Level 2
+                - generic [ref=e466]: Jul 18, 2026
+              - generic [ref=e467]: Goodfellow Chapel Catholic Music Director
+              - generic [ref=e468]: FA303026Q0020 · DEPT OF THE AIR FORCE
+              - generic [ref=e469]:
+                - generic [ref=e470]: Matched on
+                - text: DFARS 252.204-7012
+            - generic [ref=e471] [cursor=pointer]:
+              - generic [ref=e472]:
+                - generic [ref=e473]: CMMC Level 2
+                - generic [ref=e474]: Jul 19, 2026
+              - generic [ref=e475]: TINKER AFB MAC BOA-WWYK260007- Renovate Pratt & Whitney Area - B3001
+              - generic [ref=e476]: FA813726R0033 · DEPT OF THE AIR FORCE
+              - generic [ref=e477]:
+                - generic [ref=e478]: Matched on
+                - text: DFARS 252.204-7012
+            - generic [ref=e479] [cursor=pointer]:
+              - generic [ref=e480]:
+                - generic [ref=e481]: CMMC Level 2
+                - generic [ref=e482]: Jul 20, 2026
+              - generic [ref=e483]: 6A1 Preventive Maintenance for Puget Sound Naval Shipyard (PSNS) Barge YR-85 and YR-95
+              - generic [ref=e484]: N6264926RA054 · DEPT OF THE NAVY
+              - generic [ref=e485]:
+                - generic [ref=e486]: Matched on
+                - text: DFARS 252.204-7012
+            - generic [ref=e487] [cursor=pointer]:
+              - generic [ref=e488]:
+                - generic [ref=e489]: CMMC Level 3
+                - generic [ref=e490]: Jul 29, 2026
+              - generic [ref=e491]: Special programs support
+              - generic [ref=e492]: H92402-26-R-0009 · USSOCOM
+              - generic [ref=e493]:
+                - generic [ref=e494]: Matched on
+                - text: NIST SP 800-172
+        - generic [ref=e208]:
+          - generic [ref=e496]:
+            - generic [ref=e497]: Level 3 — Expert
+            - generic [ref=e498]: DoD CMMC 2.0 model · reference, not your assessment
+            - generic [ref=e499]: 134 practices
+          - generic [ref=e500]:
+            - generic [ref=e501]: What it covers
+            - text: Top.
+          - generic [ref=e502]:
+            - generic [ref=e503]: Triggering clauses
+            - generic [ref=e504]:
+              - generic [ref=e505] [cursor=pointer]: CMMC Level 3 named in the solicitation
+              - generic [ref=e506] [cursor=pointer]: NIST SP 800-172
+          - generic [ref=e507]:
+            - generic [ref=e508]: What the level asks for
+            - generic [ref=e509]: · 800-172

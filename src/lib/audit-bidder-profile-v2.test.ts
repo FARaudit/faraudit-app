@@ -44,11 +44,27 @@ const v2row = {
   size_facts: { receiptsAvg3yrAffiliateInclusiveUsd: 28_400_000, employeesAffiliateInclusive: 185, source: "verified_import", verifiedAt: "2026-07-15" },
 };
 
-// ── 1 · flag OFF ⇒ byte-identical legacy even with V2 data on the row ──
+// ── 1 · CONSTRUCTION NO LONGER READS THE FLAG (CEO ruling 2026-08-08) ──
+// This leg used to assert that with the flag OFF a V2 row degrades to the legacy shape. It was
+// rewritten rather than muted: gating construction while the satisfy discipline in firmStatus is
+// unconditional builds a WALL — the records that CAN clear a bar never reach the profile, so a
+// SAM-verified firm and a firm asserting the same string both come back `unknown`. Refusing a
+// claim is the ruling; refusing the proof is not. The row now builds identically either way, and
+// the assertion below is the SAME OBJECT the flag-ON leg expects — that is the point.
 delete process.env[FLAG];
-eq("flag OFF: V2 row builds the exact legacy profile (no attributes/asOf keys)",
+eq("flag OFF: a V2 row still builds the record-bearing profile",
   buildBidderProfileFromCapability(v2row as any, { solicitationNaics: "236220", now: nowFn }),
-  { satisfiedAttributes: ["se:sdvosb"], openWorld: true });
+  {
+    satisfiedAttributes: ["se:sdvosb", "registration:SAM-active", "naics:236220-small", "sb:total"],
+    openWorld: true,
+    attributes: [
+      { attr: "se:sdvosb", source: "sba_api", verifiedAt: "2026-07-15", expiresAt: "2029-07-15" },
+      { attr: "registration:SAM-active", source: "sam_api", verifiedAt: "2026-07-15", expiresAt: "2027-05-01" },
+      { attr: "naics:236220-small", source: "verified_import", verifiedAt: "2026-07-15", expiresAt: "2027-07-15T00:00:00.000Z" },
+      { attr: "sb:total", source: "verified_import", verifiedAt: "2026-07-15", expiresAt: "2027-07-15T00:00:00.000Z" },
+    ],
+    asOf: "2026-07-29T12:00:00.000Z",
+  });
 
 // ── 2 · flag ON, plain legacy row ⇒ byte-identical legacy ──
 process.env[FLAG] = "true";

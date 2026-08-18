@@ -6,9 +6,13 @@ import {
   fetchRecentAudits,
   fetchHomeStats,
 } from "@/lib/bd-os/queries";
-import { fetchLiveOpportunitiesScoped, WINDOW_DAYS } from "@/lib/bd-os/live-opportunities";
+import { fetchLiveOpportunitiesScoped, WINDOW_DAYS, resolveFeedScope } from "@/lib/bd-os/live-opportunities";
 import type { OpportunityRow } from "@/lib/bd-os/queries";
 import { poleToRecommendation } from "@/lib/verdict-pole";
+import { fetchDefenseSpending, type SpendingResult } from "@/lib/bd-os/defense-spending";
+import { federalRegisterUrl, parseFederalRegister, type RegRow } from "@/lib/federal-register";
+import { buildDeskDigest } from "@/lib/bd-os/desk-digest";
+import { fetchNewsHeadlines } from "@/lib/bd-os/news-headlines";
 
 export const dynamic = "force-dynamic";
 
@@ -72,7 +76,10 @@ export async function GET() {
         ? _useTokens[0][0].toUpperCase()
         : (_useTokens[0][0] + _useTokens[_useTokens.length - 1][0]).toUpperCase();
 
-    const [counters, homeStats, scoped, recentAudits, pipelineRows] = await Promise.all([
+    const [
+      counters, homeStats, scoped, recentAudits, pipelineRows,
+      cmmcAudits, regRules, spending, newsRows,
+    ] = await Promise.all([
       fetchHeaderCounter(supabase).catch(() => ({ audits: 0, traps: 0 })),
       fetchHomeStats(supabase).catch(() => null),
       // Live SAM feed (CEO 2026-07-29: go live-source; PR #334 library). null —
@@ -104,13 +111,66 @@ export async function GET() {
       // PostgrestBuilder is a thenable but not a real Promise, so we use the
       // two-arg .then(onFulfilled, onRejected) form instead of .catch().
       supabase
+        // `title` and `solicitation_number` are selected for the Pipeline DESK,
+        // which names the pursuit it ranks. Without them every card reads
+        // "Untitled pursuit" — the same shape as the CMMC column nothing asked
+        // for. The comment sits ABOVE the chain because _today-fabrication D1
+        // reads `.from("pipeline")` and `.select(...)` as adjacent lines, and
+        // that gate failing closed on a moved select is the point of it.
         .from("pipeline")
-        .select("stage, due_date, updated_at, estimated_value")
+        .select("stage, due_date, updated_at, estimated_value, title, solicitation_number")
         .eq("user_id", user.id)
         .then(
           (r) => (r.error ? null : ((r.data as any[]) || [])),
           () => null
         ),
+
+      // ── The three extra reads the CROSS-DESK DIGEST needs ──
+      // Each is null on failure, never [], for the reason stated throughout this
+      // route: a failed read and an empty desk are different facts and the
+      // panels must be able to say which one happened.
+
+      // CMMC needs `compliance_json` itself, and fetchRecentAudits above does NOT
+      // select it — it extracts a handful of sub-fields. Running inferLevel() over
+      // those rows would read every audit as "CMMC not required", turning a column
+      // this query never asked for into an all-clear on the customer's compliance
+      // obligations. So the digest gets its own select, scoped to this user.
+      supabase
+        .from("audits")
+        .select("id, notice_id, solicitation_number, title, agency, created_at, response_deadline, compliance_json")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(200)
+        .then(
+          (r) => (r.error ? null : ((r.data as any[]) || [])),
+          () => null
+        ),
+
+      // Federal Register — free, no key. The same URL /api/proposed-rules builds,
+      // through the shared library rather than a second hand-rolled query, and
+      // behind Next's data cache so Today's own calendar fetch of the same feed
+      // costs one request between them rather than two.
+      fetch(federalRegisterUrl(), {
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(8000),
+        next: { revalidate: 21600 },
+      })
+        .then(async (r): Promise<RegRow[] | null> =>
+          r.ok ? parseFederalRegister(await r.text()) : null)
+        .catch(() => null),
+
+      // Defense spending — a read of `defense_spending_intel`, the same library
+      // call the desk's own route makes, so the two cannot disagree.
+      resolveFeedScope(supabase)
+        .then((s): Promise<SpendingResult> => fetchDefenseSpending(supabase, s.codes))
+        .catch(() => null),
+      // Defence-news headlines for the Signals grid. /api/news-feed is RSS only —
+      // NO model spend — and CDN-cached for 15 minutes, so a dashboard that reloads
+      // on every tab switch costs nothing to run. The judged, desk-ranked read lives
+      // on /defense-news, which is a page you open, not one that opens itself.
+      // In the SAME Promise.all as everything else: an extra sequential hop on the
+      // slowest panel of the slowest page would be paid on every load.
+      fetchNewsHeadlines().catch(() => null),
     ]);
 
     const nowMs = Date.now();
@@ -122,9 +182,36 @@ export async function GET() {
     //   scoped === null              → upstream SAM read FAILED  → opportunities null
     //   scope.source no-profile-codes→ no NAICS on file          → empty + a fixable reason
     //   rows === []                  → codes on file, empty window
-    const liveOpps: OpportunityRow[] | null = scoped ? scoped.rows : null;
+    // DEDUPE HERE, ONCE. The ingest queue can hold several rows for one notice, and
+    // /notices was deduping on the client while this route was not — so the same feed
+    // produced "166 live notices" on Today and "165 open notices" on Notices, from the
+    // same request. A count the customer reads twice must be computed once; a second
+    // consumer that forgets to dedupe would otherwise diverge again.
+    // Key precedence matches opportunities-live.js's DISPLAY identity: a base notice
+    // and its amendment share a solicitation_number but carry different notice_ids.
+    // Rows arrive newest-first, so the first occurrence is the one kept.
+    const _seen = new Set<string>();
+    const liveOpps: OpportunityRow[] | null = scoped
+      ? scoped.rows.filter((o) => {
+          const key = o.solicitation_number || o.notice_id || String(o.id ?? "");
+          if (!key) return true;
+          if (_seen.has(key)) return false;
+          _seen.add(key);
+          return true;
+        })
+      : null;
     const feedScope = scoped ? scoped.scope : null;
     const opportunities: OpportunityRow[] = liveOpps ?? [];
+
+    // Every count below is derived by filtering `opportunities`, and that array is
+    // `[]` both when the window is genuinely empty AND when the upstream read
+    // failed. Filtering [] yields 0 either way, so each of those counts has to be
+    // nulled explicitly when the feed did not answer — otherwise the page prints a
+    // zero nobody measured next to a rail pill that says "Feed down". `feedAvailable`
+    // is the one fact that separates them, and it ships so the client can say which
+    // it is instead of inferring.
+    const feedAvailable = liveOpps !== null;
+    const feedNum = (n: number): number | null => (feedAvailable ? n : null);
 
     // ── Brief-head "since you last looked" deltas ──
     const newMatches24h = opportunities.filter((o) => {
@@ -244,6 +331,22 @@ export async function GET() {
       return !isNaN(ts) && (nowMs - ts) < weekMs;
     }).length;
 
+    // AUDITS THIS MONTH counts SOLICITATIONS, not runs. homeStats.audit_activity_month
+    // and counters.audits both count audit ROWS, and one solicitation is routinely
+    // audited several times (W911SG27BA002 shows as 1/3, 2/3, 3/3) — so the tile read
+    // 43 for a customer who had worked 8. The label says "completed by you", which a
+    // customer reads as distinct solicitations, and that is the number now shown.
+    // Runs ship alongside so the tile can state both rather than hide the re-runs.
+    const monthMs = 30 * dayMs;
+    const _monthRows = !auditsAvailable ? null : audits.filter((a) => {
+      const ts = (a.completed_at || a.created_at) ? new Date(a.completed_at || a.created_at).getTime() : NaN;
+      return !isNaN(ts) && (nowMs - ts) <= monthMs;
+    });
+    const auditRunsThisMonth = _monthRows ? _monthRows.length : null;
+    const auditSolicitationsThisMonth = _monthRows
+      ? new Set(_monthRows.map((a) => a.solicitation_number || a.notice_id || a.id)).size
+      : null;
+
     // Live-feed deadline count within 7 days — replaces homeStats.expiring_7d /
     // live_sam_gov, which count pending_audits rows (structurally zero since the
     // queue froze; a hardcoded 0 next to a live feed would be its own lie).
@@ -253,12 +356,35 @@ export async function GET() {
       return !isNaN(ms) && ms > nowMs && ms <= nowMs + weekMs;
     }).length;
 
+    // ── THE CROSS-DESK DIGEST ──
+    // One shaping, two panels. The Priority Action Feed ranks these rows and the
+    // Signals grid summarises them, so a desk cannot read as urgent in one panel
+    // and quiet in the other. `liveOpps` is passed — the deduped array, null on a
+    // failed read — not `opportunities`, which is [] in both cases.
+    const deskDigest = buildDeskDigest({
+      opportunities: liveOpps,
+      cmmcAudits: (cmmcAudits as any[] | null),
+      // pipeRows, not P — null when the read failed, so an unreadable pipeline
+      // and an empty board stay different facts on the card too.
+      pipeline: pipeRows,
+      regRules: (regRules as RegRow[] | null),
+      spending: (spending as SpendingResult | null),
+      news: newsRows,
+    }, nowMs);
+
     return NextResponse.json({
       // ── existing fields ──
-      liveCount:        liveOpps ? liveOpps.length : (homeStats?.live_sam_gov ?? 0),
+      // The homeStats fallbacks are GONE. Both counted pending_audits rows, which
+      // have been structurally zero since that queue froze — so a failed SAM read
+      // printed "0 live notices matching your NAICS" and an insight bar telling the
+      // customer to widen a window that was never read, while the rail beside it
+      // said "Feed down". null is the only honest answer to a question nothing asked.
+      liveCount:        liveOpps ? liveOpps.length : null,
       trapCount:        homeStats?.total_traps_caught   ?? counters.traps,
-      deadlineSoon:     liveOpps ? deadlineSoon7d : (homeStats?.expiring_7d ?? 0),
-      auditsThisMonth:  homeStats?.audit_activity_month ?? counters.audits,
+      deadlineSoon:     feedNum(deadlineSoon7d),
+      // DISTINCT solicitations, not audit rows. See the derivation above.
+      auditsThisMonth:  auditSolicitationsThisMonth,
+      auditRunsThisMonth,
       auditTotal:       auditsAvailable ? audits.length : null,
       // null = live fetch failed (client renders "unavailable", not "empty")
       opportunities:    liveOpps,
@@ -269,22 +395,24 @@ export async function GET() {
       // The posted-date window the live read actually used. Sent so the empty
       // state can state it instead of hardcoding a number that would rot.
       feedWindowDays:   WINDOW_DAYS,
+      // Whether the live SAM read ANSWERED. Distinct from an empty window.
+      feedAvailable,
       lastSync:         new Date().toISOString(),
 
       // ── Phase 4 additions ──
       user: { firstName, fullName, initials },
 
       // Brief-head deltas (.since-item × 4)
-      newMatches24h,
+      newMatches24h:    feedNum(newMatches24h),
       newTraps,
       pursuitsAdvanced,
-      qaWindowsClosing,
+      qaWindowsClosing: feedNum(qaWindowsClosing),
 
       // Pulse-bar deltas
-      deadlineSoonNext48h,
+      deadlineSoonNext48h: feedNum(deadlineSoonNext48h),
 
       // Sidebar badges
-      agencyCount,
+      agencyCount:      feedNum(agencyCount),
       pipelineAtRisk,
       pipelineTotal,
 
@@ -308,6 +436,11 @@ export async function GET() {
 
       // Sidebar Opportunities .sb-badge.live indicator
       ingestStatus,
+
+      // Priority Action Feed + Signals grid. One row per desk, each carrying its
+      // own status — never a partial list, because a desk missing from the array
+      // and a desk with nothing to report would look identical.
+      deskDigest,
     });
   } catch (err) {
     console.error("[command-center-data]", err);

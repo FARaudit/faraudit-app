@@ -75,6 +75,13 @@ button{font-family:inherit}
 
 .page-header{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap}
 .page-header .heading{display:flex;flex-direction:column;gap:7px}
+.export-cluster{display:flex;flex-direction:column;align-items:flex-end;gap:7px;min-width:0}
+.export-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:flex-end}
+.export-caption{font-size:11.5px;color:var(--mute);line-height:1.45;text-align:right;max-width:330px}
+.cta-secondary{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 17px;border-radius:10px;background:var(--card);color:var(--ink-2);border:1px solid var(--line);font-family:inherit;font-size:13px;font-weight:800;letter-spacing:.02em;cursor:pointer;transition:border-color .14s, color .14s, background .14s, transform .14s}
+.cta-secondary svg{width:15px;height:15px}
+.cta-secondary:hover{border-color:var(--accent-light);color:var(--accent-deep);background:rgba(55,138,221,0.04);transform:translateY(-1px)}
+[data-theme="dark"] .cta-secondary:hover{color:var(--accent-light)}
 .page-header .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:0}
 .page-header h1{font-family:"Fraunces","Georgia",serif;font-style:italic;font-weight:600;font-size:34px;letter-spacing:-.02em;color:var(--ink);margin:0;line-height:1.04}
 .page-header .sub{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--mute);margin:0;max-width:60ch;line-height:1.6}
@@ -95,7 +102,7 @@ button{font-family:inherit}
 .cs-grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:20px;align-items:start}
 
 /* ═══ DOCUMENT (left) ═══ */
-.doc-card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-pop);overflow:hidden;display:flex;flex-direction:column}
+.doc-card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-pop);overflow:hidden;display:flex;flex-direction:column;align-self:stretch}
 .doc-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 18px;background:var(--card-soft);border-bottom:1px solid var(--line)}
 .doc-toolbar .tl{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);display:flex;align-items:center;gap:8px}
 .doc-toolbar .tl svg{width:13px;height:13px;color:var(--accent-deep)}
@@ -105,10 +112,19 @@ button{font-family:inherit}
 .letterhead{background:linear-gradient(135deg,var(--navy-800),var(--navy-900));color:#e8eef6;padding:24px 28px 20px;position:relative;overflow:hidden}
 .letterhead::before{content:"";position:absolute;top:-50px;right:-40px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(55,138,221,.25),transparent 70%);pointer-events:none}
 .lh-top{display:flex;align-items:center;gap:16px;position:relative}
-.lh-logo{width:58px;height:58px;border-radius:12px;background:rgba(255,255,255,.04);border:1.5px dashed rgba(181,212,244,.4);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#8aa0bd;flex-shrink:0;cursor:pointer;transition:border-color .14s,color .14s}
-.lh-logo:hover{border-color:var(--accent);color:var(--accent-light)}
-.lh-logo svg{width:18px;height:18px}
-.lh-logo .lt{font-family:"IBM Plex Mono",monospace;font-size:7px;font-weight:700;letter-spacing:.1em}
+/* A real control: it uploads to POST /api/capability-statement/logo, which is the only
+   writer of capability_statements.logo_url. */
+.lh-logo-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0}
+.lh-logo{position:relative;width:58px;height:58px;border-radius:12px;background:rgba(255,255,255,.04);border:1.5px dashed rgba(181,212,244,.4);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#8aa0bd;flex-shrink:0;cursor:pointer;overflow:hidden;transition:border-color .14s, color .14s}
+.lh-logo:hover{border-color:rgba(181,212,244,.85);color:#cfe0f5}
+.lh-logo:focus-within{outline:2px solid var(--accent-light);outline-offset:2px}
+.lh-logo.is-set{border-style:solid;border-color:rgba(181,212,244,.28);background:#fff}
+.lh-logo.is-busy{opacity:.55;cursor:progress}
+.lh-logo-input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
+.lh-logo-img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.lh-logo .lt{font-family:"IBM Plex Mono",monospace;font-size:7px;font-weight:700;letter-spacing:.1em;line-height:1.35;text-align:center}
+.lh-logo-remove{background:none;border:0;padding:0;font-family:"IBM Plex Mono",monospace;font-size:7.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8aa0bd;cursor:pointer}
+.lh-logo-remove:hover{color:#ffd7d7;text-decoration:underline}
 .lh-id{min-width:0;flex:1}
 .lh-name{font-family:"Fraunces",serif;font-weight:600;font-size:24px;letter-spacing:-.01em;color:#fff;line-height:1.1;display:flex;align-items:center;flex-wrap:wrap;gap:8px}
 .lh-tag{font-family:"IBM Plex Mono",monospace;font-size:11px;color:#aebbcf;margin-top:5px;letter-spacing:.01em}
@@ -156,6 +172,41 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
 .perf-value{font-family:"IBM Plex Mono",monospace;font-size:14px;color:var(--green-700);font-weight:700;text-align:right;align-self:start}
 [data-theme="dark"] .perf-value{color:#6ee7b7}
 .perf-summary{grid-column:1/-1;font-size:12px;color:var(--ink-2);line-height:1.55;margin-top:4px}
+.perf-more{font-size:11.5px;color:var(--mute);line-height:1.5;padding-top:2px}
+
+/* tailored versions — editions the award history can support */
+.ver-intro{font-size:12px;color:var(--mute);line-height:1.5;margin:0 0 10px}
+.ver-list{display:flex;flex-direction:column;gap:6px}
+.ver-opt{display:flex;align-items:center;gap:9px;width:100%;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--card-soft);font-family:inherit;font-size:12.5px;font-weight:600;color:var(--ink-2);cursor:pointer;text-align:left;transition:border-color .14s,color .14s,background .14s}
+.ver-opt:hover{border-color:var(--accent-light);color:var(--accent-deep)}
+.ver-opt.is-active{border-color:var(--accent);color:var(--accent-deep);background:rgba(55,138,221,0.06)}
+[data-theme="dark"] .ver-opt.is-active,[data-theme="dark"] .ver-opt:hover{color:var(--accent-light)}
+.ver-opt .vc{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--mute)}
+.ver-opt.is-active .vc{color:var(--accent)}
+
+/* award history — full width, below the grid */
+.award-history{margin-top:20px}
+.ah-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:12px}
+.award-history h2{display:flex;align-items:center;gap:9px;font-family:"Manrope",sans-serif;font-size:15px;font-weight:800;letter-spacing:-.01em;color:var(--ink);margin:0}
+.award-history h2 svg{width:17px;height:17px;color:var(--accent)}
+.ah-sub{font-size:12px;color:var(--mute);line-height:1.5;margin:5px 0 0}
+.ah-table{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-pop);overflow:hidden}
+.ah-row{display:grid;grid-template-columns:minmax(0,2.4fr) minmax(0,1.5fr) minmax(0,1.1fr) minmax(0,1fr) minmax(0,.8fr);gap:16px;padding:12px 18px;align-items:baseline}
+.ah-header{background:var(--card-soft);border-bottom:1px solid var(--line)}
+.ah-header span{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
+.ah-body .ah-row{border-bottom:1px solid var(--line-2)}
+.ah-body .ah-row:last-child{border-bottom:0}
+.ah-body .ah-row:hover{background:var(--card-soft)}
+.ah-title{font-size:13px;font-weight:700;color:var(--ink);line-height:1.35;overflow-wrap:break-word}
+.ah-cell{font-size:11.5px;color:var(--ink-2);line-height:1.4;overflow-wrap:break-word}
+.ah-mono{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute)}
+.ah-value{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;color:var(--green-700)}
+[data-theme="dark"] .ah-value{color:#6ee7b7}
+.ah-empty{color:var(--mute)}
+@media (max-width:900px){
+  .ah-row{grid-template-columns:1fr;gap:3px}
+  .ah-header{display:none}
+}
 
 .diff-list{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(2,1fr);gap:11px 18px}
 .diff-list li{font-size:12.5px;color:var(--ink-2);line-height:1.45;padding-left:24px;position:relative}
@@ -163,13 +214,30 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
 [data-theme="dark"] .diff-list li::before{background-color:rgba(16,185,129,.16);border-color:rgba(16,185,129,.3)}
 
 /* contact strip */
-.contact-strip{display:flex;flex-wrap:wrap;gap:18px 28px;padding:16px 28px;background:var(--card-soft);border-top:1px solid var(--line)}
+/* Two columns: who to call, then where they are. The left column is a FIXED width
+   rather than half the card. Halves push the second block to the middle of an 1100px
+   card and leave a canyon between them; sizing to content closes the canyon but makes
+   the second column's position depend on the longest value in the first, so the layout
+   moves when a customer edits their email. A fixed track is stable at every width, and
+   a long value wraps inside its own column instead of pushing the grid around. */
+.contact-strip{display:grid;grid-template-columns:minmax(0,320px) minmax(0,1fr);gap:13px 48px;padding:18px 28px;background:var(--card-soft);border-top:1px solid var(--line);margin-top:auto;align-content:start}
 .contact-item{display:flex;align-items:center;gap:9px;min-width:0}
 .contact-item svg{width:15px;height:15px;color:var(--accent-deep);flex-shrink:0}
 [data-theme="dark"] .contact-item svg{color:var(--accent-light)}
 .contact-item .ci{min-width:0}
 .contact-item .ck{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);line-height:1.2}
-.contact-item .cv{font-size:12px;color:var(--ink-2);font-weight:600;line-height:1.3;white-space:nowrap}
+.contact-item .cv{font-size:12px;color:var(--ink-2);font-weight:600;line-height:1.3;white-space:normal;overflow-wrap:break-word}
+/* Two stacked columns: who to call on the left, where they are on the right. Each cell
+   is placed BY FIELD, not by source order — the markup order is already load-bearing for
+   which record column an edit writes to, and nothing about layout may depend on it. */
+.contact-item[data-cs-contact="contact_name"]{grid-column:1;grid-row:1}
+.contact-item[data-cs-contact="contact_email"]{grid-column:1;grid-row:2}
+.contact-item[data-cs-contact="contact_phone"]{grid-column:1;grid-row:3}
+/* The title prints beside the name because the document prints them as one value. It is a
+   qualifier on the same entity, which is the only construction a sub-position is allowed. */
+.contact-item .ct{color:var(--mute)}
+.contact-item[data-cs-contact="contact_address"]{grid-column:2;grid-row:1}
+.contact-item[data-cs-contact="contact_website"]{grid-column:2;grid-row:2}
 
 /* ═══ SIDE (right) ═══ */
 .side-col{display:flex;flex-direction:column;gap:16px;position:sticky;top:80px}
@@ -229,6 +297,11 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
   .stat-strip{grid-template-columns:repeat(2,1fr)}
 }
 
+@media (max-width:680px){
+  .contact-strip{grid-template-columns:1fr}
+  .contact-strip .contact-item{grid-column:auto !important;grid-row:auto !important}
+}
+
 /* ── canonical toggle sidebar ── */
 :root{--sb-width:56px}
 [data-sb="open"]{--sb-width:232px}
@@ -276,6 +349,71 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
 [data-sb="open"] .sb-bottom{align-items:flex-start;width:100%;padding:0 4px}
 
 /* ── /canonical toggle sidebar ── */
+
+/* ── field editor ─────────────────────────────────────────────────────────────
+   Replaces window.prompt(). The prompt was browser chrome on a designed document
+   ("www.faraudit.com says"), and it gave a ONE-LINE box for Core Competencies —
+   a field that holds paragraphs. Built from this page's own tokens and its three
+   loaded faces; it introduces no new colour, no new typeface, and no new radius. */
+.fe-scrim{position:fixed;inset:0;z-index:200;display:grid;place-items:center;padding:24px;
+  background:color-mix(in srgb, var(--page-bg) 72%, transparent);backdrop-filter:blur(2px)}
+.fe-scrim[hidden]{display:none}
+.fe{width:min(620px,100%);max-height:calc(100vh - 48px);display:flex;flex-direction:column;
+  background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+.fe-head{padding:18px 22px 0}
+.fe-kind{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--mute);margin:0 0 5px}
+.fe-title{font-size:17px;font-weight:800;letter-spacing:-.014em;color:var(--ink);margin:0}
+.fe-help{font-size:12.5px;line-height:1.55;color:var(--ink-2);margin:7px 0 0;text-wrap:pretty}
+.fe-body{padding:16px 22px 4px;overflow-y:auto}
+/* A grouped dialog labels each part; the parts below the first need air above them. */
+.fe-label{display:block;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--mute);margin:0 0 6px}
+.fe-body .fe-help + .fe-label{margin-top:16px}
+.fe-input,.fe-area{width:100%;box-sizing:border-box;font-family:Manrope,system-ui,sans-serif;font-size:14px;
+  line-height:1.6;color:var(--ink);background:var(--card-soft);border:1px solid var(--line);
+  border-radius:9px;padding:11px 13px;outline:none;transition:border-color .14s,box-shadow .14s}
+.fe-area{min-height:180px;resize:vertical}
+.fe-area-sm{min-height:62px}
+.fe-items{display:flex;flex-direction:column;gap:14px}
+.fe-item{border:1px solid var(--line-2);border-radius:10px;padding:12px 13px 14px;background:var(--card-soft)}
+.fe-item-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.fe-item-n{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--mute)}
+.fe-item-x{font-family:Manrope,system-ui,sans-serif;font-size:11.5px;font-weight:600;color:var(--mute);
+  background:none;border:none;padding:2px 4px;cursor:pointer;border-radius:6px}
+.fe-item-x:hover{color:var(--ink);background:var(--search-bg)}
+.fe-lab{display:block;font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--mute);margin:9px 0 4px}
+.fe-item .fe-input,.fe-item .fe-area{background:var(--card,#fff)}
+.fe-cap{font-size:12px;line-height:1.5;color:var(--mute);margin:12px 0 0}
+.fe-cap.is-off{color:var(--accent-deep,#185FA5);font-weight:600}
+.fe-items+.fe-btn{margin-top:14px}
+.cs-item{margin:0 0 14px}
+.cs-item:last-child{margin-bottom:0}
+.cs-item-k{margin:0 0 3px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:700;
+  letter-spacing:.09em;text-transform:uppercase;color:var(--accent-deep,#185FA5)}
+.cs-item-h{margin:0 0 4px;font-size:14px;font-weight:700;line-height:1.3;color:var(--ink)}
+.cs-item-s{margin:5px 0 0;font-family:'IBM Plex Mono',monospace;font-size:11.5px;line-height:1.45;color:var(--mute)}
+.cs-cap{margin:12px 0 0;font-size:12px;line-height:1.5;color:var(--accent-deep,#185FA5);font-weight:600}
+.fe-input:focus,.fe-area:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.fe-foot{display:flex;align-items:center;gap:12px;padding:14px 22px 18px;border-top:1px solid var(--line-2);margin-top:14px}
+.fe-count{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mute);font-variant-numeric:tabular-nums;margin-right:auto}
+.fe-btn{font-family:Manrope,system-ui,sans-serif;font-size:13px;font-weight:700;border-radius:8px;
+  padding:8px 15px;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--ink-2);transition:background-color .14s,color .14s}
+.fe-btn:hover{background:var(--search-bg);color:var(--ink)}
+.fe-btn.primary{background:var(--accent-deep,#185FA5);border-color:var(--accent-deep,#185FA5);color:#fff}
+.fe-btn.primary:hover{background:var(--accent,#378ADD);border-color:var(--accent,#378ADD)}
+.fe-btn:focus-visible,.fe-input:focus-visible,.fe-area:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.fe-hint{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mute)}  /* --mute-2 is not a text token: 2.56:1 */
+@media (prefers-reduced-motion:reduce){.fe-input,.fe-area,.fe-btn{transition:none}}
+/* Guidance shown where a prose field is empty. Muted and rule-led so it can never be
+   mistaken for content — it is not in the record and the export cannot reach it. */
+.cs-guide{margin:10px 0 0;padding:12px 14px;border-left:2px solid var(--line);background:var(--card-soft);border-radius:0 8px 8px 0}
+.cs-guide-lead{margin:0 0 7px;font-size:12.5px;font-weight:700;color:var(--ink-2)}
+.cs-guide-list{margin:0;padding-left:17px;display:flex;flex-direction:column;gap:4px}
+.cs-guide-list li{font-size:12.5px;line-height:1.5;color:var(--mute)}
+.cs-localnote{margin-left:12px;font-size:12px;font-weight:700;color:var(--good,#067647)}
+.cs-localnote.is-error{color:var(--alarm,#b42318)}
 </style>
 </head>
 <body>
@@ -288,17 +426,17 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
   <div class="sb-logo-row"><div class="sb-logo">F</div><span class="sb-wordmark">FAR<span class="wm-au">audit</span></span></div>
   <div class="sb-group-label">WORKSPACE</div>
   <a class="sb-icon" href="/command-center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="sb-label">Today</span><span class="sb-tip">Today</span></a>
-  <a class="sb-icon" href="/audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg><span class="sb-label">Run Audit</span><span class="sb-badge new">New</span><span class="sb-tip">Run Audit</span></a>
+  <a class="sb-icon" href="/audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg><span class="sb-label">Run Audit</span><span class="sb-tip">Run Audit</span></a>
   <a class="sb-icon" href="/acquisition-stages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span class="sb-label">Acquisition Stages</span><span class="sb-tip">Acquisition Stages</span></a>
-  <a class="sb-icon" href="/dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="sb-label">Past Audits</span><span class="sb-badge count">15</span><span class="sb-tip">Past Audits</span></a>
-  <a class="sb-icon" href="/pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg><span class="sb-label">Pipeline</span><span class="sb-badge danger">3</span><span class="sb-tip">Pipeline</span></a>
+  <a class="sb-icon" href="/dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="sb-label">Past Audits</span><span class="sb-tip">Past Audits</span></a>
+  <a class="sb-icon" href="/pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg><span class="sb-label">Pipeline</span><span class="sb-tip">Pipeline</span></a>
   <a class="sb-icon active" href="/capability-statement"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span class="sb-label">Capability Statement</span><span class="sb-tip">Capability Statement</span></a>
   <div class="sb-divider"></div>
   <div class="sb-group-label">INTELLIGENCE</div>
-  <a class="sb-icon" href="/opportunities"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">Opportunities</span><span class="sb-badge live">Live</span><span class="sb-tip">Opportunities</span></a>
+  <a class="sb-icon" href="/opportunities"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">Opportunities</span><span class="sb-tip">Opportunities</span></a>
   <a class="sb-icon" href="/defense-news"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L4 8v8l8 5 8-5V8l-8-5z"/></svg><span class="sb-label">Defense News</span><span class="sb-tip">Defense News</span></a>
   <a class="sb-icon" href="/defense-spending"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="13" width="3" height="4"/></svg><span class="sb-label">Defense Spending</span><span class="sb-tip">Defense Spending</span></a>
-  <a class="sb-icon" href="/agencies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg><span class="sb-label">Defense Agencies</span><span class="sb-badge count">8</span><span class="sb-tip">Defense Agencies</span></a>
+  <a class="sb-icon" href="/agencies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg><span class="sb-label">Defense Agencies</span><span class="sb-tip">Defense Agencies</span></a>
   <a class="sb-icon" href="/contracting-officers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M21 17c-.5-2-2-3.5-4-3.5"/></svg><span class="sb-label">Contracting Officers</span><span class="sb-tip">Contracting Officers</span></a>
   <div class="sb-divider"></div>
   <div class="sb-group-label">COMPLIANCE &amp; BD</div>
@@ -336,8 +474,8 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
           <span class="nbadge" style="display:none"></span>
         </button>
         <div class="user-chip">
-          <div class="av">JR</div>
-          <div><div class="nm">Jose Rodriguez</div></div>
+          <div class="av"></div>
+          <div><div class="nm"></div></div>
         </div>
       </div>
     </div>
@@ -349,13 +487,22 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
         <div class="heading">
           <p class="eyebrow">Workspace · Capability Statement</p>
           <h1>Your Capability Statement</h1>
-          <p class="sub">The document you send to contracting officers — and the record the audit engine reads when it judges whether you are eligible to bid. <b>Past performance fills in from audits you record as won</b>; everything else is yours to write.</p>
+          <p class="sub">The document you send to contracting officers — and the record the audit engine reads when it judges whether you are eligible to bid. <b>Past performance is designed to fill itself from awards</b>, though recording an outcome is not built yet; everything else is yours to write.</p>
         </div>
-        <button class="cta-primary" id="csCopy" type="button">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
-          Copy statement
-        </button>
-        <span class="cs-note" id="csNote" hidden></span>
+        <div class="export-cluster">
+          <div class="export-actions">
+            <button class="cta-primary" id="csCopyTop" data-cs-copy type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+              Copy statement
+            </button>
+            <button class="cta-secondary" id="csPdfExport" data-cs-download="pdf" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+              Download PDF
+            </button>
+          </div>
+          <p class="export-caption">Copy keeps its formatting in an email or Google Docs. To send a document, download the PDF.</p>
+          <span class="cs-note" id="csNote" hidden></span>
+        </div>
       </header>
 
       <!-- stat strip -->
@@ -379,7 +526,14 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
           <!-- letterhead -->
           <div class="letterhead">
             <div class="lh-top">
-              <div class="lh-logo" aria-hidden="true"><span class="lt">LOGO</span></div>
+              <div class="lh-logo-wrap">
+                <label class="lh-logo" data-cs-logo>
+                  <input type="file" accept="image/png,image/jpeg,image/webp" class="lh-logo-input" aria-label="Upload your company logo">
+                  <img class="lh-logo-img" alt="" hidden>
+                  <span class="lt lh-logo-cta">ADD<br>LOGO</span>
+                </label>
+                <button class="lh-logo-remove" type="button" hidden>Remove</button>
+              </div>
               <div class="lh-id">
                 <div class="lh-name"><button class="lh-name-edit" type="button" data-cs-field="company_name" aria-label="Edit company name"></button></div>
                 <div class="lh-tag"></div>
@@ -404,7 +558,6 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
             </div>
             <div class="perf-list"></div>
           </div>
-          </div>
 
           <!-- differentiators -->
           <div class="doc-section">
@@ -417,39 +570,31 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
 
           <!-- contact strip -->
           <div class="contact-strip">
-            <div class="contact-item">
+            <div class="contact-item" data-cs-contact="contact_name">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>
               <div class="ci"><div class="ck">Point of Contact</div><div class="cv"></div></div>
             </div>
-            <div class="contact-item">
+            <div class="contact-item" data-cs-contact="contact_email">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
               <div class="ci"><div class="ck">Email</div><div class="cv"></div></div>
             </div>
-            <div class="contact-item">
+            <div class="contact-item" data-cs-contact="contact_phone">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.13.96.36 1.9.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0122 16.92z"/></svg>
               <div class="ci"><div class="ck">Phone</div><div class="cv"></div></div>
             </div>
-            <div class="contact-item">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 010 18a15 15 0 010-18z"/></svg>
-              <div class="ci"><div class="ck">Website</div><div class="cv"></div></div>
-            </div>
-            <div class="contact-item">
+            <div class="contact-item" data-cs-contact="contact_address">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>
               <div class="ci"><div class="ck">Business address</div><div class="cv"></div></div>
+            </div>
+            <div class="contact-item" data-cs-contact="contact_website">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 010 18a15 15 0 010-18z"/></svg>
+              <div class="ci"><div class="ck">Website</div><div class="cv"></div></div>
             </div>
           </div>
         </article>
 
         <!-- RIGHT: side cards -->
         <aside class="side-col">
-
-          <section class="side-card">
-            <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Export</h3>
-            <div class="export-list">
-              <button class="export-btn" id="csCopy" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>Copy to Clipboard<span class="ext">TEXT</span></button>
-            </div>
-            <p class="cs-unwired">PDF and Word export are not built yet. Copy to clipboard gives you the full statement as text.</p>
-          </section>
 
           <section class="side-card">
             <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>Statement Health</h3>
@@ -469,10 +614,31 @@ body.cs-unreadable .stat-strip,body.cs-unreadable .side-col{opacity:.45}
 
           <section class="side-card">
             <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/></svg>Tailored versions</h3>
-            <p class="cs-unwired">Agency-specific editions are not built yet. This statement is the single version.</p>
+            <p class="ver-intro"></p>
+            <div class="ver-list"></div>
           </section>
 
         </aside>
+      </section>
+
+      <!-- award history — the record, not the document -->
+      <section class="award-history" id="awardHistory" hidden>
+        <div class="ah-head">
+          <div>
+            <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M5 4h14v5a7 7 0 01-14 0V4z"/><path d="M5 6H3v2a3 3 0 003 3"/><path d="M19 6h2v2a3 3 0 01-3 3"/></svg>Award history</h2>
+            <p class="ah-sub"></p>
+          </div>
+        </div>
+        <div class="ah-table" role="table">
+          <div class="ah-row ah-header" role="row">
+            <span role="columnheader">Award</span>
+            <span role="columnheader">Agency</span>
+            <span role="columnheader">Contract</span>
+            <span role="columnheader">Period</span>
+            <span role="columnheader">Value</span>
+          </div>
+          <div class="ah-body"></div>
+        </div>
       </section>
     </div>
   </main>

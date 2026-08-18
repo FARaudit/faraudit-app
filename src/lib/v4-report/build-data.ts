@@ -9,6 +9,7 @@ import type {
   V4SubmissionL, V4EvalM, V4Clins, V4Date, V4Provenance, Tone, Pole,
 } from "@/lib/v4-report/render";
 import { reconcileOfferDueDeadlines, isDeadDateLabel } from "@/lib/audit-deadline-extract";
+import { adaptV2ToV3Payload } from "@/lib/v4-report/adapt-v2-payload";
 
 // ── pole → display word + tone (Brain doctrine; honest-fail poles carry noVerdict + noCharge) ──
 const POLE_BAND: Record<string, string> = {
@@ -604,7 +605,12 @@ function deriveDocType(noticeType: string, pole: Pole): string {
  */
 export function buildV4Data(audit: Record<string, unknown>): V4Data {
   const cj = (audit.compliance_json as Record<string, unknown> | null) ?? {};
-  const p = (cj.v3 as V3ReportPayload | undefined) ?? {
+  // A PRE-V3 AUDIT IS ADAPTED, NOT DECLARED UNLOADABLE. 29 of the 105 complete audits predate the
+  // v3 engine and carry 38-39 populated v2 fields plus overview_json and risks_json. Falling
+  // straight through to the INCOMPLETE branch below would have told those customers their report
+  // "could not be loaded ... re-run", which is false — the analysis is there, in the older shape.
+  // The INCOMPLETE branch stays, and is still reached when there is genuinely nothing to read.
+  const p = (cj.v3 as V3ReportPayload | undefined) ?? adaptV2ToV3Payload(audit) ?? {
     // schema-drift / missing payload → INCOMPLETE with an EXPLANATORY rationale (never a blank verdict).
     verdict: "INCOMPLETE", eligible: null,
     reason: "The agentic report payload could not be loaded for this audit — it is under review and was not charged. Re-run to recover a complete report.",

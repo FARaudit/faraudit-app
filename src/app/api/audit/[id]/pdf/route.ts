@@ -20,8 +20,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@/lib/supabase-server";
-import { buildViewModel } from "../../../../audit/[id]/_view-model";
-import { renderAuditReportComplete } from "../../../../audit/[id]/_render";
+import { buildViewModel } from "../../../../audits/[id]/_view-model";
+import { renderAuditReportComplete } from "../../../../audits/[id]/_render";
 import { renderV4ReportFromRow } from "@/lib/v4-report/report";
 import { renderExecBriefV5 } from "@/lib/v5-report/render-pdf";
 import { renderGateDeckV5 } from "@/lib/v5-report/render-deck";
@@ -143,7 +143,7 @@ export async function GET(
       process.cwd(),
       "src",
       "app",
-      "audit",
+      "audits",
       "[id]",
       "_template.html"
     );

@@ -296,6 +296,39 @@ export async function runWatcherTick(opts: WatcherTickOptions = {}): Promise<Wat
     }
   }
 
+  // ── PER-USER ALERT PREFERENCES ────────────────────────────────────────────────────────
+  // Read ONCE for the tick, not once per row: the same customer usually owns several of them.
+  //
+  // ABSENT MEANS ON. A customer who has never opened the Notifications tab has not opted out,
+  // and treating a missing row as "off" would silently stop the alerts they signed up for.
+  // Only an explicit `false` suppresses, which is why the test is `!== false` and not truthiness.
+  //
+  // A FAILED READ FAILS TOWARD DELIVERY, and that direction is deliberate. The two ways to be
+  // wrong are not symmetric: sending one alert to someone who had switched them off is a
+  // nuisance, while swallowing a time-critical RFP notice during our own outage is the failure
+  // the customer is paying us to prevent. So an unreadable preference table sends as configured
+  // on the row and says so in the log rather than going quiet.
+  const alertPrefs = new Map<string, { email: boolean; inApp: boolean }>();
+  const prefUserIds = [...new Set(rows.map((r) => r.user_id).filter(Boolean))];
+  if (prefUserIds.length) {
+    const { data: prefRows, error: prefErr } = await admin
+      .from("user_preferences")
+      .select("user_id, alerts_email_enabled, alerts_in_app_enabled")
+      .in("user_id", prefUserIds);
+    if (prefErr) {
+      console.warn(`[watcher-tick] alert preferences unreadable (${prefErr.message}) — delivering as configured on each row`);
+    } else {
+      for (const p of prefRows ?? []) {
+        const r = p as { user_id: unknown; alerts_email_enabled?: unknown; alerts_in_app_enabled?: unknown };
+        alertPrefs.set(String(r.user_id), {
+          email: r.alerts_email_enabled !== false,
+          inApp: r.alerts_in_app_enabled !== false,
+        });
+      }
+    }
+  }
+  const alertsAllowed = (userId: string) => alertPrefs.get(userId) ?? { email: true, inApp: true };
+
   for (const row of rows) {
     result.checked++;
     try {
@@ -461,7 +494,7 @@ export async function runWatcherTick(opts: WatcherTickOptions = {}): Promise<Wat
       result.audited++;
 
       // Notification (in-app)
-      if (row.notify_in_app) {
+      if (row.notify_in_app && alertsAllowed(row.user_id).inApp) {
         await admin.from("notifications").insert({
           user_id: row.user_id,
           kind: "watcher_posted",
@@ -469,7 +502,7 @@ export async function runWatcherTick(opts: WatcherTickOptions = {}): Promise<Wat
           body: incomplete
             ? "Auto-audit needs your review — couldn't confirm a complete read"
             : `Auto-audit complete · ${String(recommendation ?? "").replace(/_/g, " ").toUpperCase() || "verdict ready"}`,
-          link: `/audit/${newAuditId}`,
+          link: `/audits/${newAuditId}`,
           meta: {
             audit_id: newAuditId,
             notice_id: row.notice_id,
@@ -482,7 +515,7 @@ export async function runWatcherTick(opts: WatcherTickOptions = {}): Promise<Wat
       }
 
       // Email
-      if (row.notify_email) {
+      if (row.notify_email && alertsAllowed(row.user_id).email) {
         const toEmail = await fetchEmailForUser(admin, row.user_id);
         if (toEmail) {
           // V3 surfaces detail in the grounded report (not a flat flags list); the
@@ -505,7 +538,7 @@ export async function runWatcherTick(opts: WatcherTickOptions = {}): Promise<Wat
             risksFlagsCount,
             responseDeadline: solicitation.responseDeadLine,
             questionsDueDate: null,
-            auditUrl: `${appBase}/audit/${newAuditId}`,
+            auditUrl: `${appBase}/audits/${newAuditId}`,
             watchingUrl: `${appBase}/watching`,
             settingsUrl: `${appBase}/settings`,
             unsubscribeUrl: `${appBase}/settings#alerts`,

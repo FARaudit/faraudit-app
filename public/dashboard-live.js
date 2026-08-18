@@ -304,7 +304,7 @@
       + '<td class="cell-date">' + esc(a.date) + '</td>'
       + '<td><span class="vcell" data-pole="' + esc(a._s) + '"><i class="pd ' + esc(a._s) + '"></i>' + esc(SL[a._s]) + '</span></td>'
       + '<td><span class="stcell">' + stInner + '</span></td>'
-      + '<td class="right"><a class="view-link" href="/audit/' + slug + '">' + (failed && a.retryable ? "Re-run" : "View") + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></td>'
+      + '<td class="right"><a class="view-link" href="/audits/' + slug + '">' + (failed && a.retryable ? "Re-run" : "View") + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></td>'
       + '</tr>';
   }
 
@@ -422,7 +422,7 @@
 
     if (sorted.length === 0) {
       body.innerHTML = '<tr><td colspan="10" style="padding:36px 16px;text-align:center;color:var(--mute);font-size:13px">'
-        + 'No audits yet — <a href="/audit" style="color:var(--blue-600);font-weight:600;text-decoration:none">run your first audit →</a>'
+        + 'No audits yet — <a href="/audits" style="color:var(--blue-600);font-weight:600;text-decoration:none">run your first audit →</a>'
         + '</td></tr>';
     } else if (visible.length === 0) {
       // R10 — honest empty: name the combination, offer clear. Never a blank
@@ -810,6 +810,25 @@
     });
   }
 
+  // Set by wireSearch so the ?sol= seed can open the same search UI a click opens.
+  var activateSearchRef = null;
+
+  /* /run-audit renders one row per NOTICE and links its run count here as `N runs →`.
+     That control is only honest if the ledger it lands on is actually narrowed to that
+     solicitation — otherwise it drops the customer on the full ledger and the label lies.
+     The parameter seeds the SAME visible search the customer can read and clear; it is
+     never a hidden filter, and an unmatched value shows the ordinary no-match state
+     rather than an empty page with no explanation. */
+  function seedSearchFromUrl() {
+    var sol = "";
+    try { sol = (new URLSearchParams(window.location.search).get("sol") || "").trim(); } catch (e) { sol = ""; }
+    if (!sol) return;
+    STATE.search = sol.toLowerCase();
+    if (activateSearchRef) activateSearchRef();
+    var input = document.querySelector(".search .cc-search-input");
+    if (input) { input.value = sol; input.blur(); }
+  }
+
   function wireSearch() {
     var sb = document.querySelector(".search");
     if (!sb || sb.dataset.ccWired) return;
@@ -837,6 +856,7 @@
         writeTable();
       });
     }
+    activateSearchRef = activateSearch;
     sb.addEventListener("click", activateSearch);
     window.addEventListener("keydown", function (e) {
       if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
@@ -864,7 +884,7 @@
       });
       row.style.cursor = "pointer";
       row.addEventListener("click", function () {
-        if (target) window.location.href = "/audit/" + encodeURIComponent(target);
+        if (target) window.location.href = "/audits/" + encodeURIComponent(target);
       });
     });
     var clear = document.querySelector(".cc-clear-filters");
@@ -1053,6 +1073,7 @@
     wireSort();
     wireSearch();
     wireFilterBar();
+    seedSearchFromUrl();
 
     // Loading state before the fetch — the markup ships placeholders, never numbers.
     var body = document.getElementById("ledgerBody");

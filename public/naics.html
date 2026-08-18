@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <style>
-:root{ --accent:#378ADD; --accent-deep:#185FA5; --accent-light:#B5D4F4; }
+:root{ --accent:#378ADD; --accent-deep:#185FA5; --accent-light:#B5D4F4; --rail-w:400px; --row-pad:10px; --sec-n:31px; --title-max:560px; }
 :root,[data-theme="light"]{
   --page-bg:#eef2f7; --bg:#f0f4f8; --card:#ffffff; --card-soft:#fafcfe;
   --ink:#0A1628; --ink-2:#334155; --mute:#64748b; --mute-2:#94a3b8;
@@ -233,102 +233,185 @@ details[open]>summary .chev{transform:rotate(180deg)}
 .ct-vs .mid{align-self:center;font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute-2)}
 
 /* NAICS */
-.naics{overflow:hidden;max-width:1060px}
-.nx-top{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line-2);flex-wrap:wrap}
-.nx-search{display:flex;align-items:center;gap:9px;height:36px;flex:1;min-width:220px;padding:0 12px;background:var(--card-soft);border:1px solid var(--line);border-radius:9px}
-.nx-search svg{width:15px;height:15px;color:var(--mute-2);flex:none}
-.nx-search input{border:0;background:transparent;outline:none;color:var(--ink);font-size:13px;width:100%}
-.nx-search input::placeholder{color:var(--mute-2);font-family:"IBM Plex Mono",monospace;font-size:12px}
-.nx-legend{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--mute);white-space:nowrap}
-.nx-legend .mon{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-.nx-legend b{color:var(--accent-on);font-weight:700}
-.nx-pills{display:flex;gap:7px;padding:12px 16px;border-bottom:1px solid var(--line-2);flex-wrap:wrap}
-.npill{height:28px;padding:0 12px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--mute);font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:7px}
-.npill .ct{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute-2);flex:none}
-/* Sector names are the regulation's own and run to seventy characters. The pill is a
-   fixed 28px, so an untruncated label overflows its box and lands on its neighbours.
-   The label truncates and carries the full name in its tooltip; the count never shrinks. */
-.npill .plabel{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:18ch;min-width:0}
-.npill:hover{border-color:var(--mute-2);color:var(--ink-2)}
-.npill.on{background:var(--accent-soft);border-color:var(--accent-hair);color:var(--accent-on)}
-.npill.on .ct{color:var(--accent)}
-.npill .pdot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);margin-right:1px}
-.nx-resbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 18px 4px}
-.nx-resbar .res{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute)}.nx-resbar .res b{color:var(--ink);font-weight:700}
-.nx-resbar .note{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute-2)}
-.nx-cards{display:grid;grid-template-columns:1fr;gap:12px;padding:8px 18px 18px}
-@media(min-width:760px){.nx-cards{grid-template-columns:repeat(2,1fr)}}
-@media(min-width:1200px){.nx-cards{grid-template-columns:repeat(3,1fr)}}
-.ncard{border:1px solid var(--line);border-radius:13px;background:var(--card-soft);padding:15px 16px;display:flex;flex-direction:column;gap:11px}
-.ncard.mon{border-color:var(--accent-hair);box-shadow:inset 3px 0 0 0 var(--accent)}
-.ncard-top{display:flex;align-items:center;gap:9px}
-.ncard-code{font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:700;color:var(--ink);display:inline-flex;align-items:center}
-.ncard-code .mdot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);margin-right:9px;opacity:0}
-.ncard.mon .ncard-code .mdot{opacity:1}
-.ncard-mon{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-on);background:var(--accent-soft);border:1px solid var(--accent-hair);border-radius:4px;padding:2px 6px}
-.ncard-mine{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#15623f;background:#e7f4ed;border:1px solid #bfe3cf;border-radius:4px;padding:2px 6px}
-[data-theme="dark"] .ncard-mine{color:#6ee7b7;background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.3)}
-.ncard-cat{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--mute);text-transform:uppercase;letter-spacing:.04em}
-.ncard-cat .cd{width:6px;height:6px;border-radius:50%}
-.ncard-title{font-size:15px;font-weight:600;color:var(--ink);line-height:1.3;letter-spacing:-.01em}
-.ncard-facts{display:flex;flex-direction:column;gap:7px;padding:11px 0;border-top:1px solid var(--line-3);border-bottom:1px solid var(--line-3)}
-.ncard-facts .fact{display:flex;align-items:baseline;gap:12px}
-.fact .fk{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mute-2);width:88px;flex:none}
-.fact .fv{font-size:13px;color:var(--ink-2);display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
-.fact .fv .sv2{font-family:"IBM Plex Mono",monospace;font-weight:700;color:var(--ink)}
-.ncard-facts .fnote{font-size:10px;color:var(--mute-2);font-style:italic;margin-left:100px;margin-top:-1px}
-.ncard-insight{display:flex;gap:10px;align-items:flex-start;background:var(--accent-soft);border:1px solid var(--accent-hair);border-radius:9px;padding:11px 12px}
-.ncard-insight .ai-spark{margin-top:4px;margin-right:0}
-.ncard-insight .ins-k{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-on);display:block;margin-bottom:3px}
-.ncard-insight p{margin:0;font-size:13px;line-height:1.45;color:var(--ink-2)}
-.nx-empty{padding:30px 18px;text-align:center;color:var(--mute);font-size:13px;display:none}
-.nx-tablewrap{overflow-x:auto}
-.ntable{width:100%;min-width:980px;border-collapse:collapse;table-layout:fixed}
-.ntable thead th:nth-child(1),.ntable td.code{width:9%}
-.ntable thead th:nth-child(2){width:13%}
-.ntable thead th:nth-child(3){width:24%}
-.ntable thead th:nth-child(4){width:10%}
-.ntable thead th:nth-child(5){width:13%}
-.ntable thead th:nth-child(6){width:31%}
-.ntable td.terms .termstack{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
-.ntable thead th.ai-h{color:var(--accent-on)}
-.ai-spark{display:inline-block;width:5px;height:5px;background:var(--accent);transform:rotate(45deg);border-radius:1px;margin-right:7px;vertical-align:middle;flex:none}
-.ntable td.notes.ai{color:var(--ink-2);font-weight:500;border-left:1px solid var(--line-2)}
-.ntable thead th{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute-2);text-align:left;padding:9px 16px;background:var(--card-soft);border-bottom:1px solid var(--line-2)}
-.ntable th.r,.ntable td.r{text-align:right}
-.ntable tbody tr{border-bottom:1px solid var(--line-3)}
-.ntable tbody tr:hover{background:var(--card-soft)}
-.ntable tbody tr.mon{background:linear-gradient(var(--accent-soft),var(--accent-soft))}
-.ntable tbody tr.mon td:first-child{box-shadow:inset 3px 0 0 0 var(--accent)}
-.ntable td{padding:8px 13px;vertical-align:middle}
-.ntable td.size{font-family:"IBM Plex Mono",monospace;white-space:nowrap;text-align:right;width:1%}
-.ntable td.size .sv{font-size:12px;font-weight:700;color:var(--ink)}
-.ntable td.size .su{display:block;font-size:9px;font-weight:500;color:var(--mute-2);text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
-.ntable td.eval,.ntable td.clause{white-space:nowrap;width:1%}
-.ntable td.notes{font-size:11.5px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.nchip{display:inline-flex;align-items:center;gap:5px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.03em;border-radius:5px;padding:2px 7px;white-space:nowrap;border:1px solid var(--line);color:var(--chip-text);background:var(--chip-bg)}
-.nchip .cd{width:5px;height:5px;border-radius:50%;flex:none}
-.nchip.rev{color:#1f6f4f;background:var(--ok-soft);border-color:var(--ok-hair)}
-.nchip.emp{color:#7c5e16;background:#fbf3df;border-color:#ecd9a8}
-.nchip.bv{color:var(--accent-on);background:transparent;border-color:var(--accent-hair)}
-.nchip.lpta{color:#9a5a12;background:transparent;border-color:#eccfa8}
-.nchip.cl-far,.nchip.cl-dfars,.nchip.cl-agar,.nchip.cl-affars{background:transparent;color:var(--mute);border-color:var(--line)}
-.cl-far .cd{background:#94a3b8}.cl-dfars .cd{background:#378ADD}.cl-agar .cd{background:#2f9e6f}.cl-affars .cd{background:#8a6fd0}
-[data-theme="dark"] .nchip.rev{color:#6ee7b7;background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.28)}
-[data-theme="dark"] .nchip.emp{color:#fcd34d;background:rgba(214,162,60,.12);border-color:rgba(214,162,60,.3)}
-[data-theme="dark"] .nchip.lpta{color:#fcd34d;background:transparent;border-color:rgba(214,162,60,.4)}
-.ntable td.code{font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:600;color:var(--ink);width:1%;white-space:nowrap}
-.ntable td.code .mdot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);margin-right:9px;vertical-align:middle;opacity:0}
-.ntable tr.mon td.code .mdot{opacity:1}
-.ntable td.title{font-size:13px;color:var(--ink-2);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ntable td.size{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600;color:var(--ink-2);white-space:nowrap}
-.ntable td.cat{width:1%;white-space:nowrap}
-.catbadge{display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--mute);border:1px solid var(--line);border-radius:5px;padding:2px 7px}
-.catbadge .cd{width:5px;height:5px;border-radius:50%;flex:none}
-.nx-foot{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;border-top:1px solid var(--line-2)}
-.nx-foot .res{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute)}.nx-foot .res b{color:var(--ink-2)}
-.nx-foot .note{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute-2)}
-.nx-empty{padding:30px 16px;text-align:center;color:var(--mute);font-size:13px;display:none}
+/* ══ the tab ═════════════════════════════════════════════════════════════════ */
+.naics{overflow:hidden;display:flex;flex-direction:column;height:calc(100vh - 250px);min-height:580px}
+.nt-top{display:flex;align-items:center;gap:14px;padding:14px 16px;border-bottom:1px solid var(--line-2);flex-wrap:wrap}
+.nt-srch{display:flex;align-items:center;gap:10px;height:38px;flex:1;min-width:260px;padding:0 13px;background:var(--card-soft);border:1px solid var(--line);border-radius:10px;transition:border-color .14s,box-shadow .14s}
+.nt-srch:focus-within{border-color:var(--accent-hair);box-shadow:0 0 0 3px var(--accent-soft)}
+.nt-srch svg{width:15px;height:15px;color:var(--mute);flex:none}
+.nt-srch input{border:0;background:transparent;outline:none;color:var(--ink);font-size:13.5px;width:100%;font-family:inherit}
+.nt-srch input::placeholder{color:var(--mute)}
+.nt-legend{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2);white-space:nowrap}
+.nt-legend b{color:var(--accent-on);font-weight:700}
+.nt-split{display:grid;grid-template-columns:var(--rail-w) minmax(0,1fr);min-height:0;flex:1}
+/* rail */
+.nt-rail{border-right:1px solid var(--line-2);overflow-y:auto;min-width:0}
+.nt-rail-in{position:relative;padding:12px 10px 18px}
+.nt-ind{position:absolute;left:0;top:0;width:3px;border-radius:0 3px 3px 0;background:var(--accent);opacity:0;transition:transform .24s cubic-bezier(.2,.7,.3,1),height .24s cubic-bezier(.2,.7,.3,1),opacity .18s}
+.nt-rk{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);padding:14px 9px 7px;margin:0;line-height:1.45;display:flex;flex-wrap:wrap;gap:0 8px;align-items:baseline}
+.nt-rk-s{letter-spacing:.04em;text-transform:none;font-weight:500;color:var(--mute)}
+.nt-ri{display:flex;gap:9px;align-items:baseline;width:100%;text-align:left;border:1px solid transparent;background:transparent;border-radius:9px;padding:7px 9px;color:var(--ink-2);transition:background .14s,border-color .14s,color .14s}
+.nt-ri:hover{background:var(--card-soft);border-color:var(--line)}
+.nt-ri.on{background:var(--accent-soft);border-color:var(--accent-hair)}
+.nt-ri.on .nt-ri-l,.nt-ri.on .nt-ri-c,.nt-ri.on .nt-ri-n{color:var(--accent-on);font-weight:700}
+.nt-ri:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.nt-ri-n{flex:none;width:38px;font-size:11px;font-weight:600;color:var(--mute)}
+.nt-ri-l{flex:1;min-width:0;font-size:12.5px;font-weight:600;line-height:1.38}
+.nt-ri.scope .nt-ri-l{font-weight:700;color:var(--ink)}
+/* "My codes" is the customer's own set and "All codes" is the regulation's — the same
+   control, two different questions. They were flush against each other and read as one
+   list; this breaks them apart without inventing a heading for a group of two. */
+.nt-ri.scope[data-scope="mine"]{margin-bottom:14px}
+.nt-ri-c{flex:none;font-size:11px;font-weight:700;color:var(--mute)}
+.nt-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);flex:none;align-self:center;position:relative}
+/* The ring is a SEPARATE element from the dot, so the dot itself never dims — a dot that
+ * blinks off reads as a fault light. Only the ACTIVE scope's dot animates; the legend dot
+ * in the search row is a key, and a key that pulses claims a state it does not have. */
+.nt-dot::after{content:"";position:absolute;left:50%;top:50%;width:7px;height:7px;margin:-3.5px 0 0 -3.5px;border-radius:50%;background:var(--accent);opacity:0;pointer-events:none}
+@keyframes ntDotPing{0%{transform:scale(1);opacity:.45}70%{transform:scale(3.4);opacity:0}100%{transform:scale(3.4);opacity:0}}
+.nt-ri.on .nt-dot::after,.nt-pin-h .nt-dot::after{animation:ntDotPing 2.4s cubic-bezier(.22,.61,.36,1) infinite}
+/* results */
+#ntMain{overflow-y:auto;min-width:0}
+.nt-res{display:flex;align-items:baseline;justify-content:space-between;gap:14px;padding:14px 20px 12px;flex-wrap:wrap;border-bottom:1px solid var(--line-3);position:sticky;top:0;background:var(--card);z-index:3}
+.nt-res-t{font-size:13px;color:var(--ink-2);margin:0}
+.nt-res-t b{color:var(--ink);font-weight:700}
+.nt-res-in{color:var(--mute)}
+.nt-res-n{font-size:11px;color:var(--mute);margin:0}
+/* the document beat */
+.nt-sec{display:grid;grid-template-columns:104px minmax(0,1fr);column-gap:16px;align-items:start;padding:28px 20px 13px;border-top:1px solid var(--line-2)}
+.nt-body>.nt-sec:first-child{border-top:0;padding-top:22px}
+.nt-sec.nosec{grid-template-columns:minmax(0,1fr)}
+.nt-sec-n{font-size:var(--sec-n);font-weight:600;color:var(--mute);line-height:1;letter-spacing:-.02em;padding-top:2px}
+html[data-t-facts="off"] .nt-facts{display:none}
+.nt-sec-l{font-size:17px;font-weight:800;letter-spacing:-.014em;color:var(--ink);margin:0 0 8px;line-height:1.3;text-wrap:pretty}
+.nt-facts{display:flex;flex-wrap:wrap;gap:7px 22px}
+.nt-fact{display:inline-flex;align-items:baseline;gap:7px}
+.nt-fact b{font-size:12.5px;font-weight:700;color:var(--ink)}
+.nt-fk{font-size:11.5px;color:var(--mute)}
+/* rows */
+.nt-rows{display:flex;flex-direction:column}
+/* The title track is CAPPED, not 1fr. As 1fr it absorbed every pixel of slack, so at a
+   wide viewport the figure sat ~708px from the end of a title that averages 234px — the
+   row read as crammed left with a void before the number. 560px clears 960 of the 978
+   titles on one line; the 18 longest wrap rather than truncate. The rule still spans the
+   full row, so the table keeps its shape and only the figure moves in. */
+.nt-r{display:grid;grid-template-columns:104px minmax(0,var(--title-max)) 92px 88px;column-gap:16px;row-gap:9px;align-items:baseline;padding:var(--row-pad) 20px;border-bottom:1px solid var(--line-3);transition:background .14s}
+html[data-t-rule="none"] .nt-r{border-bottom-color:transparent}
+html[data-t-rule="zebra"] .nt-r{border-bottom-color:transparent}
+html[data-t-rule="zebra"] .nt-r:nth-child(even){background:var(--card-soft)}
+html[data-t-yours="chip"] .nt-r.mine{box-shadow:none}
+html[data-t-yours="bar"] .nt-yours{display:none}
+html[data-t-prefix="off"] .nt-c1{font-weight:500;color:var(--ink-2)}
+.nt-r:hover{background:var(--card-soft)}
+.nt-r.mine{box-shadow:inset 3px 0 0 0 var(--accent)}
+.nt-c{font-size:13px;white-space:nowrap;letter-spacing:.01em}
+.nt-c1{font-weight:700;color:var(--ink)}
+.nt-c2{font-weight:500;color:var(--ink-2)}
+.nt-t{font-size:13.5px;font-weight:500;color:var(--ink-2);line-height:1.42;text-wrap:pretty}
+.nt-r.mine .nt-t{color:var(--ink);font-weight:600}
+.nt-yours{display:inline-block;margin-left:9px;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:var(--accent-on);background:var(--accent-soft);border:1px solid var(--accent-hair);border-radius:5px;padding:0 7px;white-space:nowrap;vertical-align:1px}
+.nt-fig{font-size:13px;font-weight:700;color:var(--ink);text-align:right;white-space:nowrap}
+.nt-unit{font-size:11.5px;color:var(--mute);white-space:nowrap}
+/* The editorial continuation. Drawn as a CARD it reads as a different object sitting
+   inside the row, which is what made "My codes" look like a different view — the row grid
+   was identical but the eye was reading a panel, not a row. The shipped default is FLOW:
+   the same content with no border and no fill, so a rich row is simply a taller row of
+   the same kind, the way a long title makes a taller row. */
+.nt-m{grid-column:2/-1;display:flex;flex-direction:column;gap:6px;padding:2px 0 0;border:0;background:transparent}
+html[data-t-ed="card"] .nt-m{gap:7px;padding:10px 12px;border:1px solid var(--line-2);border-radius:10px;background:var(--card-soft)}
+html[data-t-ed="inline"] .nt-m{flex-direction:row;flex-wrap:wrap;align-items:baseline;gap:6px 12px}
+html[data-t-ed="hide"] .nt-m{display:none}
+.nt-chips{display:flex;flex-wrap:wrap;gap:7px}
+.nt-chip{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;border-radius:5px;padding:2px 8px;white-space:nowrap;border:1px solid var(--line);color:var(--chip-text);background:var(--chip-bg)}
+/* --chip-text on a translucent chip over --card measures 4.39:1 in dark, across 54 chips.
+   Light is clean at 6.92, so only dark moves. Raising the chip BACKGROUND makes it worse,
+   not better — lifting a translucent white over a dark card walks the ground toward the
+   muted ink (.05→4.39, .10→3.76). The ink is what has to move: --ink-2 gives 8.42:1. */
+html[data-theme="dark"] .nt-chip{color:var(--ink-2)}
+.nt-chip.cat{background:transparent;border-style:dashed}
+.nt-note{font-size:12.5px;line-height:1.5;color:var(--ink-2);margin:0;text-wrap:pretty}
+/* empty */
+.nt-empty{padding:56px 24px;text-align:center}
+.nt-empty-h{font-size:15px;font-weight:700;color:var(--ink);margin:0 0 7px}
+.nt-empty-b{font-size:13px;color:var(--ink-2);margin:0 0 4px;line-height:1.5}
+.nt-widen{margin-top:13px;height:34px;padding:0 15px;border-radius:9px;border:1px solid var(--accent-hair);background:var(--accent-soft);color:var(--accent-on);font-size:12.5px;font-weight:700;transition:border-color .14s,background .14s}
+.nt-widen:hover{border-color:var(--accent)}
+
+/* ══ motion — matched to the platform's own .14s transitions ═══════════════════
+   Entry only, short, and never past the first screenful: a stagger running down 978
+   rows would make the table feel slow rather than alive. --dir carries the direction
+   of the move in the rail, so rows enter from the side you came from. */
+@keyframes ntRow{from{opacity:0;transform:translateY(calc(var(--dir,1)*7px))}to{opacity:1;transform:none}}
+@keyframes ntSec{from{opacity:0;transform:translateY(calc(var(--dir,1)*10px))}to{opacity:1;transform:none}}
+@keyframes ntRise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.nt-body.anim .nt-r{animation:ntRow .24s cubic-bezier(.2,.7,.3,1) both;animation-delay:calc(var(--i,0)*13ms)}
+.nt-body.anim .nt-sec{animation:ntSec .3s cubic-bezier(.2,.7,.3,1) both}
+.nt-body.anim .nt-empty{animation:ntRise .28s cubic-bezier(.2,.7,.3,1) both}
+.pg-in{animation:ntRise .34s cubic-bezier(.2,.7,.3,1) both}
+.pg-in.d1{animation-delay:.05s}
+.pg-in.d2{animation-delay:.1s}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ══ pinned band — your registered codes ══════════════════════════════
+   The card treatment was never the problem — its CONTAINER was. In a grid holding all 978,
+   one rich card stretches its sparse neighbours into empty space. A band that holds only
+   your registered codes has no sparse neighbours, so matching heights costs nothing, and
+   the register below keeps ONE row shape for everything. */
+/* auto-FIT, not auto-fill: empty tracks collapse, so three cards divide the whole width
+   between them instead of leaving a fourth column of air. The count sets the columns. */
+.nt-pin-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(292px,1fr));gap:11px}
+.nt-pin-g.mine-cards{padding:15px 18px 20px}
+/* SUBGRID, so the cards align at every width rather than at the one I measured.
+   Reserving two lines for the title fixed 1835px and nothing else: at 1700 and 1440 the
+   TERM CHIPS wrap to a second row on some cards and not others, and at 1600 and below the
+   longest title needs a THIRD line. Two independent causes, both width-dependent, so no
+   fixed min-height can hold them. Each card subscribes to the grid's rows instead, and
+   every band — title, size standard, terms, note — takes the height of the tallest card
+   in that row. Below ~880px the grid drops to fewer columns and the cards stack, where
+   aligning across bands is not a thing to want. */
+.pc{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:11px;padding:13px 15px 15px;min-width:0;display:grid;grid-template-rows:subgrid;grid-row:span 5;align-content:start}
+.pc-h{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:7px}
+.pc-code{font-size:16px;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
+.pc-cat{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:var(--mute);white-space:nowrap}
+/* TWO LINES ARE RESERVED WHETHER OR NOT THE TITLE NEEDS THEM. Titles run one or two
+   lines, and a one-line title lifted everything beneath it by exactly one line — the grey
+   rule, the size standard and the blue note all sat 20px higher than the neighbouring
+   card. This is min-height, not a forced break: "Machine Shops" still sits on one line
+   and simply has clean space under it. */
+.pc-t{font-size:15px;font-weight:700;line-height:1.35;min-height:2.7em;margin:0 0 11px;color:var(--ink);text-wrap:pretty}
+.pc-f{display:grid;grid-template-columns:104px minmax(0,1fr);gap:10px;align-items:baseline;padding:7px 0;border-top:1px solid var(--line-3)}
+.pc-k{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
+.pc-v b{font-size:17px;font-weight:700}
+.pc-u{font-size:12.5px;color:var(--ink-2);margin-left:5px}
+.pc-n{margin-top:11px;background:var(--accent-soft);border-radius:9px;padding:9px 11px}
+.pc-nk{display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--accent-on);margin-bottom:3px}
+.pc-nt{margin:0;font-size:13px;line-height:1.45;color:var(--ink);text-wrap:pretty}
+/* The strip is the BOUNDED shape: one row high whatever the count, so the tab keeps its
+   proportions for a customer with 3 codes and a customer with 30. */
+
+/* ══ narrow widths ═══════════════════════════════════════════════════════════
+   The rail plus four fixed row columns need about 1,240px. Below that the columns
+   step down; below 1,000px the rail stops being a column and becomes a strip above
+   the rows, and the figure drops to its own line rather than squeezing the title. */
+@media (max-width:1240px){
+  .nt-split{grid-template-columns:248px minmax(0,1fr)}
+  .nt-r{grid-template-columns:92px minmax(0,1fr) 84px 78px;column-gap:12px}
+  .nt-sec{grid-template-columns:92px minmax(0,1fr);column-gap:12px}
+}
+@media (max-width:1000px){
+  .nt-split{display:flex;flex-direction:column}
+  .nt-rail{border-right:0;border-bottom:1px solid var(--line-2);max-height:196px}
+  .nt-r{grid-template-columns:92px minmax(0,1fr);row-gap:5px}
+  .nt-fig{grid-column:1;text-align:left}
+  .nt-unit{grid-column:2}
+  .nt-m{grid-column:1/-1}
+  .nt-sec{grid-template-columns:minmax(0,1fr);row-gap:6px}
+  .nt-sec-n{font-size:22px}
+  .nt-pin-g{grid-template-columns:minmax(0,1fr)}
+  .pc-f{grid-template-columns:minmax(0,1fr);gap:2px;row-gap:2px}
+  .naics{height:auto;min-height:0}
+}
+
 /* ── page body sections + order flip ── */
 .body-stack{display:flex;flex-direction:column;gap:30px;margin-top:30px;max-width:1080px}
 #view-audit.on{display:flex;flex-direction:column}
@@ -511,18 +594,18 @@ details[open]>summary .chev{transform:rotate(180deg)}
   <div class="sb-logo-row"><div class="sb-logo">F</div><span class="sb-wordmark">FAR<span class="wm-au">audit</span></span></div>
   <div class="sb-group-label">WORKSPACE</div>
   <a class="sb-icon" href="/command-center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="sb-label">Today</span><span class="sb-tip">Today</span></a>
-  <a class="sb-icon" href="/audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg><span class="sb-label">Run Audit</span><span class="sb-badge new">New</span><span class="sb-tip">Run Audit</span></a>
+  <a class="sb-icon" href="/audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg><span class="sb-label">Run Audit</span><span class="sb-tip">Run Audit</span></a>
   <a class="sb-icon" href="/acquisition-stages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span class="sb-label">Acquisition Stages</span><span class="sb-tip">Acquisition Stages</span></a>
-  <a class="sb-icon" href="/dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="sb-label">Past Audits</span><span class="sb-badge count">15</span><span class="sb-tip">Past Audits</span></a>
-  <a class="sb-icon" href="/pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg><span class="sb-label">Pipeline</span><span class="sb-badge danger">3</span><span class="sb-tip">Pipeline</span></a>
+  <a class="sb-icon" href="/dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="sb-label">Past Audits</span><span class="sb-tip">Past Audits</span></a>
+  <a class="sb-icon" href="/pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg><span class="sb-label">Pipeline</span><span class="sb-tip">Pipeline</span></a>
   <a class="sb-icon" href="/capability-statement"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span class="sb-label">Capability Statement</span><span class="sb-tip">Capability Statement</span></a>
   <div class="sb-divider"></div>
   <div class="sb-group-label">INTELLIGENCE</div>
-  <a class="sb-icon" href="/opportunities"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">Opportunities</span><span class="sb-badge live">Live</span><span class="sb-tip">Opportunities</span></a>
-  <a class="sb-icon active" href="/naics"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/><circle cx="19" cy="18" r="2.4" fill="#378ADD" stroke="none"/></svg><span class="sb-label">NAICS Codes</span><span class="sb-badge new">New</span><span class="sb-tip">NAICS Codes</span></a>
+  <a class="sb-icon" href="/opportunities"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">Opportunities</span><span class="sb-tip">Opportunities</span></a>
+  <a class="sb-icon active" href="/naics"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/><circle cx="19" cy="18" r="2.4" fill="#378ADD" stroke="none"/></svg><span class="sb-label">NAICS Codes</span><span class="sb-tip">NAICS Codes</span></a>
   <a class="sb-icon" href="/defense-news"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L4 8v8l8 5 8-5V8l-8-5z"/></svg><span class="sb-label">Defense News</span><span class="sb-tip">Defense News</span></a>
   <a class="sb-icon" href="/defense-spending"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="13" width="3" height="4"/></svg><span class="sb-label">Defense Spending</span><span class="sb-tip">Defense Spending</span></a>
-  <a class="sb-icon" href="/agencies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg><span class="sb-label">Defense Agencies</span><span class="sb-badge count">8</span><span class="sb-tip">Defense Agencies</span></a>
+  <a class="sb-icon" href="/agencies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg><span class="sb-label">Defense Agencies</span><span class="sb-tip">Defense Agencies</span></a>
   <a class="sb-icon" href="/contracting-officers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M21 17c-.5-2-2-3.5-4-3.5"/></svg><span class="sb-label">Contracting Officers</span><span class="sb-tip">Contracting Officers</span></a>
   <div class="sb-divider"></div>
   <div class="sb-group-label">COMPLIANCE &amp; BD</div>
@@ -558,8 +641,8 @@ details[open]>summary .chev{transform:rotate(180deg)}
           <span class="nbadge" id="bellBadge" style="display:none"></span>
         </button>
         <div class="user-chip">
-          <div class="av">JR</div>
-          <div><div class="nm">Jose Rodriguez</div></div>
+          <div class="av"></div>
+          <div><div class="nm"></div></div>
         </div>
         <!-- Q6 — Notifications panel (same structure as Today) -->
         <div class="notif-panel" id="notifPanel" role="dialog" aria-label="Notifications">
@@ -667,18 +750,21 @@ details[open]>summary .chev{transform:rotate(180deg)}
       </div>
 
       <div class="view on" id="view-naics">
-        <h1 class="page-h">NAICS Code Reference</h1>
-        <p class="page-sub">Search any NAICS code, keyword, or type of work — try “ballistic glass” or “paving.” Every NAICS code carrying an SBA size standard, from 13 CFR 121.201; your registered codes show first once your Capability Statement is set.</p>
-        <div class="naics card">
-          <div class="nx-top">
-            <div class="nx-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input id="nxSearch" type="text" placeholder="Search code or keyword — e.g. 541512 or “machine shop”…" autocomplete="off" /></div>
-            <span class="nx-legend"><span class="mon"></span><b>Your codes</b>&nbsp;· SBA size standards</span>
-          </div>
-          <div class="nx-pills" id="nxPills"></div>
-          <div class="nx-resbar"><span class="res" id="nxRes"></span><span class="note">size std = SBA threshold, 13 CFR 121.201</span></div>
-          <div class="nx-cards" id="nxCards"></div>
-          <div class="nx-empty" id="nxEmpty">No codes match — try the 6-digit code or a keyword like “repair” or “IT.”</div>
+      <h1 class="page-h pg-in">NAICS Code Reference</h1>
+      <p class="page-sub pg-in d1">Search any NAICS code, keyword, or type of work — try “ballistic glass” or “paving.” Every NAICS code carrying an SBA size standard, from 13 CFR 121.201; your registered codes show first once your Capability Statement is set.</p>
+      <div class="naics card pg-in d2">
+        <div class="nt-top">
+          <label class="nt-srch">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            <input id="ntSearch" type="text" placeholder="Type a code or a keyword — 332, or “machine shop”" aria-label="Search NAICS codes" />
+          </label>
+          <span class="nt-legend"><i class="nt-dot"></i><b>Your codes</b> · SBA size standards</span>
         </div>
+        <div class="nt-split">
+          <div id="ntRail" class="nt-rail"></div>
+          <div id="ntMain"></div>
+        </div>
+      </div>
       </div>
     </div>
   </div>
@@ -702,92 +788,9 @@ function $(id){return document.getElementById(id);}
   document.addEventListener('click',function(e){var t=e.target&&e.target.closest&&e.target.closest('#sbToggle');if(!t)return;var n=h.getAttribute('data-sb')==='open'?'closed':'open';h.setAttribute('data-sb',n);try{localStorage.setItem(KEY,n);}catch(e){}});})();
 /* The bell — panel, badge and read-state — is owned by /notifications-chrome.js.
    The tracked count lives on Opportunities, where the notices are. */
-/* NAICS search-to-card */
-(function(){
-  var REF=window.NAICS_REF||{CATS:[],DATA:[],SYN:{},SECTORS:[]};
-  var CATS=REF.CATS,DATA=REF.DATA,SYN=REF.SYN,SECTORS=REF.SECTORS||[];
-  var CM={};CATS.forEach(function(c){CM[c.id]=c;});
-  var STDU={rev:'revenue',emp:'employees'},EVAL={bv:['Best Value','bv'],lpta:['LPTA','lpta']},CLAUSE={far:'FAR',dfars:'FAR+DFARS',agar:'FAR+AGAR',affars:'FAR+AFFARS'};
-  var pills=$('nxPills'),cards=$('nxCards'),res=$('nxRes'),empty=$('nxEmpty'),search=$('nxSearch');
-  if(!pills||!cards)return;
-  var MINE={},mineCount=0,active='all',q='';
-  /* Pills are BUILT AS NODES, not markup. Sector labels are transcribed from 13 CFR
-     121.201 by the generator rather than written here, so they are external text going
-     into the page; textContent cannot carry markup out of them however the source changes. */
-  function pill(id,label,count,dot){
-    var b=document.createElement('button');
-    b.className='npill'+(active===id?' on':'');b.setAttribute('data-c',id);
-    if(dot){var d=document.createElement('span');d.className='pdot';b.appendChild(d);}
-    var lb=document.createElement('span');lb.className='plabel';lb.textContent=label;b.appendChild(lb);
-    b.title=label;
-    var ct=document.createElement('span');ct.className='ct';ct.textContent=String(count);b.appendChild(ct);
-    return b;
-  }
-  function buildPills(){
-    pills.replaceChildren();
-    pills.appendChild(pill('mine','My codes',mineCount,true));
-    pills.appendChild(pill('all','All',DATA.length,false));
-    SECTORS.forEach(function(s){
-      var n=DATA.filter(function(r){return r[8]===s.id;}).length;
-      if(n)pills.appendChild(pill(s.id,s.label,n,false));
-    });
-  }
-  /* THE SOURCED FACTS RENDER ON EVERY ROW; THE EDITORIAL ONES ONLY WHERE WRITTEN.
-     Code, title and size standard are transcribed from 13 CFR 121.201 and are present on
-     every row. Category, typical terms and the note are editorial and cover a subset of
-     codes; where one is absent its block is omitted rather than defaulted, so nothing on
-     screen states an evaluation method or a threshold that no source carries.
-     Built as nodes: the titles are external text. */
-  function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
-  function fact(k,vNode){var f=el('div','fact');f.appendChild(el('span','fk',k));var v=el('span','fv');v.appendChild(vNode);f.appendChild(v);return f;}
-  function card(r){
-    var cat=CM[r[1]],ev=EVAL[r[5]],cl=CLAUSE[r[6]],yours=MINE[r[0]];
-    var d=el('div','ncard'+(yours?' mon':''));
-    var top=el('div','ncard-top');
-    var code=el('span','ncard-code');code.appendChild(el('span','mdot'));code.appendChild(document.createTextNode(r[0]));top.appendChild(code);
-    if(yours)top.appendChild(el('span','ncard-mine','Yours'));
-    if(cat){var ct=el('span','ncard-cat');var dot=el('span','cd');dot.style.background=cat.color;ct.appendChild(dot);ct.appendChild(document.createTextNode(cat.label));top.appendChild(ct);}
-    d.appendChild(top);
-    d.appendChild(el('div','ncard-title',r[2]));
-    var facts=el('div','ncard-facts');
-    var sv=el('span');sv.appendChild(el('span','sv2',r[3]));sv.appendChild(document.createTextNode(' '+(STDU[r[4]]||'')));
-    facts.appendChild(fact('Size standard',sv));
-    if(ev&&cl){var terms=el('span');terms.appendChild(el('span','nchip '+ev[1],ev[0]));
-      var c2=el('span','nchip cl-'+r[6]);c2.appendChild(el('span','cd'));c2.appendChild(document.createTextNode(cl));terms.appendChild(c2);
-      facts.appendChild(fact('Typical terms',terms));
-      facts.appendChild(el('div','fnote','directional — confirm per solicitation'));}
-    d.appendChild(facts);
-    if(r[7]){var ins=el('div','ncard-insight');ins.appendChild(el('span','ai-spark'));
-      var b=el('div','ins-body');b.appendChild(el('span','ins-k','What to expect'));b.appendChild(el('p',null,r[7]));ins.appendChild(b);d.appendChild(ins);}
-    return d;
-  }
-  function render(){
-    if(active==='mine'&&mineCount===0){empty.style.display='none';cards.innerHTML='<div class="nx-empty" style="display:block;grid-column:1/-1">Set your <b>Capability Statement</b> NAICS codes to see <b>My codes</b> here. <a href="/capability-statement" style="color:var(--accent-on);font-weight:700;text-decoration:none">Set it up →</a></div>';res.innerHTML='No registered codes yet';return;}
-    var scope=(q&&active==='mine')?'all':active;
-    var rows=DATA.filter(function(r){if(scope==='mine'&&!MINE[r[0]])return false;if(scope!=='mine'&&scope!=='all'&&r[8]!==scope)return false;
-      /* NULL-SAFE ON EVERY EDITORIAL FIELD. Most of the table has no note and no
-         category — those exist for a few dozen defense-relevant codes — so a filter that
-         calls .toLowerCase() on them unconditionally throws on the other nine hundred. */
-      if(q){var cl=CM[r[1]]?CM[r[1]].label.toLowerCase():'';
-        if(r[0].indexOf(q)<0&&r[2].toLowerCase().indexOf(q)<0&&(r[7]||'').toLowerCase().indexOf(q)<0&&cl.indexOf(q)<0&&(SYN[r[0]]||'').indexOf(q)<0)return false;}
-      return true;});
-    cards.replaceChildren();
-    var frag=document.createDocumentFragment();
-    rows.forEach(function(r){frag.appendChild(card(r));});
-    cards.appendChild(frag);
-    empty.style.display=rows.length?'none':'block';
-    if(active==='mine'&&!q)res.innerHTML='Showing your <b>'+mineCount+'</b> registered code'+(mineCount===1?'':'s')+' · search any NAICS';
-    else if(active==='all'&&!q)res.innerHTML='<b>'+DATA.length+'</b> codes with an SBA size standard · search a code, keyword, or type of work';
-    else res.innerHTML='<b>'+rows.length+'</b> result'+(rows.length===1?'':'s');}
-  pills.addEventListener('click',function(e){var b=e.target.closest('.npill');if(!b)return;active=b.dataset.c;buildPills();render();});
-  if(search)search.addEventListener('input',function(){q=this.value.trim().toLowerCase();render();});
-  buildPills();render();
-  fetch('/api/capability-statement',{credentials:'include'}).then(function(r){return r.ok?r.json():null;}).then(function(d){
-    var n=(d&&d.statement&&Array.isArray(d.statement.naics_codes))?d.statement.naics_codes:[];n.forEach(function(c){MINE[String(c).trim()]=1;});mineCount=Object.keys(MINE).length;
-    if(mineCount>0)active='mine';buildPills();render();}).catch(function(){});
-})();
 })();
 </script>
+<script src="/naics-tab.js"></script>
 <script src="/notifications-chrome.js" defer></script>
 </body>
 </html>

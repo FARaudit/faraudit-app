@@ -50,6 +50,20 @@ type Office = {
 
 /** Split resolveAgency()'s "Department · Office". Only the FIRST separator splits, so an
  *  office whose own name contains " · " stays intact. Mirrors opportunities-live.js. */
+/* THE JOIN BETWEEN A NOTICE AND AN AUDIT IS A STRING, SO IT IS NORMALISED ON BOTH SIDES.
+   Measured against production today the two agree character-for-character — normalising
+   changes not one of the 53 matches — so this is insurance against a latent class, not a
+   live fix. The class is worth closing because of how it fails: a case or spacing change
+   on SAM's side would drop an office to 0 audits, and a zero in that column reads as "you
+   have never worked this office" rather than "we could not match the name."
+
+   NOT office_leaf, which is the obvious-looking alternative and is wrong: it is sub-office
+   grain — "NAVSUP FLT LOG CTR YOKOSUKA", "W6QM MICC-FT BLISS" — where this page groups at
+   "DEPT OF DEFENSE · DEPT OF THE NAVY". Joining on it would match almost nothing. */
+function officeKey(s: string | null | undefined): string {
+  return String(s ?? "").toUpperCase().replace(/\s+/g, " ").trim();
+}
+
 function splitAgency(s: string | null): [string, string] {
   const v = String(s ?? "").trim();
   if (!v) return ["", ""];
@@ -65,10 +79,14 @@ export async function GET() {
 
   let rows;
   let scope;
+  let feedComplete = true;
   try {
     const out = await fetchLiveOpportunitiesScoped(supabase);
     rows = out.rows;
     scope = out.scope;
+    // Rides out with the numbers so a surface stating a total can hedge it. The 200-cap
+    // survived as long as it did because it was a console.warn nobody read.
+    feedComplete = out.complete;
   } catch (e) {
     // Rule 61 — a failed dependency is a visible failure state, never a plausible one.
     // "SAM did not answer" and "no office is buying your codes" are different facts and
@@ -90,14 +108,28 @@ export async function GET() {
     // stay zero and the page says nothing about audits rather than claiming none exist.
     audits = [];
   }
-  const auditedByOffice = new Map<string, { audited: number; decided: number }>();
+  /* THIS COLUMN COUNTS SOLICITATIONS, NOT RUNS. "Your audits: 37" beside a buying office
+     is read as "I have looked at 37 of their opportunities". It was counting engine runs,
+     and this customer's ledger holds 77 runs across 19 solicitations — measured per office,
+     21 runs against the Air Force covered 2 solicitations, and 3 against DLA covered 1.
+     Re-auditing the same solicitation is our retry, not their pursuit, so it is collapsed.
+
+     ONLY A RUN THAT FINISHED COUNTS. fetchRecentAudits applies no status filter, so a
+     failed run used to claim we had audited an office when nothing was produced. A run
+     that died is our problem. `complete` is the marker live-opportunities.ts joins on. */
+  const auditedByOffice = new Map<string, { sols: Set<string>; decided: Set<string> }>();
   for (const a of audits) {
-    const key = String(a.agency ?? "").trim();
+    if (a.status !== "complete") continue;
+    const key = officeKey(a.agency);
     if (!key) continue;
-    const cur = auditedByOffice.get(key) ?? { audited: 0, decided: 0 };
-    cur.audited += 1;
+    // Identity of the pursuit, not of the run. Falls back through notice id to the row id
+    // so a solicitation with no number still counts once rather than vanishing.
+    const sol = String(a.solicitation_number || a.notice_id || a.id || "").trim();
+    if (!sol) continue;
+    const cur = auditedByOffice.get(key) ?? { sols: new Set<string>(), decided: new Set<string>() };
+    cur.sols.add(sol);
     // A decision is a recorded outcome or a committal verdict — not merely a completed run.
-    if (a.outcome || a.recommendation) cur.decided += 1;
+    if (a.outcome || a.recommendation) cur.decided.add(sol);
     auditedByOffice.set(key, cur);
   }
 
@@ -128,8 +160,8 @@ export async function GET() {
     byKey.set(raw, cur);
   }
   for (const [raw, o] of byKey) {
-    const hit = auditedByOffice.get(raw);
-    if (hit) { o.audited = hit.audited; o.decided = hit.decided; }
+    const hit = auditedByOffice.get(officeKey(raw));
+    if (hit) { o.audited = hit.sols.size; o.decided = hit.decided.size; }
   }
 
   const OFFICES = [...byKey.values()].sort(
@@ -158,6 +190,7 @@ export async function GET() {
       offices: OFFICES.length,
       naics_scope: scope.codes,
       scope_source: scope.source,
+      feed_complete: feedComplete,
     },
   });
 }

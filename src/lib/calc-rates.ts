@@ -104,3 +104,59 @@ export async function calcRateStats(laborCategory: string): Promise<CalcRateStat
     source: "GSA CALC+ (live)",
   };
 }
+
+// ── BULK, CACHED, AND ON A DEADLINE ────────────────────────────────────────────────────
+//
+// Awarded rates are the headline number on Wage Benchmarks, so every visible row needs one,
+// not just the selected one. Measured 2026-08-10: 55 categories at concurrency 8 takes 5.8s
+// and 55 outbound requests. Doing that per page load is not a page load.
+//
+// So it is cached in process. CALC+ indexes ceiling rates off GSA schedules, which move on
+// contract award and option exercise, not by the minute — six hours is well inside the
+// staleness this data actually has, and the alternative is a new table and a migration for a
+// value we do not own.
+//
+// A DEADLINE, NOT A HANG. Whatever has resolved when the budget expires is returned, and the
+// rest report as unresolved rather than as "no awarded rate". A category CALC+ has never heard
+// of and a category we ran out of time to ask about are different facts, and a page that
+// collapses them tells a customer their role has no market when we simply did not ask.
+const RATE_CACHE = new Map<string, { stats: CalcRateStats | null; at: number }>();
+const RATE_TTL_MS = 6 * 3600_000;
+const BULK_CONCURRENCY = 8;
+
+export type BulkRate = CalcRateStats | null;
+
+/** Awarded rates for many categories. Returns a Map holding an entry ONLY for categories that
+ *  were actually resolved — a missing key means "not asked", which is not "not indexed". */
+export async function calcRateStatsBulk(
+  categories: string[],
+  opts?: { deadlineMs?: number; now?: number }
+): Promise<Map<string, BulkRate>> {
+  const now = opts?.now ?? Date.now();
+  const deadline = now + (opts?.deadlineMs ?? 7000);
+  const out = new Map<string, BulkRate>();
+  const pending: string[] = [];
+
+  for (const c of categories) {
+    const hit = RATE_CACHE.get(c);
+    if (hit && now - hit.at < RATE_TTL_MS) out.set(c, hit.stats);
+    else pending.push(c);
+  }
+
+  for (let i = 0; i < pending.length; i += BULK_CONCURRENCY) {
+    if (Date.now() >= deadline) break;
+    await Promise.all(pending.slice(i, i + BULK_CONCURRENCY).map(async (c) => {
+      try {
+        const stats = await calcRateStats(c);
+        RATE_CACHE.set(c, { stats, at: Date.now() });
+        out.set(c, stats);
+      } catch {
+        // Not cached: a transient failure must not pin "unknown" for six hours.
+      }
+    }));
+  }
+  return out;
+}
+
+/** Test seam — the cache is process-global and would otherwise leak between cases. */
+export function __resetRateCache(): void { RATE_CACHE.clear(); }

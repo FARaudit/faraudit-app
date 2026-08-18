@@ -34,10 +34,10 @@ function check(name: string, cond: boolean, detail = ""): void {
 async function main(): Promise<void> {
   const att = await import("../src/lib/sam-attachments");
   const { executeAudit } = await import("../src/lib/audit-executor");
-  const { buildViewModel } = await import("../src/app/audit/[id]/_view-model");
-  const { renderAuditReportComplete } = await import("../src/app/audit/[id]/_render");
+  const { buildViewModel } = await import("../src/app/audits/[id]/_view-model");
+  const { renderAuditReportComplete } = await import("../src/app/audits/[id]/_render");
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
-  const template = readFileSync("src/app/audit/[id]/_template.html", "utf8");
+  const template = readFileSync("src/app/audits/[id]/_template.html", "utf8");
 
   // ── P · deterministic plan on real manifests ───────────────────────────────
   const m1232 = await att.fetchAttachmentManifest(NOTICE_1232);

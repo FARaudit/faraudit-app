@@ -25,6 +25,11 @@ const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
 const src = read("public/naics-reference.js");
 const page = read("public/naics.html");
 const build = read("scripts/naics/build-naics-reference.mjs");
+// The tab's behaviour moved out of an inline <script> in naics.html and into its own served
+// file. The invariants below are unchanged; only where they are written has changed. Read the
+// two together so a check cannot pass merely because the code it guards left the file.
+const tab = read("public/naics-tab.js");
+const surface = page + "\n" + tab;
 
 // Loaded the way the browser loads it — the file is an IIFE that assigns window.NAICS_REF,
 // so planting a window on the global and requiring it runs the real module.
@@ -95,15 +100,72 @@ for (const [code, [size, kind]] of Object.entries(SPOT)) {
 }
 
 console.log("\n── the page renders what is sourced and omits what is not ──");
-check("the directory groups by sector, not the editorial category", /r\[8\]===s\.id/.test(page), "pills still filter on the curated category, which most rows lack");
-check("the category chip is conditional", /if\(cat\)/.test(page), "a row without a category would read a property of undefined");
-check("typical terms are conditional", /if\(ev&&cl\)/.test(page), "a row without an evaluation method would render undefined as a chip");
-check("the note block is conditional", /if\(r\[7\]\)/.test(page), "an empty note renders as an empty insight block");
-check("search is null-safe on editorial fields", /\(r\[7\]\|\|''\)/.test(page) && /CM\[r\[1\]\]\?/.test(page), "searching would throw on rows with no note or category");
+// r[8] is the sector; r[1] the curated category. Scoping on r[8] is the invariant — 951 of
+// 978 rows carry no category, so a directory keyed on it would hide them.
+check("the directory groups by sector, not the editorial category",
+  /r\[8\]\s*!==\s*S\.scope/.test(tab) && /SEC_N\[r\[8\]\]/.test(tab),
+  "the rail still scopes on the curated category, which most rows lack");
+// Nothing is defaulted: the four editorial fields render only where all four are sourced,
+// and every element carrying authored content is marked so the gate can find it.
+check("the editorial block is gated on all four sourced fields",
+  /function isEd\(r\)\s*\{\s*return !!\(r\[1\] && r\[5\] && r\[6\] && r\[7\]\)/.test(tab),
+  "a row missing a field would render undefined as a chip");
+check("the register row renders editorial content only behind that gate",
+  /if \(isEd\(r\)\)/.test(tab), "the chips and note are drawn unconditionally");
+check("the category chip is conditional in the card", /if \(r\[1\] && CM\[r\[1\]\]\)/.test(tab),
+  "a row without a category would read a property of undefined");
+check("the note block is conditional in the card", /if \(r\[7\]\)/.test(tab),
+  "an empty note renders as an empty insight block");
+check("authored content is marked for the gate to read", (tab.match(/dataset\.ed/g) || []).length >= 4,
+  "data-ed is what distinguishes sourced content from rendered chrome");
+// The field has no Clear control, so Escape is its ONLY keyboard exit — without it the
+// way back to the full table is select-all-delete. Defense Agencies already does this;
+// the two search boxes in one product must not disagree about it.
+check("Escape clears the search field",
+  /e\.key !== 'Escape'/.test(tab) && /input\.value = ''/.test(tab) && /input\.id !== 'ntSearch'/.test(tab),
+  "the search box has no keyboard exit");
+// The title track absorbing all slack is what pushed the figure ~708px from the title.
+// A one-line card title lifted the rule, the size standard and the blue note by exactly
+// one line against its neighbours. Two lines are reserved whether or not they are used.
+// Reserving two title lines aligned the cards at 1835px and nowhere else: at 1700 and
+// 1440 the term chips wrap on some cards and not others, and below 1600 the longest title
+// needs a third line. Subgrid is what makes every band take the tallest card in its row.
+// The band shapes were dead code behind pinMode(), which never returned anything but
+// 'off'. Deleted on Design's word after the CEO settled the shape. `.nt-pin-g` is NOT part
+// of it — Design's instruction said delete `.nt-pin*`, but that grid is what renders the
+// live My-codes cards, and following the instruction literally would erase them.
+check("the dead band paths are gone",
+  !/pinMode|renderPin|renderDivider|pinStripItem/.test(tab),
+  "the unreachable band shape is back in a served file");
+check("…and the live cards grid survived the deletion",
+  /\.nt-pin-g\{/.test(page) && /\.nt-pin-g\.mine-cards\{/.test(page) && /nt-pin-g mine-cards/.test(tab),
+  "My codes has no grid to render into");
+check("the cards align by subgrid, not by a guessed row count",
+  /\.pc\{[^}]*display:grid[^}]*grid-template-rows:subgrid[^}]*grid-row:span 5/.test(page),
+  "card alignment is back to fixed heights and breaks whenever the chips or title wrap");
+check("the two rail scopes are visually separated",
+  /\.nt-ri\.scope\[data-scope="mine"\]\{margin-bottom:\d+px\}/.test(page),
+  "My codes and All codes read as one undifferentiated list");
+check("the card title reserves two lines",
+  /\.pc-t\{[^}]*min-height:\s*2\.7em/.test(page),
+  "a one-line title pulls everything under it up and the cards stop aligning");
+// The caveat is honesty, not decoration: evaluation method and clause regime are OUR
+// editorial judgment, not the regulation. It may be said once — it may not be dropped.
+check("the typical-terms caveat is still stated",
+  /typical terms are directional — confirm per solicitation/.test(tab),
+  "an unsourced evaluation method is presented as fact");
+check("…and stated once, not per row", !/'nt-dir'/.test(tab),
+  "the caveat is back on every card and all 27 editorial rows");
+check("the title track is capped, not 1fr",
+  /grid-template-columns:104px minmax\(0,var\(--title-max\)\) 92px 88px/.test(page) && /--title-max:\s*\d+px/.test(page),
+  "the title column takes every spare pixel and strands the figure at the far edge");
+check("search is null-safe on editorial fields",
+  /\(r\[7\] \|\| ''\)/.test(tab) && /r\[1\] && CM\[r\[1\]\] \?/.test(tab),
+  "searching would throw on rows with no note or category");
 // Comments are documentation, not shipped claims. Scanning them made the copy check fire
 // on the comment explaining why the copy changed — the same way the settings gate did.
 // Code only, for every check that asks "does this still ship?".
-const pageCode = page.replace(/\/\*[\s\S]*?\*\//g, "").replace(/<!--[\s\S]*?-->/g, "");
+const pageCode = surface.replace(/\/\*[\s\S]*?\*\//g, "").replace(/<!--[\s\S]*?-->/g, "");
 check("no stale hardcoded size-standard vintage", !/tbl\s*\d\/\d{4}/.test(pageCode), "a hand-typed table date will outlive the data");
 check("the count is not described as a curated set", !/defense-relevant codes/.test(pageCode), "copy still claims a curated subset over the full regulation");
 check("N-P0 · the copy check can still see shipped text", /codes with an SBA size standard/.test(pageCode), "stripping comments removed the copy too — the check would pass on an empty string");
@@ -126,6 +188,29 @@ console.log("\n── the settings picker names itself as suggestions, not the t
   check("the no-match message explains what absence means",
     /so a code that is absent is one SBA does not size/.test(live), "absence reads as a gap in our data rather than a fact about SBA");
   check("N-P5 · rejects the stale subset copy", /carries a subset of NAICS/.test("It carries a subset of NAICS — type it in."));
+}
+
+
+// THE OVERLAY AND THE GENERATED FILE MUST AGREE ON EVERY CATEGORY. The categories are the one
+// part of this table that is NOT derived from 13 CFR — they are hand-authored in overlay.json —
+// so nothing else would catch an edit landing in one file and not the other. That drift is silent:
+// the picker groups by the GENERATED value while a future regeneration would restore the overlay's.
+{
+  const overlay = JSON.parse(read("scripts/naics/overlay.json")) as { rows: Record<string, { cat?: string }> };
+  const gen = read("public/naics-reference.js");
+  const mismatched: string[] = [];
+  let compared = 0;
+  for (const [code, row] of Object.entries(overlay.rows)) {
+    if (!row || typeof row.cat !== "string" || !row.cat) continue;
+    const m = gen.match(new RegExp(`\\['${code}','([a-z]*)'`));
+    if (!m) { mismatched.push(`${code} absent from the generated file`); continue; }
+    compared++;
+    if (m[1] !== row.cat) mismatched.push(`${code}: overlay ${row.cat} vs generated ${m[1]}`);
+  }
+  check("every overlay category compared against the generated file", compared > 0,
+    "nothing was compared — this leg is inert");
+  check("overlay and generated file agree on every category",
+    mismatched.length === 0, mismatched.join(" · "));
 }
 
 console.log("\n── planted positives ──");

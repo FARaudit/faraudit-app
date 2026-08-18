@@ -23,8 +23,13 @@
     const m = next.meta || {};
     window.CMMC.meta = {
       state: flagged > 0 ? 'ready' : 'empty',
-      reason: m.reason || (next.total_audited ? 'none-flagged' : 'no-audits'),
+      reason: m.reason || (next.total_solicitations ? 'none-flagged' : 'no-audits'),
+      // The distribution counts SOLICITATIONS — one per solicitation, its most recent audit.
+      // totalAudited is how many runs produced that, and the two are shown separately
+      // because a page that states one while counting the other is the defect being fixed.
+      totalSolicitations: typeof next.total_solicitations === 'number' ? next.total_solicitations : 0,
       totalAudited: typeof next.total_audited === 'number' ? next.total_audited : 0,
+      duplicatesCollapsed: typeof next.duplicates_collapsed === 'number' ? next.duplicates_collapsed : 0,
       unanalyzed: typeof next.unanalyzed === 'number' ? next.unanalyzed : 0
     };
   }
@@ -32,7 +37,7 @@
   function fail(detail) {
     window.CMMC.DISTRIBUTION = { '0': 0, '1': 0, '2': 0, '3': 0 };
     window.CMMC.BY_LEVEL = { '1': [], '2': [], '3': [] };
-    window.CMMC.meta = { state: 'error', reason: 'fetch-failed', detail: detail || null, totalAudited: 0, unanalyzed: 0 };
+    window.CMMC.meta = { state: 'error', reason: 'fetch-failed', detail: detail || null, totalSolicitations: 0, totalAudited: 0, duplicatesCollapsed: 0, unanalyzed: 0 };
   }
 
   function paint() {

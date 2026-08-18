@@ -57,6 +57,23 @@
   // is a server round-trip, not a client-side filter, so it cannot be faked.
   window.WAGE_LOAD = load;
 
+  /* ONE CATEGORY'S AWARDED RATES, asked for when a row is selected. It is a server round-trip
+     to GSA CALC+, so it cannot be answered client-side and must not be guessed. The reply is
+     handed back whatever it says — found, not indexed, or unreachable — because a panel that
+     renders nothing for all three tells three different customers the same untrue thing. */
+  async function compare(category) {
+    if (!category) return null;
+    try {
+      const res = await fetch('/api/labor-rates?compare=' + encodeURIComponent(category), { credentials: 'include' });
+      const data = await res.json().catch(function () { return null; });
+      if (!res.ok || !data) return { category: category, state: 'error' };
+      return data.compare || { category: category, state: 'none' };
+    } catch (e) {
+      return { category: category, state: 'error' };
+    }
+  }
+  window.WAGE_COMPARE = compare;
+
   const obs = new MutationObserver(() => {
     if (window.WAGE_APP && typeof window.WAGE_APP.onThemeChange === 'function') window.WAGE_APP.onThemeChange();
   });

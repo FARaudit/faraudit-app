@@ -15,9 +15,9 @@ import * as path from "node:path";
 import {
   renderV2Surfaces,
   buildV2ViewModelFromShadow,
-} from "../src/app/audit/[id]/_v2-render-surfaces";
+} from "../src/app/audits/[id]/_v2-render-surfaces";
 
-const TEMPLATE_PATH = path.join(process.cwd(), "src/app/audit/[id]/_template.html");
+const TEMPLATE_PATH = path.join(process.cwd(), "src/app/audits/[id]/_template.html");
 
 // Synthetic v2_shadow — every surface populated with distinctive content
 // the verifier can grep for in the output.

@@ -8,21 +8,25 @@
   // render logic doesn't change.
   window.CC = window.CC || {
     DESK: {
-      opp:   { label: 'Opportunities', color: '#378ADD', href: '/opportunities', icon: 'M12 2a9 9 0 100 18 9 9 0 000-18zM9 12l2 2 4-4' },
-      co:    { label: 'Contracting Officers', color: '#185FA5', href: '/contracting-officers', icon: 'M9 9a3 3 0 100-6 3 3 0 000 6zM3 20c1-3 3-5 6-5s5 2 6 5' },
-      cmmc:  { label: 'CMMC Readiness', color: '#0891b2', href: '/cmmc', icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4' },
-      gao:   { label: 'GAO Protests', color: '#dc2626', href: '/gao-protests', icon: 'M12 3a9 9 0 100 18 9 9 0 000-18zM3 12h18' },
-      far:   { label: 'FAR/DFARS', color: '#7c3aed', href: '/far-dfars-updates', icon: 'M4 3h16v18H4zM8 8h8M8 12h8M8 16h5' },
-      wage:  { label: 'Wage Benchmarks', color: '#d97706', href: '/wage-benchmarks', icon: 'M3 20h18M6 16v-5M11 16V8M16 16v-3' },
-      team:  { label: 'Teaming Partners', color: '#059669', href: '/teaming-partners', icon: 'M7 9a3 3 0 100-6 3 3 0 000 6zM17 9a3 3 0 100-6 3 3 0 000 6zM2 20c0-3 2.5-5 5-5M22 20c0-3-2.5-5-5-5' },
-      spend: { label: 'Defense Spending', color: '#2C6CB4', href: '/defense-spending', icon: 'M4 19V5M4 19h16M8 16v-4M13 16V9M18 16v-2' }
+      pipe:  { label: 'Pipeline', color: '#0f766e', href: '/pipeline', icon: 'M4 5h16M4 12h10M4 19h6', cta: 'Open pursuit' },
+      opp:   { label: 'Notices', color: '#378ADD', href: '/notices', icon: 'M12 2a9 9 0 100 18 9 9 0 000-18zM9 12l2 2 4-4', cta: 'View notice' },
+      co:    { label: 'Contracting Officers', color: '#185FA5', href: '/contracting-officers', icon: 'M9 9a3 3 0 100-6 3 3 0 000 6zM3 20c1-3 3-5 6-5s5 2 6 5', cta: 'Contact' },
+      cmmc:  { label: 'CMMC Readiness', color: '#0891b2', href: '/cmmc', icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4', cta: 'Review' },
+      gao:   { label: 'GAO Protests', color: '#dc2626', href: '/gao-protests', icon: 'M12 3a9 9 0 100 18 9 9 0 000-18zM3 12h18', cta: 'Read' },
+      news:  { label: 'Defense News', color: '#b45309', href: '/defense-news', icon: 'M4 4h16v16H4zM8 8h8M8 12h8M8 16h5', cta: 'Read' },
+      far:   { label: 'FAR/DFARS', color: '#7c3aed', href: '/far-dfars-updates', icon: 'M4 3h16v18H4zM8 8h8M8 12h8M8 16h5', cta: 'Read rule' },
+      wage:  { label: 'Wage Benchmarks', color: '#d97706', href: '/wage-benchmarks', icon: 'M3 20h18M6 16v-5M11 16V8M16 16v-3', cta: 'Compare' },
+      team:  { label: 'Teaming Partners', color: '#059669', href: '/teaming-partners', icon: 'M7 9a3 3 0 100-6 3 3 0 000 6zM17 9a3 3 0 100-6 3 3 0 000 6zM2 20c0-3 2.5-5 5-5M22 20c0-3-2.5-5-5-5', cta: 'Search' },
+      spend: { label: 'Defense Spending', color: '#2C6CB4', href: '/defense-spending', icon: 'M4 19V5M4 19h16M8 16v-4M13 16V9M18 16v-2', cta: 'View market' }
     },
     // ACTIONS + WEEK ship EMPTY and are filled only from what the API
-    // genuinely returns. Until a per-desk digest exists to populate them,
-    // these panels say so rather than showing anything unearned.
-    // Guarded by test/public/_today-fabrication.test.ts.
+    // genuinely returns. Guarded by test/public/_today-fabrication.test.ts.
     ACTIONS: [],
     WEEK: [],
+    // One row per desk from the cross-desk digest, each carrying its own status.
+    // null = the digest has not arrived, which is not the same as a set of desks
+    // with nothing to report, and the two never render alike.
+    SIGNALS: null,
     // Scalars the /api/command-center-data response already carries. null =
     // not computed; every render site prints an em dash for null and never a
     // zero standing in for "unknown".
@@ -40,6 +44,19 @@
   // is a different claim from "we have not computed this".
   const DASH = '—';
   function num(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
+
+  // EVERY value below that came off a desk is EXTERNAL TEXT — a SAM notice
+  // title, a point-of-contact's name, a Federal Register headline, a recipient
+  // name from USAspending. All four reach these panels verbatim and all four are
+  // written by someone outside this product, so they are escaped before they
+  // enter markup. The panels were safe while they shipped empty; feeding them is
+  // what makes this necessary.
+  function esc(v) {
+    if (v === null || v === undefined) return '';
+    return String(v)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
   function fmtMoney(v) {
     const n = num(v);
     if (n === null || n <= 0) return null;
@@ -62,6 +79,30 @@
     return total + ' active pursuit' + (total === 1 ? '' : 's') + (money ? '' : ' · none carry a stated value');
   }
 
+  // A tile whose number comes from the SAM feed may only describe a feed that
+  // ANSWERED. When it did not, the value is DASH and the foot says why — the same
+  // voice the rail pill and the Week Ahead panel use.
+  function feedFoot(L, whenAnswered) {
+    if (!L) return 'feed not loaded';
+    return L.feedAvailable === false ? 'the SAM.gov feed did not answer' : whenAnswered;
+  }
+  function feedVal(L, v) {
+    if (!L || L.feedAvailable === false) return DASH;
+    return String(num(v) ?? DASH);
+  }
+
+  // The tile counts SOLICITATIONS. Runs are usually higher because one solicitation
+  // is audited more than once, so the foot names the unit and surfaces the re-runs
+  // rather than letting the larger number sit behind a smaller one.
+  function auditsFoot(L) {
+    if (!L) return 'not loaded';
+    const sol = num(L.auditsThisMonth), runs = num(L.auditRunsThisMonth);
+    if (sol === null) return 'your audits could not be read';
+    if (sol === 0) return 'no solicitations audited in the last 30 days';
+    const base = 'solicitation' + (sol === 1 ? '' : 's') + ' you audited';
+    return (runs !== null && runs > sol) ? base + ' · ' + runs + ' runs' : base;
+  }
+
   function renderKPIs() {
     const L = window.CC.LIVE;
     const arrow = '<span class="kpi-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M7 17L17 7M9 7h8v8"/></svg></span>';
@@ -70,9 +111,9 @@
     // says why, in the same voice /opportunities uses for absent values.
     const money = L ? fmtMoney(L.pipelineWeightedValue) : null;
     const cards = [
-      { href: '/opportunities', lbl: 'Live Notices',     val: L ? String(num(L.liveCount) ?? DASH) : DASH,    unit: '',  foot: L ? 'matching your NAICS on SAM.gov' : 'feed not loaded', tone: 'blue' },
-      { href: '/opportunities', lbl: 'Closing ≤ 7 Days', val: L ? String(num(L.deadlineSoon) ?? DASH) : DASH, unit: '',  foot: L ? 'live notices with a stated deadline' : 'feed not loaded', tone: 'amber' },
-      { href: '/past-audits',   lbl: 'Audits This Month', val: L ? String(num(L.auditsThisMonth) ?? DASH) : DASH, unit: '', foot: L ? 'completed by you' : 'not loaded', tone: 'red' },
+      { href: '/notices', lbl: 'Live Notices',     val: feedVal(L, L && L.liveCount),    unit: '',  foot: feedFoot(L, 'matching your NAICS on SAM.gov'), tone: 'blue' },
+      { href: '/notices', lbl: 'Closing ≤ 7 Days', val: feedVal(L, L && L.deadlineSoon), unit: '',  foot: feedFoot(L, 'live notices with a stated deadline'), tone: 'amber' },
+      { href: '/past-audits',   lbl: 'Audits This Month', val: L ? String(num(L.auditsThisMonth) ?? DASH) : DASH, unit: '', foot: auditsFoot(L), tone: 'red' },
       { href: '/pipeline',      lbl: 'Pipeline Value',   val: money ?? DASH, unit: '', foot: pipelineFoot(L), tone: 'green' }
     ];
     $('kpiStrip').innerHTML = cards.map(c => `<a class="kpi" data-tone="${c.tone}" href="${c.href}">${arrow}<p class="lbl">${c.lbl}</p><div class="kpi-val">${c.val}<span class="unit">${c.unit}</span></div><div class="foot">${c.foot}</div></a>`).join('');
@@ -90,13 +131,17 @@
       body = `<span class="ib-label">Status</span><b>Your desk data is unavailable.</b> Nothing on this page is sample data — the panels stay empty until the feed answers.`;
     } else if (!L) {
       body = `<span class="ib-label">Status</span>Loading your desks — nothing on this page is sample data.`;
+    } else if (L.feedAvailable === false) {
+      // The feed did not answer. Nothing matched or failed to match, so this may
+      // not describe the window or suggest widening it.
+      body = `<span class="ib-label">Status</span><b>The SAM.gov feed did not answer.</b> Notice counts are unavailable rather than zero — nothing on this page is sample data.`;
     } else {
       const live = num(L.liveCount) ?? 0;
       const soon = num(L.deadlineSoon) ?? 0;
       if (live === 0) {
-        body = `<span class="ib-label">Status</span>No live SAM.gov notices match your NAICS in the current window. <a class="ib-link" href="/opportunities">Open the feed${arrow}</a> to widen it.`;
+        body = `<span class="ib-label">Status</span>No live SAM.gov notices match your NAICS in the current window. <a class="ib-link" href="/notices">Open the feed${arrow}</a> to widen it.`;
       } else {
-        body = `<span class="ib-label">Start here</span><a class="ib-link" href="/opportunities">${live} live notice${live === 1 ? '' : 's'}${arrow}</a> match your NAICS`
+        body = `<span class="ib-label">Start here</span><a class="ib-link" href="/notices">${live} live notice${live === 1 ? '' : 's'}${arrow}</a> match your NAICS`
           + (soon > 0 ? `, and <b>${soon}</b> close within 7 days — work those first.` : `. None carry a deadline inside 7 days.`);
       }
     }
@@ -131,16 +176,38 @@
     });
   }
 
-  // Two DIFFERENT empty states, because they are two different claims:
-  //   · ACTIONS is empty because no ranking is computed → say exactly that.
-  //     "Inbox zero" here would be a false all-clear on unexamined work.
-  //   · ACTIONS had rows and the user cleared/filtered them → inbox zero is true.
+  // FOUR empty states, because they are four different claims and only one of
+  // them is an all-clear:
+  //   · the digest has not arrived → nothing is examined yet.
+  //   · the data does not answer → nothing is measured. Never an all-clear.
+  //   · every desk answers and none returns a rankable item → say how many
+  //     desks are asked; each one's own reason is in Signals below.
+  //   · the rows are there and the user cleared or filtered them → inbox zero.
   function emptyFeed() {
+    const info = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>';
     const tick = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>';
     if (ACTIONS.length === 0) {
-      return `<div class="feed-clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
-        <div class="fc-t">Cross-desk ranking not built yet</div>
-        <div class="fc-d">This panel will rank the single most urgent item from each desk once the digest query ships. It is empty rather than illustrative — nothing here is sample data. Live data you can use today: <a class="fc-undo" href="/opportunities">Opportunities</a> · <a class="fc-undo" href="/past-audits">Past Audits</a> · <a class="fc-undo" href="/pipeline">Pipeline</a></div></div>`;
+      const S = window.CC.SIGNALS;
+      if (window.CC.FEED_ERROR) {
+        return `<div class="feed-clear">${info}<div class="fc-t">Your desks are unavailable</div>
+          <div class="fc-d">The data did not answer, so nothing is ranked rather than ranked from stale rows — nothing here is sample data.</div></div>`;
+      }
+      if (!Array.isArray(S)) {
+        return `<div class="feed-clear">${info}<div class="fc-t">Ranking your desks…</div>
+          <div class="fc-d">Nothing here is sample data.</div></div>`;
+      }
+      // A desk that could not be read is not a quiet desk, so the headline says
+      // which of the two happened rather than letting "nothing to rank" stand
+      // over a set of sources that never answered.
+      const down = S.filter(x => x && x.status === 'unavailable').length;
+      const head = down > 0
+        ? `${down} of your desks could not be read`
+        : 'No desk has an item to rank';
+      const lead = down > 0
+        ? `Nothing is ranked rather than ranked from what is left.`
+        : `All ${S.length} desks were asked and none returned something that needs action.`;
+      return `<div class="feed-clear">${info}<div class="fc-t">${head}</div>
+        <div class="fc-d">${lead} Each states its own reason in Signals below. Live data you can use today: <a class="fc-undo" href="/notices">Notices</a> · <a class="fc-undo" href="/past-audits">Past Audits</a> · <a class="fc-undo" href="/pipeline">Pipeline</a></div></div>`;
     }
     return `<div class="feed-clear">${tick}<div class="fc-t">Inbox zero</div><div class="fc-d">You've cleared every priority in this filter.${dismissed.size ? ` <button class="fc-undo" id="fcUndo">Restore ${dismissed.size} dismissed</button>` : ''}</div></div>`;
   }
@@ -151,20 +218,24 @@
     if (filter !== 'all') data = data.filter(a => filter === 'crit' ? a.urg === 'crit' : a.urg !== 'ok');
     $('actFeed').innerHTML = data.map((a, i) => {
       const d = DESK[a.desk], u = URG[a.urg];
-      const when = a.days === 0 ? 'now' : a.days != null ? `${a.days}d` : 'open';
+      // A NEGATIVE day count is OVERDUE, and it is the one case where the slot
+      // must not read as a countdown. "open" would say there is still time.
+      const when = a.days == null ? 'open'
+        : a.days < 0 ? `${-a.days}d ago`
+        : a.days === 0 ? 'now' : `${a.days}d`;
       const snz = snoozed.has(a.desk);
       return `<a class="act-card${snz ? ' snoozed' : ''}" href="${d.href}" style="--dc:${d.color}">
         <div class="act-rank">${snz ? '·' : i + 1}</div>
         <div class="act-ico" style="background:${hexA(d.color,.13)};color:${d.color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="${d.icon}"/></svg></div>
         <div class="act-body">
           <div class="act-meta"><span class="act-desk" style="color:${d.color}">${d.label}</span><span class="act-dot">·</span><span class="act-urg" style="color:${u.c}">${snz ? 'Snoozed' : u.l}</span></div>
-          <div class="act-title">${a.title}</div>
-          <div class="act-why">${a.why}</div>
+          <div class="act-title">${esc(a.title || d.label)}</div>
+          <div class="act-why">${esc(a.why)}</div>
         </div>
         <div class="act-right">
-          <div class="act-val">${a.val}</div>
+          <div class="act-val">${esc(a.val)}</div>
           <div class="act-when" style="color:${u.c}">${when}</div>
-          <span class="act-cta">${a.cta}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+          <span class="act-cta">${d.cta || 'Open'}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
         </div>
         <div class="act-ctrls">
           <button class="act-ctrl" data-snooze="${a.desk}" title="${snz ? 'Un-snooze' : 'Snooze'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l2.5 2.5"/></svg></button>
@@ -222,6 +293,13 @@
     groups.forEach(g => {
       const items = WEEK.filter(g.test);
       if (!items.length) return;
+      // Government events NEVER compete with notice deadlines for cap slots. There are
+      // a handful a quarter and each one binds every customer, so being sorted in among
+      // a hundred response deadlines and truncated away is the one outcome that makes
+      // them worthless. The cap governs notice rows only; gov rows always render.
+      // The calendar carries major events only, so there is nothing to truncate — a
+      // cap existed to hold back 177 response deadlines, and those are gone. It stays
+      // as a DOM backstop in case a future source floods a group.
       const cap = WEEK_GROUP_CAPS[g.label] || items.length;
       const shown = items.slice(0, cap);
       const hidden = items.length - shown.length;
@@ -231,40 +309,72 @@
       html += `<div class="wk-group"><span>${g.label}</span><b>${items.length}</b></div>` + shown.map(wkRow).join('');
       // Truncation is surfaced INSIDE the group it belongs to, never silent.
       if (hidden > 0) {
-        html += `<a class="wk-row" href="/opportunities"><div class="wk-date"><span class="wk-d">+${hidden}</span></div>
+        html += `<a class="wk-row" href="/notices"><div class="wk-date"><span class="wk-d">+${hidden}</span></div>
           <div class="wk-line"><span class="wk-node" style="background:var(--t40,#64748b)"></span></div>
-          <div class="wk-body"><div class="wk-label">${hidden} more in ${g.label.toLowerCase()} — open Opportunities</div></div></a>`;
+          <div class="wk-body"><div class="wk-label">${hidden} more in ${g.label.toLowerCase()} — open Notices</div></div></a>`;
       }
     });
     // Backstop drop from the wiring layer (DOM ceiling), counted separately so
     // the two truncation reasons are never conflated.
     const dropped = num(window.CC.WEEK_DROPPED) || 0;
     if (html && dropped > 0) {
-      html += `<a class="wk-row" href="/opportunities"><div class="wk-date"><span class="wk-d">+${dropped}</span></div>
+      html += `<a class="wk-row" href="/notices"><div class="wk-date"><span class="wk-d">+${dropped}</span></div>
         <div class="wk-line"><span class="wk-node" style="background:var(--t40,#64748b)"></span></div>
-        <div class="wk-body"><div class="wk-label">${dropped} more deadline${dropped === 1 ? '' : 's'} not shown — open Opportunities</div></div></a>`;
+        <div class="wk-body"><div class="wk-label">${dropped} more deadline${dropped === 1 ? '' : 's'} not shown — open Notices</div></div></a>`;
     }
     // Three states: outage · feed answered with nothing dated · rows.
     let empty;
     if (window.CC.FEED_ERROR || window.CC.WEEK_SOURCED === false) {
       empty = `<div class="fc-t">Deadlines unavailable</div><div class="fc-d">The feed did not answer, so this calendar is empty rather than illustrative — nothing here is sample data.</div>`;
     } else {
-      empty = `<div class="fc-t">No dated deadlines</div><div class="fc-d">No live notice in your NAICS carries a future response deadline right now. Only response deadlines are wired — wage-determination, regulatory and fiscal dates are not sourced yet.</div>`;
+      empty = `<div class="fc-t">No major dates ahead</div><div class="fc-d">No open comment period, rule effective date or fiscal marker falls in the window. Response deadlines are not shown here — they live on <a class="fc-undo" href="/notices">Notices</a>.</div>`;
     }
     $('weekList').innerHTML = html || `<div class="feed-clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>${empty}</div>`;
   }
 
-  // The desk registry (label / colour / route / icon) is real UI config, so
-  // these render as plain NAVIGATION: every desk reachable, zero assertions
-  // about what is in it. A desk card makes a claim only once its query exists.
+  // Every card states its desk's own answer, from the SAME cross-desk digest the
+  // Priority Action Feed ranks — one query, two panels, so a desk can never read
+  // as urgent above and quiet here.
+  //
+  // FOUR OUTCOMES, NEVER COLLAPSED. A desk that measured something states it; a
+  // desk whose source answered with nothing says so; a desk whose source FAILED
+  // says that instead, because an outage is not a quiet market; and a desk with
+  // no query behind it names what is missing rather than implying it is empty.
+  // The one sentence this replaces said the last of those about all six.
   function renderSignals() {
-    const order = ['spend', 'co', 'cmmc', 'far', 'gao', 'team'];
+    /* SIX CARDS. GAO is not among them: its own summary says GAO refuses the request
+       upstream, so that slot could never fill — a permanently blank card in a grid
+       whose whole job is to say what each desk holds. Defense news takes the slot and
+       carries a real headline. The GAO DESK entry stays: the rail still links to the
+       page, and this list is about what the GRID shows. */
+    const order = ['spend', 'co', 'cmmc', 'far', 'news', 'team'];
+    const S = window.CC.SIGNALS;
+    const byDesk = {};
+    if (Array.isArray(S)) S.forEach(x => { if (x && x.desk) byDesk[x.desk] = x; });
     $('sigGrid').innerHTML = order.map(key => {
       const d = DESK[key];
       if (!d) return '';
+      const s = byDesk[key];
+      let t, body, tone = null;
+      if (!s) {
+        // No row for this desk: the digest has not landed, or the fetch failed.
+        // Neither is a statement about what the desk holds.
+        t = 'Open ' + d.label;
+        body = window.CC.FEED_ERROR
+          ? 'Your data did not answer, so this desk has no summary — open it for its own live data.'
+          : 'Loading this desk…';
+      } else if (s.status === 'ok') {
+        t = s.title || d.label;
+        const when = s.days === 0 ? 'today' : s.days != null ? 'in ' + s.days + 'd' : null;
+        body = [s.why, s.value, when].filter(Boolean).join(' · ');
+        if (URG[s.urg]) tone = URG[s.urg].c;
+      } else {
+        t = 'Open ' + d.label;
+        body = s.reason || 'No summary is computed for this desk.';
+      }
       return `<a class="sig-card" href="${d.href}">
         <div class="sig-top"><span class="sig-ico" style="background:${hexA(d.color,.13)};color:${d.color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="${d.icon}"/></svg></span><span class="sig-desk">${d.label}</span><span class="sig-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
-        <div class="sig-t">Open ${d.label}</div><div class="sig-d">No cross-desk summary is computed yet — open the desk for its own live data.</div>
+        <div class="sig-t"${tone ? ' style="box-shadow:inset 3px 0 0 ' + tone + ';padding-left:9px"' : ''}>${esc(t)}</div><div class="sig-d">${esc(body)}</div>
       </a>`;
     }).join('');
   }
@@ -297,23 +407,30 @@
     }
   }
 
-  // Sidebar badges were three hardcoded counts (past audits, at-risk pipeline,
-  // agencies). All three are real fields on the API response, so they now read
-  // from it — and stay HIDDEN when unknown rather than showing a number nobody
-  // counted. A zero also hides: an empty badge is noise, not information.
+  // Sidebar counts go into the rail's own count slot — <span class="sb-ct"> on a
+  // row, built by renderCount() in src/lib/nav/rail.ts — under that function's
+  // rule: render a live value only, never a zero, never a stale one.
+  function railCount(href, v) {
+    const link = document.querySelector('.sb-step[href="' + href + '"], .sb-icon[href="' + href + '"]');
+    if (!link) return;
+    let el = link.querySelector('.sb-ct');
+    const n = num(v);
+    // A zero is not news and an unknown is not a number: remove the slot rather
+    // than leave a stale count standing (rail.ts renderCount, same rule).
+    if (n === null || n <= 0) { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement('span');
+      el.className = 'sb-ct';
+      const tip = link.querySelector('.sb-tip');
+      if (tip) link.insertBefore(el, tip); else link.appendChild(el);
+    }
+    el.textContent = String(n);
+  }
   function renderSidebarBadges() {
     const L = window.CC.LIVE;
-    const set = (id, v) => {
-      const el = $(id);
-      if (!el) return;
-      const n = num(v);
-      if (n === null || n <= 0) { el.style.display = 'none'; el.textContent = ''; return; }
-      el.textContent = String(n);
-      el.style.display = '';
-    };
-    set('sbAudits',   L ? L.auditTotal : null);
-    set('sbPipeline', L ? L.pipelineAtRisk : null);
-    set('sbAgencies', L ? L.agencyCount : null);
+    railCount('/past-audits', L ? L.auditTotal : null);
+    railCount('/pipeline',    L ? L.pipelineAtRisk : null);
+    railCount('/agencies',    L ? L.agencyCount : null);
   }
 
   function renderAll() { renderDateline(); renderIdentity(); renderSidebarBadges(); renderKPIs(); renderInsight(); renderTabs(); renderFeed(); renderWeek(); renderSignals(); }

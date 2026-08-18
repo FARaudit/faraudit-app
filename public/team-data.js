@@ -9,5 +9,5 @@
 window.TEAM = {
   PARTNERS: [],
   SCOPE: { codes: [], source: null },
-  meta: { state: 'loading', reason: null, perCode: {}, stateFilter: null, setAside: null }
+  meta: { state: 'loading', reason: null, perCode: {}, stateFilter: null, setAside: null, setAsideOptions: [] }
 };

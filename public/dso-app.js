@@ -695,7 +695,7 @@ function rowHTML(o) {
     '<div class="pc-state"><span class="vd ' + v.cls + '">' + v.word + '</span><span class="pc-note">' + clause(o) + '</span></div>' +
     '<div class="pc-actions">' +
       (hasSolicitation && auditRef
-        ? '<a class="btn-open" href="/audit?noticeId=' + encodeURIComponent(auditRef) + '&sol=' + encodeURIComponent(o.id || '') + '">Run audit</a>'
+        ? '<a class="btn-open" href="/audits?noticeId=' + encodeURIComponent(auditRef) + '&sol=' + encodeURIComponent(o.id || '') + '">Run audit</a>'
         : '<span class="btn-open off" title="' + (hasSolicitation ? 'No notice reference' : 'Special Notice — no solicitation document has posted for this requirement yet') + '">' + (hasSolicitation ? 'Run audit' : 'No solicitation yet') + '</span>') +
       '<button class="btn-2" type="button" data-watch-notice="' + esc(o.notice_id) + '">Track</button>' +
       '<button class="btn-2" type="button" data-track="' + esc(o.id) + '">Pipeline</button>' +
@@ -776,7 +776,14 @@ function wireActions() {
     }
     b.className = 'btn-2' + (status ? ' on' : '');
     b.textContent = status ? 'Tracking' : 'Track';
-    b.title = status ? 'Watching this notice — click to stop' : 'Watch this notice — you are alerted on amendments and deadline changes';
+    // WHAT THE WATCHER ACTUALLY DOES. This read 'you are alerted on amendments and deadline
+    // changes' and neither is built: watcher-tick's ONLY trigger is resourceLinks going
+    // []->[url] — the solicitation posting its documents. It refetches the deadline onto the
+    // row but never alerts on a change to it, and nothing detects amendments at all. A
+    // control may only claim what the code can do.
+    b.title = status
+      ? 'Watching this notice — click to stop'
+      : 'Watch this notice — when its documents post we run the audit and alert you';
     b.onclick = (e) => {
       e.stopPropagation();
       if (b.dataset._busy === '1') return;
@@ -843,6 +850,16 @@ function renderList() {
     : priced === 0 ? ' · no stated contract value on any of them'
     : priced === data.length ? ' · all with a stated value'
     : ' · ' + priced + ' with a stated value';
+  // THE SEAM BETWEEN THIS PAGE AND NOTIFICATIONS WAS INVISIBLE. Pressing Track is what
+  // creates a watched notice, and watched notices are the entire subject of the
+  // Notifications tab — but neither surface said so, so the connection lived only in the
+  // code. Stated once, here, where the button is.
+  const trackHint = $('plistTrackHint');
+  if (trackHint) {
+    trackHint.innerHTML = 'Press <b>Track</b> on a notice and we re-check it against SAM every hour — '
+      + 'when its documents post we run the audit and alert you. '
+      + '<a href="/settings">Choose how you are told</a>.';
+  }
   $('plistCount').innerHTML = '<b>' + data.length + '</b> of ' + total + ' shown' +
     (S.band ? ' · band: ' + BANDS.find((b) => b.k === S.band).t : '') +
     (S.stage !== 'all' ? ' · type: ' + STAGE_LABEL[S.stage] : '') +

@@ -50,7 +50,7 @@ function walk(dir: string, out: string[] = []): string[] {
     const p = join(dir, e);
     if (statSync(p).isDirectory()) walk(p, out);
     // .html IS included. The first cut filtered to /\.tsx?$/ and therefore could not see
-    // src/app/audit/[id]/_template.html — a SERVED customer surface (route.ts falls through to it for any row
+    // src/app/audits/[id]/_template.html — a SERVED customer surface (route.ts falls through to it for any row
     // whose engine is not agentic_v3). That made the design's "the inventory over-reports, which is the safe
     // direction" claim exactly backwards: it UNDER-reported, and a build-time ratchet seeded from it would
     // have passed green while the richest fabrication surface shipped. Caught by the ex-KO seat, not by me.
@@ -114,7 +114,7 @@ const SPECIFIC = /\b(?:fixed|transfer pric\w+|distributor|dealer|reseller|agreem
 const AUDIT_ROOTS = [
   "src/lib/audit-decide.ts", "src/lib/audit-engine.ts", "src/lib/audit-orchestrator.ts",
   "src/lib/audit-v3-report.ts", "src/lib/v4-report/build-data.ts", "src/lib/v5-report/report.ts",
-  "src/app/audit/[id]/_view-model.ts", "src/app/audit/[id]/route.ts",
+  "src/app/audits/[id]/_view-model.ts", "src/app/audits/[id]/route.ts",
 ].map((x) => join(ROOT, x)).filter((x) => existsSync(x));
 
 const RESOLVE_EXT = ["", ".ts", ".tsx", "/index.ts"];

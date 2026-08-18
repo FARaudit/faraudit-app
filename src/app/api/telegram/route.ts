@@ -261,7 +261,7 @@ async function triggerAuditReply(noticeId: string): Promise<string> {
     .limit(1)
     .maybeSingle();
   if (inflight) {
-    return `Manual audit · ${noticeId} already in flight (${inflight.status}). Report: ${base}/audit/${inflight.audit_id}`;
+    return `Manual audit · ${noticeId} already in flight (${inflight.status}). Report: ${base}/audits/${inflight.audit_id}`;
   }
   const { data: audit, error: auditErr } = await sb
     .from("audits")
@@ -287,6 +287,6 @@ async function triggerAuditReply(noticeId: string): Promise<string> {
     await sb.from("audits").update({ status: "failed", error_message: `telegram enqueue failed: ${error.message}` }).eq("id", audit.id);
     return `Manual audit · queue failed: ${error.message}`;
   }
-  return `Manual audit queued · ${noticeId}\n\nThe resident audit worker claims it within ~10s and fetches SAM facts + documents at run time. Report: ${base}/audit/${audit.id}`;
+  return `Manual audit queued · ${noticeId}\n\nThe resident audit worker claims it within ~10s and fetches SAM facts + documents at run time. Report: ${base}/audits/${audit.id}`;
 }
 

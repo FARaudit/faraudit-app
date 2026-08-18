@@ -1,0 +1,184 @@
+- generic [active] [ref=f4e1]:
+  - navigation [ref=f4e2]:
+    - generic [ref=f4e3]:
+      - link "F FARaudit" [ref=f4e4] [cursor=pointer]:
+        - /url: /
+        - generic [ref=f4e5]: F
+        - generic [ref=f4e6]: FARaudit
+      - generic [ref=f4e7]:
+        - link "How it works" [ref=f4e8] [cursor=pointer]:
+          - /url: /how-it-works
+        - link "Plans" [ref=f4e9] [cursor=pointer]:
+          - /url: /pricing
+        - link "Learn" [ref=f4e10] [cursor=pointer]:
+          - /url: /learn
+        - link "Sign in" [ref=f4e11] [cursor=pointer]:
+          - /url: /sign-in
+        - link "Request Access" [ref=f4e12] [cursor=pointer]:
+          - /url: /access
+  - generic [ref=f4e15]:
+    - generic [ref=f4e16]: Learn
+    - heading "Federal contracts, decoded." [level=1] [ref=f4e17]: Federal contracts,decoded.
+    - paragraph [ref=f4e18]: Five moves across the arc. Four modules on the FAR/DFARS landscape. A glossary you'll actually use.
+    - generic [ref=f4e19]:
+      - link "01 The tour" [ref=f4e20] [cursor=pointer]:
+        - /url: "#tour"
+        - generic [ref=f4e21]: "01"
+        - text: The tour
+      - link "02 Modules" [ref=f4e22] [cursor=pointer]:
+        - /url: "#modules"
+        - generic [ref=f4e23]: "02"
+        - text: Modules
+      - link "03 Glossary" [ref=f4e24] [cursor=pointer]:
+        - /url: "#glossary"
+        - generic [ref=f4e25]: "03"
+        - text: Glossary
+  - generic [ref=f4e27]:
+    - generic [ref=f4e28]:
+      - generic [ref=f4e29]:
+        - generic [ref=f4e30]: ↑
+        - text: The tour
+      - heading "One arc, five moves." [level=2] [ref=f4e31]
+      - paragraph [ref=f4e32]: Step through the full federal BD arc — click a move, or use the arrows.
+    - generic [ref=f4e33]:
+      - tablist "The arc, five moves" [ref=f4e34]:
+        - tab "01 SIGNAL" [selected] [ref=f4e35] [cursor=pointer]:
+          - generic [ref=f4e36]: "01"
+          - generic [ref=f4e37]: SIGNAL
+        - tab "02 SHAPE" [ref=f4e38] [cursor=pointer]:
+          - generic [ref=f4e39]: "02"
+          - generic [ref=f4e40]: SHAPE
+        - tab "03 VERDICT" [ref=f4e41] [cursor=pointer]:
+          - generic [ref=f4e42]: "03"
+          - generic [ref=f4e43]: VERDICT
+        - tab "04 SUBMIT" [ref=f4e44] [cursor=pointer]:
+          - generic [ref=f4e45]: "04"
+          - generic [ref=f4e46]: SUBMIT
+        - tab "05 RECOMPETE" [ref=f4e47] [cursor=pointer]:
+          - generic [ref=f4e48]: "05"
+          - generic [ref=f4e49]: RECOMPETE
+      - generic [ref=f4e50]: 1 of 5 explored
+      - generic [ref=f4e54]:
+        - generic [ref=f4e55]:
+          - generic [ref=f4e56]: SIGNAL
+          - paragraph [ref=f4e58]: FARaudit catches the Pre-Sol synopsis 60–90 days before the solicitation drops — and drafts the CO contact that puts you in the room early.
+        - generic [ref=f4e59]:
+          - button "Previous move" [ref=f4e60] [cursor=pointer]: ‹
+          - button "Next move" [ref=f4e61] [cursor=pointer]: ›
+  - generic [ref=f4e63]:
+    - generic [ref=f4e64]:
+      - generic [ref=f4e65]:
+        - generic [ref=f4e66]: §
+        - text: Modules
+      - heading "The FAR/DFARS landscape." [level=2] [ref=f4e67]
+      - paragraph [ref=f4e68]: Four short reads. Open the one you need.
+    - generic [ref=f4e69]:
+      - group [ref=f4e70]:
+        - generic "MODULE 01 FAR · DFARS + FAR vs DFARS — what's the difference?" [ref=f4e71] [cursor=pointer]:
+          - generic [ref=f4e72]:
+            - generic [ref=f4e73]: MODULE 01
+            - generic [ref=f4e74]: FAR · DFARS
+            - generic [ref=f4e75]: +
+          - generic [ref=f4e76]: FAR vs DFARS — what's the difference?
+        - generic [ref=f4e77]: "FAR (Federal Acquisition Regulation) applies to all federal procurement. DFARS (Defense FAR Supplement) layers DoD-specific rules on top. If your solicitation cites a DFARS clause, treat it as authoritative for DoD work; FAR fills the gaps. Common DFARS pain points: 252.204-7012 (covered defense info safeguarding), 252.225-7001 (Buy American), 252.225-7048 (export control)."
+      - group [ref=f4e78]:
+        - generic "MODULE 02 Sections L / M + Sections L and M — what to read first" [ref=f4e79] [cursor=pointer]:
+          - generic [ref=f4e80]:
+            - generic [ref=f4e81]: MODULE 02
+            - generic [ref=f4e82]: Sections L / M
+            - generic [ref=f4e83]: +
+          - generic [ref=f4e84]: Sections L and M — what to read first
+      - group [ref=f4e85]:
+        - generic "MODULE 03 CLINs + How to read CLINs without losing your mind" [ref=f4e86] [cursor=pointer]:
+          - generic [ref=f4e87]:
+            - generic [ref=f4e88]: MODULE 03
+            - generic [ref=f4e89]: CLINs
+            - generic [ref=f4e90]: +
+          - generic [ref=f4e91]: How to read CLINs without losing your mind
+      - group [ref=f4e92]:
+        - generic "MODULE 04 Set-asides + Set-asides and certifications — what unlocks what" [ref=f4e93] [cursor=pointer]:
+          - generic [ref=f4e94]:
+            - generic [ref=f4e95]: MODULE 04
+            - generic [ref=f4e96]: Set-asides
+            - generic [ref=f4e97]: +
+          - generic [ref=f4e98]: Set-asides and certifications — what unlocks what
+  - generic [ref=f4e100]:
+    - generic [ref=f4e101]:
+      - generic [ref=f4e102]:
+        - generic [ref=f4e103]: ≡
+        - text: Glossary
+      - heading "A glossary you'll actually use." [level=2] [ref=f4e104]
+      - paragraph [ref=f4e105]: Browse the reference — or switch to flashcards and quiz yourself to mastery.
+    - generic [ref=f4e106]:
+      - generic [ref=f4e107]:
+        - textbox "Filter terms…" [ref=f4e112]
+        - tablist "Glossary view" [ref=f4e113]:
+          - tab "Reference" [selected] [ref=f4e114] [cursor=pointer]
+          - tab "Flashcards" [ref=f4e115] [cursor=pointer]
+        - generic [ref=f4e116]: 14 terms
+      - generic [ref=f4e117]:
+        - generic [ref=f4e118]:
+          - generic [ref=f4e119]: KO
+          - generic [ref=f4e120]: Contracting Officer — the only person legally allowed to commit the government to a contract.
+        - generic [ref=f4e121]:
+          - generic [ref=f4e122]: COR
+          - generic [ref=f4e123]: Contracting Officer's Representative — technical liaison; can clarify but not commit.
+        - generic [ref=f4e124]:
+          - generic [ref=f4e125]: RFQ
+          - generic [ref=f4e126]: Request for Quote — informal price solicitation, usually under simplified acquisition threshold.
+        - generic [ref=f4e127]:
+          - generic [ref=f4e128]: RFP
+          - generic [ref=f4e129]: Request for Proposal — formal solicitation, usually best-value with technical evaluation.
+        - generic [ref=f4e130]:
+          - generic [ref=f4e131]: IFB
+          - generic [ref=f4e132]: Invitation for Bid — sealed bid, lowest price wins, no negotiation.
+        - generic [ref=f4e133]:
+          - generic [ref=f4e134]: BPA
+          - generic [ref=f4e135]: Blanket Purchase Agreement — preset terms, ordered against over time.
+        - generic [ref=f4e136]:
+          - generic [ref=f4e137]: IDIQ
+          - generic [ref=f4e138]: Indefinite Delivery / Indefinite Quantity — task-order vehicle; min/max ceiling.
+        - generic [ref=f4e139]:
+          - generic [ref=f4e140]: GSA Schedule
+          - generic [ref=f4e141]: Pre-negotiated price list; contracting shortcut for federal buyers.
+        - generic [ref=f4e142]:
+          - generic [ref=f4e143]: NAICS
+          - generic [ref=f4e144]: North American Industry Classification System — drives small business size standards.
+        - generic [ref=f4e145]:
+          - generic [ref=f4e146]: CAGE Code
+          - generic [ref=f4e147]: Commercial and Government Entity code — your federal vendor ID.
+        - generic [ref=f4e148]:
+          - generic [ref=f4e149]: UEI
+          - generic [ref=f4e150]: Unique Entity ID — replaced DUNS in 2022; required in SAM.gov.
+        - generic [ref=f4e151]:
+          - generic [ref=f4e152]: FAR 52.204-25
+          - generic [ref=f4e153]: Section 889 — bans Huawei/ZTE telecom from federal contracts.
+        - generic [ref=f4e154]:
+          - generic [ref=f4e155]: DFARS 252.204-7012
+          - generic [ref=f4e156]: Cyber clause — requires NIST 800-171 compliance for DoD contractors.
+        - generic [ref=f4e157]:
+          - generic [ref=f4e158]: DFARS 252.223-7008
+          - generic [ref=f4e159]: Hex chrome prohibition — no hexavalent chromium without KO approval.
+    - generic [ref=f4e160]:
+      - generic [ref=f4e161]: Ready
+      - heading "Ready to see it on your own solicitation?" [level=3] [ref=f4e162]
+      - link "Request access →" [ref=f4e163] [cursor=pointer]:
+        - /url: /access
+  - contentinfo [ref=f4e164]:
+    - generic [ref=f4e165]:
+      - link "F FARaudit" [ref=f4e166] [cursor=pointer]:
+        - /url: /
+        - generic [ref=f4e167]: F
+        - generic [ref=f4e168]: FARaudit
+      - generic [ref=f4e169]:
+        - link "How it works" [ref=f4e170] [cursor=pointer]:
+          - /url: /how-it-works
+        - link "Plans" [ref=f4e171] [cursor=pointer]:
+          - /url: /pricing
+        - link "Learn" [ref=f4e172] [cursor=pointer]:
+          - /url: /learn
+        - link "Sign in" [ref=f4e173] [cursor=pointer]:
+          - /url: /sign-in
+        - link "Request Access" [ref=f4e174] [cursor=pointer]:
+          - /url: /access
+      - generic [ref=f4e175]: © 2026 FARaudit Inc. · Dover, DE

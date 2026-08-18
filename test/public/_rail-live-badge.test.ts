@@ -93,9 +93,13 @@ console.log("\n── Part C · Week Ahead calendar ──");
   check("each truncated group says how many it hid", /more in \$\{g\.label/.test(ccApp), "group truncation is silent");
   // The trap: showing N rows under a header reading N hides that more exist.
   // The header must print the group's TRUE total.
+  // The PROPERTY is: the header prints the group's true total while the rows are a
+  // capped subset. The second half used to pin the exact expression `shown =
+  // items.slice`, so exempting government rows from the cap — which does not touch
+  // the header at all — turned this red. Test the property, not the spelling.
   check(
     "group header count is the true total, not the shown count",
-    /<b>\$\{items\.length\}<\/b>/.test(ccApp) && /shown\s*=\s*items\.slice/.test(ccApp),
+    /<b>\$\{items\.length\}<\/b>/.test(ccApp) && /\.slice\(0,\s*cap\)/.test(ccApp),
     "header count derived from the capped slice"
   );
   check("wiring-layer ceiling is a DOM backstop, not the display cap", /WEEK_MAX_ROWS/.test(ccLive), "display cap still lives in the fetch layer");
@@ -239,9 +243,12 @@ console.log("\n── Part H · card 807 workflow rail ──");
   const R = renderRail("opportunities");
   const S = railStyle();
   const J = railScript();
-  const ROUTES = ["/command-center","/opportunities","/audit","/past-audits","/pipeline","/cmmc","/capability-statement","/teaming-partners","/defense-news","/defense-spending","/agencies","/contracting-officers","/naics","/far-dfars-updates","/wage-benchmarks"];
+  // The list is spelled out rather than derived from rail.ts, on purpose: derived
+  // from the source it would agree with any rail, including one that lost a
+  // destination. Adding a page means adding it HERE too — that edit is the review.
+  const ROUTES = ["/command-center","/notices","/audits","/past-audits","/pipeline","/who-to-call","/cmmc","/capability-statement","/teaming-partners","/defense-news","/defense-spending","/agencies","/contracting-officers","/naics","/far-dfars-updates","/wage-benchmarks"];
   const hrefs = [...R.matchAll(/href="([^"]+)"/g)].map((m) => m[1]).filter((h) => h !== "/settings");
-  check("15 destinations, exactly the source routes", JSON.stringify(hrefs) === JSON.stringify(ROUTES), hrefs.join(" "));
+  check(`${ROUTES.length} destinations, exactly the source routes`, JSON.stringify(hrefs) === JSON.stringify(ROUTES), hrefs.join(" "));
 
   // §6: counts derive live or do not ship. The handoff MARKUP shipped 4, 19 and a 72% with no
   // source named anywhere — a stale number in the rail is on every page, all day.
@@ -254,10 +261,32 @@ console.log("\n── Part H · card 807 workflow rail ──");
 
   // The collapse control must keep the id that 18 pages bind from OUTSIDE the replaced aside.
   check("collapse control keeps id=sbToggle", /id="sbToggle"/.test(R), "renaming it breaks collapse on every page");
-  check("rail does not re-bind faraudit-sb", !/faraudit-sb/.test(J), "double-binding makes every click a no-op");
+  // QUOTE-EXACT, not a bare substring: the key this guards is 'faraudit-sb', and a
+  // substring test also condemns every longer key that merely starts with it —
+  // 'faraudit-rail-sections' was renamed away from 'faraudit-sb-sections' for this
+  // reason, but the next such key should fail review, not this gate.
+  check("rail does not re-bind faraudit-sb", !/['"]faraudit-sb['"]/.test(J), "double-binding makes every click a no-op");
 
-  check("3 collapsible sections, Readiness open", (R.match(/class="sb-sec"/g) || []).length === 3 && (R.match(/data-open="true"/g) || []).length === 1);
-  check("the active page's section is forced open", (renderRail("naics").match(/data-open="true"/g) || []).length === 2, "landing in a collapsed section hides the active row");
+  // EVERY section starts closed (CEO 2026-08-16). The rail's job on arrival is to show
+  // where you are, not everywhere you could go.
+  check("3 collapsible sections, all closed by default",
+    (R.match(/class="sb-sec"/g) || []).length === 3 && (R.match(/data-open="true"/g) || []).length === 0,
+    "a section opens on a page it does not hold");
+  /* The one exception, and it is asserted as BEHAVIOUR rather than as a count: the
+     section holding the active page opens, whatever the default. The previous form
+     counted open sections and so went red when the default changed — a number that
+     moves for a reason the check does not care about. Checked across all three
+     sections so a rule that happened to work for one is not mistaken for the rule. */
+  for (const [page, sec] of [["naics", "reference"], ["cmmc", "readiness"], ["defense-news", "market-intel"]] as Array<[string, string]>) {
+    const html = renderRail(page);
+    const m = html.match(new RegExp(`data-sec="${sec}"([^>]*)`));
+    check(`the active page's section opens · ${page} → ${sec}`,
+      !!m && /data-open="true"/.test(m[1]) && /data-active="true"/.test(m[1]),
+      "landing in a collapsed section hides the active row");
+    const others = [...html.matchAll(/data-sec="([^"]+)"([^>]*)/g)]
+      .filter((x) => x[1] !== sec && /data-open="true"/.test(x[2])).map((x) => x[1]);
+    check(`…and no OTHER section opens with it · ${page}`, others.length === 0, others.join(","));
+  }
   check("sentence-case group headers", !/MARKET INTEL|READINESS/.test(R), "caps headers returned");
 
   // The base layout block was MISSING from the handoff's rail.css; without it every new class
@@ -413,9 +442,9 @@ console.log("\n── Part K · badge selectors resolve against the real rail �
   check("dashboard-live.js · its selector matches a real rail row", matchesRail(dashSel, railHtml), dashSel);
 
   // Planted positives — the check must be able to go RED on the exact defect it was written for.
-  check("K-P1 · REJECTS the shipped-and-dead `.sb-icon[href=\"/opportunities\"]`", !matchesRail('.sb-icon[href="/opportunities"]', railHtml));
+  check("K-P1 · REJECTS the shipped-and-dead `.sb-icon[href=\"/notices\"]`", !matchesRail('.sb-icon[href="/notices"]', railHtml));
   check("K-P2 · REJECTS the shipped-and-dead `.sb-icon[href=\"/past-audits\"]`", !matchesRail('.sb-icon[href="/past-audits"]', railHtml));
-  check("K-P3 · ACCEPTS the corrected `.sb-step[href=\"/opportunities\"]`", matchesRail('.sb-step[href="/opportunities"]', railHtml));
+  check("K-P3 · ACCEPTS the corrected `.sb-step[href=\"/notices\"]`", matchesRail('.sb-step[href="/notices"]', railHtml));
   // A section row genuinely IS .sb-icon — the check must not simply reject that class.
   check("K-P4 · ACCEPTS `.sb-icon[href=\"/cmmc\"]`, a real section row", matchesRail('.sb-icon[href="/cmmc"]', railHtml));
   check("K-P5 · REJECTS a route the rail does not carry", !matchesRail('.sb-step[href="/not-a-route"]', railHtml));
@@ -608,7 +637,7 @@ console.log("\n── Part P · run-audit distinguishes failure from empty ─�
 }
 
 // ── Part Q · every nav link points at a route that EXISTS ─────────────────────────────────
-// The audit report (/audit/[id], the v5 "Gate Brief") is deliberately NOT injectRail'd —
+// The audit report (/audits/[id], the v5 "Gate Brief") is deliberately NOT injectRail'd —
 // route.ts explains the rail assumes a grid the single-column report does not have — so it
 // ships its OWN sidebar in src/lib/v5-report/report.ts. Nothing checked that sidebar's
 // hrefs, and it carried href="/account", which 404s in production. A nav link to a route
@@ -621,7 +650,7 @@ console.log("\n── Part Q · nav links resolve to real routes ──");
     if (p === "") return true;
     try { readdirSync(join(APP, p)); return true; } catch { return false; }
   };
-  const sources = ["src/lib/v5-report/report.ts", "src/app/audit/[id]/_template.html"];
+  const sources = ["src/lib/v5-report/report.ts", "src/app/audits/[id]/_template.html"];
   for (const src of sources) {
     const html = read(src);
     // NAV links only — scoped to the <aside> sidebar. A whole-file href sweep also
@@ -642,6 +671,171 @@ console.log("\n── Part Q · nav links resolve to real routes ──");
   check("Q-P1 · REJECTS the /account link that shipped", !routeExists("/account"));
   check("Q-P2 · ACCEPTS a route that exists", routeExists("/settings"));
   check("Q-P3 · ACCEPTS the ledger route", routeExists("/past-audits"));
+}
+
+// ── Part R · the rail STYLES the pill it creates ──────────────────────────────────────
+// Found by the CEO on the live product: the "Live" pill rendered as plain dark text — no
+// dot, no background, no radius. Measured on the page 2026-08-09: display block,
+// background rgba(0,0,0,0), color rgb(10,22,40), ::before content none.
+//
+// Cause: every .sb-badge rule in the product is scoped `.sb-icon .sb-badge`, inherited
+// from the sidebar this rail REPLACED. rail.ts renders workflow rows as .sb-step, so the
+// badge matched nothing and took the nav link's ink and font-size. Every check in this
+// file passed throughout — they all assert the pill EXISTS and says the right word, and
+// none asserted it could be SEEN.
+//
+// The rule: a component that injects markup ships the CSS for that markup.
+console.log("\n── Part R · the rail styles its own badge ──");
+{
+  const css = railStyle();
+  check("the rail stylesheet declares .sb-badge at all", /\.sb-badge\s*\{/.test(css),
+    "the pill is styled only by whatever the host page happens to carry");
+  // The exact properties measured missing. A rule that exists but sets none of them
+  // leaves the same plain text on screen.
+  // Read the .sb-badge base rule out of the sheet and check its declarations, so a
+  // property set on some OTHER selector cannot satisfy this.
+  const badgeRule = (css.match(/\.sb-badge\s*\{([^}]*)\}/) ?? ["", ""])[1];
+  check("the .sb-badge rule body was located", badgeRule.length > 20,
+    `read ${badgeRule.length} chars — this leg would pass on an empty rule`);
+  for (const [prop, why] of [
+    ["display:inline-flex", "a block badge drops onto its own line"],
+    ["border-radius", "no radius means it is not a pill"],
+    ["padding", "no padding means text, not a chip"],
+    ["font-size", "it inherits the nav link's 14.5px"],
+  ] as const) {
+    check(`.sb-badge sets ${prop}`, badgeRule.includes(prop), why);
+  }
+  check("the green dot is drawn by the rail, not the page",
+    /\.sb-badge::before\s*\{[^}]*content/.test(css),
+    "::before content was 'none' live — the dot came from a page rule that no longer matches");
+  // Both states, both themes. A pill readable in one theme and invisible in the other is
+  // the same defect with a smaller audience.
+  for (const sel of [".sb-badge.live", ".sb-badge.danger",
+                     `[data-theme="dark"] .sb-badge.live`, `[data-theme="dark"] .sb-badge.danger`]) {
+    check(`${sel} has a colour`, css.includes(sel), "this state or theme falls back to inherited ink");
+  }
+  check("the collapsed rail hides the pill", /\[data-sb="(mini|closed)"\][^{]*\.sb-badge/.test(css),
+    "the pill survives into the icon-only rail with nothing to sit beside");
+
+  // Planted positives — this leg must be able to go red.
+  check("R-P1 · rejects a stylesheet with no badge rule",
+    !/\.sb-badge\s*\{/.test(".sb-step{color:red}.sb-label{color:blue}"),
+    "the detector fires on a sheet that never mentions the badge");
+  check("R-P2 · rejects a badge rule that sets no shape",
+    !/display:inline-flex/.test(".sb-badge{color:#047857}"),
+    "a colour-only rule would pass as styled while still rendering as plain text");
+  check("R-P3 · accepts the real rule",
+    /display:inline-flex/.test(".sb-badge{display:inline-flex;padding:3px 7px}"));
+}
+
+// ── Part S · the pill can appear on EVERY injected route ──────────────────────────────
+// The CEO: "ensure the Live pill follows all tabs, views, profile settings". It did not,
+// and the reason was not the badge logic — rail-live-badge.js was referenced by exactly
+// two pages, opportunities.html and today.html, the same two that measure the feed. On
+// the other injected routes window.setRailLiveBadge did not exist, so no pill could
+// appear however it was asked for.
+//
+// Every check above this line ran against renderRail()/railStyle() in isolation, where
+// the setter is irrelevant — which is how "the pill is correct" and "the pill is absent
+// on eight routes" stayed indistinguishable.
+console.log("\n── Part S · the badge script reaches every injected route ──");
+{
+  const railSrc = read("src/lib/nav/rail.ts");
+  check("injectRail ships the badge script", /rail-live-badge\.js/.test(railSrc),
+    "the rail styles a pill whose setter it never delivers");
+  check("...only when the page does not already carry it",
+    /includes\("rail-live-badge\.js"\)\s*===\s*false/.test(railSrc),
+    "a page that loads it itself would get it twice");
+
+  // Prove it through the real function, on a page that never referenced the script.
+  const bare = `<html><head></head><body><aside class="sidebar">old</aside></body></html>`;
+  const injected = injectRail(bare, "opportunities");
+  check("a page with no badge script gets one", /src="\/rail-live-badge\.js"/.test(injected),
+    "injectRail did not add the script");
+  const already = injectRail(
+    `<html><head></head><body><aside class="sidebar">old</aside><script src="/rail-live-badge.js"></script></body></html>`,
+    "opportunities");
+  check("a page that already has it does not get a second",
+    (already.match(/rail-live-badge\.js/g) ?? []).length === 1,
+    `found ${(already.match(/rail-live-badge\.js/g) ?? []).length} references`);
+
+  // The script must survive being run twice regardless, because the two self-loading
+  // pages exist and the guard above is a belt, not a proof.
+  const badgeSrc = read("public/rail-live-badge.js");
+  check("the script is idempotent", /if\s*\(window\.setRailLiveBadge\)\s*return/.test(badgeSrc),
+    "loading it twice re-registers the setter and fires a second probe");
+
+  // The shared reading, and its ranking against a real measurement.
+  check("the script asks the shared feed-state route", /\/api\/sam-feed-state/.test(badgeSrc),
+    "nothing tells a non-feed page what the feed is doing");
+  check("a page-measured call outranks the shared probe", /if\s*\(!d\s*\|\|\s*measured\)\s*return/.test(badgeSrc),
+    "a generic probe could overwrite the account's own feed reading");
+  check("the shared route exists", (() => { try { read("src/app/api/sam-feed-state/route.ts"); return true; } catch { return false; } })(),
+    "the script fetches a route that is not in the tree");
+
+  // The route must be BOUNDED — the rail asks on every page load, on ~10 routes.
+  const stateRoute = read("src/app/api/sam-feed-state/route.ts");
+  check("the shared route caches", /TTL_MS/.test(stateRoute) && /checkedAt/.test(stateRoute),
+    "an uncached probe is one upstream call per pageview across every route");
+  check("...and collapses concurrent misses", /inFlight/.test(stateRoute),
+    "a cold start would fire one probe per simultaneous page load");
+  check("...and goes through the shared SAM library, not its own request",
+    /searchOpportunitiesByNaics/.test(stateRoute),
+    "a hand-rolled query omitted api_key and reported unavailable every time — SAM 500s without one");
+  check("...and separates OUR misconfiguration from SAM's outage",
+    /unconfigured/.test(stateRoute) && /"unknown"/.test(stateRoute),
+    "a missing key on our server would be shown to the customer as a SAM outage");
+  check("...and an answer with zero results still counts as live",
+    /out\.ok\)? return \{ state: "live"/.test(stateRoute) || /out\.ok/.test(stateRoute),
+    "an empty but successful read must not read as an outage");
+
+  // ── No badge value is ever written into a served page ──────────────────────
+  // The static sidebars carried 86 of them across 17 pages — 16×"8", 14×"15",
+  // 16×"3" and, worst, 17×"Live". injectRail replaces the whole <aside> so none
+  // of them reached production, which is exactly why they survived: dead markup
+  // that no one sees is dead until the day the regex misses a page, and then the
+  // page claims the feed is up during an outage. The runtime is the only thing
+  // allowed to assert a badge — rail-live-badge.js builds the span itself when it
+  // is absent, and removes it rather than leave a stale claim standing.
+  {
+    const files = readdirSync(join(ROOT, "public")).filter((f) => f.endsWith(".html"));
+    const offenders: string[] = [];
+    for (const f of files) {
+      const html = readFileSync(join(ROOT, "public", f), "utf8");
+      const aside = html.match(/<aside class="sidebar">([\s\S]*?)<\/aside>/);
+      if (!aside) continue;
+      const n = (aside[1].match(/sb-badge/g) ?? []).length;
+      if (n) offenders.push(`${f}(${n})`);
+    }
+    check("no served page hardcodes a rail badge",
+      offenders.length === 0, offenders.join(", "));
+
+    // Same class, worse blast radius: the topbar chip shipped "Jose Rodriguez" / "JR" on
+    // 15 pages. rail.ts hydrates it from /api/profile and its own comment says "never
+    // hardcoded" — but it bails on `if(!p)return`, so a customer whose profile read failed
+    // kept the CEO's name on screen. The rail's own markup ships EMPTY and lets hydration
+    // fill it; the topbar now matches.
+    const idOffenders: string[] = [];
+    for (const f of files) {
+      const html = readFileSync(join(ROOT, "public", f), "utf8");
+      const named = [...html.matchAll(/<div class="(nm|av)">([^<]+)<\/div>/g)].map((m) => `${m[1]}=${m[2].trim()}`);
+      if (named.length) idOffenders.push(`${f}: ${named.join(", ")}`);
+    }
+    check("no served page hardcodes a user identity", idOffenders.length === 0, idOffenders.join(" · "));
+    check("S-P5 · that check can see a planted name",
+      /<div class="nm">([^<]+)<\/div>/.test('<div class="nm">Jose Rodriguez</div>'));
+    check("S-P4 · that check can see a planted badge",
+      /sb-badge/.test('<aside class="sidebar"><a><span class="sb-badge count">8</span></a></aside>'));
+  }
+
+  // Planted positives.
+  check("S-P1 · rejects a rail that never mentions the script",
+    !/rail-live-badge\.js/.test("export function injectRail(h){return h}"));
+  check("S-P2 · the duplicate check would catch a second copy",
+    ('<script src="/rail-live-badge.js"></script><script src="/rail-live-badge.js"></script>'
+      .match(/rail-live-badge\.js/g) ?? []).length === 2);
+  check("S-P3 · rejects an uncached probe route",
+    !/TTL_MS/.test("export async function GET(){ return fetch(SAM) }"));
 }
 
 console.log(`\n${pass} passed · ${fail} failed`);

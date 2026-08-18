@@ -48,7 +48,14 @@
     if (!iso) return '—';
     const t = Date.parse(iso);
     if (Number.isNaN(t)) return '—';
-    return new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    // Registration and certification expiry arrive as calendar dates, not instants. A
+    // date-only string parses as UTC midnight, so formatting it in local time lands on the
+    // previous day for any viewer west of UTC. A date with no time of day has no timezone to
+    // convert, so it is formatted in UTC.
+    const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(String(iso).trim());
+    return new Date(t).toLocaleDateString('en-US',
+      dateOnly ? { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }
+               : { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
   const meta = () => (window.TEAM && window.TEAM.meta) || { state: 'loading' };
@@ -62,7 +69,9 @@
   function filtered() {
     const q = S.q.trim().toLowerCase();
     return partners().filter((p) => {
-      if (S.cert !== 'all' && !certsOf(p).some((c) => c === S.cert)) return false;
+      // No certification test here. S.cert is an SBA code and the server has already applied
+      // it against every registration under the customer's codes; re-testing it locally
+      // against SAM's description strings would compare a code to a label and drop every row.
       if (!q) return true;
       return [p.legal_business_name, p.uei, p.cage_code, p.state, p.poc_name]
         .some((v) => v && String(v).toLowerCase().includes(q));
@@ -125,6 +134,17 @@
       ]);
       return;
     }
+    // Ready — but SAM's entity search serves one page and rejects pageSize, so what arrived
+    // is usually a small sample of what is registered. The count carries its caveat in
+    // place: a list of ten drawn from thousands must not read as the whole market.
+    if (typeof m.totalAvailable === 'number' && typeof m.shown === 'number' && m.totalAvailable > m.shown) {
+      el.hidden = false;
+      fill(el, [
+        h('span', { cls: 'sb-label', text: 'Partial list' }),
+        h('span', { text: 'SAM holds ' + m.totalAvailable.toLocaleString() + ' active registrations under your codes. This page shows the ' + m.shown + ' it returns per request — narrow by NAICS to see a different set.' })
+      ]);
+      return;
+    }
     el.hidden = true;
     fill(el, []);
   }
@@ -164,12 +184,17 @@
   function renderCertPills() {
     const host = $('certFilters');
     if (!host) return;
-    const counts = certCounts();
-    const keys = Object.keys(counts).sort();
-    const opts = [{ k: 'all', label: 'All certifications' }].concat(keys.map((k) => ({ k, label: k + ' · ' + counts[k] })));
+    // The certifications SAM can be filtered on, named by the server. These are NOT derived
+    // from the rows on screen: SAM returns one page per code, so a chip built from what
+    // arrived could only ever filter that sample, and a certification held by thousands of
+    // firms would be missing whenever none of them landed on page one. Choosing one is a
+    // fresh query against every registration under the customer's codes.
+    const options = (meta().setAsideOptions || []);
+    const opts = [{ k: 'all', label: 'All certifications' }]
+      .concat(options.map((o) => ({ k: o.code, label: o.label })));
     fill(host, opts.map((o) => {
       const b = h('button', { cls: 'fpill' + (S.cert === o.k ? ' active' : ''), text: o.label, attrs: { type: 'button' } });
-      b.addEventListener('click', () => { S.cert = o.k; renderList(); renderPanel(); renderCertPills(); });
+      b.addEventListener('click', () => { S.cert = o.k; reload(); });
       return b;
     }));
   }
@@ -305,7 +330,10 @@
     if (typeof window.TEAM_LOAD !== 'function') return;
     window.TEAM.meta = Object.assign({}, meta(), { state: 'loading' });
     renderBanner();
-    window.TEAM_LOAD({ naics: S.naics === 'all' ? null : S.naics });
+    window.TEAM_LOAD({
+      naics: S.naics === 'all' ? null : S.naics,
+      setAside: S.cert === 'all' ? null : S.cert
+    });
   }
 
   function buildControls() {
