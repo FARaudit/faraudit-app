@@ -11,8 +11,8 @@ a single "Model (live)" column is what let an unmerged branch read as shipped.
 |---|---|---|---|---|
 | 0a | OCR residual confirm — VISION (`makeVisionConfirmer`) | `crossdoc` | `claude-opus-5` | — |
 | 0b | OCR rate-table confirm — VISION (`makeTableVisionConfirmer`) | `crossdoc` | `claude-opus-5` | — |
-| 1 | MAP — per-doc extraction | `extractor` | `claude-haiku-4-5` | — |
-| — | `buildCompactMatrix` | deterministic | none · $0 | — |
+| ~~1~~ | ~~MAP — per-doc extraction~~ · **DEAD CODE, DOES NOT RUN** — see below | `extractor` | **none** | — |
+| ~~—~~ | ~~`buildCompactMatrix`~~ · **DEAD CODE, DOES NOT RUN** | deterministic | **none** | — |
 | 2 | Lenses — overview / compliance / risk | `lens` | `claude-sonnet-4-6` | — |
 | 2.5 | Cross-doc pass | `crossdoc` | `claude-opus-5` | — (#385 merged) |
 | L3 | Section finder | `finder` | `claude-sonnet-4-6` | — |
@@ -25,6 +25,32 @@ a single "Model (live)" column is what let an unmerged branch read as shipped.
 | 6b | Panel — Adversarial Verifier | `opus` | `claude-opus-5` | — (#385 merged) |
 | 6c | Panel — Chief Judge (id 5, `gatekeeper_synthesizer`) | `sonnet` | `claude-sonnet-4-6` | — |
 | 7 | `deriveVerdict` | **none — pure TypeScript** | **no model · no tools** | — |
+
+## ⛔ ROW 1 WAS WRONG — the MAP stage has not run since 2026-06-28 (corrected 2026-08-17)
+
+This table listed **stage 1, per-doc extraction on `claude-haiku-4-5`, as live on MAIN.** It is not
+live. It is not gated off by a flag either — **its runner was deleted**, and the deletion left a note
+one file away:
+
+> `agentic-orchestrator.ts:250` — *"[V1/shadow purged 2026-06-28 — A4] runAgenticMap() removed — engine
+> is 100% agentic (executeAgenticPrimary → auditPackage). See git history."*
+
+Verified by counting callers, not by reading the comment. Every entry point of `agentic-map.ts` —
+`mapDocument` · `selectMapTargets` · `mergeExtracts` · `withDocExtractCache` · `chunkForMap` — has
+**zero non-test callers outside its own file**. `agentic-orchestrator.ts` imports the module
+**type-only**. `buildCompactMatrix` (`agentic-lenses.ts:257`) has **zero callers anywhere**. So the
+whole map → matrix → reduce path is dead: the expert loop reads the source directly through tools.
+
+**Why this mattered more than a stale row.** This file opens by saying it *"lives next to the code it
+describes so it cannot drift silently"*, and by warning that a single mislabelled column *"is what let
+an unmerged branch read as shipped."* It then did the inverse for six weeks — it let **deleted code
+read as shipped**, and it named a paid Haiku stage in the live column that bills nothing because it
+never executes. `ENGINE-WALK-2026-08-05.md:31` had already recorded the type-only import without the
+table being reconciled to it.
+
+**The cost measurements are unaffected** — they were taken empirically from run records, which is why
+no MAP line ever appeared in them. That absence was the evidence, and it was read as "cheap" rather
+than "absent."
 
 No `AUDIT_*_MODEL` override variables are set on `audit-worker`, so the deployed code is the
 whole story — there is no env layer to check separately. Re-confirmed in-container 2026-08-02 by resolving
