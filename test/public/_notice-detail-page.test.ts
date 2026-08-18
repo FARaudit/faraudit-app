@@ -25,7 +25,10 @@ const check = (label: string, ok: boolean, detail = ""): void => {
 
 const ROOT = join(import.meta.dirname ?? __dirname, "..", "..");
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
-const ROUTE = read("src/app/notices/[noticeId]/route.ts");
+// The handler and its render helpers are two files: Next forbids a route from
+// exporting anything but handlers and config, and the build — not tsc — enforces it.
+// Both are swept, because the guarantees below hold across the pair, not one half.
+const ROUTE = read("src/app/notices/[noticeId]/route.ts") + "\n" + read("src/app/notices/[noticeId]/_render.ts");
 const PAGE = read("public/notice-detail.html");
 const LIST = read("public/dso-app.js");
 
