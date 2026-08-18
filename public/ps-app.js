@@ -6,6 +6,7 @@
   const NAV = [
     { key: 'company', label: 'Company Profile', icon: 'M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6' },
     { key: 'naics', label: 'NAICS Configuration', icon: 'M4 19V5M4 19h16M8 16v-5M13 16V8M18 16v-3' },
+    { key: 'interface', label: 'Interface', icon: 'M3 4h18v14H3zM3 9h18M8 18v2h8v-2' },
     { key: 'notifs', label: 'Notifications', icon: 'M6 8a6 6 0 1112 0c0 7 3 8 3 8H3s3-1 3-8zM10 21a2 2 0 004 0' },
     { key: 'security', label: 'Security', icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM12 11v4M12 8h.01' },
     { key: 'team', label: 'Team Members', icon: 'M7 9a3 3 0 100-6 3 3 0 000 6zM17 9a3 3 0 100-6 3 3 0 000 6zM2 20c0-3 2.5-5 5-5M22 20c0-3-2.5-5-5-5' },
@@ -399,6 +400,36 @@
         <div class="note"><b>What this is not:</b> it is a timer in your browser, not a shorter session. Closing the tab does not sign you out, and the setting cannot end a session on a device you no longer have. It is off unless you turn it on, and if your preferences cannot be read it stays off rather than signing you out on a guess.</div>
       </div>`,
 
+    /* THE SHELL YOU LOOK AT, not what reaches you. A group's start state and the app's
+       appearance are layout, not notifications, and belong on their own panel. */
+    interface: () => `
+      <div class="sp-hd"><div class="sp-t">Interface</div><div class="sp-s">How the app is laid out for you</div></div>
+      <div class="sp-bd" id="interface">
+        <div class="nf-row" data-pref-row style="align-items:flex-start">
+          <div class="nf-l">
+            <div class="nf-t">Sidebar groups</div>
+            <div class="nf-d">Which groups are already open when a page loads. The group holding the page you are on always opens regardless, so you are never left without a highlight, and opening a group while you work is remembered here too. Saved to your account, so it follows you to a new browser.</div>
+          </div>
+          <div class="if-secs">
+            <label class="if-sec"><span>Readiness</span><button class="nf-tg" data-rail-sec="readiness"><span class="tgl"><i></i></span></button></label>
+            <label class="if-sec"><span>Market intel</span><button class="nf-tg" data-rail-sec="market-intel"><span class="tgl"><i></i></span></button></label>
+            <label class="if-sec"><span>Reference</span><button class="nf-tg" data-rail-sec="reference"><span class="tgl"><i></i></span></button></label>
+          </div>
+        </div>
+        <div class="nf-row" data-pref-row>
+          <div class="nf-l">
+            <div class="nf-t">Appearance</div>
+            <div class="nf-d">Light follows the default. Dark is a fixed choice; Match my system follows the setting on whichever device you are using. The switch in the top bar changes this device only — this one is saved to your account.</div>
+          </div>
+          <select class="ps-sel" id="themeSel" aria-label="Appearance">
+            <option value="">Light</option>
+            <option value="dark">Dark</option>
+            <option value="auto">Match my system</option>
+          </select>
+        </div>
+        <div class="naics-msg" id="psIfNote" role="status" hidden></div>
+      </div>`,
+
     notifs: () => `
       <div class="sp-hd"><div class="sp-t">Notification Preferences</div><div class="sp-s">What reaches you, and what does not yet</div></div>
       <div class="sp-bd" id="alerts">
@@ -573,19 +604,104 @@
       });
     };
   }
+  /* The rail applies this preference BEFORE it paints, which a fetch cannot do, so the
+     account value is mirrored into localStorage and read synchronously there. Written on
+     save so the very next navigation is already right; the rail also refreshes the mirror
+     in the background for a browser that has never seen this account. Mirrored ONLY after
+     the server acknowledged the write — a mirror ahead of the account would show a
+     preference that is not stored. */
+  /* THE RAIL SECTION TOGGLES.
+     The account column holds the SAME map the rail keeps in localStorage — keyed by the
+     rail's own data-sec slug — so this mirrors rather than reconciles. The previous
+     single switch had to WIPE the customer's group clicks to take effect, because it was
+     a second statement about the same thing; there is now only one statement.
+     The rail applies this before it paints, which a fetch cannot do, so the mirror is
+     what the rail actually reads. */
+  const RAIL_SECS = ['readiness', 'market-intel', 'reference'];
+
+  function mirrorRailSections(map) {
+    try { localStorage.setItem('faraudit-rail-sections', JSON.stringify(map || {})); } catch (e) {}
+  }
+
+  function wireRailSections(prefs) {
+    var btns = $('setContent').querySelectorAll('[data-rail-sec]');
+    if (!btns.length) return;
+    // NULL means never chosen, and the shipped default is every group closed. An empty
+    // object is a customer who chose all-closed; both render the same, and neither is
+    // invented into the other at rest.
+    var map = (prefs && prefs.rail_sections_open && typeof prefs.rail_sections_open === 'object')
+      ? Object.assign({}, prefs.rail_sections_open) : {};
+    mirrorRailSections(map);
+    btns.forEach(function (b) {
+      var sec = b.getAttribute('data-rail-sec');
+      var tgl = b.querySelector('.tgl');
+      if (map[sec] === true) tgl.classList.add('on'); else tgl.classList.remove('on');
+      b.onclick = function (e) {
+        e.preventDefault();
+        var next = !tgl.classList.contains('on');
+        tgl.classList.toggle('on', next);
+        b.disabled = true;
+        var candidate = Object.assign({}, map);
+        candidate[sec] = next;
+        savePref('rail_sections_open', candidate).then(function (ok) {
+          b.disabled = false;
+          // MIRROR ONLY WHAT THE SERVER TOOK. Writing the mirror first would leave the
+          // rail showing a layout the account does not hold.
+          if (ok) { map = candidate; prefs.rail_sections_open = candidate; mirrorRailSections(map); flash('Sidebar groups', true); }
+          else { tgl.classList.toggle('on', !next); flash('Sidebar groups', false); }
+        });
+      };
+    });
+  }
+
+  /* Appearance. The masthead button writes localStorage for the device it is pressed on;
+     this writes the account, so a new browser starts where the customer left off. Both
+     are kept in step — a saved account theme that the current tab ignores would read as
+     a control that did not work. */
+  function wireTheme(prefs) {
+    var sel = $('themeSel');
+    if (!sel) return;
+    var cur = prefs && typeof prefs.theme === 'string' ? prefs.theme : '';
+    sel.value = cur === 'dark' || cur === 'auto' ? cur : '';
+    sel.onchange = function () {
+      var v = sel.value;
+      sel.disabled = true;
+      savePref('theme', v === '' ? null : v).then(function (ok) {
+        sel.disabled = false;
+        if (!ok) { sel.value = cur; flash('Appearance', false); return; }
+        cur = v; prefs.theme = v;
+        var applied = v === 'auto'
+          ? (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+          : (v === 'dark' ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', applied);
+        try { localStorage.setItem('faraudit-theme', applied); } catch (e) {}
+        flash('Appearance', true);
+      });
+    };
+  }
+
+
   function wireServerPrefs() {
     var btns = $('setContent').querySelectorAll('[data-pref-tg]');
     // The duration select lives on its own panel, so an early return on "no toggles
     // here" would have left it unwired — a control that loads, looks live and saves
     // nothing.
-    if (!btns.length && !$('autoSignoutSel')) return;
+    // Each control lives on its own panel, so an early return on "no toggles here" would
+    // leave whichever panel is open unwired — a control that loads, looks live and saves
+    // nothing. That defect has been shipped on this page once already.
+    if (!btns.length && !$('autoSignoutSel') && !$('themeSel') && !$('setContent').querySelector('[data-rail-sec]')) return;
     loadPrefs().then(prefs => {
       wireAutoSignout(prefs);
+      wireRailSections(prefs);
+      wireTheme(prefs);
       btns.forEach(b => {
         var key = b.getAttribute('data-pref-tg');
         var current = prefs[key];
         // Server default for weekly_digest_watched is true — interpret null/undefined as on.
         var on = current === undefined || current === null ? true : !!current;
+        // Seed the mirror from what the ACCOUNT says, not only from a toggle press: a
+        // customer who opens Settings and changes nothing should still leave with the
+        // rail matching their account on the next page.
         var tgl = b.querySelector('.tgl');
         if (on) tgl.classList.add('on'); else tgl.classList.remove('on');
         b.onclick = function(e){
