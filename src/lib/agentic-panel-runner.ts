@@ -17,10 +17,16 @@ import { panelFindingsToTyped } from "./panel-findings-bridge";
 import { scanPackageMarkers, absenceClaimContradicted } from "./absence-grounding-gate";
 import type { TypedFinding } from "./audit-findings";
 
-// ⚠ NOT YET WIRED: this flag currently GATES NOTHING — runPanelJudge has no production caller
-// (only the proof driver + tests). Flipping AUDIT_PANEL_JUDGE on Railway does NOT activate the panel
-// in a customer audit. It becomes live ONLY at graduation, when runPanelJudge is wired into
-// executeAudit. Kept here as the intended switch so graduation has an obvious hook. (Re-review 2026-06-25.)
+// ⚠ WIRED AND LIVE. `runPanelJudge` IS called in production — audit-executor-v3.ts:593, inside the
+// AGENTIC_PANEL_ENABLED branch — and AUDIT_PANEL_JUDGE is armed on the worker, so flipping this flag DOES
+// change what a paying customer gets.
+//
+// This comment said the exact opposite ("no production caller … only the proof driver + tests") from the
+// 2026-06-25 re-review until 2026-08-06, surviving the graduation it was describing. It is corrected here
+// rather than deleted because of what it cost: during the 2026-08-06 adversarial audit a verifier reading
+// this header came within one grep of refuting a REAL, measured $0.59/run defect on the grounds that the
+// code could not run. A stale comment on a live path does not merely misinform — it launders a defect as
+// unreachable. Verify the caller, not the note about the caller.
 export const AGENTIC_PANEL_ENABLED = process.env.AUDIT_PANEL_JUDGE === "true";
 
 // PRODUCER PREFIX CACHE — EVALUATED + REJECTED (card #612-(3), CEO ruling 2026-07-21). The card premise ("the
@@ -195,7 +201,7 @@ const FIELD_CHARS = 650;
 /** One structured call with the MAP/lens retry ladder (a truncated JSON escalates the cap
  *  before failing loud — never an opaque SyntaxError). */
 async function panelCall<T>(p: {
-  model: string; system: string; cachedSystemPrefix?: string; userPrompt: string;
+  model: string; system: string; cachedSystemPrefix?: string; cachePrefix?: boolean; userPrompt: string;
   schema: object; maxTokens: number; ceiling: number; timeoutMs: number; label: string; signal?: AbortSignal;
   // P1b (card #523) — cost visibility: every panel model call must land in the executor's per-run usage tally
   // (the `label` is stage-distinct — panel:<lens>/panel:verifier/panel:gatekeeper — so aggregation yields
@@ -209,7 +215,7 @@ async function panelCall<T>(p: {
   let bumpedForValidTruncation = false;
   for (;;) {
     const res = await callStructuredClaude({
-      apiKey, model: p.model, system: p.system, cachedSystemPrefix: p.cachedSystemPrefix,
+      apiKey, model: p.model, system: p.system, cachedSystemPrefix: p.cachedSystemPrefix, cachePrefix: p.cachePrefix,
       userPrompt: p.userPrompt, schema: p.schema, maxTokens, timeoutMs: p.timeoutMs,
       label: `${p.label}${maxTokens > p.maxTokens ? ` @${maxTokens}` : ""}`, signal: p.signal, onUsage: p.onUsage,
     });
@@ -449,7 +455,14 @@ export async function runPanelJudge(params: {
         `For EVERY named_hard_gate and risk, copy the VERBATIM source sentence(s) into its \`excerpt\` field (exact text, not a paraphrase) so it can be independently verified — use "" only if the claim genuinely has no supporting source text. ` +
         `Return ONLY the structured JSON; populate every required field.${missingNote}${partNote}`;
       return panelCall<PanelistOutput>({
-        model: modelFor(p.tier, params.models), system: p.system, cachedSystemPrefix: lensPrefix,
+        // UNIQUE PER CALL ⇒ NOT CACHEABLE. `lensPrefix` interpolates the lens key and this pass's section
+        // list into the cached bytes, and assembleLensPasses hands every pass a DISJOINT slice — so no two
+        // requests in a run can ever produce byte-identical prefix bytes. A breakpoint therefore has exactly
+        // one possible reader: panelCall's own max_tokens retry, which re-sends the identical prefix. Live run
+        // 3b5bba30 measured that shape exactly — 67 panel calls, 52 wrote cache and read zero, and all 7 reads
+        // were retries. The content still ships (it IS this lens's assigned source); only the 1.25× write
+        // surcharge is dropped, so the prompt is byte-identical and the model sees no difference.
+        model: modelFor(p.tier, params.models), system: p.system, cachedSystemPrefix: lensPrefix, cachePrefix: false,
         userPrompt: task, schema: PANELIST_SCHEMA, maxTokens: 4_000, ceiling: 8_000,
         timeoutMs: PANELIST_TIMEOUT_MS, label: passes.length > 1 ? `panel:${p.key}#${idx + 1}` : `panel:${p.key}`, signal: params.signal, onUsage,
       });

@@ -121,7 +121,13 @@ export function deriveAnalyzedDocuments(
     analyzed_of: analyzableRegions.length,
     unanalyzed: unanalyzedNames.map((name) => ({
       name,
-      reason: "read in full, but no finding was grounded in it — content NOT analyzed",
+      // "RETRIEVED", not "read". This function knows only that the document is a REGION of the assembled
+      // source — that its bytes arrived. Whether any lens opened it is a different fact, held in the
+      // orchestrator's docsRead set, and this function is not given it. The customer-facing copy in
+      // audit-gate-reason.ts already says "retrieved in full" and is correct; this string said "read in
+      // full" and was the same claim one level stronger than the evidence. It renders nowhere today, which
+      // is exactly why it could drift — an unrendered string is still the engine asserting something.
+      reason: "retrieved in full, but no finding was grounded in it — content NOT analyzed",
     })),
   };
 }
