@@ -19,6 +19,7 @@ import { recomputeGrounding } from "./audit-grounding-recompute";
 import { detectSoleSourceLock } from "./audit-sole-source-lock";
 import { runSectionFinder, type SectionFinderCall } from "./audit-section-finder";
 import { isBindingDoc, hasEngineText } from "./sam-attachments";
+import { DOC_EXTRACTION_ENABLED, selectExtractionTargets, runCoverageExtraction } from "./audit-doc-extraction";
 import { looksMojibake } from "./pdf-ocr";
 import { NOTICE_BODY_DOC_NAME } from "./agentic-executor";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
@@ -815,7 +816,13 @@ export function groundedSourceRegionNames(fullSource: string, findings: TypedFin
 export function documentsCovered(
   fullSource: string,
   findings: TypedFinding[],
-  opts?: { docsRead?: string[]; attestations?: string[] },
+  // `extractedSpans` — COVERAGE-ONLY per-doc extraction (flag AUDIT_DOC_EXTRACTION, default OFF). It is
+  // a SEPARATE field from docsRead/attestations and is deliberately NOT routed through
+  // AUDIT_ATTACHMENT_COVERAGE: that flag reads FALSE on the live worker, so anything carried in its
+  // opts ships inert while passing its own tests — the placebo shape named at :858 and caught again on
+  // 2026-08-17. Spans are verbatim text, never findings: extraction output may CREDIT COVERAGE and may
+  // never reach the verdict (CEO ruling 2026-08-17).
+  opts?: { docsRead?: string[]; attestations?: string[]; extractedSpans?: Array<{ doc: string; excerpt: string }> },
 ): { complete: boolean; uncovered: string[] } {
   const regions = docRegions(fullSource);
   if (regions.length <= 1) return { complete: true, uncovered: [] }; // single-doc package — section completeness governs
@@ -836,8 +843,25 @@ export function documentsCovered(
   // excludes excerpts shared with the PRIMARY; it must ALSO exclude excerpts shared with ANOTHER attachment, else a
   // finding grounded in attachment A (a flow-down phrase A and B both carry) would falsely certify B as analyzed →
   // false COMPLETE. Opts absent (flag off) ⇒ gate off ⇒ byte-identical to prior behaviour.
-  const crossAttGate = opts != null;
+  // Keyed on the ORIGINAL two fields, not on `opts != null`. Under AUDIT_DOC_EXTRACTION the caller
+  // supplies opts carrying ONLY `extractedSpans`, and `opts != null` would have silently switched this
+  // gate — plus the #372-B dropped-finding filter and the ELIGIBILITY_BAR_RE floor — ON as a side
+  // effect of an unrelated flag. Both pre-existing states are unchanged: ATTACHMENT_COVERAGE on ⇒ true
+  // exactly as before; neither flag ⇒ opts undefined ⇒ false exactly as before.
+  const crossAttGate = opts != null && (opts.docsRead != null || opts.attestations != null);
   const otherAttNorms = crossAttGate ? regions.filter((x) => !x.isPrimary).map((x) => ({ name: x.name, t: norm(x.text) })) : [];
+  // COVERAGE-ONLY EXTRACTION SPANS, indexed by document. A span credits its document only if it is
+  // verbatim IN that region and NOT in the primary — the same two conditions the grounded-finding path
+  // applies, so a paraphrase earns nothing and a flow-down sentence shared with the primary earns
+  // nothing. The extractor is never trusted; the text is checked. Absent ⇒ empty ⇒ byte-identical.
+  const spansByDoc = new Map<string, string[]>();
+  for (const s of opts?.extractedSpans ?? []) {
+    if (!s?.doc || !s?.excerpt) continue;
+    const k = nameKey(s.doc);
+    const list = spansByDoc.get(k) ?? [];
+    list.push(s.excerpt);
+    spansByDoc.set(k, list);
+  }
   const uncovered: string[] = [];
   for (const r of regions) {
     if (r.isPrimary) continue;                                           // primary solicitation — handled by section completeness
@@ -910,6 +934,27 @@ export function documentsCovered(
       return true;
     })) continue;
     const nName = nameKey(r.name);
+    // COVERAGE-ONLY EXTRACTION CREDIT (flag AUDIT_DOC_EXTRACTION). Ordered AFTER the grounded finding —
+    // a verified finding is the stronger proof and its `continue` should win — and BEFORE attestation,
+    // because a verbatim span is EVIDENCE the document was read whereas an attestation is a CLAIM that
+    // it was. Conditions are deliberately identical to the finding path's: verbatim in THIS region, and
+    // absent from the primary, so a flow-down sentence the primary also carries proves nothing here
+    // either. The length floor lives in audit-doc-extraction.ts (MIN_SPAN_CHARS) and has already been
+    // applied by `verifySpans` before these reach us; re-checking `includes` here is deliberate
+    // defence-in-depth, not redundancy — this function must never take a caller's word for grounding.
+    // No spans (flag off) ⇒ the map is empty ⇒ this cannot fire ⇒ byte-identical.
+    const spans = spansByDoc.get(nName);
+    if (spans?.length) {
+      const credited = spans.find((raw) => {
+        const ex = norm(raw || "");
+        return ex.length > 0 && nRegion.includes(ex) && !primaryNorm.includes(ex);
+      });
+      if (credited) {
+        console.log(`[coverage] extraction span credited "${r.name}" — verbatim in-region, absent from primary (coverage-only; never a finding)`);
+        continue;
+      }
+      console.warn(`[coverage] extraction spans REJECTED for "${r.name}" — ${spans.length} span(s) offered, none verbatim in-region and absent from primary → uncovered`);
+    }
     if (attSet.has(nName) && readSet.has(nName)) {
       // Brain #347/#348 — a provably-read "no operative obligation" attestation covers the doc, with honesty deferred
       // to the verifier/panel (Gate 4). DETERMINISTIC FLOOR (Gauntlet #349 R2, narrowed by Card #370 R2): an attestation
@@ -2751,6 +2796,33 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // binding attachment the panel READ (and grounded an obligation in, OR attested no-obligation) is covered. Opts
   // only supplied when the flag is on ⇒ flag-OFF is byte-identical (documentsCovered's opts default to empty sets).
   const attCoverageOpts = ATTACHMENT_COVERAGE_ENABLED ? { docsRead: [...docsRead], attestations: [...attestedDocs] } : undefined;
+  // ── COVERAGE-ONLY PER-DOCUMENT EXTRACTION (flag AUDIT_DOC_EXTRACTION, default OFF) ─────────────────
+  // Reads every READABLE binding attachment in its own small context and offers verbatim spans as
+  // evidence it was read. Coverage-only by construction: `ExtractedSpan` has no kind/controllability/
+  // requiredAttribute/curableInWindow, so there is no field a verdict path could consume (CEO ruling
+  // 2026-08-17). Its OWN flag — deliberately NOT ATTACHMENT_COVERAGE, which is false on the live
+  // worker and would make this inert while its tests passed.
+  // Cost is measured, not assumed: 52 documents on the largest banked package chunk to 53 calls,
+  // ~$1.07 unbatched on the extractor tier. Failure direction is toward UNCOVERED — a document whose
+  // extraction throws contributes no spans and stays uncovered.
+  let extractedSpans: Array<{ doc: string; excerpt: string }> = [];
+  if (DOC_EXTRACTION_ENABLED()) {
+    const targets = selectExtractionTargets(
+      docRegions(ctx.fullSource),
+      (name) => isBindingDoc({ role: "attachment", name }),
+      (text) => hasEngineText(text),
+    );
+    const { mapDocument } = await import("./agentic-map");
+    const res = await runCoverageExtraction(targets, (name, text) => mapDocument(name, text, undefined, opts.signal));
+    extractedSpans = res.spans;
+    console.log(`[coverage] doc-extraction: ${res.read}/${targets.length} document(s) read · ${res.spans.length} verbatim span(s) verified · ${res.failed.length} failed`);
+    for (const f of res.failed) console.warn(`[coverage] doc-extraction FAILED for "${f.doc}" — ${f.error} (contributes no coverage credit)`);
+  }
+  // Merge WITHOUT letting either feature turn the other's fields on. Both off ⇒ `undefined`, exactly as
+  // before ⇒ byte-identical.
+  const coverageOpts = (attCoverageOpts || extractedSpans.length)
+    ? { ...(attCoverageOpts ?? {}), ...(extractedSpans.length ? { extractedSpans } : {}) }
+    : undefined;
   // SOURCE (Gauntlet #350 R6 — REVERTS the R3 groundingSource alignment): documentsCovered parses DOCUMENT regions by
   // the "==== DOCUMENT: name ====" delimiter, which ONLY fullSource carries (assembleFullSource writes one per doc when
   // >1). groundingSource is `docs.map(d=>d.text).join` — DELIMITER-LESS → parseDocRegions finds 0 regions → collapses
@@ -2760,7 +2832,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // path fullSource IS the whole binding text WITH delimiters.
   const docCoverage = (ctx.constructionManifest && procurementPart(ctx) === "part36-construction")
     ? constructionDocumentsCovered(ctx, findings)   // Brain card 289 — sealed full-text attestation for attachments
-    : documentsCovered(ctx.fullSource, findings, attCoverageOpts);
+    : documentsCovered(ctx.fullSource, findings, coverageOpts);
   // Brain card 288 RULING 2 — interim amendment-resolution fail-safe (flag-gated; OFF ⇒ byte-identical). Unresolved
   // SF-30 supersession → INCOMPLETE, never a decided verdict over possibly-superseded terms. Full resolution is a
   // later tranche; this is detection + fail-safe only.
