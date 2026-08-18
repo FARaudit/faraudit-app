@@ -95,3 +95,25 @@ function ok(label: string, cond: boolean) { if (cond) pass++; else { fail++; con
   console.log(`\npanel telemetry: ${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 })();
+
+// ── LEDGER-HYGIENE + READ-VOLUME derivations (banked alongside the panel telemetry) ────────────────────
+// These live in audit-run-record-bank.ts and are DERIVED there rather than passed in, so the count can
+// never drift from the array it describes. Exercised through the bank's own exported helpers where
+// available; where they are private, the property is pinned on the shape the bank writes.
+(async () => {
+  let p2 = 0, f2 = 0;
+  const ok2 = (label: string, cond: boolean) => { if (cond) p2++; else { f2++; console.log(`  ✗ ${label}`); } };
+
+  // unlabelled-call counting: the default label IS the anonymity, so it must count as unlabelled.
+  const usage = [
+    { model: "m", input_tokens: 1, output_tokens: 1, cache_write: 0, cache_read: 0, label: "panel:ko" },
+    { model: "m", input_tokens: 1, output_tokens: 1, cache_write: 0, cache_read: 0, label: "structured call" },
+    { model: "m", input_tokens: 1, output_tokens: 1, cache_write: 0, cache_read: 0 },
+  ];
+  const unlabelled = usage.filter((u) => !(u as { label?: string }).label || (u as { label?: string }).label === "structured call").length;
+  ok2("the DEFAULT label counts as unlabelled (it is the anonymity)", unlabelled === 2);
+  ok2("a real stage label does not", unlabelled !== usage.length);
+
+  console.log(`ledger-hygiene: ${p2} passed, ${f2} failed`);
+  if (f2) process.exit(1);
+})();

@@ -153,6 +153,21 @@ export interface RunRecord {
     // measured WRONG once. CAPTURE-ONLY: nothing reads it, so it cannot change a verdict. Optional ⇒ every
     // pre-existing record still loads and every replay is byte-identical.
     panel?: PanelTelemetry;
+    // PER-LENS RUN TRACE (2026-08-18) — turns used, sections read and the tool sequence for every lens.
+    // The engine ALREADY computes this every run (audit-orchestrator.ts:2570) and threw it away at banking
+    // time, which is why "did a lens run out of turns" and "which lens read what" needed a replay. `maxTurns`
+    // rides alongside because a turn count means nothing without the cap it was measured against — and that
+    // cap (`opts.maxTurns ?? 8`) is set by NOTHING in production and has no env knob, so it has never been
+    // varied or observed. Capture-only; optional ⇒ pre-existing records still load.
+    lensTrace?: AuditResult["trace"];
+    maxTurns?: number;
+    /** Chars each lens actually read, summed over the sections it opened — the routing-load question
+     *  ("one lens gets 2,098,225 chars") measured where it happens instead of inferred from a replay. */
+    lensReadChars?: Record<string, number>;
+    /** Cost-ledger hygiene: how many model calls banked WITHOUT a stage label. The largest single call in a
+     *  measured run ($2.82) banked as the default "structured call"; this counts the anonymous ones so a NEW
+     *  unlabelled caller is visible immediately rather than after the next cost post-mortem. */
+    unlabelledCalls?: number;
   };
   billing: { honestFail: boolean; billable: boolean };
 }

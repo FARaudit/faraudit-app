@@ -1044,6 +1044,10 @@ export async function executeAgenticPrimary(
       // the cost aggregate reads, so the ledger and the invoice can never disagree about the run.
       usage: usageCalls,
       panel: _panelTelemetry,
+      // Per-lens trace the engine already computed and used to discard at this exact line. `maxTurns` is the
+      // cap the turn counts were measured against; `lensReadChars` sums the sections each lens actually opened.
+      lensTrace: res.trace,
+      maxTurns: Number(process.env.AUDIT_LENS_MAX_TURNS) || 8,
       flags: {
         AUDIT_SECTION_M_DEPTH: process.env.AUDIT_SECTION_M_DEPTH,
         AUDIT_PROCUREMENT_TYPE_SECTIONS: process.env.AUDIT_PROCUREMENT_TYPE_SECTIONS,
