@@ -21,6 +21,7 @@ import { deriveVerdict, applyFindingDedup, applyCrossFleetDedup } from "./audit-
 import { consequenceTailsAfter, gradeCoverageV2, verifyRecitalInSource, type CoverageV2 } from "./audit-gate-v2";
 import type { TypedFinding, VerdictInputs, BidderProfile } from "./audit-findings";
 import type { UsageCall } from "./audit-cost";
+import type { PanelTelemetry } from "./audit-panel-telemetry";
 
 export const RUN_RECORD_SCHEMA = "run-record/v1" as const;
 
@@ -146,6 +147,27 @@ export interface RunRecord {
     // Optional ⇒ every pre-existing record still loads, and replay never reads it: this is EVIDENCE, not input,
     // so adding it cannot change a replayed verdict.
     usage?: UsageCall[];
+    // PANEL TELEMETRY (plan step 1, 2026-08-17) — the panel is 47% of a run's cost and the record could not
+    // say whether it FIRED. "Gate suppressed it" and "it ran and produced nothing" were indistinguishable in
+    // every banked record, and they need opposite fixes; an inference on exactly this point was already
+    // measured WRONG once. CAPTURE-ONLY: nothing reads it, so it cannot change a verdict. Optional ⇒ every
+    // pre-existing record still loads and every replay is byte-identical.
+    panel?: PanelTelemetry;
+    // PER-LENS RUN TRACE (2026-08-18) — turns used, sections read and the tool sequence for every lens.
+    // The engine ALREADY computes this every run (audit-orchestrator.ts:2570) and threw it away at banking
+    // time, which is why "did a lens run out of turns" and "which lens read what" needed a replay. `maxTurns`
+    // rides alongside because a turn count means nothing without the cap it was measured against — and that
+    // cap (`opts.maxTurns ?? 8`) is set by NOTHING in production and has no env knob, so it has never been
+    // varied or observed. Capture-only; optional ⇒ pre-existing records still load.
+    lensTrace?: AuditResult["trace"];
+    maxTurns?: number;
+    /** Chars each lens actually read, summed over the sections it opened — the routing-load question
+     *  ("one lens gets 2,098,225 chars") measured where it happens instead of inferred from a replay. */
+    lensReadChars?: Record<string, number>;
+    /** Cost-ledger hygiene: how many model calls banked WITHOUT a stage label. The largest single call in a
+     *  measured run ($2.82) banked as the default "structured call"; this counts the anonymous ones so a NEW
+     *  unlabelled caller is visible immediately rather than after the next cost post-mortem. */
+    unlabelledCalls?: number;
   };
   billing: { honestFail: boolean; billable: boolean };
 }
@@ -158,6 +180,9 @@ export interface BuildRunRecordArgs {
   result: AuditResult;
   billing: { honestFail: boolean; billable: boolean };
   commercialHonestFail?: boolean;               // the coreMissing flag state the run used (AUDIT_PROCUREMENT_TYPE_SECTIONS)
+  /** Capture-only panel telemetry (plan step 1). Absent ⇒ the key is omitted, not written empty, so a
+   *  record banked before this existed and a run whose caller supplies nothing stay distinguishable. */
+  panel?: PanelTelemetry;
 }
 
 /** Capture a complete, replayable record from a finished paid run. Pure — computes the deterministic
@@ -205,6 +230,7 @@ export function buildRunRecord(args: BuildRunRecordArgs): RunRecord {
       // banking an empty array, so "this run predates the ledger" stays distinguishable from "this run made
       // zero model calls". Those are different facts and only one of them is alarming.
       ...(args.usage && args.usage.length ? { usage: args.usage } : {}),
+      ...(args.panel ? { panel: args.panel } : {}),
     },
     billing: args.billing,
   };

@@ -18,6 +18,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildRunRecord, captureAuditFlagEnv, type RunRecordMeta, type RunRecordInput } from "./audit-run-record";
 import type { UsageCall } from "./audit-cost";
 import type { AuditResult } from "./audit-orchestrator";
+import type { PanelTelemetry } from "./audit-panel-telemetry";
+type AuditRunTrace = import("./audit-orchestrator").AuditResult["trace"];
 
 export const RUN_RECORD_BANK_ENABLED = process.env.AUDIT_BANK_RUN_RECORD === "true";
 const BUCKET = "run-records";
@@ -36,6 +38,23 @@ export interface BankRunRecordArgs {
   /** Per-call cost/latency ledger for this run (see RunRecord.result.usage). Optional — a caller that has
    *  none banks a record without the key rather than an empty array. */
   usage?: UsageCall[];
+  /** Capture-only panel telemetry (plan step 1) — banked verbatim, read by humans and $0 replays only. */
+  panel?: PanelTelemetry;
+  /** Per-lens run trace + the turn cap it was measured against, and per-lens read volume. Capture-only. */
+  lensTrace?: AuditRunTrace;
+  maxTurns?: number;
+}
+
+/** Sum the characters each lens actually opened, from the sections its trace says it read. Pure; a section
+ *  the trace names but the input does not carry contributes 0 rather than throwing. */
+function lensReadChars(
+  trace: AuditRunTrace,
+  sections: Record<string, string> | null | undefined,
+): Record<string, number> {
+  const len = new Map<string, number>();
+  for (const [k, v] of Object.entries(sections ?? {})) len.set(k, String(v ?? "").length);
+  return Object.fromEntries(Object.entries(trace ?? {}).map(([lens, t]) =>
+    [lens, (t?.sectionsRead ?? []).reduce((n, sec) => n + (len.get(sec) ?? 0), 0)]));
 }
 
 /** Bank a replayable RunRecord to durable storage. FLAG-GATED + best-effort — returns the storage path on
@@ -62,6 +81,18 @@ export async function bankRunRecord(
       billing: args.billing,
       commercialHonestFail: args.commercialHonestFail,
       ...(args.usage && args.usage.length ? { usage: args.usage } : {}),
+      ...(args.panel ? { panel: args.panel } : {}),
+      ...(args.lensTrace ? { lensTrace: args.lensTrace } : {}),
+      ...(args.maxTurns != null ? { maxTurns: args.maxTurns } : {}),
+      // Derived here, not by the caller: the ledger is the single source and a hand-passed count could drift
+      // from the array it claims to describe.
+      ...(args.usage && args.usage.length
+        ? { unlabelledCalls: args.usage.filter((u) => !u.label || u.label === "structured call").length }
+        : {}),
+      // Per-lens READ VOLUME, derived HERE because this is the one scope holding BOTH the trace and the
+      // sections it names — passing a pre-computed count from the executor would let the number drift from
+      // the arrays it claims to describe.
+      ...(args.lensTrace ? { lensReadChars: lensReadChars(args.lensTrace, args.input.sections) } : {}),
     });
     // Path: run-records/<sol>/<auditId>.json — sol-grouped so the pull script + scorer can match a blind key
     // by sol id. Sanitize the sol into a safe path segment (attacker-influenceable via SAM/upload metadata).
