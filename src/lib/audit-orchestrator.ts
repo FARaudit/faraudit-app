@@ -239,6 +239,24 @@ function assignUniqueFindingIds(rows: TypedFinding[], prefix: string, existing: 
   }
 }
 
+/** How many DISTINCT documents the expert phase opened, and how many lens-reads that took.
+ *
+ *  The expert-phase log summed `r.docsRead.length` across lenses, which is a count of READS, not of
+ *  DOCUMENTS: five lenses opening the same three attachments logged 15. That number is the instrument we
+ *  read coverage off, and it over-reported twice on the record ("17 of 52", "15 of 52" on runs whose real
+ *  distinct sets were smaller). The orchestrator's own `docsRead` Set — the one that actually feeds
+ *  documentsCovered — is not populated until ~23 lines after the log, so the log could not have used it.
+ *
+ *  Both figures are kept because they answer different questions: `distinct` is coverage, `lensReads` is
+ *  re-read pressure across the panel. Naming them apart is the point; one number could only be one of the
+ *  two, and it silently was the wrong one. Pure; no I/O; verdict-inert (telemetry only). */
+export function tallyDocsRead(runs: Array<{ docsRead: string[] }>): { distinct: number; lensReads: number } {
+  const seen = new Set<string>();
+  let lensReads = 0;
+  for (const r of runs) for (const d of r.docsRead) { seen.add(d); lensReads++; }
+  return { distinct: seen.size, lensReads };
+}
+
 export function buildManifest(ctx: AuditToolContext): string[] {
   if (procurementPart(ctx) === "part36-construction" && ctx.constructionManifest) return constructionRequired(ctx.constructionManifest);
   return BINDING_SECTIONS.filter((k) => readSection(ctx, k).present);
@@ -2587,7 +2605,8 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     if (_lensFailed.length > 0) {
       console.warn(`[expert] DEGRADED — ${_lensFailed.length} of ${experts.length} lens(es) failed and contributed NOTHING (coverage counts them unread ⇒ the package falls toward INCOMPLETE): ${_lensFailed.map((f) => `${f.key}: ${f.reason}`).join(" · ")}`);
     }
-    console.log(`[timing] expert-phase ${Date.now() - _tExp}ms · turns/lens ${experts.map((s, i) => `${s.key}:${runs[i].turns}`).join(" ")} · docsRead=${runs.reduce((n, r) => n + r.docsRead.length, 0)}`);
+    const _docsRead = tallyDocsRead(runs);
+    console.log(`[timing] expert-phase ${Date.now() - _tExp}ms · turns/lens ${experts.map((s, i) => `${s.key}:${runs[i].turns}`).join(" ")} · docsRead=${_docsRead.distinct} distinct (${_docsRead.lensReads} lens-reads)`);
     // GROUNDING-BACKSTOP TELEMETRY (verdict-inert). runAgenticExpert has always returned `dropped`; until now
     // NOTHING read it, so findings deleted by the grounding backstop left no trace anywhere — no log, no field,
     // nothing persisted. That made the one question worth asking ("is the backstop deleting findings the lens
