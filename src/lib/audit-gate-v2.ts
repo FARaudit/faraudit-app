@@ -901,6 +901,41 @@ const FIRM_FACT_NOUN_RE = new RegExp(
   "i");
 const SAM_ACTIVE_RE = /\bmaintain\s+an?\s+active\s+(?:sam(?:\.gov)?|system\s+for\s+award\s+management)\s+registration\b|\bactive\s+registration\s+in\s+(?:sam\b|the\s+system\s+for\s+award\s+management)\b/i;
 
+// ── U-A.2 · A BOND TOKEN IS NOT A LONG-LEAD CREDENTIAL (flag AUDIT_UA_BOND_NOT_FIRM_FACT, default-OFF) ────────
+// LONG_LEAD_CRED_RE carries a bare `bond(?:ing)?\b|surety|treasury-listed` group, and the U-A firm_fact_bar arm
+// in gateV2Outcome fires on that regex ALONE (no noun/possession predicate required). Measured on the banked
+// run-records: 10 of the 11 muted buckets are muted by a bond token and by nothing else. The token is wrong in
+// BOTH directions at once, which is why neither direction can be called conservative:
+//   TOO LOOSE — "submitted on SF-1444 or bond paper" (a PAPER STOCK) classifies as a scarce credential and mutes
+//     the verdict (`_fire-45f9bacd`). This is the same collision #587b already fixed for BAR_SIGNAL_RE at
+//     `bondPaperNonBarEnabled()`; the identical token in LONG_LEAD_CRED_RE was never carved out. One of two sites.
+//   TOO TIGHT — `bond(?:ing)?\b` does not match the PLURAL: "performance bonds shall be furnished" and "payment
+//     bonds and performance bonds are required" both score NEGATIVE, while the singular scores positive. A real
+//     bonding bar written in the plural already evades the classifier entirely, so the status quo is not a
+//     fail-closed posture that this change gives up — it is an arbitrary split on a trailing "s".
+// WHAT RULE 70(c) ACTUALLY RESERVES THE MUTE FOR: "an unverifiable firm-fact a bar turns on" — a Top Secret
+// facility clearance, CMMC, a QPL listing. The engine cannot know the firm's status and the credential takes
+// months to obtain. A BID GUARANTEE is not that shape: it is furnished WITH the bid, it is priced into bid prep,
+// and the bidder knows their own surety position. The engine's uncertainty about it is ordinary uncovered-
+// obligation uncertainty — precisely the case Rule 70 says must CAP at BID_WITH_CAUTION naming the item, never
+// mute. BONDING CAPACITY is the opposite: a threshold the firm must already carry, which a small sub can simply
+// fail. That is a genuine firm fact and it KEEPS its mute here.
+// SCOPE — U-A ONLY, exactly like the U-A.1 FIRM_FACT_NOUN_RE narrowing above. LONG_LEAD_CRED_RE itself is NOT
+// edited: it also drives the #576 upkeep discriminator (Axis-2 negative) and the #590 self-clearable recognizer,
+// both armed, and widening or narrowing it there would change served behaviour with no new flag.
+// FAIL-CLOSED CONSTRUCTION — the strip runs, then `hasLongLeadCredential` is re-asked. A bond sitting alongside a
+// real scarce credential ("a bid bond and a Top Secret facility clearance") still mutes on the clearance token.
+const UA_BOND_TOKEN_RE = /\bbond(?:s|ing|ed)?\b|\bsurety\b|\btreasury[\s-]?listed\b/gi;
+// The bonding shapes that ARE a firm fact: a capacity threshold, or bondability asserted of the firm itself.
+const UA_BOND_FIRM_FACT_RE = /\bbond(?:ing)?\s+capacity\b|\bbondable\b|\bcapacity\s+to\s+bond\b|\baggregate\s+bonding\b|\bsurety\s+(?:capacity|limit)\b|\bbonding\s+(?:limit|program)\b/i;
+const uaBondNotFirmFactEnabled = () => process.env.AUDIT_UA_BOND_NOT_FIRM_FACT === "true";
+/** U-A-scoped long-lead test. Flag-OFF ⇒ the production predicate, unchanged (byte-identical). */
+const uaHasLongLeadCredential = (ob: string): boolean => {
+  if (!uaBondNotFirmFactEnabled()) return hasLongLeadCredential(ob);
+  if (UA_BOND_FIRM_FACT_RE.test(ob)) return true;          // capacity/bondability → a real firm fact, mute holds
+  return hasLongLeadCredential(ob.replace(UA_BOND_TOKEN_RE, " "));
+};
+
 /** Recognize a credential-conditional bar obligation and extract its credential phrase VERBATIM from the obligation
  *  (card #575b). Returns { credential } or null. Pure; the flag gates the CALLER (gateV2Outcome). The credential text is
  *  a grounded substring of `ob` (or a fixed grounded label for the SAM class) — it is NEVER a claim about the bidder. */
@@ -1416,8 +1451,10 @@ export function gateV2Outcome(cov: CoverageV2, opts?: { findings?: Array<{ kind?
     // verb-form "registered", "credentials", facility RATING, and Authority to Operate — all firm-facts the
     // parent held. Adjective "qualified" is deliberately NOT matched (qualificat\w* only), so the
     // equipment-and-qualified-personnel mechanics class stays released (probe R4).
+    // U-A.2 — `uaHasLongLeadCredential` is `hasLongLeadCredential` verbatim while AUDIT_UA_BOND_NOT_FIRM_FACT is
+    // OFF; flag-ON it declines to treat a bare bond/surety token as a scarce credential. See its doctrine above.
     const firmFactAny = ccAny ? undefined : firing.find((f) =>
-      (hasPreAwardPossession(f.obligation) && FIRM_FACT_NOUN_RE.test(f.obligation)) || hasLongLeadCredential(f.obligation));
+      (hasPreAwardPossession(f.obligation) && FIRM_FACT_NOUN_RE.test(f.obligation)) || uaHasLongLeadCredential(f.obligation));
     const kind: "credential_conditional" | "firm_fact_bar" | "uncovered_obligation" =
       ccAny ? "credential_conditional" : firmFactAny ? "firm_fact_bar" : "uncovered_obligation";
     if (credentialConditionalReasonEnabled()) {
