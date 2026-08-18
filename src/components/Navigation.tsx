@@ -230,7 +230,7 @@ export default function Navigation(_: { initialPinned: boolean }) {
     href: string;
     badge?: NavBadge;
   }> = [
-    { id: "opportunities", label: "Opportunities", icon: "opportunities", href: "/opportunities", badge: { text: "Live", variant: "green" } },
+    { id: "opportunities", label: "Notices", icon: "opportunities", href: "/notices", badge: { text: "Live", variant: "green" } },
     { id: "defense-spending", label: "Defense Spending", icon: "defense-spending", href: "/defense-spending" },
     { id: "news", label: "Defense News", icon: "news", href: "/defense-news" },
     { id: "contracting-officers", label: "Contracting Officers", icon: "contracting-officers", href: "/contracting-officers" },

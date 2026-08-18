@@ -1,0 +1,145 @@
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - button "Toggle sidebar" [ref=e4] [cursor=pointer]
+    - generic [ref=e7]:
+      - generic [ref=e8]: F
+      - generic [ref=e9]:
+        - text: FAR
+        - generic [ref=e10]: audit
+    - generic [ref=e11]: WORKSPACE
+    - link "Today" [ref=e12] [cursor=pointer]:
+      - /url: /command-center
+    - link "Run Audit" [ref=e19] [cursor=pointer]:
+      - /url: /audit
+    - link "Acquisition Stages" [ref=e25] [cursor=pointer]:
+      - /url: /acquisition-stages
+    - link "Past Audits" [ref=e30] [cursor=pointer]:
+      - /url: /dashboard
+    - link "Pipeline" [ref=e35] [cursor=pointer]:
+      - /url: /pipeline
+    - link "Capability Statement" [ref=e40] [cursor=pointer]:
+      - /url: /capability-statement
+    - generic [ref=e45]: INTELLIGENCE
+    - link "Opportunities" [ref=e46] [cursor=pointer]:
+      - /url: /opportunities
+    - link "Defense News" [ref=e51] [cursor=pointer]:
+      - /url: /defense-news
+    - link "Defense Spending" [ref=e55] [cursor=pointer]:
+      - /url: /defense-spending
+    - link "Defense Agencies" [ref=e62] [cursor=pointer]:
+      - /url: /agencies
+    - link "Contracting Officers" [ref=e67] [cursor=pointer]:
+      - /url: /contracting-officers
+    - generic [ref=e74]: COMPLIANCE & BD
+    - link "FAR/DFARS Updates" [ref=e75] [cursor=pointer]:
+      - /url: /far-dfars-updates
+    - link "CMMC Readiness" [ref=e81] [cursor=pointer]:
+      - /url: /cmmc
+    - link "Wage Benchmarks" [ref=e86] [cursor=pointer]:
+      - /url: /wage-benchmarks
+    - link "Teaming Partners" [ref=e92] [cursor=pointer]:
+      - /url: /teaming-partners
+    - link "GAO Protests" [ref=e99] [cursor=pointer]:
+      - /url: /gao-protests
+    - generic [ref=e104]: ACCOUNT
+    - link "Profile & Settings" [ref=e105] [cursor=pointer]:
+      - /url: /settings
+    - button "Sign out" [ref=e111] [cursor=pointer]
+    - generic [ref=e116]: JR
+  - main [ref=e118]:
+    - generic [ref=e119]:
+      - generic [ref=e120]:
+        - generic [ref=e121]: Capability Statement
+        - generic [ref=e122]: /
+        - generic [ref=e123]: Your company record
+      - generic [ref=e124]:
+        - generic [ref=e128]: Search sections, NAICS, contracts…
+        - generic [ref=e129]: ⌘K
+      - generic [ref=e130]:
+        - button "Toggle theme" [ref=e131] [cursor=pointer]
+        - button "Notifications" [ref=e134] [cursor=pointer]
+        - dialog "Notifications":
+          - generic:
+            - heading "Notifications" [level=3]
+            - generic: "0"
+          - generic:
+            - generic:
+              - generic:
+                - generic: Notifications unavailable
+                - generic: We could not read them just now — this is not an empty inbox. Retry shortly.
+          - generic:
+            - link "View all activity":
+              - /url: /dashboard
+    - generic [ref=e140]:
+      - generic [ref=e141]:
+        - generic [ref=e142]:
+          - paragraph [ref=e143]: Workspace · Capability Statement
+          - heading "Your Capability Statement" [level=1] [ref=e144]
+          - paragraph [ref=e145]: The document you send to contracting officers — and the record the audit engine reads when it judges whether you are eligible to bid. Past performance fills in from audits you record as won; everything else is yours to write.
+        - generic [ref=e146]:
+          - generic [ref=e147]:
+            - button "Copy statement" [ref=e148] [cursor=pointer]
+            - button "Download PDF" [ref=e152] [cursor=pointer]
+            - button "Download Word" [ref=e156] [cursor=pointer]
+          - paragraph [ref=e161]: Copy keeps its formatting when pasted into Word, Google Docs or an email. PDF and Word download as files.
+      - generic [ref=e162]:
+        - generic [ref=e163]:
+          - paragraph [ref=e164]: Awards on file
+          - paragraph
+          - paragraph
+        - generic [ref=e165]:
+          - paragraph [ref=e166]: NAICS codes
+          - paragraph
+          - paragraph
+        - generic [ref=e167]:
+          - paragraph [ref=e168]: Completeness
+          - paragraph
+          - paragraph
+        - generic [ref=e169]:
+          - paragraph [ref=e170]: Last saved
+          - paragraph
+          - paragraph
+      - generic [ref=e171]:
+        - article [ref=e172]:
+          - text: Your company record could not be read. This is a connection problem, not an empty record — reload, and if it persists the page is not showing what is on file.
+          - generic [ref=e173]: Generated Statement
+          - generic [ref=e178]:
+            - generic [ref=e179]:
+              - generic [ref=e181] [cursor=pointer]:
+                - button "Upload your company logo" [ref=e182]
+                - generic [ref=e183]: ADDLOGO
+              - generic [ref=e185]:
+                - button "Edit company name"
+            - generic [ref=e186]:
+              - generic [ref=e187]:
+                - generic [ref=e188]: CAGE
+                - generic [ref=e189]: not on file
+              - generic [ref=e190]:
+                - generic [ref=e191]: UEI
+                - generic [ref=e192]: not on file
+              - generic [ref=e193]:
+                - generic [ref=e194]: SAM registration
+                - generic [ref=e195]:
+                  - textbox "12-character SAM UEI" [ref=e196]
+                  - button "SAVE" [ref=e197] [cursor=pointer]
+                - generic [ref=e198]: Could not read your profile — enter your UEI below to set it.
+          - generic [ref=e200]:
+            - generic [ref=e201]: Core Competencies
+            - button "Edit" [ref=e202] [cursor=pointer]
+          - generic [ref=e205]: Past Performance
+          - generic [ref=e209]:
+            - generic [ref=e210]: Differentiators
+            - button "Edit" [ref=e211] [cursor=pointer]
+          - generic [ref=e214]:
+            - generic [ref=e215] [cursor=pointer]: Point of Contact
+            - generic [ref=e221] [cursor=pointer]: Email
+            - generic [ref=e227] [cursor=pointer]: Phone
+            - generic [ref=e232] [cursor=pointer]: Business address
+            - generic [ref=e238] [cursor=pointer]: Website
+        - complementary [ref=e244]:
+          - generic [ref=e245]:
+            - heading "Statement Health" [level=3] [ref=e246]
+            - list
+          - generic [ref=e256]:
+            - heading "Tailored versions" [level=3] [ref=e257]
+            - paragraph

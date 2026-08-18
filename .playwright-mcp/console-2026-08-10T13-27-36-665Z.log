@@ -1,0 +1,14 @@
+[      20ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://localhost:8811/api/capability-statement:0
+[      20ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://localhost:8811/api/capability-statement:0
+[      21ms] [ERROR] [capability-statement-live] Error: capability statement fetch failed: 404
+    at http://localhost:8811/capability-statement-live.js:1418:26 @ http://localhost:8811/capability-statement-live.js:1438
+[      21ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://localhost:8811/api/notifications?limit=20:0
+[      21ms] [ERROR] [notif-chrome] load failed: Error: notifications 404
+    at http://localhost:8811/notifications-chrome.js:217:26 @ http://localhost:8811/notifications-chrome.js:238
+[   21790ms] TypeError: Cannot read properties of null (reading 'company_name')
+    at statementText (http://localhost:8811/capability-statement-live.js:1010:20)
+    at copyStatement (http://localhost:8811/capability-statement-live.js:1347:16)
+    at HTMLDocument.<anonymous> (http://localhost:8811/capability-statement-live.js:991:40)
+    at eval (eval at <anonymous> (eval at evaluate (:311:30)), <anonymous>:19:44)
+    at async eval (eval at evaluate (:311:30), <anonymous>:4:30)
+    at async <anonymous>:337:30

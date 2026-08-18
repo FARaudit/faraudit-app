@@ -43,7 +43,8 @@ export interface ProfileConstructionOptions {
   now?: () => string;
 }
 
-const profileSchemaV2Enabled = () => process.env.AUDIT_PROFILE_SCHEMA_V2 === "true";
+// AUDIT_PROFILE_SCHEMA_V2 is no longer read here. Deleted rather than left dangling so the
+// discipline cannot be reopened by restoring one call site — see the ruling note in audit-decide.ts.
 const RECORD_SOURCES = new Set(["sam_api", "sba_api", "verified_import", "customer_asserted", "document"]);
 // Verification round F2: size-class namespaces may NEVER ride in via attributes_v2 — a stored
 // `sb:total`/`naics:*-small`/`size:*` record is exactly the NAICS-independent derived boolean the
@@ -122,11 +123,13 @@ export function buildBidderProfileFromCapability(
       if (token) tokens.add(token);
     }
   }
-  const v2 = profileSchemaV2Enabled()
-    ? [...validAttributeRecords(cap?.attributes_v2), ...sizeAttributeRecords(cap?.size_facts, opts?.solicitationNaics)]
-    : [];
+  // UNGATED 2026-08-08 (CEO ruling, with firmStatus). Gating CONSTRUCTION while the satisfy
+  // discipline is unconditional builds a wall: the records that CAN clear a bar would never
+  // reach the profile, so a SAM-verified firm and a firm asserting the same string would both
+  // come back `unknown`. Refusing a claim is the ruling; refusing the proof is not.
+  const v2 = [...validAttributeRecords(cap?.attributes_v2), ...sizeAttributeRecords(cap?.size_facts, opts?.solicitationNaics)];
   if (v2.length === 0) {
-    // legacy shape, byte-identical (flag OFF, or nothing V2 materialized)
+    // legacy shape — nothing V2 materialized on this record
     if (tokens.size === 0) return null;
     return { satisfiedAttributes: [...tokens], openWorld: true };
   }

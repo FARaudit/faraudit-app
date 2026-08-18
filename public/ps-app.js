@@ -6,7 +6,9 @@
   const NAV = [
     { key: 'company', label: 'Company Profile', icon: 'M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6' },
     { key: 'naics', label: 'NAICS Configuration', icon: 'M4 19V5M4 19h16M8 16v-5M13 16V8M18 16v-3' },
+    { key: 'interface', label: 'Interface', icon: 'M3 4h18v14H3zM3 9h18M8 18v2h8v-2' },
     { key: 'notifs', label: 'Notifications', icon: 'M6 8a6 6 0 1112 0c0 7 3 8 3 8H3s3-1 3-8zM10 21a2 2 0 004 0' },
+    { key: 'security', label: 'Security', icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM12 11v4M12 8h.01' },
     { key: 'team', label: 'Team Members', icon: 'M7 9a3 3 0 100-6 3 3 0 000 6zM17 9a3 3 0 100-6 3 3 0 000 6zM2 20c0-3 2.5-5 5-5M22 20c0-3-2.5-5-5-5' },
     { key: 'billing', label: 'Billing & Plan', icon: 'M2 7h20v12H2zM2 11h20' }
   ];
@@ -21,8 +23,14 @@
   //
   // loadError is the third state: empty, failure and data are three different
   // answers and none may wear another's clothes.
+  //
+  // `loaded` is the FOURTH state: NOT YET KNOWN. The first paint happens before the
+  // account read answers, so every array here is empty while loadError is still
+  // false — indistinguishable from a genuinely empty account. Absence may only be
+  // asserted once the read has SETTLED.
   window.PS = window.PS || {
     loadError: false,
+    loaded: false,
     COMPANY: { name: '', cage: '', uei: '', address: '', contact: '', email: '', phone: '' },
     CERTS: [], NAICS: [], NOTIFS: [], TEAM: [], USAGE: []
   };
@@ -32,6 +40,16 @@
   const NOTIFS = window.PS.NOTIFS;
   const TEAM = window.PS.TEAM;
   const USAGE = window.PS.USAGE;
+
+  /* Has the account read SETTLED? Every statement about what this record does or does
+     not hold is conditioned on this. It is deliberately a positive test — `settled()`
+     is false until something says otherwise, so a new panel that forgets to ask still
+     renders the unknown state rather than inventing an empty one. */
+  function settled() { return !!window.PS.loaded; }
+  /* The unknown state. Not an error and not an empty result — the page simply does not
+     know yet, and says so in the same quiet register the header counters already use
+     (they ship a dash, which is why they never lied here and these rows did). */
+  function pending(what) { return `<span class="fld-none">${esc(what)}</span>`; }
 
   function tog(on) { return `<span class="tgl ${on ? 'on' : ''}"><i></i></span>`; }
   function field(label, val, ph) { return `<div class="fld"><label>${label}</label><input type="text" value="${val || ''}" placeholder="${ph || ''}"></div>`; }
@@ -107,6 +125,37 @@
     }
     return `<span class="cert-tg" title="Carried on your profile — not established in SAM under the UEI on file">${name}</span>`;
   }
+  /* AN EMPTY ROW HAS FIVE CAUSES AND THEY ARE NOT THE SAME ANSWER. "None on file" reads as
+     "you hold none" in every one of them, and one of them is OUR OWN READ FAILING — telling a
+     customer they hold nothing because we could not look is the fabrication this product
+     exists to refuse. The stamp below already names the state, so this line carries what
+     follows from it: the action where there is one, and the answer where the zero is real.
+     The unread case is the only one that must not read as a quantity at all.
+
+     THE TWO STATES THAT SPEAK FOR SAM MUST NAME WHAT SAM CANNOT CARRY. Its SBA list holds
+     8(a), HUBZone, WOSB and EDWOSB and nothing else, so "the programs you are registered
+     under appear here" promises a service-disabled or veteran-owned firm something no
+     registration can deliver — and the real-zero message then lands as "you hold none" on a
+     firm that holds VetCert. The boundary is stated in the empty state, not only in the
+     caption that needs a chip to exist before it renders. */
+  function certEmpty() {
+    var st = window.PS.CERT_STATE;
+    var msg = st === 'no-uei'
+        ? 'Add your SAM.gov UEI above and any 8(a), HUBZone, WOSB or EDWOSB registration appears here on its own. Service-disabled and veteran-owned status is issued by VA VetCert, which SAM does not publish.'
+      : st === 'uei-not-found'
+        ? 'SAM lists no programs under the UEI on file.'
+      : st === 'registration-inactive'
+        ? 'None until the SAM registration is renewed.'
+      : st === 'verified'
+        ? 'Your active SAM registration carries no SBA socioeconomic programs. Service-disabled and veteran-owned status is issued separately by VA VetCert and does not appear here.'
+      : 'Not known — SAM could not be read just now, so this row is unanswered rather than empty.';
+    // A SIXTH CAUSE: the read has not finished. It falls through to the message above,
+    // which names SAM as the thing at fault — the honest direction, but the wrong
+    // reason, and a reason a customer may act on.
+    if (!st && !settled()) return pending('Reading your registration…');
+    return `<span class="fld-none">${esc(msg)}</span>`;
+  }
+
   /* AN UNPROMOTED CHIP HAS TO SAY WHAT IT IS. Grey conveys "not established", but a row
      of grey chips with no caption leaves the reader to guess whether they are examples,
      placeholders, or their own record. They are none of those: they are entries carried
@@ -193,18 +242,25 @@
 
   function editable(id, label, val, ph) { return `<div class="fld"><label>${label}</label><input type="text" id="${id}" value="${esc(val)}" placeholder="${esc(ph)}"></div>`; }
   /* Read-only value. "Not on file" rather than an empty box, so nothing-on-file is visibly
-     different from a field you are meant to fill in. */
+     different from a field you are meant to fill in — but only once we know, since
+     before the read settles every value here is '' and would report itself absent. */
   function ro(label, val, note) {
-    return `<div class="fld"><label>${label}</label><div class="fld-ro">${val ? esc(val) : '<span class="fld-none">Not on file</span>'}</div>${note ? `<div class="fld-note">${esc(note)}</div>` : ''}</div>`;
+    const shown = val ? esc(val)
+      : settled() ? '<span class="fld-none">Not on file</span>'
+      : pending('…');
+    return `<div class="fld"><label>${label}</label><div class="fld-ro">${shown}</div>${note ? `<div class="fld-note">${esc(note)}</div>` : ''}</div>`;
   }
 
   /* Plan comes from the subscription record, and there are three answers, not two:
      a plan, no subscription, or a record that could not be read. An unreadable
-     billing record must never render as "no subscription". */
+     billing record must never render as "no subscription". Nor must an unfinished
+     one: before the read settles there is no plan_label and no plan_unreadable, and
+     a two-way test on those alone resolves to "no subscription" on every first paint. */
   function planName() {
     if (window.PS.plan_unreadable) return '<span class="fld-none">Could not be read</span>';
-    return window.PS.plan_label ? esc(window.PS.plan_label)
-      : '<span class="fld-none">No subscription on file</span>';
+    if (window.PS.plan_label) return esc(window.PS.plan_label);
+    return settled() ? '<span class="fld-none">No subscription on file</span>'
+                     : pending('Reading your plan…');
   }
   /* NO PRICE IS RENDERED. What a customer pays is agreed with their point of contact
      and is stored nowhere this page can read, so the page states that instead of a
@@ -252,13 +308,13 @@
           ${editable('psAddress', 'Business address', COMPANY.address, 'Street, city, state ZIP')}
         </div>
         <div class="fld-sec">NAICS codes</div>
-        <div class="cert-row">${NAICS.length ? NAICS.map(n => `<span class="cert-tg on">${esc(n.code || n.k || n)}</span>`).join('') : '<span class="fld-none">None on file</span>'}</div>
-        ${NAICS.length ? '' : '<div class="note note-warn">No NAICS codes on file, so Today, Opportunities, Contracting Officers and Teaming Partners have nothing to match against and will stay empty. Add them under NAICS Configuration.</div>'}
+        <div class="cert-row">${NAICS.length ? NAICS.map(n => `<span class="cert-tg on">${esc(n.code || n.k || n)}</span>`).join('') : settled() ? '<span class="fld-none">None on file</span>' : pending('Reading your record…')}</div>
+        ${NAICS.length || !settled() ? '' : '<div class="note note-warn">No NAICS codes on file, so Today, Notices, Contracting Officers and Teaming Partners have nothing to match against and will stay empty. Add them under NAICS Configuration.</div>'}
         <div class="fld-sec">Certifications on your capability statement</div>
-        <div class="cert-row">${CERTS.length ? CERTS.map(c => certChip(c)).join('') : '<span class="fld-none">None on file</span>'}</div>
+        <div class="cert-row">${CERTS.length ? CERTS.map(c => certChip(c)).join('') : certEmpty()}</div>
         ${certCaption()}
         ${certNote()}
-        <div class="note">This is the same record the <a href="/capability-statement">capability statement</a> prints and the audit engine reads when it judges whether you are eligible to bid — so what you enter here shapes real verdicts. NAICS codes are edited under NAICS Configuration, and certifications on your <a href="/capability-statement">capability statement</a>. They are shown here only: one clears a set-aside bar just when it is verified against SAM, so there is nothing useful to type.</div>
+        <div class="note">This is the same record the <a href="/capability-statement">capability statement</a> prints and the audit engine reads when it judges whether you are eligible to bid — so what it holds shapes real verdicts. NAICS codes are edited under NAICS Configuration. Certifications are not typed anywhere: any 8(a), HUBZone, WOSB or EDWOSB registration under the UEI above appears here on its own. Service-disabled and veteran-owned status is issued by VA VetCert, which SAM does not publish.</div>
       </div>
       <div class="sp-foot"><span class="saved" id="psSavedNote" hidden></span><button class="save-btn" id="psSaveBtn">Save changes</button></div>`,
 
@@ -283,7 +339,7 @@
         ${NAICS.length
           ? `<div class="naics-head"><span>Code</span><span>Description</span><span class="nh-r">Size standard</span><span></span></div>`
             + NAICS.map(n => naicsRow(n.code)).join('')
-          : '<div class="fld-none" style="padding:6px 2px 12px">No NAICS codes on file.</div>'}
+          : `<div class="fld-none" style="padding:6px 2px 12px">${settled() ? 'No NAICS codes on file.' : 'Reading your record…'}</div>`}
         ${(window.PS.NAICS_DERIVED || []).length ? `
         <div class="naics-sugg">
           <div class="ns-t">From contracts you have won — not saved to your profile yet</div>
@@ -298,7 +354,7 @@
              directly, because the reference table is a convenience and not an allowlist. -->
         <div class="naics-find" id="psNaicsResults" role="listbox" aria-label="Matching NAICS codes" hidden></div>
         <div class="naics-msg" id="psNaicsMsg" role="status" hidden></div>
-        <div class="note"><b>How this works:</b> your NAICS codes are what Today, Opportunities, Contracting Officers and Teaming Partners match against — with none on file those pages have nothing to match and stay empty. Wage Benchmarks offers them as an optional filter over a national reference table; it is not scoped by them. Each page picks up a change the next time it loads.</div>
+        <div class="note"><b>How this works:</b> your NAICS codes are what Today, Notices, Contracting Officers and Teaming Partners match against — with none on file those pages have nothing to match and stay empty. Wage Benchmarks offers them as an optional filter over a national reference table; it is not scoped by them. Each page picks up a change the next time it loads.</div>
       </div>
       `,
 
@@ -319,38 +375,133 @@
        template rows with no handler and no backing preference; they are gone. The bell
        is genuinely wired — notifications are written by the watcher and read by the
        page — so that sentence stays. */
+    /* Idle auto sign-out. The copy states what the timer DOES — it posts the same
+       sign-out the rail's button posts — and what it is not: it does not shorten the
+       session's own lifetime, which the auth provider owns. OFF is the default and the
+       only state a failed preference read can produce. */
+    security: () => `
+      <div class="sp-hd"><div class="sp-t">Security</div><div class="sp-s">What happens when you walk away</div></div>
+      <div class="sp-bd" id="security">
+        <div class="nf-row" data-pref-row>
+          <div class="nf-l">
+            <div class="nf-t">Sign me out after a period of inactivity</div>
+            <div class="nf-d">For a shared or unattended machine. After the chosen idle time you get a one-minute warning with a <b>Stay signed in</b> button; if nothing happens, FARaudit signs you out — the same sign-out as the button in the sidebar, so the session really ends. Typing, scrolling or clicking anywhere in FARaudit resets the clock, in any open tab.</div>
+          </div>
+          <select class="ps-sel" id="autoSignoutSel" aria-label="Idle sign-out after">
+            <option value="0">Off</option>
+            <option value="15">15 minutes</option>
+            <option value="30">30 minutes</option>
+            <option value="60">1 hour</option>
+            <option value="120">2 hours</option>
+            <option value="240">4 hours</option>
+          </select>
+        </div>
+        <div class="naics-msg" id="psPrefNote" role="status" hidden></div>
+        <div class="note"><b>What this is not:</b> it is a timer in your browser, not a shorter session. Closing the tab does not sign you out, and the setting cannot end a session on a device you no longer have. It is off unless you turn it on, and if your preferences cannot be read it stays off rather than signing you out on a guess.</div>
+      </div>`,
+
+    /* THE SHELL YOU LOOK AT, not what reaches you. A group's start state and the app's
+       appearance are layout, not notifications, and belong on their own panel. */
+    interface: () => `
+      <div class="sp-hd"><div class="sp-t">Interface</div><div class="sp-s">How the app is laid out for you</div></div>
+      <div class="sp-bd" id="interface">
+        <div class="nf-row" data-pref-row style="align-items:flex-start">
+          <div class="nf-l">
+            <div class="nf-t">Sidebar groups</div>
+            <div class="nf-d">Which groups are already open when a page loads. The group holding the page you are on always opens regardless, so you are never left without a highlight, and opening a group while you work is remembered here too. Saved to your account, so it follows you to a new browser.</div>
+          </div>
+          <div class="if-secs">
+            <label class="if-sec"><span>Readiness</span><button class="nf-tg" data-rail-sec="readiness"><span class="tgl"><i></i></span></button></label>
+            <label class="if-sec"><span>Market intel</span><button class="nf-tg" data-rail-sec="market-intel"><span class="tgl"><i></i></span></button></label>
+            <label class="if-sec"><span>Reference</span><button class="nf-tg" data-rail-sec="reference"><span class="tgl"><i></i></span></button></label>
+          </div>
+        </div>
+        <div class="nf-row" data-pref-row>
+          <div class="nf-l">
+            <div class="nf-t">Appearance</div>
+            <div class="nf-d">Light follows the default. Dark is a fixed choice; Match my system follows the setting on whichever device you are using. The switch in the top bar changes this device only — this one is saved to your account.</div>
+          </div>
+          <select class="ps-sel" id="themeSel" aria-label="Appearance">
+            <option value="">Light</option>
+            <option value="dark">Dark</option>
+            <option value="auto">Match my system</option>
+          </select>
+        </div>
+        <div class="naics-msg" id="psIfNote" role="status" hidden></div>
+      </div>`,
+
     notifs: () => `
       <div class="sp-hd"><div class="sp-t">Notification Preferences</div><div class="sp-s">What reaches you, and what does not yet</div></div>
       <div class="sp-bd" id="alerts">
         <div class="nf-row" data-pref-row>
           <div class="nf-l">
-            <div class="nf-t">Weekly digest of watched opportunities <span class="nf-tag">Not yet sending</span></div>
-            <div class="nf-d">Your choice is saved, but the digest itself is not built — nothing is emailed on a schedule today. Set it now and it will apply when it ships.</div>
+            <div class="nf-t">Weekly digest of watched opportunities</div>
+            <div class="nf-d">Monday mornings: what posted that week, what you newly tracked, and anything closing within a fortnight. A quiet week sends nothing — an empty digest reads like a broken pipeline.</div>
           </div>
           <button class="nf-tg" data-pref-tg="weekly_digest_watched"><span class="tgl"><i></i></span></button>
         </div>
+        <div class="nf-row" data-pref-row>
+          <div class="nf-l">
+            <div class="nf-t">Email me when a watched notice posts</div>
+            <div class="nf-d">Sent to <b>${esc(COMPANY.email)}</b> as it posts, carrying the auto-audit verdict.</div>
+          </div>
+          <button class="nf-tg" data-pref-tg="alerts_email_enabled"><span class="tgl"><i></i></span></button>
+        </div>
+        <div class="nf-row" data-pref-row>
+          <div class="nf-l">
+            <div class="nf-t">Show those alerts on the bell</div>
+            <div class="nf-d">The same events in your top bar, whether or not the email is on.</div>
+          </div>
+          <button class="nf-tg" data-pref-tg="alerts_in_app_enabled"><span class="tgl"><i></i></span></button>
+        </div>
         <div class="naics-msg" id="psPrefNote" role="status" hidden></div>
-        <div class="note">Alerts on the notices you are watching are emailed to <b>${esc(COMPANY.email)}</b> as they post, and also appear on the bell in your top bar. Turning those off is not built yet.</div>
-      </div>
-      `,
-
-    /* NO ROLE BADGE. There is no membership table, no invitation, no seat and no role
-       model anywhere in the product — the OWNER pill was a literal typed into the array
-       one line before it rendered, and a role badge implies other roles that do not
-       exist. The seat sentence pointed at a Billing tab that holds no seat count. What
-       is true: one account, and it is yours. */
-    team: () => `
-      <div class="sp-hd"><div class="sp-t">Team Members</div><div class="sp-s">Who can sign in to this workspace</div></div>
-      <div class="sp-bd">
-        ${TEAM.map(m => `<div class="tm-row"><div class="tm-av">${esc(String(m.name || '?').split(' ').map(w => w[0]).join(''))}</div><div class="tm-info"><div class="tm-name">${esc(m.name)}${m.you ? ' <span class="tm-you">You</span>' : ''}</div><div class="tm-email">${esc(m.email)}</div></div></div>`).join('')}
-        <p class="ps-unwired">Inviting teammates is not built yet. This workspace has a single account, yours.</p>
+        <div class="note"><b>Where these come from:</b> press <b>Track</b> on any notice in <a href="/notices">Notices</a>. From then on we re-check that notice against SAM every hour, and the moment its documents post we run the audit and tell you — by email, on the bell, or both, depending on the switches above. The weekly digest is the same activity gathered into one Monday summary.<br><br>A switch you have never touched is ON, and if we cannot read your preferences we deliver rather than go quiet — missing a solicitation costs more than one unwanted email.</div>
       </div>`,
 
+    /* A ROSTER WITH NOBODY ON IT IS AN ANSWER — a workspace whose own owner is not
+       listed, under a line stating it has a single account. There is no such thing
+       as a signed-in customer with an empty roster: either the read has not answered
+       yet, or it has and the account holder is in the list. The list itself therefore
+       decides all three states, and no branch can render an empty one. */
+    /* THE HEADING AND THE LABEL TRAVEL TOGETHER.
+       There is no membership table, no roles model, no invitation path and no API that
+       lists people. This panel does not read a roster — it renders the signed-in account
+       and nothing else, so it could never show a second person even if one existed.
+       "Team Members" over one row therefore reads as an enumeration of a set nobody
+       queried, and the NOT-YET-LIVE chip plus the line below are the only things making
+       it true. Delete either and the panel becomes a claim. Gated in
+       test/public/_settings-honesty.test.ts.
+       "Workspace" is retired here: it appeared nowhere else in the product, which says
+       account, profile and company record. */
+    team: () => TEAM.length ? `
+      <div class="sp-hd"><div class="sp-t">Team Members<span class="sp-soon">Not yet live</span></div><div class="sp-s">People with access to your FARaudit account</div></div>
+      <div class="sp-bd">
+        ${TEAM.map(m => `<div class="tm-row"><div class="tm-av">${esc(String(m.name || '?').split(' ').map(w => w[0]).join(''))}</div><div class="tm-info"><div class="tm-name">${esc(m.name)}${m.you ? ' <span class="tm-you">You</span>' : ''}</div><div class="tm-email">${esc(m.email)}</div></div></div>`).join('')}
+        <p class="ps-unwired">You are the only person with access. Adding people — invitations, roles and permissions — is coming.</p>
+      </div>` : settled() ? `
+      <div class="sp-hd"><div class="sp-t">Team Members<span class="sp-soon">Not yet live</span></div><div class="sp-s">People with access to your FARaudit account</div></div>
+      <div class="sp-bd">
+        <div class="ps-failed">
+          <div class="ps-failed-t">Access could not be loaded</div>
+          <div class="ps-failed-s">A connection problem, not an empty account — nothing has been lost and nothing has been changed. Reload to try again.</div>
+        </div>
+      </div>` : `
+      <div class="sp-hd"><div class="sp-t">Team Members<span class="sp-soon">Not yet live</span></div><div class="sp-s">People with access to your FARaudit account</div></div>
+      <div class="sp-bd">
+        ${pending('Reading your account…')}
+      </div>`,
+
+    /* THE LABEL GOES ON THE PART THAT IS UNBUILT, NOT ON THE PANEL.
+       The plan readout is LIVE — /api/profile queries the subscriptions table, maps
+       tier to label, and reports plan_unreadable when the read fails, which is why
+       "No subscription on file" is an answer rather than an assumption. Metering is
+       the piece that does not exist, so the chip sits on that section. A chip across
+       the whole panel would understate a part that genuinely works. */
     billing: () => `
       <div class="sp-hd"><div class="sp-t">Billing &amp; Plan</div><div class="sp-s">Your plan, and what this page can and cannot change</div></div>
       <div class="sp-bd">
         <div class="plan-card"><div class="pc-l"><div class="pc-kicker">Current plan</div><div class="pc-name">${planName()}</div>${planStatus() ? `<div class="pc-status">${planStatus()}</div>` : ''}<div class="pc-desc">${planPrice()}</div></div></div>
-        <div class="fld-sec">Usage this period</div>
+        <div class="fld-sec">Usage this period<span class="sp-soon">Not yet live</span></div>
         ${USAGE.length
           ? `<div class="usage-list">${USAGE.map(u => `<div class="us-row"><div class="us-l">${u.l}${u.s ? `<small>${u.s}</small>` : ''}</div><span class="us-v">${u.v}</span></div>`).join('')}</div>`
           : '<p class="ps-unwired">Usage metering is not built yet, so there is nothing to show for this period.</p>'}
@@ -412,16 +563,145 @@
       body: JSON.stringify({ [key]: value })
     }).then(r => r.ok);
   }
-  const PREF_LABELS = { weekly_digest_watched: 'Weekly digest' };
+  const PREF_LABELS = { weekly_digest_watched: 'Weekly digest', alerts_email_enabled: 'Alert emails', alerts_in_app_enabled: 'Bell alerts', auto_signout_minutes: 'Auto sign-out' };
+
+  /* The idle sign-out duration. Same save path and same refused-save reporting as the
+     toggles below; it is a <select> only because the value is a duration, not a state.
+     On a successful save the running timer is re-armed in this tab, so the setting the
+     customer just chose is the one in force without a reload. */
+  function wireAutoSignout(prefs) {
+    var sel = $('autoSignoutSel');
+    if (!sel) return;
+    /* The store has to be able to HOLD this before the control offers to set it. A row
+       came back carrying other keys but not this one means the column is not there yet,
+       and a select that looks live and refuses every save is worse than one that says
+       so. An empty object is "no row yet", which is normal and storable. */
+    var storable = !Object.keys(prefs).length || Object.prototype.hasOwnProperty.call(prefs, 'auto_signout_minutes');
+    if (!storable) {
+      sel.disabled = true;
+      sel.title = 'Not available on this account yet';
+      var msg = $('psPrefNote');
+      if (msg) { msg.hidden = false; msg.textContent = 'Auto sign-out is not available on your account yet — the setting cannot be stored, so it stays off rather than appearing to be on.'; }
+      return;
+    }
+    var cur = prefs.auto_signout_minutes;
+    sel.value = String(typeof cur === 'number' && cur > 0 ? cur : 0);
+    sel.onchange = function () {
+      var mins = parseInt(sel.value, 10) || 0;
+      sel.disabled = true;
+      savePref('auto_signout_minutes', mins === 0 ? null : mins).then(function (ok) {
+        sel.disabled = false;
+        if (ok) {
+          prefs.auto_signout_minutes = mins === 0 ? null : mins;
+          if (typeof window.faSetAutoSignout === 'function') window.faSetAutoSignout(mins === 0 ? null : mins);
+          flash(PREF_LABELS.auto_signout_minutes, true);
+        } else {
+          // A refused save names itself and the control goes back to what is STORED —
+          // leaving the new value selected would show a setting that is not in force.
+          sel.value = String(typeof prefs.auto_signout_minutes === 'number' && prefs.auto_signout_minutes > 0 ? prefs.auto_signout_minutes : 0);
+          flash(PREF_LABELS.auto_signout_minutes, false);
+        }
+      });
+    };
+  }
+  /* The rail applies this preference BEFORE it paints, which a fetch cannot do, so the
+     account value is mirrored into localStorage and read synchronously there. Written on
+     save so the very next navigation is already right; the rail also refreshes the mirror
+     in the background for a browser that has never seen this account. Mirrored ONLY after
+     the server acknowledged the write — a mirror ahead of the account would show a
+     preference that is not stored. */
+  /* THE RAIL SECTION TOGGLES.
+     The account column holds the SAME map the rail keeps in localStorage — keyed by the
+     rail's own data-sec slug — so this mirrors rather than reconciles. The previous
+     single switch had to WIPE the customer's group clicks to take effect, because it was
+     a second statement about the same thing; there is now only one statement.
+     The rail applies this before it paints, which a fetch cannot do, so the mirror is
+     what the rail actually reads. */
+  const RAIL_SECS = ['readiness', 'market-intel', 'reference'];
+
+  function mirrorRailSections(map) {
+    try { localStorage.setItem('faraudit-rail-sections', JSON.stringify(map || {})); } catch (e) {}
+  }
+
+  function wireRailSections(prefs) {
+    var btns = $('setContent').querySelectorAll('[data-rail-sec]');
+    if (!btns.length) return;
+    // NULL means never chosen, and the shipped default is every group closed. An empty
+    // object is a customer who chose all-closed; both render the same, and neither is
+    // invented into the other at rest.
+    var map = (prefs && prefs.rail_sections_open && typeof prefs.rail_sections_open === 'object')
+      ? Object.assign({}, prefs.rail_sections_open) : {};
+    mirrorRailSections(map);
+    btns.forEach(function (b) {
+      var sec = b.getAttribute('data-rail-sec');
+      var tgl = b.querySelector('.tgl');
+      if (map[sec] === true) tgl.classList.add('on'); else tgl.classList.remove('on');
+      b.onclick = function (e) {
+        e.preventDefault();
+        var next = !tgl.classList.contains('on');
+        tgl.classList.toggle('on', next);
+        b.disabled = true;
+        var candidate = Object.assign({}, map);
+        candidate[sec] = next;
+        savePref('rail_sections_open', candidate).then(function (ok) {
+          b.disabled = false;
+          // MIRROR ONLY WHAT THE SERVER TOOK. Writing the mirror first would leave the
+          // rail showing a layout the account does not hold.
+          if (ok) { map = candidate; prefs.rail_sections_open = candidate; mirrorRailSections(map); flash('Sidebar groups', true); }
+          else { tgl.classList.toggle('on', !next); flash('Sidebar groups', false); }
+        });
+      };
+    });
+  }
+
+  /* Appearance. The masthead button writes localStorage for the device it is pressed on;
+     this writes the account, so a new browser starts where the customer left off. Both
+     are kept in step — a saved account theme that the current tab ignores would read as
+     a control that did not work. */
+  function wireTheme(prefs) {
+    var sel = $('themeSel');
+    if (!sel) return;
+    var cur = prefs && typeof prefs.theme === 'string' ? prefs.theme : '';
+    sel.value = cur === 'dark' || cur === 'auto' ? cur : '';
+    sel.onchange = function () {
+      var v = sel.value;
+      sel.disabled = true;
+      savePref('theme', v === '' ? null : v).then(function (ok) {
+        sel.disabled = false;
+        if (!ok) { sel.value = cur; flash('Appearance', false); return; }
+        cur = v; prefs.theme = v;
+        var applied = v === 'auto'
+          ? (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+          : (v === 'dark' ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', applied);
+        try { localStorage.setItem('faraudit-theme', applied); } catch (e) {}
+        flash('Appearance', true);
+      });
+    };
+  }
+
+
   function wireServerPrefs() {
     var btns = $('setContent').querySelectorAll('[data-pref-tg]');
-    if (!btns.length) return;
+    // The duration select lives on its own panel, so an early return on "no toggles
+    // here" would have left it unwired — a control that loads, looks live and saves
+    // nothing.
+    // Each control lives on its own panel, so an early return on "no toggles here" would
+    // leave whichever panel is open unwired — a control that loads, looks live and saves
+    // nothing. That defect has been shipped on this page once already.
+    if (!btns.length && !$('autoSignoutSel') && !$('themeSel') && !$('setContent').querySelector('[data-rail-sec]')) return;
     loadPrefs().then(prefs => {
+      wireAutoSignout(prefs);
+      wireRailSections(prefs);
+      wireTheme(prefs);
       btns.forEach(b => {
         var key = b.getAttribute('data-pref-tg');
         var current = prefs[key];
         // Server default for weekly_digest_watched is true — interpret null/undefined as on.
         var on = current === undefined || current === null ? true : !!current;
+        // Seed the mirror from what the ACCOUNT says, not only from a toggle press: a
+        // customer who opens Settings and changes nothing should still leave with the
+        // rail matching their account on the next page.
         var tgl = b.querySelector('.tgl');
         if (on) tgl.classList.add('on'); else tgl.classList.remove('on');
         b.onclick = function(e){

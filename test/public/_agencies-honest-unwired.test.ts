@@ -77,7 +77,17 @@ console.log("\n── C · the page asserts nothing it cannot measure ──");
 // The stylesheet may still carry the rule; what matters is whether the MARKUP
 // asserts a figure. Judge the body, not the <style> block.
 const MARKUP = HTML.replace(/<style>[\s\S]*?<\/style>/, "");
-ok(!/hdr-stat/.test(MARKUP), "the hardcoded header figures are gone from the markup");
+// The old header hardcoded its figures INSIDE `.hdr-stat`, so banning the class was a fair
+// proxy for banning the figures. The header is now derived — `paintHeader` writes each value
+// with textContent, and only off the `ok` path — so the class name is no longer the defect.
+// Ban the thing itself: a header stat that ships a digit is a figure no source produced,
+// because the markup is what renders before any answer arrives.
+const HDR = (MARKUP.match(/<div class="hdr-stat">[\s\S]*?<\/div>\s*<\/div>/) || [""])[0];
+const hdrValues = [...HDR.matchAll(/<span class="v"[^>]*>([\s\S]*?)<\/span>/g)].map((m) => m[1].trim());
+ok(HDR !== "" && hdrValues.length > 0, "the header stat block is present and parsed", `parsed ${hdrValues.length} values`);
+ok(hdrValues.every((v) => !/\d/.test(v)),
+  "the header figures are placeholders in the markup, not hardcoded numbers",
+  hdrValues.filter((v) => /\d/.test(v)).join(", "));
 ok(!/\$\d/.test(MARKUP), "no dollar figure survives in the markup");
 ok(!/FPDS/.test(HTML), "the page no longer cites a source it does not read");
 const PROMISES = [/Command Leaderboard/i, /Set-Aside Posture/i, /Procurement Forecast/i, /Org Map/i];

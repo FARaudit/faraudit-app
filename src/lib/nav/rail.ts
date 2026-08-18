@@ -64,6 +64,13 @@ const I = {
   runAudit: '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/>',
   pastAudits: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   pipeline: '<path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/>',
+  /* A CONTRACT COMING ROUND AGAIN, not a handset. The tab is the recompete
+     record; the phone belonged to the section it used to be named after, and a
+     glyph naming one section of five reads as the whole page's subject.
+     A bare renewal cycle. No hands inside it: a clock face is already the glyph
+     two rows up, and at 22px an arc with a hand in it and an arc without one are
+     the same mark. The gap and the arrowhead carry the meaning on their own. */
+  whoToCall: '<path d="M20.5 12a8.5 8.5 0 11-2.4-5.9"/><path d="M20.5 3.5v5h-5"/>',
   capability: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
   opportunities: '<circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/>',
   defenseIntel: '<path d="M12 3L4 8v8l8 5 8-5V8l-8-5z"/>',
@@ -90,18 +97,40 @@ export const TODAY: RailItem = { key: "today", label: "Today", href: "/command-c
 
 // The four things a user does in sequence. Order is the work, not the alphabet.
 export const WORKFLOW: RailItem[] = [
-  { key: "opportunities", label: "Opportunities", href: "/opportunities", icon: I.opportunities },
-  // "Audit" not "Run Audit" — the noun matches its neighbours; the page's own button still reads Run Audit.
-  { key: "run-audit", label: "Audit", href: "/audit", icon: I.runAudit },
+  // "Notices" names what SAM actually publishes and what the customer tracks. The KEY and
+  // the ROUTE are unchanged: /opportunities stays valid, so every link already sent — in a
+  // digest email, a bookmark, a deep link — still lands.
+  { key: "opportunities", label: "Notices", href: "/notices", icon: I.opportunities },
+  // Plural, matching its neighbours; the page's own button still reads Run Audit.
+  { key: "run-audit", label: "Audits", href: "/audits", icon: I.runAudit },
   // "Decisions" names the artifact the engine produces. The ROUTE is unchanged.
   { key: "past-audits", label: "Decisions", href: "/past-audits", icon: I.pastAudits },
   { key: "pipeline", label: "Pipeline", href: "/pipeline", icon: I.pipeline },
+  /* Openings on contracts that ALREADY EXIST — primes carrying a subcontracting-plan
+     obligation, unobligated ceiling on live awards, and contracts inside their
+     recompete window. None of it reaches SAM.gov as a solicitation, so it is
+     invisible to anyone watching notices. It sits in Workflow because it is a
+     WEEKLY read; it lived at the bottom of Defense Spending, which is a
+     twice-a-year orientation, and a weekly list loses to a long scroll. */
+  /* THE LABEL IS `Recompetes`; THE KEY AND THE PATH STAY `who-to-call`. A route
+     is an address other things hold on to — bookmarks, the ?office= deep link
+     out of the record, this rail's own active-item key, and several gates — so
+     renaming an address to match a word breaks every holder to fix the word.
+     `Recompetes` is what the page contains and what its own masthead already
+     calls it; the previous label named one section of five and read as an
+     instruction where every sibling is a noun. */
+  { key: "who-to-call", label: "Recompetes", href: "/who-to-call", icon: I.whoToCall },
 ];
 
 export const SECTIONS: RailSection[] = [
   {
     label: "Readiness",
-    defaultOpen: true,
+    // EVERY section starts closed. The rail's job on arrival is to show where you are,
+    // not everywhere you could go: three open groups pushed the workflow items — the
+    // ones used every session — below the fold on a laptop. A section holding the
+    // ACTIVE page still opens regardless (see renderRail), and a section the customer
+    // opens stays open, so this is a starting position rather than a restriction.
+    defaultOpen: false,
     items: [
       { key: "cmmc", label: "CMMC readiness", href: "/cmmc", icon: I.cmmc },
       { key: "capability-statement", label: "Capability statement", href: "/capability-statement", icon: I.capability },
@@ -156,6 +185,13 @@ function row(it: RailItem, activeKey: string, counts: RailCounts, cls: "sb-step"
   );
 }
 
+/** Stable per-section key for the stored open/closed state. Derived from the label,
+ *  so a section renamed in SECTIONS forgets its old state rather than inheriting a
+ *  neighbour's — which is the right failure: it reverts to defaultOpen. */
+function secSlug(label: string): string {
+  return label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
 export function renderRail(activeKey: string, counts: RailCounts = {}): string {
   const todayActive = activeKey === "today" ? " active" : "";
   const flow = WORKFLOW.map((it) => row(it, activeKey, counts, "sb-step")).join("\n    ");
@@ -165,8 +201,12 @@ export function renderRail(activeKey: string, counts: RailCounts = {}): string {
     // landing on Contracting Officers shows a collapsed rail with nothing highlighted.
     const open = sec.defaultOpen || sec.items.some((it) => it.key === activeKey);
     const rows = sec.items.map((it) => row(it, activeKey, counts, "sb-icon")).join("\n      ");
+    // The active section OPENS regardless of the stored preference — a rail that hid
+    // the highlight for the page you are on would be worse than one that forgets.
+    // data-active is what tells the restore script below to leave this one alone.
+    const holdsActive = sec.items.some((it) => it.key === activeKey);
     return (
-      `  <div class="sb-sec" data-open="${open}">\n` +
+      `  <div class="sb-sec" data-sec="${secSlug(sec.label)}"${holdsActive ? ' data-active="true"' : ""} data-open="${open}">\n` +
       `    <button class="sb-sech" type="button" aria-expanded="${open}"><span>${esc(sec.label)}</span>` +
       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></button>\n` +
       `    <div class="sb-secb">\n      ${rows}\n    </div>\n` +
@@ -217,7 +257,32 @@ export function renderRail(activeKey: string, counts: RailCounts = {}): string {
     `      <form action="/api/auth/sign-out" method="post" style="display:contents"><button type="submit" class="sb-am-item sb-am-signout" role="menuitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${I.signout}</svg>Sign out</button></form>\n` +
     `    </div>\n` +
     `  </div>\n` +
-    `</aside>`
+    `</aside>` +
+    /* RESTORE THE STORED SECTION STATE, INLINE AND IMMEDIATELY AFTER THE RAIL.
+       Not in railScript() at the end of <body>: .sb-secb animates max-height, so a
+       section restored after first paint visibly swings shut. Parsed here it applies
+       while the parser is still inside <body>, before the rail's subtree is painted.
+       Skips [data-active] — the section holding the current page always shows, which
+       is the rule renderRail() already applies server-side. */
+    `<script>(function(){try{` +
+    /* THE ACCOUNT DEFAULT, read from a MIRROR rather than fetched. The preference lives
+       on user_preferences.rail_sections_collapsed, but this script has to run before the
+       rail is painted — a fetch cannot, and applying the answer afterwards is the exact
+       swing-shut this block was written to avoid. So the account value is mirrored into
+       localStorage (refreshed in the background by railScript below) and read here
+       synchronously. A browser that has never seen the account falls through to the
+       server default, which is collapsed. */
+    `var m=JSON.parse(localStorage.getItem('faraudit-rail-sections')||'{}');` +
+    `document.querySelectorAll('.sb-sec[data-sec]').forEach(function(s){` +
+    `if(s.hasAttribute('data-active'))return;` +
+    `var v=m[s.getAttribute('data-sec')];` +
+    /* ONE MAP, not two competing statements. The account column holds the same shape
+       this reads, so a group the customer opens here and a group they set in Settings
+       are the same fact — the earlier boolean had to wipe this store to take effect. */
+    `if(v!==true&&v!==false)return;` +
+    `s.setAttribute('data-open',String(v));` +
+    `var h=s.querySelector('.sb-sech');if(h)h.setAttribute('aria-expanded',String(v));});` +
+    `}catch(e){}})();</script>`
   );
 }
 
@@ -287,6 +352,25 @@ export function railStyle(): string {
     `<style id="sb-phase5">` +
     RAIL_807_CSS +
     WORDMARK_CSS +
+    /* THE RAIL OWNS THE PILL IT RENDERS.
+       rail-live-badge.js builds <span class="sb-badge live">Live</span> inside a workflow
+       row. Every .sb-badge rule in the product is scoped `.sb-icon .sb-badge` — markup
+       belonging to the sidebar THIS RAIL REPLACED — and workflow rows are .sb-step, so
+       not one rule matched. Measured on the live page 2026-08-09: display block,
+       background rgba(0,0,0,0), color rgb(10,22,40), ::before content none. The pill was
+       inheriting the nav link's ink and font-size and rendering as plain dark text.
+       An injected component owns what it displaces, styling included. */
+    `.sb-badge{display:inline-flex;align-items:center;gap:4px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:.02em;line-height:1;padding:3px 7px 3px 6px;border-radius:5px;flex:none;white-space:nowrap}` +
+    `.sb-badge::before{content:"";width:5px;height:5px;border-radius:50%;flex:none;background:currentColor}` +
+    /* Each theme carries its own pair: the light values disappear on the navy rail and
+       the dark ones wash out on the white one. */
+    `.sb-badge.live{background:rgba(16,185,129,.14);color:#047857}` +
+    `.sb-badge.danger{background:rgba(180,35,24,.12);color:#b42318}` +
+    `[data-theme="dark"] .sb-badge.live{background:rgba(16,185,129,.20);color:#6ee7b7}` +
+    `[data-theme="dark"] .sb-badge.danger{background:rgba(248,113,113,.18);color:#fca5a5}` +
+    /* The collapsed rail hides every label, so a pill left standing would sit beside an
+       icon with nothing to attach it to. */
+    `[data-sb="mini"] .sb-badge,[data-sb="closed"] .sb-badge{display:none!important}` +
     `.sb-bottom{position:relative;margin-top:auto}` +
     `.sb-avatar-btn{display:flex;align-items:center;gap:9px;width:100%;padding:7px;border:0;background:transparent;border-radius:9px;cursor:pointer;text-align:left}` +
     `.sb-st{display:flex;flex-direction:column;min-width:0;gap:1px}` +
@@ -328,7 +412,12 @@ export function railScript(): string {
     `document.addEventListener('click',function(e){if(!e.target.closest)return;` +
     `var h=e.target.closest('.sb-sech');if(!h)return;var s=h.closest('.sb-sec');if(!s)return;` +
     `var o=s.getAttribute('data-open')==='true';s.setAttribute('data-open',String(!o));` +
-    `h.setAttribute('aria-expanded',String(!o));syncInert();});` +
+    `h.setAttribute('aria-expanded',String(!o));` +
+    // Remember it. Without this the control was cosmetic: the rail re-renders from
+    // defaultOpen on every navigation, so opening a section lasted until the next click.
+    `try{var K='faraudit-rail-sections',m=JSON.parse(localStorage.getItem(K)||'{}');` +
+    `var k=s.getAttribute('data-sec');if(k){m[k]=!o;localStorage.setItem(K,JSON.stringify(m));}}catch(e){}` +
+    `syncInert();});` +
     // ── INERT ───────────────────────────────────────────────────────────────────
     // max-height:0 hides pixels but NOT focus, so a collapsed section left its links
     // in the tab order. But data-open only means anything in the OPEN rail: collapsed,
@@ -340,6 +429,21 @@ export function railScript(): string {
     `document.querySelectorAll('.sb-sec').forEach(function(s){var b=s.querySelector('.sb-secb');if(!b)return;` +
     `if(strip||s.getAttribute('data-open')==='true'){b.removeAttribute('inert');b.removeAttribute('aria-hidden');}` +
     `else{b.setAttribute('inert','');b.setAttribute('aria-hidden','true');}});}` +
+    /* REFRESH THE ACCOUNT MIRROR, and never apply it to THIS paint.
+       The pre-paint restore above reads a localStorage mirror because it must be
+       synchronous. This keeps that mirror current: one small conditional request per
+       page load — /api/preferences is `private, max-age=0, must-revalidate`, so an
+       unchanged answer is a 304 with no body.
+       It deliberately does NOT re-open or re-close anything now. Applying a freshly
+       fetched value after paint is the swing-shut the inline block exists to prevent,
+       so a browser that has never seen this account converges on the NEXT navigation
+       rather than rearranging the rail under the cursor. */
+    `fetch('/api/preferences',{credentials:'include',headers:{accept:'application/json'}})` +
+    `.then(function(r){return r.ok?r.json():null;}).then(function(d){` +
+    `if(!d||!d.preferences)return;var o=d.preferences.rail_sections_open;` +
+    `if(!o||typeof o!=='object')return;` +
+    `try{localStorage.setItem('faraudit-rail-sections',JSON.stringify(o));}catch(e){}` +
+    `}).catch(function(){});` +
     `syncInert();` +
     // Observe the attribute rather than guessing which controls change it. Bound to
     // #sbToggle clicks alone the sync went stale on every OTHER path — measured: setting
@@ -440,6 +544,26 @@ export function injectRail(html: string, activeKey: string, counts: RailCounts =
     out = out.includes("</head>")
       ? out.replace("</head>", `${railFonts()}</head>`)
       : railFonts() + out;
+  }
+  /* THE RAIL SHIPS THE SCRIPT FOR THE PILL IT OWNS.
+     rail-live-badge.js was referenced by exactly TWO pages — opportunities.html and
+     today.html, the same two that measure the feed — so on the other ~8 injected routes
+     the setter did not exist and no pill could appear however it was asked for. That is
+     why it followed you onto Notices and Today and nowhere else.
+     Injected only when the page does not already carry it, and the script is written to
+     be idempotent, so the two pages that load it themselves are unaffected. */
+  if (out.includes("rail-live-badge.js") === false) {
+    const tag = `<script src="/rail-live-badge.js" defer></script>`;
+    out = out.includes("</body>") ? out.replace("</body>", `${tag}</body>`) : out + tag;
+  }
+  /* Idle auto sign-out rides with the rail for the same reason the pill does: it is a
+     property of being signed in, not of one page. Per-page <script> tags gave the pill
+     two surfaces out of ten; a timer that only runs on the pages that remembered to
+     load it is not a security control. The script is idempotent and OFF unless the
+     customer's stored preference says otherwise. */
+  if (out.includes("auto-signout.js") === false) {
+    const tag = `<script src="/auto-signout.js" defer></script>`;
+    out = out.includes("</body>") ? out.replace("</body>", `${tag}</body>`) : out + tag;
   }
   return out;
 }

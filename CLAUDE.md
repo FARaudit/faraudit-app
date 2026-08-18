@@ -17,6 +17,14 @@ without them** — say so rather than improvising a substitute.
 it rather than a relative path: worktrees live under the **primary checkout's**
 `.claude/worktrees/`, so that path does not resolve from inside one.
 
+**A `cd <primary>` inside a compound shell command applies to the WHOLE command.** Adding one just to
+run a `gh` call silently redirects every step after it — the file write, the `git add`, the
+`git commit` — into the *shared* checkout. On 2026-08-07 that committed 16 stray files including
+another session's uncommitted probes, while the real work sat unstaged in the worktree. It also
+poisons verification: a `grep`, `tsc` or `node --check` run that way reads the **unedited** copy and
+reports a confident pass. Run bare — the worktree is already cwd — and give anything that genuinely
+needs the primary (`ceo/checkpoint.sh`) its own invocation with nothing after it.
+
 **The primary checkout is usually NOT on `main`** — it sits on whatever branch was last worked. Check
 before running anything that uploads or deploys a working tree from it.
 

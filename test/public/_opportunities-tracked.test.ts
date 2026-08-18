@@ -157,6 +157,24 @@ const noId = trackedRow({ title: "Orphan record", response_deadline: null });
 ok(!/data-untrack/.test(noId), "a record with no notice id offers no Untrack it could not honour");
 ok(noId.includes("Orphan record"), "but it is still LISTED — unremovable is not the same as invisible");
 
+console.log("\nC2 · Track says what it actually does");
+// The tooltip read "you are alerted on amendments and deadline changes". NEITHER is built:
+// watcher-tick's only trigger is resourceLinks going []->[url] — the solicitation posting
+// its documents. It refetches the deadline onto the row but never alerts on a change to it,
+// and nothing detects amendments at all. A control may only claim what the code can do.
+ok(!/alerted on amendments/.test(CODE), "the tooltip no longer promises amendment alerts");
+ok(!/deadline changes'/.test(CODE), "…nor deadline-change alerts");
+ok(/documents post we run the audit and alert you/.test(CODE),
+  "…and it names the trigger the watcher actually has");
+// The seam to Notifications was invisible: Track is what CREATES a watched notice, and
+// watched notices are the whole subject of that tab.
+ok(/plistTrackHint/.test(CODE) && /plistTrackHint/.test(HTML),
+  "a visible hint explains Track, not only a tooltip nobody sees on touch");
+ok(/href="\/settings"/.test(CODE), "…and points at where the channels are chosen");
+// PLANTED: the old copy must drive this red, or the check is decorative.
+ok(/alerted on amendments/.test("b.title = 'Watch this notice — you are alerted on amendments and deadline changes';"),
+  "PLANTED: the retired wording is still recognizable to this check");
+
 console.log("\nD · it is not wired into Pipeline or Decisions");
 ok(!/S\.view === 'tracked'[^]{0,400}pipeline/i.test(CODE),
   "the tracked view does not touch pipeline state");

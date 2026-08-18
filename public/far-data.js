@@ -26,7 +26,7 @@ window.FARD = (function () {
   // Solicitations in the signed-in account touched by a clause change.
   const AFFECTED = [];
 
-  const SORTS = ['Newest', 'Impact', 'Most affected'];
+  const SORTS = ['Newest', 'Impact', 'Most amended'];
 
   /* Feed state. 'loading' until the API answers; 'ok' with however many records
      arrived; 'unavailable' when the sources could not be reached. Counts render as

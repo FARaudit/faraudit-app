@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-sb="open" data-shell="sheet">
+<head>
+<meta charset="utf-8" />
+<title>FARaudit — Recompetes</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@1,72,400;1,72,500;1,72,600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/dsb.css">
+<style>
+/* /who-to-call · THE DOSSIER.
+
+   A record, not a dashboard: no card, no tint, no fill — rule, indent and ink
+   weight only. A contracting officer reads documents all day, so a page shaped
+   like a record is read as evidence. One Fraunces italic line carries the
+   finding; everything else is Manrope and IBM Plex Mono.
+
+   PAPER-GROUND INK, MEASURED: --p-slate is 5.02:1 on #f4f6f9, AA at every size
+   on this ground, and the rank numerals and the distribution ticks take it too.
+   Neither is decoration: the ranking is what makes the page a worklist, and the
+   ticks ARE the encoding of the headline finding. */
+#o4{--p-ink:#111a26;--p-ink2:#28323f;--p-slate:#5d6b7d;--p-line:#c9d2dd;--p-line2:#e2e7ee;--p-cell:#fff;--p-link:#185FA5;color:var(--p-ink)}
+#o4 a{color:var(--p-link);text-decoration:none}
+#o4 a:hover{text-decoration:underline}
+/* THE RESET IS WRAPPED IN :where() SO IT CONTRIBUTES NO SPECIFICITY. Scoping a
+   `* { padding: 0 }` reset with an id selector makes it (1,0,1), which outranks
+   every class rule in this sheet — the column gutters, the summary-strip cells
+   and the table padding all resolve to zero and the headers collide. :where()
+   keeps the scope and drops the weight, so the reset behaves like the bare `*`
+   it stands in for and each rule below still wins on its own terms. */
+:where(#o4, #o4 *){box-sizing:border-box;margin:0;padding:0}
+
+/* NIGHT. A paper document does not invert into a dark card — it needs its own
+   ground. #0e1a28 is a deep navy paper, one clear step from the app shell behind
+   it, and every ink is re-derived against it rather than borrowed from the light
+   theme. MEASURED on #0e1a28: --p-ink 15.03:1 · --p-ink2 9.73:1 · --p-slate
+   6.19:1 · --p-link 11.43:1. All AA at every size, which is the standard the
+   paper theme holds rather than the 3.25 floor.
+   --accent-deep is NOT used on this ground: it is a light-theme ink and measures
+   2.65:1 here. */
+[data-theme="dark"] #o4{--p-ink:#e8eef6;--p-ink2:#b6c2d3;--p-slate:#8b9bb0;--p-line:#2a3a4e;--p-line2:#1b2a3a;--p-cell:transparent;--p-link:#B5D4F4}
+
+/* SHELL · how the document meets the platform. The paper sits on the platform's
+   own app surface, inset as ONE bordered sheet. The document itself is
+   untouched — no cards inside it, no tint, no widget per section — so it still
+   reads as a record while sitting on the product the way a document sits on a
+   desk. The effect depends on the margin of app surface around the sheet, which
+   is what .body's width cap preserves.
+   THE GROUND IS ONE STEP DARKER THAN THE PLATFORM DEFAULT so the sheet is
+   actually seen to sit on it: at #eef2f7 the two fills separate by 1.04:1 and
+   the inset is carried by the 1px border alone. #e7ecf3 gives 1.10:1, which is
+   the separation an ordinary card already gets, so this page matches the
+   platform's own figure-on-ground rather than inventing a softer one. The SHEET
+   does not move toward white — white is the card colour here, and the record is
+   not a card. Night already separates cleanly and is left alone. */
+[data-shell="sheet"] .body{background:#e7ecf3}
+[data-shell="sheet"] #o4{background:#f4f6f9;border:1px solid #dde4ed;border-radius:14px;padding:26px 30px 32px}
+[data-theme="dark"][data-shell="sheet"] .body{background:#071018}
+[data-theme="dark"][data-shell="sheet"] #o4{background:#0e1a28;border-color:#22344a}
+
+/* ⛔ THE TOPBAR'S RIGHT ALIGNMENT IS CARRIED HERE, because the element that used
+   to carry it is gone. `.tb-search` in dsb.css holds `margin-left:auto`, and
+   that one declaration is what pushes the theme, notification and account
+   controls to the right edge on every page that has a search box. This page has
+   none — a placeholder search that performs nothing is a control the page cannot
+   honour — so the alignment moves onto the actions themselves. A deleted
+   control hands on whatever it was holding beyond itself, and here that was the
+   whole topbar: without this line the buttons slide left and sit against the
+   breadcrumb while every other tab keeps them at the edge. */
+.topbar .top-actions{margin-left:auto}
+
+/* THE NAICS SCOPE · chrome, not document. It sits on the app surface above the
+   sheet, because the record has no controls inside it and a picker printed on a
+   document reads as part of the record. Its own inks are declared against the
+   app surface rather than inherited from #o4, which carries the paper ground. */
+.wtc-scope{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.wtc-scope:empty{display:none}
+.wtc-scope .wsk{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:#5d6b7d;margin-right:2px}
+.wtc-scope button{font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:600;color:#28323f;background:#f4f6f9;border:1px solid #c9d2dd;border-radius:7px;padding:6px 11px;cursor:pointer}
+.wtc-scope button:hover{border-color:#8b9bb0}
+/* The selected code is stated by FILL, not by a tint: one pill is the subject of
+   the document below it and the rest are alternatives, which is a difference in
+   kind rather than in degree. aria-pressed carries the same fact to a reader who
+   is not looking at the colour. */
+.wtc-scope button[aria-pressed="true"]{background:#111a26;border-color:#111a26;color:#fff}
+.wtc-scope .wsn{font-family:"Manrope",system-ui,sans-serif;font-size:12.5px;line-height:1.5;color:#5d6b7d;flex-basis:100%}
+[data-theme="dark"] .wtc-scope .wsk,[data-theme="dark"] .wtc-scope .wsn{color:#8b9bb0}
+[data-theme="dark"] .wtc-scope button{background:#0e1a28;border-color:#2a3a4e;color:#b6c2d3}
+[data-theme="dark"] .wtc-scope button:hover{border-color:#5d6b7d}
+[data-theme="dark"] .wtc-scope button[aria-pressed="true"]{background:#e8eef6;border-color:#e8eef6;color:#0e1a28}
+
+/* FRESHNESS · chrome, beside the scope. It states the age of the MEASUREMENT
+   and the time of the last check as two separate facts: a re-check confirms the
+   measurement, it does not renew it. The warn tone is reserved for a check that
+   did not complete, and it stays on this strip — the record below it is a real
+   read, so the document itself is never tinted by it. */
+.wtc-fresh{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:-4px}
+.wtc-fresh:empty{display:none}
+.wtc-fresh .wf-t{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#5d6b7d}
+.wtc-fresh .wf-t.warn{color:#8a5a12}
+.wtc-fresh button{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;letter-spacing:.04em;color:#185FA5;background:none;border:0;padding:2px 0;cursor:pointer;text-decoration:underline}
+.wtc-fresh button[disabled]{color:#5d6b7d;cursor:default;text-decoration:none}
+.wtc-fresh .wf-n{flex-basis:100%;font-family:"Manrope",system-ui,sans-serif;font-size:12.5px;line-height:1.5;color:#5d6b7d}
+[data-theme="dark"] .wtc-fresh .wf-t,[data-theme="dark"] .wtc-fresh .wf-n{color:#8b9bb0}
+[data-theme="dark"] .wtc-fresh .wf-t.warn{color:#e0b155}
+[data-theme="dark"] .wtc-fresh button{color:#B5D4F4}
+[data-theme="dark"] .wtc-fresh button[disabled]{color:#8b9bb0}
+
+.o4-h{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid var(--p-ink);padding-bottom:9px}
+.o4-hk,.o4-hd{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase}
+.o4-hd{color:var(--p-slate);letter-spacing:.05em}
+.o4-hero{display:flex;justify-content:space-between;align-items:flex-end;gap:64px;margin:34px 0 30px}
+/* THE FINDING SITS AT THE PLATFORM'S OWN DISPLAY SIZE — 34px, the same as
+   `.page-header h1` in dsb.css, so the largest line on this document is the same
+   height as the largest line on every other tab. Only the SIZE is shared: the
+   weight stays 400 and the leading 1.14, because this is a sentence carrying a
+   conclusion rather than a title naming a page, and a title's 600/1.04 would set
+   it as a heading. Its measure is in ch, so the line count holds as the size
+   moves. */
+.o4-lede{font-family:"Fraunces",Georgia,serif;font-style:italic;font-weight:400;font-size:34px;line-height:1.14;letter-spacing:-.02em;max-width:26ch;text-wrap:pretty}
+.o4-fig{flex:none;text-align:right}
+.o4-fig b{display:block;font-family:"IBM Plex Mono",monospace;font-size:44px;font-weight:700;letter-spacing:-.04em;line-height:1}
+.o4-fig i{display:block;font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:11px;line-height:1.6;letter-spacing:.04em;color:var(--p-slate);margin-top:10px}
+.o4-sum{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));border-top:1px solid var(--p-line);border-bottom:1px solid var(--p-line)}
+.o4-sc{padding:12px 16px 13px;border-left:1px solid var(--p-line2)}
+.o4-sc:first-child{border-left:0;padding-left:0}
+.o4-sc dt{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--p-slate)}
+/* ONE declaration for the strip figure, at 17px. A second declaration of this
+   rule anywhere in the sheet takes the cascade by document order regardless of
+   which is intended, so this size is stated exactly once. */
+.o4-sc dd{font-family:"IBM Plex Mono",monospace;font-size:17px;font-weight:600;margin-top:7px;letter-spacing:-.015em}
+.o4-s{margin-top:34px}
+.o4-s h3{display:flex;align-items:baseline;gap:14px;font-size:15px;font-weight:800;letter-spacing:.01em;text-transform:uppercase;border-bottom:1px solid var(--p-ink);padding-bottom:7px}
+.o4-s h3 span{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600;color:var(--p-slate)}
+.o4-s h3 em{margin-left:auto;font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:400;letter-spacing:.06em;text-transform:none;color:var(--p-slate)}
+.o4-p{font-size:15px;line-height:1.62;max-width:74ch;margin-top:14px;color:var(--p-ink2);text-wrap:pretty}
+.o4-p b{font-weight:700;color:var(--p-ink)}
+.o4-two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:48px;align-items:start}
+.o4-rail{padding-top:16px}
+.o4-rk{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--p-slate)}
+/* FORM B · THE COUNT BLOCK — one cell per contract, in order of expiry. Every
+   fill is --p-ink or a bordered cell, so nothing in the graphic that carries the
+   finding sits below AA. The bracket is ink, not a tint. */
+.o4-blk{display:flex;gap:4px;margin-top:14px}
+.o4-cell{flex:1;height:38px;background:var(--p-cell);border:1px solid var(--p-line)}
+.o4-cell.on{background:var(--p-ink);border-color:var(--p-ink)}
+.o4-brk{position:relative;height:22px;margin-top:6px}
+.o4-bk{position:absolute;top:0;height:6px;border:1px solid var(--p-ink);border-top:0}
+.o4-bl{position:absolute;top:11px;transform:translateX(-50%);font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--p-ink);white-space:nowrap}
+.o4-rr{display:flex;justify-content:space-between;font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.05em;color:var(--p-slate);padding-top:7px}
+.o4-t{width:100%;border-collapse:collapse;margin-top:16px}
+.o4-t th{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--p-slate);text-align:left;padding:0 14px 7px 0;border-bottom:1px solid var(--p-ink)}
+/* NUMERIC COLUMNS SHRINK TO THEIR CONTENT AND SIT TOGETHER ON THE RIGHT; the
+   name column absorbs everything left over. `width:1%` on a table cell means "as
+   narrow as the content allows", which is what stops table layout handing an
+   even share of the surplus to each numeric column. */
+.o4-t th.n,.o4-t th.c,.o4-t th.r{width:1%;white-space:nowrap}
+.o4-t td.o4-vl,.o4-t td.o4-pc,.o4-t td.o4-ct,.o4-t td.o4-rk2,.o4-t td.o4-dy{width:1%;white-space:nowrap}
+/* COLUMN GUTTERS ARE A PROPERTY OF THE COLUMN BOUNDARY, not of a cell's
+   alignment: every cell carries a left gutter except the first in its row, and
+   the last drops its right one. 26px, because two right-aligned numeric columns
+   need more air between them than a name and a number — digits have no word
+   space to borrow.
+   WRITTEN WITH `tr>` SO IT OUT-SPECIFIES THE BASE PADDING SHORTHANDS rather than
+   depending on declaration order: `.o4-t td{padding:10px 14px 10px 0}` is
+   declared below this block and its shorthand resets padding-left to 0. */
+.o4-t tr>th,.o4-t tr>td{padding-left:26px}
+.o4-t tr>th:first-child,.o4-t tr>td:first-child{padding-left:0}
+.o4-t tr>th:last-child,.o4-t tr>td:last-child{padding-right:0}
+/* §05 · SPANNING GROUP KEYS. Each group names the BASE its figures are measured
+   against, so no number can be read as belonging to the name beside it. The rule
+   under each group is drawn by the GROUP, not by its member cells — a boundary
+   drawn by a member moves when the members change. */
+.o4-grp th{border-bottom:0;padding-bottom:5px;font-size:10px;letter-spacing:.09em;color:var(--p-ink2);text-align:left}
+.o4-grp th[colspan]{border-bottom:1px solid var(--p-line)}
+.o4-sb thead tr:last-child th{padding-top:6px}
+.o4-t th.n{text-align:right;padding-right:0}
+/* A column key may carry a qualifier when the qualifier describes the same thing
+   the key names — here, which officers these are. This fragment is READ rather
+   than scanned and it is the one credibility-relevant qualifier on the page
+   (that these are not the officer ON the contract), so it takes 11.5px on its
+   own line. NO OPACITY: --p-slate alone is 4.97:1 on this ground and passes; at
+   .95 the composite falls to 4.21. */
+.o4-t th em{display:block;font-style:normal;font-size:11.5px;font-weight:400;letter-spacing:.01em;text-transform:none;color:var(--p-slate);margin-top:4px}
+.o4-t th.r,.o4-t th.c{text-align:center}
+.o4-t td{padding:10px 14px 10px 0;border-bottom:1px solid var(--p-line2);vertical-align:top}
+.o4-dt,.o4-dy{font-family:"IBM Plex Mono",monospace;font-size:12.5px;white-space:nowrap}
+/* Days is a magnitude read against its neighbours, so it centres on one axis
+   with its own key — the same treatment as the counted columns. */
+.o4-dy{color:var(--p-slate);text-align:center;padding-right:14px}
+.o4-ct{font-family:"IBM Plex Mono",monospace;font-size:13px;text-align:center}
+/* A zero is a real value and stays fully legible — it is the one the reader acts
+   on. It differs from a non-zero count by WEIGHT, not by fading. */
+.o4-ct.zero{color:var(--p-slate)}
+.o4-rk2{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600;color:var(--p-slate);text-align:center}
+.o4-pc{font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--p-slate);text-align:right;padding-right:0;font-variant-numeric:tabular-nums}
+.o4-rc b{display:block;font-size:14px;font-weight:700;letter-spacing:-.01em;line-height:1.3}
+.o4-rc i,.o4-of i{display:block;font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--p-slate);margin-top:3px;line-height:1.45}
+.o4-of{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--p-ink2)}
+.o4-of i.none{color:var(--p-slate)}
+.o4-vl{font-family:"IBM Plex Mono",monospace;font-size:13.5px;font-weight:600;text-align:right;white-space:nowrap;padding-right:0;font-variant-numeric:tabular-nums}
+/* The provenance notes take the full column. A footnote under a wide table is
+   read in a glance rather than in a reading posture, so the table's own width is
+   the honest measure. */
+.o4-n{font-size:13.5px;line-height:1.55;color:var(--p-ink2);margin-top:14px}
+.o4-n b{font-weight:700;color:var(--p-ink)}
+/* §02 · the call list. A call list is a LIST — no card, no tint, no button. The
+   number is set as text at 16px: findable at a glance, and not the loudest thing
+   on a page whose ranking is what tells you which one to dial first. */
+.o4-call td{padding-top:13px;padding-bottom:13px}
+.o4-oc b{display:block;font-size:14px;font-weight:700;letter-spacing:-.01em}
+.o4-oc i{display:block;font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--p-slate);margin-top:4px}
+/* The number is a BUTTON now, because it copies rather than navigates. Every
+   inherited button style is reset so it still reads as the typeset number it
+   was — the affordance is the pointer and the copy confirmation, not a control
+   that looks like a control. */
+.o4-tel{font-family:"IBM Plex Mono",monospace;font-size:16px;font-weight:600;letter-spacing:-.01em;color:var(--p-link);background:none;border:0;padding:0;cursor:pointer;text-align:left}
+.o4-tel:hover{text-decoration:underline}
+/* The two outcomes read differently. A confirmation that looks the same whether
+   the clipboard was written or refused would be worth nothing. */
+.o4-tel[data-state="ok"]{color:#127a4b;text-decoration:none}
+.o4-tel[data-state="fail"]{color:#8a5a12;text-decoration:none}
+[data-theme="dark"] .o4-tel[data-state="ok"]{color:#4ade80}
+[data-theme="dark"] .o4-tel[data-state="fail"]{color:#e0b155}
+.o4-mail{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--p-link)}
+/* Two contact methods on ONE line, baseline-aligned, so the cell is two lines
+   (name, then how to reach them) rather than four. */
+.o4-cm{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 14px;margin-top:5px}
+/* The roster link — a fact about the office, so it sits in the office cell. */
+.o4-more{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.03em;color:var(--p-link);margin-top:5px}
+/* EMPTY. No hero, no summary strip, no numbered sections: a heading over a dash
+   is worse than an absence, and that holds for a document as much as for a cell. */
+.o4-empty{margin-top:34px;max-width:62ch}
+/* The empty lede keeps the RATIO it was drawn at rather than a number typed
+   against the old base: it sat at 38 to the finding's 54, so it follows the new
+   base down and stays visibly subordinate to it. */
+.o4-empty .o4-lede{font-size:24px;max-width:24ch}
+.o4-empty .o4-p{margin-top:20px}
+.o4-empty .o4-n{margin-top:18px;padding-top:14px;border-top:1px solid var(--p-line)}
+/* §03 · the record. Scanning is the whole point, so the rows are tight, the
+   incumbent is the only sans-serif column, and a repeated expiry leaves its
+   cells empty so a run of one date reads as one date. The rules run on
+   border-TOP so that suppression has an edge to suppress. */
+.o4-rec td{padding-top:8px;padding-bottom:8px;border-bottom:0;border-top:1px solid var(--p-line2)}
+.o4-rec tr.rep td{border-top:0}
+.o4-in{font-size:13px;font-weight:600;letter-spacing:-.01em;line-height:1.35}
+/* ⛔ THIS CELL WRAPS, AND IT IS THE ONLY ONE OF THE THREE THAT MAY. Agency,
+   code and award id joined on one line runs to 429px, which is what pushes
+   §03 past its container at the 1280px the app declares as its minimum —
+   measured 1088px of table inside 962px of sheet. The dates and the money
+   keep `nowrap` because breaking either mid-value misreads; this one is
+   three separate facts with separators already between them, so a wrap
+   lands on a boundary a reader can follow. At the wider sizes there is
+   room and it stays on one line by itself. */
+.o4-id{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--p-slate)}
+.o4-rec .o4-of{font-family:"IBM Plex Mono",monospace;font-size:11px}
+.o4-rec tr.tot td{border-bottom:0;border-top:2px solid var(--p-ink);padding-top:12px;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--p-slate)}
+.o4-rec tr.tot .o4-vl{font-size:15px;letter-spacing:-.01em;text-transform:none;color:var(--p-ink)}
+/* §§04–05 · the NAICS group cell. Suppressed on repeat, the same convention a
+   repeated expiry uses in §03, so one code reads as one code rather than as five
+   assertions of it. Shrunk to content so §04 and §05 open on the same two
+   tracks, which is what lets their name columns start at one x. */
+.o4-nc{font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:600;white-space:nowrap;width:1%}
+/* §04 HAS SIX COLUMNS WHERE §03 HAS SEVEN, so it carries real slack, and pinning
+   its numerics hands all of that slack to the recipient name. Here the surplus
+   distributes across every column instead, which is what puts §04 on the same
+   rhythm as §03. Scoped to this table: in §02, §03 and §05 the name column IS
+   the elastic content and should absorb. */
+.o4-conc tr>th,.o4-conc tr>td{width:auto}
+/* §05 · the boundary between the two column GROUPS takes a wider gutter than the
+   boundaries inside them — the gap has to say "different subject", and 26px only
+   says "next column". Applied to the group key and the columns beneath it, so
+   the fence is one straight line down the table. */
+.o4-sb .o4-grp th:nth-child(3),.o4-sb tr>th:nth-child(5),.o4-sb tr>td:nth-child(5){padding-left:60px}
+</style>
+</head>
+<body>
+
+<div class="frame">
+
+  <!-- ═════════ SIDEBAR ═════════ -->
+  <aside class="sidebar">
+  <button class="sb-toggle" id="sbToggle" type="button" aria-label="Toggle sidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+  <div class="sb-logo-row"><div class="sb-logo">F</div><span class="sb-wordmark">FAR<span class="wm-au">audit</span></span></div>
+  <div class="sb-group-label">WORKSPACE</div>
+  <a class="sb-icon" href="/command-center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="sb-label">Today</span><span class="sb-tip">Today</span></a>
+  <a class="sb-icon" href="/audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg><span class="sb-label">Run Audit</span><span class="sb-tip">Run Audit</span></a>
+  <a class="sb-icon" href="/acquisition-stages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span class="sb-label">Acquisition Stages</span><span class="sb-tip">Acquisition Stages</span></a>
+  <a class="sb-icon" href="/dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="sb-label">Past Audits</span><span class="sb-tip">Past Audits</span></a>
+  <a class="sb-icon" href="/pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg><span class="sb-label">Pipeline</span><span class="sb-tip">Pipeline</span></a>
+  <a class="sb-icon" href="/capability-statement"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span class="sb-label">Capability Statement</span><span class="sb-tip">Capability Statement</span></a>
+  <div class="sb-divider"></div>
+  <div class="sb-group-label">INTELLIGENCE</div>
+  <a class="sb-icon" href="/opportunities"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">Opportunities</span><span class="sb-tip">Opportunities</span></a>
+  <a class="sb-icon" href="/defense-news"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L4 8v8l8 5 8-5V8l-8-5z"/></svg><span class="sb-label">Defense News</span><span class="sb-tip">Defense News</span></a>
+  <a class="sb-icon" href="/defense-spending"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="13" width="3" height="4"/></svg><span class="sb-label">Defense Spending</span><span class="sb-tip">Defense Spending</span></a>
+  <a class="sb-icon" href="/agencies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg><span class="sb-label">Defense Agencies</span><span class="sb-tip">Defense Agencies</span></a>
+  <a class="sb-icon" href="/contracting-officers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M21 17c-.5-2-2-3.5-4-3.5"/></svg><span class="sb-label">Contracting Officers</span><span class="sb-tip">Contracting Officers</span></a>
+  <div class="sb-divider"></div>
+  <div class="sb-group-label">COMPLIANCE &amp; BD</div>
+  <a class="sb-icon" href="/far-dfars-updates"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 8h8M9 12h8M9 16h5"/><circle cx="18" cy="17" r="2.5" fill="#378ADD" stroke="none"/></svg><span class="sb-label">FAR/DFARS Updates</span><span class="sb-tip">FAR/DFARS Updates</span></a>
+  <a class="sb-icon" href="/cmmc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">CMMC Readiness</span><span class="sb-tip">CMMC Readiness</span></a>
+  <a class="sb-icon" href="/wage-benchmarks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20h18"/><rect x="5" y="11" width="3" height="9"/><rect x="10.5" y="6" width="3" height="14"/><rect x="16" y="14" width="3" height="6"/></svg><span class="sb-label">Wage Benchmarks</span><span class="sb-tip">Wage Benchmarks</span></a>
+  <a class="sb-icon" href="/teaming-partners"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="9" r="3"/><circle cx="17" cy="9" r="3"/><path d="M2 20c0-3 2.5-5 5-5s5 2 5 5"/><path d="M12 20c0-3 2.5-5 5-5s5 2 5 5"/></svg><span class="sb-label">Teaming Partners</span><span class="sb-tip">Teaming Partners</span></a>
+  <a class="sb-icon" href="/gao-protests"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M2 12h20M12 2a14 14 0 010 20M12 2a14 14 0 000 20"/></svg><span class="sb-label">GAO Protests</span><span class="sb-tip">GAO Protests</span></a>
+  <div class="sb-divider"></div>
+  <div class="sb-group-label">ACCOUNT</div>
+  <a class="sb-icon" href="/settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg><span class="sb-label">Profile &amp; Settings</span><span class="sb-tip">Profile &amp; Settings</span></a>
+  <form action="/api/auth/sign-out" method="post" style="display:contents">
+    <button type="submit" class="sb-icon sb-signout" aria-label="Sign out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg><span class="sb-label">Sign out</span><span class="sb-tip">Sign out</span></button>
+  </form>
+  <div class="sb-bottom"><div class="sb-avatar">JR</div></div>
+</aside>
+
+  <!-- ═════════ MAIN ═════════ -->
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs"><b>Recompetes</b><span class="sep">/</span><span>Openings on contracts that already exist</span></div>
+      <div class="top-actions">
+        <button class="icon-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
+          <svg id="themeSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          <svg id="themeMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
+        </button>
+        <button class="icon-btn" title="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1112 0c0 7 3 8 3 8H3s3-1 3-8z"/><path d="M10 21a2 2 0 004 0"/></svg><span class="nbadge" style="display:none"></span></button>
+        <div class="user-chip"><div class="av"></div><div><div class="nm"></div></div></div>
+      </div>
+    </div>
+
+    <div class="body">
+      <!-- NAICS scope · chrome, above the sheet. Driven by wtc-app.js
+           through the shared window.BD_SCOPE. -->
+      <div class="wtc-scope" id="wtcScope"></div>
+      <!-- Measurement age and last check · two clocks, one strip.
+           Rendered by wtc-app.js, repainted on a timer. -->
+      <div class="wtc-fresh" id="wtcFresh"></div>
+      <!-- The document. Masthead, hero, summary strip and five numbered
+           sections, all rendered by wtc-app.js from the live payload. -->
+      <div id="o4"></div>
+
+      <!-- Two openings that are NOT recompetes, so they sit outside the record
+           rather than inside it. The document is ordered by expiry and these
+           carry no date. Rendered by the shared dsb-app.js. -->
+      <section class="row">
+        <section class="widget">
+          <header class="widget-head">
+            <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg></span>
+              <div class="wh-text"><h3>Primes who owe a subcontracting plan</h3><p class="wh-sub" id="ptSub"></p></div></div>
+            <span class="wh-source">USAspending</span>
+          </header>
+          <div class="pt-list" id="ptList"></div>
+          <p class="pt-cap" id="ptCap"></p>
+        </section>
+      </section>
+
+      <section class="row">
+        <section class="widget">
+          <header class="widget-head">
+            <div class="wh-left"><span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 20h18"/><path d="M6 20V10"/><path d="M12 20V4"/><path d="M18 20v-7"/></svg></span>
+              <div class="wh-text"><h3>Room left on contracts already awarded</h3><p class="wh-sub" id="chSub"></p></div></div>
+            <span class="wh-source">USAspending</span>
+          </header>
+          <div class="ch-top"><span class="ch-big" id="chBig"></span><p class="ch-say" id="chSay"></p></div>
+          <div class="ch-list" id="chList"></div>
+          <p class="ch-cap" id="chCap"></p>
+        </section>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="bd-scope.js"></script>
+<script src="dsb-data.js"></script>
+<!-- The widget renderer set, for the two panels below the sheet. Every one of
+     its other renderers no-ops here: each returns early on a missing host. -->
+<script src="dsb-app.js"></script>
+<script src="defense-spending-live.js"></script>
+<script src="phone-copy.js"></script>
+<script src="wtc-app.js"></script>
+<script>/* theme + sidebar toggles */
+(function(){
+  var root=document.documentElement, sun=document.getElementById('themeSun'), moon=document.getElementById('themeMoon'), btn=document.getElementById('themeToggle');
+  function sync(){ if(!sun||!moon) return; var t=root.getAttribute('data-theme'); if(t==='light'){sun.style.display='none';moon.style.display='';} else {sun.style.display='';moon.style.display='none';} }
+  try{ var saved=localStorage.getItem('faraudit-theme'); if(saved) root.setAttribute('data-theme',saved); }catch(e){}
+  sync();
+  if(btn) btn.addEventListener('click', function(){ var next=root.getAttribute('data-theme')==='light'?'dark':'light'; root.setAttribute('data-theme',next); try{localStorage.setItem('faraudit-theme',next);}catch(e){} sync(); });
+})();
+(function(){
+  var KEY='faraudit-sb', html=document.documentElement;
+  try{var s=localStorage.getItem(KEY); if(s==='closed') html.setAttribute('data-sb','closed'); else if(!html.hasAttribute('data-sb')) html.setAttribute('data-sb','open');}catch(e){}
+  document.addEventListener('click',function(e){
+    var t=e.target&&e.target.closest&&e.target.closest('#sbToggle'); if(!t) return;
+    var next=html.getAttribute('data-sb')==='open'?'closed':'open';
+    html.setAttribute('data-sb',next);
+    try{localStorage.setItem(KEY,next);}catch(e){}
+  });
+})();
+</script>
+<script src="/notifications-chrome.js" defer></script>
+</body>
+</html>

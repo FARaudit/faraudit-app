@@ -162,10 +162,7 @@ button{font-family:inherit;cursor:pointer}
   .brand-sm{display:flex}
 }
 
-/* ── Auth state banners ───────────────────────────────────────────────
-   .auth-error / .auth-success / .auth-info were referenced by the sign-in
-   markup with no rule anywhere, so a failed sign-in and both confirmations
-   rendered as unstyled body text. */
+/* ── Auth state banners ─────────────────────────────────────────────── */
 .auth-error,.auth-success,.auth-info{
   padding:11px 13px;border-radius:8px;font-size:13px;line-height:1.55;
   margin-bottom:16px;border:1px solid transparent
@@ -175,8 +172,7 @@ button{font-family:inherit;cursor:pointer}
 .auth-info{background:rgba(55,138,221,.09);border-color:rgba(55,138,221,.28);color:var(--accent-light)}
 .auth-error strong,.auth-success strong,.auth-info strong{font-weight:700;color:var(--ink)}
 
-/* Recovery escape hatches. The old success state replaced the whole form, so a
-   reset that never arrived left nothing to press. */
+/* Recovery escape hatches. */
 .auth-recovery-actions{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
 .auth-alt-btn{
   flex:1 1 auto;min-width:150px;height:42px;padding:0 16px;border-radius:9px;

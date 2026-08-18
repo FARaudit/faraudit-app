@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
 import { syncCertifications } from "@/lib/cert-sync";
+import { suggestedNaics } from "@/lib/naics-suggestions";
+import { PAST_PERFORMANCE_LIMIT } from "@/lib/capability-statement-limits";
+import { naicsLines } from "@/lib/capability-statement-naics";
+import { agencyOptions } from "@/lib/capability-statement-tailoring";
 
 export const dynamic = "force-dynamic";
 
@@ -8,12 +12,22 @@ interface PatchBody {
   company_name?: string | null;
   uei?: string | null;
   cage_code?: string | null;
-  duns?: string | null;
   naics_codes?: string[];
   certifications?: string[];
+  // SAM-OWNED, AND DELIBERATELY NOT IN ALLOWED_FIELDS. Registration status is a fact SAM holds;
+  // a customer typing "Active" over a lapsed registration puts a false statement on a document
+  // a contracting officer reads. Declared so the plate's ninth cell has a shape to bind, absent
+  // until a SAM sync writes it, and never settable through the record PATCH.
+  sam_registration_status?: string | null;
   core_competencies?: string | null;
   differentiators?: string | null;
+  // Structured forms. The plate draws four fields per competency and two per differentiator;
+  // the TEXT columns can carry one. Both shapes are accepted and the readers prefer these.
+  core_competencies_json?: unknown;
+  differentiators_json?: unknown;
   contact_name?: string | null;
+  // Read by the card-825 plate to build "Name, Title"; declared here so it can also be written.
+  contact_title?: string | null;
   contact_email?: string | null;
   contact_phone?: string | null;
   contact_website?: string | null;
@@ -22,10 +36,19 @@ interface PatchBody {
 }
 
 const ALLOWED_FIELDS = new Set<keyof PatchBody>([
-  "company_name", "uei", "cage_code", "duns",
+  // No duns: UEI replaced it for federal use in April 2022 and no surface renders
+  // it. A field that can be written and is never read is a trap for whoever is next.
+  "company_name", "uei", "cage_code",
   "naics_codes", "certifications",
   "core_competencies", "differentiators",
-  "contact_name", "contact_email", "contact_phone", "contact_website", "contact_address",
+  "core_competencies_json", "differentiators_json",
+  // contact_title was READ by the plate and WRITEABLE BY NOBODY. The card-825 plate builds the
+  // CONTACT cell as "Name, Title" and Design asked for the field by name — a CO wants to know
+  // whether they are reading the President or the front desk. The column landed, the renderer
+  // reads it, and it was never added here, so every PATCH carrying a title had it silently
+  // dropped by the allowlist and the cell printed a bare name. Exactly the trap the `duns` note
+  // above describes, in the other direction: a field that can be read and never written.
+  "contact_name", "contact_title", "contact_email", "contact_phone", "contact_website", "contact_address",
   "past_performance"
 ]);
 
@@ -155,17 +178,25 @@ async function autopopulate(supabase: Awaited<ReturnType<typeof createServerClie
     });
   }
 
-  const past = Array.from(byId.values())
+  const ranked = Array.from(byId.values())
     .sort((a, b) => {
       const ta = a.awarded_at ? new Date(a.awarded_at).getTime() : 0;
       const tb = b.awarded_at ? new Date(b.awarded_at).getTime() : 0;
       return tb - ta;
-    })
-    .slice(0, 20);
+    });
+
+  // HOW MANY WERE WON IS REPORTED SEPARATELY FROM HOW MANY ARE SENT.
+  // The page prints one row per award and a capability statement is read in one
+  // sitting, so the list is capped — but the count is not the cap. A customer with
+  // 300 wins whose statement says "20 awards on file" is understating their own past
+  // performance to a contracting officer, and nothing on the page told them a cap
+  // existed. The cap stays; the total travels with it.
+  const pastTotal = ranked.length;
+  const past = ranked.slice(0, PAST_PERFORMANCE_LIMIT);
 
   const naicsSet = new Set<string>();
-  for (const p of past) if (p.naics_code) naicsSet.add(String(p.naics_code));
-  return { past, naics: Array.from(naicsSet) };
+  for (const p of ranked) if (p.naics_code) naicsSet.add(String(p.naics_code));
+  return { past, pastTotal, naics: Array.from(naicsSet) };
 }
 
 export async function GET(_req: NextRequest) {
@@ -194,7 +225,7 @@ export async function GET(_req: NextRequest) {
     );
   }
 
-  const { past, naics } = autoRes;
+  const { past, pastTotal, naics } = autoRes;
 
   // First-time visit — no saved row yet. Return a stub seeded from autopopulate.
   if (!stmtRes.data) {
@@ -208,6 +239,10 @@ export async function GET(_req: NextRequest) {
         certifications: [],
         core_competencies: null,
         differentiators: null,
+        // NULL, not [] — the stub has not been structured, it is not structured-and-empty,
+        // and the readers key on exactly that difference.
+        core_competencies_json: null,
+        differentiators_json: null,
         contact_name: null,
         contact_email: user.email || null,
         contact_phone: null,
@@ -227,6 +262,10 @@ export async function GET(_req: NextRequest) {
       // saved branch computes when its list is empty.
       naics_saved: [],
       naics_derived: naics,
+      past_performance_total: pastTotal,
+      past_performance_limit: PAST_PERFORMANCE_LIMIT,
+      naics_titles: naicsTitles(naics),
+      tailored_agencies: agencyOptions(past),
       stub: true
     });
   }
@@ -248,14 +287,32 @@ export async function GET(_req: NextRequest) {
   // customer typed them — the display becomes the record because someone added a code.
   // An editor must build its writes from `naics_saved`, which is the row and nothing
   // else. `naics_derived` is what the overlay contributed: a suggestion until acted on.
-  const derived = savedNaics.length > 0 ? [] : naics.slice();
+  // SUBTRACT what is already saved; do not suppress the whole set once anything is. Rule and
+  // rationale live in src/lib/naics-suggestions.ts, where they can be driven by a test.
+  const derived = suggestedNaics(savedNaics, naics);
 
   return NextResponse.json({
     statement: merged,
     naics_saved: savedNaics,
     naics_derived: derived,
+    past_performance_total: pastTotal,
+    past_performance_limit: PAST_PERFORMANCE_LIMIT,
+    // The industry titles for the codes on THIS record. Sent from here rather than read
+    // from public/naics-reference.js so the page, the clipboard copy and the PDF all
+    // quote 13 CFR 121.201 through one path — and so the page does not pull a 90 KB
+    // table to print three lines. A code the regulation does not carry is simply absent.
+    naics_titles: naicsTitles(merged.naics_codes),
+    // Editions the record can support: an agency appears only because a win with it is
+    // recorded. Offering the rest would name relevance the history does not back.
+    tailored_agencies: agencyOptions(past),
     stub: false
   });
+}
+
+function naicsTitles(codes: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const line of naicsLines(codes)) if (line.title) out[line.code] = line.title;
+  return out;
 }
 
 export async function PATCH(req: NextRequest) {

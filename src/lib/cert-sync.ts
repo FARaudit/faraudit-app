@@ -110,7 +110,7 @@ export async function syncCertifications(
 ): Promise<CertSyncResult | { error: string }> {
   const { data, error } = await supabase
     .from("capability_statements")
-    .select("uei, attributes_v2")
+    .select("uei, attributes_v2, cage_code")
     .eq("user_id", userId)
     .maybeSingle();
   if (error) return { error: `profile lookup failed: ${error.message}` };
@@ -145,6 +145,20 @@ export async function syncCertifications(
     // No UEI means nothing can be attested, and anything present is bound to a UEI no longer on this
     // profile. Clearing is the whole point, so this compares against the RAW column.
     const persisted = await write([]);
+    /* CAGE IS BOUND TO THE REGISTRATION, so it goes with it. Syncing CAGE in on a UEI and
+       leaving it behind on a clear would strand another firm's identifier on this document —
+       the same defect this branch already prevents for attested programs, one field over. */
+    if (String(data?.cage_code ?? "").trim()) {
+      const { data: rows, error: cErr } = await supabase
+        .from("capability_statements")
+        .update({ cage_code: null })
+        .eq("user_id", userId)
+        .select("user_id");
+      if (cErr) console.error("[cert-sync] cage_code clear failed:", cErr.message);
+      else if (!Array.isArray(rows) || rows.length === 0) {
+        console.error("[cert-sync] cage_code clear matched ZERO rows (RLS or missing row) — not written");
+      }
+    }
     return {
       state: "no-uei", uei: null, legalName: null, registrationExpires: null,
       records: [], establishedPrograms: [], persisted, checkedAt: nowIso,
@@ -219,6 +233,29 @@ export async function syncCertifications(
       uei,
     };
   });
+
+  /* CAGE COMES FROM THE REGISTRATION, NOT FROM TYPING. It was already being fetched —
+     SamEntity.cage_code is parsed at sam-entity.ts from er.cageCode — and then dropped on
+     the floor, so the capability statement displayed "not on file" forever with no control
+     anywhere that could change it. A contracting officer reads CAGE off this document.
+
+     Synced rather than made editable, for the reason certifications are: a hand-typed CAGE
+     can be wrong and nothing would catch it, while this one is whatever SAM has against the
+     UEI the customer just proved. Written only when it differs, so a page view does not
+     rewrite the row. */
+  const samCage = String(entity.cage_code ?? "").trim().toUpperCase();
+  if (samCage && samCage !== String(data?.cage_code ?? "").trim().toUpperCase()) {
+    const { data: cageRows, error: cageErr } = await supabase
+      .from("capability_statements")
+      .update({ cage_code: samCage })
+      .eq("user_id", userId)
+      .select("user_id");
+    if (cageErr) console.error("[cert-sync] cage_code write failed:", cageErr.message);
+    else if (!Array.isArray(cageRows) || cageRows.length === 0) {
+      // Same trap as attributes_v2: PostgREST reports no error on a zero-row UPDATE.
+      console.error("[cert-sync] cage_code update matched ZERO rows (RLS or missing row) — not written");
+    }
+  }
 
   return {
     state: "verified", uei,

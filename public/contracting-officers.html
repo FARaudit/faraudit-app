@@ -40,6 +40,12 @@
 
 html,body{margin:0;padding:0;background:var(--page-bg);font-family:"Manrope",ui-sans-serif,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;transition:background-color .25s ease,color .25s ease}
 button{font-family:inherit}
+/* Links had no rule, so every one fell to the UA default — browser blue on paper and
+   an unreadable dark blue on the night card, visited purple in both. */
+a{color:var(--accent-deep)}
+a:hover{color:var(--accent)}
+[data-theme="dark"] a{color:var(--accent-light)}
+[data-theme="dark"] a:hover{color:#dbeafe}
 .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
 .frame{width:100%;max-width:1800px;min-width:1280px;margin:0 auto;background:var(--bg);display:grid;grid-template-columns:var(--sb-width) 1fr;min-height:100vh;align-items:stretch;transition:grid-template-columns .22s cubic-bezier(0.16,1,0.3,1)}
 .main{display:flex;flex-direction:column;min-width:0}
@@ -74,7 +80,11 @@ button{font-family:inherit}
 .page-header h1{font-family:"Fraunces","Georgia",serif;font-style:italic;font-weight:600;font-size:34px;letter-spacing:-.02em;color:var(--ink);margin:0;line-height:1.04}
 .page-header .sub{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--mute);margin:0}
 .page-header .sub b{color:var(--ink-2);font-weight:600}
-.hdr-stat{display:flex;gap:22px;flex-shrink:0}
+/* One number is the subject of this page and the other two qualify it. At a common
+   size all three were equally unimportant. */
+.hdr-stat{display:flex;gap:26px;flex-shrink:0;align-items:flex-end}
+.hdr-stat .hs:first-child .v{font-size:46px;letter-spacing:-.035em;line-height:.86}
+.hdr-stat .hs:first-child .l{color:var(--ink-2)}
 .hdr-stat .hs{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
 .hdr-stat .hs .v{font-family:"Manrope";font-size:22px;font-weight:800;letter-spacing:-.02em;color:var(--ink);line-height:1}
 .hdr-stat .hs .v.warm{color:var(--green-700)}
@@ -82,11 +92,18 @@ button{font-family:inherit}
 .hdr-stat .hs .l{font-family:"IBM Plex Mono",monospace;font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute);font-weight:700}
 
 /* control bar */
-.controls{position:sticky;top:60px;z-index:50;display:flex;flex-direction:column;gap:10px;padding:12px 16px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-sm)}
+/* Not sticky: once an agency is chosen the bar has no further job, and it was
+   following the reader down a 132-row list holding the page's best space. */
+.controls{display:flex;flex-direction:column;gap:10px;padding:11px 16px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-sm)}
 .ctl-line{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .ctl-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);white-space:nowrap}
-.pillset{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.fpill{height:27px;padding:0 11px;border-radius:8px;background:var(--card-soft);border:1px solid var(--line);color:var(--ink-2);font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:700;letter-spacing:.03em;cursor:pointer;transition:all .14s;display:inline-flex;align-items:center;gap:5px}
+/* The agency set is laid on a column grid rather than left to wrap: equal tracks, one
+   agency per cell, so ten names of very different lengths read as a list instead of a
+   ragged wall. The full qualified name is on each cell's title and in the panel. */
+.pillset{display:grid;grid-template-columns:repeat(auto-fill,minmax(204px,1fr));gap:6px;flex:1 1 100%;min-width:0}
+.pillset .fpill{display:block;width:100%;min-width:0;height:26px;line-height:24px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pillset .fpill-note{grid-column:1/-1;margin-left:0!important}
+.fpill{height:25px;padding:0 9px;border-radius:6px;background:transparent;border:1px solid var(--line);color:var(--ink-2);font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:500;letter-spacing:.01em;white-space:nowrap;cursor:pointer;transition:all .14s;display:inline-flex;align-items:center;gap:5px}
 .fpill:hover{border-color:var(--accent-light);color:var(--accent-deep)}
 .fpill.active{background:rgba(55,138,221,0.12);border-color:var(--accent-light);color:var(--accent-deep)}
 [data-theme="dark"] .fpill.active{color:var(--accent-light);background:rgba(55,138,221,0.2)}
@@ -104,7 +121,7 @@ button{font-family:inherit}
 
 /* rows + widgets */
 .row{display:grid;gap:16px;align-items:stretch}
-.row.hero{grid-template-columns:1.5fr 1fr}
+.row.hero{grid-template-columns:1.75fr 1fr}
 .row.two{grid-template-columns:1fr 1fr}
 @media(max-width:1180px){.row.hero,.row.two{grid-template-columns:1fr}}
 .widget{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-sm);padding:18px 20px;display:flex;flex-direction:column;gap:14px;overflow:hidden;min-width:0}
@@ -116,13 +133,13 @@ button{font-family:inherit}
 .wh-text{display:flex;flex-direction:column;gap:2px;min-width:0}
 .wh-text h3{font-family:"Manrope",sans-serif;font-size:14.5px;font-weight:800;letter-spacing:-.01em;color:var(--ink);margin:0;line-height:1.2}
 .wh-text .wh-sub{font-size:11.5px;color:var(--mute);margin:0;line-height:1.35}
-.wh-source{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mute-2);background:var(--card-soft);border:1px solid var(--line);padding:3px 7px;border-radius:5px;white-space:nowrap;flex-shrink:0}
+.wh-source{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);background:var(--card-soft);border:1px solid var(--line);padding:3px 7px;border-radius:5px;white-space:nowrap;flex-shrink:0}
 .scatter-svg circle.dot.sel{stroke:var(--ink);stroke-width:2.5}
 
 /* CO profile panel */
 .co-panel{display:flex;flex-direction:column;gap:0;min-width:0}
 .cop-head{display:flex;align-items:flex-start;gap:13px;padding-bottom:14px;border-bottom:1px solid var(--line-2)}
-.cop-av{width:52px;height:52px;border-radius:13px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:18px;flex-shrink:0;box-shadow:var(--shadow-sm)}
+.cop-av{width:52px;height:52px;border-radius:13px;display:grid;place-items:center;font-weight:800;font-size:18px;flex-shrink:0;box-shadow:var(--shadow-sm)}
 .cop-id{min-width:0;flex:1}
 .cop-name{font-family:"Manrope";font-size:17px;font-weight:800;letter-spacing:-.01em;color:var(--ink);line-height:1.15}
 .cop-title{font-size:11.5px;color:var(--mute);margin-top:1px}
@@ -134,6 +151,9 @@ button{font-family:inherit}
 .cop-note b{color:var(--accent-deep);font-family:"IBM Plex Mono";font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:4px}
 [data-theme="dark"] .cop-note b{color:var(--accent-light)}
 .cop-actions{display:flex;gap:8px;padding-top:14px}
+.cop-phcol{flex:1;min-width:0;display:flex;flex-direction:column}
+.cop-phcol .cop-btn{flex:none;width:100%}
+.cop-phnote{margin:6px 0 0;font-size:9.5px;line-height:1.4;color:var(--mute-2);letter-spacing:.02em;text-align:center}
 .cop-btn{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:36px;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;border:0;transition:transform .12s}
 .cop-btn:hover{transform:translateY(-1px)}
 .cop-btn.primary{background:linear-gradient(180deg,var(--accent),var(--accent-deep));color:#fff}
@@ -146,11 +166,30 @@ button{font-family:inherit}
 .cop-empty .d{font-size:11.5px;color:var(--mute);max-width:240px;line-height:1.5}
 .people-tab.active{background:rgba(55,138,221,0.12);border-color:var(--accent-light);color:var(--accent-deep)}
 [data-theme="dark"] .people-tab.active{color:var(--accent-light)}
-.ppl-list{display:flex;flex-direction:column;gap:4px;max-height:520px;overflow-y:auto;padding-right:3px}
-.ppl-row{display:grid;grid-template-columns:44px 2.4fr 1.5fr 1fr 1.25fr 52px;gap:16px;align-items:center;padding:11px 14px;border-radius:11px;border:1px solid var(--line-2);background:var(--card-soft);cursor:pointer;transition:border-color .12s,transform .12s}
+/* The column heads already say LATEST NOTICE and NOTICES; carrying the unit on every
+   row printed those two words 264 times between them. Scoped to out-specify the base
+   rules, which are declared further down this sheet. */
+.ppl-row .pt-l{display:none}
+.ppl-row .ppl-awd small{display:none}
+.ppl-list{display:flex;flex-direction:column;gap:4px;max-height:calc(100vh - 372px);min-height:360px;overflow-y:auto;padding-right:3px}
+/* Name and office carry the longest strings on the row; NAICS and the date were both
+   holding more track than their content can ever use. */
+.ppl-row{display:grid;grid-template-columns:44px 2.9fr 1.4fr .7fr 1.05fr 52px;gap:16px;align-items:center;padding:11px 14px;border-radius:11px;border:1px solid var(--line-2);background:var(--card-soft);cursor:pointer;transition:border-color .12s,transform .12s}
 .ppl-row:hover{border-color:var(--accent-light);transform:translateX(2px)}
 .ppl-row.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);background:var(--card)}
-.ppl-av{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:14px;position:relative}
+/* One monogram tile for every officer, in both themes. The tile is a field the name
+   sits on, not a code, so the ink carries the reading and the field stays quiet. */
+:root,[data-theme="light"],[data-theme="auto"]{--av-bg:#dbe9f8;--av-ink:#123a63}
+[data-theme="dark"]{--av-bg:rgba(181,212,244,.14);--av-ink:#cfe1f6}
+.ppl-av,.cop-av{background:var(--av-bg);color:var(--av-ink)}
+.ppl-av{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;font-weight:800;font-size:14px;position:relative}
+/* the agency repeats on every row and the filter above already names it, so it is
+   set as a label rather than a second heading */
+.ppl-row .pt-agy{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:500;line-height:1.45;letter-spacing:.01em;color:var(--mute)}
+/* an officer posts in a SET of codes; the row shows the one they post in most and
+   counts the rest, so the cell stays one line however many they carry */
+.ppl-row .pt-naics{white-space:nowrap}
+.ppl-row .pt-naics .more{margin-left:6px;font-size:10px;font-weight:600;color:var(--mute);letter-spacing:.02em}
 .ppl-av .reldot{position:absolute;bottom:-2px;right:-2px;width:13px;height:13px;border-radius:50%;border:2px solid var(--card)}
 .ppl-info{min-width:0}
 .ppl-name{font-size:14px;font-weight:800;color:var(--ink);line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -161,11 +200,32 @@ button{font-family:inherit}
 .pt-v{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.1}
 .pt-l{display:flex;align-items:center;gap:5px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.04em}
 .pt-l::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0}
-.ppl-awd{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:800;color:var(--accent-deep);text-align:right}
+.ppl-awd{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:800;color:var(--accent-deep);text-align:center}
 [data-theme="dark"] .ppl-awd{color:var(--accent-light)}
 .ppl-awd small{display:block;font-size:8px;color:var(--mute);font-weight:600;letter-spacing:.04em}
-.ppl-head{display:grid;grid-template-columns:44px 2.4fr 1.5fr 1fr 1.25fr 52px;gap:16px;padding:0 14px 8px;border-bottom:1px solid var(--line-2)}
-.ppl-head span{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
+/* The head sits OUTSIDE the scroller, so it never lost the scrollbar's width and every
+   column drifted against the rows below it. Both now reserve the same gutter, so the
+   tracks line up whatever the platform's scrollbar measures. */
+/* The head has no border and the rows do, so the head's 14px padding started one
+   pixel to the left of every cell beneath it. */
+.ppl-head{display:grid;grid-template-columns:44px 2.9fr 1.4fr .7fr 1.05fr 52px;gap:16px;padding:0 15px 8px;border-bottom:1px solid var(--line-2);overflow-y:auto;scrollbar-gutter:stable}
+.ppl-list{scrollbar-gutter:stable;padding-right:0}
+.ppl-head span{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);white-space:nowrap}
+/* NAICS, latest notice and the count are all centred in their tracks, head and value
+   together, so each column reads as one axis rather than three ragged ones. */
+/* The avatar fills its track and is a rounded block, so a label pinned to the track's
+   left edge sits beside the corner radius and reads as indented even though the two
+   boxes share an x (measured: both at 124). Both are centred on the track instead. */
+.ppl-head span:first-child{text-align:center}
+.ppl-row .ppl-av{justify-self:center}
+.ppl-head span:nth-child(4),.ppl-head span:nth-child(5){text-align:center}
+/* Centring the whole cell centred CODE + MARKER, so a row carrying +3 pushed its code
+   left of a row carrying none and the column never lined up. The code alone is
+   centred; the marker is taken out of flow and hangs off its right edge. */
+.ppl-row .ppl-touch:nth-child(4){display:flex;flex-direction:row;justify-content:center;align-items:center}
+.ppl-row .pt-naics{position:relative;white-space:nowrap;flex:none}
+.ppl-row .pt-naics .more{position:absolute;left:calc(100% + 6px);top:0;margin-left:0}
+.ppl-row .ppl-touch:nth-child(5){text-align:center}
 .ppl-head span:last-child{text-align:center}
 .resp-num .rn-delta.up{color:var(--green-700);background:rgba(5,150,105,.1)}
 [data-theme="dark"] .resp-num .rn-delta.up{color:#6ee7b7;background:rgba(16,185,129,.14)}
@@ -175,6 +235,12 @@ button{font-family:inherit}
 [data-theme="dark"] .fn-drillbtn:hover,[data-theme="dark"] .fn-drillbtn.on{color:var(--accent-light)}
 
 /* state banner — loading, empty and failure states */
+/* the notice meta sets as discrete facts, so a wrap lands between them, never inside
+   one — "closes Aug 20, 2026" used to break across two lines */
+.nt-row{padding:10px 0;border-bottom:1px solid var(--line-3)}
+.nt-title{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.35}
+.nt-meta{display:flex;flex-wrap:wrap;align-items:baseline;gap:3px 14px;margin-top:5px;font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute)}
+.nt-meta>*{white-space:nowrap}
 .state-banner{display:flex;align-items:center;gap:11px;padding:12px 16px;background:var(--accent-pale);border:1px solid var(--accent-light);border-radius:11px;font-size:12.5px;color:var(--ink-2);line-height:1.5}
 /* the class sets display, so it must also honour the hidden attribute */
 .state-banner[hidden]{display:none}
@@ -246,17 +312,17 @@ button{font-family:inherit}
   <div class="sb-logo-row"><div class="sb-logo">F</div><span class="sb-wordmark">FAR<span class="wm-au">audit</span></span></div>
   <div class="sb-group-label">WORKSPACE</div>
   <a class="sb-icon" href="/command-center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="sb-label">Today</span><span class="sb-tip">Today</span></a>
-  <a class="sb-icon" href="/audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg><span class="sb-label">Run Audit</span><span class="sb-badge new">New</span><span class="sb-tip">Run Audit</span></a>
+  <a class="sb-icon" href="/audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg><span class="sb-label">Run Audit</span><span class="sb-tip">Run Audit</span></a>
   <a class="sb-icon" href="/acquisition-stages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span class="sb-label">Acquisition Stages</span><span class="sb-tip">Acquisition Stages</span></a>
-  <a class="sb-icon" href="/dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="sb-label">Past Audits</span><span class="sb-badge count">15</span><span class="sb-tip">Past Audits</span></a>
-  <a class="sb-icon" href="/pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg><span class="sb-label">Pipeline</span><span class="sb-badge danger">3</span><span class="sb-tip">Pipeline</span></a>
+  <a class="sb-icon" href="/dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="sb-label">Past Audits</span><span class="sb-tip">Past Audits</span></a>
+  <a class="sb-icon" href="/pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg><span class="sb-label">Pipeline</span><span class="sb-tip">Pipeline</span></a>
   <a class="sb-icon" href="/capability-statement"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span class="sb-label">Capability Statement</span><span class="sb-tip">Capability Statement</span></a>
   <div class="sb-divider"></div>
   <div class="sb-group-label">INTELLIGENCE</div>
-  <a class="sb-icon" href="/opportunities"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">Opportunities</span><span class="sb-badge live">Live</span><span class="sb-tip">Opportunities</span></a>
+  <a class="sb-icon" href="/opportunities"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">Opportunities</span><span class="sb-tip">Opportunities</span></a>
   <a class="sb-icon" href="/defense-news"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L4 8v8l8 5 8-5V8l-8-5z"/></svg><span class="sb-label">Defense News</span><span class="sb-tip">Defense News</span></a>
   <a class="sb-icon" href="/defense-spending"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="13" width="3" height="4"/></svg><span class="sb-label">Defense Spending</span><span class="sb-tip">Defense Spending</span></a>
-  <a class="sb-icon" href="/agencies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg><span class="sb-label">Defense Agencies</span><span class="sb-badge count">8</span><span class="sb-tip">Defense Agencies</span></a>
+  <a class="sb-icon" href="/agencies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg><span class="sb-label">Defense Agencies</span><span class="sb-tip">Defense Agencies</span></a>
   <a class="sb-icon active" href="/contracting-officers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M21 17c-.5-2-2-3.5-4-3.5"/></svg><span class="sb-label">Contracting Officers</span><span class="sb-tip">Contracting Officers</span></a>
   <div class="sb-divider"></div>
   <div class="sb-group-label">COMPLIANCE &amp; BD</div>
@@ -288,7 +354,7 @@ button{font-family:inherit}
           <svg id="themeMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
         </button>
         <button class="icon-btn" title="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1112 0c0 7 3 8 3 8H3s3-1 3-8z"/><path d="M10 21a2 2 0 004 0"/></svg><span class="nbadge" style="display:none"></span></button>
-        <div class="user-chip"><div class="av">JR</div><div><div class="nm">Jose Rodriguez</div></div></div>
+        <div class="user-chip"><div class="av"></div><div><div class="nm"></div></div></div>
       </div>
     </div>
 
@@ -337,6 +403,7 @@ button{font-family:inherit}
 </div>
 
 <script src="dco-data.js"></script>
+<script src="phone-copy.js"></script>
 <script src="dco-app.js"></script>
 <script src="contracting-officers-live.js"></script>
 <script>

@@ -16,7 +16,7 @@
 (function () {
   'use strict';
 
-  const S = { naics: 'all', q: '', sel: null, sort: 'category' };
+  const S = { naics: 'all', q: '', sel: null, sort: 'category', compare: null };
   const $ = (id) => document.getElementById(id);
 
   function h(tag, opts, children) {
@@ -186,19 +186,72 @@
       const row = h('div', { cls: 'wage-row' + (S.sel === rowId(r) ? ' sel' : '') }, [
         h('div', { cls: 'wr-cat' }, [
           h('div', { cls: 'wr-name', text: r.category }),
-          h('div', { cls: 'wr-src', text: r.source || 'source not recorded' })
+          /* The source line is the same 50 times out of 55, so the row says what this
+             number IS instead — which of the two it is reading. */
+          h('div', { cls: 'wr-src', text: awardedLabel(r) })
         ]),
         h('div', { cls: 'wr-codes mono', text: (r.naics_codes || []).join(' · ') || '—' }),
         h('div', { cls: 'wr-rate mono', text: money(r.rate_low) }),
-        h('div', { cls: 'wr-rate wr-med mono', text: money(r.rate_median) }),
+        /* THE HEADLINE IS WHAT WAS AWARDED. A band from national medians is where to start;
+           what schedule holders actually won on federal contracts is what a subcontractor
+           prices against. The reference median stays beside it as context, never replaced by
+           it — a row with no awarded rate shows the reference and says which one it is. */
+        h('div', { cls: 'wr-rate wr-med mono', text: headlineRate(r) }),
         h('div', { cls: 'wr-rate mono', text: money(r.rate_high) })
       ]);
-      row.addEventListener('click', () => { S.sel = rowId(r); renderList(); renderPanel(); });
+      row.addEventListener('click', () => {
+        selectRow(r);
+      });
       return row;
     }));
   }
 
+  /* SELECTING A ROW IS ONE ACT, so the click and the first paint do the same thing. Landing on
+     a blank right-hand panel makes the reader hunt for the interaction before the page has told
+     them anything — the first row is as good an example as any and it costs nothing. */
+  function selectRow(r) {
+    {
+        S.sel = rowId(r);
+        /* The comparison belongs to the row that asked for it. Without clearing it, a fast
+           click to a second category paints the first category's awarded rates under the
+           second one's name — which is worse than showing nothing. */
+        S.compare = null;
+        renderList(); renderPanel();
+        if (typeof window.WAGE_COMPARE === 'function') {
+          const asked = rowId(r);
+          window.WAGE_COMPARE(r.category).then((c) => {
+            if (S.sel !== asked) return;   // selection moved on; this answer is stale
+            S.compare = c;
+            renderPanel();
+          });
+        }
+    }
+  }
+
+  /* Only on the FIRST paint with rows, and only when nothing is chosen — a re-render after a
+     save must not drag the reader back to row one. */
+  function autoSelectFirst() {
+    if (S.sel !== null) return;
+    const list = rates();
+    if (!list.length) return;
+    selectRow(list[0]);
+  }
+
   /* ── detail panel ───────────────────────────────────────────────────── */
+
+  /* WHICH NUMBER THIS ROW IS SHOWING, said on the row itself. Three states and they are not
+     interchangeable: an awarded median, a category CALC+ does not index, and one the lookup did
+     not get to. Collapsing the last two tells a customer their role has no market when the only
+     thing that happened is that we ran out of time to ask. */
+  function headlineRate(r) {
+    return r.awarded && r.awarded.median != null ? money(r.awarded.median) : money(r.rate_median);
+  }
+  function awardedLabel(r) {
+    if (r.awarded && r.awarded.median != null) return 'Awarded median · ' + r.awarded.count + ' rates';
+    if (r.awarded_state === 'none') return 'Reference — not indexed by CALC+';
+    if (r.awarded_state === 'unresolved') return 'Reference — awarded rate not checked';
+    return r.source || 'source not recorded';
+  }
 
   function renderPanel() {
     const host = $('wagePanel');
@@ -213,12 +266,19 @@
       return;
     }
 
-    const band = h('div', { style: 'display:flex;flex-direction:column;gap:9px;margin-top:4px' }, [
-      ['Low', r.rate_low], ['Median', r.rate_median], ['High', r.rate_high]
-    ].map(([label, v]) => h('div', { style: 'display:flex;justify-content:space-between;gap:12px' }, [
-      h('span', { text: label, style: 'font-size:12px;color:var(--mute)' }),
-      h('span', { cls: 'mono', text: money(v), style: 'font-size:13px;font-weight:800;color:var(--ink)' })
-    ])));
+    /* THE PANEL SAYS WHAT THE ROW CANNOT. The row already prints low, median and high, so
+       repeating them here spends the whole panel restating the line the customer just read.
+       What it adds instead: what the category IS, what it takes to fill it, and what primes
+       have actually been awarded for it. */
+    const rows = (pairs) => h('div', { style: 'display:flex;flex-direction:column;gap:7px;margin-top:5px' },
+      pairs.map(([label, v, strong]) => h('div', { style: 'display:flex;justify-content:space-between;gap:12px' }, [
+        h('span', { text: label, style: 'font-size:12px;color:var(--mute)' }),
+        h('span', { cls: 'mono', text: v, style: 'font-size:13px;font-weight:' + (strong ? '800' : '600') + ';color:var(--ink)' })
+      ])));
+
+    const spec = r.spec || null;
+    const cmp = S.compare && S.compare.category === r.category ? S.compare : null;
+
 
     fill(host, [
       h('div', { cls: 'cop-head' }, [
@@ -228,13 +288,49 @@
           (r.naics_codes || []).length ? h('div', { cls: 'cop-agy', text: (r.naics_codes || []).join(' · ') }) : null
         ])
       ]),
-      h('div', { cls: 'cop-note' }, [h('b', { text: 'Hourly band' }), band]),
-      h('div', { cls: 'cop-note' }, [h('b', { text: 'Where this came from' }), h('span', { text: r.source || 'source not recorded' })]),
+
+      spec ? h('div', { cls: 'cop-note' }, [h('b', { text: 'What this role does' }), h('span', { text: spec.what })]) : null,
+      spec ? h('div', { cls: 'cop-note' }, [h('b', { text: 'Typical qualifications' }), h('span', { text: spec.quals })]) : null,
+      spec ? h('div', { cls: 'cop-note' }, [
+        h('span', { text: 'Role summary and qualifications are FARaudit editorial, not a government standard.',
+                    style: 'font-size:11px;color:var(--mute)' })
+      ]) : null,
+
+      /* AGAINST WHAT PRIMES HAVE WON. Four states, each said plainly — a blank panel for
+         "loading", "not in the index" and "the lookup failed" would tell three different
+         customers the same untrue thing. */
+      h('div', { cls: 'cop-note' }, [
+        h('b', { text: 'Against awarded rates' }),
+        !cmp ? h('span', { text: 'Checking GSA CALC+ for awarded rates…', style: 'color:var(--mute)' })
+        : cmp.state === 'found' ? rows([
+            ['Your reference median', money(r.rate_median), false],
+            ['Awarded median (GSA CALC+)', money(cmp.median), true],
+            ['Awarded range', money(cmp.min) + ' – ' + money(cmp.max), false],
+            ['Awarded rates in sample', String(cmp.count), false],
+            ['Difference', (cmp.median >= r.rate_median ? '+' : '−') + money(Math.abs(cmp.median - r.rate_median)), true]
+          ])
+        : cmp.state === 'none' ? h('span', { text: 'GSA CALC+ indexes no awarded rate under this category name. That is a gap in the index, not a rate of zero.', style: 'color:var(--mute)' })
+        : h('span', { text: 'The GSA CALC+ lookup could not be reached, so no comparison is shown rather than a stale one.', style: 'color:var(--mute)' })
+      ]),
+
+      /* BOTH NUMBERS, BOTH SOURCES. The panel shows a reference band and an awarded median side
+         by side — two different origins — so it names each rather than leaving the reader to
+         infer that an absent line means the default. The row still stays quiet: 50 of the 55
+         carry the same reference string and repeating it on every row is the bloat this
+         replaced. */
+      h('div', { cls: 'cop-note' }, [
+        h('b', { text: 'Where these came from' }),
+        rows([
+          ['Reference band', r.source || 'source not recorded', false],
+          ['Awarded median', cmp && cmp.state === 'found' ? 'GSA CALC+ · awarded ceiling rates' : 'not shown for this category', false]
+        ])
+      ]),
+
       h('div', { cls: 'cop-note' }, [
         h('b', { text: 'What it is not' }),
         h('span', { text: 'A market band, not your payroll and not an SCA wage determination for a specific place of performance. Check the WD named in the solicitation before you price to it.' })
       ])
-    ]);
+    ].filter(Boolean));
   }
 
   /* ── wiring ─────────────────────────────────────────────────────────── */
@@ -245,6 +341,7 @@
     renderNaicsPills();
     renderSort();
     renderList();
+    autoSelectFirst();
     renderPanel();
   }
 

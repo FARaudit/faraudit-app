@@ -78,8 +78,12 @@ console.log("── filters ──");
   const many = Array.from({ length: 260 }, (_, i) =>
     item({ noticeId: `n${i}`, postedDate: `2026-07-${String((i % 28) + 1).padStart(2, "0")}` }));
   const rows = mapSamItems(many, NOW);
-  check("F5 · feed capped at 200", rows.length === 200);
-  check("F6 · cap keeps newest-first order", Date.parse(rows[0].created_at) >= Date.parse(rows[199].created_at));
+  // The 200-cap is GONE. It ran after a newest-posted-first sort, so what it deleted was
+  // the oldest posted — which skews hard to soonest closing. On a real 147-row feed the
+  // eight rows nearest the cut had 0,1,1,1,2,2,7,8 days left to respond. mapSamItems now
+  // returns everything it was given; the only ceiling is a runaway guard one layer up.
+  check("F5 · the feed is NOT capped", rows.length === 260, String(rows.length));
+  check("F6 · display order is newest-posted first", Date.parse(rows[0].created_at) >= Date.parse(rows[259].created_at));
 }
 
 // ── request contract + failure direction ──
@@ -97,7 +101,8 @@ const ok = (items: unknown[]) => ({
   // P1 — param contract. A regression back to naicsCode (silently ignored by
   // SAM v2) must fail these assertions.
   (globalThis as any).fetch = async (url: string) => { seenUrls.push(String(url)); return ok([item()]); };
-  const rows = await fetchLiveSamRowsUncached("336413, 332710");
+  const feed = await fetchLiveSamRowsUncached("336413, 332710");
+  const rows = feed.rows;
   const u = seenUrls[0] ? new URL(seenUrls[0]) : null;
   check("P1a · one call per NAICS code", seenUrls.length === 2, String(seenUrls.length));
   check("P1b · uses ncode param", u?.searchParams.get("ncode") === "336413", String(u));
@@ -106,6 +111,8 @@ const ok = (items: unknown[]) => ({
   check("P1e · MM/dd/yyyy posted window, both bounds", /^\d{2}\/\d{2}\/\d{4}$/.test(u?.searchParams.get("postedFrom") || "") && /^\d{2}\/\d{2}\/\d{4}$/.test(u?.searchParams.get("postedTo") || ""));
   check("P1f · sam.gov/api/prod host (api.sam.gov 404s)", (u?.origin || "") + (u?.pathname || "") === "https://sam.gov/api/prod/opportunities/v2/search");
   check("P1g · rows come back mapped", rows.length >= 1 && rows[0].source === "sam_live");
+  // The feed now reports its own completeness so a surface stating a total can hedge it.
+  check("P1h · the feed reports whether it is complete", feed.complete === true, String(feed.complete));
 
   // P2 — fail-closed, key never echoed. Partial failure must fail the WHOLE
   // fetch (a partial result presented as the full feed is a lie), and no

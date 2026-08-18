@@ -122,6 +122,233 @@ async function main(): Promise<void> {
   // trivial reason that the function drops everything.
   check("D5 · a real upcoming date is KEPT", buildEffective([{ title: "x", effective_date: iso(10) }]).length === 1);
 
+
+  // ── A ROW'S IDENTITY IS ITS DOCUMENT, NOT ITS CLAUSE ──────────────────────
+  // Measured against the live Federal Register feed 2026-08-10: of 40 documents, FOUR cite a
+  // "part N" and ONE carries a bare clause number. So `clause` is empty on ~88% of rows, and
+  // the timeline keyed its D3 join on exactly that field. A keyed join binds one datum per
+  // key, so forty updates collapsed to a single circle — which then got a NEGATIVE radius,
+  // because scaleSqrt over domain [1,7] extrapolates 0 affected clauses to -1.29 and SVG
+  // draws nothing for a negative r. Two independent reasons the chart was empty.
+  //
+  // A clause is not a row identity even when it IS present: two rules may amend the same part.
+  console.log("\n── the timeline is keyed on the document, not on a clause ──");
+  {
+    check("the live mapping gives every row an id", /id:\s*u\.link \|\| u\.title/.test(live),
+      "rows arrive with no stable identity, so any join must fall back to a content field");
+    check("the data join is keyed on that id", /\.data\(data, d => d\.id\)/.test(app),
+      "the join is keyed on a field that is absent on most rows — they collapse to one mark");
+    check("no selection is keyed on clause",
+      !/x\.clause === S\.sel/.test(app) && !/dataset\.clause/.test(app) && !/S\.sel === u\.clause/.test(app),
+      "the chart selects by id while the panel looks up by clause, so the panel goes blank");
+
+    const domain = app.match(/scaleSqrt\(\)\.domain\(\[(\d+), *(\d+)\]\)/);
+    check("the radius domain starts at zero", !!domain && domain[1] === "0",
+      `domain starts at ${domain?.[1]} — a rule naming no clause is extrapolated below the range`);
+    check("the radius scale is clamped", /scaleSqrt\(\)[\s\S]{0,80}?\.clamp\(true\)/.test(app),
+      "an out-of-domain value still extrapolates past the declared range");
+
+    // BEHAVIOUR, not source. The scale is transcribed and driven with the value 88% of live
+    // rows actually carry. A radius must be a positive number or the browser draws nothing.
+    const scaleSqrt = (d0: number, d1: number, r0: number, r1: number, clamp: boolean) => (d: number) => {
+      const v = clamp ? Math.min(Math.max(d, d0), d1) : d;
+      return r0 + (Math.sqrt(v) - Math.sqrt(d0)) * (r1 - r0) / (Math.sqrt(d1) - Math.sqrt(d0));
+    };
+    check("the OLD scale drew nothing for a rule with no clause",
+      scaleSqrt(1, 7, 6, 18, false)(0) < 0,
+      "the pre-fix defect is not reproducible, so this check proves nothing");
+    const rNow = scaleSqrt(0, 7, 6, 18, true);
+    check("the new scale gives a visible radius at zero", rNow(0) >= 6,
+      `r(0) = ${rNow(0)} — still not drawable`);
+    check("…and still scales up with affected clauses", rNow(7) > rNow(1) && rNow(1) > rNow(0),
+      "the radius no longer carries the affected count");
+
+    // A keyed join over the live shape: every row empty-claused, ids distinct.
+    const rows = Array.from({ length: 40 }, (_, i) => ({ clause: "", id: `https://example.gov/doc/${i}` }));
+    check("keying on clause collapses the live corpus to one mark",
+      new Set(rows.map((r) => r.clause)).size === 1,
+      "the collapse this gate exists for is not reproducible from the live shape");
+    check("keying on id keeps every row", new Set(rows.map((r) => r.id)).size === 40,
+      "the replacement key is not unique either");
+
+    check("a blank clause never renders as an empty headline",
+      /u\.clause \|\| u\.title/.test(app) && /d\.clause \|\| d\.title/.test(app),
+      "the tooltip and panel print an empty string as the title of the update");
+  }
+
+
+  // ── THE PAGE MAY NOT DENY ITS OWN FEED, AND A CONTROL MAY ONLY CLAIM WHAT IT DOES ──
+  // Found by driving the deployed page 2026-08-10. Two of these are CEO findings from his own
+  // review; the first is a regression I shipped in the commit directly above.
+  //
+  // Keying selection on `id` left `S.sel` null on load. renderPanel already split "nothing
+  // selected" from "nothing published"; renderInsight did not, so the bar printed the no-data
+  // message beside a counter reading 40 IN FEED. A surface claiming absence while holding data
+  // is the honest-fail rule inverted.
+  console.log("\n── nothing selected is not nothing published ──");
+  {
+    const insight = app.slice(app.indexOf("function renderInsight()"), app.indexOf("function shade("));
+    check("the insight source was sliced, not empty", insight.length > 200,
+      `sliced ${insight.length} chars — the markers are out of order and the checks below are vacuous`);
+    check("an unselected row does not report an empty feed", /D\.UPDATES\.length[\s\S]{0,120}?blankReason\(\)/.test(insight),
+      "with rows loaded and none selected, the bar prints the source-unavailable message");
+    check("…and it still reports a genuinely empty feed", /blankReason\(\)/.test(insight),
+      "the no-data state lost its message along with the bug");
+    // The panel had it right all along — the two must not drift apart again.
+    const panel = app.slice(app.indexOf("function renderPanel()"), app.indexOf("function renderFeed()"));
+    check("the panel draws the same distinction", /D\.UPDATES\.length \? \['Select a clause'/.test(panel),
+      "the two empty states disagree about what an empty selection means");
+
+    // CEO review 2026-08-10: "when I click Read full text or + Track clause, nothing happens."
+    // Both were <button> with no handler. Read full text has a real destination on every row —
+    // the Federal Register URL the feed already carries. Track clause had no feature behind it.
+    check("Read full text is a real link to the published rule",
+      /<a class="cop-btn primary" href="\$\{esc\(u\.link\)\}"/.test(panel),
+      "the control is a button with no handler — pressing it does nothing");
+    check("…and it opens safely in a new tab", /rel="noopener noreferrer"/.test(panel),
+      "target=_blank without noopener hands the opener to the destination");
+    check("…and it is not rendered for a row with no link", /\$\{u\.link \? /.test(panel),
+      "a row with no URL still offers a control that cannot go anywhere");
+    check("Track clause is gone", !/Track clause/.test(app),
+      "a control with no feature behind it is still on the page");
+
+    // "Why it matters" printed its own label with nothing after it: this route runs no insight
+    // pass, so `insight` is the empty string on every row.
+    check("the insight block is omitted when there is no insight",
+      /\$\{u\.insight \? /.test(panel) && (app.match(/\$\{u\.insight \? /g) || []).length >= 2,
+      "a bold heading renders above an empty string, in the panel or the feed or both");
+
+    check("P· the dead-control check can see a handlerless button",
+      /<button class="cop-btn ghost">/.test('<button class="cop-btn ghost">Track clause</button>'),
+      "the check cannot see the shape it forbids");
+  }
+
+
+  // ── WHAT THE PAGE OPENS ON, AND WHAT AN EMPTY PANEL COSTS ────────────────
+  // CEO, 2026-08-10: open on the highest-impact change rather than blank, and collapse the
+  // panels that have nothing in them. Both taken, with one correction to the first.
+  console.log("\n── the page opens on something, and says so honestly ──");
+  {
+    check("a default is picked", /function autoPick\(\)/.test(app) && /autoPick\(\); renderKPIs\(\)/.test(app),
+      "the panel is blank on load and again after Reset");
+
+    // AFFECTED FIRST. Impact is a keyword heuristic over title and summary — nothing
+    // authoritative sets it — so it must not be the primary sort or the page opens on whatever
+    // has the scariest words. Contracts touched is a fact about THIS account.
+    const pick = app.slice(app.indexOf("function defaultPick(rows)"), app.indexOf("function autoPick()"));
+    check("the default-pick source was sliced, not empty", pick.length > 120,
+      `sliced ${pick.length} chars — the checks below would be vacuous`);
+    // IMPACT LEADS, BREADTH BREAKS THE TIE. Breadth is the more defensible number — read from
+    // the rule's own amendatory instructions rather than guessed — and the worse default.
+    // Ranked first it opened the page on an inflation threshold adjustment rewriting 97
+    // sections that creates no obligation anyone can fail, over a CMMC rule amending one clause
+    // that disqualifies a bid. This page's own KPI card says "act before bidding".
+    const impactAt = pick.indexOf("impMeta(b.impact).rank");
+    const amendsAt = pick.indexOf("b.amends - a.amends");
+    check("both keys are in the ranking", impactAt > -1 && amendsAt > -1,
+      `impact@${impactAt} amends@${amendsAt} — the sort lost a key`);
+    check("impact is the primary sort", impactAt > -1 && impactAt < amendsAt,
+      "the page opens on the broadest rewrite rather than on the disqualifier class");
+    check("breadth breaks the tie", amendsAt > impactAt,
+      "equally-flagged rules order arbitrarily");
+    check("newest breaks the remaining tie", /Date\.parse\(b\.date\) - Date\.parse\(a\.date\)/.test(pick),
+      "the page opens somewhere different on each load");
+    check("impact is still only a heuristic", /cmmc\|cyber\|cui\|safeguard/.test(live),
+      "if impact ever becomes authoritative this ranking should be revisited");
+
+    // A DELIBERATE DESELECT IS A CHOICE. Re-picking on the next render undoes it.
+    check("a deselect is not undone on the next render", /if \(S\.picked \|\| S\.sel !== null\) return;/.test(app),
+      "clicking the selected row to close it re-opens it immediately");
+    check("Reset picks again", /S\.sel = null; S\.picked = false;/.test(app),
+      "Reset leaves the panel on a row that no longer matches the filters");
+
+    // COLLAPSED, NOT HIDDEN. A panel that vanishes when empty teaches the reader it does not
+    // exist; one that keeps 200px of centred white to say nothing wastes the fold.
+    check("an empty side panel collapses", /is-collapsed/.test(html) && /emptyBlock\(esc\(t\), esc\(d\), true\)/.test(app),
+      "an empty panel still occupies its full height");
+    // Each collapsed panel still states its own reason. The affected-contracts wording changed
+    // when it was relabelled as unbuilt — the requirement is that a reason is given, not that
+    // this particular sentence survives.
+    check("…and still states the reason", /No change in this view has an effective date still ahead/.test(app)
+      && /solicitations you are active on/.test(app),
+      "collapsing removed the sentence along with the whitespace");
+    check("the rule panel does NOT collapse", /emptyBlock\(esc\(t\), esc\(d\)\);/.test(app),
+      "the main reading surface shrank to a caption");
+    check("no panel is hidden outright", !/effList[^\n]*hidden|affList[^\n]*hidden/.test(app),
+      "a section that disappears when empty teaches the reader it does not exist");
+
+    check("P· the ranking check can see an impact-first sort",
+      !/\(b\.affects - a\.affects\) \|\|/.test("rows.sort((a,b) => impMeta(b.impact).rank - impMeta(a.impact).rank)"));
+  }
+
+
+  // ── A NUMBER MAY NOT BE LABELLED AS SOMETHING IT IS NOT ──────────────────
+  // Found by driving the deployed page: the panel read "97 CONTRACTS HIT" while the KPI card
+  // directly above it read "AFFECTED CONTRACTS 0". Two numbers contradicting each other on one
+  // screen, for a customer with no solicitations on file.
+  //
+  // `affects_clauses` is the set of CFR sections a rule amends. It was mapped to a field called
+  // `affects` and rendered as "Contracts hit", "size = contracts affected" and "hits N of your
+  // contracts" — in four places. That read as true only while it was always 0, which it was
+  // until clause extraction landed. Making a number correct turned a dormant mislabel into a
+  // false claim, which is the cost of fixing a fail-open.
+  console.log("\n── the number says what it counts ──");
+  {
+    const data = readFileSync(join(PUBLIC, "far-data.js"), "utf8");
+
+    check("the field is named for what it counts", /amends: Array\.isArray\(u\.affects_clauses\)/.test(live),
+      "a field named `affects` invites the label `contracts affected`");
+    check("no surface calls it contracts",
+      !/Contracts hit/.test(app) && !/contracts affected/.test(app) && !/of your contracts/.test(app),
+      "the panel, the legend or the insight bar still claims this counts contracts");
+    check("the panel says clauses amended", /<span class="ml">Clauses amended<\/span>/.test(app));
+    check("the timeline legend says clauses amended", /size = clauses amended/.test(app),
+      "the dot size is explained as contracts");
+    check("the sort control says what it sorts", /'Most amended'/.test(data),
+      "the control is labelled for contracts and sorts by clauses");
+
+    // The customer's real contract count lives elsewhere and stays there.
+    check("the affected-contracts panel is untouched", /D\.AFFECTED/.test(app),
+      "the genuine contracts list was renamed along with the mislabelled count");
+    check("the KPI card still reads the contracts list", /AFFECTED|affList/.test(app));
+
+    check("P· the mislabel check can see the shipped text",
+      /Contracts hit/.test('<span class="ml">Contracts hit</span>'),
+      "the check cannot see the label it forbids");
+  }
+
+
+  // ── A PANEL THAT CANNOT FILL SAYS SO ─────────────────────────────────────
+  // CEO asked what "Your Affected Contracts" is based on. Nothing: `AFFECTED` is declared as []
+  // in far-data.js and the only line that touches it CLEARS it on an outage. No FPDS call
+  // exists anywhere. The panel claimed "Active solicitations touched by these clause changes"
+  // and sourced itself to FPDS-NG, so it read as "you are unaffected" when the truth is that
+  // nothing has ever computed it — for any customer, ever.
+  console.log("\n── the unbuilt panel admits it ──");
+  {
+    const data = readFileSync(join(PUBLIC, "far-data.js"), "utf8");
+    const writes = (live.match(/FARD\.AFFECTED[^\n]*push|AFFECTED\.push/g) || []).length;
+    check("nothing populates AFFECTED — the premise of this block", writes === 0,
+      `${writes} writer(s) found; if it is wired now, this panel should stop saying it is not`);
+    check("the empty state says it is not built", /Not built yet/.test(app),
+      "an unbuilt panel reads as 'no clause change touches you', which is a claim about the customer");
+    check("…and says what it would take", /solicitations you are active on/.test(app),
+      "'not built' with no reason is as opaque as the false version");
+    check("the header no longer promises the capability",
+      !/Active solicitations touched by these clause changes/.test(html),
+      "the heading still describes a feature that does not exist");
+    check("the source badge no longer names FPDS-NG",
+      !/wh-source">FPDS-NG/.test(html),
+      "a source is credited for data it never supplied");
+
+    // The OTHER empty panel is genuinely working and must NOT be relabelled with it.
+    check("upcoming effective dates still states a real fact",
+      /No change in this view has an effective date still ahead/.test(app),
+      "a working empty state was swept up with an unbuilt one");
+    check("P· the not-built check can see the old claim",
+      /Active solicitations touched by these clause changes/.test('<p class="wh-sub">Active solicitations touched by these clause changes</p>'));
+  }
+
   console.log(`\n${pass} passed · ${fail} failed`);
   if (fail > 0) process.exit(1);
 }

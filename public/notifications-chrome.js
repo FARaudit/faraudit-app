@@ -23,7 +23,7 @@
    * may not belong to. */
   var NDESK = {
     watcher_posted: { c: '#378ADD', l: 'Watcher',       href: null },
-    opp:            { c: '#378ADD', l: 'Opportunities', href: '/opportunities' },
+    opp:            { c: '#378ADD', l: 'Notices', href: '/notices' },
     gao:            { c: '#dc2626', l: 'GAO',           href: '/gao-protests' },
     cmmc:           { c: '#0891b2', l: 'CMMC',          href: '/cmmc' },
     far:            { c: '#7c3aed', l: 'FAR/DFARS',     href: '/far-dfars-updates' },
@@ -66,13 +66,13 @@
     + '.notif-panel.open{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}'
     + '.np-head{display:flex;align-items:center;gap:10px;padding:14px 16px 12px;border-bottom:1px solid var(--line-2)}'
     + '.np-head h3{font-size:14px;font-weight:800;margin:0;letter-spacing:-.01em;color:var(--ink)}'
-    + '.np-count{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:#fff;background:var(--accent);border-radius:999px;padding:1px 7px}'
-    + '.np-mark{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:700;color:var(--accent-deep);background:none;border:0;cursor:pointer;padding:0}'
+    + '.np-count{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:#fff;background:var(--accent);border-radius:999px;padding:1px 7px}'
+    + '.np-mark{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--accent-deep);background:none;border:0;cursor:pointer;padding:0}'
     + '.np-mark:hover{text-decoration:underline}'
     + '[data-theme="dark"] .np-mark{color:var(--accent-light)}'
     + '.np-mark[hidden]{display:none}'
     + '.np-scroll{max-height:340px;overflow-y:auto}'
-    + '.np-grp{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);padding:11px 16px 5px;display:flex;align-items:center;gap:8px}'
+    + '.np-grp{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);padding:11px 16px 5px;display:flex;align-items:center;gap:8px}'
     + '.np-grp::after{content:"";flex:1;height:1px;background:var(--line-2)}'
     + '.np-item{display:grid;grid-template-columns:9px 1fr auto;gap:11px;align-items:start;padding:10px 16px 11px;text-decoration:none;color:inherit;border-left:3px solid transparent;cursor:pointer;transition:background .12s}'
     + '.np-item:hover{background:var(--card-soft)}'
@@ -82,10 +82,17 @@
     + '[data-theme="dark"] .np-item.unread:hover{background:rgba(55,138,221,.16)}'
     + '.np-dot{width:9px;height:9px;border-radius:50%;margin-top:5px}'
     + '.np-body{min-width:0}'
+    /* The empty and failure states are NOT rows. .np-item is a 3-column grid
+       (dot | body | time) and these carry only a body, so as an .np-item the text
+       landed in the 9px DOT track and wrapped one word per line. A track belongs to
+       the row, never to whichever child happens to be present. */
+    + '.np-note{display:block;padding:18px 16px 20px;cursor:default}'
+    + '.np-note .np-t{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.32}'
+    + '.np-note .np-d{font-size:11px;color:var(--mute);line-height:1.45;margin-top:3px}'
     + '.np-t{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.32}'
-    + '.np-t .np-desk{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-right:6px}'
+    + '.np-t .np-desk{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-right:6px}'
     + '.np-d{font-size:11px;color:var(--mute);line-height:1.45;margin-top:2px}'
-    + '.np-time{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--mute-2);white-space:nowrap;padding-top:2px}'
+    + '.np-time{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute-2);white-space:nowrap;padding-top:2px}'
     + '.np-foot{padding:11px 16px;border-top:1px solid var(--line-2);text-align:center}'
     + '.np-foot a{font-size:12px;font-weight:700;color:var(--accent-deep);text-decoration:none;display:inline-flex;align-items:center;gap:6px}'
     + '.np-foot a svg{width:13px;height:13px}'
@@ -180,8 +187,8 @@
       else if (loaded) { t = 'No notifications';          d = "You're all caught up."; }
       else             { t = 'Loading…';                  d = 'Reading your notifications.'; }
 
-      scroll.innerHTML = html || '<div class="np-item" style="cursor:default"><div class="np-body"><div class="np-t">'
-        + t + '</div><div class="np-d">' + d + '</div></div></div>';
+      scroll.innerHTML = html || '<div class="np-note"><div class="np-t">'
+        + t + '</div><div class="np-d">' + d + '</div></div>';
 
       var unread = ITEMS.filter(function (n) { return n.unread; }).length;
       if (count) count.textContent = String(unread);

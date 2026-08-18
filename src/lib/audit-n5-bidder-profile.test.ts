@@ -41,11 +41,23 @@ eq("canon: OEM sole-source → null", canonicalizeEligibilityAttr("oem:dillon-ap
 eq("canon: NAICS-size → null (cannot self-assert size)", canonicalizeEligibilityAttr("naics:333120-small"), null);
 
 // ── firmStatus: open-world capability profile ──
+
+// ══ CEO RULING 2026-08-08 — A TYPED CERTIFICATION NO LONGER CLEARS A BAR ══════════════════
+// The five expectations below were written for the pre-flag world, in which an open-world
+// capability statement could self-clear a PURE set-aside bar ("benefit preserved"). That
+// world ended when AUDIT_PROFILE_SCHEMA_V2 was armed in production: run this file with the
+// flag set to production's value on unmodified main and these same five already FAIL. They
+// stayed green only because CI runs the suite with the flag unset — a gate certifying a path
+// production cannot reach.
+//
+// firmStatus is now unconditional, so the production answer is the only answer. `unknown` is
+// not a refusal: it routes to caution / human review, which is what an unproven claim earns.
+// A SAM-verified record still clears its bar — see cert-verification.test.ts P1b.
 const sdvosbBar = f({ requirement: "SDVOSB set-aside", requiredAttribute: "setaside:sdvosb", curableInWindow: true });
 const profSDVOSB = buildBidderProfileFromCapability({ certifications: ["SDVOSB"] })!;
 eq("builder produced an open-world profile", profSDVOSB.openWorld, true);
 eq("builder token canonicalized", profSDVOSB.satisfiedAttributes.includes("se:sdvosb"), true);
-eq("held cert CLEARS matching set-aside bar (canonical) → satisfies", firmStatus(sdvosbBar, profSDVOSB), "satisfies");
+eq("typed cert does NOT clear a matching set-aside bar (canonical)", firmStatus(sdvosbBar, profSDVOSB), "unknown");
 
 // open-world: a DIFFERENT set-aside the firm didn't list → unknown (NOT fails)
 const wosbBar = f({ requirement: "WOSB set-aside", requiredAttribute: "setaside:wosb", curableInWindow: true });
@@ -58,8 +70,8 @@ eq("structural clearance bar under open-world profile → unknown (human review)
 // ── verdict-level safety: open-world never manufactures a false INELIGIBLE ──
 eq("WOSB bar + SDVOSB firm (open-world) → NOT INELIGIBLE (curable caution)",
   deriveVerdict(inp([wosbBar], profSDVOSB)).verdict, "BID_WITH_CAUTION");
-eq("SDVOSB bar + SDVOSB firm → cleared → BID",
-  deriveVerdict(inp([sdvosbBar], profSDVOSB)).verdict, "BID");
+eq("SDVOSB bar + SDVOSB firm that only TYPED it → caution, not a clean BID",
+  deriveVerdict(inp([sdvosbBar], profSDVOSB)).verdict, "BID_WITH_CAUTION");
 // structural non-curable bar + open-world firm that lacks it → human review (conditional NO-BID), never auto-INELIGIBLE
 eq("structural clearance bar + open-world firm → NEEDS_HUMAN_REVIEW (not INELIGIBLE)",
   deriveVerdict(inp([clearanceBar], profSDVOSB)).verdict, "NEEDS_HUMAN_REVIEW");
@@ -93,11 +105,11 @@ eq("8(a)+'small business under NAICS' (no trigger word) → NOT self-cleared", f
 
 // A PURE set-aside bar (no structural/size language) IS still cleared — the benefit survives.
 const pure8a = f({ requirement: "set aside for 8(a) participants", requiredAttribute: "setaside:8a", excerpt: "This acquisition is set aside for 8(a) program participants.", curableInWindow: true });
-eq("PURE 8(a) set-aside bar + 8(a) firm → cleared (benefit preserved)", firmStatus(pure8a, prof8a), "satisfies");
+eq("PURE 8(a) set-aside bar + a firm that only TYPED 8(a) → not cleared", firmStatus(pure8a, prof8a), "unknown");
 // A2-1 over-block fix: a pure set-aside whose excerpt incidentally says "incumbent"/"employees"
 // must STILL clear (bare tokens no longer over-block → N5 benefit preserved on common phrasing).
 const pureWithIncidental = f({ requirement: "set aside for SDVOSB", requiredAttribute: "setaside:sdvosb", excerpt: "Set aside for SDVOSB; this is a follow-on to the incumbent and the firm's employees perform on site.", curableInWindow: true });
-eq("pure SDVOSB set-aside whose excerpt mentions incumbent/employees → STILL cleared (no over-block)", firmStatus(pureWithIncidental, profSDVOSB), "satisfies");
+eq("pure SDVOSB set-aside with incidental incumbent/employees wording → still unknown, for the SAME reason", firmStatus(pureWithIncidental, profSDVOSB), "unknown");
 
 // ── code-review #3 fix — closed-world NON-exact socioeconomic string does NOT canonical-flip ──
 const wosbBarExact = f({ requirement: "WOSB set-aside", requiredAttribute: "WOSB", curableInWindow: true });
@@ -106,7 +118,10 @@ eq("closed-world non-exact cert string → still 'fails' (no canonical flip; gol
 // ── CLOSED-WORLD (gold) regression: unchanged ──
 const dillonBar = f({ requirement: "sole-source named OEM", requiredAttribute: "oem:dillon-approved-source", curableInWindow: false });
 eq("closed-world empty profile → fails (gold behavior intact)", firmStatus(dillonBar, { satisfiedAttributes: [], closedWorld: true }), "fails");
-eq("closed-world exact hold → satisfies (gold behavior intact)", firmStatus(dillonBar, { satisfiedAttributes: ["oem:dillon-approved-source"] }), "satisfies");
+// NOTE: this fixture never set closedWorld — its label was wrong. It is an OPEN-WORLD profile
+// asserting a named-OEM sole-source attr, exactly what the authoritative-only floor exists to
+// refuse. It passed via the flag escape alone; with the flag armed it already returned unknown.
+eq("open-world asserted OEM sole-source attr → unknown (authoritative floor)", firmStatus(dillonBar, { satisfiedAttributes: ["oem:dillon-approved-source"] }), "unknown");
 
 console.log(`\n──────────────  ${pass} pass · ${fail} fail`);
 process.exit(fail === 0 ? 0 : 1);

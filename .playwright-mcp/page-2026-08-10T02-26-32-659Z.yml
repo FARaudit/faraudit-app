@@ -1,0 +1,119 @@
+- generic [ref=f3e2]:
+  - complementary [ref=f3e3]:
+    - button "Toggle sidebar" [ref=f3e4] [cursor=pointer]
+    - generic [ref=f3e7]:
+      - generic [ref=f3e8]: F
+      - generic [ref=f3e9]:
+        - text: FAR
+        - generic [ref=f3e10]: audit
+    - generic [ref=f3e11]: WORKSPACE
+    - link "Today" [ref=f3e12] [cursor=pointer]:
+      - /url: /command-center
+    - link "Run Audit" [ref=f3e19] [cursor=pointer]:
+      - /url: /audit
+    - link "Acquisition Stages" [ref=f3e25] [cursor=pointer]:
+      - /url: /acquisition-stages
+    - link "Past Audits" [ref=f3e30] [cursor=pointer]:
+      - /url: /dashboard
+    - link "Pipeline" [ref=f3e35] [cursor=pointer]:
+      - /url: /pipeline
+    - link "Capability Statement" [ref=f3e40] [cursor=pointer]:
+      - /url: /capability-statement
+    - generic [ref=f3e45]: INTELLIGENCE
+    - link "Opportunities" [ref=f3e46] [cursor=pointer]:
+      - /url: /opportunities
+    - link "Defense News" [ref=f3e51] [cursor=pointer]:
+      - /url: /defense-news
+    - link "Defense Spending" [ref=f3e55] [cursor=pointer]:
+      - /url: /defense-spending
+    - link "Defense Agencies" [ref=f3e62] [cursor=pointer]:
+      - /url: /agencies
+    - link "Contracting Officers" [ref=f3e67] [cursor=pointer]:
+      - /url: /contracting-officers
+    - generic [ref=f3e74]: COMPLIANCE & BD
+    - link "FAR/DFARS Updates" [ref=f3e75] [cursor=pointer]:
+      - /url: /far-dfars-updates
+    - link "CMMC Readiness" [ref=f3e81] [cursor=pointer]:
+      - /url: /cmmc
+    - link "Wage Benchmarks" [ref=f3e86] [cursor=pointer]:
+      - /url: /wage-benchmarks
+    - link "Teaming Partners" [ref=f3e92] [cursor=pointer]:
+      - /url: /teaming-partners
+    - link "GAO Protests" [ref=f3e99] [cursor=pointer]:
+      - /url: /gao-protests
+    - generic [ref=f3e104]: ACCOUNT
+    - link "Profile & Settings" [ref=f3e105] [cursor=pointer]:
+      - /url: /settings
+    - button "Sign out" [ref=f3e111] [cursor=pointer]
+    - generic [ref=f3e116]: JR
+  - main [ref=f3e118]:
+    - generic [ref=f3e119]:
+      - generic [ref=f3e120]:
+        - generic [ref=f3e121]: Teaming Partners
+        - generic [ref=f3e122]: /
+        - generic [ref=f3e123]: Business Development
+      - generic [ref=f3e124]:
+        - generic [ref=f3e128]: Search partners, NAICS, certs…
+        - generic [ref=f3e129]: ⌘K
+      - generic [ref=f3e130]:
+        - button "Toggle theme" [ref=f3e131] [cursor=pointer]
+        - button "Notifications" [ref=f3e134] [cursor=pointer]
+        - dialog "Notifications":
+          - generic:
+            - heading "Notifications" [level=3]
+            - generic: "0"
+          - generic:
+            - generic:
+              - generic:
+                - generic: Notifications unavailable
+                - generic: We could not read them just now — this is not an empty inbox. Retry shortly.
+          - generic:
+            - link "View all activity":
+              - /url: /dashboard
+    - generic [ref=f3e140]:
+      - generic [ref=f3e141]:
+        - generic [ref=f3e142]:
+          - paragraph [ref=f3e143]: Business Development
+          - heading "Teaming Partners" [level=1] [ref=f3e144]
+          - paragraph [ref=f3e145]: Active SAM registrations whose primary NAICS matches your codes — identifiers, SBA certifications and the contact SAM publishes
+        - generic [ref=f3e146]:
+          - generic [ref=f3e147]:
+            - generic [ref=f3e148]: —
+            - generic [ref=f3e149]: Entities
+          - generic [ref=f3e150]:
+            - generic [ref=f3e151]: —
+            - generic [ref=f3e152]: Cert types
+          - generic [ref=f3e153]:
+            - generic [ref=f3e154]: —
+            - generic [ref=f3e155]: Your codes
+      - generic [ref=f3e156]:
+        - generic [ref=f3e157]:
+          - generic [ref=f3e158]: NAICS
+          - button "All codes" [ref=f3e160] [cursor=pointer]
+          - textbox "Search name, UEI, CAGE or contact…" [ref=f3e165]
+        - generic [ref=f3e166]:
+          - generic [ref=f3e167]: Certification
+          - button "All certifications" [ref=f3e169] [cursor=pointer]
+          - button "Reset" [ref=f3e170] [cursor=pointer]
+      - generic [ref=f3e171]:
+        - generic [ref=f3e172]: Unavailable
+        - generic [ref=f3e173]: The partner search did not answer, so this page has nothing to show. It is not an empty market — reload to try again.
+        - generic [ref=f3e174]: HTTP 404
+      - generic [ref=f3e175]:
+        - generic [ref=f3e176]:
+          - generic [ref=f3e177]:
+            - generic [ref=f3e185]:
+              - heading "Registered entities in your codes" [level=3] [ref=f3e186]
+              - paragraph
+            - generic [ref=f3e187]: SAM entity registry
+          - generic [ref=f3e188]:
+            - generic [ref=f3e189]: Legal name / identifier
+            - generic [ref=f3e190]: State
+            - generic [ref=f3e191]: Primary NAICS
+            - generic [ref=f3e192]: SBA certifications
+          - generic [ref=f3e194]:
+            - generic [ref=f3e195]: Nothing to list
+            - generic [ref=f3e196]: See the note above for why.
+        - generic [ref=f3e199]:
+          - generic [ref=f3e200]: Nothing selected
+          - generic [ref=f3e201]: There is no entity to select yet.

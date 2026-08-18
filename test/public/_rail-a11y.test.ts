@@ -43,6 +43,7 @@
 export {}; // module scope (harness memory: tsx script-scope redeclare collisions)
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
+import { pageSource } from "./_page-styles";
 
 let pass = 0, fail = 0;
 const ok = (c: boolean, label: string, detail = "") => {
@@ -87,7 +88,11 @@ console.log("\nR1 · the contrast function is calibrated");
 
 // ── R2 · COVERAGE ────────────────────────────────────────────────────────────
 const PUBLIC = path.join(process.cwd(), "public");
-const readHtml = (f: string) => readFileSync(path.join(PUBLIC, f), "utf8");
+/* Markup PLUS the stylesheets the page links. The rail's CSS is copied into every
+   served page, and one of them now keeps that copy in a shared stylesheet rather
+   than inline — the rail still ships identically, so a reader anchored to "inline
+   <style>" would report a rail-less page that has a rail. */
+const readHtml = (f: string) => pageSource(f);
 const htmlFiles = readdirSync(PUBLIC).filter((f) => f.endsWith(".html"));
 
 /* The rail is platform chrome, so the population is defined by its COMPLEMENT: the
@@ -197,7 +202,7 @@ function badgeBg(src: string): RGB | null {
 console.log("\nR3 · every rail token clears 4.5:1 on its composited ground");
 {
   for (const f of railFiles) {
-    const src = readFileSync(path.join(PUBLIC, f), "utf8");
+    const src = readHtml(f);   // markup + linked stylesheets — see readHtml
     const a = labelAlpha(src);
     if (a === null) { ok(false, `${f}: .sb-group-label colour not found`); continue; }
     const r = ratio(over(WHITE, a, RAIL_BG), RAIL_BG);
@@ -216,7 +221,7 @@ console.log("\nR4 · all copies resolve to the same effective values");
   const alphas = new Map<string, string[]>();
   const bgs = new Map<string, string[]>();
   for (const f of railFiles) {
-    const src = readFileSync(path.join(PUBLIC, f), "utf8");
+    const src = readHtml(f);   // markup + linked stylesheets — see readHtml
     const a = String(labelAlpha(src)), b = String(badgeBg(src));
     (alphas.get(a) ?? alphas.set(a, []).get(a)!).push(f);
     (bgs.get(b) ?? bgs.set(b, []).get(b)!).push(f);

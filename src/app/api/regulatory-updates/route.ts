@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
-import { federalRegisterUrl, parseFederalRegister, type RegRow } from "@/lib/federal-register";
+import { federalRegisterUrl, parseFederalRegister, extractAmendedClauses, type RegRow } from "@/lib/federal-register";
+
+// Six at a time over a 30s route: 40 documents at ~300ms each finishes inside a few seconds,
+// and no single slow document can hold the whole batch.
+const FULLTEXT_CONCURRENCY = 6;
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -94,11 +98,37 @@ export async function GET(req: NextRequest) {
     rows = fetched.flatMap((f) => f.rows)
       .sort((a, b) => new Date(b.published_at || 0).getTime() - new Date(a.published_at || 0).getTime());
 
+    // WHICH CLAUSES EACH RULE CHANGES — read from the rule, not from its abstract.
+    // Measured 2026-08-10: the abstract names a clause number on 1 of 40 documents, so the
+    // page shipped an empty clause on every row and a filter that could never match. The
+    // amendatory instructions live in the full text, which is a second fetch per document.
+    //
+    // Bounded, and it FAILS SOFT: a document whose text cannot be read keeps its row with no
+    // clauses rather than dropping out of the feed. Enrichment is a detail on a rule, not the
+    // rule itself, and this runs inside a 30s route.
+    const enrichable = rows.filter((r) => r.raw_text_url);
+    for (let i = 0; i < enrichable.length; i += FULLTEXT_CONCURRENCY) {
+      await Promise.all(enrichable.slice(i, i + FULLTEXT_CONCURRENCY).map(async (r) => {
+        try {
+          const res = await fetch(r.raw_text_url as string, { signal: AbortSignal.timeout(6000) });
+          if (!res.ok) return;
+          const amended = extractAmendedClauses(await res.text());
+          if (amended.length) { r.affects_clauses = amended; r.clause = amended[0]; }
+        } catch { /* keep the row, drop the enrichment */ }
+      }));
+    }
+
     if (rows.length > 0) {
       await supabase
         .from("regulatory_updates")
         .upsert(
-          rows.map((r) => ({ ...r, fetched_at: new Date().toISOString() })),
+          // TRANSIENT FIELDS ARE STRIPPED HERE, and this spread is why it matters:
+          // `...r` carries whatever RegRow gains, so a field added upstream for a
+          // reader reaches this INSERT and fails the whole write on a column the
+          // table does not have. raw_text_url is how the clauses were read;
+          // comments_close_on is a date a reader ranks by. Neither is a column.
+          rows.map(({ raw_text_url: _drop, comments_close_on: _drop2, ...r }) =>
+            ({ ...r, fetched_at: new Date().toISOString() })),
           { onConflict: "source,link" }
         )
         .then(() => null, () => null);

@@ -14,9 +14,9 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { renderV2Surfaces, type V2RenderInput } from "../src/app/audit/[id]/_v2-render-surfaces";
+import { renderV2Surfaces, type V2RenderInput } from "../src/app/audits/[id]/_v2-render-surfaces";
 
-const TEMPLATE_PATH = path.join(process.cwd(), "src/app/audit/[id]/_template.html");
+const TEMPLATE_PATH = path.join(process.cwd(), "src/app/audits/[id]/_template.html");
 
 function sectionSlice(html: string, sectionId: string): string {
   const re = new RegExp(`<section\\b[^>]*\\bid="${sectionId}"[\\s\\S]*?</section>`, "i");

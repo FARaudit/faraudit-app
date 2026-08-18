@@ -71,12 +71,12 @@ const TEAM = "team_4FAowTLgslDBY6aZ0acPaES0";
     html = renderV5ReportFromRow(row);
     renderPath = "v5";
   } else {
-    const { buildViewModel } = await import("../../src/app/audit/[id]/_view-model");
-    const { renderAuditReportComplete } = await import("../../src/app/audit/[id]/_render");
+    const { buildViewModel } = await import("../../src/app/audits/[id]/_view-model");
+    const { renderAuditReportComplete } = await import("../../src/app/audits/[id]/_render");
     const { readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
     const vm = buildViewModel(row as never, { isWatching: false, hasCapabilityStatement: true });
-    const template = readFileSync(join(process.cwd(), "src", "app", "audit", "[id]", "_template.html"), "utf8");
+    const template = readFileSync(join(process.cwd(), "src", "app", "audits", "[id]", "_template.html"), "utf8");
     html = renderAuditReportComplete(template, vm as never, row);
     renderPath = "v1";
   }

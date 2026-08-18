@@ -10,8 +10,9 @@
 //
 // The rule this pins: a control may only claim what the code can do. An input with
 // no write path is a lie the moment a customer types in it.
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import vm from "node:vm";
 
 let pass = 0; let fail = 0;
 const check = (label: string, ok: boolean, detail = "") => {
@@ -269,17 +270,454 @@ console.log("\n── an unfilled chip may not promise a check that never runs �
     !/if\s*\(!st\s*\|\|\s*!any/.test(noteFn) && /cert-state/.test(noteFn),
     "the stamp is gated on the chips, so 'Not found in SAM' vanishes on a VetCert-only profile");
 
+  // THE NOTE MAY NOT SEND THE CUSTOMER TO AN EDITOR THAT DOES NOT EXIST. No screen in the
+  // product writes capability_statements.certifications: the statement page only prints the
+  // list, profile-editor is NAICS-only by design, and this panel renders chips, not inputs.
+  // A sentence routing the reader to the statement to change them describes a product we do
+  // not ship — the defect PR #514 removed, restated in prose instead of an <input>.
+  const companyPanel = appCode.slice(appCode.indexOf("company: () =>"), appCode.indexOf("/* The row carries the CODE"));
+  check("the note does not route certifications to an editor",
+    !/certifications on your <a href="\/capability-statement">/.test(companyPanel),
+    "the note points at a page with no certification control");
+  check("no certification write path exists to point at",
+    !/certifications/.test(read("public/capability-statement.html")),
+    "a control appeared — the note above may now name it");
+
+  // THE NOTE OUTLIVES THE EMPTY STATE, so it carries the boundary too. Once one chip exists
+  // the empty message is gone, and a firm holding HUBZone in SAM plus SDVOSB from VetCert
+  // would read "your registrations appear here" beside a single chip — the same promise the
+  // empty state was just fixed for, in the one case where the row is NOT empty.
+  {
+    const anchor = "Certifications are not typed anywhere";
+    const at = companyPanel.indexOf(anchor);
+    check("the certifications note exists to be checked", at !== -1, "anchor moved — this leg is inert");
+    const noteText = at === -1 ? "" : companyPanel.slice(at, companyPanel.indexOf("</div>", at));
+    check("the note names the VetCert boundary",
+      /VetCert/.test(noteText),
+      "a VetCert firm reads its one SAM chip as the whole answer");
+  }
+
+  // ...and it may not claim the typed value is inert. It is not: the audit engine reads the
+  // same column and canonicalizes it into a satisfied eligibility attribute.
+  check("the note does not claim there is nothing useful to type",
+    !/nothing useful to type/i.test(companyPanel),
+    "the page calls a value inert that the engine acts on");
+
+  // THE ROW MUST BE FED BY SAM, NOT ONLY BY THE CARRIED LIST. Promotion alone can only turn
+  // green an entry the company record already holds, and no screen writes that column — so a
+  // registered firm read "None on file" under a stamp saying "Registered in SAM".
+  const markFn = liveCode.slice(liveCode.indexOf("async function markVerifiedCerts()"), liveCode.indexOf("function shapeError("));
+  check("SAM's records are ADDED to the row, not merely matched against it",
+    /CERTS\.push\(/.test(markFn),
+    "the row can still only display what the record already carried");
+  check("the row renders REGISTRATIONS, not containment-derived programs",
+    /d\.records/.test(markFn) && !/establishedPrograms[\s\S]{0,80}CERTS\.push/.test(markFn),
+    "an SDVOSB registration would print VOSB as a second registration");
+  check("the header count is recomputed after the SAM read",
+    /writeHeaderStats\(\)/.test(markFn),
+    "the strip reports a total the row below it contradicts");
+
+  // AN EMPTY ROW HAS FIVE CAUSES. Collapsing them tells four of those five customers something
+  // untrue, and the fifth — our own read failing — is told they hold nothing.
+  check("the empty row is state-derived, not a fixed string",
+    /certEmpty\(\)/.test(appCode) && !/cert-row">\$\{CERTS\.length \? [\s\S]{0,80}None on file/.test(appCode),
+    "one message for five different answers");
+  for (const st of ["no-uei", "uei-not-found", "registration-inactive", "verified"]) {
+    check(`certEmpty branches on '${st}'`, new RegExp(`'${st}'`).test(appCode), "that cause collapses into the default");
+  }
+  {
+    const emptyFn = appCode.slice(appCode.indexOf("function certEmpty()"), appCode.indexOf("function certCaption("));
+    // The unread case may not read as a quantity, and may not be the same sentence as the real zero.
+    const real = emptyFn.match(/'verified'\s*\?\s*'([^']+)'/);
+    const unread = emptyFn.match(/:\s*'([^']*could not be read[^']*)'/);
+    check("the unread case is worded as UNKNOWN, not as zero",
+      !!unread && /not known|unanswered|unknown/i.test(unread[1]) && !/^none\b/i.test(unread[1]),
+      "our outage is reported to the customer as 'you hold none'");
+    check("the unread case and the real zero are DIFFERENT sentences",
+      !!real && !!unread && real[1] !== unread[1],
+      "'we could not look' and 'you have none' render identically");
+
+    // THE STATES THAT SPEAK FOR SAM MUST NAME WHAT SAM CANNOT CARRY. Its SBA list holds 8(a),
+    // HUBZone, WOSB and EDWOSB only, so an unqualified "your programs appear here" promises a
+    // VetCert firm something no registration delivers, and the real zero then reads as "you
+    // hold none" to a firm that holds one. The caption already says this — but it needs a chip
+    // to exist before it renders, and these are exactly the states where none does.
+    const noUei = emptyFn.match(/'no-uei'\s*\?\s*'([^']+)'/);
+    check("the no-UEI invitation names the VetCert boundary",
+      !!noUei && /VetCert/.test(noUei[1]),
+      "a service-disabled firm is invited to add a UEI that can never surface its status");
+    check("the real-zero answer names the VetCert boundary",
+      !!real && /VetCert/.test(real[1]),
+      "'no socioeconomic programs' lands as 'you hold none' on a VetCert firm");
+  }
+
   // Planted positives — per leg, not per section.
   const probe = /\bsdvosb\b|\bvosb\b|service[\s-]?disabled|veteran[\s-]?owned/i;
   check("V-P1 · a naive /vosb/ WOULD wrongly match nothing here but a bare one is caught", !probe.test("WOSB"));
   check("V-P2 · the executed check rejects a predicate that matches WOSB", /wosb/i.test("WOSB"), "control: the string really does contain wosb");
   check("V-P3 · rejects a collapsed caption", !/issued by VA VetCert/.test("1 carried on your profile, not established in SAM."));
   check("V-P4 · rejects an ungated promise", !/if\s*\(awaitingSam\)/.test("lines.push(why + ' These are read from your SAM registration');"));
+  check("V-P5 · rejects a note routing certifications to the statement",
+    /certifications on your <a href="\/capability-statement">/.test('and certifications on your <a href="/capability-statement">capability statement</a>.'));
+  check("V-P6 · rejects a note calling the typed value inert",
+    /nothing useful to type/i.test("so there is nothing useful to type."));
+  check("V-P7 · rejects a promote-only marker that never adds a row",
+    !/CERTS\.push\(/.test("window.PS.CERTS.forEach(function (c) { c.on = labels.some(fn); });"));
+  check("V-P8 · rejects a fixed empty string in the cert row",
+    /None on file/.test('<div class="cert-row">${CERTS.length ? x : \'<span class="fld-none">None on file</span>\'}</div>'));
+  check("V-P9 · rejects an unread message that asserts zero",
+    /^none\b/i.test("None on file"));
+  check("V-P10 · rejects an empty-state promise that omits the VetCert boundary",
+    !/VetCert/.test("Add your SAM.gov UEI above and the programs SBA has registered you under appear here on their own."));
+  check("V-P11 · rejects a note that omits it",
+    !/VetCert/.test("Certifications are not typed anywhere: the programs SBA has registered under the UEI above appear here on their own."));
+}
+
+// EVERY SWITCH MUST HAVE A HANDLER. PR #514 removed seven controls that wrote nowhere; the
+// way that comes back is a toggle shipped ahead of the thing it governs. So each
+// data-pref-tg key must (a) be accepted by the preferences API and (b) be READ by something
+// that acts on it. A key the API stores and nothing consults is decoration.
+{
+  const keys = [...appCode.matchAll(/data-pref-tg="([a-z_]+)"/g)].map((m) => m[1]);
+  check("the panel actually declares toggles to check", keys.length > 0, "no toggles found — this leg is inert");
+  const prefRoute = read("src/app/api/preferences/route.ts");
+  // ...AND THE COLUMN MUST EXIST. This gate shipped #541 green while two of its three
+  // toggles wrote nowhere: PostgREST silently DROPS an unknown column, so the PATCH
+  // answered 2xx, the switch moved, and the value vanished. Reading the key and being
+  // able to STORE it are different claims, and only one was being checked.
+  {
+    const migrations = readdirSync(join(ROOT, "supabase/migrations"))
+      .filter((f) => f.endsWith(".sql"))
+      .map((f) => readFileSync(join(ROOT, "supabase/migrations", f), "utf8")).join("\n");
+    for (const k of [...appCode.matchAll(/data-pref-tg="([a-z_]+)"/g)].map((m) => m[1])) {
+      // Case-INSENSITIVE: this directory holds both conventions (67 upper, 13 lower),
+      // so matching one spelling reports a migration that exists as missing. The claim
+      // being checked is that the column is created, not how it was typed.
+      check(`'${k}' has a migration that adds the column`,
+        new RegExp(`add\\s+column\\s+if\\s+not\\s+exists\\s+${k}\\b`, "i").test(migrations),
+        "PostgREST drops an unknown column — the PATCH would report success and store nothing");
+    }
+  }
+
+  /* WHO ACTS ON A PREFERENCE depends on what the preference is for. This list was
+     written when every toggle was a notification toggle and the only consumers were the
+     watcher and the digest cron. An interface preference is consumed by the interface —
+     the rail reads rail_sections_collapsed — so the list grows with the kinds of
+     preference the panel offers. It stays an ALLOWLIST of named files: "read somewhere
+     in the repo" would pass on the settings page reading its own switch back. */
+  /* THE PER-GROUP CONTROLS MUST REACH THE RAIL.
+     An earlier single boolean shipped INERT: the rail keeps a per-group open/closed map
+     in localStorage, the boolean was a SECOND statement about the same thing, and it had
+     to wipe that map to take effect — so setting a preference destroyed the group clicks
+     the customer had made. The account now stores the map ITSELF, in the rail's own
+     shape, which removes the conflict rather than arbitrating it.
+     What has to stay true: the controls exist, they write the map key, and the mirror is
+     only written once the SERVER took the value — a mirror written first would leave the
+     rail showing a layout the account does not hold. */
+  {
+    const secBtns = [...appCode.matchAll(/data-rail-sec="([a-z0-9-]+)"/g)].map((m) => m[1]);
+    check("the Interface panel offers a control per sidebar group",
+      secBtns.length >= 3, `found ${secBtns.length}`);
+    check("...and they write the per-group map, not a blunt boolean",
+      /savePref\('rail_sections_open'/.test(appCode),
+      "a single switch cannot say 'this one open, those two closed'");
+    check("...and the mirror is written only after the server accepted it",
+      /if \(ok\) \{[^}]*mirrorRailSections\(map\)/.test(appCode),
+      "the rail would show a layout the account does not hold");
+    check("the retired all-or-nothing switch is gone",
+      !/rail_sections_collapsed/.test(appCode),
+      "two statements about one thing is what made the first one inert");
+    // It moved OFF Notifications: a group's start state is not something that reaches you.
+    check("the sidebar control is not on the Notifications panel",
+      !/notifs: \(\) => \{?[\s\S]{0,2600}data-rail-sec/.test(appCode),
+      "an interface preference filed under notifications");
+  }
+
+  const consumers = [
+    "src/lib/watcher-tick.ts",
+    "src/app/api/cron/watched-digest/route.ts",
+    "src/lib/nav/rail.ts",
+  ].map((f) => { try { return read(f); } catch { return ""; } }).join("\n");
+  for (const k of keys) {
+    check(`'${k}' is accepted by the preferences API`, new RegExp(`"${k}"`).test(prefRoute),
+      "the toggle writes to a key the API will silently drop");
+    /* WORD-BOUNDED. A bare substring match is satisfied by any longer identifier that
+       merely starts with the key — `rail_sections_collapsed` matched inside
+       `rail_sections_collapsed_UNREAD`, so a consumer that had been renamed away still
+       read as present and the control proving this check could not go red. */
+    check(`'${k}' is READ by something that acts on it`, new RegExp(`\\b${k}\\b`).test(consumers),
+      "a switch with no handler — the #514 defect");
+  }
+}
+
+// THE TAB MUST SAY WHERE ITS SUBJECT COMES FROM. Found by the CEO using the product: the
+// panel governs "the notices you are watching" and never said how a notice BECOMES watched,
+// so the link between pressing Track in Opportunities and receiving an email existed only in
+// the code. A control whose input is undiscoverable is only half-shipped.
+{
+  const notifs = appCode.slice(appCode.indexOf("notifs: () =>"), appCode.indexOf("team: () =>"));
+  check("the notifications panel names Track as the origin", /\bTrack\b/.test(notifs),
+    "the tab never says how a notice becomes watched");
+  check("...and links to where that is done", /href="\/notices"/.test(notifs),
+    "the reader is told the mechanism but not where to find it");
+  check("...and says what actually reaches them", /every hour/.test(notifs) && /run the audit/.test(notifs),
+    "no account of what happens between tracking and the email");
+}
+
+// EVERY NAV KEY MUST HAVE A PANEL. Found by the CEO clicking Team Members and getting
+// nothing: `PANELS[active] is not a function`. The panel had been deleted by an over-broad
+// edit to its NEIGHBOUR, and shipped — every content check in this file still passed,
+// because they all assert what a panel SAYS and none asserted that it EXISTS. A tab that
+// renders nothing is the loudest possible defect and it was the one thing unguarded.
+{
+  const nav = [...appCode.matchAll(/\{\s*key:\s*['"]([a-z]+)['"]/g)].map((m) => m[1]);
+  check("the NAV list was located", nav.length >= 3, `found ${nav.length} nav entries`);
+  const panels = new Set([...appCode.matchAll(/^\s{4}([a-z]+):\s*\(\)\s*=>/gm)].map((m) => m[1]));
+  check("at least one panel was located", panels.size > 0, "the PANELS scan found nothing — this leg is inert");
+  for (const k of nav) {
+    check(`nav key '${k}' has a panel function`, panels.has(k),
+      "clicking this tab throws PANELS[active] is not a function and the panel never changes");
+  }
+}
+
+// NOTHING MAY BE ASSERTED ABOUT A RECORD THAT HAS NOT BEEN READ YET.
+// Measured live 2026-08-09 against production 763712b1: ps-app.js finishes at ~723ms and
+// /api/profile does not answer until ~1220-1573ms. For that window every array in
+// window.PS is empty while loadError is still false — byte for byte the shape of a real
+// empty account — so Settings told an account holding three NAICS codes that it had none,
+// and that Today, Opportunities, Contracting Officers and Teaming Partners "will stay
+// empty". It corrected itself when the fetch landed. It was wrong until then.
+//
+// The page had a mechanism for exactly this and the mechanism was inert:
+// profile-settings-live.js added `is-loading` to <body> and removed it again, and no CSS
+// rule for that class exists anywhere in the repo. A flag name is not a behaviour.
+//
+// This leg does not grep for guards — it RUNS the page. ps-app.js is executed in a vm
+// against a minimal DOM, every panel is opened through its own nav click handler, and the
+// emitted HTML is read back. A panel that states absence without asking first goes red
+// whether or not its author knew this rule existed.
+console.log("\n── no absence is claimed before the read settles ──");
+{
+  // Statements about what THIS ACCOUNT holds. Every one is false while the answer is
+  // still in flight. Copy about the PRODUCT — "usage metering is not built yet" — is
+  // true at any time and is deliberately absent from this list.
+  const RECORD_CLAIMS = [
+    "None on file",
+    "No NAICS codes on file",
+    "will stay empty",
+    "Not on file",
+    "No subscription on file",
+    "SAM could not be read just now",
+    "This workspace has a single account, yours",
+  ];
+
+  type State = Record<string, unknown>;
+
+  // Runs ps-app.js and returns the HTML each panel rendered, keyed by nav key.
+  // `source` is a parameter so the planted positive can run the SAME harness over a
+  // deliberately broken copy — a plant checked by a different code path proves nothing.
+  const renderPanels = (source: string, state: State): Record<string, string> => {
+    const written: Record<string, string> = {};
+    const navButtons: Record<string, { dataset: { k: string }; onclick: null | (() => void) }> = {};
+    const nodes: Record<string, Record<string, unknown>> = {};
+    const node = (id: string) => {
+      if (nodes[id]) return nodes[id];
+      const n: Record<string, unknown> = {
+        _html: "",
+        get innerHTML() { return this._html as string; },
+        set innerHTML(v: string) { this._html = v; written[id] = v; },
+        // renderNav re-reads its own markup to bind the clicks. Handing back real button
+        // stand-ins is what lets this test open a panel the way a customer does, rather
+        // than reaching past the handler into the template.
+        querySelectorAll(sel: string) {
+          if (sel !== ".sn") return [];
+          return [...String(this._html).matchAll(/data-k="([a-z]+)"/g)].map((m) => {
+            const b = { dataset: { k: m[1] }, onclick: null as null | (() => void) };
+            navButtons[m[1]] = b;
+            return b;
+          });
+        },
+        classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+        hidden: false, textContent: "", disabled: false, value: "",
+      };
+      nodes[id] = n;
+      return n;
+    };
+    const sandbox: Record<string, unknown> = {
+      console: { log() {}, error() {} },
+      setTimeout: () => 0,
+      fetch: () => Promise.reject(new Error("no network in this harness")),
+      document: {
+        readyState: "complete",
+        getElementById: (id: string) => node(id),
+        addEventListener() {},
+        body: { classList: { add() {}, remove() {} } },
+      },
+    };
+    sandbox.window = sandbox;
+    sandbox.PS = state;
+    vm.createContext(sandbox);
+    new vm.Script(source, { filename: "ps-app.js" }).runInContext(sandbox);
+
+    const out: Record<string, string> = {};
+    for (const [key, btn] of Object.entries(navButtons)) {
+      btn.onclick?.();
+      out[key] = written["setContent"] ?? "";
+    }
+    return out;
+  };
+
+  const inFlight = (): State => ({
+    loadError: false, loaded: false,
+    COMPANY: { name: "", cage: "", uei: "", address: "", contact: "", email: "", phone: "" },
+    CERTS: [], NAICS: [], NOTIFS: [], TEAM: [], USAGE: [],
+  });
+
+  // ── 1 · the harness has to be real before its silence means anything ──────────
+  const pending = renderPanels(app, inFlight());
+  const navKeys = [...appCode.matchAll(/\{\s*key:\s*['"]([a-z]+)['"]/g)].map((m) => m[1]);
+  check("the harness opened every nav panel", navKeys.length > 0 && navKeys.every((k) => k in pending),
+    `opened [${Object.keys(pending).join(", ")}] · nav declares [${navKeys.join(", ")}]`);
+  check("...and every panel rendered something", Object.values(pending).every((h) => h.length > 40),
+    "a panel came back empty — these checks would pass on a blank page");
+
+  // ── 2 · in flight, no panel states what the record holds ──────────────────────
+  for (const key of Object.keys(pending)) {
+    const said = RECORD_CLAIMS.filter((c) => pending[key].includes(c));
+    check(`'${key}' claims nothing about the record before the read settles`, said.length === 0,
+      `renders ${said.map((s) => JSON.stringify(s)).join(", ")} while the answer is still in flight`);
+  }
+
+  // ── 3 · NEGATIVE CONTROL — the real zero must still speak ─────────────────────
+  // A guard that silences the genuine empty state is the same defect facing the other
+  // way. A customer who truly holds no NAICS codes must still be told so, and told what
+  // it costs. This is what stops the fix from being "hide it and pass".
+  const settledEmpty = renderPanels(app, { ...inFlight(), loaded: true });
+  check("N1 · a settled empty record still says 'None on file'",
+    settledEmpty.company.includes("None on file"),
+    "the guard swallowed the real empty state — a genuine zero is now invisible");
+  check("N2 · ...and still states what an empty NAICS list costs",
+    settledEmpty.company.includes("will stay empty"),
+    "the consequence of holding no codes is no longer stated");
+  check("N3 · ...and the NAICS panel still reports the zero",
+    settledEmpty.naics.includes("No NAICS codes on file"),
+    "the panel went quiet on a real empty list");
+  check("N4 · ...and Billing still reports no subscription",
+    settledEmpty.billing.includes("No subscription on file"),
+    "an account with no plan is no longer told so");
+
+  // ── 4 · a failed read renders as a failure on every record-bearing panel ──────
+  const failed = renderPanels(app, { ...inFlight(), loaded: true, loadError: true });
+  for (const key of ["company", "naics", "team"]) {
+    check(`F · '${key}' renders a failure, not an empty answer, when the read failed`,
+      failed[key].includes("could not be loaded"),
+      "a connection failure is being shown to the customer as their own empty record");
+  }
+
+  // ── 5 · PLANTED POSITIVE — this leg must be able to go red ────────────────────
+  // The guards are removed from a copy of the source and the SAME harness re-run. If it
+  // comes back clean, everything above is decoration.
+  const unguarded = app
+    .replace("settled() ? '<span class=\"fld-none\">None on file</span>' : pending('Reading your record…')",
+             "'<span class=\"fld-none\">None on file</span>'")
+    .replace("${NAICS.length || !settled() ? '' :", "${NAICS.length ? '' :");
+  check("PL1 · the plant actually removed both guards", unguarded !== app
+    && !unguarded.includes("NAICS.length || !settled()"),
+    "the guard text was not found — this planted positive is inert and proves nothing");
+  const plantedOut = renderPanels(unguarded, inFlight());
+  check("PL2 · without the guards the harness DOES see the claims",
+    plantedOut.company.includes("None on file") && plantedOut.company.includes("will stay empty"),
+    "the harness cannot see the defect it exists to catch — check 2 is passing for the wrong reason");
+
+  // ── 6 · the inert mechanism must not come back ────────────────────────────────
+  const anyStylesheetReads = /\.is-loading\b/.test(html);
+  check("no body class stands in for the loaded state unless something styles it",
+    !/is-loading/.test(liveCode) || anyStylesheetReads,
+    "profile-settings-live.js toggles `is-loading` and no stylesheet reads it — an inert guard");
+}
+
+
+// A HEADING THAT ENUMERATES A SET NOBODY QUERIED.
+// "Team Members" sits over a list built from the signed-in account and nothing else:
+// there is no membership table, no roles model, no invitation path and no API that
+// returns people. The panel could not show a second person if one existed, so the
+// heading reads as an enumeration the code never performed.
+//
+// What makes it TRUE rather than a claim is the NOT-YET-LIVE chip and the sentence
+// under the row. They are the load-bearing part, and they are exactly the kind of copy
+// a later tidy-up deletes as redundant — leaving the enumerating heading standing alone.
+// So the heading and its qualifiers are pinned together here.
+console.log("\n── the team panel cannot lose the label that makes it true ──");
+{
+  const panel = appCode.slice(appCode.indexOf("team: () =>"), appCode.indexOf("billing: () =>"));
+  check("the team panel was located", panel.length > 200, `read ${panel.length} chars`);
+
+  // Every branch of the panel — data, failure and not-yet-known — carries the label.
+  const headings = (panel.match(/Team Members/g) ?? []).length;
+  const chips = (panel.match(/sp-soon">Not yet live/g) ?? []).length;
+  check("every 'Team Members' heading carries the not-yet-live chip", headings > 0 && chips === headings,
+    `${headings} heading(s), ${chips} chip(s) — a branch renders the heading bare`);
+
+  check("the panel states that access is not shareable yet", /is coming|not built|not yet/i.test(panel),
+    "the row stands alone as if it were a roster");
+  check("...and says who has access today", /only person with access/i.test(panel),
+    "the reader cannot tell whether more people exist");
+
+  // The jargon this panel was the only user of.
+  check("no 'workspace' jargon in the panel", !/workspace/i.test(panel),
+    "a word the rest of the product does not use is back");
+
+  // Planted positives.
+  check("T-P1 · a bare heading is caught",
+    (() => { const p = '<div class="sp-t">Team Members</div>';
+      return ((p.match(/Team Members/g) ?? []).length) !== ((p.match(/sp-soon">Not yet live/g) ?? []).length); })(),
+    "a heading with no chip would pass");
+  check("T-P2 · a labelled heading is accepted",
+    (() => { const p = '<div class="sp-t">Team Members<span class="sp-soon">Not yet live</span></div>';
+      return ((p.match(/Team Members/g) ?? []).length) === ((p.match(/sp-soon">Not yet live/g) ?? []).length); })());
+  check("T-P3 · the jargon check fires on the retired word",
+    /workspace/i.test("Who can sign in to this workspace"));
+}
+
+// THE UNBUILT PART OF BILLING CARRIES THE LABEL — AND THE LIVE PART DOES NOT.
+// Billing is two things at once. The plan readout is real: /api/profile queries the
+// subscriptions table, maps tier to label, and sets plan_unreadable when the read
+// fails, so "No subscription on file" is a computed answer. Metering does not exist.
+// Labelling the whole panel would understate the half that works; labelling nothing
+// leaves "Usage this period" reading as a section that simply happens to be empty.
+console.log("\n── billing labels the unbuilt half, not the whole ──");
+{
+  const panel = appCode.slice(appCode.indexOf("billing: () =>"));
+  check("the billing panel was located", panel.length > 200, `read ${panel.length} chars`);
+  check("the usage section carries the not-yet-live chip",
+    /Usage this period<span class="sp-soon">/.test(panel),
+    "an empty usage list reads as a period with no activity rather than a feature that does not exist");
+  check("...and still says metering is not built", /metering is not built/i.test(panel),
+    "the chip replaced the sentence instead of reinforcing it");
+  check("the panel header is NOT chipped", !/Billing &amp; Plan<span class="sp-soon">/.test(panel),
+    "the live plan readout is being labelled as unbuilt");
+  check("the plan readout is still driven by the server fields",
+    /planName\(\)/.test(panel) && /plan_unreadable/.test(appCode),
+    "the plan line stopped distinguishing an unreadable record from no subscription");
+
+  // Planted positives.
+  check("B-P1 · an unchipped usage header is caught",
+    !/Usage this period<span class="sp-soon">/.test('<div class="fld-sec">Usage this period</div>'));
+  check("B-P2 · a chipped one is accepted",
+    /Usage this period<span class="sp-soon">/.test('<div class="fld-sec">Usage this period<span class="sp-soon">Not yet live</span></div>'));
+  check("B-P3 · a chipped PANEL header is caught",
+    /Billing &amp; Plan<span class="sp-soon">/.test('<div class="sp-t">Billing &amp; Plan<span class="sp-soon">Not yet live</span></div>'));
 }
 
 console.log("\n── planted positives ──");
+check("P5 · rejects a panel that names no origin",
+  !/\bTrack\b/.test("These apply to the notices you are watching."));
+check("P6 · rejects a nav key with no panel",
+  !new Set(["company","naics"]).has("team"));
 check("P1 · rejects a resurrected auto-save claim", /changes save automatically/i.test('<b id="savedAt">changes save automatically</b>'));
 check("P2 · accepts copy with no such claim", !/changes save automatically/i.test("<p>Your details and the company record.</p>"));
+check("P4 · rejects a toggle whose key no consumer reads",
+  !/nonexistent_pref_key/.test("watcher reads alerts_email_enabled and alerts_in_app_enabled"));
 check("P3 · rejects a fake input for a company field", /\$\{field\('Company name'/.test("${field('Company name', COMPANY.name)}"));
 
 console.log(`\n${pass} passed · ${fail} failed`);

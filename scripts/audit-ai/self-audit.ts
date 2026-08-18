@@ -28,7 +28,18 @@ const want = (k: string) => only.length === 0 || only.includes(k);
  *  Every other non-zero exit is still a hard failure. The skip cannot spread quietly: a suite has to call
  *  requireCorpus() to earn it. */
 if (want("suites")) {
-  const files = readdirSync(LIB).filter((f) => f.endsWith(".test.ts")).sort();
+  /* ⛔ THIS WAS `readdirSync(LIB)` — ONE LEVEL, NOT RECURSIVE. Fifteen suites under
+     src/lib/bd-os, src/lib/email, src/lib/v4-report and src/lib/v5-report had
+     therefore NEVER run here. One was already RED: defense-spending.test.ts
+     asserted a KPI that #656 removed, and it went red the moment that merged
+     without a single check turning. A suite the sweep cannot see is not a gate —
+     it is a file that makes people feel gated. Same shape as the test/public/
+     note in the workflow: a sweep is only worth its glob. */
+  const walk = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? walk(join(dir, e.name))
+        : e.name.endsWith(".test.ts") ? [join(dir, e.name)] : []);
+  const files = walk(LIB).map((f) => f.slice(LIB.length + 1)).sort();
   const failed: string[] = [], skipped: string[] = [];
   for (const f of files) {
     try { execFileSync("npx", ["tsx", join(LIB, f)], { stdio: "pipe", cwd: ROOT }); }

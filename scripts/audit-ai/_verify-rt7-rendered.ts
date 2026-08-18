@@ -6,8 +6,8 @@ import { createClient } from "@supabase/supabase-js";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import * as dotenv from "dotenv";
-import { buildViewModel } from "../../src/app/audit/[id]/_view-model";
-import { renderAuditReportComplete } from "../../src/app/audit/[id]/_render";
+import { buildViewModel } from "../../src/app/audits/[id]/_view-model";
+import { renderAuditReportComplete } from "../../src/app/audits/[id]/_render";
 import { renderV4ReportFromRow } from "../../src/lib/v4-report/report";
 import { renderV5ReportFromRow } from "../../src/lib/v5-report/report";
 import { reconcileAbsenceClaims } from "../../src/lib/audit-absence-reconcile";
@@ -35,7 +35,7 @@ function render(audit: Record<string, unknown>): { html: string; path: string } 
   const v5On = process.env.AUDIT_REPORT_V5 === "true";
   if (engine === "agentic_v3") return { html: v5On ? renderV5ReportFromRow(audit) : renderV4ReportFromRow(audit), path: v5On ? "v5" : "v4" };
   const vm = buildViewModel(audit as never, { isWatching: false, hasCapabilityStatement: true });
-  const template = readFileSync(join(process.cwd(), "src", "app", "audit", "[id]", "_template.html"), "utf8");
+  const template = readFileSync(join(process.cwd(), "src", "app", "audits", "[id]", "_template.html"), "utf8");
   return { html: renderAuditReportComplete(template, vm as never, audit), path: "v1" };
 }
 

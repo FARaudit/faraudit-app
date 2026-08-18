@@ -23,6 +23,8 @@
   --shadow:0 1px 2px rgba(15,23,42,.06), 0 8px 24px -12px rgba(15,23,42,.10);
   --shadow-sm:0 1px 3px rgba(0,0,0,0.06);
   --shadow-pop:0 24px 60px -22px rgba(15,23,42,.28), 0 6px 16px -6px rgba(15,23,42,.12);
+  /* department ramp — ONE hue, value carries the category (brand.md §2: reach for value, not a new hue) */
+  --dep-hi:#185FA5; --dep-lo:#CFE1F7;
 }
 [data-theme="dark"]{
   --page-bg:#02060c; --bg:#050d1a; --card:#0c1b30; --card-soft:#0a1729;
@@ -31,6 +33,7 @@
   --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px -12px rgba(0,0,0,.6);
   --shadow-sm:0 1px 3px rgba(0,0,0,0.5);
   --shadow-pop:0 1px 2px rgba(0,0,0,.5), 0 28px 64px -22px rgba(0,0,0,.85);
+  --dep-hi:#B5D4F4; --dep-lo:#264A70;
 }
 *{box-sizing:border-box}
 /* The UA rule for [hidden] is display:none at specificity (0,1,0), so any class rule
@@ -40,6 +43,7 @@
 
 html,body{margin:0;padding:0;background:var(--page-bg);font-family:"Manrope",ui-sans-serif,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;transition:background-color .25s ease,color .25s ease}
 button{font-family:inherit}
+.mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
 .frame{width:100%;max-width:1800px;min-width:1280px;margin:0 auto;background:var(--bg);display:grid;grid-template-columns:var(--sb-width) 1fr;min-height:100vh;align-items:stretch;transition:grid-template-columns .22s cubic-bezier(0.16,1,0.3,1)}
 .main{display:flex;flex-direction:column;min-width:0}
 
@@ -66,25 +70,165 @@ button{font-family:inherit}
 .user-chip .nm{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.1}
 
 /* body + header */
-.body{padding:26px 32px 64px;display:flex;flex-direction:column;gap:18px;max-width:1520px;width:100%;margin:0 auto}
-.page-header{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap}
-.page-header .heading{display:flex;flex-direction:column;gap:7px;min-width:0}
-.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:0}
-.page-header h1{font-family:"Fraunces","Georgia",serif;font-style:italic;font-weight:600;font-size:34px;letter-spacing:-.02em;color:var(--ink);margin:0;line-height:1.04}
-.page-header .sub{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--mute);margin:0}
-.page-header .sub b{color:var(--ink-2);font-weight:600}
-[data-theme="dark"] .fpill.active{background:rgba(55,138,221,0.12);border-color:var(--accent-light);color:var(--accent-deep)}
-[data-theme="dark"] .fpill.active{color:var(--accent-light);background:rgba(55,138,221,0.2)}
-.view-chip.active{background:var(--accent-pale);border-color:var(--accent-light)}
-[data-theme="dark"] .view-chip.active{background:rgba(55,138,221,0.16)}
-.view-chip.active .vc-t{color:var(--accent-deep)}
-[data-theme="dark"] .view-chip.active .vc-t{color:var(--accent-light)}
-.row.two{grid-template-columns:1fr 1fr}
-@media(max-width:1180px){.row.hero,.row.two{grid-template-columns:1fr}}
-.cop-ring-txt .t{font-size:12px;font-weight:800;color:var(--ink)}
-.cop-empty .t{font-size:13px;font-weight:700;color:var(--ink-2)}
-.people-tab.active{background:rgba(55,138,221,0.12);border-color:var(--accent-light);color:var(--accent-deep)}
-[data-theme="dark"] .people-tab.active{color:var(--accent-light)}
+.body{padding:28px 32px 72px;display:flex;flex-direction:column;gap:20px;max-width:1520px;width:100%;margin:0 auto}
+.page-header{display:flex;align-items:flex-end;justify-content:space-between;gap:28px;flex-wrap:wrap}
+.page-header .heading{display:flex;flex-direction:column;gap:8px;min-width:0;max-width:74ch}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--accent-deep);margin:0}
+[data-theme="dark"] .eyebrow{color:var(--accent-light)}
+.page-header h1{font-family:"Fraunces","Georgia",serif;font-style:italic;font-weight:600;font-size:38px;letter-spacing:-.02em;color:var(--ink);margin:0;line-height:1.02}
+/* --mute measures 4.31:1 on --bg (brand.md §2). Body-ground text is --ink-2 on this page. */
+.page-header .sub{font-size:14px;color:var(--ink-2);margin:2px 0 0;line-height:1.5;text-wrap:pretty}
+.hdr-stat{display:flex;gap:30px;flex-shrink:0;padding-bottom:4px}
+.hdr-stat .hs{display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+.hdr-stat .hs .v{font-family:"IBM Plex Mono",monospace;font-size:30px;font-weight:600;letter-spacing:-.02em;color:var(--ink);line-height:1;font-variant-numeric:tabular-nums}
+.hdr-stat .hs .l{font-family:"IBM Plex Mono",monospace;font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-2);font-weight:600}
+
+/* widget shell */
+.widget{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-sm);padding:20px 22px 22px;display:flex;flex-direction:column;gap:18px;min-width:0}
+.widget[hidden]{display:none}
+.widget-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+.wh-left{display:flex;align-items:flex-start;gap:12px;min-width:0}
+.wh-icon{width:34px;height:34px;border-radius:10px;background:rgba(55,138,221,.1);color:var(--accent-deep);display:grid;place-items:center;flex-shrink:0}
+[data-theme="dark"] .wh-icon{background:rgba(55,138,221,.18);color:var(--accent-light)}
+.wh-icon svg{width:18px;height:18px}
+.wh-text{display:flex;flex-direction:column;min-width:0}
+.wh-text h3{font-size:16.5px;font-weight:800;letter-spacing:-.012em;color:var(--ink);margin:0;line-height:1.25}
+.wh-text .wh-sub{font-size:13.5px;color:var(--mute);margin:4px 0 0;line-height:1.45;text-wrap:pretty}
+.wh-source{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);background:var(--card-soft);border:1px solid var(--line);padding:5px 9px;border-radius:7px;white-space:nowrap;flex-shrink:0}
+
+/* concentration strip — one measured whole, split by department */
+.conc{display:flex;flex-direction:column;gap:20px}
+.conc-strip{display:flex;gap:3px;height:40px}
+.conc-seg{flex:0 0 auto;min-width:2px;border-radius:5px;transform-origin:left center;animation:grow .5s cubic-bezier(.16,1,.3,1) both;transition:opacity .18s;overflow:hidden}
+.conc-seg.dim{opacity:.32}
+.conc-seg.dim .seg-lbl{display:none}
+.seg-lbl{display:inline-block;width:max-content;font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;letter-spacing:.02em;line-height:40px;padding-left:12px;white-space:nowrap}
+/* No opacity in the keyframes: an animation with fill-mode both wins over .dim, and the
+   selected-department dimming would silently never paint. */
+@keyframes grow{from{transform:scaleX(0)}to{transform:none}}
+/* The legend IS a table, so it is set as one: fixed tracks, figures right-aligned in their own
+   columns. Items wrapped inline give the eye no column to run down. */
+.conc-body{display:grid;grid-template-columns:minmax(320px,1fr) minmax(320px,1.05fr);gap:22px 40px;align-items:start}
+.conc-legend{display:flex;flex-direction:column;gap:1px;min-width:0}
+.cl{display:grid;grid-template-columns:11px minmax(0,1fr) 46px 44px;align-items:baseline;gap:12px;padding:7px 10px;border-radius:8px;border:1px solid transparent;background:transparent;cursor:pointer;font:inherit;text-align:left;transition:background .14s,border-color .14s}
+.cl:hover{background:var(--card-soft);border-color:var(--line)}
+.cl.on{background:var(--accent-pale);border-color:var(--accent-light)}
+.cl.on .cl-p{color:var(--accent-deep)}
+[data-theme="dark"] .cl:hover{background:rgba(255,255,255,.04)}
+[data-theme="dark"] .cl.on{background:rgba(55,138,221,.20);border-color:rgba(181,212,244,.34)}
+[data-theme="dark"] .cl.on .cl-p{color:var(--accent-light)}
+.cl-sw{width:11px;height:11px;border-radius:3px;transform:translateY(1px)}
+.cl-n{font-size:13px;font-weight:700;color:var(--ink);line-height:1.38;text-wrap:pretty}
+.cl-c{font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:700;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums}
+.cl-p{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-2);text-align:right;font-variant-numeric:tabular-nums}
+/* Two derived findings, set AS findings — figure, claim, working. Not a paragraph. */
+.conc-notes{display:flex;flex-direction:column;gap:20px;min-width:0}
+.note{display:grid;grid-template-columns:auto minmax(0,1fr);gap:0 16px;align-items:baseline}
+.note-f{font-family:"IBM Plex Mono",monospace;font-size:30px;font-weight:600;letter-spacing:-.025em;color:var(--ink);line-height:1;font-variant-numeric:tabular-nums}
+.note-t{font-size:14px;font-weight:700;color:var(--ink);line-height:1.42;text-wrap:pretty}
+.note-d{grid-column:2;font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--mute);line-height:1.55;margin-top:5px}
+.conc-foot{font-size:13.5px;line-height:1.6;color:var(--mute);margin:0;max-width:92ch;padding-top:16px;border-top:1px solid var(--line-2);text-wrap:pretty}
+
+/* controls */
+.controls{position:sticky;top:60px;z-index:50;display:flex;flex-direction:column;gap:11px;padding:14px 16px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-sm)}
+.controls[hidden]{display:none}
+.ctl-line{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.ctl-label{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2);white-space:nowrap;width:84px;flex-shrink:0}
+.pillset{display:flex;align-items:center;gap:7px;flex-wrap:wrap;min-width:0}
+.fpill{height:31px;padding:0 12px;border-radius:9px;background:var(--card-soft);border:1px solid var(--line);color:var(--ink-2);font-size:12.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;transition:border-color .14s,background .14s,color .14s}
+.fpill .ct{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--mute);font-variant-numeric:tabular-nums}
+.fpill:hover{border-color:var(--accent-light)}
+.fpill.on{background:var(--accent-pale);border-color:var(--accent-light);color:var(--accent-deep)}
+/* On a tinted ground a muted ink steps UP — --mute measures 4.24:1 on this tint. */
+.fpill.on .ct{color:var(--accent-deep)}
+[data-theme="dark"] .fpill.on{background:rgba(55,138,221,.20);border-color:rgba(181,212,244,.34);color:var(--accent-light)}
+[data-theme="dark"] .fpill.on .ct{color:var(--accent-light)}
+.ctl-search{display:flex;align-items:center;gap:9px;height:32px;flex:1 1 220px;max-width:330px;padding:0 12px;border-radius:9px;background:var(--card-soft);border:1px solid var(--line);margin-left:auto}
+.ctl-search:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(55,138,221,.14)}
+.ctl-search svg{width:15px;height:15px;color:var(--ink-2);flex-shrink:0}
+.ctl-search input{border:0;background:transparent;outline:0;font-family:inherit;font-size:13px;color:var(--ink);width:100%;min-width:0}
+.ctl-search input::placeholder{color:var(--mute)}
+.ctl-result{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--ink-2);margin-left:auto;text-align:right;line-height:1.5;font-variant-numeric:tabular-nums}
+.reset-btn{font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:700;color:var(--accent-deep);background:none;border:0;cursor:pointer;padding:0;white-space:nowrap}
+.reset-btn:hover{text-decoration:underline}
+[data-theme="dark"] .reset-btn{color:var(--accent-light)}
+.reset-btn[hidden]{display:none}
+
+/* the register — ONE row shape for every office */
+:root{--reg-cols:minmax(230px,2.5fr) 92px minmax(142px,1.15fr) minmax(116px,.95fr) minmax(152px,1.25fr) minmax(104px,.9fr)}
+.reg-head,.reg-row{display:grid;grid-template-columns:var(--reg-cols);gap:18px;align-items:center}
+.reg-head{padding:0 16px 11px;border-bottom:1px solid var(--line-2)}
+.reg-head span{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-2)}
+.reg-head span.r{text-align:right}
+.reg-list{display:flex;flex-direction:column;gap:7px}
+.reg-row{padding:15px 16px;border-radius:12px;border:1px solid var(--line-2);background:var(--card-soft);transition:border-color .14s;animation:rise .3s cubic-bezier(.16,1,.3,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.reg-row:hover{border-color:var(--accent-light)}
+.reg-row.soon{border-left:3px solid var(--accent-deep);padding-left:13px}
+[data-theme="dark"] .reg-row.soon{border-left-color:var(--accent-light)}
+.c{min-width:0}
+.c.r{text-align:right}
+.of-n{font-size:15.5px;font-weight:800;letter-spacing:-.01em;color:var(--ink);line-height:1.32;text-wrap:pretty}
+.of-d{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--mute);margin-top:5px;line-height:1.4}
+.of-pipe{display:inline-flex;align-items:center;margin-top:8px;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--accent-deep);background:var(--accent-pale);border-radius:6px;padding:3px 8px}
+[data-theme="dark"] .of-pipe{color:var(--accent-light);background:rgba(55,138,221,.16)}
+.n-v{font-family:"IBM Plex Mono",monospace;font-size:24px;font-weight:600;color:var(--ink);line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.n-s{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute);margin-top:6px;font-variant-numeric:tabular-nums}
+.dl-d{font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.32}
+.dl-d.none{color:var(--ink-2);font-weight:600}
+.dl-r{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute);margin-top:5px;line-height:1.4}
+/* state is carried by weight AND a mark, so hue is never load-bearing on its own */
+.dl-r.soon{color:var(--accent-deep);font-weight:700}
+.dl-r.soon::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:6px;vertical-align:middle}
+[data-theme="dark"] .dl-r.soon{color:var(--accent-light)}
+.dl-r.closed{color:var(--ink-2);font-weight:700}
+.codes{display:flex;flex-wrap:wrap;gap:5px}
+.code{font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:600;color:var(--accent-deep);background:var(--accent-pale);border-radius:6px;padding:4px 8px;line-height:1.25}
+[data-theme="dark"] .code{color:var(--accent-light);background:rgba(55,138,221,.16)}
+.sa-h{font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.32}
+.sa-h.none{color:var(--ink-2);font-weight:600}
+.sa-s{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute);margin-top:5px;line-height:1.4}
+.au-v{font-family:"IBM Plex Mono",monospace;font-size:17px;font-weight:600;color:var(--ink);line-height:1;font-variant-numeric:tabular-nums}
+.au-v.zero{color:var(--mute)}
+.au-s{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute);margin-top:6px;line-height:1.4}
+.reg-empty{padding:38px 16px;text-align:center}
+.reg-empty[hidden]{display:none}
+.reg-empty .t{font-size:15.5px;font-weight:800;color:var(--ink);line-height:1.4}
+.reg-empty .d{font-size:13.5px;color:var(--ink-2);margin-top:8px;line-height:1.55}
+.wide-btn{margin-top:16px;height:34px;padding:0 15px;border-radius:9px;border:1px solid var(--line);background:var(--card);color:var(--accent-deep);font-size:12.5px;font-weight:700;cursor:pointer}
+.wide-btn:hover{border-color:var(--accent-light)}
+[data-theme="dark"] .wide-btn{color:var(--accent-light)}
+
+/* state banner — loading, empty and failure states */
+.state-banner{display:flex;align-items:baseline;gap:11px;padding:14px 17px;background:var(--accent-pale);border:1px solid var(--accent-light);border-radius:12px;font-size:13.5px;color:var(--ink-2);line-height:1.55;flex-wrap:wrap}
+.state-banner[hidden]{display:none}
+[data-theme="dark"] .state-banner{background:rgba(55,138,221,0.12);border-color:rgba(181,212,244,0.3)}
+.state-banner .sb-label{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-deep);flex-shrink:0}
+[data-theme="dark"] .state-banner .sb-label{color:var(--accent-light)}
+.state-banner.is-error{background:var(--red-50);border-color:var(--red-200)}
+.state-banner.is-error .sb-label{color:var(--red-700)}
+[data-theme="dark"] .state-banner.is-error{background:rgba(239,68,68,.10);border-color:rgba(239,68,68,.35)}
+[data-theme="dark"] .state-banner.is-error .sb-label{color:#fca5a5}
+.state-banner a{color:var(--accent-deep);font-weight:700}
+.state-banner a:hover{color:var(--ink)}
+[data-theme="dark"] .state-banner a{color:var(--accent-light)}
+a{color:var(--accent-deep)}
+a:hover{color:var(--ink)}
+[data-theme="dark"] a{color:var(--accent-light)}
+[data-theme="dark"] a:hover{color:#fff}
+
+@media(max-width:1360px){
+  :root{--reg-cols:minmax(196px,2.4fr) 84px minmax(128px,1.1fr) minmax(106px,.9fr) minmax(138px,1.2fr) minmax(96px,.85fr)}
+  .reg-head,.reg-row{gap:14px}
+  .reg-head{padding-inline:13px}
+  .reg-row{padding-inline:13px}
+  .reg-row.soon{padding-left:10px}
+}
+/* No stacked fallback: .frame carries min-width:1280px, so the content box never drops below
+   ~850px and the six columns always fit. A second row shape that only appears at a width the
+   app cannot reach is a shape nobody reviews. */
+@media(prefers-reduced-motion:reduce){.conc-seg,.reg-row{animation:none!important}}
+html[data-still] .conc-seg,html[data-still] .reg-row,html[data-still] .live-pill::before{animation:none!important}
 
 /* sidebar (canonical) */
 :root{--sb-width:56px}
@@ -131,11 +275,9 @@ button{font-family:inherit}
 [data-sb="open"] .sb-icon.sb-signout:hover{color:#fca5a5;background:rgba(220,38,38,.08)}
 .sb-bottom{margin-top:auto;display:flex;flex-direction:column;gap:6px;align-items:center}
 [data-sb="open"] .sb-bottom{align-items:flex-start;width:100%;padding:0 4px}
-
 </style>
 </head>
 <body>
-
 
 <div class="frame">
 
@@ -144,17 +286,17 @@ button{font-family:inherit}
   <div class="sb-logo-row"><div class="sb-logo">F</div><span class="sb-wordmark">FAR<span class="wm-au">audit</span></span></div>
   <div class="sb-group-label">WORKSPACE</div>
   <a class="sb-icon" href="/command-center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="sb-label">Today</span><span class="sb-tip">Today</span></a>
-  <a class="sb-icon" href="/audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg><span class="sb-label">Run Audit</span><span class="sb-badge new">New</span><span class="sb-tip">Run Audit</span></a>
+  <a class="sb-icon" href="/audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg><span class="sb-label">Run Audit</span><span class="sb-tip">Run Audit</span></a>
   <a class="sb-icon" href="/acquisition-stages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span class="sb-label">Acquisition Stages</span><span class="sb-tip">Acquisition Stages</span></a>
-  <a class="sb-icon" href="/dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="sb-label">Past Audits</span><span class="sb-badge count">15</span><span class="sb-tip">Past Audits</span></a>
-  <a class="sb-icon" href="/pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg><span class="sb-label">Pipeline</span><span class="sb-badge danger">3</span><span class="sb-tip">Pipeline</span></a>
+  <a class="sb-icon" href="/dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="sb-label">Past Audits</span><span class="sb-tip">Past Audits</span></a>
+  <a class="sb-icon" href="/pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg><span class="sb-label">Pipeline</span><span class="sb-tip">Pipeline</span></a>
   <a class="sb-icon" href="/capability-statement"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span class="sb-label">Capability Statement</span><span class="sb-tip">Capability Statement</span></a>
   <div class="sb-divider"></div>
   <div class="sb-group-label">INTELLIGENCE</div>
-  <a class="sb-icon" href="/opportunities"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">Opportunities</span><span class="sb-badge live">Live</span><span class="sb-tip">Opportunities</span></a>
+  <a class="sb-icon" href="/opportunities"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">Opportunities</span><span class="sb-tip">Opportunities</span></a>
   <a class="sb-icon" href="/defense-news"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L4 8v8l8 5 8-5V8l-8-5z"/></svg><span class="sb-label">Defense News</span><span class="sb-tip">Defense News</span></a>
   <a class="sb-icon" href="/defense-spending"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="13" width="3" height="4"/></svg><span class="sb-label">Defense Spending</span><span class="sb-tip">Defense Spending</span></a>
-  <a class="sb-icon active" href="/agencies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg><span class="sb-label">Defense Agencies</span><span class="sb-badge count">8</span><span class="sb-tip">Defense Agencies</span></a>
+  <a class="sb-icon active" href="/agencies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg><span class="sb-label">Defense Agencies</span><span class="sb-tip">Defense Agencies</span></a>
   <a class="sb-icon" href="/contracting-officers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M21 17c-.5-2-2-3.5-4-3.5"/></svg><span class="sb-label">Contracting Officers</span><span class="sb-tip">Contracting Officers</span></a>
   <div class="sb-divider"></div>
   <div class="sb-group-label">COMPLIANCE &amp; BD</div>
@@ -186,18 +328,70 @@ button{font-family:inherit}
           <svg id="themeMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
         </button>
         <button class="icon-btn" title="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1112 0c0 7 3 8 3 8H3s3-1 3-8z"/><path d="M10 21a2 2 0 004 0"/></svg><span class="nbadge" style="display:none"></span></button>
-        <div class="user-chip"><div class="av">JR</div><div><div class="nm">Jose Rodriguez</div></div></div>
+        <div class="user-chip"><div class="av"></div><div><div class="nm"></div></div></div>
       </div>
     </div>
 
     <div class="body">
       <header class="page-header">
         <div class="heading">
-          <p class="eyebrow">Where your codes are bought</p>
+          <p class="eyebrow">SAM.gov · your NAICS codes</p>
           <h1>Defense Agencies</h1>
-          <p class="sub">The buying offices issuing work against <b>your NAICS codes</b> — ranked by what is open now</p>
+          <p class="sub" id="pageSub">The buying offices issuing work against your NAICS codes.</p>
         </div>
+        <div class="hdr-stat">
+          <div class="hs"><span class="v" id="hsOffices">—</span><span class="l">Offices</span></div>
+          <div class="hs"><span class="v" id="hsNotices">—</span><span class="l">Open notices</span></div>
+          <div class="hs"><span class="v" id="hsDepts">—</span><span class="l">Departments</span></div>
+        </div>
+      </header>
+
+      <div class="state-banner" id="stateBanner" hidden></div>
+
+      <section class="widget" id="concWidget" hidden>
+        <header class="widget-head">
+          <div class="wh-left">
+            <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg></span>
+            <div class="wh-text"><h3>Where your work is bought</h3><p class="wh-sub" id="concSub"></p></div>
+          </div>
+          <span class="wh-source" id="concSource"></span>
         </header>
+        <div class="conc">
+          <div class="conc-strip" id="concStrip"></div>
+          <div class="conc-body">
+            <div class="conc-legend" id="concLegend"></div>
+            <div class="conc-notes" id="concRead"></div>
+          </div>
+          <p class="conc-foot">Counts only — no spending source is connected, so no dollars, share, forecast or score appear on this page.</p>
+        </div>
+      </section>
+
+      <section class="controls" id="controls" hidden>
+        <div class="ctl-line">
+          <span class="ctl-label">Order</span>
+          <div class="pillset" id="sortPills"></div>
+          <div class="ctl-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input id="searchInput" type="text" aria-label="Search offices, departments and NAICS codes" placeholder="Search office, department or code…" /></div>
+        </div>
+        <div class="ctl-line">
+          <span class="ctl-result" id="resultLine"></span>
+          <button class="reset-btn" id="resetBtn" type="button" hidden>Clear</button>
+        </div>
+      </section>
+
+      <section class="widget" id="regWidget" hidden>
+        <header class="widget-head">
+          <div class="wh-left">
+            <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span>
+            <div class="wh-text"><h3>The offices, ranked</h3></div>
+          </div>
+          <span class="wh-source">SAM.gov</span>
+        </header>
+        <div class="reg-head">
+          <span>Buying office</span><span class="r">Open now</span><span>Next response due</span><span>Your codes</span><span>Set-asides seen</span><span>Your audits</span>
+        </div>
+        <div class="reg-list" id="regList"></div>
+        <div class="reg-empty" id="regEmpty" hidden></div>
+      </section>
 
     </div>
   </main>
