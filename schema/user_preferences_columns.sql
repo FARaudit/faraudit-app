@@ -1,0 +1,32 @@
+-- user_preferences — THE TWO ANOMALIES, and nothing else.
+--
+-- ⚠ THIS FILE IS NOT WHERE PREFERENCE COLUMNS GO. `supabase/migrations/` is the
+-- CLI-tracked source of truth for app-wide schema work (see its README); `schema/` is
+-- the email-AI-era directory applied through the SQL editor. Every live preference
+-- column already has a migration there:
+--
+--   theme                  007_user_preferences_theme.sql
+--   weekly_digest_watched  20260604182020_notifications_and_digest_pref.sql
+--   alerts_email_enabled   20260808200000_alert_channel_prefs.sql
+--   alerts_in_app_enabled  20260808200000_alert_channel_prefs.sql
+--   auto_signout_minutes   20260813040000_auto_signout_preference.sql
+--   rail_sections_collapsed 20260817040000_rail_sections_collapsed.sql
+--
+-- An earlier version of this file re-declared all of those, having read only `schema/`
+-- and mistaken one directory's silence for the absence of a record. They are listed
+-- above rather than restated below: a column declared in two places is two declarations
+-- that can disagree.
+--
+-- What remains are the two things that genuinely do not line up, verified against the
+-- live table on 2026-08-17 via /api/preferences, which selects *.
+
+-- 1 · LIVE WITH NO MIGRATION ANYWHERE. Present on the table, declared in neither
+--     directory, and referenced nowhere in the app. Recorded so the next reader does
+--     not have to rediscover it; NOT adopted, because nothing reads it.
+ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS notifications_pref TEXT;
+
+-- 2 · DECLARED BUT ABSENT, and deliberately not "fixed" here.
+--     fa_intelligence_v2.sql declares `weekly_brief_email TEXT`. The live table has no
+--     such column, and nothing in the app reads or writes it — a dead declaration
+--     rather than a live defect. Deleting a line from a historical create script is a
+--     decision about the record, not a repair, so it is named and left alone.

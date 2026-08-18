@@ -390,20 +390,62 @@ console.log("\n── an unfilled chip may not promise a check that never runs �
       .filter((f) => f.endsWith(".sql"))
       .map((f) => readFileSync(join(ROOT, "supabase/migrations", f), "utf8")).join("\n");
     for (const k of [...appCode.matchAll(/data-pref-tg="([a-z_]+)"/g)].map((m) => m[1])) {
+      // Case-INSENSITIVE: this directory holds both conventions (67 upper, 13 lower),
+      // so matching one spelling reports a migration that exists as missing. The claim
+      // being checked is that the column is created, not how it was typed.
       check(`'${k}' has a migration that adds the column`,
-        new RegExp(`ADD COLUMN IF NOT EXISTS ${k}\\b`).test(migrations),
+        new RegExp(`add\\s+column\\s+if\\s+not\\s+exists\\s+${k}\\b`, "i").test(migrations),
         "PostgREST drops an unknown column — the PATCH would report success and store nothing");
     }
+  }
+
+  /* WHO ACTS ON A PREFERENCE depends on what the preference is for. This list was
+     written when every toggle was a notification toggle and the only consumers were the
+     watcher and the digest cron. An interface preference is consumed by the interface —
+     the rail reads rail_sections_collapsed — so the list grows with the kinds of
+     preference the panel offers. It stays an ALLOWLIST of named files: "read somewhere
+     in the repo" would pass on the settings page reading its own switch back. */
+  /* THE PER-GROUP CONTROLS MUST REACH THE RAIL.
+     An earlier single boolean shipped INERT: the rail keeps a per-group open/closed map
+     in localStorage, the boolean was a SECOND statement about the same thing, and it had
+     to wipe that map to take effect — so setting a preference destroyed the group clicks
+     the customer had made. The account now stores the map ITSELF, in the rail's own
+     shape, which removes the conflict rather than arbitrating it.
+     What has to stay true: the controls exist, they write the map key, and the mirror is
+     only written once the SERVER took the value — a mirror written first would leave the
+     rail showing a layout the account does not hold. */
+  {
+    const secBtns = [...appCode.matchAll(/data-rail-sec="([a-z0-9-]+)"/g)].map((m) => m[1]);
+    check("the Interface panel offers a control per sidebar group",
+      secBtns.length >= 3, `found ${secBtns.length}`);
+    check("...and they write the per-group map, not a blunt boolean",
+      /savePref\('rail_sections_open'/.test(appCode),
+      "a single switch cannot say 'this one open, those two closed'");
+    check("...and the mirror is written only after the server accepted it",
+      /if \(ok\) \{[^}]*mirrorRailSections\(map\)/.test(appCode),
+      "the rail would show a layout the account does not hold");
+    check("the retired all-or-nothing switch is gone",
+      !/rail_sections_collapsed/.test(appCode),
+      "two statements about one thing is what made the first one inert");
+    // It moved OFF Notifications: a group's start state is not something that reaches you.
+    check("the sidebar control is not on the Notifications panel",
+      !/notifs: \(\) => \{?[\s\S]{0,2600}data-rail-sec/.test(appCode),
+      "an interface preference filed under notifications");
   }
 
   const consumers = [
     "src/lib/watcher-tick.ts",
     "src/app/api/cron/watched-digest/route.ts",
+    "src/lib/nav/rail.ts",
   ].map((f) => { try { return read(f); } catch { return ""; } }).join("\n");
   for (const k of keys) {
     check(`'${k}' is accepted by the preferences API`, new RegExp(`"${k}"`).test(prefRoute),
       "the toggle writes to a key the API will silently drop");
-    check(`'${k}' is READ by something that acts on it`, new RegExp(k).test(consumers),
+    /* WORD-BOUNDED. A bare substring match is satisfied by any longer identifier that
+       merely starts with the key — `rail_sections_collapsed` matched inside
+       `rail_sections_collapsed_UNREAD`, so a consumer that had been renamed away still
+       read as present and the control proving this check could not go red. */
+    check(`'${k}' is READ by something that acts on it`, new RegExp(`\\b${k}\\b`).test(consumers),
       "a switch with no handler — the #514 defect");
   }
 }
