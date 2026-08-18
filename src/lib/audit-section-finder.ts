@@ -63,6 +63,9 @@ export type SectionFinderCall = (args: {
   fullSource: string;
   sectionKey: string;
   sectionIntent: string;
+  /** How many keys this run locates in total. The real caller uses it to decide whether caching the shared
+   *  document prefix can pay — see `finderCacheWouldPay`. A stub finder can ignore it. */
+  targetKeyCount?: number;
 }) => Promise<{ located: boolean; anchor?: string | null }>;
 
 export interface LocateAttempt {
@@ -111,7 +114,7 @@ export async function runSectionFinder(opts: {
     const intent = SECTION_INTENT[key] ?? `section ${key}`;
     let res: { located: boolean; anchor?: string | null };
     try {
-      res = await opts.finder({ fullSource: opts.fullSource, sectionKey: key, sectionIntent: intent });
+      res = await opts.finder({ fullSource: opts.fullSource, sectionKey: key, sectionIntent: intent, targetKeyCount: keys.length });
     } catch (e) {
       attempts.push({ key, located: false, rejected: false, reason: `finder error: ${(e as Error)?.message ?? String(e)}` });
       continue;
@@ -155,12 +158,25 @@ const FINDER_SCHEMA = {
 
 /** Build the real (PAID) finder — a locate-only structured call. Constructed ONLY when AUDIT_SECTION_FINDER is on
  *  (auditPackage), so flag-OFF is byte-identical (finder undefined ⇒ L3 never runs). Locate, never summarize. */
+/** Whether caching the document prefix can PAY on this run. A cache write costs 1.25x base input and a read
+ *  costs 0.1x, so the break-even is TWO calls sharing the prefix — one call that writes and is never read back
+ *  is a flat 1.25x LOSS. The caching below was written for "§L then §M", i.e. two locates; `targetKeys` is
+ *  filtered to the keys the DETERMINISTIC slicer did not already find, so it is routinely ONE.
+ *
+ *  Measured, live run 3b5bba30 (2026-08-06): §L was found deterministically, so only §M was targeted. The single
+ *  finder call cache-wrote 752,793 tokens — the entire 2,876,257-char source — for an 11-token "not located",
+ *  and nothing read it. $4.70 with the cache against $3.76 without: a $0.94 loss on one call, the largest
+ *  single misplaced-cache cost in the engine. */
+export const finderCacheWouldPay = (targetKeyCount: number): boolean => targetKeyCount >= 2;
+
 export function makeSectionFinderCaller(
   callStructured: (args: { model: string; system: string; user: string; schema: object; maxTokens: number; signal?: AbortSignal; cachedSystemPrefix?: string }) => Promise<string>,
   model: string,
   signal?: AbortSignal,
 ): SectionFinderCall {
-  return async ({ fullSource, sectionKey, sectionIntent }) => {
+  // `targetKeyCount` arrives PER CALL from runSectionFinder, which is the only place that knows how many keys
+  // this run will actually locate. Defaulted so a caller that does not supply it keeps the previous behaviour.
+  return async ({ fullSource, sectionKey, sectionIntent, targetKeyCount = 2 }) => {
     const system =
       "You are a locator, not a summarizer. You are given the FULL TEXT of a federal solicitation. Find where a " +
       "specific required section's content begins. Return a DISTINCTIVE VERBATIM anchor: copy the exact characters " +
@@ -173,7 +189,7 @@ export function makeSectionFinderCaller(
     // on, carry the document as a SHARED cached system prefix (identical across §L/§M) so the FIRST locate writes
     // it and the SECOND reads it (~10% of input price). The section-specific ask stays in the (tiny) user turn.
     // Flag-OFF ⇒ document rides the user turn exactly as before (BYTE-IDENTICAL prompt — no behavior change).
-    const cacheOn = process.env.AUDIT_PROMPT_CACHE === "true";
+    const cacheOn = process.env.AUDIT_PROMPT_CACHE === "true" && finderCacheWouldPay(targetKeyCount);
     const docBlock = `---DOCUMENT---\n${fullSource}`;
     const user = cacheOn
       ? `Required section §${sectionKey} contains ${sectionIntent}.\n\n` +
