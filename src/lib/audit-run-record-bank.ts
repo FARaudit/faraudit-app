@@ -18,6 +18,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildRunRecord, captureAuditFlagEnv, type RunRecordMeta, type RunRecordInput } from "./audit-run-record";
 import type { UsageCall } from "./audit-cost";
 import type { AuditResult } from "./audit-orchestrator";
+import type { PanelTelemetry } from "./audit-panel-telemetry";
 
 export const RUN_RECORD_BANK_ENABLED = process.env.AUDIT_BANK_RUN_RECORD === "true";
 const BUCKET = "run-records";
@@ -36,6 +37,8 @@ export interface BankRunRecordArgs {
   /** Per-call cost/latency ledger for this run (see RunRecord.result.usage). Optional — a caller that has
    *  none banks a record without the key rather than an empty array. */
   usage?: UsageCall[];
+  /** Capture-only panel telemetry (plan step 1) — banked verbatim, read by humans and $0 replays only. */
+  panel?: PanelTelemetry;
 }
 
 /** Bank a replayable RunRecord to durable storage. FLAG-GATED + best-effort — returns the storage path on
@@ -62,6 +65,7 @@ export async function bankRunRecord(
       billing: args.billing,
       commercialHonestFail: args.commercialHonestFail,
       ...(args.usage && args.usage.length ? { usage: args.usage } : {}),
+      ...(args.panel ? { panel: args.panel } : {}),
     });
     // Path: run-records/<sol>/<auditId>.json — sol-grouped so the pull script + scorer can match a blind key
     // by sol id. Sanitize the sol into a safe path segment (attacker-influenceable via SAM/upload metadata).

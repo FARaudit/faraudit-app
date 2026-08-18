@@ -21,6 +21,7 @@ import { deriveVerdict, applyFindingDedup, applyCrossFleetDedup } from "./audit-
 import { consequenceTailsAfter, gradeCoverageV2, verifyRecitalInSource, type CoverageV2 } from "./audit-gate-v2";
 import type { TypedFinding, VerdictInputs, BidderProfile } from "./audit-findings";
 import type { UsageCall } from "./audit-cost";
+import type { PanelTelemetry } from "./audit-panel-telemetry";
 
 export const RUN_RECORD_SCHEMA = "run-record/v1" as const;
 
@@ -146,6 +147,12 @@ export interface RunRecord {
     // Optional ⇒ every pre-existing record still loads, and replay never reads it: this is EVIDENCE, not input,
     // so adding it cannot change a replayed verdict.
     usage?: UsageCall[];
+    // PANEL TELEMETRY (plan step 1, 2026-08-17) — the panel is 47% of a run's cost and the record could not
+    // say whether it FIRED. "Gate suppressed it" and "it ran and produced nothing" were indistinguishable in
+    // every banked record, and they need opposite fixes; an inference on exactly this point was already
+    // measured WRONG once. CAPTURE-ONLY: nothing reads it, so it cannot change a verdict. Optional ⇒ every
+    // pre-existing record still loads and every replay is byte-identical.
+    panel?: PanelTelemetry;
   };
   billing: { honestFail: boolean; billable: boolean };
 }
@@ -158,6 +165,9 @@ export interface BuildRunRecordArgs {
   result: AuditResult;
   billing: { honestFail: boolean; billable: boolean };
   commercialHonestFail?: boolean;               // the coreMissing flag state the run used (AUDIT_PROCUREMENT_TYPE_SECTIONS)
+  /** Capture-only panel telemetry (plan step 1). Absent ⇒ the key is omitted, not written empty, so a
+   *  record banked before this existed and a run whose caller supplies nothing stay distinguishable. */
+  panel?: PanelTelemetry;
 }
 
 /** Capture a complete, replayable record from a finished paid run. Pure — computes the deterministic
@@ -205,6 +215,7 @@ export function buildRunRecord(args: BuildRunRecordArgs): RunRecord {
       // banking an empty array, so "this run predates the ledger" stays distinguishable from "this run made
       // zero model calls". Those are different facts and only one of them is alarming.
       ...(args.usage && args.usage.length ? { usage: args.usage } : {}),
+      ...(args.panel ? { panel: args.panel } : {}),
     },
     billing: args.billing,
   };

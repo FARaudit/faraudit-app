@@ -49,6 +49,7 @@ import { makeVisionConfirmer, makeTableVisionConfirmer } from "./ocr-vision-conf
 import { detectRateTable, gateRateTable } from "./ocr-table-gate";
 import { clampToWord, reframeNoSetAsideFindings } from "./audit-decide";
 import { pipelinePrescreen, pipelineBoundaryRecord, censusPackage, SIZE_BOUNDARY_STATUS } from "./cost-prescreen";
+import { buildPanelTelemetry, panelTelemetryLine } from "./audit-panel-telemetry";
 
 /** The agentic V3 engine is the SOLE engine. V1/V2 are DELETED (2026-06-28) — there is no
  *  fallback path in the code at all, and no env flag can switch engines. `executeAudit` calls
@@ -698,6 +699,10 @@ export async function executeAgenticPrimary(
     catch (e) { if (signal?.aborted) throw new Error("agentic engine aborted after verdict (overall budget) — not persisting a late-complete row"); throw e; }
   }
   if (panelResult) panelResult.judgment = panelJudgment;
+  // Captured for telemetry BEFORE the branch, so a false `foldApplied` can be attributed to the exact
+  // precondition that failed rather than re-derived from the executor months later.
+  const _judgeCommittal = !!panelJudgment?.verdict && COMMITTAL_JUDGE_VERDICT.has(panelJudgment.verdict);
+  let _foldApplied = false;
   if (panelResult?.typedFindings.length && panelJudgment?.rationale && COMMITTAL_JUDGE_VERDICT.has(panelJudgment.verdict)) {
     // RE-GATE (review round 3, finding #6). The orchestrator gates `decision.reason` and returns — and then
     // this line reopens the very field it gated, appending up to 400 chars of MODEL-AUTHORED judge rationale
@@ -713,6 +718,10 @@ export async function executeAgenticPrimary(
     const foldGate = citationFidelityEnabled()
       ? gateCitationsInText(folded, groundingSource ?? fullSource, "reason")
       : { text: folded, withheld: [] as ReturnType<typeof gateCitationsInText>["withheld"] };
+    // Telemetry only. Deliberately placed AFTER the fold gate, not between the fold and it: a call-site
+    // tripwire (audit-citation-fidelity-forms.test.ts) asserts those two statements stay ADJACENT, because a
+    // line slipped between them is how the citation gate got bypassed once before. It caught this edit.
+    _foldApplied = true;
     if (foldGate.withheld.length) {
       console.warn(`[executor] citation-fidelity: withheld ${foldGate.withheld.length} unresolvable citation(s) from the folded panel rationale — ` +
         foldGate.withheld.map((w) => w.raw).join("; "));
@@ -1007,6 +1016,22 @@ export async function executeAgenticPrimary(
   // can fail a finished, persisted, paid audit (the internal try/catch could not protect arg evaluation). Flag OFF ⇒
   // pure no-op (byte-identical). manifestComplete is banked as the EFFECTIVE value the run USED (…&& !constructionOOS),
   // matching what auditPackage received, so the $0 replay reproduces the real verdict. See audit-run-record-bank.ts.
+  // PANEL TELEMETRY (plan step 1) — built here because the executor is the only scope holding BOTH the
+  // panel result and the final finding set, which is what makes "produced N, zero survived" expressible.
+  // Best-effort by construction: a throw here must not fail a finished, paid audit, so it mirrors the
+  // bank's own caller-side catch.
+  let _panelTelemetry;
+  try {
+    _panelTelemetry = buildPanelTelemetry(panelResult, {
+      finalFindings: res.findings as Array<{ lens?: string | null }>,
+      seatDisplayNames: (panelResult?.panelists ?? []).map((p) => p.name),
+      judgeCommittal: _judgeCommittal,
+      foldApplied: _foldApplied,
+    });
+    console.log(panelTelemetryLine(_panelTelemetry));
+  } catch (e) {
+    console.warn(`[panel] telemetry capture failed (audit unaffected): ${String((e as Error)?.message ?? e).slice(0, 160)}`);
+  }
   try {
     await bankRunRecord(supabase, {
       auditId,
@@ -1018,6 +1043,7 @@ export async function executeAgenticPrimary(
       // spent the wall-clock and the tokens" for every run from here on. Passed by reference to the same array
       // the cost aggregate reads, so the ledger and the invoice can never disagree about the run.
       usage: usageCalls,
+      panel: _panelTelemetry,
       flags: {
         AUDIT_SECTION_M_DEPTH: process.env.AUDIT_SECTION_M_DEPTH,
         AUDIT_PROCUREMENT_TYPE_SECTIONS: process.env.AUDIT_PROCUREMENT_TYPE_SECTIONS,
