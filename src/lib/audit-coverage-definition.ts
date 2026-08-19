@@ -16,9 +16,12 @@
 //
 // ⛔ WHY THE UNIQUENESS CLAUSE IS THE LOAD-BEARING HALF, measured 2026-08-19 on run 3b5bba30:
 // `documentsCovered` tests each region INDEPENDENTLY, so one excerpt that is verbatim in two documents
-// credits BOTH. On the flagship that credited three documents nothing had analysed — both Solicitation
-// Amendments and the NM Bid Schedule — because the phrase carrying the finding also appears in the
-// document it was attributed to. 3 of the 8 "covered" documents, 37.5%, were shared-excerpt credit.
+// credits BOTH. Measured on the flagship: SIX documents have no credit other than a shared excerpt —
+// both Bid Schedules, both Solicitation Amendments, the Solicitation itself and the unrevised
+// Instructions to Bidders. Three of those sit OUTSIDE the live gap list, i.e. the engine already counts
+// them covered while nothing is attributed to them at all. Under this definition, none of the six is
+// analysed. (Both figures are real and answer different questions: 3 is what the live predicate gets
+// visibly wrong today; 6 is what the uniqueness clause withholds. Quote them apart.)
 // The guard for this exists at audit-orchestrator.ts:857 and is INERT in production: it needs opts that
 // only arrive under AUDIT_ATTACHMENT_COVERAGE, which reads false on the live worker. A shared excerpt
 // proves the PHRASE was read. It does not prove the DOCUMENT was analysed, and for near-duplicate
