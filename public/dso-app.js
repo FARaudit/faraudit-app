@@ -683,7 +683,18 @@ function rowHTML(o) {
     '<div class="pc-when"><div class="pc-d">' + (o.days == null ? '—' : o.days + '<small>d</small>') + '</div>' +
       (o.days == null ? '<div class="pc-dl">NO DEADLINE</div>' : '') + '</div>' +
     '<div class="pc-main">' +
-      '<div class="pc-title" title="' + esc(o.title || '') + '">' + esc(TITLECASE(READABLE(o.title))) + '</div>' +
+      /* The title is the notice's LINK to its own page. The card still expands in
+         place — this is the address, for sending, bookmarking, and coming back to
+         after a run. Plain text when SAM published no notice id: a link to nothing is
+         worse than no link.
+         The readable label is computed ONCE and the wrapper varies, so this stays a
+         single render site — two copies of READABLE(o.title) would be two places for
+         the transform to drift. */
+      (function (label) {
+        return o.notice_id
+          ? '<a class="pc-title" href="/notices/' + encodeURIComponent(o.notice_id) + '" title="' + esc(o.title || '') + '">' + label + '</a>'
+          : '<div class="pc-title" title="' + esc(o.title || '') + '">' + label + '</div>';
+      })(esc(TITLECASE(READABLE(o.title)))) +
       '<div class="pc-buyer">' + (officeName(o.office) === deptName(o.agency) ? '<b>' + esc(officeName(o.office)) + '</b>' : '<b>' + esc(officeName(o.office)) + '</b> · ' + esc(deptName(o.agency))) + '</div>' +
       '<div class="pc-id">' + esc(o.id) + '</div>' +
       '<div class="pc-chips"><span class="chip naics">' + esc(o.naics || 'NAICS —') + '</span>' +
