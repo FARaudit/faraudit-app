@@ -100,6 +100,44 @@ ok(!/READABLE\([^)]*\)\s*\.\s*(includes|indexOf|match)/.test(CODE),
 ok(!/solicitation[^\n]*READABLE|READABLE[^\n]*solicitation/i.test(CODE),
   "and never touches the solicitation number");
 
+console.log("\nF · the title LOOKS like the doorway it is");
+/* The title is an anchor to /notices/<id>. Before this gate it was ink with
+   text-decoration:none — identical to a heading — and the only signals were :hover
+   and the pointer cursor, NEITHER of which exists on touch. These assert the
+   at-rest affordance, and that it is paid for without a third blue on the card. */
+const OPPS = readFileSync(path.join(import.meta.dirname ?? __dirname, "..", "..", "public", "opportunities.html"), "utf8");
+const restRule = (OPPS.match(/\na\.pc-title\{[^}]*\}/) || [""])[0];
+
+ok(/text-decoration\s*:\s*underline/.test(restRule),
+  "the title is underlined AT REST, not only on hover",
+  "hover and cursor:pointer both require a pointing device");
+ok(/text-decoration-color\s*:\s*var\(--mute\)/.test(restRule),
+  "the underline carries NO HUE — it is --mute",
+  "a blue underline is what opportunities.html:341 objected to, and the objection stands");
+ok(!/(?:^|[;{])\s*color\s*:/.test(restRule),
+  "the title's own colour is untouched at rest",
+  "recolouring it would add the third blue the card cannot afford");
+ok(/a\.pc-title:focus-visible\{[^}]*outline/.test(OPPS),
+  "the title has a visible keyboard focus state");
+
+/* The SAM.gov link is a DIFFERENT DESTINATION — sam.gov, in a new tab. It is not a
+   second door to our page, and removing it would delete the only route to the
+   authoritative source. */
+const DSOJS = readFileSync(path.join(import.meta.dirname ?? __dirname, "..", "..", "public", "dso-app.js"), "utf8");
+ok(/view notice/.test(DSOJS) && /o\.ui_link/.test(DSOJS) && /target="_blank"/.test(DSOJS),
+  "the SAM.gov link still points OFF-SITE and survives",
+  "it is the source document, not a duplicate of the title's destination");
+
+/* The trap the file documents at line 61: a plainly-written dark link rule is 0-1-1,
+   outranks .btn-open, and drops the primary button's label to 4.25:1. */
+/* COMMENTS STRIPPED FIRST. The warning three lines above this rule names the very
+   selector being banned, so a raw match reads the prose and reports the defect it is
+   warning about. Match CSS, never the text beside it. */
+const CSS_ONLY = OPPS.replace(/\/\*[\s\S]*?\*\//g, "");
+ok(!/(^|[^:])\[data-theme="dark"\]\s+a\s*\{/m.test(CSS_ONLY),
+  "no un-scoped [data-theme=\"dark\"] a{} rule was introduced",
+  "that selector repaints .btn-open's label to 4.25:1");
+
 console.log("\nE · falsifiability (planted positive)");
 // Plant the tempting over-reach: strip the identifiers to 'clean up' the title.
 const planted = (s: string) => s.replace(/_+/g, " ").replace(/\s*(NSN|PN|End Item)\s+\S+/g, "").trim();
@@ -107,6 +145,17 @@ const lost = planted(LIVE[0][0]);
 ok(!lost.includes("1650015171308FW"),
   "an implementation that 'tidies' the identifiers away IS caught by the B checks",
   `it yields "${lost}" — the NSN is gone`);
+
+// Plant the shipped defect back: a title with no at-rest decoration.
+const plantedRule = restRule.replace(/text-decoration\s*:\s*underline/, "text-decoration:none");
+ok(!/text-decoration\s*:\s*underline/.test(plantedRule),
+  "removing the at-rest underline IS caught by the F checks",
+  "the planted rule yields no underline");
+// Plant the documented contrast trap.
+const plantedTrap = CSS_ONLY.replace(":where([data-theme=\"dark\"]) :where(a){", "[data-theme=\"dark\"] a{");
+ok(/(^|[^:])\[data-theme="dark"\]\s+a\s*\{/m.test(plantedTrap),
+  "un-scoping the dark link rule IS caught by the F checks",
+  "the 0-1-1 selector is detected");
 
 console.log(`\n${fail === 0 ? "✅ ALL PASS" : `❌ ${fail} RED`} — ${pass} check(s) green`);
 process.exit(fail === 0 ? 0 : 1);
