@@ -14,6 +14,9 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+// Static, not dynamic: this suite transpiles to CJS, where top-level await is a
+// transform error rather than a runtime one — the failure is at build, not in a check.
+import { renderNotice } from "../../src/app/notices/[noticeId]/_render";
 
 let pass = 0;
 let fail = 0;
@@ -78,6 +81,47 @@ check("a failed ATTACHMENT read is distinct from an empty list",
   /attachments === null/.test(ROUTE) && /lists no attachments/i.test(ROUTE),
   "null is a failed read and [] is 'SAM listed none'");
 
+/* ── the buying office is a DISPLAY string, not SAM's machine path ──
+   RENDERED, not grepped. The shipped bug was invisible to a source sweep: office_path
+   and agency were both read correctly and the guard between them looked reasonable.
+   Only executing renderNotice() on a real path shows the two of them printed back to
+   back. This section imports the real helper and reads its actual output. */
+
+// Verbatim from SAM for solicitation 70Z08026Q16007B00, the notice that exposed this.
+const PATH = "HOMELAND SECURITY, DEPARTMENT OF.US COAST GUARD.SFLC PROCUREMENT BRANCH 3(00040)";
+const DEPT = "HOMELAND SECURITY, DEPARTMENT OF";
+const row = (over: Record<string, unknown> = {}) => ({
+  notice_id: "n1", solicitation_number: "70Z08026Q16007B00", title: "Rudder Overhaul",
+  agency: `${DEPT} · US COAST GUARD`, office_path: PATH,
+  naics_code: "332710", set_aside: null, notice_type: "Solicitation",
+  response_deadline: null, created_at: null, ...over,
+}) as unknown as Parameters<typeof renderNotice>[0];
+
+const buyerOf = (html: string): string =>
+  (html.match(/<div class="nd-buyer">([\s\S]*?)<\/div>/) || ["", ""])[1];
+
+console.log("── the buying office reads as a place, not a path ──");
+const buyer = buyerOf(renderNotice(row()));
+check("the raw dotted SAM path is never printed",
+  !buyer.includes(PATH) && !/[A-Z]\.[A-Z]/.test(buyer),
+  `fullParentPathName is a machine field; got: ${buyer}`);
+check("the department is named once, not twice",
+  buyer.split(DEPT).length - 1 <= 1,
+  `agency is a prefix of office_path, so printing both repeats it: ${buyer}`);
+check("the specific buying office is what LEADS the line",
+  /^<b>SFLC PROCUREMENT BRANCH 3<\/b>/.test(buyer),
+  `the leaf is the only new information the hierarchy does not already carry: ${buyer}`);
+
+// A path with no leaf below the top two segments, and a row with no path at all:
+// neither may render empty, and neither may fall back to the dotted string.
+const shallow = buyerOf(renderNotice(row({ office_path: `${DEPT}.US COAST GUARD` })));
+check("a path with no leaf still names the agency",
+  shallow.includes("US COAST GUARD") && !/[A-Z]\.[A-Z]/.test(shallow),
+  `got: ${shallow}`);
+const none = buyerOf(renderNotice(row({ office_path: null, agency: null })));
+check("a notice with no buyer at all says so",
+  /not stated/i.test(none), `an empty line reads as a render failure: ${none}`);
+
 console.log("── Part P · positive controls ──");
 const controls: Array<[string, string, (s: string) => boolean]> = [
   ["the route starts a paid run",
@@ -89,6 +133,17 @@ const controls: Array<[string, string, (s: string) => boolean]> = [
     // occurrence left the other, so the control read as inert.
     ROUTE.replace(/not in your feed/gi, "could not be read"),
     (s) => !/not in your feed/i.test(s)],
+  // The shipped defect itself: reinstate the guard that compared a dotted path to a
+  // middot-joined string. It is a RENDER control, so it asserts on output, not source.
+  ["the buyer line prints the raw path and repeats the department",
+    (() => {
+      // Typed as `string`, not left as literals: with literal types tsc REJECTS the
+      // comparison below as having no overlap — the compiler can see the shipped guard
+      // was dead. The real code widened both through String(), which is why it built.
+      const office: string = PATH, agency: string = `${DEPT} \u00b7 US COAST GUARD`;
+      return office && agency && office !== agency ? `${office} \u00b7 ${agency}` : office;
+    })(),
+    (s) => s.includes(PATH) && s.split(DEPT).length - 1 > 1],
   ["the page forks its own feed read",
     ROUTE.replace(/fetchLiveOpportunitiesScoped/g, "fetchSomethingElse"),
     (s) => !/fetchLiveOpportunitiesScoped/.test(s)],

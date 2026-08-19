@@ -8,6 +8,7 @@
  * beside its route for the same reason.
  */
 import type { OpportunityRow } from "@/lib/bd-os/queries";
+import { resolveOfficeLeaf } from "@/lib/sam";
 
 const esc = (s: unknown): string =>
   String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -45,14 +46,19 @@ export function deadlineCell(row: OpportunityRow): { k: string; v: string; cls: 
 export function renderNotice(row: OpportunityRow): string {
   const dl = deadlineCell(row);
   const title = String(row.title || "").trim() || String(row.solicitation_number || "Untitled notice");
-  /* office_path is SAM's fullParentPathName — the field the list's own office column is
-     built from. There is no office_display on a live feed row (that one belongs to the
-     audits row), so reaching for it would render empty on every notice. */
-  const office = String(row.office_path || row.agency || "").trim();
+  /* office_path is SAM's fullParentPathName — a DOTTED MACHINE PATH, never a display
+     string, and `agency` is built out of it: resolveAgency() splits on "." and re-joins
+     the first two segments with " \u00b7 ". So agency is a PREFIX of office_path in a
+     different alphabet, and the old `office !== agency` guard could not once be equal —
+     it compared "A.B.C" to "A \u00b7 B". Every notice carrying a multi-segment path
+     therefore rendered the raw path AND then repeated the department and service after
+     it. Fixed by showing the buying-office LEAF over the hierarchy, which is what
+     resolveOfficeLeaf() was written for (FA-151) and what the list already does. */
+  const leaf = resolveOfficeLeaf({ fullParentPathName: row.office_path });
   const agency = String(row.agency || "").trim();
-  const buyer = office && agency && office !== agency
-    ? `<b>${esc(office)}</b> &middot; ${esc(agency)}`
-    : `<b>${esc(office || agency || "Buying office not stated")}</b>`;
+  const buyer = leaf && agency
+    ? `<b>${esc(leaf)}</b> &middot; ${esc(agency)}`
+    : `<b>${esc(leaf || agency || "Buying office not stated")}</b>`;
   const sol = String(row.solicitation_number || row.notice_id || "").trim();
   const noticeId = String(row.notice_id || "").trim();
 
