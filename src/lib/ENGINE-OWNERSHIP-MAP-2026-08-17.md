@@ -1,5 +1,15 @@
 # The ownership map — designed, built, measured, and NOT sufficient on its own
 
+> ## ⚑ DOCTRINE RECORDED 2026-08-19 (Brain ruling, CEO-approved 08-17)
+> **1 Ownership is TOTAL** — every obligation-carrying document gets exactly one owner before any lens
+> fires; unassignable ⇒ a NAMED coverage gap, never silence. **2 OWNERSHIP IS DOCUMENT-KEYED, NOT SECTION-KEYED** — sections are a hint; the document is the unit. **3 Routing is 1:1** — no fan-out.
+> **4 Refusal must NAME what it could not read** — the refusal itself is untouchable. **5 COVERAGE IS DERIVED, never recorded** — a proof grading its own subset is a placebo (Rule 69).
+>
+> **MEASURED on the flagship the same day: 52 binding documents, 48 carrying obligations, and 51 have
+> NO POSSIBLE OWNER under the live section-keyed lanes — 47 of those carry obligations.** That is why
+> "ignore the rest" is an offer: the rest is structurally unownable. Full table + router proposal →
+> `ceo/engine/ownership-remainder-map.md`.
+
 **2026-08-17. Built from the 135 binding-document names actually observed across the banked corpus,
 measured $0 through the production tools. No model calls, no paid run.** Answers the design question
 left open by `ENGINE-RESIDUE-OWNERSHIP-2026-08-17.md`.
