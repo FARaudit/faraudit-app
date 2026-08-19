@@ -96,8 +96,50 @@
     'none-flagged': {
       label: 'No CMMC requirement found',
       body: 'None of the solicitations you have audited names a CMMC level, a CUI obligation, or DFARS 252.204-7012/7021. The reference below still shows what each level would demand.'
+    },
+    /* SEPARATE FROM 'none-flagged', because the two mean opposite things and both leave the page
+       empty. 'none-flagged' is a finding: the audits read every solicitation and none carried a
+       CMMC requirement. This one is the absence of a finding — no run finished, so nothing was
+       read. Showing the first copy here would report a clean bill of health from zero analysis. */
+    'none-analyzed': {
+      label: 'Nothing analyzed yet',
+      body: 'None of your audits finished, so no solicitation here has been read for a CMMC requirement. This is not a clean result — it is no result. Re-run an audit and what it finds appears here.'
     }
   };
+
+  /* The solicitations the distribution cannot speak for, named by what actually happened to them.
+     A run that FAILED will never answer without being re-run; a run still going will. Both are
+     outside the counts below, and neither is a solicitation that requires no CMMC. */
+  function unanalyzedNote(m) {
+    if (!m.unanalyzed) return null;
+    // 'none-analyzed' means every solicitation is in this bucket, and its own copy already says
+    // so — repeating it here would print the same fact twice in one banner.
+    if (m.reason === 'none-analyzed') return null;
+    // Singular when there is one, the same standard the level cards below hold to. "1 of your 3
+    // solicitations have" is the kind of seam that makes a reader wonder what else was not looked at.
+    const one = m.unanalyzed === 1;
+    const of = m.unanalyzed + ' of your ' + m.totalSolicitations + ' solicitations';
+    const tail = (one ? ' so it answers' : ' so they answer')
+      + ' neither way and ' + (one ? 'is' : 'are') + ' not counted as clear.';
+    if (m.unanalyzedFailed && m.unanalyzedRunning) {
+      return of + ' have no finished audit (' + m.unanalyzedFailed + ' failed, '
+        + m.unanalyzedRunning + ' still running),' + tail;
+    }
+    if (m.unanalyzedRunning) {
+      return of + (one ? ' is' : ' are') + ' still being audited,' + tail;
+    }
+    return of + (one ? ' has' : ' have') + ' no finished audit — '
+      + (one ? 'that run' : 'those runs') + ' failed,' + tail
+      + ' Re-run ' + (one ? 'it' : 'them') + ' to get an answer.';
+  }
+
+  /* The counts describe the newest rowCap audits, not the account. Silence here would present a
+     partial page as a complete one. */
+  function truncationNote(m) {
+    if (!m.truncated || !m.rowCap) return null;
+    return 'This page reads your most recent ' + m.rowCap
+      + ' audit runs. Older ones are not included, so these counts cover part of your account, not all of it.';
+  }
 
   function renderBanner() {
     const el = $('stateBanner');
@@ -123,23 +165,24 @@
       ]);
       return;
     }
+    // Caveats are APPENDED to whatever the banner already says, including the empty-state copy.
+    // "No CMMC requirement found" and "three of these were never read" are both true at once and
+    // the reader needs both sentences, so neither replaces the other.
+    const notes = [unanalyzedNote(m), truncationNote(m)].filter(Boolean);
+
     if (m.state === 'empty') {
       const copy = EMPTY_COPY[m.reason] || EMPTY_COPY['none-flagged'];
       el.hidden = false;
       fill(el, [
         h('span', { cls: 'sb-label', text: copy.label }),
         h('span', { text: copy.body })
-      ]);
+      ].concat(notes.map((t) => h('span', { text: t }))));
       return;
     }
-    // Ready — but a count drawn from partly-unanalyzed audits carries its
-    // caveat in place, not in a footnote nobody reads.
-    if (m.unanalyzed > 0) {
+    if (notes.length) {
       el.hidden = false;
-      fill(el, [
-        h('span', { cls: 'sb-label', text: 'Note' }),
-        h('span', { text: m.unanalyzed + ' of your ' + m.totalSolicitations + ' solicitations carry no analysis yet, so they answer neither way and are not counted as clear.' })
-      ]);
+      fill(el, [h('span', { cls: 'sb-label', text: 'Note' })]
+        .concat(notes.map((t) => h('span', { text: t }))));
       return;
     }
     el.hidden = true;
