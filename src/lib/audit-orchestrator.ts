@@ -826,6 +826,7 @@ export type UncoveredReason =
   | "no_grounded_finding"           // read, but nothing grounded a finding in it (the 48-of-52 case)
   | "extraction_spans_rejected"     // spans were offered, none verbatim in-region and absent from primary
   | "attestation_rejected_hard_bar" // provably read + attested, but eligibility-bar language forbids attesting it
+  | "shared_excerpt_only"           // the only excerpt reaching it is verbatim in ANOTHER document too — proves the phrase was read, not this document
   | "no_attestation";               // construction path: no sealed per-doc attestation, or it had no text
 
 export function documentsCovered(
@@ -864,7 +865,20 @@ export function documentsCovered(
   // effect of an unrelated flag. Both pre-existing states are unchanged: ATTACHMENT_COVERAGE on ⇒ true
   // exactly as before; neither flag ⇒ opts undefined ⇒ false exactly as before.
   const crossAttGate = opts != null && (opts.docsRead != null || opts.attestations != null);
-  const otherAttNorms = crossAttGate ? regions.filter((x) => !x.isPrimary).map((x) => ({ name: x.name, t: norm(x.text) })) : [];
+  // ── UNIQUE-EXCERPT COVERAGE (flag AUDIT_COVERAGE_UNIQUE_EXCERPT, default OFF ⇒ byte-identical) ──────
+  // The cross-attachment uniqueness rule directly above is CORRECT and has NEVER RUN IN PRODUCTION: it is
+  // gated on `crossAttGate`, which needs opts that arrive only under AUDIT_ATTACHMENT_COVERAGE, and that
+  // flag reads FALSE on the live worker. So in production one excerpt that is verbatim in two documents
+  // credits BOTH. Measured on banked run 3b5bba30: six documents are credited by an excerpt they share
+  // with a sibling — both Bid Schedules, both Solicitation Amendments, the Solicitation and the unrevised
+  // Instructions to Bidders — and three of those sit OUTSIDE the gap list, i.e. the engine already counts
+  // them analyzed with nothing attributed to them at all. A shared excerpt proves the PHRASE was read; it
+  // does not prove the DOCUMENT was analyzed, and between near-duplicate siblings everything that DIFFERS
+  // is exactly what went unread. Its OWN flag, never inheriting AUDIT_ATTACHMENT_COVERAGE — inheriting the
+  // gate that is false on the worker is what left the original rule dark for its whole life.
+  // Direction: it can only ADD to `uncovered`. It never certifies a document covered.
+  const uniqueExcerptGate = process.env.AUDIT_COVERAGE_UNIQUE_EXCERPT === "true";
+  const otherAttNorms = (crossAttGate || uniqueExcerptGate) ? regions.filter((x) => !x.isPrimary).map((x) => ({ name: x.name, t: norm(x.text) })) : [];
   // COVERAGE-ONLY EXTRACTION SPANS, indexed by document. A span credits its document only if it is
   // verbatim IN that region and NOT in the primary — the same two conditions the grounded-finding path
   // applies, so a paraphrase earns nothing and a flow-down sentence shared with the primary earns
@@ -947,18 +961,19 @@ export function documentsCovered(
     // filter adds the decision-bearing half: a `dropped` (boilerplate/non-operative) survivor credits NOTHING, so only a
     // finding the engine would actually act on can lift the INCOMPLETE veto. Flag-gated on crossAttGate ⇒ flag-OFF
     // byte-identical (a `dropped` finding still counted before).
+    let sharedOnly = false;   // a finding reached this region, but only through an excerpt another document also carries
     if (findings.some((f) => {
       const ex = norm(analyzedExcerptOf(f) || "");
       if (!(ex.length > 0 && nRegion.includes(ex) && !primaryNorm.includes(ex))) return false;
       if (crossAttGate && disposeFinding(f) === "dropped") return false;   // #372 B — boilerplate/dropped finding is not decision-bearing → credits no coverage
-      if (crossAttGate && otherAttNorms.some((o) => o.name !== r.name && o.t.includes(ex))) return false; // excerpt shared with ANOTHER attachment → doesn't prove THIS one analyzed
+      if ((crossAttGate || uniqueExcerptGate) && otherAttNorms.some((o) => o.name !== r.name && o.t.includes(ex))) { sharedOnly = true; return false; } // excerpt shared with ANOTHER attachment → doesn't prove THIS one analyzed
       return true;
     })) continue;
     const nName = nameKey(r.name);
     // Default cause: the document was READ and nothing grounded a finding in it. Narrowed below only when a
     // more specific branch actually declined, so the reason names the LAST gate that said no rather than a
     // guess. Never widened — an unrecognised path keeps the honest default.
-    let _why: UncoveredReason = "no_grounded_finding";
+    let _why: UncoveredReason = sharedOnly ? "shared_excerpt_only" : "no_grounded_finding";
     // COVERAGE-ONLY EXTRACTION CREDIT (flag AUDIT_DOC_EXTRACTION). Ordered AFTER the grounded finding —
     // a verified finding is the stronger proof and its `continue` should win — and BEFORE attestation,
     // because a verbatim span is EVIDENCE the document was read whereas an attestation is a CLAIM that
@@ -972,7 +987,11 @@ export function documentsCovered(
     if (spans?.length) {
       const credited = spans.find((raw) => {
         const ex = norm(raw || "");
-        return ex.length > 0 && nRegion.includes(ex) && !primaryNorm.includes(ex);
+        if (!(ex.length > 0 && nRegion.includes(ex) && !primaryNorm.includes(ex))) return false;
+        // Same rule as the finding path above: a span verbatim in a sibling document proves the phrase was
+        // extracted, not that THIS document was covered. Flag OFF ⇒ this clause is never evaluated.
+        if (uniqueExcerptGate && otherAttNorms.some((o) => o.name !== r.name && o.t.includes(ex))) return false;
+        return true;
       });
       if (credited) {
         console.log(`[coverage] extraction span credited "${r.name}" — verbatim in-region, absent from primary (coverage-only; never a finding)`);

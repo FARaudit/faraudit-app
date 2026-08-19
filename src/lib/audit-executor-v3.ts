@@ -109,6 +109,10 @@ export function agenticManifestComplete(
 export function deriveAnalyzedDocuments(
   fullSource: string,
   uncovered: string[],
+  // WHY each document is uncovered, when the orchestrator captured it (diagnostics.docUncoveredDetail).
+  // DISPLAY ONLY — it never reaches the verdict, which is why the detail lives in the capture-only slot.
+  // Absent ⇒ every reason falls back to the default string ⇒ byte-identical to before this parameter existed.
+  reasons?: Array<{ doc: string; reason: string }>,
 ): { analyzed: number; analyzed_of: number; unanalyzed: Array<{ name: string; reason: string }> } {
   const analyzableRegions = docRegions(fullSource).filter((r) => r.name !== NOTICE_BODY_DOC_NAME);
   const regionNames = new Set(analyzableRegions.map((r) => r.name));
@@ -127,7 +131,13 @@ export function deriveAnalyzedDocuments(
       // audit-gate-reason.ts already says "retrieved in full" and is correct; this string said "read in
       // full" and was the same claim one level stronger than the evidence. It renders nowhere today, which
       // is exactly why it could drift — an unrendered string is still the engine asserting something.
-      reason: "retrieved in full, but no finding was grounded in it — content NOT analyzed",
+      // The default is true of the ordinary case and FALSE of one class: a document credited only by an
+      // excerpt it shares with a sibling DID have a finding grounded in text it contains — the text just was
+      // not distinctive to it. Saying "no finding was grounded in it" there is a confident-wrong claim on a
+      // customer surface, which is the class this whole arc exists to remove. So the reason is per-document.
+      reason: (reasons ?? []).find((x) => x.doc === name)?.reason === "shared_excerpt_only"
+        ? "retrieved in full, but the only finding reaching it quotes text that also appears in another document — nothing analyzed THIS document specifically"
+        : "retrieved in full, but no finding was grounded in it — content NOT analyzed",
     })),
   };
 }
@@ -878,7 +888,9 @@ export async function executeAgenticPrimary(
   // setting the top-level field by hand.
   let docsAnalyzedIncomplete = false;
   if (docCov && payload.documents) {
-    const truth = deriveAnalyzedDocuments(fullSource, docCov.uncovered);
+    const uncoveredReasons = (res as { diagnostics?: { docUncoveredDetail?: Array<{ doc: string; reason: string }> } })
+      .diagnostics?.docUncoveredDetail;
+    const truth = deriveAnalyzedDocuments(fullSource, docCov.uncovered, uncoveredReasons);
     docsAnalyzedIncomplete = truth.unanalyzed.length > 0;
     payload.documents.analyzed_of = truth.analyzed_of;
     payload.documents.analyzed = truth.analyzed;
