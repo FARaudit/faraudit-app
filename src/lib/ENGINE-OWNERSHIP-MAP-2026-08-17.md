@@ -10,6 +10,131 @@
 > "ignore the rest" is an offer: the rest is structurally unownable. Full table + router proposal →
 > `ceo/engine/ownership-remainder-map.md`.
 
+> ## ⚑ SIX RULINGS — Brain, CEO-approved 2026-08-17 · recorded 2026-08-19
+> **CANONICAL TEXT. This file is version-controlled and exists in every worktree and in CI; `ceo/` does
+> not (`.gitignore:45`). `ceo/engine/ownership-remainder-map.md` carries the per-document measurement
+> and points here for the rulings — one home, so the two cannot drift into two rules.**
+>
+> Each ruling is recorded as given. Where the $0 re-measurement of 2026-08-19 **diverges from the number
+> in the ruling, the divergence is recorded beside it and the measured value governs** — a ruling is an
+> instruction, and a number inside it is still a claim.
+
+### R1 — TWO AXES, NOT ONE. Ownership was necessary and INSUFFICIENT.
+Ownership fixes **who reads what**; it does not fix **volume within a lane**. Both axes ship together:
+document-keyed ownership for the heterogeneous remainder, batched per-document extraction
+(`AUDIT_DOC_EXTRACTION`, merged and dormant) for the homogeneous spec bulk — 54 of 135 observed names.
+**A four-week target assuming the router alone closes the 47 will miss.**
+
+**MEASURED 08-17 (read volume through `readDocument`, which caps each document at `DOC_READ_CAP`
+40,000 chars):** busiest lens p50 34,358 → 13,134 tok (−62%), max 274,744 → 209,532 (−24%), 1 of 44
+packages over context. **The ruling quotes these and they reproduce.**
+
+⚠ **DIVERGENCE — re-measured 08-19 over the UNCAPPED region text (`docRegions`), residue folded into
+`former_ko` by rule, 50 banked packages: p50 30,713 tok · p90 153,139 · MAX 655,864 · 4 of 50 over
+200,000.** Both numbers are correct and they answer different questions. The 08-17 figure is what a
+lens can RECEIVE through a 40k-per-document read cap; the 08-19 figure is what the owned set actually
+CONTAINS. **The gap between them is unread content — the cap does not shrink the obligation set, it
+hides it.** R1's conclusion strengthens: on the uncapped measure the busiest lane holds 655k tokens
+against an 8-turn budget, so the second axis is not optional at any p50.
+
+### R2 — THE OVER-CONTEXT PACKAGE IS AN HONEST-FAIL CASE, NOT A TARGET.
+The engine names the package as exceeding single-pass capacity and refuses. **Do not engineer around
+it.** Same surface as `ENGINE-SIZE-REFUSAL-SURFACE` already in the backlog — **ONE implementation, not
+two.** Naming a real limit is the product claim working.
+
+⚠ **DIVERGENCE — the population is larger than "1 in 44".** On the uncapped measure it is **4 of 50**.
+The refusal surface must be built for a class, not for one specimen.
+
+### R3 — COVERAGE HAS MORE THAN ONE DEFINITION. RULE 68 VIOLATION. Collapse to ONE.
+Recorded as ruled: the completeness proof grades **48 of 2,879** enumerable obligations (**1.7%**) while
+the derived document measure is a different fraction, and both are called coverage. **Rule 69 — a proof
+that grades its own subset is a placebo control.**
+
+⚠ **DIVERGENCE, and it is bigger than the ruling states — there are THREE layers, not two, and the
+document layer alone has two disagreeing implementations inside a single run record.** Already measured
+and written up in `ENGINE-DENOMINATOR-SCOPE-2026-08-17.md`: layer **A · sections** (`required = ["L"]`,
+1 of 53), layer **B · documents**, layer **C · obligations** (48 of 2,879). Re-measured on the flagship
+run record `3b5bba30`, $0, production functions only:
+
+| measure | value | how |
+|---|---:|---|
+| posted binding documents received | **52** | `docRegions` = 53 regions, minus the notice body (UNIVERSAL) |
+| …carrying an obligation | **48** | production `countGroundableObligations` over full region text |
+| …assignable under the DOCUMENT-keyed map | **50** | `ownerOf`; true residue **2** |
+| …the engine's OWN coverage says analysed | **8 of 52** (15.4%) | `deriveAnalyzedDocuments(uncoveredForGap)` |
+| …**ANALYSED under the definition chosen below** | **3 of 52** (5.8%) | `deriveDocumentCoverage` |
+| …obligation-carrying AND analysed — **the R6 measure** | **3 of 48** (6.3%) | `deriveDocumentCoverage` |
+| …credited by an excerpt SHARED with another document | **6** | `sharedExcerptCreditOnly` |
+
+**The "9 of 52 / 17.3%" figure carried in the continuity pointer does not reproduce.** The engine's own
+coverage path says **8 of 52 (15.4%)**; under the definition chosen below it is **3 of 52 (5.8%)**.
+**Do not quote 9 or 17.3% again.**
+
+> ##### ⚠ A CORRECTION TO A CORRECTION, kept visible because it is the whole lesson
+> An earlier pass of this same measurement counted **53 received / 49 obligation-carrying** and recorded
+> that the ruling's denominator "is 49, not 48". **That was wrong, and the error was mine:** it counted
+> the SAM Notice Body as a posted document. The notice body is SAM's description field, is UNIVERSAL —
+> every lens already reads it — and is excluded from both sides of the coverage ratio by the same rule
+> `deriveAnalyzedDocuments` already applies. Excluded, the totals are **52 and 48**, exactly as R6 states.
+> **R6's "48 of 48" is correct and stands. The ownership remainder is 47 and stands.**
+> What survives from that pass is a REAL and separate defect, and it is a membership error rather than a
+> total: the per-document table in `ceo/engine/ownership-remainder-map.md` enumerates 52 rows that are
+> **51 posted documents plus the notice body** — it omits `W911SG27BA002 Instructions to Bidders
+> (Revised).pdf` while counting a row that does not belong in the denominator. The two errors cancel in
+> the totals and do not cancel in the membership, and the omitted document is one the engine actually
+> read. **A total that reconciles is not a set that reconciles.**
+
+> #### ⛔ THE DEFECT THIS SURFACED — three documents are counted COVERED that nothing analysed
+> `Bid Schedule_…_PavingNM.pdf`, `Solicitation Amendment …0001 SF 30.pdf` and `Solicitation Amendment -
+> …0001.pdf` are all outside the gap list, and **no finding is attributed to any of them.** Mechanism,
+> confirmed by re-running the join: `documentsCovered` tests each region **independently**, so an
+> excerpt that is verbatim in two documents credits **both** — the two Bid Schedules share the phrase
+> that carries `pricing_analyst#0/#1`, and five regions share the phrase carrying `capture_strategist#0`.
+> The guard for exactly this exists — the cross-attachment uniqueness gate at `audit-orchestrator.ts:857`
+> — and it is **inert in production**: `crossAttGate` requires `opts.docsRead`/`opts.attestations`, which
+> only arrive under `AUDIT_ATTACHMENT_COVERAGE`, and that flag reads **false on the live worker**.
+> **37.5% of the flagship's "covered" set is shared-excerpt credit.** A shared excerpt proves the phrase
+> was read; it does not prove the document was analysed, and for near-duplicate siblings everything that
+> DIFFERS between them is exactly what went unread.
+
+**THE ONE DEFINITION, CHOSEN:** **coverage is DOCUMENT-KEYED (layer B), and a document is ANALYSED only
+when a grounded, decision-bearing finding's analyzed excerpt is verbatim in THAT document and in no
+other.** Chosen because it is the measure R6's four-week target is stated in, the measure doctrine rule
+5 derives, and the only one of the three a customer can verify by opening the report. Layer C's 2,879
+remains a **diagnostic** and is never called coverage. Layer A stays as-is pending the step-2 ruling.
+**Defined in ONE place: `src/lib/audit-coverage-definition.ts`.** Every other coverage figure derives
+from it.
+
+### R4 — VERDICT ABSENCE HAS TWO CAUSES. Record them separately, never again as one.
+Card 858 reported "zero BID · zero NO_BID · zero INELIGIBLE" as a single finding. It is two:
+**NO_BID and INELIGIBLE are UNARMED PATHWAYS — not coverage artefacts. Zero plain BID IS coverage.**
+
+✅ **CONFIRMED, and more precisely than the ruling states** — established 2026-08-05 by the line-by-line
+`deriveVerdict` audit executed at production flag parity on worker sha `12e43884`
+(`ENGINE-DECIDE-AUDIT-2026-08-05.md`). The three decisive decline exits are dark for three DIFFERENT
+reasons, none of them coverage: `NO_BID` at `audit-decide.ts:3438` needs `AUDIT_TEMPORAL_VERDICT`
+(unset) · `NO_BID` at `:3750` is suppressed at `:3716` unless `AUDIT_FOURWALLS_NOBID=true` (unset) ·
+`INELIGIBLE` at `:3756` needs `closedWorld: true`, **which no production code builds**. So the framing
+"the engine has never said no" is not a coverage finding at all — it is three unarmed levers, two of
+them one environment variable each.
+
+### R5 — COST IS SETTLED. STOP WEIGHING IT.
++$2/audit at 1:1 routing, against a run already spending **$5.67 on a panel that landed nothing**.
+**Not a constraint.** Cost is not to be re-litigated in any downstream document or card.
+
+### R6 — THE FOUR-WEEK TARGET, MEASURABLE.
+**ONE package where every obligation-carrying document is owned, analysed, and produces a grounded
+finding** — on flagship `W911SG27BA002` that is **48 of 48** — **and a report the CEO would hand a
+stranger without apologising.** NOT CERT-5 completion. NOT a shifted verdict distribution. **Coverage of
+one package, taken to defensible.**
+
+✅ **CONFIRMED — the denominator IS 48**, by the production obligation detector over the full text of the
+52 posted binding documents (notice body excluded as UNIVERSAL). **Today's figure under the chosen
+definition is 3.** The target stands exactly as ruled: **48 of 48.**
+
+
+---
+
 **2026-08-17. Built from the 135 binding-document names actually observed across the banked corpus,
 measured $0 through the production tools. No model calls, no paid run.** Answers the design question
 left open by `ENGINE-RESIDUE-OWNERSHIP-2026-08-17.md`.
