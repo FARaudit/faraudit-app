@@ -114,11 +114,25 @@ ok(/text-decoration\s*:\s*underline/.test(restRule),
 ok(/text-decoration-color\s*:\s*var\(--mute\)/.test(restRule),
   "the underline carries NO HUE — it is --mute",
   "a blue underline is what opportunities.html:341 objected to, and the objection stands");
-ok(!/(?:^|[;{])\s*color\s*:/.test(restRule),
-  "the title's own colour is untouched at rest",
-  "recolouring it would add the third blue the card cannot afford");
+/* Asserts the VALUE, not the absence of a declaration: the ruling restates
+   `color:var(--ink)` on purpose, to make "unchanged" explicit at the rule. Testing
+   for no colour declaration at all failed on a rule that changes no colour. */
+const restColour = (restRule.match(/(?:^|[;{])\s*color\s*:\s*([^;}]+)/) || [])[1];
+ok(restColour === undefined || restColour.trim() === "var(--ink)",
+  "the title's own colour is unchanged at rest",
+  `recolouring it would add the third blue the card cannot afford — found ${restColour}`);
 ok(/a\.pc-title:focus-visible\{[^}]*outline/.test(OPPS),
   "the title has a visible keyboard focus state");
+
+ok(/@media\(max-width:1000px\)\{\s*a\.pc-title\{[^}]*padding:13px 0/.test(OPPS.replace(/\/\*[\s\S]*?\*\//g, "")),
+  "short titles get a 44px+ tap target at narrow widths",
+  "measured at 390px: 14 of 180 titles fall under 44px, the shortest at 19px");
+ok(!/@media\(max-width:1000px\)\{\s*a\.pc-title\{[^}]*display:inline-block/.test(OPPS.replace(/\/\*[\s\S]*?\*\//g, "")),
+  "no inert display:inline-block on the tap-target rule",
+  ".pc-main is display:flex, so a flex item's inline-block is blockified to block");
+ok(/\[data-theme="dark"\]\s+a\.pc-title:hover\{/.test(OPPS),
+  "the dark hover rule is scoped to the CLASS",
+  "0-2-1 cannot reach .btn-open; the unscoped form is 0-1-1 and can");
 
 /* The SAM.gov link is a DIFFERENT DESTINATION — sam.gov, in a new tab. It is not a
    second door to our page, and removing it would delete the only route to the
