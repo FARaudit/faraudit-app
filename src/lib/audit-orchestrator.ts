@@ -208,6 +208,11 @@ export interface RunDiagnostics {
   stageCounts: Record<string, number>;          // pre/post finding counts around the flag-gated tail (e.g. preDedup, postDedup, final)
   verifierLedger?: VerifierLedger;              // R1 · card #592 — the P2 skeptic's per-claim ledger + the mechanical unsoundness cause; present only when banking is on
   shadowVerdict?: ShadowVerdict;               // Phase-1 SHADOW · cards #596/#597 — the positive-shape pole computed BESIDE the real verdict; present only when AUDIT_POSITIVE_VERDICT_POLE is on; NEVER authoritative
+  /** WHY each binding document is uncovered, not just WHICH. documentsCovered already decided this at every
+   *  exit and only console.warn-ed it, so the record kept the name list and discarded the cause — which is
+   *  why "48 of 52 documents unanalyzed" could not be broken down without a replay. Lives HERE, in the
+   *  capture-only slot, deliberately: putting it on `coverage` would place it where the verdict path reads. */
+  docUncoveredDetail?: Array<{ doc: string; reason: UncoveredReason }>;
 }
 
 /** P0 — the manifest: binding UCF sections that are actually PRESENT (non-empty) in this package's source.
@@ -813,6 +818,16 @@ export function groundedSourceRegionNames(fullSource: string, findings: TypedFin
   return out;
 }
 
+/** WHY a binding document ended up uncovered. A CLOSED set on purpose: a new exit must name itself here
+ *  rather than fall into a catch-all, because "other" is exactly the value that would make this recorder
+ *  useless the first time the function grows a branch. */
+export type UncoveredReason =
+  | "unreadable"                    // no machine-readable text — never analyzable, honest INCOMPLETE
+  | "no_grounded_finding"           // read, but nothing grounded a finding in it (the 48-of-52 case)
+  | "extraction_spans_rejected"     // spans were offered, none verbatim in-region and absent from primary
+  | "attestation_rejected_hard_bar" // provably read + attested, but eligibility-bar language forbids attesting it
+  | "no_attestation";               // construction path: no sealed per-doc attestation, or it had no text
+
 export function documentsCovered(
   fullSource: string,
   findings: TypedFinding[],
@@ -823,7 +838,7 @@ export function documentsCovered(
   // 2026-08-17. Spans are verbatim text, never findings: extraction output may CREDIT COVERAGE and may
   // never reach the verdict (CEO ruling 2026-08-17).
   opts?: { docsRead?: string[]; attestations?: string[]; extractedSpans?: Array<{ doc: string; excerpt: string }> },
-): { complete: boolean; uncovered: string[] } {
+): { complete: boolean; uncovered: string[]; uncoveredDetail?: Array<{ doc: string; reason: UncoveredReason }> } {
   const regions = docRegions(fullSource);
   if (regions.length <= 1) return { complete: true, uncovered: [] }; // single-doc package — section completeness governs
   const primaryNorm = norm(regions.find((r) => r.isPrimary)?.text ?? "");
@@ -863,6 +878,12 @@ export function documentsCovered(
     spansByDoc.set(k, list);
   }
   const uncovered: string[] = [];
+  // WHY each document is uncovered. The function already KNOWS this at every exit and was only ever
+  // console.warn-ing it, so the record kept the NAME list and threw the cause away — which is why "48 of 52
+  // documents unanalyzed" needed a replay to break down. Same capture-only posture as the rest: additive,
+  // read by nobody, and `complete`/`uncovered` are untouched so no consumer changes behaviour.
+  const uncoveredDetail: Array<{ doc: string; reason: UncoveredReason }> = [];
+  const markUncovered = (name: string, reason: UncoveredReason): void => { uncovered.push(name); uncoveredDetail.push({ doc: name, reason }); };
   for (const r of regions) {
     if (r.isPrimary) continue;                                           // primary solicitation — handled by section completeness
     if (!isBindingDoc({ role: "attachment", name: r.name })) continue;   // non-binding attachment (offeror-fill) — exempt
@@ -870,7 +891,7 @@ export function documentsCovered(
     // binding attachment whose region carries no machine-readable text (failed extraction / scanned / empty) was
     // NOT analyzed — its obligations were never extractable, so "0 obligations" is not proof of coverage. Flag it
     // uncovered ⇒ INCOMPLETE (the safe direction); never let a content-loss doc pass as read_no_obligation.
-    if (!hasEngineText(r.text)) { uncovered.push(r.name); continue; }
+    if (!hasEngineText(r.text)) { markUncovered(r.name, "unreadable"); continue; }
     const obs = obligationsOf(r.text).obligations;
     if (!obs.length) {
       // DETERMINISTIC FLOOR on the read_no_obligation valve too (Gauntlet #350 ADD-7 — the SECOND hard-bar bypass): a
@@ -934,6 +955,10 @@ export function documentsCovered(
       return true;
     })) continue;
     const nName = nameKey(r.name);
+    // Default cause: the document was READ and nothing grounded a finding in it. Narrowed below only when a
+    // more specific branch actually declined, so the reason names the LAST gate that said no rather than a
+    // guess. Never widened — an unrecognised path keeps the honest default.
+    let _why: UncoveredReason = "no_grounded_finding";
     // COVERAGE-ONLY EXTRACTION CREDIT (flag AUDIT_DOC_EXTRACTION). Ordered AFTER the grounded finding —
     // a verified finding is the stronger proof and its `continue` should win — and BEFORE attestation,
     // because a verbatim span is EVIDENCE the document was read whereas an attestation is a CLAIM that
@@ -954,6 +979,7 @@ export function documentsCovered(
         continue;
       }
       console.warn(`[coverage] extraction spans REJECTED for "${r.name}" — ${spans.length} span(s) offered, none verbatim in-region and absent from primary → uncovered`);
+      _why = "extraction_spans_rejected";
     }
     if (attSet.has(nName) && readSet.has(nName)) {
       // Brain #347/#348 — a provably-read "no operative obligation" attestation covers the doc, with honesty deferred
@@ -969,10 +995,11 @@ export function documentsCovered(
       const hardHit = ELIGIBILITY_BAR_RE.exec(r.text);
       if (!hardHit) { console.log(`[coverage] attestation honored for "${r.name}" — provably-read, no hard-bar obligation (obligationsOf soft-detected ${obs.length}; honesty = verifier/panel gate)`); continue; }
       console.warn(`[coverage] attestation REJECTED for "${r.name}" — HARD-BAR language present ("${hardHit[0].slice(0, 90)}"); requires a grounded finding, not an attestation → uncovered`);
+      _why = "attestation_rejected_hard_bar";
     }
-    uncovered.push(r.name);
+    markUncovered(r.name, _why);
   }
-  return { complete: uncovered.length === 0, uncovered };
+  return { complete: uncovered.length === 0, uncovered, uncoveredDetail };
 }
 
 // B3 (Brain card 421 Fork-3) — NOTICE-BODY deterministic ELIGIBILITY-BAR floor. documentsCovered runs ELIGIBILITY_BAR_RE
@@ -1701,12 +1728,14 @@ export function excludeUnverifiedInformational(findings: TypedFinding[]): { kept
  *     zero groundable obligations" ⇒ covered WITHOUT a finding-in-doc (the drawings-PDF relief valve);
  *   • has obligations ⇒ still needs a grounded finding IN the doc's region (never suppresses a real obligation —
  *     Fix-2 condition 3). Attestation reads the SEALED FULL-TEXT sweep, never the digest self-certifying. */
-export function constructionDocumentsCovered(ctx: AuditToolContext, findings: TypedFinding[]): { complete: boolean; uncovered: string[] } {
+export function constructionDocumentsCovered(ctx: AuditToolContext, findings: TypedFinding[]): { complete: boolean; uncovered: string[]; uncoveredDetail?: Array<{ doc: string; reason: UncoveredReason }> } {
   const regions = docRegions(ctx.fullSource);
   if (regions.length <= 1) return { complete: true, uncovered: [] };
   const attByName = new Map((ctx.constructionManifest?.docAttestations ?? []).map((a) => [a.name, a]));
   const primaryNorm = norm(regions.find((r) => r.isPrimary)?.text ?? "");
   const uncovered: string[] = [];
+  const uncoveredDetail: Array<{ doc: string; reason: UncoveredReason }> = [];
+  const markUncovered = (name: string, reason: UncoveredReason): void => { uncovered.push(name); uncoveredDetail.push({ doc: name, reason }); };
   // R7 D3 / R8 P2 (Gauntlet Gate-2) — CROSS-ATTACHMENT excerpt norms, built ONCE (mirrors documentsCovered's line-368
   // hoist; the per-region rebuild was O(N²·L)). Keyed by name so the in-loop check can exclude the current region.
   // Flag-gated under AUDIT_ATTACHMENT_COVERAGE ⇒ empty flag-OFF ⇒ byte-identical to legacy.
@@ -1715,7 +1744,7 @@ export function constructionDocumentsCovered(ctx: AuditToolContext, findings: Ty
     if (r.isPrimary) continue;
     if (!isBindingDoc({ role: "attachment", name: r.name })) continue; // offeror-fill exempt
     const att = attByName.get(r.name);
-    if (!att || !att.hasText) { uncovered.push(r.name); continue; }    // HARD LINE — unread/no-text can NEVER be attested
+    if (!att || !att.hasText) { markUncovered(r.name, att ? "unreadable" : "no_attestation"); continue; }    // HARD LINE — unread/no-text can NEVER be attested
     // (B) Brain card 291 — SWEEP-based attestation (complement): a construction ELEMENT sealed IN this doc (verbatim
     // span + full-text hash at ingest) attests the doc was read + its binding content captured, without a proposer
     // finding — reduces per-doc passes. Insufficient alone for a doc carrying NO element (e.g. a drawings/spec set).
@@ -1738,9 +1767,9 @@ export function constructionDocumentsCovered(ctx: AuditToolContext, findings: Ty
       if (!(ex.length > 0 && nRegion.includes(ex) && !primaryNorm.includes(ex))) return false;
       if (otherAttNorms.some((o) => o.name !== r.name && o.t.includes(ex))) return false;   // shared with ANOTHER attachment → doesn't prove THIS one analyzed
       return true;
-    })) uncovered.push(r.name);
+    })) markUncovered(r.name, "no_grounded_finding");
   }
-  return { complete: uncovered.length === 0, uncovered };
+  return { complete: uncovered.length === 0, uncovered, uncoveredDetail };
 }
 
 // C-19 INTERIM GUARD (Brain C.f — resolution is its OWN tranche; here: detect + disclose, NEVER a verdict cap).
@@ -3200,7 +3229,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // AUDIT_CROSS_FLEET_DEDUP default-OFF ⇒ byte-identical.
   findings = applyCrossFleetDedup(findings, { enabled: process.env.AUDIT_CROSS_FLEET_DEDUP === "true" });
   const _bankDiag: RunDiagnostics | undefined = _preDedupFindings
-    ? { preProcessingFindings: _preDedupFindings, stageCounts: { preDedup: _preDedupFindings.length, postDedup: findings.length }, ...(ver.ledger ? { verifierLedger: ver.ledger } : {}) }
+    ? { preProcessingFindings: _preDedupFindings, stageCounts: { preDedup: _preDedupFindings.length, postDedup: findings.length }, ...(ver.ledger ? { verifierLedger: ver.ledger } : {}), ...(docCoverage.uncoveredDetail?.length ? { docUncoveredDetail: docCoverage.uncoveredDetail } : {}) }
     : undefined;
   const coverageV2 = GATE_V2_ENABLED ? gradeCoverageV2(attestations, { locate: (ob) => locateObligationContext(ctx.fullSource, ob), verifyRecitalPresence: (ob) => verifyRecitalInSource(ctx.fullSource, ob), consequenceTails: (ob) => consequenceTailsAfter(ctx.fullSource, ob) }) : undefined;
   // card #576 — an ordinary-course performance-upkeep recital demoted off NHR (coverageV2.caveatRecital, present ONLY
