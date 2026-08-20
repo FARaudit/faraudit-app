@@ -37,6 +37,21 @@ CONTAINS. **The gap between them is unread content — the cap does not shrink t
 hides it.** R1's conclusion strengthens: on the uncapped measure the busiest lane holds 655k tokens
 against an 8-turn budget, so the second axis is not optional at any p50.
 
+> #### ⚑ BOTH AXES MEASURED TOGETHER, 2026-08-19 — necessary, and still not sufficient
+> The second axis is built (`AUDIT_DOC_EXTRACTION_SPEC_BULK`, spec bulk → per-document extraction).
+> Measured over 50 banked packages, busiest lens in tokens:
+>
+> | | p50 | p90 | MAX | over 200k |
+> |---|---:|---:|---:|---:|
+> | axis 1 — ownership only | 30,713 | 153,139 | 655,864 | **4 of 50** |
+> | axis 1 + 2 — spec bulk to extraction | 30,713 | **56,111** | **451,565** | **3 of 50** |
+>
+> It moves **74 documents and 1,388,142 tokens** off the lenses. p90 falls 63%. **MAX falls 31% and
+> three packages are still over context.** So the pair is a large real gain and it does NOT close the
+> tail — which is not a gap in the plan, it is R2 arriving on schedule: those three are the honest-fail
+> class, and the answer to them is the refusal surface that NAMES what it could not read, not a third
+> routing trick. **Do not engineer around them.**
+
 ### R2 — THE OVER-CONTEXT PACKAGE IS AN HONEST-FAIL CASE, NOT A TARGET.
 The engine names the package as exceeding single-pass capacity and refuses. **Do not engineer around
 it.** Same surface as `ENGINE-SIZE-REFUSAL-SURFACE` already in the backlog — **ONE implementation, not

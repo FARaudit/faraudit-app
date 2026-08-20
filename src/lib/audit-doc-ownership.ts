@@ -84,3 +84,17 @@ export function ownerOf(name: string): { owner: Owner; why: string } {
   for (const r of OWNERSHIP_RULES) if (r.re.test(n)) return { owner: r.owner, why: r.why };
   return { owner: "RESIDUE", why: "no observed shape matched" };
 }
+
+/** THE HOMOGENEOUS SPEC BULK — the half of the package a lens read is the wrong tool for.
+ *
+ *  Measured on the flagship (`_spec-bulk-probe.ts`, $0): 28 of 52 posted documents are claimed by the
+ *  technical-specification rule and they carry **434,149 of the package's tokens** — more than every other
+ *  class combined, and the next-largest single class is 100k. 25 of them are sibling UFGS construction
+ *  specs. Nothing in an assignment map can divide a pile that is intrinsically one lane's work, which is
+ *  why ownership alone moved the busiest lens's p50 by 62% and its MAX by only 24% (ruling R1).
+ *
+ *  Keyed on the RULE that claimed the document, not on a second regex. A separate matcher here would be a
+ *  copy that drifts from the map the moment either is edited — and the drift would be silent, because a
+ *  document simply stops being selected and the coverage number falls with no error. */
+export const SPEC_BULK_WHY = "technical specification (UFGS / DOT spec / design narrative)";
+export const isSpecBulk = (name: string): boolean => ownerOf(name).why === SPEC_BULK_WHY;

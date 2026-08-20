@@ -19,6 +19,7 @@ import { recomputeGrounding } from "./audit-grounding-recompute";
 import { detectSoleSourceLock } from "./audit-sole-source-lock";
 import { runSectionFinder, type SectionFinderCall } from "./audit-section-finder";
 import { isBindingDoc, hasEngineText } from "./sam-attachments";
+import { isSpecBulk } from "./audit-doc-ownership";
 import { DOC_EXTRACTION_ENABLED, selectExtractionTargets, runCoverageExtraction } from "./audit-doc-extraction";
 import { looksMojibake } from "./pdf-ocr";
 import { NOTICE_BODY_DOC_NAME } from "./agentic-executor";
@@ -2855,15 +2856,26 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // extraction throws contributes no spans and stays uncovered.
   let extractedSpans: Array<{ doc: string; excerpt: string }> = [];
   if (DOC_EXTRACTION_ENABLED()) {
+    // SPEC-BULK NARROWING (flag AUDIT_DOC_EXTRACTION_SPEC_BULK, default OFF ⇒ target set unchanged).
+    // Ruling R1's second axis: the homogeneous specification pile goes to per-document extraction while
+    // document ownership routes the heterogeneous remainder to lenses. Measured on the flagship: 28 of 52
+    // documents are technical specs carrying 434,149 tokens — more than every other class combined — and
+    // no assignment map can divide a pile that is intrinsically one lane's work (ruling R1).
+    // ⛔ ITS OWN FLAG. It deliberately does NOT read AUDIT_DOC_OWNERSHIP: coupling them would mean arming
+    // one silently changed what the other does, which is the inheritance shape that shipped a guard inert.
+    const specBulkOnly = process.env.AUDIT_DOC_EXTRACTION_SPEC_BULK === "true";
     const targets = selectExtractionTargets(
       docRegions(ctx.fullSource),
       (name) => isBindingDoc({ role: "attachment", name }),
       (text) => hasEngineText(text),
+      specBulkOnly ? isSpecBulk : undefined,
     );
+    // Schedule only — never the result. Default 1 keeps the original serial loop byte-identical.
+    const extractionWidth = Math.max(1, Number(process.env.AGENTIC_DOC_EXTRACTION_CONCURRENCY) || 1);
     const { mapDocument } = await import("./agentic-map");
-    const res = await runCoverageExtraction(targets, (name, text) => mapDocument(name, text, undefined, opts.signal));
+    const res = await runCoverageExtraction(targets, (name, text) => mapDocument(name, text, undefined, opts.signal), { concurrency: extractionWidth });
     extractedSpans = res.spans;
-    console.log(`[coverage] doc-extraction: ${res.read}/${targets.length} document(s) read · ${res.spans.length} verbatim span(s) verified · ${res.failed.length} failed`);
+    console.log(`[coverage] doc-extraction${specBulkOnly ? " (SPEC-BULK only)" : ""} @concurrency=${extractionWidth}: ${res.read}/${targets.length} document(s) read · ${res.spans.length} verbatim span(s) verified · ${res.failed.length} failed`);
     for (const f of res.failed) console.warn(`[coverage] doc-extraction FAILED for "${f.doc}" — ${f.error} (contributes no coverage credit)`);
   }
   // Merge WITHOUT letting either feature turn the other's fields on. Both off ⇒ `undefined`, exactly as

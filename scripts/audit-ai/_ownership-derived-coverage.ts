@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { docRegions } from "../../src/lib/audit-orchestrator";
 import { deriveDocumentCoverage, coverageDisclosure } from "../../src/lib/audit-coverage-definition";
 import { ownerOf, type Owner } from "./_ownership-map-proposal";
+import { isSpecBulk } from "../../src/lib/audit-doc-ownership";
 
 // DATA, not code: the banked records live in the primary checkout and are gitignored. Reading them from
 // there is safe; running CODE from there is the trap this file deliberately avoids by importing ../../src.
@@ -53,29 +54,40 @@ if (cov.unanalysedObligationCarrying.length > 10) console.log(`   … and ${cov.
 console.log(`\n── THE CUSTOMER-VISIBLE DISCLOSURE, derived (doctrine rule 4 — refusal must NAME):`);
 console.log(`   "${coverageDisclosure(cov, { maxNamed: 3 })}"`);
 
-// ── POST-ROUTING PER-LENS LOAD across every banked record that carries a fullSource
+// ── POST-ROUTING PER-LENS LOAD across every banked record that carries a fullSource.
+//    TWO passes, because ruling R1 is that ONE axis is not enough and the pair has to be measured together:
+//      axis 1 alone — ownership routes every document to a lens
+//      axis 1 + 2   — the homogeneous SPEC BULK goes to per-document extraction instead of a lens read
 console.log(`\n══ POST-ROUTING PER-LENS TOKEN DISTRIBUTION (chars/${CPT}), all banked records`);
-const busiest: number[] = [];
-let over = 0, pkgs = 0;
-for (const f of readdirSync(DIR).filter((x) => x.endsWith(".json"))) {
-  let d: any; try { d = JSON.parse(readFileSync(join(DIR, f), "utf8")); } catch { continue; }
-  const fs2: string = d?.input?.fullSource; if (!fs2) continue;
-  const load: Record<string, number> = {};
-  for (const r of docRegions(fs2)) {
-    if (r.name === NOTICE_BODY) continue;                 // universal — never enters the ownership map
-    const { owner } = ownerOf(r.name);
-    const key = owner === "RESIDUE" ? "former_ko" : owner; // residue owner IS former_ko, by rule
-    load[key] = (load[key] ?? 0) + r.text.length;
+const measure = (specBulkToExtraction: boolean) => {
+  const busiest: number[] = [];
+  let over = 0, pkgs = 0, movedDocs = 0, movedTok = 0;
+  for (const f of readdirSync(DIR).filter((x) => x.endsWith(".json"))) {
+    let d: any; try { d = JSON.parse(readFileSync(join(DIR, f), "utf8")); } catch { continue; }
+    const fs2: string = d?.input?.fullSource; if (!fs2) continue;
+    const load: Record<string, number> = {};
+    for (const r of docRegions(fs2)) {
+      if (r.name === NOTICE_BODY) continue;                 // universal — never enters the ownership map
+      if (specBulkToExtraction && isSpecBulk(r.name)) { movedDocs++; movedTok += r.text.length; continue; }
+      const { owner } = ownerOf(r.name);
+      const key = owner === "RESIDUE" ? "former_ko" : owner; // residue owner IS former_ko, by rule
+      load[key] = (load[key] ?? 0) + r.text.length;
+    }
+    const maxTok = Math.max(0, ...LENSES.map((l) => (load[l] ?? 0) / CPT));
+    if (!Number.isFinite(maxTok) || maxTok === 0) continue;
+    busiest.push(maxTok); pkgs++;
+    if (maxTok > CONTEXT_LIMIT_TOK) over++;
   }
-  const maxTok = Math.max(0, ...LENSES.map((l) => (load[l] ?? 0) / CPT));
-  if (!Number.isFinite(maxTok) || maxTok === 0) continue;
-  busiest.push(maxTok); pkgs++;
-  if (maxTok > CONTEXT_LIMIT_TOK) over++;
-}
-const sorted = [...busiest].sort((a, b) => a - b);
-const p = (q: number) => Math.round(sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] ?? 0);
-console.log(`   packages measured                 ${pkgs}`);
-console.log(`   busiest lens, p50                 ${p(0.5).toLocaleString()} tok`);
-console.log(`   busiest lens, p90                 ${p(0.9).toLocaleString()} tok`);
-console.log(`   busiest lens, MAX                 ${Math.round(Math.max(...busiest)).toLocaleString()} tok`);
-console.log(`   packages over ${CONTEXT_LIMIT_TOK.toLocaleString()} tok        ${over} of ${pkgs}`);
+  const sorted = [...busiest].sort((a, b) => a - b);
+  const p = (q: number) => Math.round(sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] ?? 0);
+  return { pkgs, p50: p(0.5), p90: p(0.9), max: Math.round(Math.max(...busiest)), over, movedDocs, movedTok };
+};
+const a1 = measure(false);
+const a2 = measure(true);
+const row = (label: string, m: ReturnType<typeof measure>) =>
+  console.log(`   ${label.padEnd(34)} ${String(m.p50.toLocaleString()).padStart(9)} ${String(m.p90.toLocaleString()).padStart(10)} ${String(m.max.toLocaleString()).padStart(10)}   ${m.over} of ${m.pkgs}`);
+console.log(`   ${"busiest lens".padEnd(34)} ${"p50".padStart(9)} ${"p90".padStart(10)} ${"MAX".padStart(10)}   over ${CONTEXT_LIMIT_TOK.toLocaleString()}`);
+row("axis 1 — ownership only", a1);
+row("axis 1+2 — spec bulk → extraction", a2);
+console.log(`\n   spec-bulk documents moved off the lenses: ${a2.movedDocs} docs · ${Math.round(a2.movedTok / CPT).toLocaleString()} tok across ${a2.pkgs} packages`);
+console.log(`   packages still over context: ${a1.over} → ${a2.over}`);
