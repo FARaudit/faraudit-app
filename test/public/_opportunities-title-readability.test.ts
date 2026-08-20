@@ -20,6 +20,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 export {}; // module scope (harness memory: tsx script-scope redeclare collisions)
 import { readFileSync } from "node:fs";
+import { unscopedAnchorColourRules } from "./_link-specificity";
 import path from "node:path";
 import vm from "node:vm";
 
@@ -144,13 +145,14 @@ ok(/view notice/.test(DSOJS) && /o\.ui_link/.test(DSOJS) && /target="_blank"/.te
 
 /* The trap the file documents at line 61: a plainly-written dark link rule is 0-1-1,
    outranks .btn-open, and drops the primary button's label to 4.25:1. */
-/* COMMENTS STRIPPED FIRST. The warning three lines above this rule names the very
-   selector being banned, so a raw match reads the prose and reports the defect it is
-   warning about. Match CSS, never the text beside it. */
+/* ONE DETECTOR, SHARED. This used to ban the literal string `[data-theme="dark"] a{`,
+   which is the wrong shape — the trap belongs to any page-wide rule colouring a bare
+   anchor, and to any component that IS an anchor, not to that one selector. The general
+   form lives in _link-specificity.test.ts and is imported rather than restated. */
 const CSS_ONLY = OPPS.replace(/\/\*[\s\S]*?\*\//g, "");
-ok(!/(^|[^:])\[data-theme="dark"\]\s+a\s*\{/m.test(CSS_ONLY),
-  "no un-scoped [data-theme=\"dark\"] a{} rule was introduced",
-  "that selector repaints .btn-open's label to 4.25:1");
+ok(unscopedAnchorColourRules(OPPS).length === 0,
+  "every bare-anchor colour rule is at zero specificity",
+  "a 0-1-1 rule out-specifies .btn-open and repaints its label to 4.25:1");
 
 console.log("\nE · falsifiability (planted positive)");
 // Plant the tempting over-reach: strip the identifiers to 'clean up' the title.
@@ -166,10 +168,10 @@ ok(!/text-decoration\s*:\s*underline/.test(plantedRule),
   "removing the at-rest underline IS caught by the F checks",
   "the planted rule yields no underline");
 // Plant the documented contrast trap.
-const plantedTrap = CSS_ONLY.replace(":where([data-theme=\"dark\"]) :where(a){", "[data-theme=\"dark\"] a{");
-ok(/(^|[^:])\[data-theme="dark"\]\s+a\s*\{/m.test(plantedTrap),
+const plantedTrap = CSS_ONLY.replace(':where([data-theme="dark"]) :where(a){', '[data-theme="dark"] a{');
+ok(unscopedAnchorColourRules(plantedTrap).length > 0,
   "un-scoping the dark link rule IS caught by the F checks",
-  "the 0-1-1 selector is detected");
+  "the 0-1-1 selector is detected by the shared detector");
 
 console.log(`\n${fail === 0 ? "✅ ALL PASS" : `❌ ${fail} RED`} — ${pass} check(s) green`);
 process.exit(fail === 0 ? 0 : 1);
