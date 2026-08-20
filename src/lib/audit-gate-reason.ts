@@ -42,7 +42,11 @@ export function gateCause(audit: Record<string, unknown>): { head: string; body:
     const one = unanalyzed.length === 1;
     return {
       head: `${unanalyzed.length} document${one ? "" : "s"} read but not analyzed`,
-      body: `${names} ${one ? "was" : "were"} retrieved in full, but the audit produced no grounded finding from ${one ? "it" : "them"} — so nothing below reflects ${one ? "its" : "their"} contents. The export is held back because the report is not a complete picture of this solicitation. Read ${one ? "that document" : "those documents"} directly before pricing or bidding. Re-running will not change this.`,
+      // "produced no grounded finding from them" is FALSE for one class — a document credited only by an
+      // excerpt it shares with a sibling did have a finding grounded in text it contains. "nothing below is
+      // grounded in them SPECIFICALLY" is true of both classes, and the per-document reason (documents.unanalyzed[].reason)
+      // carries the distinction for anyone who opens it.
+      body: `${names} ${one ? "was" : "were"} retrieved in full, but nothing below is grounded in ${one ? "it" : "them"} specifically — so nothing below reflects ${one ? "its" : "their"} contents. The export is held back because the report is not a complete picture of this solicitation. Read ${one ? "that document" : "those documents"} directly before pricing or bidding. Re-running will not change this.`,
     };
   }
   if (comp.honest_fail === true) {

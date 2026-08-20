@@ -101,9 +101,14 @@ export function selectExtractionTargets(
   regions: Array<{ name: string; text: string; isPrimary: boolean }>,
   isBinding: (name: string) => boolean,
   isReadable: (text: string) => boolean,
+  // NARROW THE TARGET SET (ruling R1's second axis). Absent ⇒ every readable binding document, exactly as
+  // before. Supplied ⇒ only the documents it admits — the caller passes the SPEC-BULK predicate so the
+  // homogeneous specification pile goes to extraction while ownership routes the heterogeneous remainder
+  // to lenses. The two axes are complementary: neither one alone gets the busiest lane inside budget.
+  restrictTo?: (name: string) => boolean,
 ): Array<{ name: string; text: string }> {
   return regions
-    .filter((r) => !r.isPrimary && isBinding(r.name) && isReadable(r.text))
+    .filter((r) => !r.isPrimary && isBinding(r.name) && isReadable(r.text) && (restrictTo ? restrictTo(r.name) : true))
     .map((r) => ({ name: r.name, text: r.text }));
 }
 
@@ -121,18 +126,43 @@ export function selectExtractionTargets(
 export async function runCoverageExtraction(
   targets: Array<{ name: string; text: string }>,
   mapOne: (name: string, text: string) => Promise<DocExtract>,
+  // BOUNDED CONCURRENCY. Default 1 ⇒ the original serial loop, byte-identical. The serial shape is what
+  // made this unusable at real package sizes: 28 spec documents on the flagship, one model call each,
+  // strictly sequential, against a wall-clock budget the whole audit shares. Concurrency changes ONLY the
+  // schedule — never the result: `spans` is assembled by INDEX below, so the output is identical at any
+  // width. That property is asserted in the gate rather than assumed, because a concurrent rewrite whose
+  // output depended on completion order would be a reproducibility bug that only shows up under load.
+  opts?: { concurrency?: number },
 ): Promise<{ spans: ExtractedSpan[]; read: number; failed: Array<{ doc: string; error: string }> }> {
+  const width = Math.max(1, Math.floor(opts?.concurrency ?? 1));
+  const perTarget: Array<ExtractedSpan[] | null> = new Array(targets.length).fill(null);
+  const failedAt: Array<{ doc: string; error: string } | null> = new Array(targets.length).fill(null);
+  let next = 0;
+
+  // FAILURE DIRECTION IS UNCHANGED AND IS THE WHOLE POINT: each target is caught individually, so one
+  // document that throws or times out contributes no spans and stays uncovered. Never Promise.all over
+  // the raw promises — a single rejection would discard the coverage every other document earned.
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      const i = next++;
+      if (i >= targets.length) return;
+      const t = targets[i];
+      try {
+        const extract = await mapOne(t.name, t.text);
+        perTarget[i] = verifySpans(extract, t.text);
+      } catch (e) {
+        failedAt[i] = { doc: t.name, error: String((e as Error)?.message ?? e).slice(0, 200) };
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(width, Math.max(1, targets.length)) }, () => worker()));
+
   const spans: ExtractedSpan[] = [];
   const failed: Array<{ doc: string; error: string }> = [];
   let read = 0;
-  for (const t of targets) {
-    try {
-      const extract = await mapOne(t.name, t.text);
-      read++;
-      spans.push(...verifySpans(extract, t.text));
-    } catch (e) {
-      failed.push({ doc: t.name, error: String((e as Error)?.message ?? e).slice(0, 200) });
-    }
+  for (let i = 0; i < targets.length; i++) {
+    if (perTarget[i]) { read++; spans.push(...perTarget[i]!); }
+    if (failedAt[i]) failed.push(failedAt[i]!);
   }
   return { spans, read, failed };
 }
