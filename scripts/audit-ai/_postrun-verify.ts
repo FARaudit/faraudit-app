@@ -37,7 +37,12 @@ const PRED = {
   analysedBefore: 3,            // the pre-arc baseline under the R3 definition, run 3b5bba30
   engineCoveredBefore: 8,       // what the engine's own path said before the unique-excerpt fix
   specDocs: 28,                 // technical specifications routed to extraction
-  busiestLaneOverBy: 1,         // former_ko owns 8 against a 7-read budget at AUDIT_LENS_MAX_TURNS=8
+  busiestLaneOverBy: 0,         // AUDIT_LENS_MAX_TURNS RAISED TO 10 (CEO, 2026-08-20) ⇒ 9 reads; the
+                                //   flagship's busiest lane owns 8 and is now WITHIN capacity. Re-measured
+                                //   at the new budget before the fire: 1 of 50 packages remains beyond it
+                                //   and this is not one of them. The prediction below was rewritten for the
+                                //   config that will ACTUALLY run — a prediction banked against a superseded
+                                //   setting grades the run on a question nobody asked.
 };
 
 const fullSource: string = rec?.input?.fullSource ?? "";
@@ -88,6 +93,6 @@ console.log(`\n── COST`);
 const cost = rec?.billing ?? {};
 console.log(`   ${JSON.stringify(cost).slice(0, 300)}`);
 
-console.log(`\n⚠ KNOWN LIMIT GOING IN: at AUDIT_LENS_MAX_TURNS=8 the busiest lane on this package owns ${PRED.busiestLaneOverBy} document`);
-console.log(`   more than it has turns to open. Expect at least that one to come back unanalysed — it is`);
-console.log(`   arithmetic, not a defect, and card #860 is the ruling on whether to raise the budget.`);
+console.log(`\n✅ CAPACITY GOING IN: AUDIT_LENS_MAX_TURNS=10 ⇒ 9 reads. The busiest lane on this package owns 8,`);
+console.log(`   so every owned document is reachable. If one still comes back unanalysed it is a REAL finding`);
+console.log(`   about the lens, not arithmetic — which is exactly what raising the budget was for.`);
