@@ -135,9 +135,14 @@ export function deriveAnalyzedDocuments(
       // excerpt it shares with a sibling DID have a finding grounded in text it contains — the text just was
       // not distinctive to it. Saying "no finding was grounded in it" there is a confident-wrong claim on a
       // customer surface, which is the class this whole arc exists to remove. So the reason is per-document.
-      reason: (reasons ?? []).find((x) => x.doc === name)?.reason === "shared_excerpt_only"
-        ? "retrieved in full, but the only finding reaching it quotes text that also appears in another document — nothing analyzed THIS document specifically"
-        : "retrieved in full, but no finding was grounded in it — content NOT analyzed",
+      reason: ((): string => {
+        const why = (reasons ?? []).find((x) => x.doc === name)?.reason;
+        if (why === "beyond_single_pass_capacity")
+          return "retrieved in full, but this package is larger than one audit pass can read — the reviewer that owns this document had no capacity left to open it";
+        if (why === "shared_excerpt_only")
+          return "retrieved in full, but the only finding reaching it quotes text that also appears in another document — nothing analyzed THIS document specifically";
+        return "retrieved in full, but no finding was grounded in it — content NOT analyzed";
+      })(),
     })),
   };
 }

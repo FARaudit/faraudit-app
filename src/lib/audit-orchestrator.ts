@@ -20,6 +20,7 @@ import { detectSoleSourceLock } from "./audit-sole-source-lock";
 import { runSectionFinder, type SectionFinderCall } from "./audit-section-finder";
 import { isBindingDoc, hasEngineText } from "./sam-attachments";
 import { isSpecBulk } from "./audit-doc-ownership";
+import { SIZE_REFUSAL_ENABLED, assessSinglePassCapacity } from "./audit-capacity";
 import { DOC_EXTRACTION_ENABLED, selectExtractionTargets, runCoverageExtraction } from "./audit-doc-extraction";
 import { looksMojibake } from "./pdf-ocr";
 import { NOTICE_BODY_DOC_NAME } from "./agentic-executor";
@@ -828,6 +829,7 @@ export type UncoveredReason =
   | "extraction_spans_rejected"     // spans were offered, none verbatim in-region and absent from primary
   | "attestation_rejected_hard_bar" // provably read + attested, but eligibility-bar language forbids attesting it
   | "shared_excerpt_only"           // the only excerpt reaching it is verbatim in ANOTHER document too — proves the phrase was read, not this document
+  | "beyond_single_pass_capacity"   // the lens that owns it had no turn left to open it — structurally unreadable in one pass, not merely unanalyzed
   | "no_attestation";               // construction path: no sealed per-doc attestation, or it had no text
 
 export function documentsCovered(
@@ -839,7 +841,11 @@ export function documentsCovered(
   // opts ships inert while passing its own tests — the placebo shape named at :858 and caught again on
   // 2026-08-17. Spans are verbatim text, never findings: extraction output may CREDIT COVERAGE and may
   // never reach the verdict (CEO ruling 2026-08-17).
-  opts?: { docsRead?: string[]; attestations?: string[]; extractedSpans?: Array<{ doc: string; excerpt: string }> },
+  // `beyondCapacity` — documents whose owning lens had no turn left to open them (flag AUDIT_SIZE_REFUSAL).
+  // REASON ONLY: it never covers a document and never uncovers one that a grounded finding covered. It
+  // sharpens "read but nothing grounded in it" into "the lane that owns it could not reach it", which is a
+  // different fact and the one a customer can act on. Absent ⇒ every reason is exactly what it was.
+  opts?: { docsRead?: string[]; attestations?: string[]; extractedSpans?: Array<{ doc: string; excerpt: string }>; beyondCapacity?: string[] },
 ): { complete: boolean; uncovered: string[]; uncoveredDetail?: Array<{ doc: string; reason: UncoveredReason }> } {
   const regions = docRegions(fullSource);
   if (regions.length <= 1) return { complete: true, uncovered: [] }; // single-doc package — section completeness governs
@@ -974,7 +980,8 @@ export function documentsCovered(
     // Default cause: the document was READ and nothing grounded a finding in it. Narrowed below only when a
     // more specific branch actually declined, so the reason names the LAST gate that said no rather than a
     // guess. Never widened — an unrecognised path keeps the honest default.
-    let _why: UncoveredReason = sharedOnly ? "shared_excerpt_only" : "no_grounded_finding";
+    const beyondCap = (opts?.beyondCapacity ?? []).some((n) => nameKey(n) === nameKey(r.name));
+    let _why: UncoveredReason = beyondCap ? "beyond_single_pass_capacity" : sharedOnly ? "shared_excerpt_only" : "no_grounded_finding";
     // COVERAGE-ONLY EXTRACTION CREDIT (flag AUDIT_DOC_EXTRACTION). Ordered AFTER the grounded finding —
     // a verified finding is the stronger proof and its `continue` should win — and BEFORE attestation,
     // because a verbatim span is EVIDENCE the document was read whereas an attestation is a CLAIM that
@@ -2854,6 +2861,22 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // Cost is measured, not assumed: 52 documents on the largest banked package chunk to 53 calls,
   // ~$1.07 unbatched on the extractor tier. Failure direction is toward UNCOVERED — a document whose
   // extraction throws contributes no spans and stays uncovered.
+  // SINGLE-PASS CAPACITY (flag AUDIT_SIZE_REFUSAL, default OFF ⇒ `beyondCapacity` stays empty ⇒ every
+  // uncovered reason is exactly what it was). Ruling R2: a package a lens cannot even OPEN in its turn
+  // budget is an honest-fail case, and the engine must NAME it rather than read a few documents, submit,
+  // and leave the rest indistinguishable from documents that held nothing. ONE implementation — the gap
+  // list already names uncovered documents, so this only sharpens their REASON.
+  // The threshold is DERIVED from the live turn budget, never hardcoded: raise AUDIT_LENS_MAX_TURNS and
+  // the refusal population shrinks with no edit here (measured: 8 turns ⇒ 3 of 50, 16 turns ⇒ 0 of 50).
+  const capacity = SIZE_REFUSAL_ENABLED()
+    ? assessSinglePassCapacity(docRegions(ctx.fullSource).map((r) => r.name), {
+        maxTurns: Number(process.env.AUDIT_LENS_MAX_TURNS) || 8,
+        specBulkToExtraction: DOC_EXTRACTION_ENABLED() && process.env.AUDIT_DOC_EXTRACTION_SPEC_BULK === "true",
+      })
+    : null;
+  if (capacity && !capacity.withinCapacity) {
+    console.warn(`[capacity] BEYOND SINGLE-PASS CAPACITY — busiest lens "${capacity.busiest?.lens}" owns ${capacity.busiest?.documents} document(s) against a ${capacity.readTurns}-read budget; ${capacity.beyondCapacity.length} document(s) cannot be opened: ${capacity.beyondCapacity.join(", ")}`);
+  }
   let extractedSpans: Array<{ doc: string; excerpt: string }> = [];
   if (DOC_EXTRACTION_ENABLED()) {
     // SPEC-BULK NARROWING (flag AUDIT_DOC_EXTRACTION_SPEC_BULK, default OFF ⇒ target set unchanged).
@@ -2880,8 +2903,9 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   }
   // Merge WITHOUT letting either feature turn the other's fields on. Both off ⇒ `undefined`, exactly as
   // before ⇒ byte-identical.
-  const coverageOpts = (attCoverageOpts || extractedSpans.length)
-    ? { ...(attCoverageOpts ?? {}), ...(extractedSpans.length ? { extractedSpans } : {}) }
+  const beyondCapacity = capacity && !capacity.withinCapacity ? capacity.beyondCapacity : undefined;
+  const coverageOpts = (attCoverageOpts || extractedSpans.length || beyondCapacity?.length)
+    ? { ...(attCoverageOpts ?? {}), ...(extractedSpans.length ? { extractedSpans } : {}), ...(beyondCapacity?.length ? { beyondCapacity } : {}) }
     : undefined;
   // SOURCE (Gauntlet #350 R6 — REVERTS the R3 groundingSource alignment): documentsCovered parses DOCUMENT regions by
   // the "==== DOCUMENT: name ====" delimiter, which ONLY fullSource carries (assembleFullSource writes one per doc when
