@@ -338,9 +338,45 @@ button{font-family:inherit}
 .pc-when .pc-dl{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--tertiary);letter-spacing:.02em}
 .pc-main{grid-area:main;min-width:0;display:flex;flex-direction:column;gap:5px}
 .pc-title{font-size:14.5px;font-weight:800;color:var(--ink);letter-spacing:-.01em;line-height:1.3;display:block;text-decoration:none}
-/* The title is now an anchor to the notice's own page. It must not read as a link
-   until pointed at — a card of blue underlined titles competes with the actions. */
-a.pc-title:hover{color:var(--accent-deep);text-decoration:underline}
+/* THE TITLE IS THE DOORWAY AND IT HAS TO LOOK LIKE ONE. It is an anchor to the
+   notice's own page, and at rest it used to be indistinguishable from a heading:
+   ink, no underline, the same as every other line in the card. The only signals
+   were hover and the pointer cursor, and NEITHER EXISTS ON TOUCH — a tablet reader
+   could not learn the title was tappable except by tapping one at random.
+
+   The original objection stands and is honoured: "a card of blue underlined titles
+   competes with the actions." The underline below carries NO HUE — it is --mute on
+   an unchanged ink title, so the affordance is present at rest without adding a
+   third blue to a card that already has Run audit and the SAM.gov link.
+
+   ⛔ DO NOT RESTATE THIS AS `[data-theme="dark"] a{...}`. That selector is 0-1-1,
+   it outranks .btn-open, and it repaints the primary button's label to 4.25:1 —
+   the trap documented at the top of this file. Anything added here stays scoped to
+   .pc-title. */
+a.pc-title{color:var(--ink);text-decoration:underline;text-decoration-color:var(--mute);text-decoration-thickness:1px;text-underline-offset:3px}
+a.pc-title:hover{color:var(--accent-deep);text-decoration-color:var(--accent-deep);text-decoration-thickness:2px}
+/* Scoped to the CLASS, so it is 0-2-1 and cannot reach .btn-open. This is the same
+   rule the warning above bans in its UNSCOPED form. */
+[data-theme="dark"] a.pc-title:hover{color:var(--accent-light);text-decoration-color:var(--accent-light)}
+/* Keyboard is the third input with no hover. */
+a.pc-title:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+/* TAP TARGET. Measured at 390px across all 180 live rows: most titles wrap and are
+   nowhere near too small (median 132px), but 14 OF 180 fall under the 44px minimum and
+   the shortest is exactly 19px. Padding with a cancelling negative margin lifts those
+   to 45px and leaves .pc-main's height untouched — measured 808px both with and
+   without.
+
+   NO `display:inline-block` HERE, DELIBERATELY. .pc-main is `display:flex`, so a
+   flex item's display is blockified — `inline-block` computes to `block` and the
+   declaration is inert. It reads as intent the layout has already overruled, which is
+   worse than absent. The padding is what does the work.
+
+   Accepted trade: the enlarged region overlaps the buyer line by 8px, so a tap in that
+   sliver opens the notice. The buyer line is not itself interactive, so that is the
+   same destination rather than a stolen one. Breakpoint is the page's own 1000px. */
+@media(max-width:1000px){
+  a.pc-title{padding:13px 0;margin:-13px 0}
+}
 .pc-buyer{font-size:12.5px;color:var(--ink-2);line-height:1.35}
 .pc-buyer b{font-weight:700;color:var(--ink)}
 .pc-id{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--tertiary)}
