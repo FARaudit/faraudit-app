@@ -73,7 +73,7 @@ export interface ConstructionManifest {
 // relief valve then fires ONLY on a genuinely prose-free drawing set. If obligationsOf's verb list ever changes,
 // this must stay a superset (guarded by the imperative-spec regression test).
 const OBLIGATION_RE = /\b(?:shall|must|provide|submit|furnish|required|quote|deliver|install|erect|construct|responsible\s+for|is\s+required\s+to|are\s+required\s+to|no\s+later\s+than|at\s+no\s+(?:additional|extra)\s+cost|to\s+be\s+provided\s+by)\b/gi;
-function countGroundableObligations(text: string): number {
+export function countGroundableObligations(text: string): number {
   return (text.match(OBLIGATION_RE) ?? []).length;
 }
 
