@@ -385,7 +385,7 @@ export async function executeAgenticPrimary(
   // cost the 3.0·doc OCR time this run). Snapshot here so the projection matches the card's calibration (scannedDocs
   // = docs that went through OCR). Null when there's no ingestion meta (single-doc upload → census fallback classifies).
   const preOcrScannedDocCount = input.ingestion?.files.filter((f) => f.ingested && f.has_text !== true).length ?? null;
-  if ((isEnvOn(process.env.AUDIT_WORKER_OCR) || isEnvOn(process.env.AUDIT_OCR_TABLE_CONFIRM)) && input.ingestion) {
+  if (input.ingestion) { // AUDIT_WORKER_OCR + AUDIT_OCR_TABLE_CONFIRM retired 2026-08-20 — both true on both surfaces
     const apiKey = process.env.ANTHROPIC_API_KEY;
     // Name → base64 map over every doc the executor holds bytes for (primary + attachments). Normalised so a
     // display-name vs source-name skew still matches; a miss just leaves the doc content-loss (safe). SHARED by the
@@ -409,7 +409,7 @@ export async function executeAgenticPrimary(
     // TIMING (Brain card #623-5(i)): this vision-confirm loop can eat MINUTES on a scanned-drawing package (one
     // Opus/crossdoc vision call per residual-bearing doc) yet was previously unmeasured — d7de0285 stalled partly
     // here. Per-doc + total wall now emit under AUDIT_TIMING_PREPANEL (pure logging ⇒ verdict-inert).
-    if (isEnvOn(process.env.AUDIT_WORKER_OCR)) {
+    if (true) { // AUDIT_WORKER_OCR retired 2026-08-20
       const _tOcr3 = Date.now();
       const residualDocs = input.ingestion.files.filter((f) => f.ingested && isBindingDoc(f) && f.has_text !== true && (f.ocr_residual?.length ?? 0) > 0);
       let _ocr3Calls = 0;
@@ -443,7 +443,7 @@ export async function executeAgenticPrimary(
     // never trusted (WRONG_VERDICT=0). Peripheral caught misreads (decision number, dates) do NOT block the rate rows.
     // Does NOT flip has_text (the doc stays honestly ocr_held via the register) — only CONFIRMED rows enter analysis.
     // Flag OFF ⇒ this block never runs (byte-identical).
-    if (isEnvOn(process.env.AUDIT_OCR_TABLE_CONFIRM)) {
+    if (true) { // AUDIT_OCR_TABLE_CONFIRM retired 2026-08-20
       const docText = (name: string): string => {
         const marker = `==== DOCUMENT: ${name} ====`;
         const i = fullSource.indexOf(marker);
@@ -860,7 +860,7 @@ export async function executeAgenticPrimary(
       payload.documents.complete = false;
       // OCR-HELD REGISTER (card #471 ruling A) — route an OCR-recovered-but-held doc to the read-list caveat, a genuine
       // no-text doc to `missing`. Flag-OFF ⇒ all → `missing` ⇒ byte-identical. Never touches has_text/the hold.
-      const { missing: nlMissing, ocrHeld } = splitContentLoss(contentLoss, isEnvOn(process.env.AUDIT_OCR_HELD_REGISTER));
+      const { missing: nlMissing, ocrHeld } = splitContentLoss(contentLoss, true); // AUDIT_OCR_HELD_REGISTER retired 2026-08-20
       for (const m of nlMissing) payload.documents.missing.push(m);
       const heldReg = (payload.documents as { ocr_held?: Array<{ name: string; residuals: number; reason: string }> }).ocr_held;
       if (heldReg) for (const h of ocrHeld) heldReg.push(h);

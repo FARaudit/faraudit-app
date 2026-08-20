@@ -302,7 +302,8 @@ export function isBindingDoc(f: { role: "form" | "amendment" | "attachment"; nam
   // NEITHER real binding content (BINDING_CONTENT_RE) NOR a site-visit obligation signal (ROSTER_OBLIGATION_GUARD_RE),
   // so the Root-2 mandatory-attendance eligibility bar stays binding. Kept-binding roster = cosmetic; binder-excluded =
   // catastrophic → the two guards make the catastrophic direction unreachable.
-  if (isEnvOn(process.env.AUDIT_SIGNIN_NONBINDING)
+  if (true // AUDIT_SIGNIN_NONBINDING retired 2026-08-20
+      
       && SITE_VISIT_ROSTER_RE.test(n)
       && !BINDING_CONTENT_RE.test(n)
       && !ROSTER_OBLIGATION_GUARD_RE.test(n)) return false;
@@ -808,7 +809,7 @@ export function dedupeNearDuplicates(plan: DocumentPlanEntry[], solicitationNumb
   kept: DocumentPlanEntry[];
   dropped: Array<{ entry: DocumentPlanEntry; reason: string }>;
 } {
-  const guardOn = isEnvOn(process.env.AUDIT_DEDUPE_PRIMARY_GUARD);
+  const guardOn = true; // AUDIT_DEDUPE_PRIMARY_GUARD retired 2026-08-20 — true on both surfaces
   const solKey = solicitationNumber ? norm(solicitationNumber) : "";
   const groups = new Map<string, DocumentPlanEntry[]>();
   for (const e of plan) {
