@@ -54,5 +54,38 @@ ok("9 a single-region source is returned UNTOUCHED",
    partitionLensSource("only one doc", () => [{ name: "x", text: "only one doc" }]).lensSource === "only one doc",
    "an unparsed source must not partition to empty — that blinds every lens while reporting a saving");
 
-console.log(fail ? `\n✗ ${fail} failed` : `\n✓ 9/9`);
+// ── ⛔ THE FENCE ROUND-TRIP. This is the leg that would have caught the defect that shipped in #736:
+// parseDocRegions builds `text` from the lines AFTER "==== DOCUMENT: name ====" and excludes the fence
+// itself, so joining region texts strips every document boundary. Measured before the fix: 44 of 44
+// banked packages lost ALL regions, 40 of them with ZERO withheld documents. ──
+import { parseDocRegions } from "./primary-doc-resolve";
+
+const fenced = [
+  "==== DOCUMENT: Solicitation - X.pdf ====",
+  "AAAA",
+  "==== DOCUMENT: Attachment N - UFGS 03 30 00.pdf ====",
+  CSI,
+  "==== DOCUMENT: X Statement of Work.pdf ====",
+  "BBBB",
+].join("\n");
+
+const rt = partitionLensSource(fenced, parseDocRegions);
+// The fixture carries a PREAMBLE before the first fence, because that is the byte range a rebuild
+// silently loses: parseDocRegions only starts buffering once it has seen a fence, so everything above
+// the first one is dropped on the floor. A cleaner fixture round-trips by accident and proves nothing —
+// the first version of this leg did exactly that and stayed green when the guard was deleted.
+const untouched = "PREAMBLE THE PARSER NEVER SEES\n==== DOCUMENT: a.pdf ====\nAAAA\n==== DOCUMENT: b.pdf ====\nBBBB";
+ok("10 a package with NOTHING withheld is returned BYTE-IDENTICAL",
+   partitionLensSource(untouched, parseDocRegions).lensSource === untouched,
+   "a package this rule does not even apply to was rebuilt, losing every byte above the first fence");
+
+ok("11 the kept source ROUND-TRIPS through the same parser",
+   parseDocRegions(rt.lensSource).length === 2,
+   `got ${parseDocRegions(rt.lensSource).length} regions, expected 2 — resolvePrimary, docRegions and the coverage ledger all key on these fences`);
+
+ok("12 the surviving fences name the KEPT documents, not the withheld one",
+   parseDocRegions(rt.lensSource).map((r) => r.name).join("|") === "Solicitation - X.pdf|X Statement of Work.pdf",
+   parseDocRegions(rt.lensSource).map((r) => r.name).join("|"));
+
+console.log(fail ? `\n✗ ${fail} failed` : `\n✓ 12/12`);
 process.exit(fail ? 1 : 0);
