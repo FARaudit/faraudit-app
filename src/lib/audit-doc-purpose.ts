@@ -44,6 +44,11 @@ const SPEC_BOOK_RE = /\b(NMDOT|TXDOT|CALTRANS|FDOT|GDOT|INDOT|MNDOT|NCDOT|ODOT|P
 /** UFGS — the DoD Unified Facilities Guide Specifications series. */
 const UFGS_RE = /\bUFGS\b/i;
 
+/** The document fence parseDocRegions reads: "==== DOCUMENT: <name> ====". Defined here so a re-emitted
+ *  source round-trips through the SAME parser that produced the regions. */
+const DOC_FENCE_PREFIX = "==== DOCUMENT: ";
+const DOC_FENCE_SUFFIX = " ====";
+
 export type LensExclusionSignal = "csi-3part" | "spec-book" | "ufgs" | null;
 
 export interface DocPurpose {
@@ -80,15 +85,24 @@ export function partitionLensSource(
 ): LensPartition {
   const regions = regionsOf(fullSource ?? "");
   const withheld: LensPartition["withheld"] = [];
-  const kept: string[] = [];
+  const kept: Array<{ name: string; text: string }> = [];
   for (const r of regions) {
     const p = classifyDocPurpose(r.name, r.text);
     if (p.lensExcluded) withheld.push({ name: r.name, chars: r.text.length, signal: p.signal, reason: p.reason });
-    else kept.push(r.text);
+    else kept.push({ name: r.name, text: r.text });
   }
   // No region markers parsed (single-document source) ⇒ nothing to partition; return the source untouched
   // rather than an empty lensSource, which would blind every lens while reporting a large "saving".
   if (regions.length <= 1) return { lensSource: fullSource ?? "", withheld: [], keptChars: (fullSource ?? "").length, withheldChars: 0 };
-  const lensSource = kept.join("\n\n");
+  // ⛔ NOTHING WITHHELD ⇒ RETURN THE SOURCE BYTE-FOR-BYTE. Rebuilding an unchanged package is not a
+  // no-op: it would re-emit the text without its "==== DOCUMENT: name ====" fences and silently strip
+  // every document boundary from a package this rule does not even apply to. Measured before this
+  // guard existed: 44 of 44 banked packages lost ALL document regions, 40 of them with zero withheld.
+  if (withheld.length === 0) return { lensSource: fullSource ?? "", withheld: [], keptChars: (fullSource ?? "").length, withheldChars: 0 };
+  // ⛔ RE-EMIT THE FENCES. parseDocRegions builds `text` from the lines AFTER the delimiter and does
+  // NOT include the delimiter itself, so joining region texts destroys every document boundary —
+  // resolvePrimary, docRegions, the coverage ledger and the section detector's region walk all key on
+  // these fences. The kept source must round-trip: parseDocRegions(lensSource).length === kept.length.
+  const lensSource = kept.map((r) => `${DOC_FENCE_PREFIX}${r.name}${DOC_FENCE_SUFFIX}\n${r.text}`).join("\n");
   return { lensSource, withheld, keptChars: lensSource.length, withheldChars: withheld.reduce((a, w) => a + w.chars, 0) };
 }
