@@ -283,3 +283,32 @@ export function soleSourceCarveOut(
 
   return null;
 }
+
+/** Could `firmName` and `vendor` be the SAME firm? Deliberately generous — this is the guard on a
+ *  NO_BID, and it answers "might they match", never "do they match".
+ *
+ *  ⛔ THE ASYMMETRY DECIDES THE THRESHOLD. A false NO_BID tells an eligible bidder to walk away from
+ *  a contract they could win. A missed NO_BID costs only the status quo (NHR, which is what shipped
+ *  before). So ANY significant-token overlap returns true and HOLDS the verdict at NHR: "Raytheon
+ *  Technologies" vs "Raytheon" matches, "Raytheon" vs "RTX" does not and would be caught only by the
+ *  carve-out or by a human — which is the correct place for it.
+ *
+ *  Legal suffixes and generic words are stripped BEFORE comparison, so "FARaudit Inc." vs "FARaudit
+ *  Corporation" is a match, while "FARaudit Inc." vs "Raytheon Company" is not — the shared token
+ *  would otherwise be "Inc"/"Company" and every firm on earth would look like every vendor. */
+export function firmMayBeVendor(firmName: string, vendor: string): boolean {
+  const SUFFIX = /\b(inc|incorporated|llc|l\.l\.c|ltd|limited|corp|corporation|company|co|plc|lp|llp|gmbh|sa|nv|bv|ag|pty|holdings|group|technologies|technology|systems|services|solutions|industries|enterprises|international|usa|us)\b/gi;
+  const sig = (s: string): Set<string> => new Set(
+    (s || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(SUFFIX, " ")
+      .split(/\s+/).filter((t) => t.length >= 3),
+  );
+  const a = sig(firmName), b = sig(vendor);
+  // Either side reducing to nothing significant ⇒ UNCOMPARABLE ⇒ treat as "may be" ⇒ NHR.
+  if (a.size === 0 || b.size === 0) return true;
+  for (const t of a) if (b.has(t)) return true;
+  // Containment on the whole normalized string catches "raytheonco" style joins the tokenizer splits apart.
+  const flat = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const fa = flat(firmName), fv = flat(vendor);
+  if (fa.length >= 4 && fv.length >= 4 && (fa.includes(fv) || fv.includes(fa))) return true;
+  return false;
+}

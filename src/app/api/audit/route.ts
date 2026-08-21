@@ -550,7 +550,7 @@ export async function POST(req: NextRequest) {
     try {
       const { data: capRow } = await supabase
         .from("capability_statements")
-        .select("certifications, attributes_v2, size_facts")
+        .select("company_name, certifications, attributes_v2, size_facts")
         .eq("user_id", user.id)
         .maybeSingle();
       bidderProfile = buildBidderProfileFromCapability(capRow, { solicitationNaics: solicitation.naicsCode });

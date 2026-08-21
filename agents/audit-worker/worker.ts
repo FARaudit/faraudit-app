@@ -729,7 +729,7 @@ async function buildInput(row: UserPendingRow): Promise<AuditExecutionInput> {
     try {
       const { data: capRow } = await supabase
         .from("capability_statements")
-        .select("certifications, attributes_v2, size_facts")
+        .select("company_name, certifications, attributes_v2, size_facts")
         .eq("user_id", row.user_id)
         .maybeSingle();
       // solicitation is non-null here (synthesizeFromRow fallback above) — V2 wiring must match the
