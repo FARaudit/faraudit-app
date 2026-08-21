@@ -268,7 +268,7 @@ export async function executeAgenticPrimary(
   // PRE-PANEL TIMING INSTRUMENTATION (card #567, log-only, flag AUDIT_TIMING_PREPANEL default-OFF ⇒ byte-identical).
   // Splits the ~132s blind stretch inside the 270s budget (ingest → assembly → grounding) so a stall is diagnosed,
   // not assumed. Emits nothing behavior-affecting — pure console timing, gated so flag-OFF is a strict no-op.
-  const _timeOn = process.env.AUDIT_TIMING_PREPANEL === "true";
+  const _timeOn = true; // AUDIT_TIMING_PREPANEL retired 2026-08-20
   const _tIngest = Date.now();
   let docs = await buildAgenticDocs({
     primaryName: input.primaryDocName ?? "primary solicitation",
@@ -318,7 +318,7 @@ export async function executeAgenticPrimary(
   // compressor: an over-budget package is shrunk by keeping every BINDING line verbatim (+ context) and dropping
   // only noise, NEVER summarizing. Runs BEFORE the chunked branch and short-circuits it (no paid MAP calls).
   // Flag-OFF ⇒ this branch never runs ⇒ byte-identical to today. (W9126: 2.83M→~331K tok, §M/wage/bonding survive.)
-  const losslessOn = process.env.AUDIT_LOSSLESS_INGEST === "true";
+  const losslessOn = true; // AUDIT_LOSSLESS_INGEST retired 2026-08-20
   const chunkedOn = process.env.AUDIT_CHUNKED_INGEST === "true";
   // The lossless READ budget is sized to the model's 1M-token window (~4M chars), NOT the compression-era 1.4M-char
   // budget (that ceiling forced the summarizer). Default ~3M chars (~750K tok — a safe margin under 1M for the
@@ -605,7 +605,7 @@ export async function executeAgenticPrimary(
   // expert-phase (orchestrator :2232 JOIN). So under the flag the producer runs CONCURRENTLY with the expert-phase and
   // joins at that merge (wall-clock = max, not sum). The finding UNION into deriveVerdict is byte-identical to serial
   // (same set, same merge point, same dedup order). Flag-OFF ⇒ the serial `await runPanel()` path below ⇒ byte-identical.
-  const panelParallel = AGENTIC_PANEL_ENABLED && process.env.AUDIT_PANEL_PARALLEL === "true";
+  const panelParallel = AGENTIC_PANEL_ENABLED; // AUDIT_PANEL_PARALLEL retired 2026-08-20
   let panelPromise: Promise<PanelResult | null> | null = null;
   // The producer, with its graceful degradation preserved EXACTLY (non-abort throw → panel-off; abort → rethrow).
   const runPanel = async (): Promise<PanelResult | null> => {

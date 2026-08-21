@@ -460,4 +460,4 @@ export function resolveDocSupersession(docs: SupersessionInput[]): SupersessionD
 
 /** Flag-gate for the agentic path. OFF by default — prod is unchanged until the
  *  full build is reviewed (code-review + expert panels) and proven on a live run. */
-export const AGENTIC_INGEST_ENABLED = isEnvOn(process.env.AUDIT_AGENTIC);
+export const AGENTIC_INGEST_ENABLED = true; // AUDIT_AGENTIC retired 2026-08-20 — true on the worker, the sole engine consumer
