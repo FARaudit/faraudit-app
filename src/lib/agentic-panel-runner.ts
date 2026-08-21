@@ -27,7 +27,7 @@ import type { TypedFinding } from "./audit-findings";
 // this header came within one grep of refuting a REAL, measured $0.59/run defect on the grounds that the
 // code could not run. A stale comment on a live path does not merely misinform — it launders a defect as
 // unreachable. Verify the caller, not the note about the caller.
-export const AGENTIC_PANEL_ENABLED = process.env.AUDIT_PANEL_JUDGE === "true";
+export const AGENTIC_PANEL_ENABLED = true; // AUDIT_PANEL_JUDGE retired 2026-08-20
 
 // PRODUCER PREFIX CACHE — EVALUATED + REJECTED (card #612-(3), CEO ruling 2026-07-21). The card premise ("the
 // producer re-reads FULL source per-lens ⇒ share one cached prefix to save cost") was DISPROVEN at $0: lenses read
@@ -36,7 +36,7 @@ export const AGENTIC_PANEL_ENABLED = process.env.AUDIT_PANEL_JUDGE === "true";
 // write outweighs the 0.10× reads ⇒ ~+26% cost (probe: _cache-cost-probe.ts). So the shared-prefix path was DELETED,
 // not armed; the stopwatch below is the kept deliverable + the probe is the documented answer. [[feedback_perf_proven_only_live]].
 // AUDIT_PANEL_TIMING — emit the producer stopwatch readout. Pure logging ⇒ verdict/finding-inert in every state.
-const PANEL_TIMING_ON = () => process.env.AUDIT_PANEL_TIMING === "true" || process.env.AUDIT_TIMING_PREPANEL === "true";
+const PANEL_TIMING_ON = () => true; // AUDIT_TIMING_PREPANEL retired 2026-08-20 (it was true, so the || short-circuits regardless of AUDIT_PANEL_TIMING)
 // AUDIT_PANEL_ASYNC_RATIONALE (card #612-(4e)) — the chief-judge is REPORT-ONLY (deriveVerdict owns the verdict
 // via typedFindings). When ON, runPanelJudge returns typedFindings WITHOUT awaiting the judge; the judgment is a
 // promise the executor awaits at the reason-fold (after deriveVerdict), so the ~20-40s judge overlaps the rail.

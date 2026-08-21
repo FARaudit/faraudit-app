@@ -231,13 +231,12 @@ export async function auditPackage(input: AuditPackageInput): Promise<AuditResul
   // L3 (Brain card 265/267) — grounded agentic section-finder. Constructed ONLY when AUDIT_SECTION_FINDER is on,
   // so flag-OFF ⇒ sectionFinder undefined ⇒ L3 never runs (byte-identical, no paid calls). The caller is a
   // LOCATE-only structured call; the offset-string-match gate in runSectionFinder makes a wrong locate fail-safe.
-  const sectionFinder = process.env.AUDIT_SECTION_FINDER === "true"
-    ? makeSectionFinderCaller(
+  // AUDIT_SECTION_FINDER retired 2026-08-20 — true on the worker, the sole engine consumer.
+  const sectionFinder = makeSectionFinderCaller(
         async (a) => (await callStructuredClaude({ apiKey, model: a.model, system: a.system, userPrompt: a.user, schema: a.schema as Record<string, unknown>, maxTokens: a.maxTokens, signal: a.signal, onUsage: input.onUsage, ...(a.cachedSystemPrefix ? { cachedSystemPrefix: a.cachedSystemPrefix } : {}) })).text,
         input.sectionFinderModel ?? modelFor("finder"),
         input.signal,
-      )
-    : undefined;
+      );
 
   return runAgenticAudit({
     ctx,

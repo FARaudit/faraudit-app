@@ -681,7 +681,7 @@ export function buildV4Data(audit: Record<string, unknown>): V4Data {
   // checklist §1 + the V1 legacy renderer (audit-v3-report.ts, which only charged-off INCOMPLETE/OOS, never NHR).
   // Flag AUDIT_NHR_NOCHARGE_SUPPRESS excludes NHR from the chip; INCOMPLETE/OUT_OF_SCOPE untouched.
   // Flag OFF ⇒ NO_VERDICT_POLES.has(pole) unchanged, byte-identical (Rule 61).
-  const NHR_NOCHARGE_SUPPRESS = process.env.AUDIT_NHR_NOCHARGE_SUPPRESS === "true";
+  const NHR_NOCHARGE_SUPPRESS = true; // AUDIT_NHR_NOCHARGE_SUPPRESS retired 2026-08-20 — read true on Railway AND Vercel (this file renders on Vercel, so parity was checked before hardcoding)
   const verdict: V4Verdict = {
     pole,
     band: POLE_BAND[pole] || pole,

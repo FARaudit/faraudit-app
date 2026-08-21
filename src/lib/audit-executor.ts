@@ -235,7 +235,7 @@ export async function executeAudit(
         console.warn(`[FACTS] SAM cross-ref for ${solNum} failed/timed out (non-fatal): ${e instanceof Error ? e.message : e}`);
         return null;
       });
-      if (process.env.AUDIT_TIMING_PREPANEL === "true") console.log(`[timing] prepanel:sam-facts-fetch ${Date.now() - _tSam}ms · ${samFacts ? "hit" : "miss/timeout"}`);
+      console.log(`[timing] prepanel:sam-facts-fetch ${Date.now() - _tSam}ms · ${samFacts ? "hit" : "miss/timeout"}`); // AUDIT_TIMING_PREPANEL retired 2026-08-20
       if (samFacts) {
         // A SAM record with no set-aside is DEFINITIVELY full & open — record that
         // as a known fact, never leave it blank/unknown.

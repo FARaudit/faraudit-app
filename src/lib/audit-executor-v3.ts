@@ -268,7 +268,7 @@ export async function executeAgenticPrimary(
   // PRE-PANEL TIMING INSTRUMENTATION (card #567, log-only, flag AUDIT_TIMING_PREPANEL default-OFF ⇒ byte-identical).
   // Splits the ~132s blind stretch inside the 270s budget (ingest → assembly → grounding) so a stall is diagnosed,
   // not assumed. Emits nothing behavior-affecting — pure console timing, gated so flag-OFF is a strict no-op.
-  const _timeOn = process.env.AUDIT_TIMING_PREPANEL === "true";
+  const _timeOn = true; // AUDIT_TIMING_PREPANEL retired 2026-08-20
   const _tIngest = Date.now();
   let docs = await buildAgenticDocs({
     primaryName: input.primaryDocName ?? "primary solicitation",
@@ -318,7 +318,7 @@ export async function executeAgenticPrimary(
   // compressor: an over-budget package is shrunk by keeping every BINDING line verbatim (+ context) and dropping
   // only noise, NEVER summarizing. Runs BEFORE the chunked branch and short-circuits it (no paid MAP calls).
   // Flag-OFF ⇒ this branch never runs ⇒ byte-identical to today. (W9126: 2.83M→~331K tok, §M/wage/bonding survive.)
-  const losslessOn = process.env.AUDIT_LOSSLESS_INGEST === "true";
+  const losslessOn = true; // AUDIT_LOSSLESS_INGEST retired 2026-08-20
   const chunkedOn = process.env.AUDIT_CHUNKED_INGEST === "true";
   // The lossless READ budget is sized to the model's 1M-token window (~4M chars), NOT the compression-era 1.4M-char
   // budget (that ceiling forced the summarizer). Default ~3M chars (~750K tok — a safe margin under 1M for the
@@ -385,7 +385,7 @@ export async function executeAgenticPrimary(
   // cost the 3.0·doc OCR time this run). Snapshot here so the projection matches the card's calibration (scannedDocs
   // = docs that went through OCR). Null when there's no ingestion meta (single-doc upload → census fallback classifies).
   const preOcrScannedDocCount = input.ingestion?.files.filter((f) => f.ingested && f.has_text !== true).length ?? null;
-  if ((isEnvOn(process.env.AUDIT_WORKER_OCR) || isEnvOn(process.env.AUDIT_OCR_TABLE_CONFIRM)) && input.ingestion) {
+  if (input.ingestion) { // AUDIT_WORKER_OCR + AUDIT_OCR_TABLE_CONFIRM retired 2026-08-20 — both true on both surfaces
     const apiKey = process.env.ANTHROPIC_API_KEY;
     // Name → base64 map over every doc the executor holds bytes for (primary + attachments). Normalised so a
     // display-name vs source-name skew still matches; a miss just leaves the doc content-loss (safe). SHARED by the
@@ -409,7 +409,7 @@ export async function executeAgenticPrimary(
     // TIMING (Brain card #623-5(i)): this vision-confirm loop can eat MINUTES on a scanned-drawing package (one
     // Opus/crossdoc vision call per residual-bearing doc) yet was previously unmeasured — d7de0285 stalled partly
     // here. Per-doc + total wall now emit under AUDIT_TIMING_PREPANEL (pure logging ⇒ verdict-inert).
-    if (isEnvOn(process.env.AUDIT_WORKER_OCR)) {
+    if (true) { // AUDIT_WORKER_OCR retired 2026-08-20
       const _tOcr3 = Date.now();
       const residualDocs = input.ingestion.files.filter((f) => f.ingested && isBindingDoc(f) && f.has_text !== true && (f.ocr_residual?.length ?? 0) > 0);
       let _ocr3Calls = 0;
@@ -443,7 +443,7 @@ export async function executeAgenticPrimary(
     // never trusted (WRONG_VERDICT=0). Peripheral caught misreads (decision number, dates) do NOT block the rate rows.
     // Does NOT flip has_text (the doc stays honestly ocr_held via the register) — only CONFIRMED rows enter analysis.
     // Flag OFF ⇒ this block never runs (byte-identical).
-    if (isEnvOn(process.env.AUDIT_OCR_TABLE_CONFIRM)) {
+    if (true) { // AUDIT_OCR_TABLE_CONFIRM retired 2026-08-20
       const docText = (name: string): string => {
         const marker = `==== DOCUMENT: ${name} ====`;
         const i = fullSource.indexOf(marker);
@@ -605,7 +605,7 @@ export async function executeAgenticPrimary(
   // expert-phase (orchestrator :2232 JOIN). So under the flag the producer runs CONCURRENTLY with the expert-phase and
   // joins at that merge (wall-clock = max, not sum). The finding UNION into deriveVerdict is byte-identical to serial
   // (same set, same merge point, same dedup order). Flag-OFF ⇒ the serial `await runPanel()` path below ⇒ byte-identical.
-  const panelParallel = AGENTIC_PANEL_ENABLED && process.env.AUDIT_PANEL_PARALLEL === "true";
+  const panelParallel = AGENTIC_PANEL_ENABLED; // AUDIT_PANEL_PARALLEL retired 2026-08-20
   let panelPromise: Promise<PanelResult | null> | null = null;
   // The producer, with its graceful degradation preserved EXACTLY (non-abort throw → panel-off; abort → rethrow).
   const runPanel = async (): Promise<PanelResult | null> => {
@@ -860,7 +860,7 @@ export async function executeAgenticPrimary(
       payload.documents.complete = false;
       // OCR-HELD REGISTER (card #471 ruling A) — route an OCR-recovered-but-held doc to the read-list caveat, a genuine
       // no-text doc to `missing`. Flag-OFF ⇒ all → `missing` ⇒ byte-identical. Never touches has_text/the hold.
-      const { missing: nlMissing, ocrHeld } = splitContentLoss(contentLoss, isEnvOn(process.env.AUDIT_OCR_HELD_REGISTER));
+      const { missing: nlMissing, ocrHeld } = splitContentLoss(contentLoss, true); // AUDIT_OCR_HELD_REGISTER retired 2026-08-20
       for (const m of nlMissing) payload.documents.missing.push(m);
       const heldReg = (payload.documents as { ocr_held?: Array<{ name: string; residuals: number; reason: string }> }).ocr_held;
       if (heldReg) for (const h of ocrHeld) heldReg.push(h);

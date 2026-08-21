@@ -228,7 +228,7 @@ export async function extractText(pdfBuffer: Buffer): Promise<ExtractedDocument>
       // flip after the OCR-accuracy Gauntlet clears. Flag OFF ⇒ ocrPdfToText never called ⇒ identical to today (where
       // the binary was absent and OCR no-op'd anyway); the partialFromPages content-loss warning below still fires.
       const needsOcr = meaningfulLength < MIN_TEXT_CHARS_FOR_TEXT_BLOCK || looksGarbled(rawText) || partialFromPages;
-      if (needsOcr && isEnvOn(process.env.AUDIT_WORKER_OCR)) {
+      if (needsOcr) { // AUDIT_WORKER_OCR retired 2026-08-20 — true on both surfaces
         const ocrText = await ocrPdfToText(pdfBuffer);
         // [OCR-DIAG] (Brain card #419 step 4 — close the wage-det telemetry gap). Log the OCR outcome for EVERY
         // OCR-attempted doc: did OCR fire, what did it yield, was it garbled, and (on accept) the gate partition.

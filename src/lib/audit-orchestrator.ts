@@ -3085,7 +3085,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      status bar has no FAR-19 authority, so the allow-list would phantom-demote it to a caution. Holder status
   //      is an UNSTATED profile attribute — keep the bar so it routes to NEEDS_HUMAN_REVIEW ("confirm holder
   //      status"), never a silent caution, never INELIGIBLE (that needs a closed-world profile — a future path).
-  findings = applyEligibilityAuthorityAllowlist(findings, { enabled: process.env.AUDIT_ELIGIBILITY_AUTHORITY_ALLOWLIST === "true", boaIdiqKeep: process.env.AUDIT_BOA_IDIQ_HOLDER_KEEP === "true" });
+  findings = applyEligibilityAuthorityAllowlist(findings, { enabled: true, boaIdiqKeep: process.env.AUDIT_BOA_IDIQ_HOLDER_KEEP === "true" }); // AUDIT_ELIGIBILITY_AUTHORITY_ALLOWLIST retired 2026-08-20 (BOA_IDIQ_HOLDER_KEEP kept — it has a negative control)
 
   // P4.4-quater — INQUIRY-DEADLINE BENIGN GUARD (Brain card 520, R1), default-OFF (Rule 61, === "true"). A lens
   //      mis-types an information-exchange milestone (questions/inquiries/RFI-submission window, Q&A answer-posting
