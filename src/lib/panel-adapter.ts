@@ -10,6 +10,8 @@
 import { detectSections } from "./section-boundary-detector";
 import type { ExtractedDocument } from "./pdf-text-extractor";
 import { checkManifest, type ManifestResult } from "./agentic-panel";
+import { partitionLensSource } from "./audit-doc-purpose";
+import { parseDocRegions } from "./primary-doc-resolve";
 import { detectDocumentClass, checkBiddableContent, routeCommercialSections, ucfHeaderCount, FALLBACK_BUNDLE_KEYS, type DocumentClass } from "./panel-doc-class";
 import { LENS_SECTIONS, LENS_SECTIONS_COMMERCIAL, lensAssignedSections, type PanelLensKey } from "./agentic-sections";
 
@@ -128,7 +130,15 @@ function computeUnrouted(src: string, routedTexts: string[]): string[] {
  *  non-UCF (SF-1449) package uses content-routed sections + the biddable-content gate, with a whole-source single-bundle
  *  fallback when content routing can't place the core L/M content. Deterministic; safe on any input. */
 export function buildPanelInputs(fullSource: string): PanelInputs {
-  const src = fullSource ?? "";
+  // ── SPECIFICATIONS ARE OUT OF SCOPE FOR CONSTRUCTION (CEO ruling 2026-08-20) ────────────────────
+  // UCF §C is "Description / Specifications / Statement of Work", so on a construction package it
+  // legitimately carries the entire technical specification library — 2,098,225 chars into ONE lens
+  // seat on W911SG27BA002, 78% of it guide specs, while the Statement of Work was 8.4%. The router was
+  // obeying the Uniform Contract Format exactly; UCF section is not a unit of ANALYSIS. Withheld
+  // documents stay in fullSource and stay grounded against — only the LENS input narrows, and
+  // deriveDocumentCoverage records them as OUT OF SCOPE rather than as uncovered gaps.
+  // No env flag: the ruling is hardcoded, not turned into the 206th switch.
+  const src = partitionLensSource(fullSource ?? "", parseDocRegions).lensSource;
   const bag = detectSections(asExtractedDoc(src));
   const ucfSectionText: Record<string, string> = {};
   for (const [key, sec] of Object.entries(bag.sections)) {

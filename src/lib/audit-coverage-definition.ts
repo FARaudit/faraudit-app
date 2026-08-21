@@ -32,6 +32,7 @@
 import { analyzedExcerptOf } from "./audit-excerpt-repair";
 import { countGroundableObligations } from "./audit-construction-manifest";
 import { ownerOf, type Owner } from "./audit-doc-ownership";
+import { classifyDocPurpose } from "./audit-doc-purpose";
 import type { TypedFinding } from "./audit-findings";
 
 /** SAM's description field, not a posted document. It is UNIVERSAL — every lens already reads it — so it
@@ -58,6 +59,12 @@ export type DocumentCoverage = {
   residue: string[];
   /** ⛔ the gap the refusal must NAME: carries an obligation, nothing analysed it */
   unanalysedObligationCarrying: string[];
+  /** ⛔ OUT OF SCOPE, not a gap — technical specifications on a construction package. CEO ruling
+   *  2026-08-20: specs are out of scope for construction. They are still ingested, still read, still
+   *  grounded against; they are NOT routed to a lens seat and therefore cannot be analysed, so counting
+   *  them as unanalysed would make every construction package INCOMPLETE for doing the right thing.
+   *  NAMED, never silently dropped — the disclosure states the count (Rule 61: declare, do not hide). */
+  outOfScopeSpecifications: string[];
   /** documents credited by an excerpt they SHARE with another document — covered by the old predicate,
    *  not analysed by this one. Kept visible because it is the delta that made two numbers disagree. */
   sharedExcerptCreditOnly: string[];
@@ -99,7 +106,12 @@ export function deriveDocumentCoverage(regions: DocRegion[], findings: TypedFind
   let obligationCarrying = 0, assigned = 0, analysed = 0, both = 0;
   const residue: string[] = [];
   const unanalysed: string[] = [];
+  const outOfScope: string[] = [];
   for (const r of posted) {
+    // CEO ruling 2026-08-20 — a technical specification on a construction package is OUT OF SCOPE, not
+    // an uncovered gap. It never reaches a lens seat, so it can never carry a uniquely-grounded finding;
+    // leaving it in the denominator would report the engine failing at work it was told not to do.
+    if (classifyDocPurpose(r.name, r.text).lensExcluded) { outOfScope.push(r.name); continue; }
     const carries = countGroundableObligations(r.text) > 0;
     if (carries) obligationCarrying++;
     const owner: Owner = ownerOf(r.name).owner;
@@ -120,6 +132,7 @@ export function deriveDocumentCoverage(regions: DocRegion[], findings: TypedFind
       .sort((a, b) => b.findings - a.findings || a.doc.localeCompare(b.doc)),
     residue,
     unanalysedObligationCarrying: unanalysed,
+    outOfScopeSpecifications: outOfScope.sort(),
     sharedExcerptCreditOnly: [...sharedCredited].filter((n) => n !== NOTICE_BODY_DOC_NAME).sort(),
   };
 }
@@ -130,8 +143,11 @@ export function deriveDocumentCoverage(regions: DocRegion[], findings: TypedFind
 export function coverageDisclosure(c: DocumentCoverage, opts?: { maxNamed?: number }): string {
   const max = opts?.maxNamed ?? 8;
   if (c.received === 0) return "No posted binding documents were received with this notice.";
+  const oos = c.outOfScopeSpecifications.length
+    ? ` ${c.outOfScopeSpecifications.length} technical specification${c.outOfScopeSpecifications.length === 1 ? " is" : "s are"} out of scope for a construction package and ${c.outOfScopeSpecifications.length === 1 ? "was" : "were"} read but not analysed.`
+    : "";
   if (c.unanalysedObligationCarrying.length === 0) {
-    return `All ${c.obligationCarrying} of the ${c.received} posted binding documents that carry an obligation were analysed.`;
+    return `All ${c.obligationCarrying} of the ${c.received} posted binding documents that carry an obligation were analysed.${oos}`;
   }
   const named = c.unanalysedObligationCarrying.slice(0, max);
   const rest = c.unanalysedObligationCarrying.length - named.length;
@@ -141,5 +157,6 @@ export function coverageDisclosure(c: DocumentCoverage, opts?: { maxNamed?: numb
     named.join("; "),
     rest > 0 ? `; and ${rest} more` : "",
     ".",
+    oos,
   ].join("");
 }
