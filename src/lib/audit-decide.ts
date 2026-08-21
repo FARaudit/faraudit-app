@@ -13,7 +13,7 @@
 
 import { createHash } from "node:crypto"; // Fork-5 (card 240): deterministic sha256 for the verified-defect excerpt binding (server-side, same as agentic-ingest/model-runs). Pure — no network, no randomness.
 import type { VerdictInputs, TypedFinding, BidderProfile, Controllability, RequirementKind } from "./audit-findings";
-import { soleSourceCarveOut } from "./audit-sole-source-lock";
+import { soleSourceCarveOut, firmMayBeVendor } from "./audit-sole-source-lock";
 import { NMR_CAUTION } from "./audit-keyfact-detector"; // the canonical NMR requirement text — the positive-shape allowlist for the dormancy gate (Gauntlet Unit 2 R3)
 import { deriveTemporalDisposition, type TemporalDisposition } from "./audit-temporal"; // VERDICT ARC move 4 (flag AUDIT_TEMPORAL_VERDICT default-OFF)
 import { deriveSetAsideBackstop, type SetAsideBackstopDisposition } from "./audit-setaside-backstop"; // VERDICT ARC move-4, part B (flag AUDIT_SETASIDE_BACKSTOP default-OFF, SHADOW-ONLY; part A retired — card #677)
@@ -3789,7 +3789,11 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //   skipped ⇒ byte-identical.
   if (soleSourceLockEnabled() && inp.soleSourceLock) {
     const lock = inp.soleSourceLock;
-    const carve = soleSourceCarveOut(lock, inp.source, { samSetAside: inp.samSetAside ?? null });
+    // FIRM IDENTITY, now supplied (BidderProfile.firmName). This ALSO closes the `firm_is_vendor`
+    // carve-out, which has always accepted a firmIdentity and never been given one — so until now a
+    // sole source award TO the customer still routed them to NHR.
+    const firmName = inp.bidderProfile?.firmName?.trim() || "";
+    const carve = soleSourceCarveOut(lock, inp.source, { samSetAside: inp.samSetAside ?? null, firmIdentity: firmName });
     if (carve) {
       try { console.log(`[decide] sole-source lock on ${lock.vendor} CARVED OUT (${carve.kind}) — biddable, no NHR: ${carve.reason}`); } catch { /* logging never affects the verdict */ }
     } else {
@@ -3805,6 +3809,30 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
         severity: "P0",
       };
       const stopper: DecidedFinding = { ...stopperTF, disposition: disposeFinding(stopperTF) };
+      // ── CEO RULING 2026-08-21 — a named sole-source award to a firm that is NOT the customer is a
+      // NO_BID, not a referral to human review. Card #746 chose NHR because "≠ vendor" was
+      // unevaluable; BidderProfile.firmName makes it evaluable, so the reason card #746 gave no
+      // longer holds. Measured cause: two banked runs (SPRRA2-26-R-0034, SPMYM226Q7654) emitted
+      // NEEDS_HUMAN_REVIEW while their own reason text read "this is a no-bid" — the engine reached
+      // the conclusion and would not put it in the field the customer reads.
+      //
+      // ⛔ THREE CONDITIONS, ALL REQUIRED, AND THE DEFAULT IS STILL NHR:
+      //   (1) the lock survived every over-fire carve-out (or-equal · FAR 5.207 intent synopsis ·
+      //       descriptive incumbent · set-aside-firm-qualifies · firm-is-vendor);
+      //   (2) we can NAME the customer's firm — no firmName ⇒ unevaluable ⇒ NHR, unchanged;
+      //   (3) the names DECISIVELY differ. `firmMayBeVendor` is deliberately generous: ANY
+      //       significant-token overlap counts as "might be the same firm" and holds the verdict at
+      //       NHR. A false NO_BID tells an eligible bidder to walk away from a contract they could
+      //       win, which is strictly worse than the NHR we emit today; a missed NO_BID costs only
+      //       the status quo. The asymmetry decides every threshold here.
+      if (firmName && !firmMayBeVendor(firmName, lock.vendor)) {
+        const noBidReason = `NO-BID — this is a sole-source award to ${lock.vendor}, and your firm is ${firmName}. `
+          + `Only ${lock.vendor} (or an authorized distributor at fixed transfer pricing) can be awarded this requirement. `
+          + `Best play: pursue as a subcontractor to ${lock.vendor} and set a recompete alert. `
+          + `Based on the notice as posted — any pending amendment may alter this.`;
+        try { console.log(`[decide] sole-source lock on ${lock.vendor} vs firm "${firmName}" — NO_BID (CEO ruling 2026-08-21)`); } catch { /* logging never affects the verdict */ }
+        return enforceVerdictWordInvariant(mk("NO_BID", false, noBidReason, dispositions, [stopper]));
+      }
       const reason = `This is a sole-source award to ${lock.vendor}. If your firm is not ${lock.vendor} `
         + `(or an authorized distributor at fixed transfer pricing), this is a no-bid — confirm your firm's status before pursuing. `
         + `Best play for a small sub: pursue as a subcontractor to ${lock.vendor} and set a recompete alert for this requirement. `

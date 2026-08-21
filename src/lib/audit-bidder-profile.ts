@@ -30,6 +30,8 @@ import { sizeStandardFor, isSmallUnder } from "./sba-size-standards";
 
 /** The subset of a capability_statements row we read. Minimal so any row satisfies it. */
 export interface CapabilityProfileSource {
+  /** The customer's own company name — the firm-identity operand. See BidderProfile.firmName. */
+  company_name?: string | null;
   certifications?: string[] | null;
   /** U-C — jsonb column `attributes_v2`; validated here, never trusted as typed. */
   attributes_v2?: unknown;
@@ -130,14 +132,23 @@ export function buildBidderProfileFromCapability(
   const v2 = [...validAttributeRecords(cap?.attributes_v2), ...sizeAttributeRecords(cap?.size_facts, opts?.solicitationNaics)];
   if (v2.length === 0) {
     // legacy shape — nothing V2 materialized on this record
-    if (tokens.size === 0) return null;
-    return { satisfiedAttributes: [...tokens], openWorld: true };
+    if (tokens.size === 0 && !firmName(cap)) return null;
+    return { ...(firmName(cap) ? { firmName: firmName(cap)! } : {}), satisfiedAttributes: [...tokens], openWorld: true };
   }
   for (const r of v2) tokens.add(r.attr);
   return {
+    ...(firmName(cap) ? { firmName: firmName(cap)! } : {}),
     satisfiedAttributes: [...tokens],
     openWorld: true,
     attributes: v2,
     asOf: (opts?.now ?? (() => new Date().toISOString()))(),
   };
+}
+
+/** The customer's own company name — the firm-identity operand (see BidderProfile.firmName).
+ *  Trimmed, never invented: a blank or missing column yields undefined, which keeps every
+ *  firm-identity comparison unevaluable rather than comparing against an empty string. */
+function firmName(cap: CapabilityProfileSource | null | undefined): string | undefined {
+  const n = typeof cap?.company_name === "string" ? cap.company_name.trim() : "";
+  return n.length > 0 ? n : undefined;
 }

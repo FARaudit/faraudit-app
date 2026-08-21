@@ -194,6 +194,13 @@ export interface ProfileAttributeRecord {
   expiresAt?: string;                                                  // ISO — certification/registration expiry
 }
 export interface BidderProfile {
+  /** The customer's own company name, from `capability_statements.company_name`. THE FIRM-IDENTITY
+   *  OPERAND. Card #746 ruled a sole-source lock to NHR rather than NO_BID for exactly one reason,
+   *  recorded at audit-decide.ts: "that must PROVE firm≠vendor, but BidderProfile carries NO
+   *  firm-identity operand, so '≠ vendor' is unevaluable → it would collapse to 'any named vendor →
+   *  kill'". This is that operand. ABSENT ⇒ the comparison stays unevaluable and the verdict stays
+   *  NHR, exactly as before — a firm we cannot name can never be ruled out. */
+  firmName?: string;
   satisfiedAttributes: string[]; // qualifications the firm HOLDS (NAICS-small codes, certs, clearances) — matched against requiredAttribute
   /** U-C — the provenance/expiry records behind satisfiedAttributes. Consulted only under AUDIT_PROFILE_SCHEMA_V2. */
   attributes?: ProfileAttributeRecord[];

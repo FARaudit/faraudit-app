@@ -389,7 +389,7 @@ export async function runWatcherTick(opts: WatcherTickOptions = {}): Promise<Wat
       try {
         const { data: capRow } = await admin
           .from("capability_statements")
-          .select("certifications, attributes_v2, size_facts")
+          .select("company_name, certifications, attributes_v2, size_facts")
           .eq("user_id", row.user_id)
           .maybeSingle();
         bidderProfile = buildBidderProfileFromCapability(capRow, { solicitationNaics: solicitation.naicsCode });
