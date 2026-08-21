@@ -16,7 +16,13 @@ const check = (label: string, ok: boolean, detail = "") => {
 };
 
 const NOW = new Date("2026-07-29T12:00:00Z");
-const FUTURE = "2026-08-20T17:00:00-05:00";
+// ⛔ RELATIVE, NEVER A LITERAL. This was pinned to "2026-08-20T17:00:00-05:00" and stopped being the
+// future at 22:00 UTC on 2026-08-20, which turned P1g red on main for everyone — a green CI at 13:22
+// UTC and a red one eleven hours later, on the same sha, with no commit in between. mapSamItems is
+// given an explicit NOW so its assertions are stable, but fetchLiveSamRowsUncached reads the real
+// clock, so this fixture's deadline has to be genuinely ahead of it. A hardcoded future date is a
+// time bomb with a known detonation time.
+const FUTURE = new Date(Date.now() + 14 * 86_400_000).toISOString();
 const PAST = "2026-05-01T17:00:00-05:00";
 
 const item = (over: Record<string, unknown> = {}) => ({
