@@ -62,6 +62,8 @@ const ARC_FLAGS = [
   "AUDIT_VETO_NARROW_UNIVERSAL",
   "AUDIT_BAR_SIGNAL_REGISTER_TOKENS",
   "AUDIT_BOILERPLATE_BAR_SIGNAL_GUARD",
+  // 2026-08-22 arc — Rule 70 at the panel coverage floor (agentic-panel-runner.ts).
+  "AUDIT_PANEL_COVERAGE_CAP_NOT_MUTE",
 ] as const;
 
 /** Applies the measured configuration to `process.env`. MUST be called before any `src/lib` import.
