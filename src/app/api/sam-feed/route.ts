@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
+import { resolveFeedScope } from "@/lib/bd-os/live-opportunities";
 
-// Target NAICS codes — TX/OK aerospace + machining corridor focus.
-const NAICS_CODES = "336413,332710,332721";
+// SCOPE COMES FROM THE CUSTOMER, NOT FROM THIS FILE (2026-08-22). This line used to read
+//   const NAICS_CODES = "336413,332710,332721";  // "TX/OK aerospace + machining corridor focus"
+// — three codes hard-typed into a route every authenticated user hits. Whoever signed in saw an aerospace
+// feed, and two of those three codes are not even on our own profile. `resolveFeedScope` is the one place
+// that answers "which codes is this account scoped to": profile first, NAICS_CODES env only as an operator
+// override, honest-empty when there is nothing — never a borrowed default.
 // sam.gov/api/prod, NOT api.sam.gov (the latter 404s). Same fix in agents/sam-ingest/sam-client.ts and src/lib/sam.ts.
 const SAM_SEARCH_URL = "https://sam.gov/api/prod/opportunities/v2/search";
 const LOOKBACK_DAYS = 7;
@@ -47,6 +52,14 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Honest-empty rather than someone else's feed: no declared codes ⇒ say so, do not substitute.
+  const scope = await resolveFeedScope(sb);
+  if (scope.codes.length === 0) {
+    return NextResponse.json({ solicitations: [], note: scope.source === "unreadable"
+      ? "Your profile could not be read, so this feed was not scoped. Nothing is shown rather than someone else's market."
+      : "No NAICS codes on your profile — add one in Settings to scope this feed." });
+  }
+
   const SAM_KEY = process.env.SAM_API_KEY;
   if (!SAM_KEY) {
     // Graceful fallback — UI shows empty state with a note, no crash.
@@ -60,7 +73,7 @@ export async function GET() {
     api_key: SAM_KEY,
     postedFrom: fmtSamDate(lookback),
     postedTo: fmtSamDate(today),
-    ncode: NAICS_CODES,
+    ncode: scope.codes.join(","),
     limit: String(RESULT_LIMIT)
   });
 

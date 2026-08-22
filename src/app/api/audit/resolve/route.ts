@@ -14,6 +14,7 @@ import {
   NOTICE_BODY_MIN_CHARS,
   NOTICE_BODY_MAIN_CHARS,
 } from "@/lib/resolve-coverage";
+import { checkNaicsScope } from "@/lib/audit-naics-scope";
 
 // Synchronous resolve+manifest endpoint backing the Run Audit front door
 // (fix/run-audit-frontdoor-static). It answers ONE question — "what does the
@@ -456,9 +457,27 @@ export async function GET(req: NextRequest) {
   const absentCore = ["C", "L", "M"].filter((k) => coverageStates[k] === "absent");
   const unverifiedCore = ["MAIN", "C", "L", "M"].filter((k) => coverageStates[k] === "unverified");
 
+  // ── CODE-TO-SOLICITATION SCOPE, ANSWERED BEFORE THE SPEND (flag AUDIT_NAICS_SCOPE_DISCLOSURE) ──
+  // This route is the LAST stop before "Start the audit", which the page itself calls irreversible, so it
+  // is the only honest place to say "this package is outside the codes you declared". Saying it in the
+  // report instead would be telling the customer after they paid.
+  // ADVISORY. It is attached to the response and nothing here reads it back: `complete` is untouched, no
+  // branch below depends on it, and the button it drives ADDS a code — it never withholds the run.
+  // A failed profile read is NOT an empty profile: on error the scope is simply absent and the page shows
+  // nothing, rather than telling a customer their profile is empty when we could not read it.
+  let scope: ReturnType<typeof checkNaicsScope> | undefined;
+  if (process.env.AUDIT_NAICS_SCOPE_DISCLOSURE === "true") {
+    const { data: capRow, error: capErr } = await supabase
+      .from("capability_statements")
+      .select("naics_codes")
+      .maybeSingle();
+    if (!capErr) scope = checkNaicsScope(solicitation.naicsCode, capRow?.naics_codes);
+  }
+
   return NextResponse.json({
     ok: true,
     noticeId,
+    scope,
     solNumber: solicitation.solicitationNumber,
     agency: resolveAgency(solicitation),
     naics: solicitation.naicsCode,
