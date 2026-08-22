@@ -711,6 +711,37 @@ export function enforceVerifiedFloor(judgment: ChiefJudgeOutput, verifiedCount: 
  *  must know exactly what was missing. Coverage incompleteness DOMINATES → applied LAST. Pure → gate-testable.
  *  (This is the guard whose ABSENCE let the first clean run emit a confident eligible=true on 7 dropped
  *  sections + 28 unrouted attachments — the false green-light the engine exists to prevent.) */
+/** RULE 70 AT THE PANEL FLOOR (flag AUDIT_PANEL_COVERAGE_CAP_NOT_MUTE, default-OFF).
+ *
+ *  Rule 70 (panel-ratified 2026-07-29) says an UNCOVERED OBLIGATION *caps* commitment at BID_WITH_CAUTION
+ *  with the uncovered item NAMED — it never mutes the verdict — and reserves INCOMPLETE for a FAILED
+ *  DEPENDENCY. That ruling was wired into `audit-decide.ts` and `audit-gate-v2.ts` behind
+ *  AUDIT_COVERAGE_CAP_NOT_MUTE, and it never reached HERE. This floor kept muting.
+ *
+ *  WHAT THE MUTE ACTUALLY COSTS THE CUSTOMER. The chief judge's verdict is not the customer's verdict pole
+ *  (`deriveVerdict` owns that, via typedFindings) — but it GATES THE REASON FOLD: `audit-executor-v3.ts:727`
+ *  only folds the panel's rationale into `decision.reason` when the judge verdict is COMMITTAL. Muting to
+ *  INCOMPLETE therefore deletes the panel's entire narrative from the report's "Bottom line". The engine
+ *  spends ~48% of a run on the panel and then a SINGLE unrouted line throws the synthesis away.
+ *
+ *  THE TWO GAPS ARE NOT THE SAME KIND OF FACT, and this is the whole fix:
+ *    • `droppedSections` — content the panel was BUDGET-DROPPED and never read. That is a failed dependency,
+ *      Rule 70 case (b). It STILL MUTES, in every flag state. Nothing below weakens it.
+ *    • `unroutedBinding` — content that exists and simply routed to no lens. That is an uncovered obligation,
+ *      Rule 70's own subject. Flag ON ⇒ CAP, do not mute: keep the judge's eligibility work, clamp a
+ *      committal BID down to BID_WITH_CAUTION, and NAME what went unread.
+ *
+ *  The disqualifier class keeps its full force: NO_BID and INELIGIBLE are never capped, softened or raised —
+ *  Rule 70 narrows the ambient application of fail-toward-disqualifier, it does not disarm the disqualifier.
+ *  A verdict that is already non-committal is left exactly as the judge wrote it.
+ *
+ *  Flag OFF ⇒ byte-identical to the shipped floor. Pure → gate-testable. */
+const PANEL_COVERAGE_CAP_NOT_MUTE = () => process.env.AUDIT_PANEL_COVERAGE_CAP_NOT_MUTE === "true";
+
+/** Judge verdicts that carry a commitment. Mirrors COMMITTAL_JUDGE_VERDICT in audit-executor-v3.ts — the set
+ *  the reason-fold gates on, which is the whole reason the cap exists. */
+const COMMITTAL = new Set(["BID", "BID_WITH_CAUTION", "NO_BID", "INELIGIBLE"]);
+
 export function enforceCoverageFloor(
   judgment: ChiefJudgeOutput,
   gaps: { droppedSections?: string[]; unroutedBinding?: string[] },
@@ -721,6 +752,18 @@ export function enforceCoverageFloor(
   const parts: string[] = [];
   if (dropped.length) parts.push(`sections not read (dropped for budget): ${dropped.join(", ")}`);
   if (unrouted.length) parts.push(`${unrouted.length} binding attachment(s) routed to NO lens (e.g. ${unrouted.slice(0, 3).join("; ")})`);
+
+  // CAP path — only when the gap is UNROUTED-ONLY (a dropped section is a failed dependency and still mutes),
+  // and only over a verdict that actually carries a commitment.
+  if (PANEL_COVERAGE_CAP_NOT_MUTE() && !dropped.length && COMMITTAL.has(judgment.verdict)) {
+    const capped = judgment.verdict === "BID" ? "BID_WITH_CAUTION" : judgment.verdict;
+    return {
+      ...judgment,
+      verdict: capped,
+      rationale: `[COVERAGE CAP — commitment capped at ${capped}; ${unrouted.length} binding item(s) went unread: ${unrouted.slice(0, 3).join("; ")}${unrouted.length > 3 ? ` (+${unrouted.length - 3} more)` : ""}] This is a coverage limit on the CONFIDENCE of the assessment below, not an eligibility finding, and the assessment itself stands. ${judgment.rationale}`,
+    };
+  }
+
   return {
     ...judgment,
     verdict: "INCOMPLETE", eligible: false, fit_score: 0, show_stoppers: [],
