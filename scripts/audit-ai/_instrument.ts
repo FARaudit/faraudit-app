@@ -62,6 +62,8 @@ const ARC_FLAGS = [
   "AUDIT_VETO_NARROW_UNIVERSAL",
   "AUDIT_BAR_SIGNAL_REGISTER_TOKENS",
   "AUDIT_BOILERPLATE_BAR_SIGNAL_GUARD",
+  // 2026-08-22 arc — the adapter's router-precedence inversion at ucfHeaderCount=0 (panel-adapter.ts).
+  "AUDIT_ADAPTER_ROUTER_PRECEDENCE",
 ] as const;
 
 /** Applies the measured configuration to `process.env`. MUST be called before any `src/lib` import.
