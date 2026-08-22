@@ -129,6 +129,24 @@ function computeUnrouted(src: string, routedTexts: string[]): string[] {
  *  DOCUMENT CLASS: a UCF §A–M solicitation uses the boundary detector + checkManifest gate (unchanged); a commercial/
  *  non-UCF (SF-1449) package uses content-routed sections + the biddable-content gate, with a whole-source single-bundle
  *  fallback when content routing can't place the core L/M content. Deterministic; safe on any input. */
+/** Flag read at CALL time, never a module-load const — the A/B probe toggles it inside one process. */
+export const ROUTER_PRECEDENCE_ENABLED = (): boolean => process.env.AUDIT_ADAPTER_ROUTER_PRECEDENCE === "true";
+
+/** THE MERGE, exported so its semantics are lockable $0 (see `adapter-router-precedence.test.ts`). PRECEDENCE
+ *  ONLY: both maps are always spread, so no key is dropped in either direction — the flag decides only who wins
+ *  the keys they SHARE, and only when the UCF detector had nothing to detect (`ucfHeaders === 0`). */
+export function mergeSectionText(
+  base: Record<string, string>,
+  ucfSectionText: Record<string, string>,
+  ucfHeaders: number,
+): { sectionText: Record<string, string>; routerWins: boolean } {
+  const routerWins = ROUTER_PRECEDENCE_ENABLED() && ucfHeaders === 0;
+  return {
+    sectionText: routerWins ? { ...ucfSectionText, ...base } : { ...base, ...ucfSectionText },
+    routerWins,
+  };
+}
+
 export function buildPanelInputs(fullSource: string): PanelInputs {
   // ── SPECIFICATIONS ARE OUT OF SCOPE FOR CONSTRUCTION (CEO ruling 2026-08-20) ────────────────────
   // UCF §C is "Description / Specifications / Statement of Work", so on a construction package it
@@ -206,7 +224,27 @@ export function buildPanelInputs(fullSource: string): PanelInputs {
     : src.trim().length > 0
       ? Object.fromEntries(FALLBACK_BUNDLE_KEYS.map((k) => [k, src]))
       : {};
-  const sectionText = { ...base, ...ucfSectionText };
+  // ── ROUTER PRECEDENCE AT ZERO UCF HEADERS (flag AUDIT_ADAPTER_ROUTER_PRECEDENCE, default-OFF) ──
+  // The overlay is RIGHT when the boundary detector genuinely found UCF sections: a mixed package that labels its
+  // parts "Section L"/"Section M" yields higher-quality slices than the content router's anchors, which is the case
+  // the comment above describes and the reason the overlay exists. It is WRONG when the detector found nothing to
+  // detect. `detectSections` runs UNCONDITIONALLY at the top of this function, so on a package with ZERO canonical
+  // UCF headers it still emits a handful of thin, spurious slices — and being spread SECOND, those slices overwrite
+  // the commercial router on every key the two share.
+  // Measured $0 over the banked corpus (`_unrouted-cause-census.ts`, 2026-08-21): the merge discards 5,209,220 of
+  // 10,846,208 routed chars — 48.0% — across 44 of 45 commercial+routed packages, worst -84%. On FA813726R0033
+  // (ucfHeaderCount=0): §C 113,406 → 160 chars, §I 117,134 → 18,307, Σ 278,810 → 72,182. It is the ROOT of three
+  // reported symptoms, not a fourth one: the unrouted-binding median, `enforceCoverageFloor` discarding the chief
+  // judge on 80% of packages, and 96.8% of unrouted lines sitting in ATTACHMENT regions (§I and §C are precisely
+  // the overwritten keys).
+  // SCOPE. The inversion fires ONLY at `ucfHeaderCount(src) === 0`, so it is provably inert on any genuine UCF
+  // package and cannot regress the case the overlay was written for. PRECEDENCE ONLY: `ucfSectionText` is still
+  // spread, so a key only IT produced is still contributed — `base` merely wins the keys they SHARE. No key is
+  // dropped in either direction.
+  // ⚠ DEFAULT-OFF ON COST, NOT ON DOUBT. Restoring the routed text roughly DOUBLES the source in front of the lens
+  // seats on a run that already aborts at 900s having spent $12.77, so arming is a CEO cost decision taken on the
+  // measured OFF-vs-ON numbers, never on this comment.
+  const { sectionText, routerWins: routerPrecedence } = mergeSectionText(base, ucfSectionText, ucfHeaderCount(src));
   const detectedSections = new Set(Object.keys(sectionText));
   // ROUTING-INTEGRITY LOG (Brain card #614 addition-1, 2026-07-21) — PERMANENT, every commercial run. Whether
   // routeCommercialSections SLICED or fell back to whole-source (#525) decides if the cost-model slope is
@@ -227,7 +265,7 @@ export function buildPanelInputs(fullSource: string): PanelInputs {
       : routed.headChars < 20
         ? ` · head(pre-first-anchor): ${routed.headChars} chars (below the 20-char injection threshold; not routed)`
         : ` · head(pre-first-anchor): ${routed.headChars} chars DROPPED (unread by every lens; AUDIT_ROUTING_HEAD_COVERAGE off)`;
-  console.log(`[routing] sections routed: [${Object.keys(sectionText).join(",")}] · chars/lens: [${_charsPerLens}] · fallback: ${routeOk ? "none" : `WHOLE-SOURCE (#525 — a lens would be starved${routingV2 ? "" : "; legacy L&M predicate"}; each lens reads full source; cost-slope INFLATED)`}${_head}`);
+  console.log(`[routing] sections routed: [${Object.keys(sectionText).join(",")}] · chars/lens: [${_charsPerLens}] · fallback: ${routeOk ? "none" : `WHOLE-SOURCE (#525 — a lens would be starved${routingV2 ? "" : "; legacy L&M predicate"}; each lens reads full source; cost-slope INFLATED)`}${_head}${routerPrecedence ? " · precedence: ROUTER (ucfHeaders=0; AUDIT_ADAPTER_ROUTER_PRECEDENCE on)" : ""}`);
   return {
     sectionText,
     detectedSections,
