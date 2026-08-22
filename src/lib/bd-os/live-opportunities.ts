@@ -27,9 +27,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { classifyDocType, resolveAgency, sanitizeSolicitationNumber } from "@/lib/sam";
 import type { OpportunityRow } from "./queries";
 
-// Matches the /api/sam route's default NAICS set; NAICS_CODES env overrides
-// (same variable the retired sam-ingest cron used).
-const DEFAULT_NAICS = "336413,332710,332720,332999,334511";
+// DEFAULT_NAICS deleted 2026-08-22 — it was declared here, read by nothing, and its comment asserted it
+// "matches the /api/sam route's default NAICS set", which was itself a hardcoded scope now removed. A dead
+// constant that documents a live claim is worse than no constant: the next reader believes both.
 
 // One page per NAICS. 30-day posted window ≈ low hundreds of notices per
 // manufacturing NAICS, so 1000 (SAM's per-call max) never truncates in

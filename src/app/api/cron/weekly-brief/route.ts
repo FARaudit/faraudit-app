@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
+import { resolveFeedScope } from "@/lib/bd-os/live-opportunities";
 
 export const maxDuration = 90;
 
@@ -22,7 +23,10 @@ function getAdminClient() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-const NAICS = ["336413", "332710", "332721"];
+// SCOPE COMES FROM THE CUSTOMER (2026-08-22). This was `const NAICS = ["336413","332710","332721"]` — the
+// same three hard-typed aerospace codes that sat in the SAM feed route. It reached the MODEL PROMPT ("focused
+// on NAICS …") and the persisted brief row, so a weekly brief could tell a paving contractor its market was
+// aircraft parts. Resolved per-run from the profile via the one scope resolver; honest-empty is honest-empty.
 
 export async function GET(req: NextRequest) {
   return run(req);
@@ -46,6 +50,13 @@ async function run(req: NextRequest) {
     sb.from("intel_briefs").select("notice_id, title, agency, naics_code, response_deadline").gte("created_at", sevenAgo).limit(50),
     sb.from("audits").select("notice_id, title, document_type, recommendation, compliance_score").gte("created_at", sevenAgo).limit(20)
   ]);
+
+  const scope = await resolveFeedScope(sb);
+  const NAICS = scope.codes;
+  if (NAICS.length === 0) {
+    // Rule 61 — a brief scoped to nothing is not a brief. Say so rather than invent a market.
+    return NextResponse.json({ ok: false, reason: "no NAICS codes on the profile — brief not generated" }, { status: 200 });
+  }
 
   const opportunitiesCount = briefs?.length ?? 0;
   const ctx = JSON.stringify({
