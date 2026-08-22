@@ -55,7 +55,9 @@ export async function GET() {
   // Honest-empty rather than someone else's feed: no declared codes ⇒ say so, do not substitute.
   const scope = await resolveFeedScope(sb);
   if (scope.codes.length === 0) {
-    return NextResponse.json({ solicitations: [], note: "No NAICS codes on your profile — add one in Settings to scope this feed." });
+    return NextResponse.json({ solicitations: [], note: scope.source === "unreadable"
+      ? "Your profile could not be read, so this feed was not scoped. Nothing is shown rather than someone else's market."
+      : "No NAICS codes on your profile — add one in Settings to scope this feed." });
   }
 
   const SAM_KEY = process.env.SAM_API_KEY;

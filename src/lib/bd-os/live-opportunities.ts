@@ -283,7 +283,7 @@ const fetchLiveSamRowsCached = unstable_cache(
 // `source` is the discriminator; `codes` is empty iff source is "no-profile-codes".
 export type FeedScope = {
   codes: string[];
-  source: "profile" | "env-override" | "no-profile-codes";
+  source: "profile" | "env-override" | "no-profile-codes" | "unreadable";
 };
 
 export async function resolveFeedScope(client: SupabaseClient): Promise<FeedScope> {
@@ -291,7 +291,20 @@ export async function resolveFeedScope(client: SupabaseClient): Promise<FeedScop
     .from("capability_statements")
     .select("naics_codes")
     .maybeSingle();
-  const codes = (!error && Array.isArray(data?.naics_codes) ? data!.naics_codes : [])
+
+  // A FAILED READ IS NOT AN EMPTY PROFILE, and collapsing the two is how the borrowed default this
+  // function exists to delete comes back through the error path. `.maybeSingle()` carries no user
+  // filter — it relies on RLS — so a SERVICE-ROLE caller (the weekly-brief cron builds one from
+  // SUPABASE_SERVICE_ROLE_KEY and bypasses RLS) sees every row. Verified against this project's own
+  // PostgREST: a two-row result under the single-object Accept header returns
+  //   {"code":"PGRST116","details":"The result contains 2 rows", ...}
+  // With one capability statement on file that never fires. With TWO, the read errors, the old code
+  // read the error as "no codes on file", and NAICS_CODES — an OPERATOR override — silently became
+  // every customer's market. Honest-fail instead: say the scope is unreadable and let the caller
+  // refuse, exactly as it refuses on an empty profile.
+  if (error) return { codes: [], source: "unreadable" };
+
+  const codes = (Array.isArray(data?.naics_codes) ? data!.naics_codes : [])
     .map((c) => String(c).trim())
     .filter(Boolean);
   if (codes.length > 0) return { codes, source: "profile" };

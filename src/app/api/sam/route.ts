@@ -29,14 +29,20 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
 
   const naicsRaw = searchParams.get("naics");
-  const fromProfile = naicsRaw ? null : (await resolveFeedScope(await createServerClient())).codes;
-  const naicsCodes = (naicsRaw ? naicsRaw.split(",") : (fromProfile ?? []))
+  // Keep the SCOPE, not just its codes: "no codes on file" and "the profile could not be read" are
+  // different answers to the customer and only one of them is fixable in Settings.
+  const profileScope = naicsRaw ? null : await resolveFeedScope(await createServerClient());
+  const naicsCodes = (naicsRaw ? naicsRaw.split(",") : (profileScope?.codes ?? []))
     .map((c) => c.trim())
     .filter((c) => /^\d{6}$/.test(c))
     .slice(0, MAX_CODES);
   if (naicsCodes.length === 0) {
     return NextResponse.json(
-      { source: "error", error: naicsRaw ? "naics must be one or more 6-digit codes" : "no NAICS codes on your profile — add one in Settings to scope this feed", opportunities: [] },
+      { source: "error", error: naicsRaw
+          ? "naics must be one or more 6-digit codes"
+          : profileScope?.source === "unreadable"
+            ? "your profile could not be read, so this feed was not scoped — nothing is returned rather than someone else's market"
+            : "no NAICS codes on your profile — add one in Settings to scope this feed", opportunities: [] },
       { status: 400 }
     );
   }

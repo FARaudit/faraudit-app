@@ -55,7 +55,9 @@ async function run(req: NextRequest) {
   const NAICS = scope.codes;
   if (NAICS.length === 0) {
     // Rule 61 — a brief scoped to nothing is not a brief. Say so rather than invent a market.
-    return NextResponse.json({ ok: false, reason: "no NAICS codes on the profile — brief not generated" }, { status: 200 });
+    return NextResponse.json({ ok: false, reason: scope.source === "unreadable"
+      ? "profile scope unreadable — brief not generated (never generated against a borrowed scope)"
+      : "no NAICS codes on the profile — brief not generated" }, { status: 200 });
   }
 
   const opportunitiesCount = briefs?.length ?? 0;
