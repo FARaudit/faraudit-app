@@ -1,5 +1,6 @@
 # QA AI — Railway cron worker.
-# Runs every 30 min · checks all 3 domains · Telegram-alerts on regression.
+# PARKED — does not run. When live: every 30 min · checks all 3 domains ·
+# Telegram-alerts on regression.
 # Configure with Root Directory = agents/qa-ai (NOT / — same misconfig that
 # tripped sam-ingest and the since-deleted audit-ai fork when the GitHub
 # source defaulted to repo root and Nixpacks rebuilt Next.js).
@@ -11,4 +12,11 @@ buildCommand = ""
 startCommand = "npx tsx index.ts"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
-cronSchedule = "0 0 31 2 *"  # PARKED 2026-07-07 — Feb-31 never fires (never-run); restore "*/30 * * * *" to resume
+# PARKED 2026-08-22 on CEO instruction. Restore "*/30 * * * *" to resume.
+#
+# The line this replaces claimed PARKED 2026-07-07 and the park NEVER APPLIED.
+# Railway VALIDATES the cron expression and REJECTS "0 0 31 2 *" as invalid, so
+# the live schedule stayed */30 * * * * for six weeks while the file said parked.
+# "0 0 29 2 *" is accepted and reads back as next-fire 2028-02-29. Verify the park
+# against the API, never against this file. See ceo/agent-fleet-review.md.
+cronSchedule = "0 0 29 2 *"
