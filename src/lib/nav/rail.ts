@@ -440,7 +440,21 @@ export function railScript(): string {
        rather than rearranging the rail under the cursor. */
     `fetch('/api/preferences',{credentials:'include',headers:{accept:'application/json'}})` +
     `.then(function(r){return r.ok?r.json():null;}).then(function(d){` +
-    `if(!d||!d.preferences)return;var o=d.preferences.rail_sections_open;` +
+    `if(!d||!d.preferences)return;` +
+    // Theme rides the SAME mirror-refresh contract as the rail sections: update the stored
+    // value, never repaint THIS view. Applying a fetched theme after paint is the swing-shut
+    // the inline pre-paint block exists to prevent — a browser new to this account converges
+    // on the next navigation instead of flipping colour under the cursor.
+    // PRESENT-vs-ABSENT, not truthy-vs-falsy. `theme:null` means the account CHOSE light —
+    // Settings stores the default as null. A MISSING key means the account never chose at all,
+    // and coercing that to 'light' would let an empty account silently overwrite a device that
+    // had been set to dark. The test caught exactly that: stored dark + no account key came back
+    // light.
+    `if('theme' in d.preferences){var th=d.preferences.theme;if(th===null)th='light';` +
+    `if(th==='light'||th==='dark'||th==='auto'){try{localStorage.setItem('faraudit-theme',th);}catch(e){}` +
+    `document.querySelectorAll('.sb-am-theme').forEach(function(b){` +
+    `b.setAttribute('aria-checked',String(b.getAttribute('data-theme-choice')===th));});}}` +
+    `var o=d.preferences.rail_sections_open;` +
     `if(!o||typeof o!=='object')return;` +
     `try{localStorage.setItem('faraudit-rail-sections',JSON.stringify(o));}catch(e){}` +
     `}).catch(function(){});` +
@@ -472,8 +486,21 @@ export function railScript(): string {
     `var resolve=function(v){return v==='auto'?((mq&&mq.matches)?'dark':'light'):v};` +
     `var mark=function(v){document.querySelectorAll('.sb-am-theme').forEach(function(b){` +
     `b.setAttribute('aria-checked',String(b.getAttribute('data-theme-choice')===v));});};` +
+    // PERSIST TO THE ACCOUNT TOO, not just this device. Settings > Appearance writes
+    // `preferences.theme` AND the localStorage mirror; this control wrote the mirror ALONE.
+    // The two stores then disagreed in one direction only: change the theme here, open
+    // Settings, and Appearance still showed the old value because that select renders from
+    // the account — a control that plainly did not work. Worse, a new browser reads the
+    // account and silently reverted the choice made here.
+    // The value contract is Settings': light is the DEFAULT and stores null; dark and auto
+    // store themselves. Writing 'light' instead of null would make this control save a value
+    // the select cannot display.
     `var apply=function(v,persist){var r=resolve(v);if(r)root.setAttribute('data-theme',r);` +
-    `if(persist){try{localStorage.setItem(K,v)}catch(e){}}mark(v);};` +
+    `if(persist){try{localStorage.setItem(K,v)}catch(e){}` +
+    `fetch('/api/preferences',{method:'PATCH',credentials:'include',` +
+    `headers:{'content-type':'application/json'},` +
+    `body:JSON.stringify({theme:v==='light'?null:v})}).catch(function(){});}` +
+    `mark(v);};` +
     `var cur=pref();if(cur)apply(cur,false);else mark(root.getAttribute('data-theme')||'light');` +
     `document.querySelectorAll('.sb-am-theme').forEach(function(b){b.addEventListener('click',function(e){` +
     `e.stopPropagation();apply(b.getAttribute('data-theme-choice'),true);});});` +
