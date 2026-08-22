@@ -10,6 +10,18 @@
 // sam-ingest client.
 const BASE = "https://sam.gov/api/prod/entity-information/v3/entities";
 
+/* THE KEY RIDES IN THE QUERY STRING, SO NOTHING MAY LOG THE REQUEST.
+ * A Node fetch rejection carries the full request URL in its message, and this module puts
+ * `api_key` in that URL — so `console.error(..., err)` prints the SAM key into production logs.
+ * Four calls in this file did exactly that. Errors are reduced to a name and a redacted message
+ * before they are ever printed. Fix the reach, never the declaration. */
+function safeErr(err: unknown): string {
+  const name = err instanceof Error ? err.name : typeof err;
+  const msg = err instanceof Error ? err.message : String(err);
+  return `${name}: ${msg.replace(/api_key=[^&\s]*/gi, "api_key=[redacted]")}`;
+}
+
+
 /** One SBA certification as SAM publishes it. `certifiedUntil` is the CERTIFICATION's own expiry
  *  (certificationExitDate) — a different and usually earlier clock than the registration expiry. */
 export interface SbaCertification {
@@ -157,16 +169,16 @@ export async function lookupEntityByUei(uei: string): Promise<EntityLookup> {
       signal: AbortSignal.timeout(15000),
     });
   } catch (err) {
-    console.error("[sam-entity] uei fetch failed:", err);
+    console.error("[sam-entity] uei fetch failed:", safeErr(err));
     return unreachable;
   }
   if (!res.ok) {
-    console.error("[sam-entity] SAM responded", res.status, await res.text().catch(() => ""));
+    console.error("[sam-entity] SAM responded", res.status);  // status only — an upstream body can echo the key
     return unreachable;
   }
   let data: { entityData?: SamEntityRaw[] } = {};
   try { data = await res.json(); } catch (err) {
-    console.error("[sam-entity] uei JSON parse failed:", err);
+    console.error("[sam-entity] uei JSON parse failed:", safeErr(err));
     return unreachable;
   }
   const list = data.entityData || [];
@@ -201,6 +213,69 @@ export async function fetchEntityByUei(uei: string): Promise<SamEntity | null> {
  *  businessTypeList as self-certified code QF, which is the list toSamEntity deliberately does
  *  not read as certification. Offering an SDVOSB filter here would either return nothing or
  *  attest a self-assertion as an SBA certification. */
+/* ── FINDING YOUR OWN SAM RECORD ──────────────────────────────────────────────
+ *
+ * WHY THIS EXISTS. `syncCertifications` reads the firm's SBA-registered certifications from SAM
+ * and is already built — but it keys on a UEI, and nothing ever acquires one. Measured on the
+ * live profile: `uei`, `cage_code` and `sam_registration_status` are all NULL, so the sync has
+ * never had anything to run on and `attributes_v2` is empty. Five of the nine ruled title-block
+ * cells render blank for the same reason, and FPDS past performance has no key at all.
+ *
+ * ⛔ THIS RETURNS CANDIDATES. IT NEVER BINDS ONE. The sibling lookupEntityByUei refuses a fuzzy
+ * or first-result match because "a fuzzy or first-result match would attest one firm's
+ * certifications onto another firm's profile, the worst failure available on this path." A name
+ * search is fuzzy BY CONSTRUCTION — "Precision Machine" matches many real firms — so the same
+ * rule applies with more force: the customer confirms which record is theirs, and only that
+ * confirmation writes a UEI. Auto-picking the top hit would silently clear a set-aside bar using
+ * someone else's certifications.
+ *
+ * ⛔ QUOTA. The entity API has a SMALL DAILY allowance that resets at 00:00 UTC — a handful of
+ * large calls exhausts it for everyone. So this is an explicit, user-initiated search only. It
+ * must never run on page load, on a keystroke, or on a loop.
+ *
+ * `total` is SAM's own totalRecords, not the length of `candidates`: the v3 search rejects
+ * pageSize, so it returns roughly ten rows regardless. Showing ten of four hundred without
+ * saying so states a sample as if it were the answer. */
+export type EntityNameSearch =
+  | { outcome: "ok"; candidates: SamEntity[]; total: number }
+  | { outcome: "too-short"; candidates: null }
+  | { outcome: "unconfigured"; candidates: null }
+  | { outcome: "unreachable"; candidates: null };
+
+export async function searchEntitiesByName(name: string): Promise<EntityNameSearch> {
+  const apiKey = process.env.SAM_API_KEY;
+  if (!apiKey) return { outcome: "unconfigured", candidates: null };
+  const q = String(name ?? "").trim();
+  /* A one- or two-character query would burn a quota call to return the whole register. The
+     floor is ours to state, not SAM's to refuse. */
+  if (q.length < 3) return { outcome: "too-short", candidates: null };
+
+  const params = new URLSearchParams({ api_key: apiKey, legalBusinessName: q, registrationStatus: "A" });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}?${params.toString()}`, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch (err) {
+    console.error("[sam-entity] name search fetch failed:", safeErr(err));
+    return { outcome: "unreachable", candidates: null };
+  }
+  if (!res.ok) {
+    console.error("[sam-entity] SAM responded", res.status);  // status only — a body can echo the key
+    return { outcome: "unreachable", candidates: null };
+  }
+  let data: { entityData?: SamEntityRaw[]; totalRecords?: number } = {};
+  try { data = await res.json(); } catch (err) {
+    console.error("[sam-entity] name search JSON parse failed:", safeErr(err));
+    return { outcome: "unreachable", candidates: null };
+  }
+  const candidates = (data.entityData || []).map(toSamEntity).filter((e) => Boolean(e.uei));
+  /* A zero here is a REAL answer — SAM has no active registration under that name — and is not
+     the same as the outage above. The caller must render them differently. */
+  return { outcome: "ok", candidates, total: Number(data.totalRecords ?? candidates.length) };
+}
+
 export const SBA_SET_ASIDES: ReadonlyArray<{ code: string; label: string }> = [
   { code: "A6", label: "SBA Certified 8(a) Program Participant" },
   { code: "A9", label: "SBA-Certified Women-Owned Small Business" },
@@ -280,11 +355,11 @@ export async function searchTeamingPartners(opts: TeamingSearch): Promise<Teamin
       signal: AbortSignal.timeout(15000)
     });
   } catch (err) {
-    console.error("[sam-entity] fetch failed:", err);
+    console.error("[sam-entity] fetch failed:", safeErr(err));
     return unreachable;
   }
   if (!res.ok) {
-    console.error("[sam-entity] SAM responded", res.status, await res.text().catch(() => ""));
+    console.error("[sam-entity] SAM responded", res.status);  // status only — an upstream body can echo the key
     return unreachable;
   }
 
@@ -292,7 +367,7 @@ export async function searchTeamingPartners(opts: TeamingSearch): Promise<Teamin
   try {
     data = await res.json();
   } catch (err) {
-    console.error("[sam-entity] JSON parse failed:", err);
+    console.error("[sam-entity] JSON parse failed:", safeErr(err));
     return unreachable;
   }
   const list = data.entityData || [];
