@@ -1,4 +1,6 @@
-# Regulatory AI — daily 13:00 UTC = 08:00 CDT.
+# Regulatory AI — PARKED. This file declared 13:00 UTC and the LIVE schedule was
+# 00:00 UTC; the two had drifted apart. Restoring from this file alone would
+# resume a schedule that never ran.
 # Configure Root Directory = agents/regulatory-ai in Railway dashboard.
 # nixpacks.toml in this directory disables the build phase explicitly.
 
@@ -9,4 +11,9 @@ buildCommand = ""
 startCommand = "npx tsx index.ts"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
-cronSchedule = "0 13 * * *"
+# PARKED 2026-08-22 on CEO instruction. "0 0 29 2 *" fires 2028-02-29 and is the
+# parking value because Railway VALIDATES the expression: the obvious "0 0 31 2 *"
+# (Feb 31, never fires) is REJECTED as an invalid cron and the previous schedule
+# simply stays live. See ceo/agent-fleet-review.md. Restore to resume — LIVE
+# value at park time was "0 0 * * *"; this file had declared "0 13 * * *".
+cronSchedule = "0 0 29 2 *"
