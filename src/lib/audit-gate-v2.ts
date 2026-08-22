@@ -727,6 +727,29 @@ const benignNorm = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]+/g,
 // "at time of award" can never be laundered into the caveat frame). Flag-OFF ⇒ the old single-line behavior ⇒ byte-
 // identical. Over-fire (bridging into a separate lowercase-led obligation) is the Gauntlet red-team focus.
 const recitalLineWrapBridgeEnabled = () => process.env.AUDIT_RECITAL_LINEWRAP_BRIDGE === "true";
+
+/** SOFT-WRAP PREDICATE — the ONE definition of "this newline continues the clause". Extracted from
+ *  `recitalContinuation` (card #587) so the obligation splitter can ask the same question instead of
+ *  carrying a second, silently-divergent copy of the rule. Byte-faithful to #587's inline form: same
+ *  order (paragraph break -> enumerator -> lowercase/digit/$ -> capital), same 6-char enumerator window.
+ *
+ *  `s[nl]` is the newline. Returns the index to RESUME from on a soft wrap, or -1 when the newline ends
+ *  the unit.
+ *
+ *  KNOWN LIMIT, carried deliberately: on a CRLF source `s[nl]` is CR, the whitespace scan stops at the
+ *  following LF, and this returns -1 — a CRLF line ending reads as a paragraph break. That is #587's
+ *  existing behaviour and AUDIT_RECITAL_LINEWRAP_BRIDGE is ARMED in production, so "fixing" it here would
+ *  be an unflagged live change to the recital path. Measured 2026-08-21 across the 18 banked records
+ *  carrying a fullSource: 83,002 newlines, ZERO CRLF — the limit is unreachable on ingested text. */
+export function softWrapJoinAt(s: string, nl: number): number {
+  let q = nl + 1;
+  while (q < s.length && (s[q] === " " || s[q] === "\t" || s[q] === "\r")) q++;
+  if (q >= s.length || s[q] === "\n") return -1;                          // blank line / EOF -> paragraph break
+  if (/^(?:[-*•·]|\(?[a-z0-9]{1,3}[.)]|§|#)\s/i.test(s.slice(q, q + 6))) return -1;   // bullet / enumerator ("12.", "(a)", "-") -> new item
+  if (/[a-z0-9$]/.test(s[q])) return q;                                   // soft wrap -> the clause continues
+  return -1;                                                              // capital start -> new sentence
+}
+
 function recitalContinuation(after: string): string {
   if (!recitalLineWrapBridgeEnabled()) {                                    // flag-OFF — legacy: stop at the first newline
     const nl = after.indexOf("\n");
@@ -738,13 +761,9 @@ function recitalContinuation(after: string): string {
   for (let p = 0; p < after.length; ) {
     const ch = after[p];
     if (ch === "\n" || ch === "\r") {
-      let q = p + 1;
-      while (q < after.length && (after[q] === " " || after[q] === "\t" || after[q] === "\r")) q++;
-      if (q >= after.length || after[q] === "\n") break;                    // blank line / EOF → paragraph break → separate obligation
-      const rest = after.slice(q, q + 6);
-      if (/^(?:[-*•·]|\(?[a-z0-9]{1,3}[.)]|§|#)\s/i.test(rest)) break;       // bullet / enumerator ("12.", "(a)", "-") → new item
-      if (/[a-z0-9$]/.test(after[q])) { out += " "; p = q; continue; }       // soft wrap: next line continues the clause → join
-      break;                                                                // capital start → new sentence → stop
+      const q = softWrapJoinAt(after, p);   // shared predicate — see softWrapJoinAt above
+      if (q < 0) break;                     // paragraph break / enumerator / new sentence -> stop
+      out += " "; p = q; continue;          // soft wrap: the next line continues the clause -> join
     }
     out += ch;
     if (/[.!?]/.test(ch) && (p + 1 >= after.length || /\s/.test(after[p + 1]))) break;   // real sentence terminator → stop

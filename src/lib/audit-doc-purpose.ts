@@ -19,12 +19,26 @@
 // credited by extraction as READ. Only the LENS input narrows. The two coverage measures already split on
 // exactly this axis: engine coverage asks "was it read", analysed asks "did a grounded finding land in it".
 //
-// ⚠ ANALYSED COVERAGE WILL FALL FOR CONSTRUCTION when this is armed, because no grounded finding will land
-// in the withheld documents. Unless the completeness gate is told that is by design, every construction
-// package returns INCOMPLETE. THAT IS A VERDICT-AFFECTING DOCTRINE CHANGE AND IT IS NOT CODE'S TO MAKE —
-// it is the same open question as the construction OOS collision. Nothing calls this with withhold=true
-// until it is ruled. There is deliberately NO env flag: the decision gets hardcoded once it is made, rather
-// than becoming the 206th switch in an engine whose census already found 110 permanently-on branches.
+// ⚠ ANALYSED COVERAGE FALLS FOR CONSTRUCTION, because no grounded finding lands in a withheld document.
+// The completeness gate IS told that is by design — `audit-coverage-definition.ts:114` routes an
+// `lensExcluded` region to `outOfScope` rather than counting it an uncovered gap — so a construction
+// package does not return INCOMPLETE merely for holding specs. There is deliberately NO env flag: the
+// decision is hardcoded rather than becoming the 206th switch in an engine whose census already found
+// 110 permanently-on branches.
+//
+// ⛔ THIS IS LIVE. `partitionLensSource` is called unconditionally at `panel-adapter.ts:141` and withholds
+// whenever `classifyDocPurpose().lensExcluded` is true. It takes NO `withhold` argument — there is no
+// off position and no caller that opts out.
+//
+// This paragraph previously read "Nothing calls this with withhold=true until it is ruled", describing a
+// `withhold` parameter that the shipped function does not have, and pairing it with a warning that
+// construction packages would return INCOMPLETE. Both halves were wrong in the SAME direction: a reader
+// checking whether that verdict-affecting risk was live would have concluded it was still dark. It is not
+// dark, and the mitigation that makes it safe is the outOfScope route named above, which the old text
+// never mentioned. Corrected 2026-08-21 after `_lens-routing-census.ts` traced the real call path.
+// The neighbouring warning in agentic-panel-runner.ts is the rule this broke: a stale comment on a live
+// path does not merely misinform, it launders a defect as unreachable. Verify the caller, not the note
+// about the caller.
 
 /** Never withhold a document that names itself one of these, whatever else it looks like. */
 const LENS_ESSENTIAL_RE =

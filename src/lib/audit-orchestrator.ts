@@ -44,7 +44,7 @@ import { highSignalSweep, boilerplateTrapSweep } from "./audit-grounding-sweep";
 import { createHash } from "node:crypto";
 import type { TypedFinding, BidderProfile, VerdictInputs, Controllability } from "./audit-findings";
 import { scanPackageMarkers, absenceClaimContradicted } from "./absence-grounding-gate";
-import { consequenceTailsAfter, disqualifierTriggersOf, GATE_V2_ENABLED, gradeCoverageV2, groundingVariantToleranceEnabled, importanceOf, isLedgerDemotableNonBar, verifyRecitalInSource } from "./audit-gate-v2";
+import { consequenceTailsAfter, disqualifierTriggersOf, GATE_V2_ENABLED, gradeCoverageV2, groundingVariantToleranceEnabled, importanceOf, isLedgerDemotableNonBar, softWrapJoinAt, verifyRecitalInSource } from "./audit-gate-v2";
 
 // B1 (Brain card #421 Fork-1) — §L/§M coverage-ledger honors boilerplate. A READ §L/§M whose ONLY ungrounded
 // obligation sentences are administrative BOILERPLATE (importanceOf==="boilerplate") reads COVERED-WITH-SIGNAL, not
@@ -387,9 +387,61 @@ export interface SectionAttestation { section: string; status: "covered_direct" 
 // sentences (pathological), `truncated` fires so the caller cannot certify it covered ⇒ INCOMPLETE — never a
 // silent drop.
 const MAX_OBLIGATIONS = 200;
-/** Extract obligation sentences from a section — the clauses that impose a duty (shall/must/provide/...). */
-function obligationsOf(text: string): { obligations: string[]; truncated: boolean } {
-  const all = text.split(/(?<=[.;\n])/).map((s) => s.trim())
+// ── SOFT LINE-WRAP JOIN (flag AUDIT_OBLIGATION_LINEWRAP_JOIN, default-OFF) ──────────────────────────────
+// THE DEFECT, measured $0 over the banked corpus 2026-08-21: the splitter below cuts on EVERY newline, and
+// PDF-extracted text wraps mid-sentence. Only the head fragment carries the duty verb, so only the head
+// survives the filter — and that fragment, stripped of the words that decide what it is, is what
+// `importanceOf` classifies. Two confirmed against their own source:
+//
+//   "key personnel shall be approved"     ← source: "…shall be approved BY DOL PRIOR TO AWARD OR REPLACEMENT:"
+//   "these supplies and property shall be utilized during the performance of this"
+//                                          ← source: "…of this CONTRACT ONLY WHILE PROVIDING STUDENT CARE."
+//
+// The first is a real pre-award gate the classifier cannot see is one; the second is a benign GFP usage
+// restriction escalated as a disqualifier. Both escalate today (5 records each across the banked set), and
+// both are decided by words the fragment does not contain.
+//
+// WHY HERE AND NOT AT THE CLASSIFIER: raising or lowering a threshold cannot recover a word that was never
+// passed in. The unit the engine reasons about must be the SENTENCE.
+//
+// THE RULE IS NOT A NEW ONE — `softWrapJoinAt` is card #587's own bridge predicate, extracted and proven
+// byte-identical (`scripts/audit-ai/_softwrap-extraction-identity.ts`: 372,894 newline positions across 50
+// banked sources, 0 divergences). #587 already repairs the SEVERED TAIL for the veto machinery; it never
+// repaired the obligation string itself, so the classifier kept seeing the fragment.
+//
+// FAILURE DIRECTION — BOTH WAYS, because they genuinely differ per path and must be measured, not argued:
+//   · `groundedBy`'s 4-gram path gets EASIER (a longer sentence offers more grams) ⇒ fewer ungrounded ⇒ the
+//     RELEASE direction, whose risk is false-BID. This is the direction that must be watched.
+//   · `passesSubstantiveBar` gets HARDER (more tokens for an excerpt to cover) ⇒ more ungrounded.
+//   · MAX_OBLIGATIONS truncation becomes LESS likely (fragments merge), which is fail-safe.
+// Net effect is empirical. Measured before arming, on records this change should NOT touch as well as on
+// the ones it should — see `scripts/audit-ai/_replay-obligation-mute.ts`.
+//
+// Applies to BOTH obligationsOf callers (section attestation and the per-binding-document attestation) —
+// the defect is identical on both and a flag that fixed only one would leave a silent asymmetry.
+// Flag-OFF ⇒ `text` is passed through untouched ⇒ byte-identical.
+const obligationLinewrapJoinEnabled = () => process.env.AUDIT_OBLIGATION_LINEWRAP_JOIN === "true";
+function joinSoftWraps(text: string): string {
+  let out = "";
+  for (let p = 0; p < text.length; ) {
+    const ch = text[p];
+    if (ch === "\n" || ch === "\r") {
+      const q = softWrapJoinAt(text, p);
+      if (q >= 0) { out += " "; p = q; continue; }   // soft wrap → one space, resume on the next line
+    }
+    out += ch; p++;                                  // hard break / ordinary char → kept verbatim
+  }
+  return out;
+}
+/** Extract obligation sentences from a section — the clauses that impose a duty (shall/must/provide/...).
+ *  EXPORTED for measurement only (`scripts/audit-ai/_linewrap-join-measure.ts`). A banked run record stores
+ *  this function's OUTPUT (the section attestation), never its INPUT (the section text), so a replay that
+ *  feeds frozen attestations back in cannot see a change to the SPLIT at all — it reports "no effect" for
+ *  any flag state, which is a probe agreeing with the wrong thing. The measurement must call this directly
+ *  on real source text. No production caller uses the export. */
+export function obligationsOf(text: string): { obligations: string[]; truncated: boolean } {
+  const src = obligationLinewrapJoinEnabled() ? joinSoftWraps(text) : text;
+  const all = src.split(/(?<=[.;\n])/).map((s) => s.trim())
     .filter((s) => s.length > 12 && /\b(shall|must|provide|submit|furnish|required|quote|deliver)\b/i.test(s));
   return { obligations: all.slice(0, MAX_OBLIGATIONS), truncated: all.length > MAX_OBLIGATIONS };
 }
