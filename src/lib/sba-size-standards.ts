@@ -27,6 +27,12 @@ const TABLE: Record<string, SizeStandard> = {
   "336414": { kind: "employees", maxEmployees: 1300 },  // Guided Missile & Space Vehicle Mfg
   // Construction / services (receipts-based, USD)
   "236220": { kind: "receipts", maxReceiptsUsd: 45_000_000 },  // Commercial & Institutional Building Construction
+  // Added 2026-08-22 — the R&D corpus audits these and the table returned null, so the size bar could never
+  // resolve on the two packages we stress-test most. Values read from the SAME primary source and vintage as
+  // the rows above (13 CFR 121.201, govinfo CFR-2024-title13-vol1-sec121-201), cross-checked 3/3 against
+  // 236220 / 332710 / 336412 already in this table before adding anything. (561730 was already present.)
+  "237310": { kind: "receipts", maxReceiptsUsd: 45_000_000 },  // Highway, Street & Bridge Construction
+  "336611": { kind: "employees", maxEmployees: 1300 },         // Ship Building & Repairing
   "541330": { kind: "receipts", maxReceiptsUsd: 25_500_000 },  // Engineering Services (base standard; military-program exceptions differ)
   "541511": { kind: "receipts", maxReceiptsUsd: 34_000_000 },  // Custom Computer Programming Services
   "541512": { kind: "receipts", maxReceiptsUsd: 34_000_000 },  // Computer Systems Design Services
