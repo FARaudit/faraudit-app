@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createServerClient } from "@/lib/supabase-server";
 import { extractFeedImage, extractOgImage, type ImageCarrier } from "@/lib/news-images";
 import { resolveFeedScope } from "@/lib/bd-os/live-opportunities";
+import { getAdminClient } from "@/lib/supabase-admin";
 import { scoreArticle, scopeKey, deskDescription, distinctiveTerms } from "@/lib/defense-news-naics";
 import { naicsTitle } from "@/lib/naics-titles";
 import { decodeEntities } from "@/lib/feed-entities";
@@ -273,17 +274,65 @@ function deriveRelevance(title: string, summary: string, tag: NewsItem["tag"]): 
   return "Defense-contracting signal worth monitoring.";
 }
 
-export async function GET() {
-  const supabase = await createServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+/* WARMING, NOT A SECOND PIPELINE.
+ *
+ * The judged insights are cached per ARTICLE per DESK, so a repeat read is free and only
+ * genuinely new stories cost anything. What nobody was paying for was the FIRST read of the
+ * day: whoever signed in first waited out 11 RSS feeds, the image fetches and the model
+ * chunks, and a page that takes minutes reads as stale news rather than slow news.
+ *
+ * A cron therefore pays that cost before the workday instead of a customer paying it mid-
+ * session. It runs the SAME GET below rather than a copy — the caching, the collapse rules and
+ * the cost logging are the parts that must not fork, and a warmer that drifts from the reader
+ * warms the wrong cache. The only thing it substitutes is whose desk to warm: there is no
+ * session, so the codes arrive explicitly and the insight cache is reached with the admin
+ * client instead of the caller's.
+ *
+ * ⛔ NOT tied to sign-in. auto_signout_minutes is a live preference, so a signed-in day can
+ * contain many sign-ins; hanging the only endpoint that spends off that trigger makes the bill
+ * a function of how often someone steps away from their desk. */
+function cronCodes(req: Request): string[] | null {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return null;
+  if (req.headers.get("authorization") !== `Bearer ${secret}`) return null;
+  const raw = new URL(req.url).searchParams.get("codes") || "";
+  const codes = raw.split(",").map((c) => c.trim()).filter((c) => /^\d{6}$/.test(c));
+  return codes.length ? codes : null;
+}
+
+export async function GET(req: Request) {
+  const warmCodes = cronCodes(req);
+  let supabase;
+  /* A warm run has no reader: the spend is the business's, not a customer's. */
+  let user: { id: string } | null = null;
+  if (warmCodes) {
+    /* No service-role key means the insight cache cannot be written, so the warm would
+       spend on model calls and cache nothing — the one outcome worse than not warming. */
+    const admin = getAdminClient();
+    if (!admin) {
+      return NextResponse.json(
+        { error: "warm unavailable: no service-role key, so nothing could be cached" },
+        { status: 503 }
+      );
+    }
+    supabase = admin;
+  } else {
+    supabase = await createServerClient();
+    const auth = await supabase.auth.getUser();
+    if (!auth.data.user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    user = auth.data.user;
+  }
 
   // Per-feed outcome, so the page can tell "every source is down" from "no news
   // today" — both of which arrive as an empty array once the catches swallow them.
   // ━━ Whose desk this is ━━
   // Resolved first: the customer's codes select feeds of their own, and the
   // insights are cached under them.
-  const scope = await resolveFeedScope(supabase);
+  /* A warm run names its own desk; a reader's desk comes from their profile. The response
+     shape stays identical either way, so the warm exercises exactly what a reader will get. */
+  const scope = warmCodes
+    ? { codes: warmCodes, source: "cron-warm" as const }
+    : await resolveFeedScope(supabase);
   const codes = scope.codes;
   const allowedCodes = new Set(codes);
   const desk = deskDescription(codes);
