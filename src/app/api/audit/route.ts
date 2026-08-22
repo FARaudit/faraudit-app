@@ -7,6 +7,7 @@ import { extractText } from "@/lib/pdf-text-extractor";
 import { type PdfSource } from "@/lib/audit-engine";
 import { executeAudit } from "@/lib/audit-executor";
 import { buildBidderProfileFromCapability } from "@/lib/audit-bidder-profile";
+import { checkNaicsScope } from "@/lib/audit-naics-scope";
 import { AGENTIC_V3_PRIMARY_ENABLED } from "@/lib/audit-executor-v3";
 import { uploadPdfToFilesApi } from "@/lib/anthropic-files";
 import { getAdminClient } from "@/lib/supabase-admin";
@@ -550,10 +551,20 @@ export async function POST(req: NextRequest) {
     try {
       const { data: capRow } = await supabase
         .from("capability_statements")
-        .select("company_name, certifications, attributes_v2, size_facts")
+        .select("company_name, certifications, attributes_v2, size_facts, naics_codes")
         .eq("user_id", user.id)
         .maybeSingle();
       bidderProfile = buildBidderProfileFromCapability(capRow, { solicitationNaics: solicitation.naicsCode });
+      // CODE-TO-SOLICITATION SCOPE (flag AUDIT_NAICS_SCOPE_DISCLOSURE, default-OFF). ADVISORY ONLY — it is
+      // deliberately computed AFTER the profile and never passed into it, so no bar, token or verdict can
+      // consume it. A declared NAICS list is self-asserted marketing; being outside it is a fact about the
+      // PROFILE, not a disqualification. Until this write, `naics_codes` was not even SELECTED here, so
+      // nothing in the platform had ever compared the two — the R&D profile spent months answering paving
+      // solicitations as an aerospace machine shop and no surface said a word.
+      if (process.env.AUDIT_NAICS_SCOPE_DISCLOSURE === "true") {
+        const naicsScope = checkNaicsScope(solicitation.naicsCode, (capRow as { naics_codes?: unknown } | null)?.naics_codes);
+        console.log(`[naics-scope] ${naicsScope.verdict} · package=${naicsScope.solicitationNaics ?? "(none)"} · declared=[${naicsScope.declared.join(",")}]${naicsScope.addCode ? ` · suggest-add=${naicsScope.addCode}` : ""} — ${naicsScope.disclosure}`);
+      }
     } catch { /* unknown firm on any error — never block the audit */ }
   }
 

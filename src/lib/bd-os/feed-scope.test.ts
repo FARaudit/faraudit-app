@@ -64,9 +64,28 @@ async function main() {
   const noRow = await resolveFeedScope(clientWith(null));
   ok(noRow.codes.length === 0 && noRow.source === "no-profile-codes",
     "no profile row at all → honest-empty scope");
+  // A FAILED READ IS NOT AN EMPTY PROFILE. This assertion used to expect "no-profile-codes" and it
+  // passed for the wrong reason: NAICS_CODES simply is not set in this process, so the override branch
+  // it should have been guarding was never reached. With the override SET — which is how the audit
+  // worker and every probe run — the old code answered an ERRORED read with the operator's codes and
+  // called them the customer's. The two cases are now distinct states and BOTH are asserted with the
+  // override deliberately turned on.
   const denied = await resolveFeedScope(clientWith(null, { error: true }));
-  ok(denied.codes.length === 0 && denied.source === "no-profile-codes",
-    "profile read ERROR → honest-empty scope (never a permissive fallback)");
+  ok(denied.codes.length === 0 && denied.source === "unreadable",
+    "profile read ERROR → UNREADABLE, distinct from an empty profile", `source=${denied.source}`);
+  {
+    const restore = process.env.NAICS_CODES;
+    process.env.NAICS_CODES = "336413,332710";
+    const deniedWithOverride = await resolveFeedScope(clientWith(null, { error: true }));
+    ok(deniedWithOverride.codes.length === 0 && deniedWithOverride.source === "unreadable",
+      "profile read ERROR + NAICS_CODES set → STILL unreadable, never the operator's codes",
+      `source=${deniedWithOverride.source} codes=[${deniedWithOverride.codes.join(",")}]`);
+    const emptyWithOverride = await resolveFeedScope(clientWith([]));
+    ok(emptyWithOverride.source === "env-override",
+      "…while a genuinely EMPTY profile still reaches the override (the two paths stay different)",
+      `source=${emptyWithOverride.source}`);
+    if (restore === undefined) delete process.env.NAICS_CODES; else process.env.NAICS_CODES = restore;
+  }
 
   console.log("\n═══ PLANTED POSITIVE — prove this gate can fail ═══");
   // The pre-fix behaviour: a constant global list regardless of the customer.

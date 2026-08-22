@@ -196,7 +196,7 @@ details[open]>summary .chev{transform:rotate(180deg)}
 .ct .d{font-size:10.5px;color:var(--mute);line-height:1.3}
 
 /* NAICS */
-.naics{overflow:hidden;max-width:1060px}
+.fd-scope{display:flex;gap:10px;align-items:flex-start;margin:12px 0 0;padding:11px 13px;border:1px solid var(--dc,#e5e7eb);border-radius:10px;background:var(--accent-wash,#f2f8ff);font-size:13.5px;line-height:1.5}.fd-scope[hidden]{display:none}.fd-scope svg{width:17px;height:17px;flex:none;margin-top:1px;color:var(--brand,#185FA5)}.fd-scope.in svg{color:var(--good,#067647)}.fd-scope-tx{flex:1;min-width:0}.fd-scope-add{flex:none;margin-left:8px;padding:6px 11px;border-radius:8px;border:1px solid var(--brand,#185FA5);background:transparent;color:var(--brand,#185FA5);font:600 12.5px/1 Manrope,system-ui,sans-serif;cursor:pointer}.fd-scope-add:hover{background:var(--brand,#185FA5);color:#fff}.fd-scope-add[disabled]{opacity:.55;cursor:default}.naics{overflow:hidden;max-width:1060px}
 .nx-top{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line-2);flex-wrap:wrap}
 .nx-search{display:flex;align-items:center;gap:9px;height:36px;flex:1;min-width:220px;padding:0 12px;background:var(--card-soft);border:1px solid var(--line);border-radius:9px}
 .nx-search svg{width:15px;height:15px;color:var(--mute-2);flex:none}
@@ -822,7 +822,7 @@ details[open]>summary .chev{transform:rotate(180deg)}
                       <span class="fdr-src"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>From SAM.gov</span>
                     </div>
                     <div class="fd-autorun" id="fdConfirmRun"><div class="fd-autorun-tx"><b>Ready to audit.</b> The full analysis reads every document in this package and takes several minutes. It cannot be stopped once it has started.</div></div>
-                    <div class="fdr-foot"><div class="fdr-info">Nothing has run yet.</div><div class="sp"></div><button class="fd-btn-ghost" id="cancelRun"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>Cancel</button><button class="fd-btn" id="startRun"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 3l14 9-14 9z"/></svg>Start the audit</button></div>
+                    <div class="fd-scope" id="fdScopeComplete" hidden></div><div class="fdr-foot"><div class="fdr-info">Nothing has run yet.</div><div class="sp"></div><button class="fd-btn-ghost" id="cancelRun"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>Cancel</button><button class="fd-btn" id="startRun"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 3l14 9-14 9z"/></svg>Start the audit</button></div>
                     <details class="fd-man"><summary>View all documents<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></summary><div class="fd-man-scroll" id="fdCompleteDocs"></div></details>
                   </div>
                 </div>
@@ -838,7 +838,7 @@ details[open]>summary .chev{transform:rotate(180deg)}
                     <div class="fd-miss" id="fdPartialMiss">
                       <div class="fd-miss-h">Documents not ingested</div>
                     </div>
-                    <div class="fdr-foot"><div class="fdr-info">Completing the package keeps the audit airtight.</div><div class="sp"></div><button class="fd-btn-ghost" id="addMissing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>Add the missing files</button><button class="fd-btn" id="proceedPartial"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 3l14 9-14 9z"/></svg>Proceed on what we have</button></div>
+                    <div class="fd-scope" id="fdScopePartial" hidden></div><div class="fdr-foot"><div class="fdr-info">Completing the package keeps the audit airtight.</div><div class="sp"></div><button class="fd-btn-ghost" id="addMissing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>Add the missing files</button><button class="fd-btn" id="proceedPartial"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 3l14 9-14 9z"/></svg>Proceed on what we have</button></div>
                   </div>
                 </div>
                 <!-- ERROR -->
@@ -1040,6 +1040,44 @@ var __fdReadyNoticeId=null;
     unauthorized:'Please sign in again to run an audit.'
   };
   function showError(msg){if(errMsg)errMsg.textContent=msg;setState('error');}
+  /* Scope notice — shown on the confirmation panel, before the audit is started.
+     It reports whether this package's NAICS code is one you have declared. It never
+     blocks the run: a firm can bid outside its declared codes, so the only action
+     offered here is adding the code. */
+  var SCOPE_ICON_INFO='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>';
+  var SCOPE_ICON_OK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6L9 17l-5-5"/></svg>';
+  function renderScope(el,d){
+    if(!el)return;
+    var sc=d&&d.scope;
+    if(!sc||!sc.disclosure){el.hidden=true;el.innerHTML='';return;}
+    var inScope=sc.verdict==='IN_SCOPE';
+    el.className='fd-scope'+(inScope?' in':'');
+    var add=(!inScope&&sc.addCode)
+      ? '<button type="button" class="fd-scope-add" data-add-naics="'+escapeHtml(sc.addCode)+'">Add '+escapeHtml(sc.addCode)+'</button>'
+      : '';
+    el.innerHTML=(inScope?SCOPE_ICON_OK:SCOPE_ICON_INFO)+'<span class="fd-scope-tx">'+escapeHtml(sc.disclosure)+'</span>'+add;
+    el.hidden=false;
+    var btn=el.querySelector('.fd-scope-add');
+    if(btn)btn.addEventListener('click',function(){
+      var code=btn.getAttribute('data-add-naics');
+      var next=(sc.declared||[]).slice();
+      if(next.indexOf(code)<0)next.push(code);
+      btn.disabled=true;btn.textContent='Adding…';
+      fetch('/api/capability-statement',{method:'PATCH',credentials:'include',
+        headers:{'content-type':'application/json'},body:JSON.stringify({naics_codes:next})})
+        .then(function(r){
+          if(!r.ok)throw new Error('save refused');
+          sc.verdict='IN_SCOPE';sc.declared=next;sc.addCode=null;
+          sc.disclosure='This package is NAICS '+code+', now on your profile.';
+          renderScope(el,d);
+        })
+        .catch(function(){
+          btn.disabled=false;btn.textContent='Add '+code;
+          var tx=el.querySelector('.fd-scope-tx');
+          if(tx)tx.textContent=sc.disclosure+' (That code could not be saved just now — the audit is unaffected.)';
+        });
+    });
+  }
   // drive the COMPLETE state from real resolve data, then auto-run the audit.
   function driveComplete(data){
     var sub=$('fdCompleteSub'),docsBox=$('fdCompleteDocs');
@@ -1053,6 +1091,7 @@ var __fdReadyNoticeId=null;
       var roles=(d.sectionRoles&&d.sectionRoles.length)?d.sectionRoles.map(function(r){return '<span class="sb2 sb-sec">§'+escapeHtml(r)+'</span>';}).join(''):'';
       return '<div class="frow"><span class="fico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg></span><span class="fmeta"><span class="fname">'+escapeHtml(d.name)+'</span><span class="fsub">'+roles+(d.sizeBytes?('<span class="fsize">'+fmtSize(d.sizeBytes)+'</span>'):'')+'</span></span></div>';
     }).join('');
+    renderScope($('fdScopeComplete'),data);
     setState('complete');
     /* THE COMPLETE PACKAGE ASKS, LIKE THE PARTIAL ONE ALREADY DID.
        This branch used to call submitAudit() straight from here, so resolving a clean
@@ -1089,6 +1128,7 @@ var __fdReadyNoticeId=null;
     if(missBox)missBox.innerHTML='<div class="fd-miss-h">'+boxH+'</div>'+rows.join('');
     // stash the canonical notice id so "Proceed on what we have" enqueues the right thing.
     __fdPartialNoticeId=data.noticeId;
+    renderScope($('fdScopePartial'),data);
     setState('partial');
   }
   function run(){
